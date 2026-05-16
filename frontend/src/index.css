@@ -1,0 +1,30 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+@keyframes floatSlow {
+  0%, 100% { transform: translateY(0) }
+  50% { transform: translateY(-40px) }
+}
+
+@keyframes floatFast {
+  0%, 100% { transform: translateY(0) }
+  50% { transform: translateY(-70px) }
+}
+
+@keyframes rotate3d {
+  0% { transform: rotate(0deg) }
+  100% { transform: rotate(360deg) }
+}
+
+.animate-floatSlow {
+  animation: floatSlow 10s ease-in-out infinite;
+}
+
+.animate-floatFast {
+  animation: floatFast 7s ease-in-out infinite;
+}
+
+.animate-rotate3d {
+  animation: rotate3d 20s linear infinite;
+}
+
