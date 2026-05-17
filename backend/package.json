@@ -9,6 +9,7 @@
     "start": "node server.js",
     "test": "node test-server.js",
     "seed": "node scripts/seed.js",
+    "seed:all": "node scripts/seed-all.js",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:studio": "prisma studio"
