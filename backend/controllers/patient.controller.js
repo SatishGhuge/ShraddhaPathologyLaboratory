@@ -1,4 +1,5 @@
 import prisma from '../config/database.js';
+import { getPaginationParams, buildPaginatedResponse } from '../utils/pagination.js';
 
 // Create new patient with tests OR add tests to existing patient
 export const createPatient = async (req, res) => {
@@ -279,6 +280,13 @@ export const createPatient = async (req, res) => {
 // Get all patients
 export const getAllPatients = async (req, res) => {
   try {
+    // Get pagination parameters
+    const { page, limit, skip } = getPaginationParams(req.query);
+
+    // Get total count
+    const total = await prisma.patient.count();
+
+    // Get paginated patients
     const patients = await prisma.patient.findMany({
       include: {
         tests: {
@@ -290,13 +298,12 @@ export const getAllPatients = async (req, res) => {
       },
       orderBy: {
         createdAt: 'desc'
-      }
+      },
+      skip,
+      take: limit
     });
 
-    res.json({
-      success: true,
-      data: patients
-    });
+    res.json(buildPaginatedResponse(patients, total, page, limit));
 
   } catch (error) {
     console.error('Get patients error:', error);

@@ -1,6 +1,8 @@
 import html2pdf from "html2pdf.js";
 import { jsPDF } from "jspdf";
-import LetterHead from "../assets/LetterHead.jpeg";
+
+// Path to letterhead image in public folder
+const LETTERHEAD_PATH = "/LetterHead.jpeg";
 
 // Helper function to convert number to words
 function numberToWords(n) {
@@ -191,7 +193,7 @@ export const printBill = async (selectedBooking, billing, businessType, withHead
     let letterHeadBase64 = '';
     if (withHeader) {
       try {
-        const imgRes = await fetch(LetterHead);
+        const imgRes = await fetch(LETTERHEAD_PATH);
         const blob = await imgRes.blob();
         letterHeadBase64 = await new Promise(resolve => {
           const reader = new FileReader();
@@ -264,7 +266,7 @@ export const generateBillPDF = async (selectedBooking, billing, businessType, wi
     let letterHeadBase64 = '';
     if (withHeader) {
       try {
-        const imgRes = await fetch(LetterHead);
+        const imgRes = await fetch(LETTERHEAD_PATH);
         const blob = await imgRes.blob();
         letterHeadBase64 = await new Promise(resolve => {
           const reader = new FileReader();

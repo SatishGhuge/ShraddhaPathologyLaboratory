@@ -1,6 +1,7 @@
 import prisma from '../config/database.js';
 import { sendResultNotificationEmail } from '../utils/email.js';
 import { sendWhatsAppMessage, buildResultMessage } from '../utils/whatsapp.js';
+import { getPaginationParams, buildPaginatedResponse } from '../utils/pagination.js';
 
 /* ===============================================
  * SILVERLEAF DIAGNOSTICS - RESULT CONTROLLER
@@ -16,7 +17,7 @@ import { sendWhatsAppMessage, buildResultMessage } from '../utils/whatsapp.js';
  * Last Updated: March 2026
  * =============================================== */
 
-// Get all patient tests for results page
+// Get all patient tests for results page with pagination
 export const getPatientTests = async (req, res) => {
   try {
     const { 
@@ -29,6 +30,9 @@ export const getPatientTests = async (req, res) => {
       department, 
       testName 
     } = req.query;
+
+    // Get pagination parameters
+    const { page, limit, skip } = getPaginationParams(req.query);
 
     // Build where condition for filtering
     const andConditions = [];
@@ -81,6 +85,12 @@ export const getPatientTests = async (req, res) => {
 
     const whereCondition = andConditions.length > 0 ? { AND: andConditions } : {};
 
+    // Get total count for pagination
+    const total = await prisma.patientTest.count({
+      where: whereCondition
+    });
+
+    // Get paginated data
     const patientTests = await prisma.patientTest.findMany({
       where: whereCondition,
       include: {
@@ -113,6 +123,8 @@ export const getPatientTests = async (req, res) => {
           }
         }
       },
+      skip,
+      take: limit,
       orderBy: [
         { visitDate: 'desc' },
         { visitTime: 'desc' }

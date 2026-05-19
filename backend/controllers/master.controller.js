@@ -1,5 +1,6 @@
 import prisma from '../config/database.js';
 import { sendUserCredentialsEmail, sendFranchiseCredentialsEmail, sendCenterCredentialsEmail, sendStaffCredentialsEmail } from '../utils/email.js';
+import { getPaginationParams, buildPaginatedResponse } from '../utils/pagination.js';
 
 // Helper function to process age ranges and auto-assign gender based on label
 function processAgeRangesWithGender(ageRanges, parameterName = '') {
@@ -51,6 +52,12 @@ function processAgeRangesWithGender(ageRanges, parameterName = '') {
 // Get all active departments with tests and packages
 export const getDepartments = async (req, res) => {
   try {
+    const { page, limit, skip } = getPaginationParams(req.query);
+
+    const total = await prisma.department.count({
+      where: { isActive: true }
+    });
+
     const departments = await prisma.department.findMany({
       where: { isActive: true },
       include: {
@@ -61,13 +68,12 @@ export const getDepartments = async (req, res) => {
           where: { isActive: true }
         }
       },
-      orderBy: { name: 'asc' }
+      orderBy: { name: 'asc' },
+      skip,
+      take: limit
     });
 
-    res.json({
-      success: true,
-      data: departments
-    });
+    res.json(buildPaginatedResponse(departments, total, page, limit));
   } catch (error) {
     console.error('Get departments error:', error);
     res.status(500).json({
@@ -80,6 +86,10 @@ export const getDepartments = async (req, res) => {
 // Get all departments (including inactive ones for admin)
 export const getAllDepartments = async (req, res) => {
   try {
+    const { page, limit, skip } = getPaginationParams(req.query);
+
+    const total = await prisma.department.count();
+
     const departments = await prisma.department.findMany({
       include: {
         tests: {
@@ -89,13 +99,12 @@ export const getAllDepartments = async (req, res) => {
           where: { isActive: true }
         }
       },
-      orderBy: { sortOrder: 'asc' }
+      orderBy: { sortOrder: 'asc' },
+      skip,
+      take: limit
     });
 
-    res.json({
-      success: true,
-      data: departments
-    });
+    res.json(buildPaginatedResponse(departments, total, page, limit));
   } catch (error) {
     console.error('Get all departments error:', error);
     res.status(500).json({
@@ -917,6 +926,12 @@ export const updateTest = async (req, res) => {
 // Get all tests
 export const getTests = async (req, res) => {
   try {
+    const { page, limit, skip } = getPaginationParams(req.query);
+
+    const total = await prisma.test.count({
+      where: { isDeleted: false }
+    });
+
     const tests = await prisma.test.findMany({
       where: { isDeleted: false },
       include: {
@@ -955,13 +970,12 @@ export const getTests = async (req, res) => {
       orderBy: [
         { sortOrder: 'asc' },
         { name: 'asc' }
-      ]
+      ],
+      skip,
+      take: limit
     });
 
-    res.json({
-      success: true,
-      data: tests
-    });
+    res.json(buildPaginatedResponse(tests, total, page, limit));
   } catch (error) {
     console.error('Get tests error:', error);
     res.status(500).json({
@@ -2224,6 +2238,12 @@ export const deleteCorporateCharge = async (req, res) => {
 // Get all packages
 export const getPackages = async (req, res) => {
   try {
+    const { page, limit, skip } = getPaginationParams(req.query);
+
+    const total = await prisma.package.count({
+      where: { isActive: true }
+    });
+
     const packages = await prisma.package.findMany({
       where: { isActive: true },
       include: {
@@ -2246,7 +2266,9 @@ export const getPackages = async (req, res) => {
           }
         }
       },
-      orderBy: { name: 'asc' }
+      orderBy: { name: 'asc' },
+      skip,
+      take: limit
     });
 
     // Format packages with test information
@@ -2263,10 +2285,7 @@ export const getPackages = async (req, res) => {
       };
     });
 
-    res.json({
-      success: true,
-      data: packagesWithTests
-    });
+    res.json(buildPaginatedResponse(packagesWithTests, total, page, limit));
   } catch (error) {
     console.error('Get packages error:', error);
     res.status(500).json({
@@ -2279,6 +2298,10 @@ export const getPackages = async (req, res) => {
 // Get all packages (including inactive ones for admin)
 export const getAllPackages = async (req, res) => {
   try {
+    const { page, limit, skip } = getPaginationParams(req.query);
+
+    const total = await prisma.package.count();
+
     const packages = await prisma.package.findMany({
       include: {
         department: {
@@ -2300,7 +2323,9 @@ export const getAllPackages = async (req, res) => {
           }
         }
       },
-      orderBy: { name: 'asc' }
+      orderBy: { name: 'asc' },
+      skip,
+      take: limit
     });
 
     // Format packages with test information
@@ -2317,10 +2342,7 @@ export const getAllPackages = async (req, res) => {
       };
     });
 
-    res.json({
-      success: true,
-      data: packagesWithTests
-    });
+    res.json(buildPaginatedResponse(packagesWithTests, total, page, limit));
   } catch (error) {
     console.error('Get all packages error:', error);
     res.status(500).json({
