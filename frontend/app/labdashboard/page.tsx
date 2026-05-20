@@ -283,205 +283,8 @@ const Dashboard = () => {
   return (
     <>
     <Header />
-    <div className="p-4 bg-cyan-100 min-h-screen space-y-3">
-
-      {/* ===== MERGED HEADER WITH HEALTH THOUGHT ===== */}
-      <div className="bg-gradient-to-r from-green-50 via-emerald-50 to-teal-50 rounded-xl shadow-lg p-3 border-2 border-green-200">
-        <div className="flex items-center justify-between gap-4 flex-wrap">
-          {/* Date & Time */}
-          <div className="flex items-center gap-2">
-            <Clock className="text-cyan-600" size={24} />
-            <p className="text-base font-bold text-slate-800">
-              {dateTime.toLocaleDateString("en-IN", {
-                day: "numeric",
-                month: "short",
-                year: "numeric",
-              })} • {dateTime.toLocaleTimeString("en-IN", { hour: '2-digit', minute: '2-digit' })}
-            </p>
-          </div>
-
-          {/* Daily Health Thought */}
-          <div className="flex items-center gap-1 flex-1 min-w-[200px]">
-            <Lightbulb className="text-yellow-500" size={24} />
-               <p className="text-base font-semibold text-green-700 italic">{dailyThought}</p>
-          
-          </div>
-
-          {/* Notification Bell + Admin */}
-          <div className="flex items-center gap-4">
-
-            {/* Bell Notification */}
-            <div className="relative notification-container">
-              <button
-                onClick={() => {
-                  setShowNotifications(!showNotifications);
-                  setShowAdminPopup(false);
-                }}
-                className="relative p-1 rounded-full hover:bg-cyan-100 transition-colors"
-              >
-                <Bell
-                  size={24}
-                  className={`text-cyan-700 ${notifications.length > 0 ? "animate-bounce" : ""}`}
-                />
-                {notifications.length > 0 && (
-                  <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-xs rounded-full flex items-center justify-center font-bold animate-pulse">
-                    {notifications.length}
-                  </span>
-                )}
-              </button>
-
-              {/* Notification Dropdown */}
-              {showNotifications && (
-                <div className="absolute top-full right-0 mt-2 w-96 bg-white rounded-lg shadow-2xl border border-cyan-200 z-50">
-                  {/* Header */}
-                  <div className="flex items-center justify-between px-4 py-2 border-b border-gray-100 bg-cyan-50 rounded-t-lg">
-                    <span className="font-semibold text-cyan-700 text-sm">
-                      Home Visit Requests {notifications.length > 0 && <span className="ml-1 bg-red-500 text-white text-xs px-1.5 py-0.5 rounded-full">{notifications.length}</span>}
-                    </span>
-                    <select
-                      value={sortOrder}
-                      onChange={e => setSortOrder(e.target.value)}
-                      className="text-xs border border-gray-200 rounded px-1 py-0.5 focus:outline-none"
-                      onClick={e => e.stopPropagation()}
-                    >
-                      <option value="newest">Newest First</option>
-                      <option value="oldest">Oldest First</option>
-                    </select>
-                  </div>
-
-                  {/* List */}
-                  <div className="max-h-72 overflow-y-auto">
-                    {notifications.length === 0 ? (
-                      <p className="text-center text-gray-400 text-sm py-6">No pending callback requests</p>
-                    ) : (
-                      [...notifications]
-                        .sort((a: any, b: any) => sortOrder === "newest"
-                          ? new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
-                          : new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
-                        )
-                        .map(n => {
-                          const dt = new Date(n.timestamp);
-                          const dateStr = dt.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
-                          const timeStr = dt.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" });
-                          return (
-                            <div key={n.id} className="flex items-start gap-3 px-4 py-3 border-b border-gray-50 hover:bg-gray-50 transition-colors">
-                              <input
-                                type="checkbox"
-                                title="Mark as called — removes from list"
-                                className="mt-1 w-4 h-4 accent-cyan-600 cursor-pointer flex-shrink-0"
-                                onChange={() => {
-                                  const updated = JSON.parse(localStorage.getItem("callbackRequests") || "[]")
-                                    .map((r: any) => r.id === n.id ? { ...r, called: true } : r);
-                                  localStorage.setItem("callbackRequests", JSON.stringify(updated));
-                                  setNotifications((prev: any) => prev.filter((x: any) => x.id !== n.id));
-                                }}
-                              />
-                              <div className="flex-1 min-w-0">
-                                <p className="text-sm font-semibold text-gray-800">{n.name}</p>
-                                <p className="text-xs text-cyan-700 font-medium">{n.phone}</p>
-                                <p className="text-xs text-gray-400 mt-0.5">{dateStr} • {timeStr}</p>
-                              </div>
-                            </div>
-                          );
-                        })
-                    )}
-                  </div>
-
-                  {notifications.length > 0 && (
-                    <div className="px-4 py-2 border-t border-gray-100 bg-gray-50 rounded-b-lg">
-                      <p className="text-xs text-gray-400 flex items-center gap-1">
-                        <Check size={12} className="text-green-500" />
-                        Check the box after calling to remove from list
-                      </p>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-
-            {/* Admin Icon */}
-            <div className="flex items-center gap-2 relative admin-popup-container">
-              <span className="text-xl font-semibold text-slate-700">
-                {(() => { const u = JSON.parse(localStorage.getItem('admin') || '{}'); const r = u.role || (u.userType === 'admin' ? 'Admin' : 'User'); return r.toUpperCase().includes('ADMIN') || r.toUpperCase().includes('SUPER') ? 'Admin' : r; })()}
-              </span>
-              <FaUserCircle 
-                className="text-3xl text-cyan-700 cursor-pointer hover:text-cyan-800 transition-colors" 
-                onClick={() => setShowAdminPopup(!showAdminPopup)}
-              />
-          
-              {/* Admin Popup */}
-              {showAdminPopup && (
-                <div className="absolute top-full right-0 mt-2 w-64 bg-white rounded-lg shadow-2xl border-2 border-cyan-200 p-4 z-50">
-                  {(() => {
-                    const currentUser = JSON.parse(localStorage.getItem('admin') || '{}');
-                    const isAdmin = currentUser.userType === 'admin' || !currentUser.userType;
-                    const displayName = currentUser.name || currentUser.username || 'User';
-                    const username = currentUser.username || '-';
-                    const rawRole = currentUser.role || (isAdmin ? 'Admin' : 'User');
-                    const role = rawRole.toUpperCase().includes('ADMIN') || rawRole.toUpperCase().includes('SUPER') ? 'Admin' : rawRole;
-                    return (
-                      <div className="space-y-3">
-                        <div className="text-center">
-                          <h3 className="text-lg font-bold mb-1 text-cyan-700">
-                            WELCOME {isAdmin ? 'ADMIN' : role.toUpperCase()}
-                          </h3>
-                          <div className="w-12 h-12 bg-gradient-to-br from-cyan-100 to-cyan-200 rounded-full mx-auto flex items-center justify-center mb-2">
-                            <FaUserCircle className="text-3xl text-cyan-600" />
-                          </div>
-                        </div>
-
-                        <div className="space-y-2 bg-gradient-to-br from-cyan-50 to-blue-50 rounded-lg p-3 text-sm border border-cyan-100">
-                          <div>
-                            <p className="text-xs text-gray-600">Name:</p>
-                            <p className="font-semibold text-gray-800">{displayName}</p>
-                          </div>
-                          <div>
-                            <p className="text-xs text-gray-600">Username:</p>
-                            <p className="font-semibold text-gray-800">{username}</p>
-                          </div>
-                          <div>
-                            <p className="text-xs text-gray-600">Logged in as:</p>
-                            <p className="font-semibold text-gray-800">{role}</p>
-                          </div>
-                        </div>
-
-                        {/* Only admins can add new admin */}
-                        {isAdmin && (
-                          <button
-                            onClick={() => { setShowAddAdminForm(true); setShowAdminPopup(false); }}
-                            className="w-full bg-gradient-to-r from-cyan-500 to-cyan-600 hover:from-cyan-600 hover:to-cyan-700 text-white font-bold py-2 px-4 rounded-full shadow-lg transition-all duration-200 flex items-center justify-center gap-2 text-sm"
-                          >
-                            <span className="text-xl">+</span>
-                            <span>Add New Admin</span>
-                          </button>
-                        )}
-
-                        <button
-                          onClick={() => {
-                            if (window.confirm("Are you sure you want to logout?")) {
-                              localStorage.removeItem('token');
-                              localStorage.removeItem('admin');
-                              // Clear cookie
-                              document.cookie = 'token=; path=/; max-age=0';
-                              // Clear all form drafts
-                              localStorage.removeItem('patientRegistrationDraft');
-                              router.push("/login");
-                            }
-                          }}
-                          className="w-full bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white font-bold py-2 px-4 rounded-full shadow-lg transition-all duration-200 flex items-center justify-center gap-2 text-sm"
-                        >
-                          <LogOut size={18} />
-                          <span>Logout</span>
-                        </button>
-                      </div>
-                    );
-                  })()}
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      </div>
+    <div className="fixed top-0 left-48 right-0 bottom-0 bg-gray-50 overflow-auto pt-14">
+      <div className="p-4 space-y-4">
 
       {/* ===== STAT CARDS ===== */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
@@ -741,6 +544,7 @@ const Dashboard = () => {
         </div>
       </div>
     )}
+    </div>
     </>
   );
 };
@@ -820,9 +624,9 @@ const PieChartCard = ({ title, data, colors }: any) => (
     <div className="h-[180px]">
       <ResponsiveContainer width="100%" height="100%">
         <PieChart>
-          <Pie data={data} dataKey="value" innerRadius={35} outerRadius={70}>
-            {data.map((_: any, i: any) => (
-              <Cell key={i} fill={colors[i]} />
+          <Pie data={data || []} dataKey="value" innerRadius={35} outerRadius={70}>
+            {(data || []).map((_: any, i: any) => (
+              <Cell key={i} fill={colors?.[i] || '#cccccc'} />
             ))}
           </Pie>
           <Tooltip />

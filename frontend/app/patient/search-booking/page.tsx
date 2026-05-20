@@ -322,8 +322,9 @@ export default function BookingPage() {
   // Fetch real patients and doctors from API
   useEffect(() => {
     Promise.all([getAllPatients(), getDoctors()])
-      .then(([patientsRes, doctors]) => {
+      .then(([patientsRes, doctorsRes]) => {
         const patients = patientsRes?.data || [];
+        const doctors = doctorsRes?.data || [];
         const mapped = [];
         
         patients.forEach((p) => {
@@ -451,7 +452,9 @@ export default function BookingPage() {
   // Fetch tests and packages for the middle panel
   useEffect(() => {
     Promise.all([getTests(), getPackages(), getSpecimenTypes()])
-      .then(([tests, packages, specimens]) => {
+      .then(([testsRes, packagesRes, specimens]) => {
+        const tests = testsRes?.data || [];
+        const packages = packagesRes?.data || [];
         setSpecimenTypes(specimens);
         const mappedTests = tests.map(t => ({
           id: t.id,
