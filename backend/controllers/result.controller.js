@@ -1,0 +1,1194 @@
+import prisma from '../config/database.js';
+import { sendResultNotificationEmail } from '../utils/email.js';
+import { sendWhatsAppMessage, buildResultMessage } from '../utils/whatsapp.js';
+import { getPaginationParams, buildPaginatedResponse } from '../utils/pagination.js';
+
+/* ===============================================
+ * SILVERLEAF DIAGNOSTICS - RESULT CONTROLLER
+ * ===============================================
+ * 
+ * This controller handles all result operations:
+ * - Get patient test results
+ * - Update test status
+ * - Update test results
+ * - Filter and search results
+ * 
+ * Author: SilverLeaf Development Team
+ * Last Updated: March 2026
+ * =============================================== */
+
+// Get all patient tests for results page with pagination
+export const getPatientTests = async (req, res) => {
+  try {
+    const { 
+      status, 
+      fromDate, 
+      toDate, 
+      patientName, 
+      labRequest, 
+      corporate, 
+      department, 
+      testName 
+    } = req.query;
+
+    // Get pagination parameters
+    const { page, limit, skip } = getPaginationParams(req.query);
+
+    // Build where condition for filtering
+    const andConditions = [];
+
+    // Filter by status
+    if (status && status !== 'All') {
+      andConditions.push({ status });
+    }
+
+    // Filter by date range
+    if (fromDate || toDate) {
+      const dateFilter = {};
+      if (fromDate) { const f = new Date(fromDate); f.setHours(0,0,0,0); dateFilter.gte = f; }
+      if (toDate)   { const t = new Date(toDate);   t.setHours(23,59,59,999); dateFilter.lte = t; }
+      andConditions.push({ visitDate: dateFilter });
+    }
+
+    // Filter by patient name or patient ID
+    if (patientName) {
+      andConditions.push({
+        patient: {
+          OR: [
+            { firstName: { contains: patientName } },
+            { lastName:  { contains: patientName } },
+            { patientId: { contains: patientName } }
+          ]
+        }
+      });
+    }
+
+    // Filter by visit ID
+    if (labRequest) {
+      andConditions.push({ visitId: { contains: labRequest } });
+    }
+
+    // Filter by corporate / business type
+    if (corporate) {
+      andConditions.push({ businessType: { contains: corporate } });
+    }
+
+    // Filter by department
+    if (department && department !== 'Department') {
+      andConditions.push({ department: { name: { contains: department } } });
+    }
+
+    // Filter by test name
+    if (testName) {
+      andConditions.push({ test: { name: { contains: testName } } });
+    }
+
+    const whereCondition = andConditions.length > 0 ? { AND: andConditions } : {};
+
+    // Get total count for pagination
+    const total = await prisma.patientTest.count({
+      where: whereCondition
+    });
+
+    // Get paginated data
+    const patientTests = await prisma.patientTest.findMany({
+      where: whereCondition,
+      include: {
+        patient: {
+          select: {
+            patientId: true,
+            title: true,
+            firstName: true,
+            lastName: true,
+            age: true,
+            gender: true,
+            mobile: true,
+            email: true
+          }
+        },
+        test: {
+          select: {
+            id: true,
+            name: true,
+            testCode: true,
+            sampleType: true,
+            attachFile: true,
+            imageSize: true
+          }
+        },
+        department: {
+          select: {
+            id: true,
+            name: true
+          }
+        }
+      },
+      skip,
+      take: limit,
+      orderBy: [
+        { visitDate: 'desc' },
+        { visitTime: 'desc' }
+      ]
+    });
+
+    // Group tests by patient and visitId for display
+    const groupedResults = {};
+    
+    patientTests.forEach(patientTest => {
+      const key = `${patientTest.patientId}_${patientTest.visitId}`;
+      
+      if (!groupedResults[key]) {
+        groupedResults[key] = {
+          patient_name: `${patientTest.patient.title || ''} ${patientTest.patient.firstName || ''} ${patientTest.patient.lastName || ''}`.trim(),
+          age: patientTest.patient.age?.toString() || '',
+          gender: patientTest.patient.gender || '',
+          corporate: patientTest.businessType || 'Walk-in',
+          patient_uid: patientTest.patient.patientId,
+          visit_id: patientTest.visitId,
+          lab_no: patientTest.visitId, // Keep for backward compatibility
+          mobile: patientTest.patient.mobile,
+          email: patientTest.patient.email,
+          balance_amount: patientTest.balanceAmount || 0,
+          tests: []
+        };
+      }
+      
+      groupedResults[key].tests.push({
+        test_id: patientTest.id,
+        test_name: patientTest.test.name,
+        test_short_name: patientTest.test.shortName || patientTest.test.name,
+        test_code: patientTest.test.testCode,
+        attach_file: patientTest.test.attachFile,
+        image_size: patientTest.test.imageSize,
+        attachment_path: patientTest.attachmentPath || null,
+        specimen_type: patientTest.test.sampleType || patientTest.sample,
+        ref_by: patientTest.referralDoctor || 'SELF',
+        result_status: patientTest.status,
+        approved_date: patientTest.visitDate ? (() => {
+          const d = patientTest.visitDate;
+          const datePart = d.toLocaleDateString('en-GB'); // DD/MM/YYYY
+          const timePart = patientTest.visitTime || d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false });
+          return `${datePart} ${timePart}`;
+        })() : '',
+        order_date: (() => {
+          if (!patientTest.visitDate) return null;
+          const d = patientTest.visitDate;
+          const datePart = d.toISOString().slice(0, 10); // YYYY-MM-DD
+          const timePart = patientTest.visitTime || '00:00';
+          return `${datePart}T${timePart}`;
+        })(),
+        order_time: patientTest.visitTime || null,
+        sample_taken: patientTest.sampleTaken ? patientTest.sampleTaken.toISOString() : null,
+        sample_received: patientTest.sampleReceived ? patientTest.sampleReceived.toISOString() : null,
+        result_date: patientTest.resultDate ? patientTest.resultDate.toISOString() : null,
+        remark: patientTest.remarks || '',
+        charge: patientTest.charge,
+        result: patientTest.result,
+        department: patientTest.department.name,
+        sample_barcode: patientTest.sampleBarcodeNo,
+        visit_type: patientTest.visitType,
+        report_mode: patientTest.reportMode,
+        package_name: patientTest.packageName || null
+      });
+    });
+
+    // Convert to array format expected by frontend
+    const results = Object.values(groupedResults);
+
+    res.json({
+      success: true,
+      data: results,
+      total: results.length,
+      totalTests: patientTests.length
+    });
+
+  } catch (error) {
+    console.error('Get patient tests error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch patient tests'
+    });
+  }
+};
+
+// Get patient test by ID with parameters for result entry (WITH PROPER CATEGORIES)
+export const getPatientTestById = async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    console.log('Fetching patient test with ID:', id);
+    
+    const patientTest = await prisma.patientTest.findUnique({
+      where: { id: parseInt(id) },
+      include: {
+        patient: {
+          select: {
+            patientId: true,
+            title: true,
+            firstName: true,
+            lastName: true,
+            age: true,
+            gender: true,
+            dob: true,
+            email: true,
+            mobile: true
+          }
+        },
+        test: {
+          select: {
+            id: true,
+            name: true,
+            interpretation: true,
+            attachFile: true,
+            imageSize: true,
+            speciality: true,
+          }
+        },
+        testResults: true
+      }
+    });
+
+    if (!patientTest) {
+      console.log('Patient test not found for ID:', id);
+      return res.status(404).json({
+        success: false,
+        message: 'Patient test not found'
+      });
+    }
+
+    console.log('Found patient test:', patientTest.id, 'for patient:', patientTest.patient.firstName);
+
+    // Get test categories with their parameters - fetch all range-related fields
+    const testCategories = await prisma.testCategory.findMany({
+      where: { 
+        testId: patientTest.test.id 
+      },
+      include: {
+        testParameter: {
+          select: {
+            id: true,
+            parameterName: true,
+            units: true,
+            type: true,
+            isDescriptive: true,
+            isMandatory: true,
+            parameterSortOrder: true,
+            textContent: true,
+            displayRangeText: true,
+            rangeText: true,
+            rangeType: true,
+            // Age-specific ranges from database
+            ageRanges: true,
+            rangeValues: true,
+            // Gender and age-specific range fields from database
+            maleLowValue: true,
+            maleHighValue: true,
+            maleDefaultValue: true,
+            maleActive: true,
+            femaleLowValue: true,
+            femaleHighValue: true,
+            femaleDefaultValue: true,
+            femaleActive: true,
+            childLowValue: true,
+            childHighValue: true,
+            childDefaultValue: true,
+            childActive: true,
+            hasFormula: true,
+            formula: true
+          }
+        }
+      },
+      orderBy: {
+        sortOrder: 'asc'
+      }
+    });
+
+    console.log(`Found ${testCategories.length} categories for test`);
+
+    // Process parameters from categories
+    const allParameters = [];
+    const groupedParameters = {};
+
+    testCategories.forEach(category => {
+      if (category.testParameter) {
+        // Check if category has a manually set name (not empty/null)
+        const hasManualCategoryName = category.categoryName && 
+                                    category.categoryName.trim() !== '';
+        
+        // Use manual category name if exists, otherwise use a default that won't be displayed
+        const categoryName = hasManualCategoryName ? 
+                           category.categoryName : 
+                           'NO_CATEGORY_HEADER'; // Special flag for no header
+        
+        const parameter = {
+          id: category.testParameter.id,
+          parameterName: category.testParameter.parameterName,
+          units: category.testParameter.units,
+          type: category.testParameter.type,
+          isDescriptive: category.testParameter.isDescriptive,
+          isMandatory: category.testParameter.isMandatory,
+          categoryName: categoryName,
+          categoryId: category.id,
+          sortOrder: category.testParameter.parameterSortOrder || 999,
+          showCategoryHeader: hasManualCategoryName, // Flag to show/hide header
+          
+          // Range type and display text from database
+          rangeType: category.testParameter.rangeType,
+          displayRangeText: category.testParameter.displayRangeText,
+          rangeText: category.testParameter.rangeText,
+          
+          // Complex age ranges from database
+          ageRanges: category.testParameter.ageRanges,
+          rangeValues: category.testParameter.rangeValues,
+          
+          // Gender and age-specific ranges from database
+          maleLowValue: category.testParameter.maleLowValue,
+          maleHighValue: category.testParameter.maleHighValue,
+          maleDefaultValue: category.testParameter.maleDefaultValue,
+          maleActive: category.testParameter.maleActive,
+          femaleLowValue: category.testParameter.femaleLowValue,
+          femaleHighValue: category.testParameter.femaleHighValue,
+          femaleDefaultValue: category.testParameter.femaleDefaultValue,
+          femaleActive: category.testParameter.femaleActive,
+          childLowValue: category.testParameter.childLowValue,
+          childHighValue: category.testParameter.childHighValue,
+          childDefaultValue: category.testParameter.childDefaultValue,
+          childActive: category.testParameter.childActive,
+          
+          // Text content for text-type parameters
+          textContent: category.testParameter.textContent,
+          
+          // Formula fields
+          hasFormula: category.testParameter.hasFormula,
+          formula: category.testParameter.formula,
+          
+          // Get appropriate range based on patient demographics from database
+          normalRange: getNormalRange(category.testParameter, patientTest.patient),
+          
+          // Existing result if any
+          existingResult: patientTest.testResults.find(r => r.testParameterId === category.testParameter.id)
+        };
+
+        allParameters.push(parameter);
+
+        // Group by category name
+        if (!groupedParameters[categoryName]) {
+          groupedParameters[categoryName] = [];
+        }
+        groupedParameters[categoryName].push(parameter);
+      }
+    });
+
+    // If no categories found, get direct parameters with all range fields
+    if (allParameters.length === 0) {
+      const directParameters = await prisma.testParameter.findMany({
+        where: { 
+          testId: patientTest.test.id 
+        },
+        select: {
+          id: true,
+          parameterName: true,
+          units: true,
+          type: true,
+          isDescriptive: true,
+          isMandatory: true,
+          parameterSortOrder: true,
+          textContent: true,
+          displayRangeText: true,
+          rangeText: true,
+          rangeType: true,
+          // Age-specific ranges from database
+          ageRanges: true,
+          rangeValues: true,
+          // Gender and age-specific range fields from database
+          maleLowValue: true,
+          maleHighValue: true,
+          maleDefaultValue: true,
+          maleActive: true,
+          femaleLowValue: true,
+          femaleHighValue: true,
+          femaleDefaultValue: true,
+          femaleActive: true,
+          childLowValue: true,
+          childHighValue: true,
+          childDefaultValue: true,
+          childActive: true,
+          hasFormula: true,
+          formula: true
+        },
+        orderBy: {
+          parameterSortOrder: 'asc'
+        }
+      });
+
+      directParameters.forEach(param => {
+        const parameter = {
+          id: param.id,
+          parameterName: param.parameterName,
+          units: param.units,
+          type: param.type,
+          isDescriptive: param.isDescriptive,
+          isMandatory: param.isMandatory,
+          categoryName: 'NO_CATEGORY_HEADER', // No header for direct parameters
+          categoryId: null,
+          sortOrder: param.parameterSortOrder || 999,
+          showCategoryHeader: false, // Don't show header for direct parameters
+          
+          // Range type and display text from database
+          rangeType: param.rangeType,
+          displayRangeText: param.displayRangeText,
+          rangeText: param.rangeText,
+          
+          // Complex age ranges from database
+          ageRanges: param.ageRanges,
+          rangeValues: param.rangeValues,
+          
+          // Gender and age-specific ranges from database
+          maleLowValue: param.maleLowValue,
+          maleHighValue: param.maleHighValue,
+          maleDefaultValue: param.maleDefaultValue,
+          maleActive: param.maleActive,
+          femaleLowValue: param.femaleLowValue,
+          femaleHighValue: param.femaleHighValue,
+          femaleDefaultValue: param.femaleDefaultValue,
+          femaleActive: param.femaleActive,
+          childLowValue: param.childLowValue,
+          childHighValue: param.childHighValue,
+          childDefaultValue: param.childDefaultValue,
+          childActive: param.childActive,
+          
+          // Text content for text-type parameters
+          textContent: param.textContent,
+          
+          // Formula fields
+          hasFormula: param.hasFormula,
+          formula: param.formula,
+          
+          // Get appropriate range based on patient demographics from database
+          normalRange: getNormalRange(param, patientTest.patient),
+          
+          // Existing result if any
+          existingResult: patientTest.testResults.find(r => r.testParameterId === param.id)
+        };
+
+        allParameters.push(parameter);
+
+        // Group by test name
+        const categoryName = 'NO_CATEGORY_HEADER';
+        if (!groupedParameters[categoryName]) {
+          groupedParameters[categoryName] = [];
+        }
+        groupedParameters[categoryName].push(parameter);
+      });
+    }
+
+    console.log(`Processed ${allParameters.length} parameters in ${Object.keys(groupedParameters).length} categories`);
+
+    // Fetch signature matching the test's speciality
+    let signature = null;
+    if (patientTest.test.speciality) {
+      signature = await prisma.signature.findFirst({
+        where: { specialty: patientTest.test.speciality, isActive: true },
+        select: { id: true, specialty: true, doctorName: true, signatureText: true, signatureImage: true, width: true, height: true }
+      });
+    }
+
+    res.json({
+      success: true,
+      data: {
+        patientTest,
+        parameters: allParameters,
+        groupedParameters,
+        signature
+      }
+    });
+
+  } catch (error) {
+    console.error('Get patient test error:', error);
+    console.error('Error stack:', error.stack);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch patient test: ' + error.message
+    });
+  }
+};
+
+// Enhanced helper function to get normal range based on patient demographics from database
+function getNormalRange(parameter, patient) {
+  if (!parameter || !patient) {
+    return parameter?.displayRangeText || parameter?.rangeText || '';
+  }
+
+  // For text-type parameters, return textContent only if it has a real value
+  if (parameter.type === 'Text' || parameter.isDescriptive) {
+    return parameter.textContent || '';
+  }
+
+  const patientGender = patient.gender?.toLowerCase();
+  const patientAge = patient.age || 0;
+  
+  // Calculate exact age from DOB if available
+  let exactAgeInDays = 0;
+  let exactAgeInMonths = 0;
+  let exactAgeInYears = patientAge;
+  
+  if (patient.dob) {
+    const birthDate = new Date(patient.dob);
+    const currentDate = new Date();
+    const ageInMs = currentDate - birthDate;
+    exactAgeInDays = Math.floor(ageInMs / (1000 * 60 * 60 * 24));
+    exactAgeInMonths = Math.floor(exactAgeInDays / 30.44);
+    exactAgeInYears = Math.floor(exactAgeInDays / 365.25);
+  }
+
+  // Handle complex age ranges from database (for numeric parameters)
+  if (parameter.ageRanges) {
+    try {
+      const ageRanges = JSON.parse(parameter.ageRanges);
+      
+      // Find matching range based on patient gender and age
+      for (const range of ageRanges) {
+        if (!range.enabled) continue;
+        
+        // Check gender match - if range has gender specified, it must match patient gender
+        const rangeGender = range.gender?.toLowerCase();
+        if (rangeGender && rangeGender !== patientGender) continue;
+        
+        let ageMatches = false;
+        
+        // Handle different range types with time units
+        if (range.label?.includes('Less Than') && range.value !== null && range.value !== undefined) {
+          const ageToCheck = getAgeInUnit(exactAgeInYears, exactAgeInMonths, exactAgeInDays, range.timeUnit);
+          ageMatches = ageToCheck < range.value;
+        } else if (range.label?.includes('More Than') && range.value !== null && range.value !== undefined) {
+          const ageToCheck = getAgeInUnit(exactAgeInYears, exactAgeInMonths, exactAgeInDays, range.timeUnit);
+          ageMatches = ageToCheck > range.value;
+        } else if (range.label?.includes('Between') && range.from !== null && range.to !== null) {
+          const ageToCheck = getAgeInUnit(exactAgeInYears, exactAgeInMonths, exactAgeInDays, range.timeUnit);
+          ageMatches = ageToCheck >= range.from && ageToCheck <= range.to;
+        } else if (range.label?.includes('Equal To') && range.value !== null && range.value !== undefined) {
+          const ageToCheck = getAgeInUnit(exactAgeInYears, exactAgeInMonths, exactAgeInDays, range.timeUnit);
+          ageMatches = ageToCheck === range.value;
+        }
+        
+        // Return range if age and gender conditions match
+        if (ageMatches && range.ll !== null && range.ul !== null) {
+          return `${range.ll} - ${range.ul}`;
+        }
+      }
+    } catch (error) {
+      console.error('Error parsing age ranges:', error);
+    }
+  }
+
+  // Fallback to simple gender and age-specific ranges from database fields
+  if (parameter.rangeType === 'BySex' || parameter.rangeType === 'ByGenderAndAge') {
+    // Child ranges (typically < 18 years) - check if child range is active and available
+    if (exactAgeInYears < 18 && parameter.childActive && 
+        parameter.childLowValue !== null && parameter.childHighValue !== null) {
+      return `${parameter.childLowValue} - ${parameter.childHighValue}`;
+    }
+    
+    // Adult ranges based on gender - check if gender-specific range is active and available
+    if (exactAgeInYears >= 18) {
+      if (patientGender === 'female' && parameter.femaleActive && 
+          parameter.femaleLowValue !== null && parameter.femaleHighValue !== null) {
+        return `${parameter.femaleLowValue} - ${parameter.femaleHighValue}`;
+      }
+      
+      if (patientGender === 'male' && parameter.maleActive && 
+          parameter.maleLowValue !== null && parameter.maleHighValue !== null) {
+        return `${parameter.maleLowValue} - ${parameter.maleHighValue}`;
+      }
+    }
+  }
+
+  // Final fallback - use male range as default if available
+  if (parameter.maleLowValue !== null && parameter.maleHighValue !== null) {
+    return `${parameter.maleLowValue} - ${parameter.maleHighValue}`;
+  }
+  
+  // Last resort - return display text or empty
+  return parameter.displayRangeText || parameter.rangeText || '';
+}
+
+// Helper function to get age in specific time unit
+function getAgeInUnit(years, months, days, timeUnit) {
+  switch (timeUnit) {
+    case 'Day(s)':
+      return days;
+    case 'Month(s)':
+      return months;
+    case 'Year(s)':
+      return years;
+    default:
+      return years;
+  }
+}
+
+// Update test status
+export const updateTestStatus = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status, remarks } = req.body;
+
+    // Validate status
+    const validStatuses = ['REGISTERED', 'RECEIVED', 'PROVISIONAL', 'AUTHENTICATED', 'DELIVERED', 'RETEST', 'REVERT', 'HOLD', 'REJECTED'];
+    if (status && !validStatuses.includes(status.toUpperCase())) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid status. Valid statuses are: ' + validStatuses.join(', ')
+      });
+    }
+
+    const updatedTest = await prisma.patientTest.update({
+      where: { id: parseInt(id) },
+      data: {
+        status: status?.toUpperCase(),
+        remarks: remarks || undefined,
+        updatedAt: new Date()
+      },
+      include: {
+        patient: true,
+        test: true,
+        department: true
+      }
+    });
+
+    res.json({
+      success: true,
+      message: 'Test status updated successfully',
+      data: updatedTest
+    });
+
+  } catch (error) {
+    console.error('Update test status error:', error);
+    
+    if (error.code === 'P2025') {
+      return res.status(404).json({
+        success: false,
+        message: 'Patient test not found'
+      });
+    }
+
+    res.status(500).json({
+      success: false,
+      message: 'Failed to update test status'
+    });
+  }
+};
+
+// Update test result
+export const updateTestResult = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { result, status } = req.body;
+
+    const updateData = {
+      result: result || undefined,
+      status: status?.toUpperCase() || undefined,
+      updatedAt: new Date()
+    };
+
+    // Automatically set resultDate when result is entered
+    if (result && result.trim() !== '') {
+      updateData.resultDate = new Date();
+    }
+
+    const updatedTest = await prisma.patientTest.update({
+      where: { id: parseInt(id) },
+      data: updateData,
+      include: {
+        patient: true,
+        test: true,
+        department: true
+      }
+    });
+
+    res.json({
+      success: true,
+      message: 'Test result updated successfully',
+      data: updatedTest
+    });
+
+  } catch (error) {
+    console.error('Update test result error:', error);
+    
+    if (error.code === 'P2025') {
+      return res.status(404).json({
+        success: false,
+        message: 'Patient test not found'
+      });
+    }
+
+    res.status(500).json({
+      success: false,
+      message: 'Failed to update test result'
+    });
+  }
+};
+
+// Bulk update test statuses
+export const bulkUpdateTestStatus = async (req, res) => {
+  try {
+    const { testIds, status, remarks } = req.body;
+
+    if (!testIds || !Array.isArray(testIds) || testIds.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Test IDs array is required'
+      });
+    }
+
+    // Validate status
+    const validStatuses = ['REGISTERED', 'RECEIVED', 'PROVISIONAL', 'AUTHENTICATED', 'DELIVERED', 'RETEST', 'REVERT', 'HOLD', 'REJECTED'];
+    if (status && !validStatuses.includes(status.toUpperCase())) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid status. Valid statuses are: ' + validStatuses.join(', ')
+      });
+    }
+
+    const updatedTests = await prisma.patientTest.updateMany({
+      where: {
+        id: {
+          in: testIds.map(id => parseInt(id))
+        }
+      },
+      data: {
+        status: status?.toUpperCase(),
+        remarks: remarks || undefined,
+        updatedAt: new Date()
+      }
+    });
+
+    res.json({
+      success: true,
+      message: `${updatedTests.count} test(s) updated successfully`,
+      updatedCount: updatedTests.count
+    });
+
+  } catch (error) {
+    console.error('Bulk update test status error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to update test statuses'
+    });
+  }
+};
+
+// Get test statistics for dashboard
+export const getTestStatistics = async (req, res) => {
+  try {
+    const { fromDate, toDate } = req.query;
+    
+    let whereCondition = {};
+    
+    // Filter by date range if provided
+    if (fromDate || toDate) {
+      whereCondition.visitDate = {};
+      if (fromDate) {
+        const from = new Date(fromDate);
+        from.setHours(0, 0, 0, 0);
+        whereCondition.visitDate.gte = from;
+      }
+      if (toDate) {
+        const to = new Date(toDate);
+        to.setHours(23, 59, 59, 999);
+        whereCondition.visitDate.lte = to;
+      }
+    }
+
+    // Get counts by status
+    const statusCounts = await prisma.patientTest.groupBy({
+      by: ['status'],
+      where: whereCondition,
+      _count: {
+        id: true
+      }
+    });
+
+    // Get total count
+    const totalTests = await prisma.patientTest.count({
+      where: whereCondition
+    });
+
+    // Format response
+    const statistics = {
+      total: totalTests,
+      byStatus: {}
+    };
+
+    statusCounts.forEach(item => {
+      statistics.byStatus[item.status] = item._count.id;
+    });
+
+    // Ensure all statuses are represented
+    const allStatuses = ['REGISTERED', 'RECEIVED', 'PROVISIONAL', 'AUTHENTICATED', 'DELIVERED', 'RETEST', 'REVERT', 'HOLD', 'REJECTED'];
+    allStatuses.forEach(status => {
+      if (!statistics.byStatus[status]) {
+        statistics.byStatus[status] = 0;
+      }
+    });
+
+    res.json({
+      success: true,
+      data: statistics
+    });
+
+  } catch (error) {
+    console.error('Get test statistics error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch test statistics'
+    });
+  }
+};
+
+// Save or update test results
+export const saveTestResults = async (req, res) => {
+  try {
+    const { patientTestId } = req.params;
+    const { results, enteredBy } = req.body;
+
+    if (!results || !Array.isArray(results)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Results array is required'
+      });
+    }
+
+    // Validate patient test exists
+    const patientTest = await prisma.patientTest.findUnique({
+      where: { id: parseInt(patientTestId) },
+      include: { patient: true }
+    });
+
+    if (!patientTest) {
+      return res.status(404).json({
+        success: false,
+        message: 'Patient test not found'
+      });
+    }
+
+    const savedResults = [];
+
+    // Process each result
+    for (const result of results) {
+      const {
+        testParameterId,
+        testCategoryId,
+        numericValue,
+        textValue,
+        selectedOption,
+        isAbnormal,
+        referenceRange
+      } = result;
+
+      // Get parameter details for validation
+      const parameter = await prisma.testParameter.findUnique({
+        where: { id: testParameterId }
+      });
+
+      if (!parameter) {
+        continue; // Skip invalid parameters
+      }
+
+      // Determine if result is out of range
+      let isOutOfRange = false;
+      let isPanic = false;
+
+      if (numericValue !== null && numericValue !== undefined) {
+        const age = patientTest.patient.age || 0;
+        const gender = patientTest.patient.gender?.toLowerCase();
+        
+        let lowValue, highValue;
+        
+        // Get appropriate range
+        if (age < 18 && parameter.childActive && parameter.childLowValue !== null) {
+          lowValue = parameter.childLowValue;
+          highValue = parameter.childHighValue;
+        } else if (gender === 'female' && parameter.femaleActive && parameter.femaleLowValue !== null) {
+          lowValue = parameter.femaleLowValue;
+          highValue = parameter.femaleHighValue;
+        } else if (parameter.maleLowValue !== null) {
+          lowValue = parameter.maleLowValue;
+          highValue = parameter.maleHighValue;
+        }
+
+        // Check if out of range
+        if (lowValue !== null && highValue !== null) {
+          isOutOfRange = numericValue < lowValue || numericValue > highValue;
+        }
+
+        // Check panic values
+        if (parameter.lowPanic !== null && numericValue <= parameter.lowPanic) {
+          isPanic = true;
+        }
+        if (parameter.highPanic !== null && numericValue >= parameter.highPanic) {
+          isPanic = true;
+        }
+      }
+
+      // Upsert result
+      const savedResult = await prisma.testResult.upsert({
+        where: {
+          patientTestId_testParameterId: {
+            patientTestId: parseInt(patientTestId),
+            testParameterId: testParameterId
+          }
+        },
+        update: {
+          numericValue: numericValue,
+          textValue: textValue,
+          selectedOption: selectedOption,
+          isAbnormal: isAbnormal || false,
+          isOutOfRange: isOutOfRange,
+          isPanic: isPanic,
+          referenceRange: referenceRange,
+          enteredBy: enteredBy,
+          enteredAt: new Date(),
+          testCategoryId: testCategoryId || null
+        },
+        create: {
+          patientTestId: parseInt(patientTestId),
+          testParameterId: testParameterId,
+          testCategoryId: testCategoryId || null,
+          numericValue: numericValue,
+          textValue: textValue,
+          selectedOption: selectedOption,
+          isAbnormal: isAbnormal || false,
+          isOutOfRange: isOutOfRange,
+          isPanic: isPanic,
+          referenceRange: referenceRange,
+          enteredBy: enteredBy,
+          enteredAt: new Date()
+        },
+        include: {
+          testParameter: true
+        }
+      });
+
+      savedResults.push(savedResult);
+    }
+
+    // Update patient test status and result date
+    await prisma.patientTest.update({
+      where: { id: parseInt(patientTestId) },
+      data: {
+        status: 'PROVISIONAL',
+        resultDate: new Date(),
+        updatedAt: new Date()
+      }
+    });
+
+    res.json({
+      success: true,
+      message: 'Test results saved successfully',
+      data: savedResults
+    });
+
+  } catch (error) {
+    console.error('Save test results error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to save test results'
+    });
+  }
+};
+
+// Update test dates (for calendar functionality)
+export const updateTestDates = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { 
+      orderDate, 
+      sTakenDate, 
+      sReceivedDate, 
+      resultDate,
+      visitDate,
+      visitTime 
+    } = req.body;
+
+    const updateData = {};
+    
+    if (visitDate) {
+      updateData.visitDate = new Date(visitDate);
+    }
+    if (visitTime) {
+      updateData.visitTime = visitTime;
+    }
+    if (sTakenDate) {
+      updateData.sampleTaken = new Date(sTakenDate);
+    }
+    if (sReceivedDate) {
+      updateData.sampleReceived = new Date(sReceivedDate);
+    }
+    if (resultDate) {
+      updateData.resultDate = new Date(resultDate);
+    }
+    
+    // Add other date fields as needed
+    updateData.updatedAt = new Date();
+
+    const updatedTest = await prisma.patientTest.update({
+      where: { id: parseInt(id) },
+      data: updateData,
+      include: {
+        patient: true,
+        test: true,
+        department: true
+      }
+    });
+
+    res.json({
+      success: true,
+      message: 'Test dates updated successfully',
+      data: updatedTest
+    });
+
+  } catch (error) {
+    console.error('Update test dates error:', error);
+    
+    if (error.code === 'P2025') {
+      return res.status(404).json({
+        success: false,
+        message: 'Patient test not found'
+      });
+    }
+
+    res.status(500).json({
+      success: false,
+      message: 'Failed to update test dates'
+    });
+  }
+};
+
+// Send report to patient via Email or WhatsApp
+export const sendReport = async (req, res) => {
+  try {
+    const { testIds, channel } = req.body; // channel: 'email' | 'whatsapp'
+
+    if (!testIds || !Array.isArray(testIds) || testIds.length === 0) {
+      return res.status(400).json({ success: false, message: 'testIds required' });
+    }
+    if (!['email', 'whatsapp'].includes(channel)) {
+      return res.status(400).json({ success: false, message: 'channel must be email or whatsapp' });
+    }
+
+    // Fetch all selected patient tests with full data
+    const patientTests = await prisma.patientTest.findMany({
+      where: { id: { in: testIds.map(Number) } },
+      include: {
+        patient: true,
+        test: {
+          select: {
+            id: true, name: true, interpretation: true, speciality: true
+          }
+        },
+        testResults: {
+          include: { testParameter: { select: { parameterName: true, units: true } } }
+        }
+      }
+    });
+
+    if (patientTests.length === 0) {
+      return res.status(404).json({ success: false, message: 'No tests found' });
+    }
+
+    // Group by visitId — tests in same visit = same package = one combined report
+    const byVisit = {};
+    patientTests.forEach(pt => {
+      if (!byVisit[pt.visitId]) byVisit[pt.visitId] = [];
+      byVisit[pt.visitId].push(pt);
+    });
+
+    const sentTo = { email: [], whatsapp: [] };
+
+    for (const [visitId, tests] of Object.entries(byVisit)) {
+      const patient = tests[0].patient;
+
+      // Build combined results array across all tests in this visit
+      const allResults = [];
+      for (const pt of tests) {
+        // Add test name as a header row
+        allResults.push({ isHeader: true, testName: pt.test.name });
+        pt.testResults.forEach(r => {
+          allResults.push({
+            parameterName: r.testParameter.parameterName,
+            value: r.numericValue !== null ? r.numericValue : (r.textValue || '-'),
+            units: r.testParameter.units || '',
+            referenceRange: r.referenceRange || '',
+            isAbnormal: r.isAbnormal
+          });
+        });
+      }
+
+      const testNames = tests.map(t => t.test.name).join(', ');
+
+      if (channel === 'email') {
+        if (!patient.email) continue;
+        await sendResultNotificationEmail(patient, testNames, visitId, allResults);
+        sentTo.email.push(patient.email);
+      } else {
+        if (!patient.mobile) continue;
+        const msg = buildResultMessage(patient, testNames, visitId, allResults.filter(r => !r.isHeader));
+        await sendWhatsAppMessage(patient.mobile, msg);
+        sentTo.whatsapp.push(patient.mobile);
+      }
+    }
+
+    res.json({
+      success: true,
+      message: `Report sent via ${channel}`,
+      sentTo
+    });
+
+  } catch (error) {
+    console.error('Send report error:', error);
+    res.status(500).json({ success: false, message: 'Failed to send report: ' + error.message });
+  }
+};
+
+// Upload attachment for a patient test
+export const uploadAttachment = async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!req.file) return res.status(400).json({ success: false, message: 'No file uploaded' });
+
+    const filePath = `/uploads/attachments/${req.file.filename}`;
+
+    // Delete old file if exists
+    const existing = await prisma.patientTest.findUnique({ where: { id: parseInt(id) }, select: { attachmentPath: true } });
+    if (existing?.attachmentPath) {
+      const oldPath = `backend${existing.attachmentPath}`;
+      try { (await import('fs')).default.unlinkSync(oldPath); } catch (e) {}
+    }
+
+    await prisma.patientTest.update({
+      where: { id: parseInt(id) },
+      data: { attachmentPath: filePath }
+    });
+
+    res.json({ success: true, attachmentPath: filePath });
+  } catch (error) {
+    console.error('Upload attachment error:', error);
+    res.status(500).json({ success: false, message: 'Failed to upload attachment' });
+  }
+};
+
+// Delete attachment for a patient test
+export const deleteAttachment = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const existing = await prisma.patientTest.findUnique({ where: { id: parseInt(id) }, select: { attachmentPath: true } });
+    if (existing?.attachmentPath) {
+      const filePath = `backend${existing.attachmentPath}`;
+      try { (await import('fs')).default.unlinkSync(filePath); } catch (e) {}
+    }
+    await prisma.patientTest.update({ where: { id: parseInt(id) }, data: { attachmentPath: null } });
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Failed to delete attachment' });
+  }
+};
