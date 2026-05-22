@@ -91,10 +91,7 @@ const modules: NavModule[] = [
     id: "result",
     title: "Result",
     icon: <ClipboardCheck size={20} />,
-    items: [
-      { label: "Patient Result", path: "/result/patientresult" },
-      { label: "Result Entry", path: "/result/result-entry" },
-    ],
+    items: [],
   },
 ];
 
@@ -114,11 +111,7 @@ const Header = () => {
   const publicRoutes = ["/", "/login", "/seed-data"];
   const isPublicRoute = publicRoutes.includes(pathname);
 
-  // Show header only on public routes
-  if (isPublicRoute) {
-    return null;
-  }
-
+  // All hooks must be called BEFORE any conditional returns
   useEffect(() => {
     const user = JSON.parse(localStorage.getItem("admin") || "{}");
     setCurrentUser(user);
@@ -154,6 +147,11 @@ const Header = () => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [showAdminPopup, showNotifications]);
 
+  // Show header only on public routes - NOW AFTER ALL HOOKS
+  if (isPublicRoute) {
+    return null;
+  }
+
   const isCollectionCenter = currentUser.role === "Collection Center";
   const isFranchise = currentUser.role === "Franchise";
   const isUser = currentUser.userType === "user" && !isCollectionCenter && !isFranchise;
@@ -173,7 +171,13 @@ const Header = () => {
   const selectedModule = visibleModules.find((m) => m.id === activeModule);
 
   const handleModuleClick = (moduleId: string) => {
-    setActiveModule(moduleId);
+    // If module has no items, navigate directly to the module page
+    const module = visibleModules.find(m => m.id === moduleId);
+    if (module && module.items.length === 0) {
+      router.push(`/${moduleId}`);
+    } else {
+      setActiveModule(moduleId);
+    }
   };
 
   const handleItemClick = (path: string) => {
