@@ -215,7 +215,8 @@ function InlineSelect({ value, onChange, options, placeholder = "Select", classN
 
 // Resolved at runtime using fetched specimen types (see specimenTypes state)
 const getSampleColor = (sample: any, specimenTypes: any) => {
-  const found = specimenTypes.find(s => s.Sample_Type === sample);
+  if (!Array.isArray(specimenTypes)) return '#cccccc';
+  const found = specimenTypes.find((s: any) => s.Sample_Type === sample);
   return found?.Sample_Color || '#cccccc';
 };
 
@@ -896,7 +897,7 @@ export default function PatientRegistration() {
       // Clear saved form data after successful registration
       clearSavedFormData();
       
-      // Handle response structure correctly
+      // Handle response structure correctly - response.data contains the patient object
       const patientId = response?.data?.patientId || response?.patientId || 'N/A';
       
       // Print BEFORE showing alert if checkbox is checked

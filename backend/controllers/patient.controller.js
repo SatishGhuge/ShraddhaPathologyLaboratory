@@ -1,9 +1,27 @@
 import prisma from '../config/database.js';
+import { validationResult } from 'express-validator';
 import { getPaginationParams, buildPaginatedResponse } from '../utils/pagination.js';
 
 // Create new patient with tests OR add tests to existing patient
 export const createPatient = async (req, res) => {
   try {
+    // Check for validation errors
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({
+        success: false,
+        message: 'Validation failed',
+        errors: errors.array()
+      });
+    }
+
+    console.log('📝 Creating patient with data:', {
+      firstName: req.body.firstName,
+      mobile: req.body.mobile,
+      testsCount: req.body.tests?.length || 0,
+      businessType: req.body.businessType
+    });
+
     const { 
       // Existing patient ID (if this is an existing patient)
       existingPatientId,
@@ -366,6 +384,9 @@ export const searchPatient = async (req, res) => {
       });
     }
 
+    // Get pagination parameters
+    const { page, limit, skip } = getPaginationParams(req.query);
+
     // Build search condition
     const where = {};
     if (mobile) where.mobile = { startsWith: mobile };
@@ -373,7 +394,10 @@ export const searchPatient = async (req, res) => {
     
     console.log('🔍 Search where condition:', where);
 
-    // Find ALL patients with this mobile/email
+    // Get total count
+    const total = await prisma.patient.count({ where });
+
+    // Find patients with this mobile/email with pagination
     const patients = await prisma.patient.findMany({
       where,
       include: {
@@ -388,26 +412,18 @@ export const searchPatient = async (req, res) => {
       },
       orderBy: {
         createdAt: 'desc' // Most recent first
-      }
+      },
+      skip,
+      take: limit
     });
     
-    console.log(`✅ Found ${patients.length} patient(s)`);
+    console.log(`✅ Found ${total} patient(s), returning page ${page}`);
 
     if (!patients || patients.length === 0) {
-      return res.json({
-        success: true,
-        data: [],
-        count: 0,
-        message: 'No existing patients found'
-      });
+      return res.json(buildPaginatedResponse([], total, page, limit));
     }
 
-    res.json({
-      success: true,
-      data: patients, // Return array of all matching patients
-      count: patients.length,
-      message: `Found ${patients.length} patient(s)`
-    });
+    res.json(buildPaginatedResponse(patients, total, page, limit));
 
   } catch (error) {
     console.error('Search patient error:', error);
@@ -516,6 +532,9 @@ export const getPatientStatistics = async (req, res) => {
   try {
     const { fromDate, toDate } = req.query;
 
+    // Get pagination parameters
+    const { page, limit, skip } = getPaginationParams(req.query);
+
     // Build date filter
     const dateFilter = {};
     if (fromDate && toDate) {
@@ -535,17 +554,19 @@ export const getPatientStatistics = async (req, res) => {
     }
 
     // Get total registered patients count
-    const totalPatients = await prisma.patient.count({
+    const total = await prisma.patient.count({
       where: dateFilter
     });
 
-    res.json({
-      success: true,
-      data: {
-        total: totalPatients,
-        registered: totalPatients
-      }
+    // Get paginated patients
+    const patients = await prisma.patient.findMany({
+      where: dateFilter,
+      skip,
+      take: limit,
+      orderBy: { createdAt: 'desc' }
     });
+
+    res.json(buildPaginatedResponse(patients, total, page, limit));
 
   } catch (error) {
     console.error('Get patient statistics error:', error);

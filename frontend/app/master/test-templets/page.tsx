@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import Header from "@/src/components/Header";
 import PageHeader from "@/src/components/BreadCrumb";
-import { FileText, RotateCwIcon, X, Check, Plus, Trash2 } from 'lucide-react';
+import { FileText, RotateCwIcon, X, Check, Plus, Trash2, ChevronLeft, ChevronRight } from 'lucide-react';
 import { CKEditor } from '@ckeditor/ckeditor5-react';
 import ClassicEditor from '@ckeditor/ckeditor5-build-classic';
 import { getTemplates, getTests, createTemplate, updateTemplate, deleteTemplate, getUnits, createCategoryWithParameter } from "@/src/api/master.js";
@@ -16,6 +16,9 @@ const TestTemplets = () => {
   const [units, setUnits] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<any>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pagination, setPagination] = useState<any>(null);
+  const ITEMS_PER_PAGE = 20;
   const [showForm, setShowForm] = useState(false);
   const [editMode, setEditMode] = useState(false);
   const [currentTemplateId, setCurrentTemplateId] = useState<any>(null);
@@ -36,7 +39,7 @@ const TestTemplets = () => {
 
   // Fetch templates and tests on component mount
   useEffect(() => {
-    fetchTemplates();
+    fetchTemplates(1);
     fetchTests();
     fetchUnits();
   }, []);
@@ -93,12 +96,18 @@ const TestTemplets = () => {
     }
   };
 
-  const fetchTemplates = async () => {
+  const fetchTemplates = async (page: number = 1) => {
     try {
       setLoading(true);
       setError(null);
-      const data = await getTemplates();
-      setTemplates(data);
+      const data = await getTemplates(page, ITEMS_PER_PAGE);
+      if (data.success) {
+        setTemplates(data.data || []);
+        setPagination(data.pagination || null);
+      } else {
+        setTemplates(data.data || []);
+        setPagination(null);
+      }
     } catch (err) {
       console.error('Error fetching templates:', err);
       setError('Failed to load templates. Please try again.');
@@ -600,6 +609,51 @@ const TestTemplets = () => {
                 </tbody>
               </table>
             </div>
+
+            {/* PAGINATION CONTROLS */}
+            {pagination && templates.length > 0 && (
+              <div className="mt-3 bg-white rounded shadow-md p-3 flex items-center justify-between text-xs">
+                <div className="text-gray-600">
+                  Showing {(currentPage - 1) * ITEMS_PER_PAGE + 1} to{' '}
+                  {Math.min(currentPage * ITEMS_PER_PAGE, pagination.total)} of{' '}
+                  {pagination.total} records
+                </div>
+
+                <div className="flex gap-2 items-center">
+                  <button
+                    onClick={() => {
+                      const newPage = Math.max(1, currentPage - 1);
+                      setCurrentPage(newPage);
+                      fetchTemplates(newPage);
+                    }}
+                    disabled={currentPage === 1}
+                    className={`flex items-center gap-1 px-3 py-1 rounded ${currentPage === 1 ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-cyan-600 text-white hover:bg-cyan-700'}`}
+                  >
+                    <ChevronLeft size={14} /> Previous
+                  </button>
+
+                  <span className="px-3 py-1">
+                    Page {currentPage} of {pagination.totalPages}
+                  </span>
+
+                  <button
+                    onClick={() => {
+                      const newPage = Math.min(pagination.totalPages, currentPage + 1);
+                      setCurrentPage(newPage);
+                      fetchTemplates(newPage);
+                    }}
+                    disabled={currentPage === pagination.totalPages}
+                    className={`flex items-center gap-1 px-3 py-1 rounded ${currentPage === pagination.totalPages ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-cyan-600 text-white hover:bg-cyan-700'}`}
+                  >
+                    Next <ChevronRight size={14} />
+                  </button>
+                </div>
+
+                <div className="text-gray-600">
+                  Total: {pagination.total} records
+                </div>
+              </div>
+            )}
           )}
         </div>
       </div>

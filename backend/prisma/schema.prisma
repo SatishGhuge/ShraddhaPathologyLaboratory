@@ -51,6 +51,10 @@ model Patient {
   updatedAt         DateTime      @updatedAt
   tests             PatientTest[]
 
+  @@index([mobile], map: "patients_mobile_idx")
+  @@index([email], map: "patients_email_idx")
+  @@index([firstName, lastName], map: "patients_name_idx")
+  @@index([createdAt], map: "patients_createdAt_idx")
   @@map("patients")
 }
 
@@ -63,12 +67,16 @@ model PatientTest {
   sample          String
   charge          Float
   status          String       @default("REGISTERED")
+  isExcluded      Boolean      @default(false)
   result          String?      @db.Text
+  resultDate      DateTime?
   visitType       String?
   reportMode      String?
   referralDoctor  String?
   visitDate       DateTime?
   visitTime       String?
+  sampleTaken     DateTime?
+  sampleReceived  DateTime?
   sampleBarcodeNo String?
   remarks         String?      @db.Text
   totalAmount     Float        @default(0)
@@ -79,14 +87,10 @@ model PatientTest {
   balanceAmount   Float        @default(0)
   paymentMode     String?
   businessType    String?
-  createdAt       DateTime     @default(now())
-  updatedAt       DateTime     @updatedAt
-  sampleReceived  DateTime?
-  sampleTaken     DateTime?
-  resultDate      DateTime?
-  isExcluded      Boolean      @default(false)
   packageName     String?
   attachmentPath  String?
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
   department      Department   @relation(fields: [departmentId], references: [id])
   patient         Patient      @relation(fields: [patientId], references: [patientId], onDelete: Cascade)
   test            Test         @relation(fields: [testId], references: [id])
@@ -95,6 +99,10 @@ model PatientTest {
   @@index([departmentId], map: "patient_tests_departmentId_fkey")
   @@index([patientId], map: "patient_tests_patientId_fkey")
   @@index([testId], map: "patient_tests_testId_fkey")
+  @@index([status], map: "patient_tests_status_idx")
+  @@index([visitDate], map: "patient_tests_visitDate_idx")
+  @@index([visitId], map: "patient_tests_visitId_idx")
+  @@index([patientId, visitId], map: "patient_tests_patientId_visitId_idx")
   @@map("patient_tests")
 }
 
@@ -137,6 +145,7 @@ model Test {
   interpretation         String?           @db.Text
   outsourceLab           String?
   attachFile             String?           @default("Yes")
+  imageSize              String?           @default("800|600")
   profileTest            String?           @default("No")
   isHeader               Boolean           @default(true)
   showTestName           Boolean           @default(true)
@@ -144,11 +153,8 @@ model Test {
   lineHeight             Float?
   isActive               Boolean           @default(true)
   isDeleted              Boolean           @default(false)
-  linkedTestIds          String?           @db.Text
   createdAt              DateTime          @default(now())
   updatedAt              DateTime          @updatedAt
-  imageSize              String?           @default("800|600")
-  signatureId            Int?
   testparameters         testparameters[]
   corporateCharges       CorporateCharge[]
   packageTests           PackageTest[]
@@ -165,6 +171,8 @@ model Test {
   @@index([departmentId], map: "tests_departmentId_fkey")
   @@index([testCategoryId], map: "tests_testCategoryId_fkey")
   @@index([testParameterId], map: "tests_testParameterId_fkey")
+  @@index([isActive], map: "tests_isActive_idx")
+  @@index([name], map: "tests_name_idx")
   @@map("tests")
 }
 
@@ -229,17 +237,17 @@ model TestCharge {
 model Doctor {
   id           Int      @id @default(autoincrement())
   name         String
+  type         String   @default("Doctor")
   degree       String?
+  compliment   Float?
   mobile       String?
+  email        String?
+  address      String?  @db.Text
+  allowBalance Boolean  @default(false)
   specialty    String?
   isActive     Boolean  @default(true)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
-  address      String?  @db.Text
-  allowBalance Boolean  @default(false)
-  compliment   Float?
-  email        String?
-  type         String   @default("Doctor")
 
   @@map("doctors")
 }
@@ -358,6 +366,7 @@ model TestParameter {
   primaryTests       Test[]           @relation("PrimaryTestParameter")
 
   @@index([testId], map: "test_parameters_testId_fkey")
+  @@index([parameterCode], map: "test_parameters_parameterCode_idx")
   @@map("test_parameters")
 }
 
@@ -365,13 +374,13 @@ model TestCategory {
   id              Int            @id @default(autoincrement())
   testId          Int
   testParameterId Int
+  categoryId      String?
   categoryName    String?
   isCategory      Boolean        @default(false)
   testMethod      String?
   sortOrder       Int?
   createdAt       DateTime       @default(now())
   updatedAt       DateTime       @updatedAt
-  categoryId      String?
   test            Test           @relation(fields: [testId], references: [id], onDelete: Cascade)
   testParameter   TestParameter  @relation(fields: [testParameterId], references: [id], onDelete: Cascade)
   testResults     TestResult[]
@@ -436,6 +445,7 @@ model TestResult {
   @@index([patientTestId])
   @@index([testParameterId])
   @@index([testCategoryId], map: "test_results_testCategoryId_fkey")
+  @@index([patientTestId, testParameterId], map: "test_results_patientTestId_testParameterId_idx")
   @@map("test_results")
 }
 
@@ -472,19 +482,20 @@ model Role {
 }
 
 model User {
-  id        Int      @id @default(autoincrement())
-  center    String
-  name      String
-  username  String   @unique
-  role      String
-  mobile    String?
-  gender    String?
-  email     String?
-  address   String?  @db.Text
-  password  String
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id                   Int                    @id @default(autoincrement())
+  center               String
+  name                 String
+  username             String                 @unique
+  role                 String
+  mobile               String?
+  gender               String?
+  email                String?
+  address              String?                @db.Text
+  password             String
+  isActive             Boolean                @default(true)
+  createdAt            DateTime               @default(now())
+  updatedAt            DateTime               @updatedAt
+  user_password_resets user_password_resets[]
 
   @@map("users")
 }
@@ -495,6 +506,7 @@ model Signature {
   doctorName     String?
   signatureText  String?   @db.Text
   signatureImage String?   @db.Text
+  imageSize      String?   @default("800|600")
   activeFrom     DateTime?
   expiredOn      DateTime?
   width          Int?      @default(150)
@@ -505,4 +517,16 @@ model Signature {
   updatedAt      DateTime  @updatedAt
 
   @@map("signatures")
+}
+
+model user_password_resets {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  code      String
+  expiresAt DateTime
+  used      Boolean  @default(false)
+  createdAt DateTime @default(now())
+  users     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId], map: "user_password_resets_userId_fkey")
 }

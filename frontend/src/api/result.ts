@@ -20,6 +20,13 @@ interface ApiResponse<T = any> {
   success: boolean;
   message?: string;
   data?: T;
+  pagination?: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+    hasMore: boolean;
+  };
 }
 
 // Get all patient tests for results page

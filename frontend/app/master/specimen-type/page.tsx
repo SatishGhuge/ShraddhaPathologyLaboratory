@@ -1,11 +1,10 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { ArrowLeft, TestTube, RotateCwIcon } from "lucide-react";
+import { ArrowLeft, TestTube, RotateCwIcon, ChevronLeft, ChevronRight } from "lucide-react";
 import Header from "@/src/components/Header";
 import PageHeader from "@/src/components/BreadCrumb";
-
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || '/api';
+import { getSpecimenTypes, createSpecimenType, updateSpecimenType, deleteSpecimenType } from "@/src/api/master";
 
 // Common color name <-> hex map
 const COLOR_MAP = {
@@ -61,6 +60,9 @@ export default function SampleTypes() {
   const [search, setSearch] = useState("");
   const [data, setData] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pagination, setPagination] = useState<any>(null);
+  const ITEMS_PER_PAGE = 20;
 
   const [showModal, setShowModal] = useState(false);
   const [sampleType, setSampleType] = useState("");
@@ -72,14 +74,14 @@ export default function SampleTypes() {
   const [editId, setEditId] = useState<any>(null);
 
   // Fetch specimen types from API
-  const fetchSpecimenTypes = async () => {
+  const fetchSpecimenTypes = async (page: number = 1) => {
     try {
       setLoading(true);
-      const response = await fetch(`${API_BASE_URL}/master/specimen-types`);
-      const result = await response.json();
+      const response = await getSpecimenTypes(page, ITEMS_PER_PAGE);
       
-      if (result.success) {
-        setData(result.data);
+      if (response.success) {
+        setData(response.data || []);
+        setPagination(response.pagination || null);
       } else {
         setErrorMsg('Failed to fetch specimen types');
       }
@@ -93,7 +95,7 @@ export default function SampleTypes() {
 
   // Load data on component mount
   useEffect(() => {
-    fetchSpecimenTypes();
+    fetchSpecimenTypes(1);
   }, []);
 
   const filteredData = data.filter((item) =>
@@ -102,21 +104,19 @@ export default function SampleTypes() {
 
   const handleReset = () => {
     setSearch("");
-    fetchSpecimenTypes();
+    setCurrentPage(1);
+    fetchSpecimenTypes(1);
   };
 
   const handleDelete = async (id) => {
     if (window.confirm("Are you sure you want to delete this specimen type?")) {
       try {
-        const response = await fetch(`${API_BASE_URL}/master/specimen-types/${id}`, {
-          method: 'DELETE',
-        });
-        
-        const result = await response.json();
+        const result = await deleteSpecimenType(id);
         
         if (result.success) {
           setSuccessMsg('Specimen type deleted successfully');
-          fetchSpecimenTypes();
+          setCurrentPage(1);
+          fetchSpecimenTypes(1);
           setTimeout(() => setSuccessMsg(''), 3000);
         } else {
           setErrorMsg(result.message || 'Failed to delete specimen type');
@@ -327,6 +327,51 @@ export default function SampleTypes() {
                 )}
               </tbody>
             </table>
+          )}
+
+          {/* PAGINATION CONTROLS */}
+          {pagination && data.length > 0 && (
+            <div className="mt-3 bg-white rounded shadow-md p-3 flex items-center justify-between text-xs">
+              <div className="text-gray-600">
+                Showing {(currentPage - 1) * ITEMS_PER_PAGE + 1} to{' '}
+                {Math.min(currentPage * ITEMS_PER_PAGE, pagination.total)} of{' '}
+                {pagination.total} records
+              </div>
+
+              <div className="flex gap-2 items-center">
+                <button
+                  onClick={() => {
+                    const newPage = Math.max(1, currentPage - 1);
+                    setCurrentPage(newPage);
+                    fetchSpecimenTypes(newPage);
+                  }}
+                  disabled={currentPage === 1}
+                  className={`flex items-center gap-1 px-3 py-1 rounded ${currentPage === 1 ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-cyan-600 text-white hover:bg-cyan-700'}`}
+                >
+                  <ChevronLeft size={14} /> Previous
+                </button>
+
+                <span className="px-3 py-1">
+                  Page {currentPage} of {pagination.totalPages}
+                </span>
+
+                <button
+                  onClick={() => {
+                    const newPage = Math.min(pagination.totalPages, currentPage + 1);
+                    setCurrentPage(newPage);
+                    fetchSpecimenTypes(newPage);
+                  }}
+                  disabled={currentPage === pagination.totalPages}
+                  className={`flex items-center gap-1 px-3 py-1 rounded ${currentPage === pagination.totalPages ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-cyan-600 text-white hover:bg-cyan-700'}`}
+                >
+                  Next <ChevronRight size={14} />
+                </button>
+              </div>
+
+              <div className="text-gray-600">
+                Total: {pagination.total} records
+              </div>
+            </div>
           )}
         </div>
       </div>

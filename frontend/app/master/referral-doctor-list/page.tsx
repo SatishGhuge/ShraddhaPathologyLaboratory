@@ -12,22 +12,28 @@ export default function ReferralListing() {
   const [search, setSearch] = useState("");
   const [data, setData] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pagination, setPagination] = useState<any>(null);
+  const [filteredData, setFilteredData] = useState<any[]>([]);
+  const ITEMS_PER_PAGE = 20;
   const router = useRouter();
 
-  const fetchDoctors = () => {
+  const fetchDoctors = (page: number = 1) => {
     setLoading(true);
-    getDoctors()
+    getDoctors(page, ITEMS_PER_PAGE)
       .then((res: any) => {
         const doctors = Array.isArray(res) ? res : res?.data || [];
         setData(doctors);
+        setFilteredData(doctors);
+        setPagination(res?.pagination || null);
       })
       .catch((err) => console.error("Failed to fetch doctors:", err))
       .finally(() => setLoading(false));
   };
 
   useEffect(() => {
-    fetchDoctors();
-  }, []);
+    fetchDoctors(currentPage);
+  }, [currentPage]);
 
   const filteredData = data.filter((item) =>
     item.name.toLowerCase().includes(search.toLowerCase())
@@ -40,9 +46,15 @@ export default function ReferralListing() {
     try {
       await deleteDoctor(id);
       setData((prev) => prev.filter((item) => item.id !== id));
+      setFilteredData((prev) => prev.filter((item) => item.id !== id));
     } catch (err) {
       alert("Failed to delete: " + (err.message || "Unknown error"));
     }
+  };
+
+  const handleSearch = () => {
+    setCurrentPage(1);
+    fetchDoctors(1);
   };
 
   return (
@@ -127,6 +139,28 @@ export default function ReferralListing() {
           </tbody>
         </table>
       </div>
+
+      {pagination && filteredData.length > 0 && (
+        <div className="mt-3 bg-white rounded shadow-md p-3 flex items-center justify-between text-xs">
+          <button
+            onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+            disabled={currentPage === 1}
+            className="bg-cyan-600 hover:bg-cyan-700 disabled:bg-gray-400 text-white px-3 py-1 rounded transition-colors"
+          >
+            Previous
+          </button>
+          <span className="text-gray-700 font-medium">
+            Page {currentPage} of {pagination.totalPages} | Showing {filteredData.length} of {pagination.total} records
+          </span>
+          <button
+            onClick={() => setCurrentPage(p => Math.min(pagination.totalPages, p + 1))}
+            disabled={currentPage === pagination.totalPages}
+            className="bg-cyan-600 hover:bg-cyan-700 disabled:bg-gray-400 text-white px-3 py-1 rounded transition-colors"
+          >
+            Next
+          </button>
+        </div>
+      )}
     </div>
     </>
   );

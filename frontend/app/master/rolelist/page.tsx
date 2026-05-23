@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 
-import { Search, RotateCcw, ShieldCheck, Trash2 } from "lucide-react";
+import { Search, RotateCcw, ShieldCheck, Trash2, ChevronLeft, ChevronRight } from "lucide-react";
 import Header from "@/src/components/Header";
 import PageHeader from "@/src/components/BreadCrumb";
 import { getRoles, deleteRole } from "@/src/api/master.js";
@@ -14,13 +14,22 @@ const RoleList = () => {
   const [roles, setRoles] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<any>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pagination, setPagination] = useState<any>(null);
+  const ITEMS_PER_PAGE = 20;
 
-  const fetchRoles = async () => {
+  const fetchRoles = async (page: number = 1) => {
     setLoading(true);
     setError(null);
     try {
-      const data = await getRoles();
-      setRoles(data);
+      const data = await getRoles(page, ITEMS_PER_PAGE);
+      if (data.success) {
+        setRoles(data.data || []);
+        setPagination(data.pagination || null);
+      } else {
+        setRoles(data.data || []);
+        setPagination(null);
+      }
     } catch (err) {
       setError(err.message || "Failed to fetch roles");
     } finally {
@@ -28,13 +37,15 @@ const RoleList = () => {
     }
   };
 
-  useEffect(() => { fetchRoles(); }, []);
+  useEffect(() => { fetchRoles(1); }, []);
 
   const handleDelete = async (role) => {
     if (!window.confirm(`Delete "${role.name}"?`)) return;
     try {
       await deleteRole(role.id);
       setRoles(prev => prev.filter(r => r.id !== role.id));
+      setCurrentPage(1);
+      fetchRoles(1);
     } catch (err) {
       alert(err.message || "Failed to delete role");
     }
@@ -130,6 +141,51 @@ const RoleList = () => {
             </tbody>
           </table>
         </div>
+
+        {/* PAGINATION CONTROLS */}
+        {pagination && roles.length > 0 && (
+          <div className="mt-3 bg-white rounded shadow-md p-3 flex items-center justify-between text-xs">
+            <div className="text-gray-600">
+              Showing {(currentPage - 1) * ITEMS_PER_PAGE + 1} to{' '}
+              {Math.min(currentPage * ITEMS_PER_PAGE, pagination.total)} of{' '}
+              {pagination.total} records
+            </div>
+
+            <div className="flex gap-2 items-center">
+              <button
+                onClick={() => {
+                  const newPage = Math.max(1, currentPage - 1);
+                  setCurrentPage(newPage);
+                  fetchRoles(newPage);
+                }}
+                disabled={currentPage === 1}
+                className={`flex items-center gap-1 px-3 py-1 rounded ${currentPage === 1 ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-cyan-600 text-white hover:bg-cyan-700'}`}
+              >
+                <ChevronLeft size={14} /> Previous
+              </button>
+
+              <span className="px-3 py-1">
+                Page {currentPage} of {pagination.totalPages}
+              </span>
+
+              <button
+                onClick={() => {
+                  const newPage = Math.min(pagination.totalPages, currentPage + 1);
+                  setCurrentPage(newPage);
+                  fetchRoles(newPage);
+                }}
+                disabled={currentPage === pagination.totalPages}
+                className={`flex items-center gap-1 px-3 py-1 rounded ${currentPage === pagination.totalPages ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-cyan-600 text-white hover:bg-cyan-700'}`}
+              >
+                Next <ChevronRight size={14} />
+              </button>
+            </div>
+
+            <div className="text-gray-600">
+              Total: {pagination.total} records
+            </div>
+          </div>
+        )}
       </div>
     </>
   );

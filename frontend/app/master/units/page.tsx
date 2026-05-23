@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Ruler, RotateCcw, ArrowLeft } from "lucide-react";
+import { Ruler, RotateCcw, ArrowLeft, ChevronLeft, ChevronRight } from "lucide-react";
 import Header from "@/src/components/Header";
 import PageHeader from "@/src/components/BreadCrumb";
 import { getUnits, createUnit, updateUnit, deleteUnit } from "@/src/api/master";
@@ -10,6 +10,9 @@ export default function ResultUnits() {
   const [data, setData] = useState<any[]>([]);
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pagination, setPagination] = useState<any>(null);
+  const ITEMS_PER_PAGE = 20;
 
   const [showModal, setShowModal] = useState(false);
   const [unitSymbol, setUnitSymbol] = useState("");
@@ -20,14 +23,20 @@ export default function ResultUnits() {
 
   // Load units from database
   useEffect(() => {
-    fetchUnits();
+    fetchUnits(1);
   }, []);
 
-  const fetchUnits = async () => {
+  const fetchUnits = async (page: number = 1) => {
     try {
       setLoading(true);
-      const units = await getUnits();
-      setData(units);
+      const response = await getUnits(page, ITEMS_PER_PAGE);
+      if (response.success) {
+        setData(response.data || []);
+        setPagination(response.pagination || null);
+      } else {
+        setData(response.data || []);
+        setPagination(null);
+      }
     } catch (error) {
       console.error('Error fetching units:', error);
       setErrorMsg('Failed to load units');
@@ -209,6 +218,51 @@ export default function ResultUnits() {
             </tbody>
           </table>
         </div>
+
+        {/* PAGINATION CONTROLS */}
+        {pagination && data.length > 0 && (
+          <div className="mt-3 bg-white rounded shadow-md p-3 flex items-center justify-between text-xs">
+            <div className="text-gray-600">
+              Showing {(currentPage - 1) * ITEMS_PER_PAGE + 1} to{' '}
+              {Math.min(currentPage * ITEMS_PER_PAGE, pagination.total)} of{' '}
+              {pagination.total} records
+            </div>
+
+            <div className="flex gap-2 items-center">
+              <button
+                onClick={() => {
+                  const newPage = Math.max(1, currentPage - 1);
+                  setCurrentPage(newPage);
+                  fetchUnits(newPage);
+                }}
+                disabled={currentPage === 1}
+                className={`flex items-center gap-1 px-3 py-1 rounded ${currentPage === 1 ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-cyan-600 text-white hover:bg-cyan-700'}`}
+              >
+                <ChevronLeft size={14} /> Previous
+              </button>
+
+              <span className="px-3 py-1">
+                Page {currentPage} of {pagination.totalPages}
+              </span>
+
+              <button
+                onClick={() => {
+                  const newPage = Math.min(pagination.totalPages, currentPage + 1);
+                  setCurrentPage(newPage);
+                  fetchUnits(newPage);
+                }}
+                disabled={currentPage === pagination.totalPages}
+                className={`flex items-center gap-1 px-3 py-1 rounded ${currentPage === pagination.totalPages ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-cyan-600 text-white hover:bg-cyan-700'}`}
+              >
+                Next <ChevronRight size={14} />
+              </button>
+            </div>
+
+            <div className="text-gray-600">
+              Total: {pagination.total} records
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Modal */}

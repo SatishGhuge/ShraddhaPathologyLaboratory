@@ -102,6 +102,9 @@ export default function MonthlyCollectionSummary() {
   const [colOpen,         setColOpen]         = useState(false);
   const [colFilter,       setColFilter]       = useState("");
   const [selectedColumns, setSelectedColumns] = useState(["center","card","upi","cheque","netBanking","discount"]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pagination, setPagination] = useState<any>(null);
+  const ITEMS_PER_PAGE = 20;
 
   useEffect(() => {
     getCollectionCenters().then((res: any) => setCenters(Array.isArray(res) ? res : res?.data || [])).catch(() => {});
@@ -128,12 +131,18 @@ export default function MonthlyCollectionSummary() {
   const prevM = () => { if(cm===0){setCm(11);setCy(y=>y-1);}else setCm(m=>m-1); };
   const nextM = () => { if(cm===11){setCm(0);setCy(y=>y+1);}else setCm(m=>m+1); };
 
-  const handleSearch = async () => {
+  const handleSearch = async (page: number = 1) => {
     if (!dateFrom) { setErrors({ date: "Date is required" }); return; }
     setLoading(true); setErrors({});
     try {
-      const res = await getMonthlyCollectionSummary({ fromDate: dateFrom, toDate: dateTo || dateFrom, center });
-      setData(res.data || []);
+      const res = await getMonthlyCollectionSummary({ fromDate: dateFrom, toDate: dateTo || dateFrom, center }, page, ITEMS_PER_PAGE);
+      if (res.success) {
+        setData(res.data || []);
+        setPagination(res.pagination || null);
+      } else {
+        setData(res.data || []);
+        setPagination(null);
+      }
     } catch (err) {
       setErrors({ api: err.message });
     } finally {
@@ -143,7 +152,7 @@ export default function MonthlyCollectionSummary() {
 
   const handleReset = () => {
     setDateFrom(fmtISO(som(today0()))); setDateTo(fmtISO(eom(today0()))); setPreset("This Month"); setCustom(false);
-    setCenter(""); setErrors({}); setData([]);
+    setCenter(""); setErrors({}); setData([]); setCurrentPage(1); setPagination(null);
     setSelectedColumns(["center","card","upi","cheque","netBanking","discount"]);
   };
 
@@ -334,6 +343,51 @@ export default function MonthlyCollectionSummary() {
               )}
             </table>
           </div>
+
+          {/* PAGINATION CONTROLS */}
+          {data.length > 0 && pagination && (
+            <div className="mt-3 bg-white rounded shadow-md p-3 flex items-center justify-between text-xs">
+              <div className="text-gray-600">
+                Showing {(currentPage - 1) * ITEMS_PER_PAGE + 1} to{' '}
+                {Math.min(currentPage * ITEMS_PER_PAGE, pagination.total)} of{' '}
+                {pagination.total} records
+              </div>
+
+              <div className="flex gap-2 items-center">
+                <button
+                  onClick={() => {
+                    const newPage = Math.max(1, currentPage - 1);
+                    setCurrentPage(newPage);
+                    handleSearch(newPage);
+                  }}
+                  disabled={currentPage === 1}
+                  className={`flex items-center gap-1 px-3 py-1 rounded ${currentPage === 1 ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-cyan-600 text-white hover:bg-cyan-700'}`}
+                >
+                  <ChevronLeft size={14} /> Previous
+                </button>
+
+                <span className="px-3 py-1">
+                  Page {currentPage} of {pagination.totalPages}
+                </span>
+
+                <button
+                  onClick={() => {
+                    const newPage = Math.min(pagination.totalPages, currentPage + 1);
+                    setCurrentPage(newPage);
+                    handleSearch(newPage);
+                  }}
+                  disabled={currentPage === pagination.totalPages}
+                  className={`flex items-center gap-1 px-3 py-1 rounded ${currentPage === pagination.totalPages ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-cyan-600 text-white hover:bg-cyan-700'}`}
+                >
+                  Next <ChevronRight size={14} />
+                </button>
+              </div>
+
+              <div className="text-gray-600">
+                Total: {pagination.total} records
+              </div>
+            </div>
+          )}
         </div>
       </div>
 

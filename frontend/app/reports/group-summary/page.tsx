@@ -5,8 +5,7 @@ import { Search, RotateCcw, FileSpreadsheet, Layers, Calendar, ChevronLeft, Chev
 import Header from "@/src/components/Header";
 import PageHeader from "@/src/components/BreadCrumb";
 import * as XLSX from "xlsx";
-
-const API = process.env.NEXT_PUBLIC_API_URL || "/api";
+import { getGroupSummaryReport } from "@/src/api/admin.js";
 
 const fmtISO = (d: any) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
 const today0 = () => { const d = new Date(); d.setHours(0,0,0,0); return d; };
@@ -87,6 +86,9 @@ export default function GroupSummary() {
   const [loading,  setLoading]  = useState(false);
   const [searched, setSearched] = useState(false);
   const [errors,   setErrors]   = useState<any>({});
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pagination, setPagination] = useState<any>(null);
+  const ITEMS_PER_PAGE = 20;
 
   const token = localStorage.getItem("token");
   const authHeader = { Authorization: `Bearer ${token}` };
@@ -119,22 +121,25 @@ export default function GroupSummary() {
 
   const handleChange = (e: any) => setFilters({ ...filters, [e.target.name]: e.target.value });
 
-  const fetchData = async () => {
+  const fetchData = async (page: number = 1) => {
     if (!dateFrom) { setErrors({ date: "Date is required" }); return; }
     setLoading(true); setErrors({});
     try {
-      const params = new URLSearchParams({
+      const res = await getGroupSummaryReport({
         fromDate: dateFrom,
         toDate: dateTo || dateFrom,
         ...(filters.center && { center: filters.center }),
         ...(filters.referralDoctor && { referralDoctor: filters.referralDoctor }),
         ...(filters.businessType && { businessType: filters.businessType }),
-      });
-      const res = await fetch(`${API}/admin/group-summary-report?${params}`, { headers: authHeader });
-      const json = await res.json();
-      if (!res.ok) throw new Error(json.message || "Failed to fetch");
-      setData(json.data || []);
-      setSearched(true);
+      }, page, ITEMS_PER_PAGE);
+      
+      if (res.success) {
+        setData(res.data || []);
+        setPagination(res.pagination || null);
+        setSearched(true);
+      } else {
+        setErrors({ api: res.message || "Failed to fetch" });
+      }
     } catch (err) {
       setErrors({ api: err.message });
     } finally {
@@ -145,7 +150,7 @@ export default function GroupSummary() {
   const handleReset = () => {
     setDateFrom(fmtISO(today0())); setDateTo(fmtISO(today0())); setPreset("Today");
     setCustom(false); setFilters({ center: "", referralDoctor: "", businessType: "" });
-    setErrors({}); setData([]); setSearched(false);
+    setErrors({}); setData([]); setSearched(false); setCurrentPage(1); setPagination(null);
   };
 
   const calcTotal = (key: any) => data.reduce((s,r) => s + (r[key]||0), 0);
@@ -309,6 +314,51 @@ export default function GroupSummary() {
               )}
             </table>
           </div>
+
+          {/* PAGINATION CONTROLS */}
+          {searched && !loading && data.length > 0 && pagination && (
+            <div className="mt-3 bg-white rounded shadow-md p-3 flex items-center justify-between text-xs">
+              <div className="text-gray-600">
+                Showing {(currentPage - 1) * ITEMS_PER_PAGE + 1} to{' '}
+                {Math.min(currentPage * ITEMS_PER_PAGE, pagination.total)} of{' '}
+                {pagination.total} records
+              </div>
+
+              <div className="flex gap-2 items-center">
+                <button
+                  onClick={() => {
+                    const newPage = Math.max(1, currentPage - 1);
+                    setCurrentPage(newPage);
+                    fetchData(newPage);
+                  }}
+                  disabled={currentPage === 1}
+                  className={`flex items-center gap-1 px-3 py-1 rounded ${currentPage === 1 ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-cyan-600 text-white hover:bg-cyan-700'}`}
+                >
+                  <ChevronLeft size={14} /> Previous
+                </button>
+
+                <span className="px-3 py-1">
+                  Page {currentPage} of {pagination.totalPages}
+                </span>
+
+                <button
+                  onClick={() => {
+                    const newPage = Math.min(pagination.totalPages, currentPage + 1);
+                    setCurrentPage(newPage);
+                    fetchData(newPage);
+                  }}
+                  disabled={currentPage === pagination.totalPages}
+                  className={`flex items-center gap-1 px-3 py-1 rounded ${currentPage === pagination.totalPages ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-cyan-600 text-white hover:bg-cyan-700'}`}
+                >
+                  Next <ChevronRight size={14} />
+                </button>
+              </div>
+
+              <div className="text-gray-600">
+                Total: {pagination.total} records
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </>

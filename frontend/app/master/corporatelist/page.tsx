@@ -16,14 +16,18 @@ const CorporateList = () => {
   const [searchName,   setSearchName]   = useState("");
   const [loading,      setLoading]      = useState(true);
   const [error,        setError]        = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pagination, setPagination] = useState<any>(null);
+  const ITEMS_PER_PAGE = 20;
 
-  const fetchCorporates = async () => {
+  const fetchCorporates = async (page: number = 1) => {
     setLoading(true); setError("");
     try {
-      const res = await getCorporates();
+      const res = await getCorporates(page, ITEMS_PER_PAGE);
       const data = Array.isArray(res) ? res : res?.data || [];
       setCorporates(data);
       setFiltered(data);
+      setPagination(res?.pagination || null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load corporates");
     } finally {
@@ -31,7 +35,7 @@ const CorporateList = () => {
     }
   };
 
-  useEffect(() => { fetchCorporates(); }, []);
+  useEffect(() => { fetchCorporates(currentPage); }, [currentPage]);
 
   const handleSearch = () => {
     const q = searchName.toLowerCase();
@@ -41,13 +45,15 @@ const CorporateList = () => {
   const handleReset = () => {
     setSearchName("");
     setFiltered(corporates);
+    setCurrentPage(1);
+    fetchCorporates(1);
   };
 
   const handleDelete = async (c: any) => {
     if (!window.confirm(`Delete "${c.name}"?`)) return;
     try {
       await deleteCorporate(c.id);
-      await fetchCorporates();
+      await fetchCorporates(currentPage);
     } catch (err) {
       alert(err instanceof Error ? err.message : "Failed to delete");
     }
@@ -58,7 +64,7 @@ const CorporateList = () => {
     if (!window.confirm(msg)) return;
     try {
       await updateCorporate(c.id, { isActive: !c.isActive });
-      await fetchCorporates();
+      await fetchCorporates(currentPage);
     } catch (err) {
       alert(err instanceof Error ? err.message : "Failed to update");
     }
@@ -134,6 +140,28 @@ const CorporateList = () => {
             </tbody>
           </table>
         </div>
+
+        {pagination && filtered.length > 0 && (
+          <div className="mt-3 bg-white rounded shadow-md p-3 flex items-center justify-between text-xs">
+            <button
+              onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+              disabled={currentPage === 1}
+              className="bg-cyan-600 hover:bg-cyan-700 disabled:bg-gray-400 text-white px-3 py-1 rounded transition-colors"
+            >
+              Previous
+            </button>
+            <span className="text-gray-700 font-medium">
+              Page {currentPage} of {pagination.totalPages} | Showing {filtered.length} of {pagination.total} records
+            </span>
+            <button
+              onClick={() => setCurrentPage(p => Math.min(pagination.totalPages, p + 1))}
+              disabled={currentPage === pagination.totalPages}
+              className="bg-cyan-600 hover:bg-cyan-700 disabled:bg-gray-400 text-white px-3 py-1 rounded transition-colors"
+            >
+              Next
+            </button>
+          </div>
+        )}
       </div>
     </>
   );

@@ -15,14 +15,18 @@ const CenterList = () => {
   const [centers, setCenters] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<any>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pagination, setPagination] = useState<any>(null);
+  const ITEMS_PER_PAGE = 20;
 
-  const fetchCenters = async () => {
+  const fetchCenters = async (page: number = 1) => {
     setLoading(true);
     setError(null);
     try {
-      const res = await getCollectionCenters();
+      const res = await getCollectionCenters(page, ITEMS_PER_PAGE);
       const data = Array.isArray(res) ? res : res?.data || [];
       setCenters(data);
+      setPagination(res?.pagination || null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to fetch centers");
     } finally {
@@ -30,7 +34,7 @@ const CenterList = () => {
     }
   };
 
-  useEffect(() => { fetchCenters(); }, []);
+  useEffect(() => { fetchCenters(currentPage); }, [currentPage]);
 
   const handleDelete = async (center: any) => {
     if (!window.confirm(`Delete "${center.name}"?`)) return;
@@ -58,6 +62,18 @@ const CenterList = () => {
   };
 
   const [showInactive, setShowInactive] = useState(false);
+
+  const handleSearch = () => {
+    setCurrentPage(1);
+    fetchCenters(1);
+  };
+
+  const handleReset = () => {
+    setSearchName("");
+    setSearchLocation("");
+    setCurrentPage(1);
+    fetchCenters(1);
+  };
 
   const filtered = centers.filter(c => {
     if (showInactive && c.isActive) return false;   // show only inactive
@@ -180,6 +196,28 @@ const CenterList = () => {
             </tbody>
           </table>
         </div>
+
+        {pagination && centers.length > 0 && (
+          <div className="mt-3 bg-white rounded shadow-md p-3 flex items-center justify-between text-xs">
+            <button
+              onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+              disabled={currentPage === 1}
+              className="bg-cyan-600 hover:bg-cyan-700 disabled:bg-gray-400 text-white px-3 py-1 rounded transition-colors"
+            >
+              Previous
+            </button>
+            <span className="text-gray-700 font-medium">
+              Page {currentPage} of {pagination.totalPages} | Showing {centers.length} of {pagination.total} records
+            </span>
+            <button
+              onClick={() => setCurrentPage(p => Math.min(pagination.totalPages, p + 1))}
+              disabled={currentPage === pagination.totalPages}
+              className="bg-cyan-600 hover:bg-cyan-700 disabled:bg-gray-400 text-white px-3 py-1 rounded transition-colors"
+            >
+              Next
+            </button>
+          </div>
+        )}
       </div>
     </>
   );

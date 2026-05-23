@@ -12,6 +12,13 @@ interface ApiResponse<T = any> {
   success: boolean;
   message?: string;
   data?: T;
+  pagination?: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+    hasMore: boolean;
+  };
 }
 
 // Create new admin
@@ -66,8 +73,8 @@ export const getAdminProfile = async (): Promise<ApiResponse> => {
   }
 };
 
-// Get discount report
-export const getDiscountReport = async (filters: Filters = {}): Promise<ApiResponse> => {
+// Get discount report with pagination
+export const getDiscountReport = async (filters: Filters = {}, page: number = 1, limit: number = 20): Promise<ApiResponse> => {
   try {
     const token = localStorage.getItem('token');
     const params = new URLSearchParams();
@@ -75,6 +82,8 @@ export const getDiscountReport = async (filters: Filters = {}): Promise<ApiRespo
     if (filters.toDate) params.append('toDate', filters.toDate);
     if (filters.corporate) params.append('corporate', filters.corporate);
     if (filters.nameUsername) params.append('nameUsername', filters.nameUsername);
+    params.append('page', page.toString());
+    params.append('limit', limit.toString());
 
     const url = `${API_BASE_URL}/admin/discount-report?${params.toString()}`;
     console.log('Fetching discount report:', url);
@@ -97,8 +106,8 @@ export const getDiscountReport = async (filters: Filters = {}): Promise<ApiRespo
   }
 };
 
-// Get test report
-export const getTestReport = async (filters: Filters = {}): Promise<ApiResponse> => {
+// Get test report with pagination
+export const getTestReport = async (filters: Filters = {}, page: number = 1, limit: number = 20): Promise<ApiResponse> => {
   try {
     const token = localStorage.getItem('token');
     const params = new URLSearchParams();
@@ -113,6 +122,8 @@ export const getTestReport = async (filters: Filters = {}): Promise<ApiResponse>
     if (filters.parameter)     params.append('parameter', filters.parameter);
     if (filters.operator)      params.append('operator', filters.operator);
     if (filters.value !== undefined && filters.value !== '') params.append('value', filters.value);
+    params.append('page', page.toString());
+    params.append('limit', limit.toString());
 
     const response = await fetch(`${API_BASE_URL}/admin/test-report?${params.toString()}`, {
       method: 'GET',
@@ -150,14 +161,16 @@ export const getReportDashboard = async (filters: Filters = {}): Promise<ApiResp
   }
 };
 
-// Get monthly collection summary
-export const getMonthlyCollectionSummary = async (filters: Filters = {}): Promise<ApiResponse> => {
+// Get monthly collection summary with pagination
+export const getMonthlyCollectionSummary = async (filters: Filters = {}, page: number = 1, limit: number = 20): Promise<ApiResponse> => {
   try {
     const token = localStorage.getItem('token');
     const params = new URLSearchParams();
     if (filters.fromDate) params.append('fromDate', filters.fromDate);
     if (filters.toDate)   params.append('toDate',   filters.toDate);
     if (filters.center)   params.append('center',   filters.center);
+    params.append('page', page.toString());
+    params.append('limit', limit.toString());
 
     const response = await fetch(`${API_BASE_URL}/admin/monthly-collection-summary?${params.toString()}`, {
       method: 'GET',
@@ -172,8 +185,8 @@ export const getMonthlyCollectionSummary = async (filters: Filters = {}): Promis
   }
 };
 
-// Get turn around time report
-export const getTurnAroundTimeReport = async (filters: Filters = {}): Promise<ApiResponse> => {
+// Get turn around time report with pagination
+export const getTurnAroundTimeReport = async (filters: Filters = {}, page: number = 1, limit: number = 20): Promise<ApiResponse> => {
   try {
     const token = localStorage.getItem('token');
     const params = new URLSearchParams();
@@ -186,6 +199,8 @@ export const getTurnAroundTimeReport = async (filters: Filters = {}): Promise<Ap
     if (filters.outOfTAT) params.append('outOfTAT', filters.outOfTAT);
     if (filters.labTest) params.append('labTest', filters.labTest);
     if (filters.excludeOutsource) params.append('excludeOutsource', filters.excludeOutsource);
+    params.append('page', page.toString());
+    params.append('limit', limit.toString());
 
     const response = await fetch(`${API_BASE_URL}/admin/turn-around-time-report?${params.toString()}`, {
       method: 'GET',

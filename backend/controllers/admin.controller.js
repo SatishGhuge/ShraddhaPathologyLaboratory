@@ -1,5 +1,6 @@
 import prisma from '../config/database.js';
 import bcrypt from 'bcryptjs';
+import { getPaginationParams, buildPaginatedResponse } from '../utils/pagination.js';
 
 // Get admin profile
 export const getProfile = async (req, res) => {
@@ -117,6 +118,9 @@ export const getServiceCountReport = async (req, res) => {
   try {
     const { fromDate, toDate, center, corporate, referralDoctor, departments, inhouse } = req.query;
 
+    // Get pagination parameters
+    const { page, limit, skip } = getPaginationParams(req.query);
+
     const where = {};
 
     if (fromDate) {
@@ -181,11 +185,14 @@ export const getServiceCountReport = async (req, res) => {
     }
 
     // Sort by department then test name
-    const data = Array.from(testMap.values())
-      .sort((a, b) => a.department.localeCompare(b.department) || a.testName.localeCompare(b.testName))
-      .map((row, i) => ({ srNo: i + 1, ...row }));
+    const allData = Array.from(testMap.values())
+      .sort((a, b) => a.department.localeCompare(b.department) || a.testName.localeCompare(b.testName));
 
-    res.json({ success: true, data });
+    const total = allData.length;
+    const paginatedData = allData.slice(skip, skip + limit)
+      .map((row, i) => ({ srNo: skip + i + 1, ...row }));
+
+    res.json(buildPaginatedResponse(paginatedData, total, page, limit));
   } catch (error) {
     console.error('Service count report error:', error);
     res.status(500).json({ success: false, message: 'Failed to fetch service count report' });
@@ -195,6 +202,9 @@ export const getServiceCountReport = async (req, res) => {
 export const getGroupSummaryReport = async (req, res) => {
   try {
     const { fromDate, toDate, center, referralDoctor, businessType } = req.query;
+
+    // Get pagination parameters
+    const { page, limit, skip } = getPaginationParams(req.query);
 
     const where = {};
 
@@ -238,10 +248,13 @@ export const getGroupSummaryReport = async (req, res) => {
       d.balanceAmount += row.balanceAmount || 0;
     }
 
-    const data = Array.from(deptMap.values())
-      .sort((a, b) => a.department.localeCompare(b.department))
+    const allData = Array.from(deptMap.values())
+      .sort((a, b) => a.department.localeCompare(b.department));
+
+    const total = allData.length;
+    const paginatedData = allData.slice(skip, skip + limit)
       .map((r, i) => ({
-        id: i + 1,
+        id: skip + i + 1,
         department: r.department,
         count: r.count,
         totalAmount: parseFloat(r.totalAmount.toFixed(2)),
@@ -250,7 +263,7 @@ export const getGroupSummaryReport = async (req, res) => {
         balanceAmount: parseFloat(r.balanceAmount.toFixed(2)),
       }));
 
-    res.json({ success: true, data });
+    res.json(buildPaginatedResponse(paginatedData, total, page, limit));
   } catch (error) {
     console.error('Group summary report error:', error);
     res.status(500).json({ success: false, message: 'Failed to fetch group summary report' });
@@ -261,6 +274,9 @@ export const getGroupSummaryReport = async (req, res) => {
 export const getMonthlyCollectionSummary = async (req, res) => {
   try {
     const { fromDate, toDate, center } = req.query;
+
+    // Get pagination parameters
+    const { page, limit, skip } = getPaginationParams(req.query);
 
     const where = {};
 
@@ -334,10 +350,13 @@ export const getMonthlyCollectionSummary = async (req, res) => {
       d.netAmount += v.paidAmount;
     }
 
-    const data = Array.from(dateMap.values())
-      .sort((a, b) => new Date(a._raw) - new Date(b._raw))
+    const allData = Array.from(dateMap.values())
+      .sort((a, b) => new Date(a._raw) - new Date(b._raw));
+
+    const total = allData.length;
+    const paginatedData = allData.slice(skip, skip + limit)
       .map(({ _raw, ...rest }, i) => ({
-        id: i + 1,
+        id: skip + i + 1,
         ...rest,
         cash:       parseFloat(rest.cash.toFixed(2)),
         card:       parseFloat(rest.card.toFixed(2)),
@@ -349,7 +368,7 @@ export const getMonthlyCollectionSummary = async (req, res) => {
         netAmount:  parseFloat(rest.netAmount.toFixed(2)),
       }));
 
-    res.json({ success: true, data });
+    res.json(buildPaginatedResponse(paginatedData, total, page, limit));
   } catch (error) {
     console.error('Monthly collection summary error:', error);
     res.status(500).json({ success: false, message: 'Failed to fetch monthly collection summary' });
@@ -477,6 +496,9 @@ export const getReportDashboard = async (req, res) => {
 export const getTestReport = async (req, res) => {
   try {
     const { fromDate, toDate, patientUid, patientName, location, corporate, referralDoctor, testIds, parameter, operator, value } = req.query;
+
+    // Get pagination parameters
+    const { page, limit, skip } = getPaginationParams(req.query);
 
     const where = {};
 
@@ -624,9 +646,12 @@ export const getTestReport = async (req, res) => {
       row.testResults[pt.testId] = resultText;
     }
 
-    const data = Array.from(visitMap.values()).map((row, i) => ({ srNo: i + 1, ...row }));
+    const allData = Array.from(visitMap.values());
+    const total = allData.length;
+    const paginatedData = allData.slice(skip, skip + limit)
+      .map((row, i) => ({ srNo: skip + i + 1, ...row }));
 
-    res.json({ success: true, data });
+    res.json(buildPaginatedResponse(paginatedData, total, page, limit));
   } catch (error) {
     console.error('Test report error:', error);
     res.status(500).json({ success: false, message: 'Failed to fetch test report' });
@@ -636,6 +661,9 @@ export const getTestReport = async (req, res) => {
 export const getDiscountReport = async (req, res) => {
   try {
     const { fromDate, toDate, corporate, nameUsername } = req.query;
+
+    // Get pagination parameters
+    const { page, limit, skip } = getPaginationParams(req.query);
 
     const where = {
       discountAmount: { gt: 0 }, // only visits with actual discount
@@ -680,11 +708,10 @@ export const getDiscountReport = async (req, res) => {
         businessType: true,
         totalAmount: true,
         discountAmount: true,
-        discountPercent: true, // Add this field to get the stored discount percentage
+        discountPercent: true,
         discountRemark: true,
         visitDate: true,
         createdAt: true,
-        // from patients table
         patient: {
           select: {
             patientId: true,
@@ -710,7 +737,7 @@ export const getDiscountReport = async (req, res) => {
           businessType: row.businessType || '',
           totalAmount: 0,
           discountAmount: 0,
-          discountPercent: row.discountPercent || 0, // Use the stored discount percentage
+          discountPercent: row.discountPercent || 0,
           discountRemark: row.discountRemark || '',
           visitDate: row.visitDate || row.createdAt,
           patient: row.patient,
@@ -719,14 +746,11 @@ export const getDiscountReport = async (req, res) => {
       const entry = visitMap.get(row.visitId);
       entry.totalAmount += row.totalAmount || 0;
       entry.discountAmount += row.discountAmount || 0;
-      // Keep the discount percentage from the first record (should be same for all tests in a visit)
     }
 
-    const data = Array.from(visitMap.values()).map((v) => {
+    const allData = Array.from(visitMap.values()).map((v) => {
       const p = v.patient;
       const fullName = [p.title, p.firstName, p.lastName].filter(Boolean).join(' ').toUpperCase();
-      
-      // Use the stored discount percentage instead of recalculating
       const discountPercent = v.discountPercent ? v.discountPercent.toFixed(2) : '0.00';
 
       return {
@@ -745,7 +769,10 @@ export const getDiscountReport = async (req, res) => {
       };
     });
 
-    res.json({ success: true, data });
+    const total = allData.length;
+    const paginatedData = allData.slice(skip, skip + limit);
+
+    res.json(buildPaginatedResponse(paginatedData, total, page, limit));
   } catch (error) {
     console.error('Discount report error:', error);
     res.status(500).json({ success: false, message: 'Failed to fetch discount report' });
@@ -765,6 +792,9 @@ export const getTurnAroundTimeReport = async (req, res) => {
       labTest,
       excludeOutsource 
     } = req.query;
+
+    // Get pagination parameters
+    const { page, limit, skip } = getPaginationParams(req.query);
 
     // Build date filter based on dateFrom and dateTo
     let dateFilter = {};
@@ -827,98 +857,89 @@ export const getTurnAroundTimeReport = async (req, res) => {
     });
 
     // Process data to calculate turn around times
-    const reportData = patientTests.map((pt, index) => {
-      const patientName = `${pt.patient.title || ''} ${pt.patient.firstName || ''} ${pt.patient.lastName || ''}`.trim().toUpperCase();
-      
-      // Calculate time differences
-      const sampleTaken = pt.sampleTaken;
-      const sampleReceived = pt.sampleReceived;
-      const resultCreated = pt.resultDate;
-      
-      let timeDifference = '';
-      let isOutOfTAT = 'Not Define';
-      
-      if (sampleReceived && resultCreated) {
-        const diffMs = new Date(resultCreated) - new Date(sampleReceived);
-        const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
-        const diffMinutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
-        timeDifference = `${diffHours} hours ${diffMinutes} minutes`;
+    const allReportData = patientTests
+      .map((pt, index) => {
+        const patientName = `${pt.patient.title || ''} ${pt.patient.firstName || ''} ${pt.patient.lastName || ''}`.trim().toUpperCase();
         
-        // Check if out of TAT (you can define TAT rules based on test type)
-        const preparationTime = pt.test.preparationTime;
-        if (preparationTime) {
-          // Simple TAT check - you can make this more sophisticated
-          const tatHours = parseInt(preparationTime) || 24; // Default 24 hours
-          const actualHours = diffHours + (diffMinutes / 60);
-          isOutOfTAT = actualHours > tatHours ? 'Yes' : 'No';
+        // Calculate time differences
+        const sampleTaken = pt.sampleTaken;
+        const sampleReceived = pt.sampleReceived;
+        const resultCreated = pt.resultDate;
+        
+        let timeDifference = '';
+        let isOutOfTAT = 'Not Define';
+        
+        if (sampleReceived && resultCreated) {
+          const diffMs = new Date(resultCreated) - new Date(sampleReceived);
+          const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+          const diffMinutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+          timeDifference = `${diffHours} hours ${diffMinutes} minutes`;
+          
+          // Check if out of TAT
+          const preparationTime = pt.test.preparationTime;
+          if (preparationTime) {
+            const tatHours = parseInt(preparationTime) || 24;
+            const actualHours = diffHours + (diffMinutes / 60);
+            isOutOfTAT = actualHours > tatHours ? 'Yes' : 'No';
+          }
         }
-      }
 
-      // Apply outOfTAT filter if specified
-      if (outOfTAT && outOfTAT !== '' && isOutOfTAT !== outOfTAT) {
-        return null; // Will be filtered out
-      }
+        // Apply outOfTAT filter if specified
+        if (outOfTAT && outOfTAT !== '' && isOutOfTAT !== outOfTAT) {
+          return null;
+        }
 
-      return {
-        id: pt.id,
-        srNo: index + 1,
-        patientName,
-        patientUID: pt.visitId || pt.patientId,
-        testName: pt.test.name,
-        referralDr: pt.referralDoctor || '',
-        tat: pt.visitDate ? new Date(pt.visitDate).toLocaleString('en-GB', {
-          day: '2-digit',
-          month: '2-digit', 
-          year: 'numeric',
-          hour: '2-digit',
-          minute: '2-digit',
-          hour12: true
-        }) : '',
-        sampleTaken: sampleTaken ? new Date(sampleTaken).toLocaleString('en-GB', {
-          day: '2-digit',
-          month: '2-digit',
-          year: 'numeric', 
-          hour: '2-digit',
-          minute: '2-digit',
-          hour12: true
-        }) : '',
-        sampleReceived: sampleReceived ? new Date(sampleReceived).toLocaleString('en-GB', {
-          day: '2-digit',
-          month: '2-digit',
-          year: 'numeric',
-          hour: '2-digit', 
-          minute: '2-digit',
-          hour12: true
-        }) : '',
-        resultCreated: resultCreated ? new Date(resultCreated).toLocaleString('en-GB', {
-          day: '2-digit',
-          month: '2-digit',
-          year: 'numeric',
-          hour: '2-digit',
-          minute: '2-digit', 
-          hour12: true
-        }) : '',
-        timeDifference,
-        outOfTAT: isOutOfTAT
-      };
-    }).filter(Boolean); // Remove null entries
+        return {
+          id: pt.id,
+          patientName,
+          patientUID: pt.visitId || pt.patientId,
+          testName: pt.test.name,
+          referralDr: pt.referralDoctor || '',
+          tat: pt.visitDate ? new Date(pt.visitDate).toLocaleString('en-GB', {
+            day: '2-digit',
+            month: '2-digit', 
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: true
+          }) : '',
+          sampleTaken: sampleTaken ? new Date(sampleTaken).toLocaleString('en-GB', {
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric', 
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: true
+          }) : '',
+          sampleReceived: sampleReceived ? new Date(sampleReceived).toLocaleString('en-GB', {
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric',
+            hour: '2-digit', 
+            minute: '2-digit',
+            hour12: true
+          }) : '',
+          resultCreated: resultCreated ? new Date(resultCreated).toLocaleString('en-GB', {
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: true
+          }) : '',
+          timeDifference,
+          isOutOfTAT
+        };
+      })
+      .filter(item => item !== null);
 
-    // Re-number after filtering
-    reportData.forEach((item, index) => {
-      item.srNo = index + 1;
-    });
+    const total = allReportData.length;
+    const paginatedData = allReportData.slice(skip, skip + limit)
+      .map((item, i) => ({ srNo: skip + i + 1, ...item }));
 
-    res.json({
-      success: true,
-      data: reportData,
-      total: reportData.length
-    });
-
+    res.json(buildPaginatedResponse(paginatedData, total, page, limit));
   } catch (error) {
     console.error('Turn around time report error:', error);
-    res.status(500).json({ 
-      success: false, 
-      message: 'Failed to fetch turn around time report' 
-    });
+    res.status(500).json({ success: false, message: 'Failed to fetch turn around time report' });
   }
 };

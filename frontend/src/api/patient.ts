@@ -12,6 +12,13 @@ interface ApiResponse<T = any> {
   success: boolean;
   message?: string;
   data?: T;
+  pagination?: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+    hasMore: boolean;
+  };
 }
 
 // Helper function for API calls
@@ -46,7 +53,7 @@ export const createPatient = async (patientData: PatientData): Promise<any> => {
     method: 'POST',
     body: JSON.stringify(patientData),
   });
-  return response.data || response;
+  return response;
 };
 
 // Get all patients with pagination
@@ -67,16 +74,18 @@ export const getPatientById = async (id: string): Promise<ApiResponse> => {
   });
 };
 
-// Search patient by mobile or email - returns array of all matching patients
-export const searchPatient = async (mobile?: string, email?: string): Promise<ApiResponse> => {
+// Search patient by mobile or email - returns array of all matching patients with pagination
+export const searchPatient = async (mobile?: string, email?: string, page: number = 1, limit: number = 20): Promise<ApiResponse> => {
   const params = new URLSearchParams();
   if (mobile) params.append('mobile', mobile);
   if (email) params.append('email', email);
+  params.append('page', page.toString());
+  params.append('limit', limit.toString());
   
   const response = await apiCall(`/patients/search?${params.toString()}`, {
     method: 'GET',
   });
-  // Return the full response object with data array
+  // Return the full response object with data array and pagination info
   return response;
 };
 
@@ -157,8 +166,8 @@ export const updatePayment = async (patientId: string, visitId: string, paymentD
   return response;
 };
 
-// Get patient statistics for dashboard
-export const getPatientStatistics = async (filters: Filters = {}): Promise<any> => {
+// Get patient statistics for dashboard with pagination
+export const getPatientStatistics = async (filters: Filters = {}, page: number = 1, limit: number = 20): Promise<any> => {
   const queryParams = new URLSearchParams();
   
   // Add filters to query params
@@ -168,11 +177,14 @@ export const getPatientStatistics = async (filters: Filters = {}): Promise<any> 
     }
   });
   
+  queryParams.append('page', page.toString());
+  queryParams.append('limit', limit.toString());
+  
   const url = `/patients/statistics${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
   
   const response = await apiCall(url, {
     method: 'GET',
   });
   
-  return response.data;
+  return response;
 };

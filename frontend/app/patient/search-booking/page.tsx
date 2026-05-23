@@ -20,7 +20,8 @@ import { generateBillPDF, printBill } from "@/src/utils/billPdfGenerator.js";
 
 /* ─────────────────── helpers ─────────────────── */
 const getSampleColor = (sample: any, specimenTypes: any) => {
-  const found = specimenTypes?.find(s => s.Sample_Type === sample);
+  if (!Array.isArray(specimenTypes)) return '#cccccc';
+  const found = specimenTypes.find((s: any) => s.Sample_Type === sample);
   return found?.Sample_Color || '#cccccc';
 };
 

@@ -3213,15 +3213,23 @@ export const searchParameters = async (req, res) => {
 // Get all units
 export const getUnits = async (req, res) => {
   try {
-    const units = await prisma.unit.findMany({
-      where: { isActive: true },
-      orderBy: { symbol: 'asc' }
+    // Get pagination parameters
+    const { page, limit, skip } = getPaginationParams(req.query);
+
+    // Get total count
+    const total = await prisma.unit.count({
+      where: { isActive: true }
     });
 
-    res.json({
-      success: true,
-      data: units
+    // Get paginated units
+    const units = await prisma.unit.findMany({
+      where: { isActive: true },
+      orderBy: { symbol: 'asc' },
+      skip,
+      take: limit
     });
+
+    res.json(buildPaginatedResponse(units, total, page, limit));
   } catch (error) {
     console.error('Get units error:', error);
     res.status(500).json({
@@ -3773,6 +3781,13 @@ export const createTestCategory = async (req, res) => {
 // Get all templates
 export const getTemplates = async (req, res) => {
   try {
+    // Get pagination parameters
+    const { page, limit, skip } = getPaginationParams(req.query);
+
+    // Get total count
+    const total = await prisma.testTemplate.count();
+
+    // Get paginated templates
     const templates = await prisma.testTemplate.findMany({
       include: {
         test: {
@@ -3791,7 +3806,9 @@ export const getTemplates = async (req, res) => {
       },
       orderBy: {
         createdAt: 'desc'
-      }
+      },
+      skip,
+      take: limit
     });
 
     // Parse JSON parameters for each template
@@ -3800,10 +3817,7 @@ export const getTemplates = async (req, res) => {
       parameters: template.parameters ? JSON.parse(template.parameters) : []
     }));
 
-    res.json({
-      success: true,
-      data: parsedTemplates
-    });
+    res.json(buildPaginatedResponse(parsedTemplates, total, page, limit));
   } catch (error) {
     console.error('Error fetching templates:', error);
     res.status(500).json({
@@ -4095,14 +4109,20 @@ export const deleteTemplate = async (req, res) => {
 // Get all specimen types
 export const getSpecimenTypes = async (req, res) => {
   try {
+    // Get pagination parameters
+    const { page, limit, skip } = getPaginationParams(req.query);
+
+    // Get total count
+    const total = await prisma.sample_type.count();
+
+    // Get paginated specimen types
     const specimenTypes = await prisma.sample_type.findMany({
-      orderBy: { Sample_Type: 'asc' }
+      orderBy: { Sample_Type: 'asc' },
+      skip,
+      take: limit
     });
 
-    res.json({
-      success: true,
-      data: specimenTypes
-    });
+    res.json(buildPaginatedResponse(specimenTypes, total, page, limit));
   } catch (error) {
     console.error('Get specimen types error:', error);
     res.status(500).json({
@@ -4290,11 +4310,23 @@ export const deleteSpecimenType = async (req, res) => {
 
 export const getRoles = async (req, res) => {
   try {
+    // Get pagination parameters
+    const { page, limit, skip } = getPaginationParams(req.query);
+
+    // Get total count
+    const total = await prisma.role.count({
+      where: { isActive: true }
+    });
+
+    // Get paginated roles
     const roles = await prisma.role.findMany({
       where: { isActive: true },
       orderBy: { name: 'asc' },
+      skip,
+      take: limit
     });
-    res.json({ success: true, data: roles });
+
+    res.json(buildPaginatedResponse(roles, total, page, limit));
   } catch (error) {
     console.error('Get roles error:', error);
     res.status(500).json({ success: false, message: 'Failed to fetch roles' });
@@ -4381,12 +4413,24 @@ export const deleteRole = async (req, res) => {
 
 export const getUsers = async (req, res) => {
   try {
+    // Get pagination parameters
+    const { page, limit, skip } = getPaginationParams(req.query);
+
+    // Get total count
+    const total = await prisma.user.count({
+      where: { isActive: true, NOT: { role: { in: ['Collection Center', 'Franchise'] } } }
+    });
+
+    // Get paginated users
     const users = await prisma.user.findMany({
       where: { isActive: true, NOT: { role: { in: ['Collection Center', 'Franchise'] } } },
       select: { id: true, center: true, name: true, username: true, role: true, mobile: true, gender: true, email: true, address: true, createdAt: true },
       orderBy: { name: 'asc' },
+      skip,
+      take: limit
     });
-    res.json({ success: true, data: users });
+
+    res.json(buildPaginatedResponse(users, total, page, limit));
   } catch (error) {
     res.status(500).json({ success: false, message: 'Failed to fetch users' });
   }

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Search, RotateCcw, Printer, FileSpreadsheet, Percent } from "lucide-react";
+import { Search, RotateCcw, Printer, FileSpreadsheet, Percent, ChevronLeft, ChevronRight } from "lucide-react";
 import Header from "@/src/components/Header";
 import PageHeader from "@/src/components/BreadCrumb";
 import { getDiscountReport } from "@/src/api/admin.js";
@@ -21,14 +21,18 @@ export default function DiscountReport() {
   const [data, setData] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<any>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pagination, setPagination] = useState<any>(null);
+  const ITEMS_PER_PAGE = 20;
 
-  const fetchData = async (fromDate, toDate, corporate, nameUsername) => {
+  const fetchData = async (fromDate, toDate, corporate, nameUsername, page = 1) => {
     setLoading(true);
     setError(null);
     try {
-      const res = await getDiscountReport({ fromDate, toDate, corporate, nameUsername });
+      const res = await getDiscountReport({ fromDate, toDate, corporate, nameUsername }, page, ITEMS_PER_PAGE);
       if (res.success) {
         setData(res.data || []);
+        setPagination(res.pagination || null);
       } else {
         setError(res.message || "Failed to fetch report");
       }
@@ -43,7 +47,7 @@ export default function DiscountReport() {
 
   // Auto-fetch today's data on mount
   useEffect(() => {
-    fetchData(today, today, "", "");
+    fetchData(today, today, "", "", 1);
   }, []);
 
   const handleChange = (e: any) => {
@@ -62,14 +66,16 @@ export default function DiscountReport() {
 
   const handleSearch = async () => {
     if (!validate()) return;
-    fetchData(filters.fromDate, filters.toDate, filters.corporate, filters.nameUsername);
+    setCurrentPage(1);
+    fetchData(filters.fromDate, filters.toDate, filters.corporate, filters.nameUsername, 1);
   };
 
   const handleReset = () => {
     setFilters({ fromDate: today, toDate: today, corporate: "", nameUsername: "" });
     setErrors({});
     setError(null);
-    fetchData(today, today, "", "");
+    setCurrentPage(1);
+    fetchData(today, today, "", "", 1);
   };
 
   const totalAmount = data.reduce((sum, r) => sum + (r.totalAmount || 0), 0);
@@ -234,6 +240,51 @@ export default function DiscountReport() {
         {!searched && !loading && (
           <div className="bg-white p-6 rounded shadow-md text-center text-gray-500 text-sm">
             Loading today's discount report...
+          </div>
+        )}
+
+        {/* PAGINATION CONTROLS */}
+        {searched && !loading && data.length > 0 && pagination && (
+          <div className="mt-3 bg-white rounded shadow-md p-3 flex items-center justify-between text-xs">
+            <div className="text-gray-600">
+              Showing {(currentPage - 1) * ITEMS_PER_PAGE + 1} to{' '}
+              {Math.min(currentPage * ITEMS_PER_PAGE, pagination.total)} of{' '}
+              {pagination.total} records
+            </div>
+
+            <div className="flex gap-2 items-center">
+              <button
+                onClick={() => {
+                  const newPage = Math.max(1, currentPage - 1);
+                  setCurrentPage(newPage);
+                  fetchData(filters.fromDate, filters.toDate, filters.corporate, filters.nameUsername, newPage);
+                }}
+                disabled={currentPage === 1}
+                className={`flex items-center gap-1 px-3 py-1 rounded ${currentPage === 1 ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-cyan-600 text-white hover:bg-cyan-700'}`}
+              >
+                <ChevronLeft size={14} /> Previous
+              </button>
+
+              <span className="px-3 py-1">
+                Page {currentPage} of {pagination.totalPages}
+              </span>
+
+              <button
+                onClick={() => {
+                  const newPage = Math.min(pagination.totalPages, currentPage + 1);
+                  setCurrentPage(newPage);
+                  fetchData(filters.fromDate, filters.toDate, filters.corporate, filters.nameUsername, newPage);
+                }}
+                disabled={currentPage === pagination.totalPages}
+                className={`flex items-center gap-1 px-3 py-1 rounded ${currentPage === pagination.totalPages ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-cyan-600 text-white hover:bg-cyan-700'}`}
+              >
+                Next <ChevronRight size={14} />
+              </button>
+            </div>
+
+            <div className="text-gray-600">
+              Total: {pagination.total} records
+            </div>
           </div>
         )}
       </div>

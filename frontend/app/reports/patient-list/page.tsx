@@ -108,6 +108,9 @@ export default function PatientList() {
   const [centers, setCenters] = useState<any[]>([]);
   const [visitTypes, setVisitTypes] = useState<any[]>([]);
   const [refDoctors, setRefDoctors] = useState<any[]>([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pagination, setPagination] = useState<any>(null);
+  const ITEMS_PER_PAGE = 20;
 
   useEffect(()=>{ getCollectionCenters().then((res: any) => setCenters(Array.isArray(res) ? res : res?.data || [])).catch(()=>{}); },[]);
 
@@ -182,7 +185,7 @@ export default function PatientList() {
   });
 
   const fetchData = async (from, to) => {
-    setErrors({}); setLoading(true);
+    setErrors({}); setLoading(true); setCurrentPage(1);
     try {
       const res = await getAllPatients();
       const patients = res.data || res || [];
@@ -196,7 +199,19 @@ export default function PatientList() {
       const docs  = [...new Set(filtered.flatMap(p=>(p.tests||[]).map(t=>t.referralDoctor).filter(Boolean)))].sort();
       setVisitTypes(types);
       setRefDoctors(docs);
-      setData(applyF(rows));
+      const filteredRows = applyF(rows);
+      setData(filteredRows);
+      
+      // Set pagination metadata
+      const total = filteredRows.length;
+      const totalPages = Math.ceil(total / ITEMS_PER_PAGE);
+      setPagination({
+        page: 1,
+        limit: ITEMS_PER_PAGE,
+        total: total,
+        totalPages: totalPages,
+        hasMore: totalPages > 1
+      });
       setSearched(true);
     } catch(err) {
       setErrors({ api: err.message || "Failed to fetch data" });
@@ -214,6 +229,7 @@ export default function PatientList() {
     const todayStr = fmtISO(today0());
     setF({center:"",visitType:"",referralDoctor:"",nameUsername:"",patientName:"",onlyOutstandings:false,foc:false});
     setDateFrom(todayStr); setDateTo(todayStr); setPreset("Today"); setCustom(false);
+    setCurrentPage(1); setPagination(null);
     setSelCols(Object.fromEntries(COLS.map(c=>[c.key,true])));
     setColQ(""); setErrors({});
     fetchData(todayStr, todayStr);
@@ -379,19 +395,67 @@ export default function PatientList() {
                 {loading?(<tr><td colSpan={5+vis.length} className="text-center p-3 sm:p-4 text-gray-500 text-xs sm:text-sm border border-gray-300">Loading...</td></tr>)
                 :errors.api?(<tr><td colSpan={5+vis.length} className="text-center p-3 sm:p-4 text-red-500 text-xs sm:text-sm border border-gray-300">{errors.api}</td></tr>)
                 :data.length===0?(<tr><td colSpan={5+vis.length} className="text-center p-3 sm:p-4 text-gray-500 text-xs sm:text-sm border border-gray-300">{searched?"No records found.":"Select filters and click Search."}</td></tr>)
-                :data.map((row,i)=>(
-                  <tr key={`${row.visitId}-${i}`} className={i%2===0?"bg-white hover:bg-gray-50":"bg-gray-50 hover:bg-gray-100"}>
-                    <td className="px-2 sm:px-3 py-1.5 sm:py-2 border border-gray-200 text-xs sm:text-sm">{i+1}</td>
-                    <td className="px-2 sm:px-3 py-1.5 sm:py-2 border border-gray-200 whitespace-nowrap text-xs sm:text-sm">{row.date}</td>
-                    <td className="px-2 sm:px-3 py-1.5 sm:py-2 border border-gray-200 font-medium text-xs sm:text-sm">{row.patientName}</td>
-                    <td className="px-2 sm:px-3 py-1.5 sm:py-2 border border-gray-200 whitespace-nowrap text-xs sm:text-sm">{row.ageGender}</td>
-                    <td className="px-2 sm:px-3 py-1.5 sm:py-2 border border-gray-200 text-xs sm:text-sm">{row.testPerformed}</td>
-                    {vis.map(c=><td key={c.key} className="px-2 sm:px-3 py-1.5 sm:py-2 border border-gray-200 whitespace-nowrap text-xs sm:text-sm">{row[c.key]??"-"}</td>)}
-                  </tr>
-                ))}
+                :(() => {
+                  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+                  const endIndex = startIndex + ITEMS_PER_PAGE;
+                  const paginatedData = data.slice(startIndex, endIndex);
+                  return paginatedData.map((row, i) => (
+                    <tr key={`${row.visitId}-${i}`} className={i%2===0?"bg-white hover:bg-gray-50":"bg-gray-50 hover:bg-gray-100"}>
+                      <td className="px-2 sm:px-3 py-1.5 sm:py-2 border border-gray-200 text-xs sm:text-sm">{startIndex + i + 1}</td>
+                      <td className="px-2 sm:px-3 py-1.5 sm:py-2 border border-gray-200 whitespace-nowrap text-xs sm:text-sm">{row.date}</td>
+                      <td className="px-2 sm:px-3 py-1.5 sm:py-2 border border-gray-200 font-medium text-xs sm:text-sm">{row.patientName}</td>
+                      <td className="px-2 sm:px-3 py-1.5 sm:py-2 border border-gray-200 whitespace-nowrap text-xs sm:text-sm">{row.ageGender}</td>
+                      <td className="px-2 sm:px-3 py-1.5 sm:py-2 border border-gray-200 text-xs sm:text-sm">{row.testPerformed}</td>
+                      {vis.map(c=><td key={c.key} className="px-2 sm:px-3 py-1.5 sm:py-2 border border-gray-200 whitespace-nowrap text-xs sm:text-sm">{row[c.key]??"-"}</td>)}
+                    </tr>
+                  ));
+                })()}
               </tbody>
             </table>
           </div>
+
+          {/* PAGINATION CONTROLS */}
+          {searched && !loading && data.length > 0 && pagination && (
+            <div className="mt-3 bg-white rounded shadow-md p-3 flex items-center justify-between text-xs">
+              <div className="text-gray-600">
+                Showing {(currentPage - 1) * ITEMS_PER_PAGE + 1} to{' '}
+                {Math.min(currentPage * ITEMS_PER_PAGE, pagination.total)} of{' '}
+                {pagination.total} records
+              </div>
+
+              <div className="flex gap-2 items-center">
+                <button
+                  onClick={() => {
+                    const newPage = Math.max(1, currentPage - 1);
+                    setCurrentPage(newPage);
+                  }}
+                  disabled={currentPage === 1}
+                  className={`flex items-center gap-1 px-3 py-1 rounded ${currentPage === 1 ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-cyan-600 text-white hover:bg-cyan-700'}`}
+                >
+                  <ChevronLeft size={14} /> Previous
+                </button>
+
+                <span className="px-3 py-1">
+                  Page {currentPage} of {pagination.totalPages}
+                </span>
+
+                <button
+                  onClick={() => {
+                    const newPage = Math.min(pagination.totalPages, currentPage + 1);
+                    setCurrentPage(newPage);
+                  }}
+                  disabled={currentPage === pagination.totalPages}
+                  className={`flex items-center gap-1 px-3 py-1 rounded ${currentPage === pagination.totalPages ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-cyan-600 text-white hover:bg-cyan-700'}`}
+                >
+                  Next <ChevronRight size={14} />
+                </button>
+              </div>
+
+              <div className="text-gray-600">
+                Total: {pagination.total} records
+              </div>
+            </div>
+          )}
           {data.length>0&&(
             <div className="px-3 py-1.5 border-t border-gray-200 text-xs text-gray-500 flex justify-between">
               <span>{data.length} record(s)</span>

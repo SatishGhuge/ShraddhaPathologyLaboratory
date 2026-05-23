@@ -102,6 +102,9 @@ export default function TurnAroundTime() {
   const [loading, setLoading] = useState(false);
   const [centers, setCenters] = useState<any[]>([]);
   const [corporates, setCorporates] = useState<any[]>([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pagination, setPagination] = useState<any>(null);
+  const ITEMS_PER_PAGE = 20;
 
   // Fetch collection centers and corporates for dropdowns
   useEffect(() => {
@@ -157,7 +160,7 @@ export default function TurnAroundTime() {
     return Object.keys(err).length === 0;
   };
 
-  const handleSearchWithDates = async (fromDate, toDate) => {
+  const handleSearchWithDates = async (fromDate, toDate, page: number = 1) => {
     setLoading(true);
     setErrors({});
     
@@ -169,8 +172,14 @@ export default function TurnAroundTime() {
         ...filters
       };
       
-      const response = await getTurnAroundTimeReport(searchParams);
-      setData(response.data || []);
+      const response = await getTurnAroundTimeReport(searchParams, page, ITEMS_PER_PAGE);
+      if (response.success) {
+        setData(response.data || []);
+        setPagination(response.pagination || null);
+      } else {
+        setData(response.data || []);
+        setPagination(null);
+      }
       setSearched(true);
     } catch (error) {
       console.error('Failed to fetch turn around time report:', error);
@@ -183,7 +192,8 @@ export default function TurnAroundTime() {
 
   const handleSearch = async () => {
     if (!validate()) return;
-    await handleSearchWithDates(dateFrom, dateTo);
+    setCurrentPage(1);
+    await handleSearchWithDates(dateFrom, dateTo, 1);
   };
 
   const handleReset = () => {
@@ -192,6 +202,8 @@ export default function TurnAroundTime() {
     setDateTo(today);
     setPreset("Today");
     setCustom(false);
+    setCurrentPage(1);
+    setPagination(null);
     setFilters({
       center: "",
       corporate: "",
@@ -468,6 +480,51 @@ export default function TurnAroundTime() {
                     ))}
                   </tbody>
                 </table>
+              )}
+
+              {/* PAGINATION CONTROLS */}
+              {data.length > 0 && pagination && (
+                <div className="mt-3 bg-white rounded shadow-md p-3 flex items-center justify-between text-xs">
+                  <div className="text-gray-600">
+                    Showing {(currentPage - 1) * ITEMS_PER_PAGE + 1} to{' '}
+                    {Math.min(currentPage * ITEMS_PER_PAGE, pagination.total)} of{' '}
+                    {pagination.total} records
+                  </div>
+
+                  <div className="flex gap-2 items-center">
+                    <button
+                      onClick={() => {
+                        const newPage = Math.max(1, currentPage - 1);
+                        setCurrentPage(newPage);
+                        handleSearchWithDates(dateFrom, dateTo, newPage);
+                      }}
+                      disabled={currentPage === 1}
+                      className={`flex items-center gap-1 px-3 py-1 rounded ${currentPage === 1 ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-cyan-600 text-white hover:bg-cyan-700'}`}
+                    >
+                      <ChevronLeft size={14} /> Previous
+                    </button>
+
+                    <span className="px-3 py-1">
+                      Page {currentPage} of {pagination.totalPages}
+                    </span>
+
+                    <button
+                      onClick={() => {
+                        const newPage = Math.min(pagination.totalPages, currentPage + 1);
+                        setCurrentPage(newPage);
+                        handleSearchWithDates(dateFrom, dateTo, newPage);
+                      }}
+                      disabled={currentPage === pagination.totalPages}
+                      className={`flex items-center gap-1 px-3 py-1 rounded ${currentPage === pagination.totalPages ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-cyan-600 text-white hover:bg-cyan-700'}`}
+                    >
+                      Next <ChevronRight size={14} />
+                    </button>
+                  </div>
+
+                  <div className="text-gray-600">
+                    Total: {pagination.total} records
+                  </div>
+                </div>
               )}
             </div>
 
