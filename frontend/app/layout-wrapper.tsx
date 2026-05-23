@@ -35,7 +35,7 @@ export function LayoutWrapper({ children }: { children: ReactNode }) {
   return (
     <>
       <Header />
-      <div className={`${!isPublicRoute ? "ml-64" : ""}`}>
+      <div className={`${!isPublicRoute ? "ml-48 mt-14" : ""}`}>
         {children}
       </div>
     </>

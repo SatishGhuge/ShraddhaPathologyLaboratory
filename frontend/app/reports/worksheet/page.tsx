@@ -218,7 +218,7 @@ export default function Worksheet() {
   return (
     <>
       <Header />
-      <div className="p-2 sm:p-3 md:p-4 lg:p-6 bg-cyan-50 min-h-screen">
+      <div className="p-2 sm:p-3 md:p-4 lg:p-6 bg-primary-50 min-h-screen mt-16">
         {/* PAGE HEADING */}
         <PageHeader 
           title="Worksheet" 
@@ -237,7 +237,7 @@ export default function Worksheet() {
                 placeholder="From Date"
                 value={filters.fromDate}
                 onChange={handleChange}
-                className={`border border-gray-300 p-1.5 sm:p-2 rounded w-full text-xs sm:text-sm focus:outline-none focus:ring-1 focus:ring-cyan-500 ${
+                className={`border border-gray-300 p-1.5 sm:p-2 rounded w-full text-xs sm:text-sm focus:outline-none focus:ring-1 focus:ring-primary-500 ${
                   errors.fromDate && "border-red-500"
                 }`}
               />
@@ -253,7 +253,7 @@ export default function Worksheet() {
                 placeholder="To Date"
                 value={filters.toDate}
                 onChange={handleChange}
-                className={`border border-gray-300 p-1.5 sm:p-2 rounded w-full text-xs sm:text-sm focus:outline-none focus:ring-1 focus:ring-cyan-500 ${
+                className={`border border-gray-300 p-1.5 sm:p-2 rounded w-full text-xs sm:text-sm focus:outline-none focus:ring-1 focus:ring-primary-500 ${
                   errors.toDate && "border-red-500"
                 }`}
               />
@@ -267,7 +267,7 @@ export default function Worksheet() {
                 name="center"
                 value={filters.center}
                 onChange={handleChange}
-                className={`border border-gray-300 p-1.5 sm:p-2 rounded w-full text-xs sm:text-sm focus:outline-none focus:ring-1 focus:ring-cyan-500 ${
+                className={`border border-gray-300 p-1.5 sm:p-2 rounded w-full text-xs sm:text-sm focus:outline-none focus:ring-1 focus:ring-primary-500 ${
                   errors.center && "border-red-500"
                 }`}
               >
@@ -285,7 +285,7 @@ export default function Worksheet() {
               name="corporate"
               value={filters.corporate}
               onChange={handleChange}
-              className="border border-gray-300 p-1.5 sm:p-2 rounded w-full text-xs sm:text-sm focus:outline-none focus:ring-1 focus:ring-cyan-500"
+              className="border border-gray-300 p-1.5 sm:p-2 rounded w-full text-xs sm:text-sm focus:outline-none focus:ring-1 focus:ring-primary-500"
             >
               <option value="">Select Corporate</option>
               <option>Walkin</option>
@@ -298,7 +298,7 @@ export default function Worksheet() {
               name="selectOptions"
               value={filters.selectOptions}
               onChange={handleChange}
-              className="border border-gray-300 p-1.5 sm:p-2 rounded w-full text-xs sm:text-sm focus:outline-none focus:ring-1 focus:ring-cyan-500"
+              className="border border-gray-300 p-1.5 sm:p-2 rounded w-full text-xs sm:text-sm focus:outline-none focus:ring-1 focus:ring-primary-500"
             >
               <option value="">Select options</option>
               <option>Option 1</option>
@@ -314,7 +314,7 @@ export default function Worksheet() {
               placeholder="Exclude Test (, separated)"
               value={filters.excludeTest}
               onChange={handleChange}
-              className="border border-gray-300 p-1.5 sm:p-2 rounded w-full text-xs sm:text-sm focus:outline-none focus:ring-1 focus:ring-cyan-500"
+              className="border border-gray-300 p-1.5 sm:p-2 rounded w-full text-xs sm:text-sm focus:outline-none focus:ring-1 focus:ring-primary-500"
             />
 
             <div className="flex items-center gap-2 border border-gray-300 p-1.5 sm:p-2 rounded bg-white">
@@ -323,7 +323,7 @@ export default function Worksheet() {
                 id="excludeOutsource"
                 checked={excludeOutsource}
                 onChange={(e) => setExcludeOutsource(e.target.checked)}
-                className="w-4 h-4 text-cyan-600 focus:ring-cyan-500 border-gray-300 rounded"
+                className="w-4 h-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
               />
               <label htmlFor="excludeOutsource" className="text-xs sm:text-sm text-gray-700">
                 Exclude Outsource
@@ -335,7 +335,7 @@ export default function Worksheet() {
               <button
                 type="button"
                 onClick={() => setShowColumnDropdown(!showColumnDropdown)}
-                className="border-2 border-cyan-500 p-1.5 sm:p-2 rounded w-full text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500 bg-white text-gray-700 text-left flex items-center justify-between"
+                className="border-2 border-primary-500 p-1.5 sm:p-2 rounded w-full text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white text-gray-700 text-left flex items-center justify-between"
               >
                 <span>
                   Required Column {selectedColumns.length > 0 && `(${selectedColumns.length})`}
@@ -354,7 +354,7 @@ export default function Worksheet() {
                       placeholder="Filter: Enter keywords"
                       value={columnFilter}
                       onChange={(e) => setColumnFilter(e.target.value)}
-                      className="w-full p-1.5 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-cyan-500"
+                      className="w-full p-1.5 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-primary-500"
                     />
                   </div>
 
@@ -425,7 +425,7 @@ export default function Worksheet() {
               <>
                 <button 
                   onClick={handlePrint}
-                  className="flex gap-1 sm:gap-1.5 items-center bg-orange-600 hover:bg-orange-700 text-white px-2 sm:px-3 py-1.5 sm:py-2 rounded text-xs sm:text-sm transition-colors">
+                  className="flex gap-1 sm:gap-1.5 items-center bg-primary-600 hover:bg-primary-700 text-white px-2 sm:px-3 py-1.5 sm:py-2 rounded text-xs sm:text-sm transition-colors">
                   <Printer size={14} className="sm:w-4 sm:h-4"/> 
                   <span>Print</span>
                 </button>
@@ -450,7 +450,7 @@ export default function Worksheet() {
             {/* TABLE */}
             <div className="overflow-x-auto">
               <table className="w-full text-xs sm:text-sm border-collapse">
-                <thead className="bg-gradient-to-r from-slate-800 via-cyan-700 to-cyan-600 shadow-xl text-white">
+                <thead className="bg-gradient-to-r from-slate-800 via-primary-700 to-primary-600 shadow-xl text-white">
                   <tr>
                     <th className="px-2 sm:px-3 py-1.5 sm:py-2 text-left font-semibold text-xs sm:text-sm whitespace-nowrap border border-gray-300">
                       <input type="checkbox" className="w-4 h-4" />
@@ -696,3 +696,4 @@ export default function Worksheet() {
     </>
   );
 }
+

@@ -29,6 +29,11 @@
   animation: rotate3d 20s linear infinite;
 }
 
+/* Main content area padding to account for fixed headers */
+main, [role="main"] {
+  padding-top: 3.5rem; /* 14px header height + some buffer */
+}
+
 #root {
   max-width: 1280px;
   margin: 0 auto;

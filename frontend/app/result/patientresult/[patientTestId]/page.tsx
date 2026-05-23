@@ -46,9 +46,9 @@ const SuggestionInput = ({ value, onChange, options, isAbnormal }) => {
         onClick={() => { setShow(true); }}
       >
         {tags.map(tag => (
-          <span key={tag} className="flex items-center gap-1 bg-cyan-100 text-cyan-800 text-xs px-2 py-0.5 rounded-full">
+          <span key={tag} className="flex items-center gap-1 bg-primary-100 text-primary-800 text-xs px-2 py-0.5 rounded-full">
             {tag}
-            <button type="button" onMouseDown={(e) => { e.stopPropagation(); removeTag(tag); }} className="text-cyan-600 hover:text-red-500 font-bold leading-none">×</button>
+            <button type="button" onMouseDown={(e) => { e.stopPropagation(); removeTag(tag); }} className="text-primary-600 hover:text-red-500 font-bold leading-none">×</button>
           </span>
         ))}
         <input
@@ -66,7 +66,7 @@ const SuggestionInput = ({ value, onChange, options, isAbnormal }) => {
             <li
               key={opt}
               onMouseDown={() => addTag(opt)}
-              className="px-3 py-1.5 cursor-pointer hover:bg-cyan-50 hover:text-cyan-800"
+              className="px-3 py-1.5 cursor-pointer hover:bg-primary-50 hover:text-primary-800"
             >
               {opt}
             </li>
@@ -422,7 +422,7 @@ const PatientResult = () => {
   return (
     <>
       <Header />
-      <div className="p-4 bg-gray-100 min-h-screen">
+      <div className="p-4 bg-gray-100 min-h-screen mt-16">
 
         {/* Patient Header */}
         <div className="bg-yellow-100 border p-2 text-sm flex justify-between flex-wrap">
@@ -436,12 +436,12 @@ const PatientResult = () => {
         </div>
 
         {/* Test Name */}
-        <div className="mt-2 bg-cyan-600 text-white p-2 font-semibold">{patientData.test.name}</div>
+        <div className="mt-2 bg-primary-600 text-white p-2 font-semibold">{patientData.test.name}</div>
 
         {/* Results Table */}
         <div className="mt-3 bg-white border">
           <table className="w-full text-sm border-collapse">
-            <thead className="bg-cyan-700 text-white">
+            <thead className="bg-secondary-700 text-white">
               <tr>
                 <th className="border p-2 text-left">INVESTIGATION</th>
                 <th className="border p-2 text-left">OBSERVED VALUE</th>
@@ -554,7 +554,7 @@ const PatientResult = () => {
               {saving ? 'Saving...' : 'Save'}
             </button>
             <button onClick={() => router.back()} className="bg-gray-500 text-white px-3 py-1 rounded text-sm">Back</button>
-            <button onClick={() => handleSaveAndPrint(true)} disabled={saving} className="bg-cyan-600 text-white px-3 py-1 rounded text-sm disabled:opacity-50">
+            <button onClick={() => handleSaveAndPrint(true)} disabled={saving} className="bg-primary-600 text-white px-3 py-1 rounded text-sm disabled:opacity-50">
               Save & Print
             </button>
           </div>
@@ -568,7 +568,7 @@ const PatientResult = () => {
                 <h2 className="text-base font-semibold text-gray-900">{patientData.test.name} — Report</h2>
                 <div className="flex gap-2">
                   <button onClick={() => setReportWithHeader(false)} className={`px-3 py-1.5 rounded text-sm ${!reportWithHeader ? 'bg-green-600 text-white' : 'bg-gray-200 text-gray-700'}`}>Without Header</button>
-                  <button onClick={() => setReportWithHeader(true)} className={`px-3 py-1.5 rounded text-sm ${reportWithHeader ? 'bg-cyan-600 text-white' : 'bg-gray-200 text-gray-700'}`}>With Header</button>
+                  <button onClick={() => setReportWithHeader(true)} className={`px-3 py-1.5 rounded text-sm ${reportWithHeader ? 'bg-primary-600 text-white' : 'bg-gray-200 text-gray-700'}`}>With Header</button>
                   <button onClick={() => handlePrint(reportWithHeader)} className="bg-blue-600 text-white px-4 py-1.5 rounded text-sm hover:bg-blue-700">Print</button>
                   <button onClick={() => setShowReportModal(false)} className="text-gray-400 hover:text-gray-700 text-2xl font-bold leading-none px-1">×</button>
                 </div>

@@ -1041,7 +1041,7 @@ export default function PatientRegistration() {
 
     {!hideHeader && <Header/>}
 
-    <div className="w-full px-3 sm:px-6 mt-4">
+    <div className="w-full px-3 sm:px-6 mt-16">
       <PageHeader title="Patient Registration" icon={UserPlus} path="Patient" />
 
       {/* TOP BAR */}
