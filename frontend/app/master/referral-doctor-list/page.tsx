@@ -14,7 +14,6 @@ export default function ReferralListing() {
   const [loading, setLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
   const [pagination, setPagination] = useState<any>(null);
-  const [filteredData, setFilteredData] = useState<any[]>([]);
   const ITEMS_PER_PAGE = 20;
   const router = useRouter();
 
@@ -24,7 +23,6 @@ export default function ReferralListing() {
       .then((res: any) => {
         const doctors = Array.isArray(res) ? res : res?.data || [];
         setData(doctors);
-        setFilteredData(doctors);
         setPagination(res?.pagination || null);
       })
       .catch((err) => console.error("Failed to fetch doctors:", err))
@@ -46,7 +44,6 @@ export default function ReferralListing() {
     try {
       await deleteDoctor(id);
       setData((prev) => prev.filter((item) => item.id !== id));
-      setFilteredData((prev) => prev.filter((item) => item.id !== id));
     } catch (err) {
       alert("Failed to delete: " + (err.message || "Unknown error"));
     }
