@@ -208,7 +208,7 @@ const Header = () => {
                 placeholder="Search by Patient, Sample ID, Report..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent"
+                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
               />
             </div>
           </div>
@@ -314,7 +314,7 @@ const Header = () => {
                 </p>
               </div>
               <div 
-                className="w-10 h-10 bg-gradient-to-br from-orange-400 to-orange-600 rounded-full flex items-center justify-center text-white font-bold cursor-pointer hover:shadow-lg transition-shadow"
+                className="w-10 h-10 bg-gradient-to-br from-primary-400 to-primary-600 rounded-full flex items-center justify-center text-white font-bold cursor-pointer hover:shadow-lg transition-shadow"
                 onClick={() => setShowAdminPopup(!showAdminPopup)}
               >
                 SA
@@ -322,7 +322,7 @@ const Header = () => {
 
               {/* Admin Popup */}
               {showAdminPopup && (
-                <div className="absolute top-full right-0 mt-2 w-64 bg-white rounded-lg shadow-2xl border-2 border-orange-200 p-4 z-50">
+                <div className="absolute top-full right-0 mt-2 w-64 bg-white rounded-lg shadow-2xl border-2 border-primary-200 p-4 z-50">
                   {(() => {
                     const user = JSON.parse(localStorage.getItem('admin') || '{}');
                     const isAdmin = user.userType === 'admin' || !user.userType;
@@ -333,15 +333,15 @@ const Header = () => {
                     return (
                       <div className="space-y-3">
                         <div className="text-center">
-                          <h3 className="text-lg font-bold mb-1 text-orange-700">
+                          <h3 className="text-lg font-bold mb-1 text-primary-700">
                             WELCOME {isAdmin ? 'ADMIN' : role.toUpperCase()}
                           </h3>
-                          <div className="w-12 h-12 bg-gradient-to-br from-orange-100 to-orange-200 rounded-full mx-auto flex items-center justify-center mb-2">
-                            <span className="text-xl font-bold text-orange-600">SA</span>
+                          <div className="w-12 h-12 bg-gradient-to-br from-primary-100 to-primary-200 rounded-full mx-auto flex items-center justify-center mb-2">
+                            <span className="text-xl font-bold text-primary-600">SA</span>
                           </div>
                         </div>
 
-                        <div className="space-y-2 bg-gradient-to-br from-orange-50 to-amber-50 rounded-lg p-3 text-sm border border-orange-100">
+                        <div className="space-y-2 bg-gradient-to-br from-primary-50 to-primary-100 rounded-lg p-3 text-sm border border-primary-100">
                           <div>
                             <p className="text-xs text-gray-600">Name:</p>
                             <p className="font-semibold text-gray-800">{displayName}</p>
@@ -366,7 +366,7 @@ const Header = () => {
                               router.push("/login");
                             }
                           }}
-                          className="w-full bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white font-bold py-2 px-4 rounded-lg transition-all duration-200 flex items-center justify-center gap-2 text-sm"
+                          className="w-full bg-gradient-to-r from-primary-500 to-primary-600 hover:from-primary-600 hover:to-primary-700 text-white font-bold py-2 px-4 rounded-lg transition-all duration-200 flex items-center justify-center gap-2 text-sm"
                         >
                           <span>Logout</span>
                         </button>
@@ -390,7 +390,7 @@ const Header = () => {
         >
           <img src={logo} alt="Logo" className="w-10 h-10 object-contain flex-shrink-0" />
           <div className="flex flex-col">
-            <span className="text-sm font-bold text-orange-500 leading-tight">SHRADDHA</span>
+            <span className="text-sm font-bold text-primary-500 leading-tight">SHRADDHA</span>
             <span className="text-xs text-gray-600 leading-tight">Pathology Lab</span>
           </div>
         </div>
@@ -404,29 +404,29 @@ const Header = () => {
                 <button
                   key={module.id}
                   onClick={() => handleModuleClick(module.id)}
-                  className="w-full flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-orange-50 transition-all duration-200 text-left font-medium text-sm group text-gray-700 hover:text-orange-600"
+                  className="w-full flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-primary-50 transition-all duration-200 text-left font-medium text-sm group text-gray-700 hover:text-primary-600"
                 >
-                  <span className="text-orange-500 group-hover:text-orange-600 transition-colors">
+                  <span className="text-primary-500 group-hover:text-primary-600 transition-colors">
                     {module.icon}
                   </span>
                   <span className="flex-1">{module.title}</span>
-                  <ChevronRight size={16} className="text-gray-400 group-hover:text-orange-500" />
+                  <ChevronRight size={16} className="text-gray-400 group-hover:text-primary-500" />
                 </button>
               ))}
             </nav>
           ) : selectedModule ? (
             // Sub-modules List
             <nav className="p-3 space-y-1">
-              <h3 className="px-2 py-2 text-xs font-bold text-orange-500 uppercase tracking-wider mb-2">
+              <h3 className="px-2 py-2 text-xs font-bold text-primary-500 uppercase tracking-wider mb-2">
                 {selectedModule.title}
               </h3>
               {selectedModule.items.map((item, index) => (
                 <button
                   key={`${selectedModule.id}-${index}`}
                   onClick={() => handleItemClick(item.path)}
-                  className="w-full flex items-center gap-2 px-4 py-2 rounded-lg hover:bg-orange-50 transition-colors text-left text-sm text-gray-600 hover:text-orange-600 group"
+                  className="w-full flex items-center gap-2 px-4 py-2 rounded-lg hover:bg-primary-50 transition-colors text-left text-sm text-gray-600 hover:text-primary-600 group"
                 >
-                  <span className="text-orange-400 group-hover:text-orange-600">▸</span>
+                  <span className="text-primary-400 group-hover:text-primary-600">▸</span>
                   <span className="truncate">{item.label}</span>
                 </button>
               ))}
@@ -439,7 +439,7 @@ const Header = () => {
           <div className="p-3 border-t border-gray-200">
             <button
               onClick={handleBackClick}
-              className="w-full flex items-center justify-center gap-2 px-4 py-3 hover:orange-900 rounded-lg transition-colors font-semibold text-sm text-orange-500"
+              className="w-full flex items-center justify-center gap-2 px-4 py-3 hover:bg-primary-50 rounded-lg transition-colors font-semibold text-sm text-primary-500"
             >
               <ChevronLeft size={18} />
               Back

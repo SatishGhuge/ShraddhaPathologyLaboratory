@@ -225,7 +225,7 @@ export default function TurnAroundTime() {
   return (
     <>
       <Header />
-      <div className="p-2 sm:p-3 md:p-4 lg:p-6 bg-cyan-50 min-h-screen">
+      <div className="p-2 sm:p-3 md:p-4 lg:p-6 bg-primary-50 min-h-screen">
         {/* PAGE HEADING */}
         <PageHeader 
           title="Turn Around Time" 
@@ -240,7 +240,7 @@ export default function TurnAroundTime() {
             {/* DATE RANGE PICKER */}
             <div className="relative" ref={dpRef}>
               <button type="button" onClick={openPicker}
-                className={`border p-1.5 sm:p-2 rounded w-full text-xs sm:text-sm text-left flex items-center justify-between bg-white focus:outline-none focus:ring-1 focus:ring-cyan-500 ${errors.date?"border-red-500":"border-gray-300"}`}>
+                className={`border p-1.5 sm:p-2 rounded w-full text-xs sm:text-sm text-left flex items-center justify-between bg-white focus:outline-none focus:ring-1 focus:ring-primary-500 ${errors.date?"border-red-500":"border-gray-300"}`}>
                 <span className={dateFrom?"text-gray-800":"text-gray-400"}>{dispRange(dateFrom,dateTo)}</span>
                 <Calendar size={14} className="text-gray-400 ml-1 flex-shrink-0"/>
               </button>
@@ -292,7 +292,7 @@ export default function TurnAroundTime() {
                 name="center"
                 value={filters.center}
                 onChange={handleChange}
-                className="border border-gray-300 p-1.5 sm:p-2 rounded w-full text-xs sm:text-sm focus:outline-none focus:ring-1 focus:ring-cyan-500"
+                className="border border-gray-300 p-1.5 sm:p-2 rounded w-full text-xs sm:text-sm focus:outline-none focus:ring-1 focus:ring-primary-500"
               >
                 <option value="">Select Center</option>
                 {centers.map((center) => (
@@ -307,7 +307,7 @@ export default function TurnAroundTime() {
               name="corporate"
               value={filters.corporate}
               onChange={handleChange}
-              className="border border-gray-300 p-1.5 sm:p-2 rounded w-full text-xs sm:text-sm focus:outline-none focus:ring-1 focus:ring-cyan-500"
+              className="border border-gray-300 p-1.5 sm:p-2 rounded w-full text-xs sm:text-sm focus:outline-none focus:ring-1 focus:ring-primary-500"
             >
               <option value="">Select Corporate</option>
               {corporates.map((corporate) => (
@@ -322,7 +322,7 @@ export default function TurnAroundTime() {
               placeholder="Referral Doctor"
               value={filters.referralDoctor}
               onChange={handleChange}
-              className="border border-gray-300 p-1.5 sm:p-2 rounded w-full text-xs sm:text-sm focus:outline-none focus:ring-1 focus:ring-cyan-500"
+              className="border border-gray-300 p-1.5 sm:p-2 rounded w-full text-xs sm:text-sm focus:outline-none focus:ring-1 focus:ring-primary-500"
             />
           </div>
 
@@ -332,7 +332,7 @@ export default function TurnAroundTime() {
               name="outOfTAT"
               value={filters.outOfTAT}
               onChange={handleChange}
-              className="border border-gray-300 p-1.5 sm:p-2 rounded w-full text-xs sm:text-sm focus:outline-none focus:ring-1 focus:ring-cyan-500"
+              className="border border-gray-300 p-1.5 sm:p-2 rounded w-full text-xs sm:text-sm focus:outline-none focus:ring-1 focus:ring-primary-500"
             >
               <option value="">Select Out of TAT</option>
               <option>Yes</option>
@@ -344,7 +344,7 @@ export default function TurnAroundTime() {
               placeholder="Search Laboratory Test"
               value={filters.labTest}
               onChange={handleChange}
-              className="border border-gray-300 p-1.5 sm:p-2 rounded w-full text-xs sm:text-sm focus:outline-none focus:ring-1 focus:ring-cyan-500"
+              className="border border-gray-300 p-1.5 sm:p-2 rounded w-full text-xs sm:text-sm focus:outline-none focus:ring-1 focus:ring-primary-500"
             />
 
             <div className="flex items-center gap-2">
@@ -354,7 +354,7 @@ export default function TurnAroundTime() {
                 name="excludeOutsource"
                 checked={filters.excludeOutsource}
                 onChange={handleChange}
-                className="w-4 h-4 text-cyan-600 focus:ring-cyan-500 border-gray-300 rounded"
+                className="w-4 h-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
               />
               <label htmlFor="excludeOutsource" className="text-xs sm:text-sm text-gray-700">
                 Exclude Outsource
@@ -385,7 +385,7 @@ export default function TurnAroundTime() {
               <>
                 <button 
                   onClick={handlePrint}
-                  className="flex gap-1 sm:gap-1.5 items-center bg-orange-600 hover:bg-orange-700 text-white px-2 sm:px-3 py-1.5 sm:py-2 rounded text-xs sm:text-sm transition-colors">
+                  className="flex gap-1 sm:gap-1.5 items-center bg-primary-600 hover:bg-primary-700 text-white px-2 sm:px-3 py-1.5 sm:py-2 rounded text-xs sm:text-sm transition-colors">
                   <Printer size={14} className="sm:w-4 sm:h-4"/> 
                   <span>Print</span>
                 </button>
@@ -434,7 +434,7 @@ export default function TurnAroundTime() {
                 </div>
               ) : (
                 <table className="w-full text-xs sm:text-sm border-collapse">
-                  <thead className="bg-gradient-to-r from-slate-800 via-cyan-700 to-cyan-600 shadow-xl text-white sticky top-0">
+                  <thead className="bg-gradient-to-r from-slate-800 via-primary-700 to-primary-600 shadow-xl text-white sticky top-0">
                     <tr>
                       <th className="px-2 sm:px-3 py-1.5 sm:py-2 text-left font-semibold text-xs sm:text-sm whitespace-nowrap border border-gray-300">Sr</th>
                       <th className="px-2 sm:px-3 py-1.5 sm:py-2 text-left font-semibold text-xs sm:text-sm whitespace-nowrap border border-gray-300">Patient</th>
@@ -694,4 +694,5 @@ export default function TurnAroundTime() {
     </>
   );
 }
+
 

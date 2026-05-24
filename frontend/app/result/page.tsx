@@ -1373,9 +1373,9 @@ export default function Result() {
     const upperStatus = status.toUpperCase();
     switch (upperStatus) {
       case "REGISTERED":
-        return "bg-cyan-100 text-cyan-800";
+        return "bg-primary-100 text-primary-800";
       case "RECEIVED":
-        return "bg-orange-100 text-orange-800";
+        return "bg-secondary-100 text-secondary-800";
       case "PROVISIONAL":
         return "bg-pink-100 text-pink-800";
       case "AUTHENTICATED":
@@ -1516,7 +1516,7 @@ export default function Result() {
   return (
     <>
       <Header />
-      <div className="p-2 sm:p-3 md:p-4 lg:p-6 bg-gray-50 min-h-screen">
+      <div className="p-2 sm:p-3 md:p-4 lg:p-6 bg-gray-50 min-h-screen mt-16">
         <PageHeader title="Laboratory Dashboard" icon={FileText} path="Results" />
         
         {/* Error Message */}
@@ -1545,20 +1545,20 @@ export default function Result() {
                 <div 
                   onClick={() => setSelectedStatus("REGISTERED")}
                   className={`rounded-lg p-2 text-center cursor-pointer hover:shadow-md transition-shadow ${
-                    selectedStatus === "REGISTERED" ? "bg-cyan-200 ring-2 ring-cyan-600" : "bg-cyan-100"
+                    selectedStatus === "REGISTERED" ? "bg-primary-200 ring-2 ring-primary-600" : "bg-primary-100"
                   }`}
                 >
-                  <h3 className="text-cyan-800 font-semibold text-xs sm:text-sm">
+                  <h3 className="text-primary-800 font-semibold text-xs sm:text-sm">
                     Registered ({statistics.byStatus.REGISTERED})
                   </h3>
                 </div>
                 <div 
                   onClick={() => setSelectedStatus("RECEIVED")}
                   className={`rounded-lg p-2 text-center cursor-pointer hover:shadow-md transition-shadow ${
-                    selectedStatus === "RECEIVED" ? "bg-orange-200 ring-2 ring-orange-600" : "bg-orange-100"
+                    selectedStatus === "RECEIVED" ? "bg-secondary-200 ring-2 ring-secondary-600" : "bg-secondary-100"
                   }`}
                 >
-                  <h3 className="text-orange-800 font-semibold text-xs sm:text-sm">
+                  <h3 className="text-secondary-800 font-semibold text-xs sm:text-sm">
                     Received ({statistics.byStatus.RECEIVED})
                   </h3>
                 </div>
