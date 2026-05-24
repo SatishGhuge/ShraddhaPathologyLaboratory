@@ -120,6 +120,29 @@ const Header = () => {
     return () => clearInterval(timer);
   }, []);
 
+  // Determine active module based on current pathname
+  useEffect(() => {
+    const pathSegments = pathname.split('/').filter(Boolean);
+    if (pathSegments.length > 0) {
+      let moduleId = pathSegments[0];
+      
+      // Handle path-to-module ID mapping (e.g., "reports" -> "report")
+      const pathToModuleMap: { [key: string]: string } = {
+        "reports": "report",
+      };
+      
+      if (pathToModuleMap[moduleId]) {
+        moduleId = pathToModuleMap[moduleId];
+      }
+      
+      // Check if this is a valid module
+      const validModule = modules.find(m => m.id === moduleId);
+      if (validModule) {
+        setActiveModule(moduleId);
+      }
+    }
+  }, [pathname]);
+
   // Load notifications from localStorage
   useEffect(() => {
     const loadCallbacks = () => {
@@ -182,10 +205,13 @@ const Header = () => {
 
   const handleItemClick = (path: string) => {
     router.push(path);
+    // Don't close the sidebar - let the useEffect handle active module based on pathname
   };
 
   const handleBackClick = () => {
+    // Only close sidebar if navigating away from the module
     setActiveModule(null);
+    router.push("/labdashboard");
   };
 
   const handleLogoClick = () => {
@@ -381,7 +407,7 @@ const Header = () => {
       </header>
 
       {/* Sidebar */}
-      <aside className="w-48 bg-white flex flex-col overflow-hidden h-screen fixed left-0 top-0 z-40 border-r border-gray-300">
+      <aside className="w-48 bg-white flex flex-col overflow-hidden h-screen fixed left-0 top-0 z-40 border-r border-gray-300 transition-all duration-200">
         
         {/* Sidebar Header */}
         <div 
@@ -396,10 +422,10 @@ const Header = () => {
         </div>
         
         {/* Navigation Content */}
-        <div className="flex-1 overflow-y-auto">
+        <div className="flex-1 overflow-y-auto transition-all duration-200 animate-in fade-in">
           {!activeModule ? (
             // Main Modules List
-            <nav className="p-2 space-y-1">
+            <nav className="p-2 space-y-1" key="modules-list">
               {visibleModules.map((module) => (
                 <button
                   key={module.id}
@@ -416,7 +442,7 @@ const Header = () => {
             </nav>
           ) : selectedModule ? (
             // Sub-modules List
-            <nav className="p-3 space-y-1">
+            <nav className="p-3 space-y-1" key={`submenu-${selectedModule.id}`}>
               <h3 className="px-2 py-2 text-xs font-bold text-primary-500 uppercase tracking-wider mb-2">
                 {selectedModule.title}
               </h3>

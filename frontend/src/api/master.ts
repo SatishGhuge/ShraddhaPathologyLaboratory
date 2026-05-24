@@ -1,4 +1,5 @@
 import API_BASE_URL from './config';
+import { getCachedData, clearCache } from '@/utils/cache';
 
 interface ApiData {
   [key: string]: any;
@@ -119,9 +120,14 @@ export const getSpecimenTypes = async (page: number = 1, limit: number = 20): Pr
   const params = new URLSearchParams();
   params.append('page', page.toString());
   params.append('limit', limit.toString());
-  const r = await apiCall(`/master/specimen-types?${params.toString()}`, { method: 'GET' }); 
+  const cacheKey = `specimen_types_page_${page}_limit_${limit}`;
+  const r = await getCachedData(cacheKey, () => apiCall(`/master/specimen-types?${params.toString()}`, { method: 'GET' })); 
   return r; 
 };
+export const getSpecimenTypeById = async (id: string): Promise<any | null> => { const r = await apiCall(`/master/specimen-types/${id}`, { method: 'GET' }); return r.data || null; };
+export const createSpecimenType = async (d: ApiData): Promise<any> => { clearCache(); const r = await apiCall('/master/specimen-types', { method: 'POST', body: JSON.stringify(d) }); return r.data || r; };
+export const updateSpecimenType = async (id: string, d: ApiData): Promise<any> => { clearCache(); const r = await apiCall(`/master/specimen-types/${id}`, { method: 'PUT', body: JSON.stringify(d) }); return r.data || r; };
+export const deleteSpecimenType = async (id: string): Promise<ApiResponse> => { clearCache(); return apiCall(`/master/specimen-types/${id}`, { method: 'DELETE' }); };
 
 // ==================== ROLES ====================
 export const getRoles = async (page: number = 1, limit: number = 20): Promise<any> => { 

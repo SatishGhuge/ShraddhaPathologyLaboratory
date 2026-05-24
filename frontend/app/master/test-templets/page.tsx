@@ -23,7 +23,7 @@ const TestTemplets = () => {
   const [editMode, setEditMode] = useState(false);
   const [currentTemplateId, setCurrentTemplateId] = useState<any>(null);
   const [selectedTestParameters, setSelectedTestParameters] = useState<any[]>([]);
-  const [autoSaveStatus, setAutoSaveStatus] = useState<any>(null); // 'saving', 'saved', 'error'
+  const [autoSaveStatus, setAutoSaveStatus] = useState<any>(null);
   const [showAddCategory, setShowAddCategory] = useState(false);
   const [newCategory, setNewCategory] = useState({
     categoryName: '',
@@ -34,26 +34,22 @@ const TestTemplets = () => {
   const [formData, setFormData] = useState({
     testId: '',
     templateName: '',
-    parameters: [] // Store parameter objects with id, name, value
+    parameters: []
   });
 
-  // Fetch templates and tests on component mount
   useEffect(() => {
     fetchTemplates(1);
     fetchTests();
     fetchUnits();
   }, []);
 
-  // Auto-save effect - triggers when formData changes
   useEffect(() => {
     if (!showForm || !editMode || !currentTemplateId) return;
 
-    // Clear previous timeout
     if (autoSaveTimeoutRef.current) {
       clearTimeout(autoSaveTimeoutRef.current);
     }
 
-    // Set new timeout for auto-save (debounce for 2 seconds)
     autoSaveTimeoutRef.current = setTimeout(() => {
       performAutoSave();
     }, 2000);
@@ -82,7 +78,6 @@ const TestTemplets = () => {
       await updateTemplate(currentTemplateId, templateData);
       setAutoSaveStatus('saved');
 
-      // Clear status after 2 seconds
       setTimeout(() => {
         setAutoSaveStatus(null);
       }, 2000);
@@ -90,7 +85,6 @@ const TestTemplets = () => {
       console.error('❌ Auto-save error:', err);
       setAutoSaveStatus('error');
       
-      // Log more details
       console.error('Template ID:', currentTemplateId);
       console.error('Form Data:', formData);
     }
@@ -153,7 +147,6 @@ const TestTemplets = () => {
   const handleTestChange = (testId: any) => {
     setFormData({ ...formData, testId });
     
-    // Find and display parameters for selected test
     const selectedTest = tests.find(t => t.id === parseInt(testId));
     if (selectedTest && selectedTest.categories && selectedTest.categories.length > 0) {
       const params = selectedTest.categories.map(cat => ({
@@ -175,7 +168,6 @@ const TestTemplets = () => {
       parameters: template.parameters || []
     });
     
-    // Load parameters for the test being edited
     const selectedTest = tests.find(t => t.id === template.testId);
     if (selectedTest && selectedTest.categories && selectedTest.categories.length > 0) {
       const params = selectedTest.categories.map(cat => ({
@@ -212,7 +204,6 @@ const TestTemplets = () => {
   };
 
   const handleSave = async () => {
-    // Validation
     if (!formData.testId || !formData.templateName) {
       alert('Please select a test and enter a template name!');
       return;
@@ -255,19 +246,16 @@ const TestTemplets = () => {
     setSelectedTestParameters([]);
   };
 
-  // Filter templates based on search
   const filteredTemplates = templates.filter(template =>
     template.templateName.toLowerCase().includes(search.toLowerCase()) ||
     template.test?.name.toLowerCase().includes(search.toLowerCase())
   );
 
-  // If showing form (add or edit)
   if (showForm) {
     return (
       <>
         <Header />
         <div className="p-3 sm:p-4 md:p-6 bg-gray-100 min-h-screen">
-          {/* Header */}
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 bg-white p-3 rounded shadow-md gap-3 max-w-6xl mx-auto">
             <div className="flex items-center gap-3">
               <h2 className="text-base sm:text-lg font-semibold text-slate-800">
@@ -307,11 +295,8 @@ const TestTemplets = () => {
             </button>
           </div>
 
-          {/* Main Form Container */}
           <div className="bg-white rounded shadow-md max-w-6xl mx-auto">
-            {/* Top Section - Template Info */}
             <div className="border-b border-gray-200 p-4 sm:p-6">
-              {/* Search Test */}
               <div className="mb-4">
                 <label className="block text-xs font-semibold text-gray-700 mb-2 uppercase">
                   Search Test
@@ -331,7 +316,6 @@ const TestTemplets = () => {
                 </select>
               </div>
 
-              {/* Template Name */}
               <div className="mb-4">
                 <label className="block text-xs font-semibold text-gray-700 mb-2 uppercase">
                   Template Name
@@ -346,14 +330,12 @@ const TestTemplets = () => {
               </div>
             </div>
 
-            {/* Parameters Section - Show Only After Test Selection */}
             {selectedTestParameters.length > 0 && (
               <div className="p-4 sm:p-6">
                 <div className="space-y-6">
                   {selectedTestParameters.map((param) => (
                     <div key={param.id}>
                       <div className="flex items-start gap-4">
-                        {/* Parameter Name - Left Side */}
                         <div className="w-32 flex-shrink-0">
                           <label className="block text-xs font-semibold text-gray-700 uppercase">
                             {param.name}
@@ -364,7 +346,6 @@ const TestTemplets = () => {
                           </div>
                         </div>
 
-                        {/* Parameter Editor - Right Side */}
                         <div className="flex-1">
                           {param.type === 'Numeric' ? (
                             <input
@@ -443,7 +424,6 @@ const TestTemplets = () => {
               </div>
             )}
 
-            {/* Action Buttons */}
             <div className="flex justify-end gap-3 p-4 sm:p-6 border-t border-gray-200 bg-gray-50">
               <button
                 onClick={handleCancel}
@@ -465,7 +445,6 @@ const TestTemplets = () => {
     );
   }
 
-  // Default list view
   return (
     <>
       <Header />
@@ -473,7 +452,6 @@ const TestTemplets = () => {
         <div className="max-w-6xl mx-auto">
           <PageHeader title="Test Templates" icon={FileText} path="Master" />
 
-          {/* Top Bar - Search, Reset, Add */}
           <div className="flex flex-col sm:flex-row flex-wrap items-start sm:items-center justify-between gap-3 mb-4 bg-white p-4 rounded shadow-md">
             <div className="flex flex-col sm:flex-row gap-2 flex-1 w-full sm:w-auto">
               <input
@@ -487,10 +465,10 @@ const TestTemplets = () => {
               <button
                 onClick={handleReset}
                 className="bg-cyan-600 hover:bg-cyan-700 text-white px-4 py-2 rounded text-xs sm:text-sm transition-colors flex items-center justify-center gap-1 w-full sm:w-auto"
-            >
-              <RotateCwIcon size={16} className="sm:w-[18px] sm:h-[18px]" />
-              Reset
-            </button>
+              >
+                <RotateCwIcon size={16} className="sm:w-[18px] sm:h-[18px]" />
+                Reset
+              </button>
             </div>
 
             <button
@@ -501,7 +479,6 @@ const TestTemplets = () => {
             </button>
           </div>
 
-          {/* Loading State */}
           {loading && (
             <div className="bg-white rounded shadow-md p-8 text-center">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-cyan-700 mx-auto mb-4"></div>
@@ -509,14 +486,13 @@ const TestTemplets = () => {
             </div>
           )}
 
-          {/* Error State */}
           {error && (
             <div className="bg-white rounded shadow-md p-8 text-center">
               <div className="text-red-500 text-xl mb-4">⚠️</div>
               <p className="text-red-600 font-semibold mb-2">Error Loading Templates</p>
               <p className="text-gray-600 mb-4">{error}</p>
               <button
-                onClick={fetchTemplates}
+                onClick={() => fetchTemplates(1)}
                 className="bg-cyan-700 text-white px-6 py-2 rounded hover:bg-cyan-800"
               >
                 Retry
@@ -524,136 +500,136 @@ const TestTemplets = () => {
             </div>
           )}
 
-          {/* Table */}
           {!loading && !error && (
-            <div className="overflow-x-auto bg-white rounded shadow-md">
-              <table className="w-full text-xs sm:text-sm border-collapse">
-                <thead className="bg-gradient-to-r from-slate-800 via-cyan-700 to-cyan-600 text-white sticky top-0">
-                  <tr>
-                    <th className="border border-cyan-800 px-4 py-3 text-left font-semibold">Template Name</th>
-                    <th className="border border-cyan-800 px-4 py-3 text-left font-semibold">Test Name</th>
-                    <th className="border border-cyan-800 px-4 py-3 text-left font-semibold">Parameters</th>
-                    <th className="border border-cyan-800 px-4 py-3 text-left font-semibold">Created</th>
-                    <th className="border border-cyan-800 px-4 py-3 text-center font-semibold">Action</th>
-                  </tr>
-                </thead>
-
-                <tbody>
-                  {filteredTemplates.length === 0 ? (
+            <>
+              <div className="overflow-x-auto bg-white rounded shadow-md">
+                <table className="w-full text-xs sm:text-sm border-collapse">
+                  <thead className="bg-gradient-to-r from-slate-800 via-cyan-700 to-cyan-600 text-white sticky top-0">
                     <tr>
-                      <td colSpan={5} className="text-center py-8 text-gray-500">
-                        {search ? 'No templates found matching your search.' : 'No templates found. Click "Add Template" to create one.'}
-                      </td>
+                      <th className="border border-cyan-800 px-4 py-3 text-left font-semibold">Template Name</th>
+                      <th className="border border-cyan-800 px-4 py-3 text-left font-semibold">Test Name</th>
+                      <th className="border border-cyan-800 px-4 py-3 text-left font-semibold">Parameters</th>
+                      <th className="border border-cyan-800 px-4 py-3 text-left font-semibold">Created</th>
+                      <th className="border border-cyan-800 px-4 py-3 text-center font-semibold">Action</th>
                     </tr>
-                  ) : (
-                    filteredTemplates.map((template, index) => (
-                      <tr
-                        key={template.id}
-                        className={`hover:bg-blue-50 border-b border-gray-200 transition-colors ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}
-                      >
-                        <td className="border border-gray-300 px-4 py-3 font-semibold text-gray-800">
-                          {template.templateName}
-                        </td>
+                  </thead>
 
-                        <td className="border border-gray-300 px-4 py-3 text-gray-700">
-                          {template.test?.name || '-'}
-                        </td>
-
-                        <td className="border border-gray-300 px-4 py-3">
-                          <div className="text-xs space-y-1">
-                            {template.parameters && template.parameters.length > 0 ? (
-                              <div className="max-h-24 overflow-y-auto">
-                                {template.parameters.map((param) => (
-                                  <div key={param.id} className="text-gray-600 py-1">
-                                    <span className="font-semibold text-gray-800">{param.name}:</span>
-                                    <div className="text-gray-500 ml-2 truncate">
-                                      {param.value ? (
-                                        param.value.length > 60 ? param.value.substring(0, 60) + '...' : param.value
-                                      ) : (
-                                        <span className="text-gray-400 italic">-</span>
-                                      )}
-                                    </div>
-                                  </div>
-                                ))}
-                              </div>
-                            ) : (
-                              <span className="text-gray-400 italic">No parameters</span>
-                            )}
-                          </div>
-                        </td>
-
-                        <td className="border border-gray-300 px-4 py-3 text-gray-600">
-                          {template.createdAt ? new Date(template.createdAt).toLocaleDateString() : '-'}
-                        </td>
-
-                        <td className="border border-gray-300 px-4 py-3">
-                          <div className="flex gap-2 justify-center flex-wrap">
-                            <button
-                              onClick={() => handleEdit(template)}
-                              className="bg-blue-600 text-white px-3 py-1 rounded text-[10px] sm:text-xs hover:bg-blue-700 transition-colors font-medium"
-                            >
-                              Edit
-                            </button>
-
-                            <button
-                              onClick={() => handleDelete(template.id)}
-                              className="bg-red-500 text-white px-3 py-1 rounded text-[10px] sm:text-xs hover:bg-red-600 transition-colors font-medium"
-                            >
-                              Delete
-                            </button>
-                          </div>
+                  <tbody>
+                    {filteredTemplates.length === 0 ? (
+                      <tr>
+                        <td colSpan={5} className="text-center py-8 text-gray-500">
+                          {search ? 'No templates found matching your search.' : 'No templates found. Click "Add Template" to create one.'}
                         </td>
                       </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
+                    ) : (
+                      filteredTemplates.map((template, index) => (
+                        <tr
+                          key={template.id}
+                          className={`hover:bg-blue-50 border-b border-gray-200 transition-colors ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}
+                        >
+                          <td className="border border-gray-300 px-4 py-3 font-semibold text-gray-800">
+                            {template.templateName}
+                          </td>
 
-            {/* PAGINATION CONTROLS */}
-            {pagination && templates.length > 0 && (
-              <div className="mt-3 bg-white rounded shadow-md p-3 flex items-center justify-between text-xs">
-                <div className="text-gray-600">
-                  Showing {(currentPage - 1) * ITEMS_PER_PAGE + 1} to{' '}
-                  {Math.min(currentPage * ITEMS_PER_PAGE, pagination.total)} of{' '}
-                  {pagination.total} records
-                </div>
+                          <td className="border border-gray-300 px-4 py-3 text-gray-700">
+                            {template.test?.name || '-'}
+                          </td>
 
-                <div className="flex gap-2 items-center">
-                  <button
-                    onClick={() => {
-                      const newPage = Math.max(1, currentPage - 1);
-                      setCurrentPage(newPage);
-                      fetchTemplates(newPage);
-                    }}
-                    disabled={currentPage === 1}
-                    className={`flex items-center gap-1 px-3 py-1 rounded ${currentPage === 1 ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-cyan-600 text-white hover:bg-cyan-700'}`}
-                  >
-                    <ChevronLeft size={14} /> Previous
-                  </button>
+                          <td className="border border-gray-300 px-4 py-3">
+                            <div className="text-xs space-y-1">
+                              {template.parameters && template.parameters.length > 0 ? (
+                                <div className="max-h-24 overflow-y-auto">
+                                  {template.parameters.map((param) => (
+                                    <div key={param.id} className="text-gray-600 py-1">
+                                      <span className="font-semibold text-gray-800">{param.name}:</span>
+                                      <div className="text-gray-500 ml-2 truncate">
+                                        {param.value ? (
+                                          param.value.length > 60 ? param.value.substring(0, 60) + '...' : param.value
+                                        ) : (
+                                          <span className="text-gray-400 italic">-</span>
+                                        )}
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              ) : (
+                                <span className="text-gray-400 italic">No parameters</span>
+                              )}
+                            </div>
+                          </td>
 
-                  <span className="px-3 py-1">
-                    Page {currentPage} of {pagination.totalPages}
-                  </span>
+                          <td className="border border-gray-300 px-4 py-3 text-gray-600">
+                            {template.createdAt ? new Date(template.createdAt).toLocaleDateString() : '-'}
+                          </td>
 
-                  <button
-                    onClick={() => {
-                      const newPage = Math.min(pagination.totalPages, currentPage + 1);
-                      setCurrentPage(newPage);
-                      fetchTemplates(newPage);
-                    }}
-                    disabled={currentPage === pagination.totalPages}
-                    className={`flex items-center gap-1 px-3 py-1 rounded ${currentPage === pagination.totalPages ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-cyan-600 text-white hover:bg-cyan-700'}`}
-                  >
-                    Next <ChevronRight size={14} />
-                  </button>
-                </div>
+                          <td className="border border-gray-300 px-4 py-3">
+                            <div className="flex gap-2 justify-center flex-wrap">
+                              <button
+                                onClick={() => handleEdit(template)}
+                                className="bg-blue-600 text-white px-3 py-1 rounded text-[10px] sm:text-xs hover:bg-blue-700 transition-colors font-medium"
+                              >
+                                Edit
+                              </button>
 
-                <div className="text-gray-600">
-                  Total: {pagination.total} records
-                </div>
+                              <button
+                                onClick={() => handleDelete(template.id)}
+                                className="bg-red-500 text-white px-3 py-1 rounded text-[10px] sm:text-xs hover:bg-red-600 transition-colors font-medium"
+                              >
+                                Delete
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
               </div>
-            )}
+
+              {pagination && templates.length > 0 && (
+                <div className="mt-3 bg-white rounded shadow-md p-3 flex items-center justify-between text-xs">
+                  <div className="text-gray-600">
+                    Showing {(currentPage - 1) * ITEMS_PER_PAGE + 1} to{' '}
+                    {Math.min(currentPage * ITEMS_PER_PAGE, pagination.total)} of{' '}
+                    {pagination.total} records
+                  </div>
+
+                  <div className="flex gap-2 items-center">
+                    <button
+                      onClick={() => {
+                        const newPage = Math.max(1, currentPage - 1);
+                        setCurrentPage(newPage);
+                        fetchTemplates(newPage);
+                      }}
+                      disabled={currentPage === 1}
+                      className={`flex items-center gap-1 px-3 py-1 rounded ${currentPage === 1 ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-cyan-600 text-white hover:bg-cyan-700'}`}
+                    >
+                      <ChevronLeft size={14} /> Previous
+                    </button>
+
+                    <span className="px-3 py-1">
+                      Page {currentPage} of {pagination.totalPages}
+                    </span>
+
+                    <button
+                      onClick={() => {
+                        const newPage = Math.min(pagination.totalPages, currentPage + 1);
+                        setCurrentPage(newPage);
+                        fetchTemplates(newPage);
+                      }}
+                      disabled={currentPage === pagination.totalPages}
+                      className={`flex items-center gap-1 px-3 py-1 rounded ${currentPage === pagination.totalPages ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-cyan-600 text-white hover:bg-cyan-700'}`}
+                    >
+                      Next <ChevronRight size={14} />
+                    </button>
+                  </div>
+
+                  <div className="text-gray-600">
+                    Total: {pagination.total} records
+                  </div>
+                </div>
+              )}
+            </>
           )}
         </div>
       </div>

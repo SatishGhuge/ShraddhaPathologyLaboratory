@@ -45,7 +45,7 @@
     "src",
     ".next/types/**/*.ts",
     "next-env.d.ts"
-  ],
+, "utils/cache.ts"  ],
   "references": [
     {
       "path": "./tsconfig.node.json"

@@ -164,50 +164,31 @@ export default function SampleTypes() {
         Sample_Color: color
       };
 
-      let response;
+      let result;
       if (editId) {
         // Update existing specimen type
-        response = await fetch(`${API_BASE_URL}/master/specimen-types/${editId}`, {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(requestData)
-        });
+        result = await updateSpecimenType(editId, requestData);
       } else {
         // Create new specimen type
-        response = await fetch(`${API_BASE_URL}/master/specimen-types`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(requestData)
-        });
+        result = await createSpecimenType(requestData);
       }
 
-      const result = await response.json();
-
       if (result.success) {
-        setSuccessMsg(editId ? "Specimen Type Updated Successfully!" : "Specimen Type Added Successfully!");
+        setSuccessMsg(editId ? 'Specimen type updated successfully' : 'Specimen type created successfully');
         setErrorMsg("");
-        
-        // Refresh the data
-        fetchSpecimenTypes();
-        
-        setTimeout(() => {
-          setShowModal(false);
-          setSuccessMsg("");
-          setSampleType("");
-          setSampleColor("");
-          setEditId(null);
-        }, 1500);
+        setShowModal(false);
+        setSampleType("");
+        setSampleColor("");
+        setCurrentPage(1);
+        fetchSpecimenTypes(1);
+        setTimeout(() => setSuccessMsg(''), 3000);
       } else {
-        setErrorMsg(result.message || "Operation failed");
+        setErrorMsg(result.message || 'Failed to save specimen type');
         setSuccessMsg("");
       }
     } catch (error) {
-      console.error('Error submitting specimen type:', error);
-      setErrorMsg("Failed to save specimen type");
+      console.error('Error saving specimen type:', error);
+      setErrorMsg('Failed to save specimen type');
       setSuccessMsg("");
     }
   };
