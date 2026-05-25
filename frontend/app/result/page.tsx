@@ -29,7 +29,7 @@ import {
   getTestStatistics,
   getPatientTestById,
   sendReport
-} from "@/src/api/result.js";
+} from "@/src/api/result";
 const LetterHead = "/LetterHead.jpeg";
 
 /* ── Per-test row with ALL date fields inside Edit Details modal ── */
@@ -2665,3 +2665,4 @@ export default function Result() {
     </>
   );
 }
+

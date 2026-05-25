@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { Search, RotateCcw, ShieldCheck, Trash2, ChevronLeft, ChevronRight } from "lucide-react";
 import Header from "@/src/components/Header";
 import PageHeader from "@/src/components/BreadCrumb";
-import { getRoles, deleteRole } from "@/src/api/master.js";
+import { getRoles, deleteRole } from "@/src/api/master";
 
 const RoleList = () => {
   const router = useRouter();
@@ -192,4 +192,5 @@ const RoleList = () => {
 };
 
 export default RoleList;
+
 

@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { Search, RotateCcw, Printer, FileSpreadsheet, Percent, ChevronLeft, ChevronRight } from "lucide-react";
 import Header from "@/src/components/Header";
 import PageHeader from "@/src/components/BreadCrumb";
-import { getDiscountReport } from "@/src/api/admin.js";
+import { getDiscountReport } from "@/src/api/admin";
 
 export default function DiscountReport() {
   const today = new Date().toISOString().split("T")[0];

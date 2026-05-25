@@ -1,12 +1,12 @@
-"use client";
+﻿"use client";
 
 import { useState, useRef, useEffect } from "react";
 import { Search, RotateCcw, FileSpreadsheet, ChevronDown, FlaskConical, Calendar, ChevronLeft, ChevronRight } from "lucide-react";
 import Header from "@/src/components/Header";
 import PageHeader from "@/src/components/BreadCrumb";
-import { getTestReport } from "@/src/api/admin.js";
-import { getTests } from "@/src/api/master.js";
-import { getCollectionCenters } from "@/src/api/patient.js";
+import { getTestReport } from "@/src/api/admin";
+import { getTests } from "@/src/api/master";
+import { getCollectionCenters } from "@/src/api/patient";
 
 /* ── date helpers ── */
 const fmtISO = (d: any) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
@@ -355,7 +355,7 @@ export default function TestReport() {
 
           {/* Row 3: Action buttons */}
           <div className="flex flex-wrap items-center gap-1.5">
-            <button onClick={handleSearch} disabled={loading}
+            <button onClick={() => handleSearch(1)} disabled={loading}
               className="flex gap-1 items-center bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white px-3 py-1.5 rounded text-xs">
               <Search size={13}/> {loading ? 'Searching...' : 'Search'}
             </button>
@@ -479,3 +479,4 @@ export default function TestReport() {
     </>
   );
 }
+

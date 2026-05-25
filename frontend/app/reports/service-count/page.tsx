@@ -1,11 +1,11 @@
-"use client";
+﻿"use client";
 
 import { useState, useRef, useEffect } from "react";
 import { Search, RotateCcw, Printer, FileSpreadsheet, ChevronDown, Activity, Calendar, ChevronLeft, ChevronRight } from "lucide-react";
 import Header from "@/src/components/Header";
 import PageHeader from "@/src/components/BreadCrumb";
 import * as XLSX from "xlsx";
-import { getServiceCountReport } from "@/src/api/admin.js";
+import { getServiceCountReport } from "@/src/api/admin";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "/api";
 
@@ -331,7 +331,7 @@ export default function ServiceCount() {
           </div>
 
           <div className="flex flex-wrap gap-2">
-            <button onClick={fetchData} disabled={loading}
+            <button onClick={() => fetchData(1)} disabled={loading}
               className="flex gap-1.5 items-center bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white px-3 py-1.5 rounded text-xs">
               <Search size={13} /> {loading ? "Searching..." : "Search"}
             </button>

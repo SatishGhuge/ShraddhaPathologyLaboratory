@@ -11,8 +11,8 @@ import {
   RefreshCcw, Plus, X, RefreshCw,
   ChevronLeft, ChevronRight, CalendarDays, AlertCircle
 } from "lucide-react";
-import { getAllPatients, updatePayment, updatePatient } from "@/src/api/patient.js";
-import { getDoctors, getTests, getPackages, getSpecimenTypes } from "@/src/api/master.js";
+import { getAllPatients, updatePayment, updatePatient } from "@/src/api/patient";
+import { getDoctors, getTests, getPackages, getSpecimenTypes } from "@/src/api/master";
 import html2pdf from "html2pdf.js";
 import { jsPDF } from "jspdf";
 const LetterHead = "/LetterHead.jpeg";
@@ -2329,5 +2329,6 @@ export default function BookingPage() {
     </>
   );
 }
+
 
 

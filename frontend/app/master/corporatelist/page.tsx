@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { RotateCcw, Building } from "lucide-react";
 import Header from "@/src/components/Header";
 import PageHeader from "@/src/components/BreadCrumb";
-import { getCorporates, deleteCorporate, updateCorporate } from "@/src/api/master.js";
+import { getCorporates, deleteCorporate, updateCorporate } from "@/src/api/master";
 
 const CorporateList = () => {
   const router = useRouter();
@@ -168,3 +168,4 @@ const CorporateList = () => {
 };
 
 export default CorporateList;
+

@@ -218,3 +218,65 @@ export const getTurnAroundTimeReport = async (filters: Filters = {}, page: numbe
     throw error;
   }
 };
+
+// Get group summary report with pagination
+export const getGroupSummaryReport = async (filters: Filters = {}, page: number = 1, limit: number = 20): Promise<ApiResponse> => {
+  try {
+    const token = localStorage.getItem('token');
+    const params = new URLSearchParams();
+    
+    if (filters.fromDate) params.append('fromDate', filters.fromDate);
+    if (filters.toDate) params.append('toDate', filters.toDate);
+    if (filters.center) params.append('center', filters.center);
+    if (filters.referralDoctor) params.append('referralDoctor', filters.referralDoctor);
+    if (filters.businessType) params.append('businessType', filters.businessType);
+    params.append('page', page.toString());
+    params.append('limit', limit.toString());
+
+    const response = await fetch(`${API_BASE_URL}/admin/group-summary-report?${params.toString()}`, {
+      method: 'GET',
+      headers: { 
+        'Content-Type': 'application/json', 
+        'Authorization': `Bearer ${token}` 
+      },
+    });
+    
+    const data: ApiResponse = await response.json();
+    if (!response.ok) throw new Error(data.message || 'Failed to fetch group summary report');
+    return data;
+  } catch (error) {
+    console.error('Group summary report error:', error);
+    throw error;
+  }
+};
+
+// Get service count report with pagination
+export const getServiceCountReport = async (filters: Filters = {}, page: number = 1, limit: number = 20): Promise<ApiResponse> => {
+  try {
+    const token = localStorage.getItem('token');
+    const params = new URLSearchParams();
+    
+    if (filters.fromDate) params.append('fromDate', filters.fromDate);
+    if (filters.toDate) params.append('toDate', filters.toDate);
+    if (filters.center) params.append('center', filters.center);
+    if (filters.corporate) params.append('corporate', filters.corporate);
+    if (filters.referralDoctor) params.append('referralDoctor', filters.referralDoctor);
+    params.append('page', page.toString());
+    params.append('limit', limit.toString());
+
+    const response = await fetch(`${API_BASE_URL}/admin/service-count-report?${params.toString()}`, {
+      method: 'GET',
+      headers: { 
+        'Content-Type': 'application/json', 
+        'Authorization': `Bearer ${token}` 
+      },
+    });
+    
+    const data: ApiResponse = await response.json();
+    if (!response.ok) throw new Error(data.message || 'Failed to fetch service count report');
+    return data;
+  } catch (error) {
+    console.error('Service count report error:', error);
+    throw error;
+  }
+};

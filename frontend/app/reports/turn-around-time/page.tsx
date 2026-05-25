@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useEffect, useRef } from "react";
 import {
@@ -14,8 +14,8 @@ import {
 } from "lucide-react";
 import Header from "@/src/components/Header";
 import PageHeader from "@/src/components/BreadCrumb";
-import { getTurnAroundTimeReport } from "@/src/api/admin.js";
-import { getCollectionCenters, getCorporates } from "@/src/api/patient.js";
+import { getTurnAroundTimeReport } from "@/src/api/admin";
+import { getCollectionCenters, getCorporates } from "@/src/api/patient";
 
 /* ── Date helpers ── */
 const fmtISO = (d: any) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
@@ -365,7 +365,7 @@ export default function TurnAroundTime() {
           {/* BUTTONS */}
           <div className="flex gap-1.5 sm:gap-2 flex-wrap">
             <button
-              onClick={handleSearch}
+              onClick={() => handleSearch()}
               disabled={loading}
               className="flex gap-1 sm:gap-1.5 items-center bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white px-2 sm:px-3 py-1.5 sm:py-2 rounded text-xs sm:text-sm transition-colors"
             >
@@ -694,5 +694,6 @@ export default function TurnAroundTime() {
     </>
   );
 }
+
 
 

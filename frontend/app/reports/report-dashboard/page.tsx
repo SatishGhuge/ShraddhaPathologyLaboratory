@@ -10,8 +10,8 @@ import {
   AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, CartesianGrid,
 } from "recharts";
-import { getReportDashboard } from "@/src/api/admin.js";
-import { getDoctors } from "@/src/api/master.js";
+import { getReportDashboard } from "@/src/api/admin";
+import { getDoctors } from "@/src/api/master";
 
 /* ── date helpers ── */
 const fmtISO = (d: any) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
@@ -370,3 +370,4 @@ export default function AnalyticsDashboard() {
     </>
   );
 }
+

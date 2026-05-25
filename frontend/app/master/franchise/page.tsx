@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { RotateCcw, Building2 } from "lucide-react";
 import Header from "@/src/components/Header";
 import PageHeader from "@/src/components/BreadCrumb";
-import { getFranchises, deleteFranchise } from "@/src/api/master.js";
+import { getFranchises, deleteFranchise } from "@/src/api/master";
 
 const FranchiseList = () => {
   const router = useRouter();
@@ -197,4 +197,5 @@ const FranchiseList = () => {
 };
 
 export default FranchiseList;
+
 
