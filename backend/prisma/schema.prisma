@@ -47,6 +47,7 @@ model Patient {
   createdBy         String?
   createdAtLocation String?
   address           String?       @db.Text
+  location          String?       // Patient location (from Google Places)
   createdAt         DateTime?     @default(now())
   updatedAt         DateTime      @updatedAt
   tests             PatientTest[]
@@ -55,6 +56,7 @@ model Patient {
   @@index([email], map: "patients_email_idx")
   @@index([firstName, lastName], map: "patients_name_idx")
   @@index([createdAt], map: "patients_createdAt_idx")
+  @@index([location], map: "patients_location_idx")
   @@map("patients")
 }
 

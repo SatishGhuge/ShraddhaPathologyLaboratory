@@ -12,6 +12,7 @@ import {
   Calendar,
   UserPlus,
   ChevronDown,
+  Barcode,
 } from "lucide-react";
 import { createPatient, searchPatient } from "@/src/api/patient";
 import { getDoctors, createDoctor, getSpecimenTypes, getFranchises, getCollectionCenters } from "@/src/api/master";
@@ -248,6 +249,10 @@ export default function PatientRegistration() {
   const [mobile, setMobile] = useState(rebookingData?.mobile || "");
   const [email, setEmail] = useState(rebookingData?.email || "");
   const [address, setAddress] = useState(rebookingData?.address || "");
+  const [location, setLocation] = useState(rebookingData?.location || "");
+  const [locationSuggestions, setLocationSuggestions] = useState<any[]>([]);
+  const [showLocationDropdown, setShowLocationDropdown] = useState(false);
+
   const [remarks, setRemarks] = useState(rebookingData?.remark || "");
   const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
   const [time, setTime] = useState(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
@@ -282,6 +287,12 @@ export default function PatientRegistration() {
   const [showRefModal, setShowRefModal] = useState(false);
   const [showPackageModal, setShowPackageModal] = useState(false);
   const [showRegistrationModal, setShowRegistrationModal] = useState(false);
+  
+  // Barcode state
+  const [showBarcodeModal, setShowBarcodeModal] = useState(false);
+  const [barcodeLabels, setBarcodeLabels] = useState<any[]>([]);
+  const [barcodePatientInfo, setBarcodePatientInfo] = useState<any>(null);
+  
   const [showSimilarPatientsDropdown, setShowSimilarPatientsDropdown] = useState(false);
   const [newPackage, setNewPackage] = useState({ name: "", tests: [], b2cCharge: 0, b2bCharge: 0 });
   const [newRef, setNewRef] = useState({ type: "Doctor", name: "", degree: "", compliment: "", mobile: "", email: "", address: "", allowSend: false });
@@ -513,6 +524,7 @@ export default function PatientRegistration() {
         if (data.mobile) setMobile(data.mobile);
         if (data.email) setEmail(data.email);
         if (data.address) setAddress(data.address);
+        if (data.location) setLocation(data.location);
         if (data.gender) setGender(data.gender);
         if (data.remarks) setRemarks(data.remarks);
         if (data.createdBy) setCreatedBy(data.createdBy);
@@ -557,7 +569,7 @@ export default function PatientRegistration() {
           return;
         }
         const dataToSave = {
-          firstName, lastName, title, dob, age, mobile, email, address,
+          firstName, lastName, title, dob, age, mobile, email, address, location,
           gender, remarks, selectedCreatedAt, visitType, reportMode,
           sampleBarcodeNo, refDoctor, isManualRefDoctor, manualRefDoctorName,
           selectedTests, discount, discountPercent, discountRemark,
@@ -572,7 +584,7 @@ export default function PatientRegistration() {
 
     return () => clearTimeout(timeoutId);
   }, [
-    firstName, lastName, title, dob, age, mobile, email, address, gender, remarks,
+    firstName, lastName, title, dob, age, mobile, email, address, location, gender, remarks,
     selectedCreatedAt, visitType, reportMode, sampleBarcodeNo,
     refDoctor, isManualRefDoctor, manualRefDoctorName, selectedTests,
     discount, discountPercent, discountRemark, paid, paymentMode, businessType
@@ -604,6 +616,7 @@ export default function PatientRegistration() {
     setMobile("");
     setEmail("");
     setAddress("");
+    setLocation("");
     setGender("");
     setRemarks("");
     setCreatedBy(loggedUser);
@@ -810,6 +823,44 @@ export default function PatientRegistration() {
     }
   };
 
+  // Handle location search - fetch from collection centers
+  const handleLocationSearch = async (value: string) => {
+    setLocation(value);
+    
+    if (value.length < 1) {
+      setLocationSuggestions([]);
+      return;
+    }
+
+    try {
+      // Get unique locations from collection centers
+      const uniqueLocations = Array.from(
+        new Set(
+          collectionCenterOptions
+            .map(center => center.location)
+            .filter(loc => loc && loc.trim() !== '')
+        )
+      ).sort();
+      
+      // Filter based on user input
+      const filtered = uniqueLocations.filter(loc => 
+        loc.toLowerCase().includes(value.toLowerCase())
+      );
+      
+      setLocationSuggestions(filtered);
+      setShowLocationDropdown(filtered.length > 0);
+    } catch (error) {
+      console.error('Location search error:', error);
+      setLocationSuggestions([]);
+    }
+  };
+
+  const handleLocationSelect = (selectedLocation: string) => {
+    setLocation(selectedLocation);
+    setLocationSuggestions([]);
+    setShowLocationDropdown(false);
+  };
+
   const handleRegister = () => {
     // Validate ALL Patient Identity fields as mandatory
     const missingFields = [];
@@ -828,8 +879,9 @@ export default function PatientRegistration() {
     
     if (mobile.length !== 10) return alert("Mobile must be 10 digits");
     if (email && !email.endsWith("@gmail.com")) return alert("Email must end with @gmail.com");
-    if (selectedTests.length === 0) return alert("Add at least one test");
-    setShowRegistrationModal(true);
+    
+    // Allow registration without tests - just save patient info
+    handleSaveRegistration();
   };
 
   const handleSaveRegistration = async () => {
@@ -855,12 +907,12 @@ export default function PatientRegistration() {
       // Prepare patient data for backend with all fields
       const patientData = {
         // Existing patient ID (if found)
-        existingPatientId: existingPatientId,
+        existingPatientId: existingPatientId || null,
         // Patient Identity
         title: title,
         firstName: firstName,
         lastName: lastName || null,
-        dob: dob || null,
+        dob: dob || null,  // DOB is optional
         age: parseInt(age) || null,
         gender: gender,
         mobile: mobile,
@@ -868,23 +920,24 @@ export default function PatientRegistration() {
         createdBy: createdBy || null,
         createdAtLocation: selectedCreatedAt || null,
         address: address || null,
-        // Registration Details
-        visitType: visitType || null,
-        reportMode: reportMode || null,
+        location: location || null,  // Add location field
+        // Registration Details (optional if no tests)
+        visitType: visitType || "General",  // Default value
+        reportMode: reportMode || "Email",  // Default value
         referralDoctor: isManualRefDoctor ? manualRefDoctorName : refDoctor || null,
-        visitDate: date || null,
-        visitTime: time || null,
+        visitDate: date || new Date().toISOString().split('T')[0],  // Default to today
+        visitTime: time || "00:00",  // Default time
         sampleBarcodeNo: sampleBarcodeNo || null,
         remarks: remarks || null,
         // Billing Details
-        totalAmount: totalAmt,
-        discountPercent: discPct,
-        discountAmount: discAmt,
+        totalAmount: totalAmt || 0,
+        discountPercent: discPct || 0,
+        discountAmount: discAmt || 0,
         discountRemark: discountRemark || null,
-        paidAmount: paidAmt,
-        balanceAmount: balAmt,
-        paymentMode: paymentMode,
-        businessType: businessType,
+        paidAmount: paidAmt || 0,
+        balanceAmount: balAmt || 0,
+        paymentMode: paymentMode || "Cash",  // Default value
+        businessType: businessType || "B2C",  // Default value
         // Tests (expanded from packages)
         tests: expandedTests
       };
@@ -894,47 +947,136 @@ export default function PatientRegistration() {
       
       console.log("Patient registered successfully:", response);
       
-      // Clear saved form data after successful registration
-      clearSavedFormData();
-      
       // Handle response structure correctly - response.data contains the patient object
       const patientId = response?.data?.patientId || response?.patientId || 'N/A';
+      const visitId = response?.data?.visitId || response?.visitId || patientId;
       
-      // Print BEFORE showing alert if checkbox is checked
-      if (printReceipt) {
-        // Print immediately while modal is still visible
-        console.log('Triggering print with modal visible...');
-        window.print();
-        
-        // Show success message after print
-        const message = existingPatientId 
-          ? `Tests Added Successfully ✅\nPatient ID: ${patientId}\n\nNew tests have been added to existing patient record.`
-          : `Patient Registered Successfully ✅\nPatient ID: ${patientId}`;
-        alert(message);
-        
-        // Close modal and reload
-        setShowRegistrationModal(false);
-        if (navigateToResult) console.log("Navigating to result page...");
-        setTimeout(() => {
-          window.location.reload();
-        }, 1000);
-      } else {
-        // No print - show alert, close modal and reload
-        const message = existingPatientId 
-          ? `Tests Added Successfully ✅\nPatient ID: ${patientId}\n\nNew tests have been added to existing patient record.`
-          : `Patient Registered Successfully ✅\nPatient ID: ${patientId}`;
-        alert(message);
-        
-        setShowRegistrationModal(false);
-        if (navigateToResult) console.log("Navigating to result page...");
-        setTimeout(() => {
-          window.location.reload();
-        }, 1000);
+      // Show success message
+      const message = selectedTests.length > 0 
+        ? `Patient Registered Successfully ✅\nPatient ID: ${patientId}\n\nYou can now add more tests or print barcode.`
+        : `Patient Information Saved ✅\nPatient ID: ${patientId}\n\nYou can now select and add tests.`;
+      
+      alert(message);
+      
+      // If tests were added, show barcode modal
+      if (selectedTests.length > 0) {
+        showBarcodeAfterRegistration(
+          `${title} ${firstName} ${lastName || ''}`.trim(),
+          visitId,
+          age,
+          gender,
+          selectedTests
+        );
       }
+      
+      // Clear tests but KEEP patient info
+      setSelectedTests([]);
+      
+      // Close registration modal if it was open
+      setShowRegistrationModal(false);
+      
     } catch (error) {
       console.error("Error saving registration:", error);
       alert(`Failed to register patient: ${error.message}`);
     }
+  };
+
+  // Generate Code128 barcode bars as SVG path data
+  const buildCode128Svg = (text: any) => {
+    // Code128B encoding table (char code 32-127)
+    const CODE128B = [
+      '11011001100','11001101100','11001100110','10010011000','10010001100',
+      '10001001100','10011001000','10011000100','10001100100','11001001000',
+      '11001000100','11000100100','10110011100','10011011100','10011001110',
+      '10111001100','10011101100','10011100110','11001110010','11001011100',
+      '11001001110','11011100100','11001110100','11101101110','11101001100',
+      '11100101100','11100100110','11101100100','11100110100','11100110010',
+      '11011011000','11011000110','11000110110','10100011000','10001011000',
+      '10001000110','10110001000','10001101000','10001100010','11010001000',
+      '11000101000','11000100010','10110111000','10110001110','10001101110',
+      '10111011000','10111000110','10001110110','11101110110','11010001110',
+      '11000101110','11011101000','11011100010','11011101110','11101011000',
+      '11101000110','11100010110','11101101000','11101100010','11100011010',
+      '11101111010','11001000010','11110001010','10100110000','10100001100',
+      '10010110000','10010000110','10000101100','10000100110','10110010000',
+      '10110000100','10011010000','10011000010','10000110100','10000110010',
+      '11000010010','11001010000','11110111010','11000010100','10001111010',
+      '10100111100','10010111100','10010011110','10111100100','10011110100',
+      '10011110010','11110100100','11110010100','11110010010','11011011110',
+      '11011110110','11110110110','10101111000','10100011110','10001011110',
+      '10111101000','10111100010','11110101000','11110100010','10111011110',
+      '10111101110','11101011110','11110101110','11010000100','11010010000',
+      '11010011100','1100011101011'
+    ];
+    const START_B = 104;
+    const STOP = 106;
+
+    const codes = [START_B];
+    let checksum = START_B;
+    for (let i = 0; i < text.length; i++) {
+      const c = text.charCodeAt(i) - 32;
+      codes.push(c);
+      checksum += c * (i + 1);
+    }
+    codes.push(checksum % 103);
+    codes.push(STOP);
+
+    const barWidth = 2;
+    let x = 0;
+    let bars = '';
+    const height = 60;
+
+    codes.forEach(code => {
+      const pattern = CODE128B[code];
+      if (!pattern) return;
+      for (let i = 0; i < pattern.length; i++) {
+        const w = parseInt(pattern[i]) * barWidth;
+        if (i % 2 === 0) {
+          bars += `<rect x="${x}" y="0" width="${w}" height="${height}" fill="black"/>`;
+        }
+        x += w;
+      }
+    });
+
+    return { svg: bars, width: x, height };
+  };
+
+  // Show barcode modal after registration
+  const showBarcodeAfterRegistration = (patientName: string, visitId: string, age: string, gender: string, tests: any[]) => {
+    const now = new Date();
+    const dateStr = now.toLocaleDateString('en-GB');
+    const timeStr = now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: true }).toUpperCase();
+
+    // Group by specimen type
+    const specimenGroups: any = {};
+    tests.forEach(t => {
+      const key = t.sample || 'Unknown';
+      if (!specimenGroups[key]) specimenGroups[key] = [];
+      specimenGroups[key].push(t.name);
+    });
+
+    // Build labels
+    const specimenEntries = Object.entries(specimenGroups);
+    const labels = specimenEntries.map(([specimen, shortNames], idx) => ({
+      barcodeValue: idx === 0 ? visitId : `${visitId}-${idx + 1}`,
+      specimen,
+      shortNamesStr: (shortNames as any[]).join(' / '),
+      dateStr,
+      timeStr,
+    }));
+
+    const genderInitial = gender ? gender.charAt(0).toUpperCase() : '';
+    const ageGender = genderInitial && age ? `${genderInitial}/${age} Yrs` : genderInitial || (age ? `${age} Yrs` : '');
+
+    setBarcodePatientInfo({
+      patientName,
+      visitId,
+      age,
+      gender,
+      ageGender,
+    });
+    setBarcodeLabels(labels);
+    setShowBarcodeModal(true);
   };
 
   /* ---------------- ADD REMOVE ---------------- */
@@ -1084,7 +1226,16 @@ export default function PatientRegistration() {
                 required 
               />
               <InlineDatePicker value={dob} onChange={handleDobChange} placeholder="DOB" maxDate={new Date().toISOString().split("T")[0]} className="w-full" />
-              <input className={input} placeholder="Age *" value={age} readOnly required />
+              <input 
+                className={input} 
+                placeholder="Age *" 
+                value={age} 
+                onChange={(e) => setAge(e.target.value)}
+                type="number"
+                min="0"
+                max="150"
+                required 
+              />
               <InlineSelect
                 value={gender}
                 onChange={setGender}
@@ -1225,6 +1376,31 @@ export default function PatientRegistration() {
               </div>
 
               <textarea className={input} placeholder="Address *" value={address} onChange={(e) => setAddress(e.target.value)} rows={3} required></textarea>
+              
+              {/* Location Field with Autocomplete */}
+              <div className="relative">
+                <input 
+                  className={input} 
+                  placeholder="Location (Optional)" 
+                  value={location} 
+                  onChange={(e) => handleLocationSearch(e.target.value)}
+                  onFocus={() => location && setShowLocationDropdown(true)}
+                  autoComplete="off"
+                />
+                {showLocationDropdown && locationSuggestions.length > 0 && (
+                  <div className="absolute top-full left-0 right-0 bg-white border border-slate-300 rounded mt-1 shadow-lg z-50 max-h-40 overflow-y-auto">
+                    {locationSuggestions.map((suggestion, idx) => (
+                      <div
+                        key={idx}
+                        onClick={() => handleLocationSelect(suggestion)}
+                        className="px-3 py-2 text-xs hover:bg-orange-50 cursor-pointer border-b last:border-b-0"
+                      >
+                        {suggestion}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 
@@ -1320,8 +1496,7 @@ export default function PatientRegistration() {
 
               <InlineDatePicker value={date} onChange={setDate} placeholder="Visit Date" className="w-full" />
               <input type='time' className={input} value={time} onChange={(e) => setTime(e.target.value)} />
-              <input className={input} placeholder="Sample Barcode No" value={sampleBarcodeNo} onChange={(e) => setSampleBarcodeNo(e.target.value)} />
-              <textarea className={input} placeholder="Remarks" value={remarks} onChange={(e) => setRemarks(e.target.value)} rows={3}></textarea>
+              <textarea className={input} placeholder="Patient History" value={remarks} onChange={(e) => setRemarks(e.target.value)} rows={3}></textarea>
             </div>
           </div>
 
@@ -2239,6 +2414,109 @@ export default function PatientRegistration() {
           </div>
         </div>
         </>
+      )}
+
+      {/* Barcode Preview Modal */}
+      {showBarcodeModal && barcodePatientInfo && (
+        <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col">
+            {/* Header */}
+            <div className="flex items-center justify-between px-5 py-3 border-b bg-gray-800 rounded-t-lg">
+              <h2 className="text-sm font-semibold text-white flex items-center gap-2">
+                <Barcode size={16} /> Barcode Labels — {barcodePatientInfo.patientName} | {barcodePatientInfo.visitId}
+              </h2>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => {
+                    const printArea = document.getElementById('barcode-print-area');
+                    const win = window.open('', '_blank');
+                    win.document.write(`<!DOCTYPE html><html><head><title>Barcode Labels</title>
+                      <style>
+                        * { margin:0; padding:0; box-sizing:border-box; }
+                        body { font-family: Arial, sans-serif; background: white; }
+                        .labels-wrap { display: flex; flex-wrap: wrap; gap: 8mm; padding: 8mm; }
+                        .label { width: 80mm; border: 0.5px solid #999; page-break-inside: avoid; }
+                        @page { size: A4; margin: 8mm; }
+                      </style>
+                    </head><body>${printArea.innerHTML}</body></html>`);
+                    win.document.close();
+                    win.focus();
+                    win.print();
+                    win.close();
+                  }}
+                  className="bg-blue-600 text-white px-4 py-1.5 rounded text-xs font-semibold hover:bg-blue-700"
+                >
+                  🖨️ Print
+                </button>
+                <button
+                  onClick={() => {
+                    setShowBarcodeModal(false);
+                    setTimeout(() => {
+                      window.location.reload();
+                    }, 500);
+                  }}
+                  className="text-gray-300 hover:text-white text-xl font-bold leading-none px-1"
+                >×</button>
+              </div>
+            </div>
+
+            {/* Labels */}
+            <div className="overflow-y-auto flex-1 p-5 bg-gray-100">
+              <div id="barcode-print-area" className="flex flex-wrap gap-4 justify-start">
+                {barcodeLabels.map((label, idx) => {
+                  const { svg, width, height } = buildCode128Svg(label.barcodeValue);
+                  return (
+                    <div
+                      key={idx}
+                      className="bg-white border border-gray-300 shadow"
+                      style={{ width: '302px', fontFamily: 'Arial, sans-serif' }}
+                    >
+                      {/* Barcode — centered, horizontal, full width */}
+                      <div className="flex justify-center px-2 pt-2 pb-0">
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          width="100%"
+                          height="52"
+                          viewBox={`0 0 ${width} ${height}`}
+                          preserveAspectRatio="none"
+                          dangerouslySetInnerHTML={{ __html: svg }}
+                        />
+                      </div>
+
+                      {/* Barcode number centered */}
+                      <div className="text-center font-bold text-sm tracking-widest py-0.5 px-2">
+                        {label.barcodeValue}
+                      </div>
+
+                      {/* Date time (left) + specimen type (right) */}
+                      <div className="flex justify-between items-center px-3 pb-0.5">
+                        <span className="text-xs text-gray-700">{label.dateStr} {label.timeStr}</span>
+                        <span className="text-xs text-gray-600 font-medium">({label.specimen})</span>
+                      </div>
+
+                      {/* Patient name (left) + gender initial / age (right) */}
+                      <div className="flex justify-between items-center px-3 pb-2">
+                        <span className="font-bold text-xs leading-tight truncate max-w-[170px]">
+                          {barcodePatientInfo.patientName}
+                        </span>
+                        <span className="text-xs font-semibold whitespace-nowrap ml-1">
+                          {barcodePatientInfo.ageGender}
+                        </span>
+                      </div>
+
+                      {/* Short test names */}
+                      {label.shortNamesStr && (
+                        <div className="px-3 pb-2 text-[10px] text-gray-500 truncate">
+                          {label.shortNamesStr}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </div>
     </>

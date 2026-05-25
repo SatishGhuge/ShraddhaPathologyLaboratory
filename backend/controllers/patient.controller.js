@@ -27,7 +27,7 @@ export const createPatient = async (req, res) => {
       existingPatientId,
       // Patient Identity
       title, firstName, lastName, dob, age, gender, mobile, email,
-      createdBy, createdAtLocation, address,
+      createdBy, createdAtLocation, address, location,
       // Registration Details (will be saved with each test)
       visitType, reportMode, referralDoctor, visitDate, visitTime,
       sampleTaken, sampleReceived, sampleBarcodeNo, remarks,
@@ -229,6 +229,7 @@ export const createPatient = async (req, res) => {
           createdBy,
           createdAtLocation,
           address,
+          location,  // Add location field
           // Tests with registration & billing details
           tests: {
             create: tests?.map(test => ({
@@ -573,6 +574,78 @@ export const getPatientStatistics = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Failed to fetch patient statistics'
+    });
+  }
+};
+
+// Get patient location-wise statistics
+export const getPatientLocationStatistics = async (req, res) => {
+  try {
+    const { fromDate, toDate } = req.query;
+
+    // Build date filter
+    const dateFilter = {};
+    if (fromDate && toDate) {
+      const start = new Date(fromDate);
+      start.setHours(0, 0, 0, 0);
+      const end = new Date(toDate);
+      end.setHours(23, 59, 59, 999);
+      dateFilter.createdAt = { gte: start, lte: end };
+    } else if (fromDate) {
+      const start = new Date(fromDate);
+      start.setHours(0, 0, 0, 0);
+      dateFilter.createdAt = { gte: start };
+    } else if (toDate) {
+      const end = new Date(toDate);
+      end.setHours(23, 59, 59, 999);
+      dateFilter.createdAt = { lte: end };
+    }
+
+    // Get all patients with location
+    const patients = await prisma.patient.findMany({
+      where: dateFilter,
+      select: {
+        location: true,
+        patientId: true,
+        firstName: true,
+        lastName: true
+      }
+    });
+
+    // Group by location and count
+    const locationStats = {};
+    patients.forEach(patient => {
+      const location = patient.location || 'Not Specified';
+      if (!locationStats[location]) {
+        locationStats[location] = 0;
+      }
+      locationStats[location]++;
+    });
+
+    // Convert to array and sort by count (descending)
+    const locationArray = Object.entries(locationStats)
+      .map(([location, count]) => ({
+        location,
+        count,
+        percentage: ((count / patients.length) * 100).toFixed(2)
+      }))
+      .sort((a, b) => b.count - a.count);
+
+    res.json({
+      success: true,
+      data: {
+        totalPatients: patients.length,
+        locationStats: locationArray,
+        topLocation: locationArray[0] || null
+      }
+    });
+
+  } catch (error) {
+    console.error('Get patient location statistics error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch patient location statistics',
+      error: error.message
     });
   }
 };
