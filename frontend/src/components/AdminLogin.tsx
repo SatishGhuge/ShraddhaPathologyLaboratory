@@ -10,7 +10,7 @@ const logo = "/logo.png";
 
 const AdminLogin = ({ onLogin }: { onLogin?: () => void }) => {
   const router = useRouter();
-  const [currentView, setCurrentView] = useState("login"); // login, forgotPassword, verifyCode, resetPassword
+  const [currentView, setCurrentView] = useState("login");
   const [showPassword, setShowPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -27,18 +27,15 @@ const AdminLogin = ({ onLogin }: { onLogin?: () => void }) => {
   const [errors, setErrors] = useState<any>({});
   const [loading, setLoading] = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
-  const [otpTimer, setOtpTimer] = useState(0); // seconds remaining
+  const [otpTimer, setOtpTimer] = useState(0);
   const timerRef = useRef(null);
 
-  /* ================= PASSWORD VALIDATION ================= */
   const validatePassword = (password: any) => {
     if (password.length < 6) {
       return "Password must be at least 6 characters";
     }
     return null;
   };
-
-  /* ================= HANDLERS ================= */
 
   const handleChange = (e: any) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -65,18 +62,14 @@ const AdminLogin = ({ onLogin }: { onLogin?: () => void }) => {
       const response = await adminLogin(formData.username, formData.password);
       console.log('✅ Login successful:', response);
       
-      // Store token in cookie (for middleware)
       document.cookie = `token=${response.token}; path=/; max-age=86400; SameSite=Lax`;
-      
-      // Also store in localStorage for client-side use
       localStorage.setItem('token', response.token);
       localStorage.setItem('admin', JSON.stringify(response.admin));
 
       if (onLogin) onLogin();
 
-      // Route to appropriate dashboard based on user role
       const userRole = response.admin?.role;
-      let dashboardPath = '/labdashboard'; // default for admin
+      let dashboardPath = '/labdashboard';
       
       if (userRole === 'Collection Center') {
         dashboardPath = '/Dashboard/collectiondashboard';
@@ -87,7 +80,6 @@ const AdminLogin = ({ onLogin }: { onLogin?: () => void }) => {
       }
       
       console.log('🚀 Routing to', dashboardPath);
-      // Use replace for faster navigation without adding to history
       router.replace(dashboardPath);
     } catch (error: any) {
       console.error('❌ Login error:', error);
@@ -103,7 +95,6 @@ const AdminLogin = ({ onLogin }: { onLogin?: () => void }) => {
       return;
     }
 
-    // Basic email validation
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(formData.email)) {
       setErrors({ email: "Please enter a valid email address" });
@@ -118,7 +109,6 @@ const AdminLogin = ({ onLogin }: { onLogin?: () => void }) => {
       console.log('🔐 Sending forgot password request for:', formData.email);
       await forgotPassword(formData.email);
       setSuccessMessage("OTP sent to your email. Valid for 1 minute.");
-      // Start 60-second countdown
       setOtpTimer(60);
       if (timerRef.current) clearInterval(timerRef.current);
       timerRef.current = setInterval(() => {
@@ -209,186 +199,40 @@ const AdminLogin = ({ onLogin }: { onLogin?: () => void }) => {
     setErrors({});
   };
 
-  /* ================= UI ================= */
-
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-4 relative overflow-hidden">
-      {/* Animated Background Elements */}
+      {/* Floating particles - minimal */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        {/* Large animated blobs */}
-        <div className="absolute top-0 left-0 w-96 h-96 bg-orange-500/10 rounded-full blur-3xl animate-blob"></div>
-        <div className="absolute top-0 right-0 w-96 h-96 bg-slate-600/10 rounded-full blur-3xl animate-blob animation-delay-2000"></div>
-        <div className="absolute bottom-0 left-1/2 w-96 h-96 bg-orange-500/10 rounded-full blur-3xl animate-blob animation-delay-4000"></div>
-        
-        {/* Grid pattern overlay */}
-        <div className="absolute inset-0 bg-[linear-gradient(rgba(249,115,22,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(249,115,22,0.03)_1px,transparent_1px)] bg-[size:50px_50px]"></div>
-        
-        {/* Floating particles */}
-        <div className="absolute top-1/4 left-1/4 w-2 h-2 bg-orange-400/30 rounded-full animate-float"></div>
-        <div className="absolute top-1/3 right-1/4 w-3 h-3 bg-slate-400/30 rounded-full animate-float animation-delay-1000"></div>
-        <div className="absolute bottom-1/4 left-1/3 w-2 h-2 bg-orange-400/30 rounded-full animate-float animation-delay-2000"></div>
-        <div className="absolute top-2/3 right-1/3 w-2 h-2 bg-orange-400/30 rounded-full animate-float animation-delay-3000"></div>
-        <div className="absolute bottom-1/3 right-1/4 w-3 h-3 bg-slate-400/30 rounded-full animate-float animation-delay-4000"></div>
-        <div className="absolute top-1/2 left-1/4 w-2 h-2 bg-orange-400/30 rounded-full animate-float animation-delay-500"></div>
-        <div className="absolute bottom-1/2 right-1/2 w-2 h-2 bg-orange-400/30 rounded-full animate-float animation-delay-1500"></div>
-        <div className="absolute top-3/4 left-2/3 w-3 h-3 bg-slate-400/30 rounded-full animate-float animation-delay-2500"></div>
-        <div className="absolute bottom-2/3 left-1/2 w-2 h-2 bg-orange-400/30 rounded-full animate-float animation-delay-3500"></div>
-        <div className="absolute top-1/4 right-2/3 w-2 h-2 bg-orange-400/30 rounded-full animate-float animation-delay-4500"></div>
-        <div className="absolute bottom-1/4 right-1/2 w-3 h-3 bg-slate-400/30 rounded-full animate-float animation-delay-5000"></div>
-        <div className="absolute top-2/3 left-3/4 w-2 h-2 bg-orange-400/30 rounded-full animate-float animation-delay-5500"></div>
-        <div className="absolute bottom-3/4 right-3/4 w-2 h-2 bg-orange-400/30 rounded-full animate-float animation-delay-6000"></div>
-        <div className="absolute top-1/3 left-2/3 w-3 h-3 bg-slate-400/30 rounded-full animate-float animation-delay-6500"></div>
-        <div className="absolute bottom-2/3 right-2/3 w-2 h-2 bg-orange-400/30 rounded-full animate-float animation-delay-7000"></div>
-        <div className="absolute top-3/4 right-1/4 w-2 h-2 bg-orange-400/30 rounded-full animate-float animation-delay-7500"></div>
-        <div className="absolute bottom-1/3 left-3/4 w-3 h-3 bg-slate-400/30 rounded-full animate-float animation-delay-8000"></div>
-        <div className="absolute top-1/2 right-3/4 w-2 h-2 bg-orange-400/30 rounded-full animate-float animation-delay-8500"></div>
-        <div className="absolute bottom-1/2 left-1/3 w-2 h-2 bg-orange-400/30 rounded-full animate-float animation-delay-9000"></div>
-        <div className="absolute top-2/3 right-1/2 w-3 h-3 bg-slate-400/30 rounded-full animate-float animation-delay-9500"></div>
+        <div className="absolute top-1/4 left-1/4 w-2 h-2 bg-orange-400/20 rounded-full animate-pulse"></div>
+        <div className="absolute top-1/3 right-1/4 w-2 h-2 bg-orange-400/20 rounded-full animate-pulse" style={{ animationDelay: '1s' }}></div>
+        <div className="absolute bottom-1/4 left-1/3 w-2 h-2 bg-orange-400/20 rounded-full animate-pulse" style={{ animationDelay: '2s' }}></div>
+        <div className="absolute top-2/3 right-1/3 w-2 h-2 bg-orange-400/20 rounded-full animate-pulse" style={{ animationDelay: '0.5s' }}></div>
+        <div className="absolute bottom-1/3 right-1/4 w-2 h-2 bg-orange-400/20 rounded-full animate-pulse" style={{ animationDelay: '1.5s' }}></div>
+        <div className="absolute top-1/2 left-1/4 w-2 h-2 bg-orange-400/20 rounded-full animate-pulse" style={{ animationDelay: '2.5s' }}></div>
       </div>
 
-      {/* CSS Animations */}
-      <style>{`
-        @keyframes blob {
-          0%, 100% {
-            transform: translate(0, 0) scale(1);
-          }
-          33% {
-            transform: translate(30px, -50px) scale(1.1);
-          }
-          66% {
-            transform: translate(-20px, 20px) scale(0.9);
-          }
-        }
-        
-        @keyframes float {
-          0%, 100% {
-            transform: translateY(0) translateX(0);
-            opacity: 0;
-          }
-          10% {
-            opacity: 1;
-          }
-          90% {
-            opacity: 1;
-          }
-          50% {
-            transform: translateY(-100px) translateX(50px);
-          }
-        }
-        
-        .animate-blob {
-          animation: blob 7s infinite;
-        }
-        
-        .animate-float {
-          animation: float 10s infinite;
-        }
-        
-        .animation-delay-1000 {
-          animation-delay: 1s;
-        }
-        
-        .animation-delay-2000 {
-          animation-delay: 2s;
-        }
-        
-        .animation-delay-3000 {
-          animation-delay: 3s;
-        }
-        
-        .animation-delay-4000 {
-          animation-delay: 4s;
-        }
-        
-        .animation-delay-500 {
-          animation-delay: 0.5s;
-        }
-        
-        .animation-delay-1500 {
-          animation-delay: 1.5s;
-        }
-        
-        .animation-delay-2500 {
-          animation-delay: 2.5s;
-        }
-        
-        .animation-delay-3500 {
-          animation-delay: 3.5s;
-        }
-        
-        .animation-delay-4500 {
-          animation-delay: 4.5s;
-        }
-        
-        .animation-delay-5000 {
-          animation-delay: 5s;
-        }
-        
-        .animation-delay-5500 {
-          animation-delay: 5.5s;
-        }
-        
-        .animation-delay-6000 {
-          animation-delay: 6s;
-        }
-        
-        .animation-delay-6500 {
-          animation-delay: 6.5s;
-        }
-        
-        .animation-delay-7000 {
-          animation-delay: 7s;
-        }
-        
-        .animation-delay-7500 {
-          animation-delay: 7.5s;
-        }
-        
-        .animation-delay-8000 {
-          animation-delay: 8s;
-        }
-        
-        .animation-delay-8500 {
-          animation-delay: 8.5s;
-        }
-        
-        .animation-delay-9000 {
-          animation-delay: 9s;
-        }
-        
-        .animation-delay-9500 {
-          animation-delay: 9.5s;
-        }
-      `}</style>
-
-      <div className="bg-white/10 backdrop-blur-md border border-white/20 rounded-xl shadow-2xl w-[90%] max-w-sm p-6 relative z-10">
+      {/* Main Card */}
+      <div className="bg-slate-700/40 backdrop-blur-md border border-slate-600/50 rounded-2xl shadow-2xl w-[90%] max-w-md p-8 relative z-10">
 
         {/* Home Button */}
         <button
           onClick={() => router.push("/")}
-          className="absolute top-3 left-3 flex items-center gap-1.5 text-orange-400 hover:text-white text-xs transition hover:bg-white/10 px-2 py-1 rounded-lg"
+          className="absolute top-6 left-6 flex items-center gap-1.5 text-orange-400 hover:text-orange-300 text-xs transition hover:bg-white/10 px-2 py-1 rounded-lg"
         >
           <Home size={14} /> Home
         </button>
 
-        {/* Logo */}
-        <div className="flex flex-col items-center mb-4">
-          <img src={logo} alt="Logo" className="w-16 h-16 rounded-full hover:scale-110 transition-transform duration-200" />
-          <h1 className="text-2xl font-bold text-white">Shraddha Pathology Laboratory</h1>
-          <p className="text-xs text-center font-medium bg-gradient-to-r from-orange-300 via-orange-200 to-orange-400 bg-clip-text text-transparent">
-            Empowering Life Transforming Health
-          </p>
-          <p className="text-xs text-orange-200">
-            {currentView === "login" && "Login"}
-            {currentView === "forgotPassword" && "Forgot Password"}
-            {currentView === "verifyCode" && "Verify Code"}
-            {currentView === "resetPassword" && "Reset Password"}
-          </p>
+        {/* Logo and Branding */}
+        <div className="flex flex-col items-center mb-6">
+          <img src={logo} alt="Logo" className="w-20 h-20 mb-4 hover:scale-110 transition-transform duration-200" />
+          <h1 className="text-3xl font-bold text-white text-center">SHRADDHA</h1>
+          <p className="text-sm text-gray-300 text-center">Pathology Laboratory</p>
+          <p className="text-xs text-gray-400 text-center mt-1">Login</p>
         </div>
 
         {/* LOGIN FORM */}
         {currentView === "login" && (
-          <form className="space-y-3" onSubmit={handleLogin}>
+          <form className="space-y-4" onSubmit={handleLogin}>
             {/* Success Message */}
             {successMessage && (
               <div className="bg-green-500/20 border border-green-500 rounded-md p-2">
@@ -405,17 +249,15 @@ const AdminLogin = ({ onLogin }: { onLogin?: () => void }) => {
 
             {/* USERNAME */}
             <div>
-              <label className="block text-xs text-orange-200 mb-1">
-                Username / Email
-              </label>
+              <label className="block text-xs text-gray-300 mb-2">Username / Email</label>
               <div className="relative">
-                <User className="absolute left-3 top-1/2 -translate-y-1/2 text-orange-500" size={16} />
+                <User className="absolute left-3 top-1/2 -translate-y-1/2 text-orange-400" size={16} />
                 <input
                   name="username"
                   value={formData.username}
                   onChange={handleChange}
                   placeholder="Enter username"
-                  className="w-full pl-9 pr-3 py-2 text-sm rounded-md bg-white/90 focus:outline-none focus:ring-2 focus:ring-orange-500"
+                  className="w-full pl-9 pr-3 py-2.5 text-sm rounded-lg bg-gray-100 text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-orange-500"
                 />
               </div>
               {errors.username && (
@@ -425,23 +267,21 @@ const AdminLogin = ({ onLogin }: { onLogin?: () => void }) => {
 
             {/* PASSWORD */}
             <div>
-              <label className="block text-xs text-orange-200 mb-1">
-                Password
-              </label>
+              <label className="block text-xs text-gray-300 mb-2">Password</label>
               <div className="relative">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-orange-500" size={16} />
+                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-orange-400" size={16} />
                 <input
                   type={showPassword ? "text" : "password"}
                   name="password"
                   value={formData.password}
                   onChange={handleChange}
                   placeholder="Enter password"
-                  className="w-full pl-9 pr-10 py-2 text-sm rounded-md bg-white/90 focus:outline-none focus:ring-2 focus:ring-orange-500"
+                  className="w-full pl-9 pr-10 py-2.5 text-sm rounded-lg bg-gray-100 text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-orange-500"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-600 hover:text-gray-800"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
                 >
                   {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                 </button>
@@ -449,7 +289,6 @@ const AdminLogin = ({ onLogin }: { onLogin?: () => void }) => {
               {errors.password && (
                 <p className="text-red-400 text-xs mt-1">{errors.password}</p>
               )}
-              
             </div>
 
             {/* Forgot Password Link */}
@@ -457,7 +296,7 @@ const AdminLogin = ({ onLogin }: { onLogin?: () => void }) => {
               <button
                 type="button"
                 onClick={() => setCurrentView("forgotPassword")}
-                className="text-xs text-orange-400 hover:text-orange-200 underline"
+                className="text-xs text-orange-400 hover:text-orange-300 underline"
               >
                 Forgot Password?
               </button>
@@ -467,7 +306,7 @@ const AdminLogin = ({ onLogin }: { onLogin?: () => void }) => {
             <button
               type="submit"
               disabled={loading}
-              className="w-full px-4 py-2 rounded-md text-white bg-orange-500 hover:bg-orange-600 transition font-semibold text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full px-4 py-2.5 rounded-lg text-white bg-orange-500 hover:bg-orange-600 transition font-semibold text-sm disabled:opacity-50 disabled:cursor-not-allowed mt-6"
             >
               {loading ? "Logging in..." : "Login"}
             </button>
@@ -476,19 +315,17 @@ const AdminLogin = ({ onLogin }: { onLogin?: () => void }) => {
 
         {/* FORGOT PASSWORD FORM */}
         {currentView === "forgotPassword" && (
-          <form className="space-y-3" onSubmit={handleForgotPassword}>
-            <p className="text-xs text-orange-200 text-center mb-3">
+          <form className="space-y-4" onSubmit={handleForgotPassword}>
+            <p className="text-xs text-gray-300 text-center mb-4">
               Enter your email to receive a verification code
             </p>
 
-            {/* Success Message */}
             {successMessage && (
               <div className="bg-green-500/20 border border-green-500 rounded-md p-2">
                 <p className="text-green-200 text-xs text-center">{successMessage}</p>
               </div>
             )}
 
-            {/* Error Message */}
             {errors.submit && (
               <div className="bg-red-500/20 border border-red-500 rounded-md p-2">
                 <p className="text-red-200 text-xs text-center">{errors.submit}</p>
@@ -497,18 +334,16 @@ const AdminLogin = ({ onLogin }: { onLogin?: () => void }) => {
 
             {/* EMAIL */}
             <div>
-              <label className="block text-xs text-orange-200 mb-1">
-                Email Address
-              </label>
+              <label className="block text-xs text-gray-300 mb-2">Email Address</label>
               <div className="relative">
-                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-orange-500" size={16} />
+                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-orange-400" size={16} />
                 <input
                   type="email"
                   name="email"
                   value={formData.email}
                   onChange={handleChange}
                   placeholder="Enter your email"
-                  className="w-full pl-9 pr-3 py-2 text-sm rounded-md bg-white/90 focus:outline-none focus:ring-2 focus:ring-orange-500"
+                  className="w-full pl-9 pr-3 py-2.5 text-sm rounded-lg bg-gray-100 text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-orange-500"
                 />
               </div>
               {errors.email && (
@@ -520,7 +355,7 @@ const AdminLogin = ({ onLogin }: { onLogin?: () => void }) => {
             <button
               type="submit"
               disabled={loading}
-              className="w-full px-4 py-2 rounded-md text-white bg-orange-500 hover:bg-orange-600 transition font-semibold text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full px-4 py-2.5 rounded-lg text-white bg-orange-500 hover:bg-orange-600 transition font-semibold text-sm disabled:opacity-50 disabled:cursor-not-allowed mt-6"
             >
               {loading ? "Sending..." : "Send Code"}
             </button>
@@ -529,7 +364,7 @@ const AdminLogin = ({ onLogin }: { onLogin?: () => void }) => {
             <button
               type="button"
               onClick={goBackToLogin}
-              className="w-full flex items-center justify-center gap-2 text-orange-400 hover:text-orange-200 text-xs"
+              className="w-full flex items-center justify-center gap-2 text-orange-400 hover:text-orange-300 text-xs mt-2"
             >
               <ArrowLeft size={12} /> Back to Login
             </button>
@@ -538,8 +373,8 @@ const AdminLogin = ({ onLogin }: { onLogin?: () => void }) => {
 
         {/* VERIFY CODE FORM */}
         {currentView === "verifyCode" && (
-          <form className="space-y-3" onSubmit={handleVerifyCode}>
-            <p className="text-xs text-orange-200 text-center mb-1">
+          <form className="space-y-4" onSubmit={handleVerifyCode}>
+            <p className="text-xs text-gray-300 text-center mb-2">
               Enter the 6-digit OTP sent to <span className="font-semibold text-white">{formData.email}</span>
             </p>
 
@@ -551,21 +386,19 @@ const AdminLogin = ({ onLogin }: { onLogin?: () => void }) => {
                 </span>
               ) : (
                 <span className="text-xs text-red-400">OTP expired —&nbsp;
-                  <button type="button" onClick={(e) => handleForgotPassword(e)} className="underline text-orange-400 hover:text-orange-200">
+                  <button type="button" onClick={(e) => handleForgotPassword(e)} className="underline text-orange-400 hover:text-orange-300">
                     Resend OTP
                   </button>
                 </span>
               )}
             </div>
 
-            {/* Success Message */}
             {successMessage && (
               <div className="bg-green-500/20 border border-green-500 rounded-md p-2">
                 <p className="text-green-200 text-xs text-center">{successMessage}</p>
               </div>
             )}
 
-            {/* Error Message */}
             {errors.submit && (
               <div className="bg-red-500/20 border border-red-500 rounded-md p-2">
                 <p className="text-red-200 text-xs text-center">{errors.submit}</p>
@@ -574,9 +407,9 @@ const AdminLogin = ({ onLogin }: { onLogin?: () => void }) => {
 
             {/* CODE */}
             <div>
-              <label className="block text-xs text-orange-200 mb-1">Verification Code</label>
+              <label className="block text-xs text-gray-300 mb-2">Verification Code</label>
               <div className="relative">
-                <Key className="absolute left-3 top-1/2 -translate-y-1/2 text-orange-500" size={16} />
+                <Key className="absolute left-3 top-1/2 -translate-y-1/2 text-orange-400" size={16} />
                 <input
                   type="text"
                   name="code"
@@ -584,7 +417,7 @@ const AdminLogin = ({ onLogin }: { onLogin?: () => void }) => {
                   onChange={handleChange}
                   placeholder="Enter 6-digit OTP"
                   maxLength={6}
-                  className="w-full pl-9 pr-3 py-2 text-sm rounded-md bg-white/90 focus:outline-none focus:ring-2 focus:ring-orange-500 text-center tracking-widest"
+                  className="w-full pl-9 pr-3 py-2.5 text-sm rounded-lg bg-gray-100 text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-orange-500 text-center tracking-widest"
                 />
               </div>
               {errors.code && <p className="text-red-400 text-xs mt-1">{errors.code}</p>}
@@ -594,7 +427,7 @@ const AdminLogin = ({ onLogin }: { onLogin?: () => void }) => {
             <button
               type="submit"
               disabled={loading || otpTimer === 0}
-              className="w-full px-4 py-2 rounded-md text-white bg-orange-500 hover:bg-orange-600 transition font-semibold text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full px-4 py-2.5 rounded-lg text-white bg-orange-500 hover:bg-orange-600 transition font-semibold text-sm disabled:opacity-50 disabled:cursor-not-allowed mt-6"
             >
               {loading ? "Verifying..." : "Verify OTP"}
             </button>
@@ -603,7 +436,7 @@ const AdminLogin = ({ onLogin }: { onLogin?: () => void }) => {
             <button
               type="button"
               onClick={goBackToLogin}
-              className="w-full flex items-center justify-center gap-2 text-orange-400 hover:text-orange-200 text-xs"
+              className="w-full flex items-center justify-center gap-2 text-orange-400 hover:text-orange-300 text-xs mt-2"
             >
               <ArrowLeft size={12} /> Back to Login
             </button>
@@ -612,19 +445,17 @@ const AdminLogin = ({ onLogin }: { onLogin?: () => void }) => {
 
         {/* RESET PASSWORD FORM */}
         {currentView === "resetPassword" && (
-          <form className="space-y-3" onSubmit={handleResetPassword}>
-            <p className="text-xs text-orange-200 text-center mb-3">
+          <form className="space-y-4" onSubmit={handleResetPassword}>
+            <p className="text-xs text-gray-300 text-center mb-4">
               Create your new password
             </p>
 
-            {/* Success Message */}
             {successMessage && (
               <div className="bg-green-500/20 border border-green-500 rounded-md p-2">
                 <p className="text-green-200 text-xs text-center">{successMessage}</p>
               </div>
             )}
 
-            {/* Error Message */}
             {errors.submit && (
               <div className="bg-red-500/20 border border-red-500 rounded-md p-2">
                 <p className="text-red-200 text-xs text-center">{errors.submit}</p>
@@ -633,23 +464,21 @@ const AdminLogin = ({ onLogin }: { onLogin?: () => void }) => {
 
             {/* NEW PASSWORD */}
             <div>
-              <label className="block text-xs text-orange-200 mb-1">
-                New Password
-              </label>
+              <label className="block text-xs text-gray-300 mb-2">New Password</label>
               <div className="relative">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-orange-500" size={16} />
+                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-orange-400" size={16} />
                 <input
                   type={showNewPassword ? "text" : "password"}
                   name="newPassword"
                   value={formData.newPassword}
                   onChange={handleChange}
                   placeholder="Enter new password"
-                  className="w-full pl-9 pr-10 py-2 text-sm rounded-md bg-white/90 focus:outline-none focus:ring-2 focus:ring-orange-500"
+                  className="w-full pl-9 pr-10 py-2.5 text-sm rounded-lg bg-gray-100 text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-orange-500"
                 />
                 <button
                   type="button"
                   onClick={() => setShowNewPassword(!showNewPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-600 hover:text-gray-800"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
                 >
                   {showNewPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                 </button>
@@ -661,23 +490,21 @@ const AdminLogin = ({ onLogin }: { onLogin?: () => void }) => {
 
             {/* CONFIRM PASSWORD */}
             <div>
-              <label className="block text-xs text-orange-200 mb-1">
-                Confirm Password
-              </label>
+              <label className="block text-xs text-gray-300 mb-2">Confirm Password</label>
               <div className="relative">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-orange-500" size={16} />
+                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-orange-400" size={16} />
                 <input
                   type={showConfirmPassword ? "text" : "password"}
                   name="confirmPassword"
                   value={formData.confirmPassword}
                   onChange={handleChange}
                   placeholder="Confirm new password"
-                  className="w-full pl-9 pr-10 py-2 text-sm rounded-md bg-white/90 focus:outline-none focus:ring-2 focus:ring-orange-500"
+                  className="w-full pl-9 pr-10 py-2.5 text-sm rounded-lg bg-gray-100 text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-orange-500"
                 />
                 <button
                   type="button"
                   onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-600 hover:text-gray-800"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
                 >
                   {showConfirmPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                 </button>
@@ -691,7 +518,7 @@ const AdminLogin = ({ onLogin }: { onLogin?: () => void }) => {
             <button
               type="submit"
               disabled={loading}
-              className="w-full px-4 py-2 rounded-md text-white bg-orange-500 hover:bg-orange-600 transition font-semibold text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full px-4 py-2.5 rounded-lg text-white bg-orange-500 hover:bg-orange-600 transition font-semibold text-sm disabled:opacity-50 disabled:cursor-not-allowed mt-6"
             >
               {loading ? "Resetting..." : "Reset Password"}
             </button>
@@ -700,14 +527,15 @@ const AdminLogin = ({ onLogin }: { onLogin?: () => void }) => {
             <button
               type="button"
               onClick={goBackToLogin}
-              className="w-full flex items-center justify-center gap-2 text-orange-400 hover:text-orange-200 text-xs"
+              className="w-full flex items-center justify-center gap-2 text-orange-400 hover:text-orange-300 text-xs mt-2"
             >
               <ArrowLeft size={12} /> Back to Login
             </button>
           </form>
         )}
 
-        <p className="text-center text-xs text-orange-200 mt-3">
+        {/* Footer */}
+        <p className="text-center text-xs text-gray-400 mt-6">
           © 2026 Shraddha Pathology Laboratory
         </p>
       </div>
