@@ -361,9 +361,9 @@ export default function UserLoginReport() {
 
         {/* Invoice Header */}
         <div style={{ textAlign: 'center', marginBottom: '20px' }}>
-          <h1 style={{ fontSize: '24px', fontWeight: 'bold', margin: '0' }}>SILVERLEAF DIAGNOSTICS</h1>
+          <h1 style={{ fontSize: '24px', fontWeight: 'bold', margin: '0' }}>SHRADDHA PATHOLOGY LABORATORY</h1>
           <p style={{ margin: '5px 0', fontSize: '12px' }}>Plot No-38, Sector-1, D-Mart Road, New Panvel - 410 206</p>
-          <p style={{ margin: '5px 0', fontSize: '12px' }}>Email: info@silverleafdiagnostics.com</p>
+          <p style={{ margin: '5px 0', fontSize: '12px' }}>Email: info@shraddha.com</p>
           <p style={{ margin: '5px 0', fontSize: '12px' }}>Ph. 8779295302</p>
           <hr style={{ margin: '10px 0', border: '1px solid #000' }} />
           <h2 style={{ fontSize: '16px', fontWeight: 'bold', color: '#0066cc', margin: '10px 0' }}>User Login Report</h2>
@@ -431,9 +431,9 @@ export default function UserLoginReport() {
         {/* Second Page - Data Table */}
         <div style={{ marginTop: '20px' }}>
           <div style={{ textAlign: 'center', marginBottom: '20px' }}>
-            <h1 style={{ fontSize: '24px', fontWeight: 'bold', margin: '0' }}>SILVERLEAF DIAGNOSTICS</h1>
+            <h1 style={{ fontSize: '24px', fontWeight: 'bold', margin: '0' }}>SHRADDHA PATHOLOGY LABORATORY</h1>
             <p style={{ margin: '5px 0', fontSize: '12px' }}>Plot No-38, Sector-1, D-Mart Road, New Panvel - 410 206</p>
-            <p style={{ margin: '5px 0', fontSize: '12px' }}>Email: info@silverleafdiagnostics.com</p>
+            <p style={{ margin: '5px 0', fontSize: '12px' }}>Email: info@shraddha.com</p>
             <p style={{ margin: '5px 0', fontSize: '12px' }}>Ph. 8779295302</p>
             <hr style={{ margin: '10px 0', border: '1px solid #000' }} />
             <h2 style={{ fontSize: '16px', fontWeight: 'bold', color: '#0066cc', margin: '10px 0' }}>User Login Report</h2>

@@ -450,7 +450,7 @@ export default function ServiceCount() {
           @media screen { .print-only { display: none; } }
         `}</style>
         <div style={{ textAlign: "center", marginBottom: 16 }}>
-          <h1 style={{ fontSize: 20, fontWeight: "bold", margin: 0 }}>SILVERLEAF DIAGNOSTICS</h1>
+          <h1 style={{ fontSize: 20, fontWeight: "bold", margin: 0 }}>SHRADDHA PATHOLOGY LABORATORY</h1>
           <p style={{ margin: "4px 0", fontSize: 11 }}>Plot No-38, Sector-1, D-Mart Road, New Panvel - 410 206 | Ph. 8779295302</p>
           <hr style={{ margin: "8px 0" }} />
           <h2 style={{ fontSize: 14, fontWeight: "bold", color: "#0066cc", margin: "8px 0" }}>Service Count and Revenue Report</h2>

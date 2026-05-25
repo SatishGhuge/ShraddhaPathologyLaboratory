@@ -30,7 +30,7 @@ function processAgeRangesWithGender(ageRanges, parameterName = '') {
 }
 
 /* ===============================================
- * SILVERLEAF DIAGNOSTICS - MASTER CONTROLLER
+ * SHRADDHA PATHOLOGY LABORATORY - MASTER CONTROLLER
  * ===============================================
  * 
  * This controller handles all master data operations:
@@ -41,7 +41,7 @@ function processAgeRangesWithGender(ageRanges, parameterName = '') {
  * - Test Charges and Corporate Charges
  * - Packages
  * 
- * Author: SilverLeaf Development Team
+ * Author: Shraddha Development Team
  * Last Updated: March 2026
  * =============================================== */
 

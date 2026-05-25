@@ -128,7 +128,7 @@ const HomePage = () => {
           <div className="flex items-center gap-2">
             <img src={logo} alt="Logo" className="w-9 h-9 rounded-full" />
             <div>
-              <h1 className="text-sm sm:text-base font-bold text-slate-800 leading-tight">SilverLeaf Diagnostics</h1>
+              <h1 className="text-sm sm:text-base font-bold text-slate-800 leading-tight">Shraddha Pathology Laboratory</h1>
               <p className="text-[9px] sm:text-[10px] text-cyan-600">Empowering Life, Transforming Health</p>
             </div>
           </div>
@@ -224,7 +224,7 @@ const HomePage = () => {
       {/* ── WHY CHOOSE ── */}
       <section id="why" ref={whyRef} className="py-8 sm:py-14 bg-gray-50 text-center">
         <div className={`transition-all duration-700 ${whyVis ? "opacity-100 translate-y-0" : "opacity-0 translate-y-10"}`}>
-          <h2 className="text-2xl sm:text-3xl font-bold text-slate-800 mb-2">Why Choose SilverLeaf?</h2>
+          <h2 className="text-2xl sm:text-3xl font-bold text-slate-800 mb-2">Why Choose Shraddha?</h2>
           <p className="text-gray-500 mb-8 sm:mb-12 text-sm">Advanced medical technology with compassionate care</p>
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 sm:gap-6 container mx-auto px-4 sm:px-6">
             {[
@@ -387,7 +387,7 @@ const HomePage = () => {
                 {[
                   {
                     type: "Main Lab",
-                    name: "SilverLeaf Central Lab",
+                    name: "Shraddha Central Lab",
                     address: "Plot 12, MIDC Industrial Area, Andheri East, Mumbai – 400093",
                     phone: "+91 22 4567 8900",
                     hours: "Mon–Sat: 7:00 AM – 9:00 PM",
@@ -456,7 +456,7 @@ const HomePage = () => {
                 {[
                   {
                     type: "Main Lab",
-                    name: "SilverLeaf Pune Lab",
+                    name: "Shraddha Pune Lab",
                     address: "Survey No. 45, Baner Road, Baner, Pune – 411045",
                     phone: "+91 20 4567 8900",
                     hours: "Mon–Sat: 7:00 AM – 9:00 PM",
@@ -528,7 +528,7 @@ const HomePage = () => {
             <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center items-center relative">
               <h2 className="px-4 py-2 rounded-lg text-lg sm:text-xl font-semibold flex items-center gap-2">
                 <span className="bg-gradient-to-r from-cyan-500 via-cyan-300 to-cyan-500 bg-[length:200%_100%] bg-clip-text text-transparent animate-shimmer">
-                  Join With SilverLeaf Diagnostics
+                  Join With Shraddha Pathology Laboratory
                 </span>
                 <ArrowRight size={22} className="text-cyan-500" />
               </h2>
@@ -548,7 +548,7 @@ const HomePage = () => {
             <div className="col-span-2 md:col-span-1">
               <div className="flex items-center gap-2 mb-4">
                 <div className="bg-cyan-600 p-1.5 rounded-lg"><Activity className="w-5 h-5 text-white" /></div>
-                <span className="font-bold text-lg">SilverLeaf</span>
+                <span className="font-bold text-lg">Shraddha</span>
               </div>
               <p className="text-gray-400 text-xs leading-relaxed mb-5">
                 Precision diagnostics and compassionate care. We bring advanced healthcare testing directly to you with accurate, timely results.
@@ -582,12 +582,12 @@ const HomePage = () => {
               <ul className="space-y-3 text-gray-400 text-xs">
                 <li className="flex gap-2 items-start"><span className="text-cyan-400 mt-0.5">📍</span><span>123 Healthcare Avenue, Medical District, NY 10001</span></li>
                 <li className="flex gap-2 items-center"><span className="text-cyan-400">📞</span><span>+1 (800) 555-0199</span></li>
-                <li className="flex gap-2 items-center"><span className="text-cyan-400">✉</span><span>care@silverleaf.com</span></li>
+                <li className="flex gap-2 items-center"><span className="text-cyan-400">✉</span><span>care@shraddha.com</span></li>
               </ul>
             </div>
           </div>
           <div className="pt-6 flex flex-col md:flex-row justify-between items-center gap-3 text-xs text-gray-500">
-            <p>© {new Date().getFullYear()} SilverLeaf Diagnostic Center. All rights reserved.</p>
+            <p>© {new Date().getFullYear()} Shraddha Diagnostic Center. All rights reserved.</p>
             <div className="flex gap-5">
               <a href="#" className="hover:text-cyan-400 transition">Privacy Policy</a>
               <a href="#" className="hover:text-cyan-400 transition">Terms of Service</a>

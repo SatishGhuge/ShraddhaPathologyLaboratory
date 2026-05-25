@@ -704,7 +704,7 @@ const PatientResult = () => {
                     {!reportWithHeader && (
                       <div style={{ marginTop: (patientData.test.signature || defaultSignature) ? '4mm' : 'auto', borderTop: '1px solid #ccc', paddingTop: '3mm', fontSize: '10px', color: '#666', display: 'flex', justifyContent: 'space-between' }}>
                         <span>Report generated on: {new Date().toLocaleString('en-GB')}</span>
-                        <span>SilverLeaf Diagnostics — Pathology Laboratory</span>
+                        <span>Shraddha Pathology Laboratory — Pathology Laboratory</span>
                       </div>
                     )}
                   </div>

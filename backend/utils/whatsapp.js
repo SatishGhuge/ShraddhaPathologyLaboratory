@@ -70,7 +70,7 @@ export const buildResultMessage = (patient, testName, visitId, results) => {
   const name = `${patient.title || ''} ${patient.firstName || ''} ${patient.lastName || ''}`.trim();
   const abnormal = results.filter(r => r.isAbnormal).map(r => r.parameterName).join(', ');
 
-  let msg = `*SilverLeaf Diagnostics*\n`;
+  let msg = `*Shraddha Pathology Laboratory*\n`;
   msg += `Dear ${name},\n\n`;
   msg += `Your *${testName}* report (Lab No: ${visitId}) is ready.\n`;
   msg += `Date: ${new Date().toLocaleDateString('en-GB')}\n\n`;

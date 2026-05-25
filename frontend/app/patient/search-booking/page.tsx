@@ -225,7 +225,7 @@ function DateRangePicker({ value, onChange }: { value?: { start?: Date; end?: Da
 // Tests and packages are fetched from API — see state: allTests, packagesList
 
 const INIT_FORM = {
-  visitDate:"", location:"SILVERLEAF", corporate:"WalkIn",
+  visitDate:"", location:"SHRADDHA", corporate:"WalkIn",
   reportMode:"By hand", mobile:"", title:"MR", firstName:"", lastName:"",
   age:"", ageUnit:"Year", gender:"Male", referralDoctor:"",
   referralDoctorChecked:false, remark:"", email:"", address:""
@@ -805,7 +805,7 @@ export default function BookingPage() {
     table{width:100%;border-collapse:collapse;margin:20px 0}
     th,td{border:1px solid #ddd;padding:8px;text-align:left}
     th{background:#0891b2;color:white}</style></head>
-    <body><h1>SILVERLEAF DIAGNOSTICS - ${invoiceId}</h1>
+    <body><h1>SHRADDHA PATHOLOGY LABORATORY - ${invoiceId}</h1>
     <p><b>Patient:</b> ${b.name} | <b>ID:</b> ${b.patientId}</p>
     <p><b>Date:</b> ${b.date} | <b>Mobile:</b> ${b.patientData.mobile}</p>
     <table><tr><th>Sr</th><th>Test</th><th>Charge</th></tr>
@@ -987,7 +987,7 @@ export default function BookingPage() {
       <div className="bg-white rounded shadow p-3 mb-4">
         <div className="flex flex-wrap gap-2 items-center">
           <DateRangePicker value={dateRange} onChange={setDateRange} />
-          <select className={style.input}><option>All</option><option>SilverLeaf Center</option></select>
+          <select className={style.input}><option>All</option><option>Shraddha Center</option></select>
           <select className={style.input}><option>Select Corporate</option></select>
           <input 
             placeholder="Patient Name" 
@@ -1923,9 +1923,9 @@ export default function BookingPage() {
         const printReceipt = () => {
           const html = `<html><head><title>Receipt</title>
           <style>body{font-family:Arial;padding:20px}h2{text-align:center}table{width:100%;border-collapse:collapse;margin-top:16px}th,td{border:1px solid #ccc;padding:8px;text-align:left}th{background:#5b5ea6;color:white}</style></head>
-          <body><h2>SILVERLEAF DIAGNOSTICS</h2><h3 style="text-align:center">Receipt - ${selectedBooking.name}</h3>
+          <body><h2>SHRADDHA PATHOLOGY LABORATORY</h2><h3 style="text-align:center">Receipt - ${selectedBooking.name}</h3>
           <table><tr><th>Payment Date</th><th>Amount</th><th>Received By</th></tr>
-          <tr><td>${paymentDate}</td><td>${paidAmt}</td><td>SILVERLEAF DIAGNOSTICS</td></tr></table>
+          <tr><td>${paymentDate}</td><td>${paidAmt}</td><td>SHRADDHA PATHOLOGY LABORATORY</td></tr></table>
           </body></html>`;
           const w = window.open("","_blank"); w.document.write(html); w.document.close(); w.print();
         };
@@ -1957,7 +1957,7 @@ export default function BookingPage() {
                     <tr className="border-b hover:bg-gray-50">
                       <td className="px-3 py-2">{paymentDate}</td>
                       <td className="px-3 py-2 font-semibold">{paidAmt}</td>
-                      <td className="px-3 py-2">SILVERLEAF DIAGNOSTICS</td>
+                      <td className="px-3 py-2">SHRADDHA PATHOLOGY LABORATORY</td>
                       <td className="px-3 py-2">
                         <div className="flex gap-1 flex-wrap">
                           <button
@@ -2090,10 +2090,10 @@ export default function BookingPage() {
               <div className="overflow-y-auto flex-1 p-6" id="bill-print-area">
                 {/* Header */}
                 <div className="text-center mb-4">
-                  <h1 className="text-2xl font-bold tracking-wide">SILVERLEAF DIAGNOSTICS</h1>
+                  <h1 className="text-2xl font-bold tracking-wide">SHRADDHA PATHOLOGY LABORATORY</h1>
                   <p className="text-xs text-gray-600">Plot No-38, Sector-1, D-Mart Road, New Panvel - 410 206</p>
                   <p className="text-xs text-gray-600">+91 8779295302, 022-2745 1122</p>
-                  <p className="text-xs text-gray-600">info@silverleafdiagnostics.com | www.silverleafdiagnostics.com</p>
+                  <p className="text-xs text-gray-600">info@shraddha.com | www.shraddha.com</p>
                   <h2 className="text-sm font-bold underline mt-3 tracking-widest">
                     {isFullyPaid ? 'INVOICE-CUM-RECEIPT' : 'INVOICE'}
                   </h2>
@@ -2110,7 +2110,7 @@ export default function BookingPage() {
                     <div className="flex gap-2"><span className="w-20 font-semibold">Name</span><span>: {selectedBooking.name}</span></div>
                     <div className="flex gap-2"><span className="w-20 font-semibold">Age/Sex</span><span>: {selectedBooking.patientData?.age} Yrs/{selectedBooking.patientData?.gender}</span></div>
                     <div className="flex gap-2"><span className="w-20 font-semibold">Ref Dr.</span><span>: {selectedBooking.patientData?.referralDoctor || "—"}</span></div>
-                    <div className="flex gap-2"><span className="w-20 font-semibold">Center</span><span>: SILVERLEAF DIAGNOSTICS</span></div>
+                    <div className="flex gap-2"><span className="w-20 font-semibold">Center</span><span>: SHRADDHA PATHOLOGY LABORATORY</span></div>
                   </div>
                   <div></div>
                   <div className="space-y-1">
@@ -2219,12 +2219,12 @@ export default function BookingPage() {
                 <div className="mt-6 pt-3 border-t text-xs text-gray-600">
                   <div className="flex justify-between items-end">
                     <div>
-                      <p className="mb-2">Thank you for choosing SILVERLEAF DIAGNOSTICS</p>
+                      <p className="mb-2">Thank you for choosing SHRADDHA PATHOLOGY LABORATORY</p>
                       <p>For any queries, please contact us at +91 8779295302</p>
                     </div>
                     <div className="text-right">
                       <p className="mb-2">Authorised Signatory</p>
-                      <p>SILVERLEAF DIAGNOSTICS</p>
+                      <p>SHRADDHA PATHOLOGY LABORATORY</p>
                     </div>
                   </div>
                 </div>

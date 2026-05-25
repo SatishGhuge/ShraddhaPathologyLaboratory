@@ -1,4 +1,4 @@
-# SilverLeaf Diagnostics - Backend API
+# Shraddha Pathology Laboratory - Backend API
 
 A comprehensive backend system for managing diagnostic laboratory operations including tests, categories, charges, and patient management.
 
@@ -20,7 +20,7 @@ npm install
 2. **Database Setup**
 ```bash
 # Start MySQL (XAMPP/WAMP)
-# Create database: silverleaf_db
+# Create database: shraddha_db
 
 # Configure environment
 cp .env.example .env
@@ -183,7 +183,7 @@ The category system uses a flattened database structure for optimal performance:
 
 ### Environment Variables
 ```env
-DATABASE_URL="mysql://user:password@localhost:3306/silverleaf_db"
+DATABASE_URL="mysql://user:password@localhost:3306/shraddha_db"
 JWT_SECRET="your-jwt-secret"
 NODE_ENV="development"
 PORT=5000
@@ -248,10 +248,10 @@ Set `NODE_ENV=development` for detailed logging.
 
 ## 📄 License
 
-This project is proprietary software for SilverLeaf Diagnostics.
+This project is proprietary software for Shraddha Pathology Laboratory.
 
 ---
 
 **Last Updated**: March 2026  
 **Version**: 2.0.0  
-**Maintainer**: SilverLeaf Development Team
+**Maintainer**: Shraddha Development Team

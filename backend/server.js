@@ -43,7 +43,7 @@ app.use('/api/signatures', signatureRoutes);
 app.get('/api/health', (req, res) => {
   res.json({ 
     status: 'OK', 
-    message: 'SilverLeaf Diagnostics API is running',
+    message: 'Shraddha Pathology Laboratory API is running',
     timestamp: new Date().toISOString()
   });
 });

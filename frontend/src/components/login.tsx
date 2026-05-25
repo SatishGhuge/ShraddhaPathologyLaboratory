@@ -141,7 +141,7 @@ const Login = ({ onLogin }: { onLogin?: (data: any) => void }) => {
           <img src={logo} alt="Logo" className="w-16 h-16 rounded-full hover:scale-110 transition-transform duration-200" />
 
           <h1 className="text-2xl font-bold text-white">
-                  SilverLeaf  Diagnostics
+                  Shraddha Pathology Laboratory
                 <h4 className="text-xs text-center font-medium bg-gradient-to-r from-green-300 via-blue-300 to-pink-400 bg-clip-text text-transparent">
                   Empowering Life Transforming Health
                 </h4>
@@ -277,7 +277,7 @@ const Login = ({ onLogin }: { onLogin?: (data: any) => void }) => {
         </form>
 
         <p className="text-center text-xs text-cyan-100 mt-6">
-          © 2026 SilverLeaf Diagnostic Center
+          © 2026 Shraddha Diagnostic Center
         </p>
       </div>
     </div>

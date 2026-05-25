@@ -858,7 +858,7 @@ export default function Result() {
       ? new Date(first.patientTest.visitDate).toLocaleDateString('en-GB') : '-';
 
     const lines = [
-      `🏥 *SilverLeaf Diagnostics*`,
+      `🏥 *Shraddha Pathology Laboratory*`,
       `_Empowering Life Transforming Health_`,
       ``,
       `Dear ${name},`,
@@ -1920,7 +1920,7 @@ export default function Result() {
                                                maxWidth: 'calc(100vw - 2rem)'
                                              }}>
                                           <div className="font-semibold text-gray-800 mb-1">Patient: {patient.patient_name}</div>
-                                          <div className="font-bold text-gray-900 mb-2">SILVERLEAF DIAGNOSTICS</div>
+                                          <div className="font-bold text-gray-900 mb-2">SHRADDHA PATHOLOGY LABORATORY</div>
                                           <div className="font-semibold text-gray-800 mb-1">Visit ID:</div>
                                           <div className="text-blue-600 font-medium mb-2">{patient.visit_id}</div>
                                           <div className="font-semibold text-gray-800 mb-1">Total Tests:</div>
@@ -1956,7 +1956,7 @@ export default function Result() {
                                                  maxWidth: 'calc(100vw - 2rem)'
                                                }}>
                                             <div className="font-semibold text-gray-800 mb-1">Test: {test.test_name}</div>
-                                            <div className="font-bold text-gray-900 mb-2">SILVERLEAF DIAGNOSTICS</div>
+                                            <div className="font-bold text-gray-900 mb-2">SHRADDHA PATHOLOGY LABORATORY</div>
                                             <div className="font-semibold text-gray-800 mb-1">Sample Received:</div>
                                             <div className="text-blue-600 font-medium mb-2">{test.approved_date}</div>
                                             <div className="font-semibold text-gray-800 mb-1">Sample Type:</div>
@@ -2487,7 +2487,7 @@ export default function Result() {
                     {!reportWithHeader && (
                       <div style={{ marginTop: reportData.signature ? '4mm' : 'auto', borderTop: '1px solid #ccc', paddingTop: '3mm', fontSize: '10px', color: '#666', display: 'flex', justifyContent: 'space-between' }}>
                         <span>Report generated on: {new Date().toLocaleString('en-GB')}</span>
-                        <span>SilverLeaf Diagnostics — Pathology Laboratory</span>
+                        <span>Shraddha Pathology Laboratory — Pathology Laboratory</span>
                       </div>
                     )}
                   </div>

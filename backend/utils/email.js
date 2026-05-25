@@ -53,25 +53,25 @@ export const sendPasswordResetEmail = async (email, code) => {
     const transporter = createTransporter();
 
     const mailOptions = {
-      from: `"SilverLeaf Diagnostics Security" <${process.env.EMAIL_USER}>`,
+      from: `"Shraddha Pathology Laboratory Security" <${process.env.EMAIL_USER}>`,
       to: email,
       subject: 'Admin Password Reset - Verification Code',
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-          <div style="background: linear-gradient(135deg, #0891b2 0%, #06b6d4 100%); padding: 20px; text-align: center;">
-            <h1 style="color: white; margin: 0;">SilverLeaf Diagnostics</h1>
+          <div style="background: linear-gradient(135deg, #f97316 0%, #fb923c 100%); padding: 20px; text-align: center;">
+            <h1 style="color: white; margin: 0;">Shraddha Pathology Laboratory</h1>
             <p style="color: white; margin: 5px 0;">Admin Security Center</p>
           </div>
           
           <div style="padding: 30px; background: #f9fafb;">
-            <h2 style="color: #0891b2;">Admin Password Reset Request</h2>
+            <h2 style="color: #f97316;">Admin Password Reset Request</h2>
             <p style="color: #374151; font-size: 16px;">
               A password reset has been requested for your admin account. If you did not request this, please ignore this email and contact IT support immediately.
             </p>
             
-            <div style="background: white; border: 2px solid #0891b2; border-radius: 8px; padding: 20px; text-align: center; margin: 20px 0;">
+            <div style="background: white; border: 2px solid #f97316; border-radius: 8px; padding: 20px; text-align: center; margin: 20px 0;">
               <p style="color: #6b7280; margin: 0 0 10px 0;">Your verification code is:</p>
-              <h1 style="color: #0891b2; font-size: 36px; letter-spacing: 8px; margin: 0; font-family: 'Courier New', monospace;">${code}</h1>
+              <h1 style="color: #f97316; font-size: 36px; letter-spacing: 8px; margin: 0; font-family: 'Courier New', monospace;">${code}</h1>
             </div>
             
             <div style="background: #fef3c7; border: 1px solid #f59e0b; border-radius: 6px; padding: 15px; margin: 20px 0;">
@@ -93,7 +93,7 @@ export const sendPasswordResetEmail = async (email, code) => {
           
           <div style="background: #e5e7eb; padding: 20px; text-align: center;">
             <p style="color: #6b7280; font-size: 12px; margin: 0;">
-              © 2026 SilverLeaf Diagnostic Center - Admin Security System<br>
+              © 2026 Shraddha Pathology Laboratory - Admin Security System<br>
               This is an automated security email. Do not reply to this message.
             </p>
           </div>
@@ -133,23 +133,23 @@ export const sendPasswordChangedEmail = async (email, username, newPassword) => 
   try {
     const transporter = createTransporter();
     await transporter.sendMail({
-      from: `"SilverLeaf Diagnostics" <${process.env.EMAIL_USER}>`,
+      from: `"Shraddha Pathology Laboratory" <${process.env.EMAIL_USER}>`,
       to: email,
       subject: 'Your Admin Password Has Been Reset',
       html: `
         <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;">
-          <div style="background:linear-gradient(135deg,#0891b2,#06b6d4);padding:20px;text-align:center;">
-            <h1 style="color:white;margin:0;">SilverLeaf Diagnostics</h1>
+          <div style="background:linear-gradient(135deg,#f97316,#fb923c);padding:20px;text-align:center;">
+            <h1 style="color:white;margin:0;">Shraddha Pathology Laboratory</h1>
             <p style="color:white;margin:5px 0;">Admin Security Center</p>
           </div>
           <div style="padding:30px;background:#f9fafb;">
-            <h2 style="color:#0891b2;">Password Reset Successful</h2>
+            <h2 style="color:#f97316;">Password Reset Successful</h2>
             <p style="color:#374151;">Your admin password has been successfully reset.</p>
-            <div style="background:white;border:2px solid #0891b2;border-radius:8px;padding:20px;margin:20px 0;">
+            <div style="background:white;border:2px solid #f97316;border-radius:8px;padding:20px;margin:20px 0;">
               <p style="margin:0 0 8px 0;color:#6b7280;">Username:</p>
               <p style="font-size:18px;font-weight:bold;color:#111827;margin:0 0 16px 0;">${username}</p>
               <p style="margin:0 0 8px 0;color:#6b7280;">New Password:</p>
-              <p style="font-size:18px;font-weight:bold;color:#0891b2;letter-spacing:2px;margin:0;font-family:'Courier New',monospace;">${newPassword}</p>
+              <p style="font-size:18px;font-weight:bold;color:#f97316;letter-spacing:2px;margin:0;font-family:'Courier New',monospace;">${newPassword}</p>
             </div>
             <div style="background:#fef3c7;border:1px solid #f59e0b;border-radius:6px;padding:15px;margin:20px 0;">
               <p style="color:#92400e;font-size:14px;margin:0;">
@@ -160,7 +160,7 @@ export const sendPasswordChangedEmail = async (email, username, newPassword) => 
             </div>
           </div>
           <div style="background:#e5e7eb;padding:20px;text-align:center;">
-            <p style="color:#6b7280;font-size:12px;margin:0;">© 2026 SilverLeaf Diagnostic Center</p>
+            <p style="color:#6b7280;font-size:12px;margin:0;">© 2026 Shraddha Pathology Laboratory</p>
           </div>
         </div>
       `
@@ -178,13 +178,13 @@ export const sendUserCredentialsEmail = async (email, name, username, password) 
     const transporter = createTransporter();
     const isUpdate = password === '(unchanged)';
     await transporter.sendMail({
-      from: `"SilverLeaf Diagnostics" <${process.env.EMAIL_USER}>`,
+      from: `"Shraddha Pathology Laboratory" <${process.env.EMAIL_USER}>`,
       to: email,
       subject: isUpdate ? 'Your Staff Account Has Been Updated' : 'Your Staff Account Details',
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-          <div style="background: linear-gradient(135deg, #0891b2 0%, #06b6d4 100%); padding: 20px; text-align: center;">
-            <h1 style="color: white; margin: 0;">SilverLeaf Diagnostics</h1>
+          <div style="background: linear-gradient(135deg, #f97316 0%, #fb923c 100%); padding: 20px; text-align: center;">
+            <h1 style="color: white; margin: 0;">Shraddha Pathology Laboratory</h1>
             <p style="color: white; margin: 5px 0;">Empowering Life Transforming Health</p>
           </div>
           <div style="padding: 30px; background: #f9fafb;">
@@ -196,11 +196,11 @@ export const sendUserCredentialsEmail = async (email, name, username, password) 
               <p style="margin: 8px 0; color: #374151;"><strong>Username:</strong> ${username}</p>
               ${!isUpdate ? `<p style="margin: 8px 0; color: #374151;"><strong>Password:</strong> ${password}</p>` : ''}
             </div>
-            <p style="color: #374151; font-size: 16px;">Please login at the SilverLeaf portal with the above credentials.</p>
+            <p style="color: #374151; font-size: 16px;">Please login at the Shraddha Pathology Laboratory portal with the above credentials.</p>
             <p style="color: #374151; font-size: 16px;">Thank you.</p>
           </div>
           <div style="background: #e5e7eb; padding: 15px; text-align: center;">
-            <p style="color: #6b7280; font-size: 12px; margin: 0;">SilverLeaf Diagnostics | Plot No-38, Sector-1, New Panvel - 410 206</p>
+            <p style="color: #6b7280; font-size: 12px; margin: 0;">Shraddha Pathology Laboratory | Plot No-38, Sector-1, New Panvel - 410 206</p>
           </div>
         </div>
       `,
@@ -216,32 +216,32 @@ export const sendCenterCredentialsEmail = async (email, centerName, username, pa
   try {
     const transporter = createTransporter();
     await transporter.sendMail({
-      from: `"SilverLeaf Diagnostics" <${process.env.EMAIL_USER}>`,
+      from: `"Shraddha Pathology Laboratory" <${process.env.EMAIL_USER}>`,
       to: email,
-      subject: isUpdate ? `Collection Center Account Updated — ${centerName}` : `Welcome to SilverLeaf — ${centerName} Account Details`,
+      subject: isUpdate ? `Collection Center Account Updated — ${centerName}` : `Welcome to Shraddha Pathology Laboratory — ${centerName} Account Details`,
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-          <div style="background: linear-gradient(135deg, #0f766e 0%, #0891b2 100%); padding: 20px; text-align: center;">
-            <h1 style="color: white; margin: 0;">SilverLeaf Diagnostics</h1>
-            <p style="color: #ccfbf1; margin: 5px 0;">Collection Center Portal</p>
+          <div style="background: linear-gradient(135deg, #1e40af 0%, #f97316 100%); padding: 20px; text-align: center;">
+            <h1 style="color: white; margin: 0;">Shraddha Pathology Laboratory</h1>
+            <p style="color: #fed7aa; margin: 5px 0;">Collection Center Portal</p>
           </div>
-          <div style="padding: 30px; background: #f0fdfa;">
+          <div style="padding: 30px; background: #fffbeb;">
             <p style="color: #374151; font-size: 16px;">Hello,</p>
             <p style="color: #374151; font-size: 16px;">
               ${isUpdate
                 ? `The account for <strong>${centerName}</strong> has been updated.`
                 : `Welcome! Your Collection Center account for <strong>${centerName}</strong> has been created.`}
             </p>
-            <div style="background: white; border: 2px solid #0891b2; border-radius: 8px; padding: 20px; margin: 20px 0;">
+            <div style="background: white; border: 2px solid #f97316; border-radius: 8px; padding: 20px; margin: 20px 0;">
               <p style="margin: 8px 0; color: #374151; font-size: 15px;"><strong>Center Name:</strong> ${centerName}</p>
               <p style="margin: 8px 0; color: #374151; font-size: 15px;"><strong>Username:</strong> ${username}</p>
               ${!isUpdate ? `<p style="margin: 8px 0; color: #374151; font-size: 15px;"><strong>Password:</strong> ${password}</p>` : ''}
             </div>
-            <p style="color: #374151; font-size: 15px;">Use these credentials to log in to the SilverLeaf Collection Center portal.</p>
+            <p style="color: #374151; font-size: 15px;">Use these credentials to log in to the Shraddha Pathology Laboratory Collection Center portal.</p>
             <p style="color: #374151; font-size: 15px;">Thank you.</p>
           </div>
-          <div style="background: #ccfbf1; padding: 15px; text-align: center;">
-            <p style="color: #0f766e; font-size: 12px; margin: 0;">SilverLeaf Diagnostics | Plot No-38, Sector-1, New Panvel - 410 206 | 📞 8779295302</p>
+          <div style="background: #fed7aa; padding: 15px; text-align: center;">
+            <p style="color: #92400e; font-size: 12px; margin: 0;">Shraddha Pathology Laboratory | Plot No-38, Sector-1, New Panvel - 410 206 | 📞 8779295302</p>
           </div>
         </div>
       `,
@@ -258,29 +258,29 @@ export const sendStaffCredentialsEmail = async (email, name, username, password,
     const transporter = createTransporter();
     const isUpdate = password === '(unchanged)';
     await transporter.sendMail({
-      from: `"SilverLeaf Diagnostics" <${process.env.EMAIL_USER}>`,
+      from: `"Shraddha Pathology Laboratory" <${process.env.EMAIL_USER}>`,
       to: email,
-      subject: isUpdate ? 'Your Account Has Been Updated' : 'Your SilverLeaf Account Details',
+      subject: isUpdate ? 'Your Account Has Been Updated' : 'Your Shraddha Pathology Laboratory Account Details',
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-          <div style="background: linear-gradient(135deg, #0891b2 0%, #06b6d4 100%); padding: 20px; text-align: center;">
-            <h1 style="color: white; margin: 0;">SilverLeaf Diagnostics</h1>
+          <div style="background: linear-gradient(135deg, #f97316 0%, #fb923c 100%); padding: 20px; text-align: center;">
+            <h1 style="color: white; margin: 0;">Shraddha Pathology Laboratory</h1>
             <p style="color: white; margin: 5px 0;">Empowering Life Transforming Health</p>
           </div>
           <div style="padding: 30px; background: #f9fafb;">
             <p style="color: #374151; font-size: 16px;">Hello ${name},</p>
             <p style="color: #374151; font-size: 16px;">
-              ${isUpdate ? 'Your staff account has been updated.' : `Your SilverLeaf Diagnostics staff account has been created.`}
+              ${isUpdate ? 'Your staff account has been updated.' : `Your Shraddha Pathology Laboratory staff account has been created.`}
             </p>
             <div style="background: white; border: 1px solid #e5e7eb; border-radius: 8px; padding: 20px; margin: 20px 0;">
               <p style="margin: 8px 0; color: #374151;"><strong>Username:</strong> ${username}</p>
               ${!isUpdate ? `<p style="margin: 8px 0; color: #374151;"><strong>Password:</strong> ${password}</p>` : ''}
               <p style="margin: 8px 0; color: #374151;"><strong>Role:</strong> ${role || 'Staff'}</p>
             </div>
-            <p style="color: #374151; font-size: 16px;">Please login with the above credentials at the SilverLeaf portal.</p>
+            <p style="color: #374151; font-size: 16px;">Please login with the above credentials at the Shraddha Pathology Laboratory portal.</p>
           </div>
           <div style="background: #e5e7eb; padding: 15px; text-align: center;">
-            <p style="color: #6b7280; font-size: 12px; margin: 0;">SilverLeaf Diagnostics | Plot No-38, Sector-1, New Panvel - 410 206</p>
+            <p style="color: #6b7280; font-size: 12px; margin: 0;">Shraddha Pathology Laboratory | Plot No-38, Sector-1, New Panvel - 410 206</p>
           </div>
         </div>
       `,
@@ -317,22 +317,22 @@ export const sendResultNotificationEmail = async (patient, testName, visitId, re
     }).join('');
 
     await transporter.sendMail({
-      from: `"SilverLeaf Diagnostics" <${process.env.EMAIL_USER}>`,
+      from: `"Shraddha Pathology Laboratory" <${process.env.EMAIL_USER}>`,
       to: patient.email,
       subject: `Lab Report Ready — ${testName} | Lab No: ${visitId}`,
       html: `
         <div style="font-family:Arial,sans-serif;max-width:680px;margin:0 auto;border:1px solid #e5e7eb;border-radius:8px;overflow:hidden;">
 
           <!-- Header -->
-          <div style="background:linear-gradient(135deg,#0891b2 0%,#06b6d4 100%);padding:20px 24px;text-align:center;">
-            <h1 style="color:white;margin:0;font-size:22px;letter-spacing:1px;">SilverLeaf Diagnostics</h1>
-            <p style="color:#e0f7fa;margin:4px 0 0;font-size:13px;">Empowering Life Transforming Health</p>
-            <p style="color:#b2ebf2;margin:2px 0 0;font-size:11px;">Plot No-38, Sector-1, New Panvel - 410 206 | 📞 8779295302</p>
+          <div style="background:linear-gradient(135deg,#f97316 0%,#fb923c 100%);padding:20px 24px;text-align:center;">
+            <h1 style="color:white;margin:0;font-size:22px;letter-spacing:1px;">Shraddha Pathology Laboratory</h1>
+            <p style="color:#fed7aa;margin:4px 0 0;font-size:13px;">Empowering Life Transforming Health</p>
+            <p style="color:#fecaca;margin:2px 0 0;font-size:11px;">Plot No-38, Sector-1, New Panvel - 410 206 | 📞 8779295302</p>
           </div>
 
           <!-- Report Title -->
-          <div style="background:#f0f9ff;padding:10px 24px;border-bottom:2px solid #0891b2;text-align:center;">
-            <h2 style="margin:0;font-size:15px;color:#0c4a6e;letter-spacing:0.5px;">LABORATORY REPORT</h2>
+          <div style="background:#fffbeb;padding:10px 24px;border-bottom:2px solid #f97316;text-align:center;">
+            <h2 style="margin:0;font-size:15px;color:#92400e;letter-spacing:0.5px;">LABORATORY REPORT</h2>
           </div>
 
           <!-- Patient Info -->
@@ -356,7 +356,7 @@ export const sendResultNotificationEmail = async (patient, testName, visitId, re
           <div style="padding:0 24px 16px;">
             <table style="width:100%;border-collapse:collapse;margin-top:12px;">
               <thead>
-                <tr style="background:#0891b2;color:white;">
+                <tr style="background:#f97316;color:white;">
                   <th style="padding:8px 10px;text-align:left;font-size:12px;">Investigation</th>
                   <th style="padding:8px 10px;text-align:left;font-size:12px;">Result</th>
                   <th style="padding:8px 10px;text-align:left;font-size:12px;">Unit</th>
@@ -370,7 +370,7 @@ export const sendResultNotificationEmail = async (patient, testName, visitId, re
 
           <!-- Footer -->
           <div style="background:#f3f4f6;padding:12px 24px;text-align:center;border-top:1px solid #e5e7eb;">
-            <p style="color:#6b7280;font-size:11px;margin:0;">This is a computer-generated report. | SilverLeaf Diagnostics | ${date}</p>
+            <p style="color:#6b7280;font-size:11px;margin:0;">This is a computer-generated report. | Shraddha Pathology Laboratory | ${date}</p>
             <p style="color:#9ca3af;font-size:10px;margin:4px 0 0;">For queries: ${process.env.EMAIL_USER} | 📞 8779295302</p>
           </div>
         </div>
@@ -387,32 +387,32 @@ export const sendFranchiseCredentialsEmail = async (email, franchiseName, userna
   try {
     const transporter = createTransporter();
     await transporter.sendMail({
-      from: `"SilverLeaf Diagnostics" <${process.env.EMAIL_USER}>`,
+      from: `"Shraddha Pathology Laboratory" <${process.env.EMAIL_USER}>`,
       to: email,
       subject: isUpdate ? `Franchise Account Updated — ${franchiseName}` : `Welcome Franchise Partner — ${franchiseName}`,
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-          <div style="background: linear-gradient(135deg, #7c3aed 0%, #0891b2 100%); padding: 20px; text-align: center;">
-            <h1 style="color: white; margin: 0;">SilverLeaf Diagnostics</h1>
-            <p style="color: #e9d5ff; margin: 5px 0;">Franchise Partner Portal</p>
+          <div style="background: linear-gradient(135deg, #1e40af 0%, #f97316 100%); padding: 20px; text-align: center;">
+            <h1 style="color: white; margin: 0;">Shraddha Pathology Laboratory</h1>
+            <p style="color: #fed7aa; margin: 5px 0;">Franchise Partner Portal</p>
           </div>
-          <div style="padding: 30px; background: #faf5ff;">
+          <div style="padding: 30px; background: #fffbeb;">
             <p style="color: #374151; font-size: 16px;">Hello,</p>
             <p style="color: #374151; font-size: 16px;">
               ${isUpdate
                 ? `The franchise account for <strong>${franchiseName}</strong> has been updated.`
                 : `Welcome! Your Franchise account for <strong>${franchiseName}</strong> has been created.`}
             </p>
-            <div style="background: white; border: 2px solid #7c3aed; border-radius: 8px; padding: 20px; margin: 20px 0;">
+            <div style="background: white; border: 2px solid #f97316; border-radius: 8px; padding: 20px; margin: 20px 0;">
               <p style="margin: 8px 0; color: #374151; font-size: 15px;"><strong>Franchise Name:</strong> ${franchiseName}</p>
               <p style="margin: 8px 0; color: #374151; font-size: 15px;"><strong>Username:</strong> ${username}</p>
               ${!isUpdate ? `<p style="margin: 8px 0; color: #374151; font-size: 15px;"><strong>Password:</strong> ${password}</p>` : ''}
             </div>
-            <p style="color: #374151; font-size: 15px;">Use these credentials to log in to the SilverLeaf Franchise portal.</p>
+            <p style="color: #374151; font-size: 15px;">Use these credentials to log in to the Shraddha Pathology Laboratory Franchise portal.</p>
             <p style="color: #374151; font-size: 15px;">Thank you for partnering with us.</p>
           </div>
-          <div style="background: #ede9fe; padding: 15px; text-align: center;">
-            <p style="color: #7c3aed; font-size: 12px; margin: 0;">SilverLeaf Diagnostics | Plot No-38, Sector-1, New Panvel - 410 206 | 📞 8779295302</p>
+          <div style="background: #fed7aa; padding: 15px; text-align: center;">
+            <p style="color: #92400e; font-size: 12px; margin: 0;">Shraddha Pathology Laboratory | Plot No-38, Sector-1, New Panvel - 410 206 | 📞 8779295302</p>
           </div>
         </div>
       `,

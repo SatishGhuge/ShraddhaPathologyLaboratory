@@ -329,7 +329,7 @@ const PatientDashboard = () => {
           <div className="flex items-center gap-2">
             <img src={logo} alt="Logo" className="w-10 h-10 object-contain flex-shrink-0" />
             <div className="min-w-0">
-              <h2 className="font-bold text-base truncate">SilverLeaf</h2>
+              <h2 className="font-bold text-base truncate">Shraddha</h2>
               <p className="text-xs text-cyan-100 truncate">Diagnostic Center</p>
             </div>
           </div>

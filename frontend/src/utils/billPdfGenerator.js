@@ -44,10 +44,10 @@ const generateBillHTML = (selectedBooking, billing, businessType, withHeader, le
         ${!withHeader ? `
           <!-- Company Header for non-letterhead version -->
           <div style="text-align:center;margin-bottom:20px;">
-            <h1 style="font-size:24px;font-weight:bold;margin:0 0 8px 0;letter-spacing:1px;">SILVERLEAF DIAGNOSTICS</h1>
+            <h1 style="font-size:24px;font-weight:bold;margin:0 0 8px 0;letter-spacing:1px;">SHRADDHA PATHOLOGY LABORATORY</h1>
             <p style="font-size:12px;color:#666;margin:4px 0;">Plot No-38, Sector-1, D-Mart Road, New Panvel - 410 206</p>
             <p style="font-size:12px;color:#666;margin:4px 0;">+91 8779295302, 022-2745 1122</p>
-            <p style="font-size:12px;color:#666;margin:4px 0;">info@silverleafdiagnostics.com | www.silverleafdiagnostics.com</p>
+            <p style="font-size:12px;color:#666;margin:4px 0;">info@shraddha.com | www.shraddha.com</p>
           </div>
         ` : ''}
 
@@ -82,7 +82,7 @@ const generateBillHTML = (selectedBooking, billing, businessType, withHeader, le
               <td style="padding:3px 0;"><strong>Mobile No:</strong> ${selectedBooking.patientData?.mobile}</td>
             </tr>
             <tr>
-              <td style="padding:3px 0;"><strong>Center:</strong> SILVERLEAF DIAGNOSTICS</td>
+              <td style="padding:3px 0;"><strong>Center:</strong> SHRADDHA PATHOLOGY LABORATORY</td>
               <td style="padding:3px 0;"></td>
               <td style="padding:3px 0;"><strong>Invoice No:</strong> ${selectedBooking.visitId || selectedBooking.bookingId}</td>
             </tr>
@@ -172,12 +172,12 @@ const generateBillHTML = (selectedBooking, billing, businessType, withHeader, le
         <div style="margin-top:20px;padding-top:16px;border-top:1px solid #ccc;font-size:11px;color:#6b7280;">
           <div style="display:flex;justify-content:space-between;align-items:flex-end;">
             <div>
-              <p style="margin:0 0 8px 0;">Thank you for choosing SILVERLEAF DIAGNOSTICS</p>
+              <p style="margin:0 0 8px 0;">Thank you for choosing SHRADDHA PATHOLOGY LABORATORY</p>
               <p style="margin:0;">For any queries, please contact us at +91 8779295302</p>
             </div>
             <div style="text-align:right;">
               <p style="margin:0 0 8px 0;">Authorised Signatory</p>
-              <p style="margin:0;">SILVERLEAF DIAGNOSTICS</p>
+              <p style="margin:0;">SHRADDHA PATHOLOGY LABORATORY</p>
             </div>
           </div>
         </div>

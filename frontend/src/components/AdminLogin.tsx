@@ -212,38 +212,38 @@ const AdminLogin = ({ onLogin }: { onLogin?: () => void }) => {
   /* ================= UI ================= */
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-cyan-800 to-slate-800 p-4 relative overflow-hidden">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-4 relative overflow-hidden">
       {/* Animated Background Elements */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         {/* Large animated blobs */}
-        <div className="absolute top-0 left-0 w-96 h-96 bg-cyan-500/20 rounded-full blur-3xl animate-blob"></div>
-        <div className="absolute top-0 right-0 w-96 h-96 bg-blue-500/20 rounded-full blur-3xl animate-blob animation-delay-2000"></div>
-        <div className="absolute bottom-0 left-1/2 w-96 h-96 bg-purple-500/20 rounded-full blur-3xl animate-blob animation-delay-4000"></div>
+        <div className="absolute top-0 left-0 w-96 h-96 bg-orange-500/10 rounded-full blur-3xl animate-blob"></div>
+        <div className="absolute top-0 right-0 w-96 h-96 bg-slate-600/10 rounded-full blur-3xl animate-blob animation-delay-2000"></div>
+        <div className="absolute bottom-0 left-1/2 w-96 h-96 bg-orange-500/10 rounded-full blur-3xl animate-blob animation-delay-4000"></div>
         
         {/* Grid pattern overlay */}
-        <div className="absolute inset-0 bg-[linear-gradient(rgba(6,182,212,0.05)_1px,transparent_1px),linear-gradient(90deg,rgba(6,182,212,0.05)_1px,transparent_1px)] bg-[size:50px_50px]"></div>
+        <div className="absolute inset-0 bg-[linear-gradient(rgba(249,115,22,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(249,115,22,0.03)_1px,transparent_1px)] bg-[size:50px_50px]"></div>
         
         {/* Floating particles */}
-        <div className="absolute top-1/4 left-1/4 w-2 h-2 bg-cyan-400/40 rounded-full animate-float"></div>
-        <div className="absolute top-1/3 right-1/4 w-3 h-3 bg-blue-400/40 rounded-full animate-float animation-delay-1000"></div>
-        <div className="absolute bottom-1/4 left-1/3 w-2 h-2 bg-purple-400/40 rounded-full animate-float animation-delay-2000"></div>
-        <div className="absolute top-2/3 right-1/3 w-2 h-2 bg-cyan-400/40 rounded-full animate-float animation-delay-3000"></div>
-        <div className="absolute bottom-1/3 right-1/4 w-3 h-3 bg-blue-400/40 rounded-full animate-float animation-delay-4000"></div>
-        <div className="absolute top-1/2 left-1/4 w-2 h-2 bg-purple-400/40 rounded-full animate-float animation-delay-500"></div>
-        <div className="absolute bottom-1/2 right-1/2 w-2 h-2 bg-cyan-400/40 rounded-full animate-float animation-delay-1500"></div>
-        <div className="absolute top-3/4 left-2/3 w-3 h-3 bg-blue-400/40 rounded-full animate-float animation-delay-2500"></div>
-        <div className="absolute bottom-2/3 left-1/2 w-2 h-2 bg-purple-400/40 rounded-full animate-float animation-delay-3500"></div>
-        <div className="absolute top-1/4 right-2/3 w-2 h-2 bg-cyan-400/40 rounded-full animate-float animation-delay-4500"></div>
-        <div className="absolute bottom-1/4 right-1/2 w-3 h-3 bg-blue-400/40 rounded-full animate-float animation-delay-5000"></div>
-        <div className="absolute top-2/3 left-3/4 w-2 h-2 bg-purple-400/40 rounded-full animate-float animation-delay-5500"></div>
-        <div className="absolute bottom-3/4 right-3/4 w-2 h-2 bg-cyan-400/40 rounded-full animate-float animation-delay-6000"></div>
-        <div className="absolute top-1/3 left-2/3 w-3 h-3 bg-blue-400/40 rounded-full animate-float animation-delay-6500"></div>
-        <div className="absolute bottom-2/3 right-2/3 w-2 h-2 bg-purple-400/40 rounded-full animate-float animation-delay-7000"></div>
-        <div className="absolute top-3/4 right-1/4 w-2 h-2 bg-cyan-400/40 rounded-full animate-float animation-delay-7500"></div>
-        <div className="absolute bottom-1/3 left-3/4 w-3 h-3 bg-blue-400/40 rounded-full animate-float animation-delay-8000"></div>
-        <div className="absolute top-1/2 right-3/4 w-2 h-2 bg-purple-400/40 rounded-full animate-float animation-delay-8500"></div>
-        <div className="absolute bottom-1/2 left-1/3 w-2 h-2 bg-cyan-400/40 rounded-full animate-float animation-delay-9000"></div>
-        <div className="absolute top-2/3 right-1/2 w-3 h-3 bg-blue-400/40 rounded-full animate-float animation-delay-9500"></div>
+        <div className="absolute top-1/4 left-1/4 w-2 h-2 bg-orange-400/30 rounded-full animate-float"></div>
+        <div className="absolute top-1/3 right-1/4 w-3 h-3 bg-slate-400/30 rounded-full animate-float animation-delay-1000"></div>
+        <div className="absolute bottom-1/4 left-1/3 w-2 h-2 bg-orange-400/30 rounded-full animate-float animation-delay-2000"></div>
+        <div className="absolute top-2/3 right-1/3 w-2 h-2 bg-orange-400/30 rounded-full animate-float animation-delay-3000"></div>
+        <div className="absolute bottom-1/3 right-1/4 w-3 h-3 bg-slate-400/30 rounded-full animate-float animation-delay-4000"></div>
+        <div className="absolute top-1/2 left-1/4 w-2 h-2 bg-orange-400/30 rounded-full animate-float animation-delay-500"></div>
+        <div className="absolute bottom-1/2 right-1/2 w-2 h-2 bg-orange-400/30 rounded-full animate-float animation-delay-1500"></div>
+        <div className="absolute top-3/4 left-2/3 w-3 h-3 bg-slate-400/30 rounded-full animate-float animation-delay-2500"></div>
+        <div className="absolute bottom-2/3 left-1/2 w-2 h-2 bg-orange-400/30 rounded-full animate-float animation-delay-3500"></div>
+        <div className="absolute top-1/4 right-2/3 w-2 h-2 bg-orange-400/30 rounded-full animate-float animation-delay-4500"></div>
+        <div className="absolute bottom-1/4 right-1/2 w-3 h-3 bg-slate-400/30 rounded-full animate-float animation-delay-5000"></div>
+        <div className="absolute top-2/3 left-3/4 w-2 h-2 bg-orange-400/30 rounded-full animate-float animation-delay-5500"></div>
+        <div className="absolute bottom-3/4 right-3/4 w-2 h-2 bg-orange-400/30 rounded-full animate-float animation-delay-6000"></div>
+        <div className="absolute top-1/3 left-2/3 w-3 h-3 bg-slate-400/30 rounded-full animate-float animation-delay-6500"></div>
+        <div className="absolute bottom-2/3 right-2/3 w-2 h-2 bg-orange-400/30 rounded-full animate-float animation-delay-7000"></div>
+        <div className="absolute top-3/4 right-1/4 w-2 h-2 bg-orange-400/30 rounded-full animate-float animation-delay-7500"></div>
+        <div className="absolute bottom-1/3 left-3/4 w-3 h-3 bg-slate-400/30 rounded-full animate-float animation-delay-8000"></div>
+        <div className="absolute top-1/2 right-3/4 w-2 h-2 bg-orange-400/30 rounded-full animate-float animation-delay-8500"></div>
+        <div className="absolute bottom-1/2 left-1/3 w-2 h-2 bg-orange-400/30 rounded-full animate-float animation-delay-9000"></div>
+        <div className="absolute top-2/3 right-1/2 w-3 h-3 bg-slate-400/30 rounded-full animate-float animation-delay-9500"></div>
       </div>
 
       {/* CSS Animations */}
@@ -366,7 +366,7 @@ const AdminLogin = ({ onLogin }: { onLogin?: () => void }) => {
         {/* Home Button */}
         <button
           onClick={() => router.push("/")}
-          className="absolute top-3 left-3 flex items-center gap-1.5 text-cyan-300 hover:text-white text-xs transition hover:bg-white/10 px-2 py-1 rounded-lg"
+          className="absolute top-3 left-3 flex items-center gap-1.5 text-orange-400 hover:text-white text-xs transition hover:bg-white/10 px-2 py-1 rounded-lg"
         >
           <Home size={14} /> Home
         </button>
@@ -374,11 +374,11 @@ const AdminLogin = ({ onLogin }: { onLogin?: () => void }) => {
         {/* Logo */}
         <div className="flex flex-col items-center mb-4">
           <img src={logo} alt="Logo" className="w-16 h-16 rounded-full hover:scale-110 transition-transform duration-200" />
-          <h1 className="text-2xl font-bold text-white">SilverLeaf Diagnostics</h1>
-          <p className="text-xs text-center font-medium bg-gradient-to-r from-green-300 via-blue-200 to-pink-400 bg-clip-text text-transparent">
+          <h1 className="text-2xl font-bold text-white">Shraddha Pathology Laboratory</h1>
+          <p className="text-xs text-center font-medium bg-gradient-to-r from-orange-300 via-orange-200 to-orange-400 bg-clip-text text-transparent">
             Empowering Life Transforming Health
           </p>
-          <p className="text-xs text-cyan-100">
+          <p className="text-xs text-orange-200">
             {currentView === "login" && "Login"}
             {currentView === "forgotPassword" && "Forgot Password"}
             {currentView === "verifyCode" && "Verify Code"}
@@ -405,17 +405,17 @@ const AdminLogin = ({ onLogin }: { onLogin?: () => void }) => {
 
             {/* USERNAME */}
             <div>
-              <label className="block text-xs text-cyan-100 mb-1">
+              <label className="block text-xs text-orange-200 mb-1">
                 Username / Email
               </label>
               <div className="relative">
-                <User className="absolute left-3 top-1/2 -translate-y-1/2 text-cyan-600" size={16} />
+                <User className="absolute left-3 top-1/2 -translate-y-1/2 text-orange-500" size={16} />
                 <input
                   name="username"
                   value={formData.username}
                   onChange={handleChange}
                   placeholder="Enter username"
-                  className="w-full pl-9 pr-3 py-2 text-sm rounded-md bg-white/90 focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                  className="w-full pl-9 pr-3 py-2 text-sm rounded-md bg-white/90 focus:outline-none focus:ring-2 focus:ring-orange-500"
                 />
               </div>
               {errors.username && (
@@ -425,18 +425,18 @@ const AdminLogin = ({ onLogin }: { onLogin?: () => void }) => {
 
             {/* PASSWORD */}
             <div>
-              <label className="block text-xs text-cyan-100 mb-1">
+              <label className="block text-xs text-orange-200 mb-1">
                 Password
               </label>
               <div className="relative">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-cyan-600" size={16} />
+                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-orange-500" size={16} />
                 <input
                   type={showPassword ? "text" : "password"}
                   name="password"
                   value={formData.password}
                   onChange={handleChange}
                   placeholder="Enter password"
-                  className="w-full pl-9 pr-10 py-2 text-sm rounded-md bg-white/90 focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                  className="w-full pl-9 pr-10 py-2 text-sm rounded-md bg-white/90 focus:outline-none focus:ring-2 focus:ring-orange-500"
                 />
                 <button
                   type="button"
@@ -457,7 +457,7 @@ const AdminLogin = ({ onLogin }: { onLogin?: () => void }) => {
               <button
                 type="button"
                 onClick={() => setCurrentView("forgotPassword")}
-                className="text-xs text-cyan-300 hover:text-cyan-100 underline"
+                className="text-xs text-orange-400 hover:text-orange-200 underline"
               >
                 Forgot Password?
               </button>
@@ -467,7 +467,7 @@ const AdminLogin = ({ onLogin }: { onLogin?: () => void }) => {
             <button
               type="submit"
               disabled={loading}
-              className="w-full px-4 py-2 rounded-md text-white bg-cyan-600 hover:bg-cyan-700 transition font-semibold text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full px-4 py-2 rounded-md text-white bg-orange-500 hover:bg-orange-600 transition font-semibold text-sm disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {loading ? "Logging in..." : "Login"}
             </button>
@@ -477,7 +477,7 @@ const AdminLogin = ({ onLogin }: { onLogin?: () => void }) => {
         {/* FORGOT PASSWORD FORM */}
         {currentView === "forgotPassword" && (
           <form className="space-y-3" onSubmit={handleForgotPassword}>
-            <p className="text-xs text-cyan-200 text-center mb-3">
+            <p className="text-xs text-orange-200 text-center mb-3">
               Enter your email to receive a verification code
             </p>
 
@@ -497,18 +497,18 @@ const AdminLogin = ({ onLogin }: { onLogin?: () => void }) => {
 
             {/* EMAIL */}
             <div>
-              <label className="block text-xs text-cyan-100 mb-1">
+              <label className="block text-xs text-orange-200 mb-1">
                 Email Address
               </label>
               <div className="relative">
-                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-cyan-600" size={16} />
+                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-orange-500" size={16} />
                 <input
                   type="email"
                   name="email"
                   value={formData.email}
                   onChange={handleChange}
                   placeholder="Enter your email"
-                  className="w-full pl-9 pr-3 py-2 text-sm rounded-md bg-white/90 focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                  className="w-full pl-9 pr-3 py-2 text-sm rounded-md bg-white/90 focus:outline-none focus:ring-2 focus:ring-orange-500"
                 />
               </div>
               {errors.email && (
@@ -520,7 +520,7 @@ const AdminLogin = ({ onLogin }: { onLogin?: () => void }) => {
             <button
               type="submit"
               disabled={loading}
-              className="w-full px-4 py-2 rounded-md text-white bg-cyan-600 hover:bg-cyan-700 transition font-semibold text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full px-4 py-2 rounded-md text-white bg-orange-500 hover:bg-orange-600 transition font-semibold text-sm disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {loading ? "Sending..." : "Send Code"}
             </button>
@@ -529,7 +529,7 @@ const AdminLogin = ({ onLogin }: { onLogin?: () => void }) => {
             <button
               type="button"
               onClick={goBackToLogin}
-              className="w-full flex items-center justify-center gap-2 text-cyan-300 hover:text-cyan-100 text-xs"
+              className="w-full flex items-center justify-center gap-2 text-orange-400 hover:text-orange-200 text-xs"
             >
               <ArrowLeft size={12} /> Back to Login
             </button>
@@ -539,19 +539,19 @@ const AdminLogin = ({ onLogin }: { onLogin?: () => void }) => {
         {/* VERIFY CODE FORM */}
         {currentView === "verifyCode" && (
           <form className="space-y-3" onSubmit={handleVerifyCode}>
-            <p className="text-xs text-cyan-200 text-center mb-1">
+            <p className="text-xs text-orange-200 text-center mb-1">
               Enter the 6-digit OTP sent to <span className="font-semibold text-white">{formData.email}</span>
             </p>
 
             {/* OTP Timer */}
             <div className="text-center">
               {otpTimer > 0 ? (
-                <span className={`text-xs font-semibold ${otpTimer <= 15 ? 'text-red-400' : 'text-cyan-300'}`}>
+                <span className={`text-xs font-semibold ${otpTimer <= 15 ? 'text-red-400' : 'text-orange-400'}`}>
                   OTP expires in {otpTimer}s
                 </span>
               ) : (
                 <span className="text-xs text-red-400">OTP expired —&nbsp;
-                  <button type="button" onClick={(e) => handleForgotPassword(e)} className="underline text-cyan-300 hover:text-white">
+                  <button type="button" onClick={(e) => handleForgotPassword(e)} className="underline text-orange-400 hover:text-orange-200">
                     Resend OTP
                   </button>
                 </span>
@@ -574,9 +574,9 @@ const AdminLogin = ({ onLogin }: { onLogin?: () => void }) => {
 
             {/* CODE */}
             <div>
-              <label className="block text-xs text-cyan-100 mb-1">Verification Code</label>
+              <label className="block text-xs text-orange-200 mb-1">Verification Code</label>
               <div className="relative">
-                <Key className="absolute left-3 top-1/2 -translate-y-1/2 text-cyan-600" size={16} />
+                <Key className="absolute left-3 top-1/2 -translate-y-1/2 text-orange-500" size={16} />
                 <input
                   type="text"
                   name="code"
@@ -584,7 +584,7 @@ const AdminLogin = ({ onLogin }: { onLogin?: () => void }) => {
                   onChange={handleChange}
                   placeholder="Enter 6-digit OTP"
                   maxLength={6}
-                  className="w-full pl-9 pr-3 py-2 text-sm rounded-md bg-white/90 focus:outline-none focus:ring-2 focus:ring-cyan-500 text-center tracking-widest"
+                  className="w-full pl-9 pr-3 py-2 text-sm rounded-md bg-white/90 focus:outline-none focus:ring-2 focus:ring-orange-500 text-center tracking-widest"
                 />
               </div>
               {errors.code && <p className="text-red-400 text-xs mt-1">{errors.code}</p>}
@@ -594,7 +594,7 @@ const AdminLogin = ({ onLogin }: { onLogin?: () => void }) => {
             <button
               type="submit"
               disabled={loading || otpTimer === 0}
-              className="w-full px-4 py-2 rounded-md text-white bg-cyan-600 hover:bg-cyan-700 transition font-semibold text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full px-4 py-2 rounded-md text-white bg-orange-500 hover:bg-orange-600 transition font-semibold text-sm disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {loading ? "Verifying..." : "Verify OTP"}
             </button>
@@ -603,7 +603,7 @@ const AdminLogin = ({ onLogin }: { onLogin?: () => void }) => {
             <button
               type="button"
               onClick={goBackToLogin}
-              className="w-full flex items-center justify-center gap-2 text-cyan-300 hover:text-cyan-100 text-xs"
+              className="w-full flex items-center justify-center gap-2 text-orange-400 hover:text-orange-200 text-xs"
             >
               <ArrowLeft size={12} /> Back to Login
             </button>
@@ -613,7 +613,7 @@ const AdminLogin = ({ onLogin }: { onLogin?: () => void }) => {
         {/* RESET PASSWORD FORM */}
         {currentView === "resetPassword" && (
           <form className="space-y-3" onSubmit={handleResetPassword}>
-            <p className="text-xs text-cyan-200 text-center mb-3">
+            <p className="text-xs text-orange-200 text-center mb-3">
               Create your new password
             </p>
 
@@ -633,18 +633,18 @@ const AdminLogin = ({ onLogin }: { onLogin?: () => void }) => {
 
             {/* NEW PASSWORD */}
             <div>
-              <label className="block text-xs text-cyan-100 mb-1">
+              <label className="block text-xs text-orange-200 mb-1">
                 New Password
               </label>
               <div className="relative">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-cyan-600" size={16} />
+                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-orange-500" size={16} />
                 <input
                   type={showNewPassword ? "text" : "password"}
                   name="newPassword"
                   value={formData.newPassword}
                   onChange={handleChange}
                   placeholder="Enter new password"
-                  className="w-full pl-9 pr-10 py-2 text-sm rounded-md bg-white/90 focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                  className="w-full pl-9 pr-10 py-2 text-sm rounded-md bg-white/90 focus:outline-none focus:ring-2 focus:ring-orange-500"
                 />
                 <button
                   type="button"
@@ -661,18 +661,18 @@ const AdminLogin = ({ onLogin }: { onLogin?: () => void }) => {
 
             {/* CONFIRM PASSWORD */}
             <div>
-              <label className="block text-xs text-cyan-100 mb-1">
+              <label className="block text-xs text-orange-200 mb-1">
                 Confirm Password
               </label>
               <div className="relative">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-cyan-600" size={16} />
+                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-orange-500" size={16} />
                 <input
                   type={showConfirmPassword ? "text" : "password"}
                   name="confirmPassword"
                   value={formData.confirmPassword}
                   onChange={handleChange}
                   placeholder="Confirm new password"
-                  className="w-full pl-9 pr-10 py-2 text-sm rounded-md bg-white/90 focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                  className="w-full pl-9 pr-10 py-2 text-sm rounded-md bg-white/90 focus:outline-none focus:ring-2 focus:ring-orange-500"
                 />
                 <button
                   type="button"
@@ -691,7 +691,7 @@ const AdminLogin = ({ onLogin }: { onLogin?: () => void }) => {
             <button
               type="submit"
               disabled={loading}
-              className="w-full px-4 py-2 rounded-md text-white bg-cyan-600 hover:bg-cyan-700 transition font-semibold text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full px-4 py-2 rounded-md text-white bg-orange-500 hover:bg-orange-600 transition font-semibold text-sm disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {loading ? "Resetting..." : "Reset Password"}
             </button>
@@ -700,15 +700,15 @@ const AdminLogin = ({ onLogin }: { onLogin?: () => void }) => {
             <button
               type="button"
               onClick={goBackToLogin}
-              className="w-full flex items-center justify-center gap-2 text-cyan-300 hover:text-cyan-100 text-xs"
+              className="w-full flex items-center justify-center gap-2 text-orange-400 hover:text-orange-200 text-xs"
             >
               <ArrowLeft size={12} /> Back to Login
             </button>
           </form>
         )}
 
-        <p className="text-center text-xs text-cyan-100 mt-3">
-          © 2026 SilverLeaf Diagnostic Center
+        <p className="text-center text-xs text-orange-200 mt-3">
+          © 2026 Shraddha Pathology Laboratory
         </p>
       </div>
     </div>

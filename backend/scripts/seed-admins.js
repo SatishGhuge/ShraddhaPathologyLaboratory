@@ -18,7 +18,7 @@ async function seedAdmins() {
       },
       create: {
         username: 'admin',
-        email: 'admin@silverleaf.com',
+        email: 'admin@shraddha.com',
         password: superAdminPassword,
         role: 'SUPER_ADMIN',
         isActive: true
@@ -41,7 +41,7 @@ async function seedAdmins() {
       },
       create: {
         username: 'user',
-        email: 'user@silverleaf.com',
+        email: 'user@shraddha.com',
         password: adminPassword,
         role: 'ADMIN',
         isActive: true
@@ -64,7 +64,7 @@ async function seedAdmins() {
       },
       create: {
         username: 'labmanager',
-        email: 'labmanager@silverleaf.com',
+        email: 'labmanager@shraddha.com',
         password: labManagerPassword,
         role: 'LAB_MANAGER',
         isActive: true
@@ -87,7 +87,7 @@ async function seedAdmins() {
       },
       create: {
         username: 'receptionist',
-        email: 'receptionist@silverleaf.com',
+        email: 'receptionist@shraddha.com',
         password: receptionistPassword,
         role: 'RECEPTIONIST',
         isActive: true
