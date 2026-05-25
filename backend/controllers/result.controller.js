@@ -4,7 +4,7 @@ import { sendWhatsAppMessage, buildResultMessage } from '../utils/whatsapp.js';
 import { getPaginationParams, buildPaginatedResponse } from '../utils/pagination.js';
 
 /* ===============================================
- * SILVERLEAF DIAGNOSTICS - RESULT CONTROLLER
+ * SHRADDHA PATHOLOGY LABORATORY - RESULT CONTROLLER
  * ===============================================
  * 
  * This controller handles all result operations:
@@ -13,7 +13,7 @@ import { getPaginationParams, buildPaginatedResponse } from '../utils/pagination
  * - Update test results
  * - Filter and search results
  * 
- * Author: SilverLeaf Development Team
+ * Author: Shraddha Development Team
  * Last Updated: March 2026
  * =============================================== */
 

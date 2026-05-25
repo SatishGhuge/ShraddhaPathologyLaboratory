@@ -1,7 +1,7 @@
 {
-  "name": "silverleaf-backend",
+  "name": "shraddha-backend",
   "version": "1.0.0",
-  "description": "Backend API for SilverLeaf Diagnostics",
+  "description": "Backend API for Shraddha Pathology Laboratory",
   "main": "server.js",
   "type": "module",
   "scripts": {
@@ -19,7 +19,7 @@
     "prisma",
     "diagnostics"
   ],
-  "author": "SilverLeaf Diagnostics",
+  "author": "Shraddha Pathology Laboratory",
   "license": "ISC",
   "dependencies": {
     "@prisma/client": "^5.7.1",

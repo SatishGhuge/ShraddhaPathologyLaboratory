@@ -11,10 +11,10 @@ const data = JSON.parse(readFileSync(join(__dirname, 'seed-data.json'), 'utf-8')
 async function seedAdmins() {
   console.log('\n👤 Seeding admins...');
   const admins = [
-    { username: 'admin',        email: 'admin@silverleaf.com',        password: 'Admin@123',      role: 'SUPER_ADMIN' },
-    { username: 'user',         email: 'user@silverleaf.com',         password: 'User@123',       role: 'ADMIN' },
-    { username: 'labmanager',   email: 'labmanager@silverleaf.com',   password: 'Lab@123',        role: 'LAB_MANAGER' },
-    { username: 'receptionist', email: 'receptionist@silverleaf.com', password: 'Reception@123', role: 'RECEPTIONIST' },
+    { username: 'admin',        email: 'admin@shraddha.com',        password: 'Admin@123',      role: 'SUPER_ADMIN' },
+    { username: 'user',         email: 'user@shraddha.com',         password: 'User@123',       role: 'ADMIN' },
+    { username: 'labmanager',   email: 'labmanager@shraddha.com',   password: 'Lab@123',        role: 'LAB_MANAGER' },
+    { username: 'receptionist', email: 'receptionist@shraddha.com', password: 'Reception@123', role: 'RECEPTIONIST' },
   ];
 
   for (const a of admins) {

@@ -115,7 +115,7 @@ const CollectionDashboard = () => {
       date: "18/2/2026",
       time: "09:02 AM",
       collectedBy: "Yash Raj Kumar",
-      center: "Silverleaf Main Centre",
+      center: "Shraddha Main Centre",
       location: "Main",
       priority: "Normal",
       status: "Sent to Main Lab"
@@ -127,7 +127,7 @@ const CollectionDashboard = () => {
       date: "18/2/2026",
       time: "10:15 AM",
       collectedBy: "Dr. Sarah Wilson",
-      center: "Silverleaf North Branch",
+      center: "Shraddha North Branch",
       location: "North",
       priority: "Normal",
       status: "Collected"
@@ -139,7 +139,7 @@ const CollectionDashboard = () => {
       date: "18/2/2026",
       time: "11:30 AM",
       collectedBy: "Dr. Amit Sharma",
-      center: "Silverleaf Main Centre",
+      center: "Shraddha Main Centre",
       location: "Main",
       priority: "Critical",
       status: "Sent to Main Lab"
@@ -151,7 +151,7 @@ const CollectionDashboard = () => {
       date: "18/2/2026",
       time: "10:45 PM",
       collectedBy: "Dr. Anita Singh",
-      center: "Silverleaf South Branch",
+      center: "Shraddha South Branch",
       location: "South",
       priority: "Normal",
       status: "Pending Pickup"
@@ -163,7 +163,7 @@ const CollectionDashboard = () => {
       date: "18/2/2026",
       time: "02:08 PM",
       collectedBy: "",
-      center: "Silverleaf East Branch",
+      center: "Shraddha East Branch",
       location: "East",
       priority: "Urgent",
       status: "Collected"
@@ -230,7 +230,7 @@ const CollectionDashboard = () => {
           <div className="flex items-center gap-3 mb-2 cursor-pointer hover:opacity-80 transition-opacity" onClick={() => router.push("/labdashboard")}>
             <img src={logo} alt="Logo" className="w-12 h-12 object-contain" />
             <div>
-              <h2 className="font-bold text-lg">SilverLeaf</h2>
+              <h2 className="font-bold text-lg">Shraddha</h2>
               <p className="text-xs text-cyan-100">Collection Center</p>
             </div>
           </div>

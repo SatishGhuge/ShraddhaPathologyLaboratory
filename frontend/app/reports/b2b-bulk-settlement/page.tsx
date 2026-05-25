@@ -28,7 +28,7 @@ export default function B2bBulkSettlement() {
       date: "08/02/2026",
       patientName: "MR DEVDAS P K", 
       labNo: "2602219",
-      center: "SILVERLEAF DIAGNOSTICS",
+      center: "SHRADDHA PATHOLOGY LABORATORY",
       refDr: "",
       totalBill: 250,
       paid: 250,
@@ -41,7 +41,7 @@ export default function B2bBulkSettlement() {
       date: "08/02/2026",
       patientName: "MRS DHANASHREE DHAKTODE", 
       labNo: "2602220",
-      center: "SILVERLEAF DIAGNOSTICS",
+      center: "SHRADDHA PATHOLOGY LABORATORY",
       refDr: "",
       totalBill: 950,
       paid: 650,
@@ -54,7 +54,7 @@ export default function B2bBulkSettlement() {
       date: "08/02/2026",
       patientName: "MRS JAYSHREE", 
       labNo: "2602221",
-      center: "SILVERLEAF DIAGNOSTICS",
+      center: "SHRADDHA PATHOLOGY LABORATORY",
       refDr: "",
       totalBill: 650,
       paid: 0,
@@ -67,7 +67,7 @@ export default function B2bBulkSettlement() {
       date: "08/02/2026",
       patientName: "MRS ANITA JADHAV", 
       labNo: "2602222",
-      center: "SILVERLEAF DIAGNOSTICS",
+      center: "SHRADDHA PATHOLOGY LABORATORY",
       refDr: "",
       totalBill: 500,
       paid: 0,
@@ -80,7 +80,7 @@ export default function B2bBulkSettlement() {
       date: "08/02/2026",
       patientName: "MISS POOJA NORDE", 
       labNo: "2602223",
-      center: "SILVERLEAF DIAGNOSTICS",
+      center: "SHRADDHA PATHOLOGY LABORATORY",
       refDr: "",
       totalBill: 1500,
       paid: 0,
@@ -93,7 +93,7 @@ export default function B2bBulkSettlement() {
       date: "08/02/2026",
       patientName: "MR GEORGE THOMAS", 
       labNo: "2602224",
-      center: "SILVERLEAF DIAGNOSTICS",
+      center: "SHRADDHA PATHOLOGY LABORATORY",
       refDr: "",
       totalBill: 100,
       paid: 100,
@@ -106,7 +106,7 @@ export default function B2bBulkSettlement() {
       date: "08/02/2026",
       patientName: "MRS SNEHA DHOBALE", 
       labNo: "2602225",
-      center: "SILVERLEAF DIAGNOSTICS",
+      center: "SHRADDHA PATHOLOGY LABORATORY",
       refDr: "",
       totalBill: 100,
       paid: 0,
@@ -119,7 +119,7 @@ export default function B2bBulkSettlement() {
       date: "08/02/2026",
       patientName: "MR SACHIN BANDI", 
       labNo: "2602226",
-      center: "SILVERLEAF DIAGNOSTICS",
+      center: "SHRADDHA PATHOLOGY LABORATORY",
       refDr: "",
       totalBill: 100,
       paid: 100,
@@ -132,7 +132,7 @@ export default function B2bBulkSettlement() {
       date: "08/02/2026",
       patientName: "MRS SHUBHA RAO", 
       labNo: "2602227",
-      center: "SILVERLEAF DIAGNOSTICS",
+      center: "SHRADDHA PATHOLOGY LABORATORY",
       refDr: "",
       totalBill: 650,
       paid: 400,
@@ -145,7 +145,7 @@ export default function B2bBulkSettlement() {
       date: "08/02/2026",
       patientName: "MRS SUNITA PINGALE", 
       labNo: "2602228",
-      center: "SILVERLEAF DIAGNOSTICS",
+      center: "SHRADDHA PATHOLOGY LABORATORY",
       refDr: "",
       totalBill: 2299,
       paid: 2299,
@@ -285,7 +285,7 @@ export default function B2bBulkSettlement() {
                 }`}
               >
                 <option value="">Select Center</option>
-                <option>SILVERLEAF DIAGNOSTICS</option>
+                <option>SHRADDHA PATHOLOGY LABORATORY</option>
                 <option>Main Lab</option>
                 <option>Collection Center</option>
                 <option>Branch Office</option>
@@ -522,9 +522,9 @@ export default function B2bBulkSettlement() {
         `}</style>
 
         <div style={{ textAlign: 'center', marginBottom: '20px' }}>
-          <h1 style={{ fontSize: '24px', fontWeight: 'bold', margin: '0' }}>SILVERLEAF DIAGNOSTICS</h1>
+          <h1 style={{ fontSize: '24px', fontWeight: 'bold', margin: '0' }}>SHRADDHA PATHOLOGY LABORATORY</h1>
           <p style={{ margin: '5px 0', fontSize: '12px' }}>Plot No-38, Sector-1, D-Mart Road, New Panvel - 410 206</p>
-          <p style={{ margin: '5px 0', fontSize: '12px' }}>Email: info@silverleafdiagnostics.com | Ph. 8779295302</p>
+          <p style={{ margin: '5px 0', fontSize: '12px' }}>Email: info@shraddha.com | Ph. 8779295302</p>
           <hr style={{ margin: '10px 0', border: '1px solid #000' }} />
           <h2 style={{ fontSize: '16px', fontWeight: 'bold', color: '#0066cc', margin: '10px 0' }}>B2B Bulk Settlement Report</h2>
           <hr style={{ margin: '10px 0', border: '1px dashed #000' }} />
@@ -568,9 +568,9 @@ export default function B2bBulkSettlement() {
 
         <div style={{ marginTop: '20px' }}>
           <div style={{ textAlign: 'center', marginBottom: '20px' }}>
-            <h1 style={{ fontSize: '24px', fontWeight: 'bold', margin: '0' }}>SILVERLEAF DIAGNOSTICS</h1>
+            <h1 style={{ fontSize: '24px', fontWeight: 'bold', margin: '0' }}>SHRADDHA PATHOLOGY LABORATORY</h1>
             <p style={{ margin: '5px 0', fontSize: '12px' }}>Plot No-38, Sector-1, D-Mart Road, New Panvel - 410 206</p>
-            <p style={{ margin: '5px 0', fontSize: '12px' }}>Email: info@silverleafdiagnostics.com | Ph. 8779295302</p>
+            <p style={{ margin: '5px 0', fontSize: '12px' }}>Email: info@shraddha.com | Ph. 8779295302</p>
             <hr style={{ margin: '10px 0', border: '1px solid #000' }} />
             <h2 style={{ fontSize: '16px', fontWeight: 'bold', color: '#0066cc', margin: '10px 0' }}>B2B Bulk Settlement Report</h2>
             <hr style={{ margin: '10px 0', border: '1px dashed #000' }} />

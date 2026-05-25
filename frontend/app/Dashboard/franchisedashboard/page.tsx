@@ -43,7 +43,7 @@ const FranchiseDashboard = () => {
       subject: 'Sample awaiting',
       message: 'SAMPLE ID 14439603 BARCODE 834627908 THIS SAMPLE ENTRY DONE ON YESTERDAY BUT MISTAKELY FORGOT TO VERIFY SAMPLE.IN YESTERDAY EVENING SAMPLE IS VERIFY BUT NOT ANYTHING SHOW NOW. TO BE PROCESSED AND LAB MAY STILL SAMPLE IS SHOWING PENDING. PLEASE DO IT FROM ON URGENT BASIS & PLEASE RELEASED REPORT ON URGENT BASIS. PLEASE KINDLY CO-ORDINATE AS SOON AS POSSIBLE THANKING YOU.',
       date: '12-02-2025 03:28 PM',
-      franchise: 'Silverleaf diagnostic'
+      franchise: 'Shraddha diagnostic'
     },
     {
       id: 'EG11461',
@@ -52,7 +52,7 @@ const FranchiseDashboard = () => {
       subject: 'Sample verification',
       message: 'SAMPLE ID 34452373 BARCODE ID 8305751897 SAMPLE IS VERIFY PLEASE NOW THIS IS...',
       date: '12-01-2025 03:04 PM',
-      franchise: 'Silverleaf diagnostic'
+      franchise: 'Shraddha diagnostic'
     }
   ]);
 
@@ -309,7 +309,7 @@ const FranchiseDashboard = () => {
           <div className="flex items-center gap-3">
             <img src={logo} alt="Logo" className="w-12 h-12 object-contain bg-white rounded-lg p-1" />
             <div>
-              <h1 className="text-xl font-bold">SilverLeaf Daignostics</h1>
+              <h1 className="text-xl font-bold">Shraddha Pathology Laboratory</h1>
             
               <p className="text-sm text-gray-400">Franchise Network</p>
             </div>
@@ -402,7 +402,7 @@ const FranchiseDashboard = () => {
             </div>
             <div className="flex-1">
               <p className="font-semibold text-sm">Admin User</p>
-              <p className="text-xs text-gray-400">admin@silverleaf.com</p>
+              <p className="text-xs text-gray-400">admin@shraddha.com</p>
             </div>
             <button onClick={handleLogout} className="text-red-500 hover:text-red-400">
               <LogOut size={18} />
@@ -820,7 +820,7 @@ const FranchiseDashboard = () => {
                       </div>
                       <div className="flex items-center gap-2 bg-white bg-opacity-20 px-4 py-2 rounded-lg">
                         <Mail size={20} />
-                        <span className="font-semibold">support@silverleaf.com</span>
+                        <span className="font-semibold">support@shraddha.com</span>
                       </div>
                       <div className="flex items-center gap-2 bg-white bg-opacity-20 px-4 py-2 rounded-lg">
                         <Clock size={20} />
@@ -1371,7 +1371,7 @@ const FranchiseDashboard = () => {
 
           {/* Footer */}
           <div className="mt-8 text-center text-sm text-gray-500">
-            Last updated: {currentTime.toLocaleString()} | © 2026 SilverLeaf Diagnostics
+            Last updated: {currentTime.toLocaleString()} | © 2026 Shraddha Pathology Laboratory
           </div>
         </div>
       </main>

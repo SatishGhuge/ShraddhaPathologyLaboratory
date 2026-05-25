@@ -11,7 +11,7 @@
 ### Regular User
 - **Username**: `user`
 - **Password**: `User@123`
-- **Email**: `user@silverleaf.com`
+- **Email**: `user@shraddha.com`
 - **Role**: `USER`
 
 ## Login Instructions
@@ -43,7 +43,7 @@
   "admin": {
     "id": 1,
     "username": "admin",
-    "email": "admin@silverleaf.com",
+    "email": "admin@shraddha.com",
     "role": "SUPER_ADMIN",
     "isActive": true
   }

@@ -301,9 +301,9 @@ export default function DiscountReport() {
           @media screen { .print-only { display: none; } }
         `}</style>
         <div style={{ textAlign: "center", marginBottom: "16px" }}>
-          <h1 style={{ fontSize: "20px", fontWeight: "bold", margin: "0" }}>SILVERLEAF DIAGNOSTICS</h1>
+          <h1 style={{ fontSize: "20px", fontWeight: "bold", margin: "0" }}>SHRADDHA PATHOLOGY LABORATORY</h1>
           <p style={{ margin: "4px 0", fontSize: "11px" }}>Plot No-38, Sector-1, D-Mart Road, New Panvel - 410 206</p>
-          <p style={{ margin: "4px 0", fontSize: "11px" }}>Email: info@silverleafdiagnostics.com | Ph. 8779295302</p>
+          <p style={{ margin: "4px 0", fontSize: "11px" }}>Email: info@shraddha.com | Ph. 8779295302</p>
           <hr style={{ margin: "8px 0", border: "1px solid #000" }} />
           <h2 style={{ fontSize: "14px", fontWeight: "bold", color: "#0066cc", margin: "8px 0" }}>Patient Discount Report</h2>
           <p style={{ margin: "4px 0", fontSize: "11px" }}>

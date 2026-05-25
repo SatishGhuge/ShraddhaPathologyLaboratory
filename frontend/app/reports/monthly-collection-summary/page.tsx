@@ -395,7 +395,7 @@ export default function MonthlyCollectionSummary() {
       <div className="print-only">
         <style>{`@media print{body *{visibility:hidden}.print-only,.print-only *{visibility:visible}.print-only{position:absolute;left:0;top:0;width:100%;padding:20px}@page{size:A4;margin:10mm}}@media screen{.print-only{display:none}}`}</style>
         <div style={{textAlign:"center",marginBottom:"16px"}}>
-          <h1 style={{fontSize:"20px",fontWeight:"bold",margin:0}}>SILVERLEAF DIAGNOSTICS</h1>
+          <h1 style={{fontSize:"20px",fontWeight:"bold",margin:0}}>SHRADDHA PATHOLOGY LABORATORY</h1>
           <p style={{margin:"4px 0",fontSize:"11px"}}>Plot No-38, Sector-1, D-Mart Road, New Panvel - 410 206</p>
           <hr style={{margin:"8px 0",border:"1px solid #000"}}/>
           <h2 style={{fontSize:"14px",fontWeight:"bold",color:"#0066cc",margin:"8px 0"}}>Monthly Collection Summary</h2>

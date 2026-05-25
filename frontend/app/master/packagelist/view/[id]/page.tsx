@@ -310,7 +310,7 @@ const AddPackage = () => {
                   className="md:col-span-2 border border-cyan-600 rounded-md px-2 py-1.5 sm:py-1 text-xs sm:text-sm bg-cyan-50 focus:ring-2 focus:ring-cyan-600 outline-none disabled:bg-gray-100 disabled:cursor-not-allowed"
                 >
                   <option>All Centers</option>
-                  <option>SILVERLEAF DIAGNOSTICS</option>
+                  <option>SHRADDHA PATHOLOGY LABORATORY</option>
                   <option>City Lab</option>
                 </select>
               </div>

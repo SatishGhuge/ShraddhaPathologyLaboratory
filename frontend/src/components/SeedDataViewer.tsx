@@ -60,7 +60,7 @@ const SeedDataViewer = () => {
 
   return (
     <div style={{ padding: '20px', fontFamily: 'Arial, sans-serif' }}>
-      <h1>SilverLeaf Diagnostics - Seed Data Status</h1>
+      <h1>Shraddha Pathology Laboratory - Seed Data Status</h1>
       <p style={{ color: '#666', marginBottom: '20px' }}>
         Direct view of seeded data from: {seedData.seedFileLocation}
       </p>

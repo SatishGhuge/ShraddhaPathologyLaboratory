@@ -56,7 +56,7 @@ export default function Worksheet() {
     {
       id: 1,
       patientName: "MR PRAMOD GANPAT GAIKWAD",
-      location: "SILVERLEAF DIAGNOSTICS",
+      location: "SHRADDHA PATHOLOGY LABORATORY",
       corporate: "Walk in",
       testPerformed: "TFT",
       refDoctor: "Dr. Sharma",
@@ -67,7 +67,7 @@ export default function Worksheet() {
     {
       id: 2,
       patientName: "MR SUDHAKAR ALEKAR",
-      location: "SILVERLEAF DIAGNOSTICS",
+      location: "SHRADDHA PATHOLOGY LABORATORY",
       corporate: "Walk in",
       testPerformed: "CUE,VITD,VIT B12,TFT",
       refDoctor: "Dr. Patel",
@@ -78,7 +78,7 @@ export default function Worksheet() {
     {
       id: 3,
       patientName: "MR ATHAHAV RAUT",
-      location: "SILVERLEAF DIAGNOSTICS",
+      location: "SHRADDHA PATHOLOGY LABORATORY",
       corporate: "Walk in",
       testPerformed: "X CHEST",
       refDoctor: "Dr. Kumar",
@@ -89,7 +89,7 @@ export default function Worksheet() {
     {
       id: 4,
       patientName: "MRS DR SNEHA SRAVYA",
-      location: "SILVERLEAF DIAGNOSTICS",
+      location: "SHRADDHA PATHOLOGY LABORATORY",
       corporate: "Walk in",
       testPerformed: "X- ANKLE",
       refDoctor: "Dr. Singh",
@@ -100,7 +100,7 @@ export default function Worksheet() {
     {
       id: 5,
       patientName: "MR RAJESH MHATRE",
-      location: "SILVERLEAF DIAGNOSTICS",
+      location: "SHRADDHA PATHOLOGY LABORATORY",
       corporate: "Walk in",
       testPerformed: "Creat",
       refDoctor: "Dr. Mehta",
@@ -111,7 +111,7 @@ export default function Worksheet() {
     {
       id: 6,
       patientName: "MRS MANDA GAWAND",
-      location: "SILVERLEAF DIAGNOSTICS",
+      location: "SHRADDHA PATHOLOGY LABORATORY",
       corporate: "Walk in",
       testPerformed: "ESR",
       refDoctor: "Dr. Desai",
@@ -122,7 +122,7 @@ export default function Worksheet() {
     {
       id: 7,
       patientName: "MR KAMLESH KUMAR",
-      location: "SILVERLEAF DIAGNOSTICS",
+      location: "SHRADDHA PATHOLOGY LABORATORY",
       corporate: "Walk in",
       testPerformed: "CBC",
       refDoctor: "Dr. Joshi",
@@ -566,9 +566,9 @@ export default function Worksheet() {
 
         {/* Invoice Header */}
         <div style={{ textAlign: 'center', marginBottom: '20px' }}>
-          <h1 style={{ fontSize: '24px', fontWeight: 'bold', margin: '0' }}>SILVERLEAF DIAGNOSTICS</h1>
+          <h1 style={{ fontSize: '24px', fontWeight: 'bold', margin: '0' }}>SHRADDHA PATHOLOGY LABORATORY</h1>
           <p style={{ margin: '5px 0', fontSize: '12px' }}>Plot No-38, Sector-1, D-Mart Road, New Panvel - 410 206</p>
-          <p style={{ margin: '5px 0', fontSize: '12px' }}>Email: info@silverleafdiagnostics.com</p>
+          <p style={{ margin: '5px 0', fontSize: '12px' }}>Email: info@shraddha.com</p>
           <p style={{ margin: '5px 0', fontSize: '12px' }}>Ph. 8779295302</p>
           <hr style={{ margin: '10px 0', border: '1px solid #000' }} />
           <h2 style={{ fontSize: '16px', fontWeight: 'bold', color: '#0066cc', margin: '10px 0' }}>Worksheet Report</h2>
@@ -636,9 +636,9 @@ export default function Worksheet() {
         {/* Second Page - Data Table */}
         <div style={{ marginTop: '20px' }}>
           <div style={{ textAlign: 'center', marginBottom: '20px' }}>
-            <h1 style={{ fontSize: '24px', fontWeight: 'bold', margin: '0' }}>SILVERLEAF DIAGNOSTICS</h1>
+            <h1 style={{ fontSize: '24px', fontWeight: 'bold', margin: '0' }}>SHRADDHA PATHOLOGY LABORATORY</h1>
             <p style={{ margin: '5px 0', fontSize: '12px' }}>Plot No-38, Sector-1, D-Mart Road, New Panvel - 410 206</p>
-            <p style={{ margin: '5px 0', fontSize: '12px' }}>Email: info@silverleafdiagnostics.com</p>
+            <p style={{ margin: '5px 0', fontSize: '12px' }}>Email: info@shraddha.com</p>
             <p style={{ margin: '5px 0', fontSize: '12px' }}>Ph. 8779295302</p>
             <hr style={{ margin: '10px 0', border: '1px solid #000' }} />
             <h2 style={{ fontSize: '16px', fontWeight: 'bold', color: '#0066cc', margin: '10px 0' }}>Worksheet Report</h2>

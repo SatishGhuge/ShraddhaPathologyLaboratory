@@ -2,7 +2,7 @@ import './globals.css';
 import { LayoutWrapper } from './layout-wrapper';
 
 export const metadata = {
-  title: 'SilverLeaf Diagnostics',
+  title: 'Shraddha Pathology Laboratory',
   description: 'Laboratory Management System',
   icons: {
     icon: '/logo.png',
