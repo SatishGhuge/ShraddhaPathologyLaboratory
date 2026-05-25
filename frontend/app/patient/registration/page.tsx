@@ -880,8 +880,67 @@ export default function PatientRegistration() {
     if (mobile.length !== 10) return alert("Mobile must be 10 digits");
     if (email && !email.endsWith("@gmail.com")) return alert("Email must end with @gmail.com");
     
-    // Allow registration without tests - just save patient info
-    handleSaveRegistration();
+    // If NO tests selected - save patient info only
+    if (selectedTests.length === 0) {
+      handleSavePatientInfoOnly();
+      return;
+    }
+    
+    // If tests selected - show registration confirmation modal
+    setShowRegistrationModal(true);
+  };
+
+  // Save patient info only (without tests)
+  const handleSavePatientInfoOnly = async () => {
+    try {
+      const patientData = {
+        existingPatientId: existingPatientId || null,
+        title: title,
+        firstName: firstName,
+        lastName: lastName || null,
+        dob: dob || null,
+        age: parseInt(age) || null,
+        gender: gender,
+        mobile: mobile,
+        email: email || null,
+        createdBy: createdBy || null,
+        createdAtLocation: selectedCreatedAt || null,
+        address: address || null,
+        location: location || null,
+        visitType: visitType || "General",
+        reportMode: reportMode || "Email",
+        referralDoctor: isManualRefDoctor ? manualRefDoctorName : refDoctor || null,
+        visitDate: date || new Date().toISOString().split('T')[0],
+        visitTime: time || "00:00",
+        sampleBarcodeNo: sampleBarcodeNo || null,
+        remarks: remarks || null,
+        totalAmount: 0,
+        discountPercent: 0,
+        discountAmount: 0,
+        discountRemark: null,
+        paidAmount: 0,
+        balanceAmount: 0,
+        paymentMode: paymentMode || "Cash",
+        businessType: businessType || "B2C",
+        tests: [] // Empty tests array
+      };
+
+      console.log('Saving patient info only:', patientData);
+      const response = await createPatient(patientData);
+      
+      console.log("Patient info saved successfully:", response);
+      
+      const patientId = response?.data?.patientId || response?.patientId || 'N/A';
+      
+      alert(`Patient Information Saved ✅\nPatient ID: ${patientId}\n\nYou can now add tests and click "Register" to complete registration.`);
+      
+      // Clear tests but KEEP patient info
+      setSelectedTests([]);
+      
+    } catch (error) {
+      console.error("Error saving patient info:", error);
+      alert(`Failed to save patient info: ${error.message}`);
+    }
   };
 
   const handleSaveRegistration = async () => {
@@ -1998,8 +2057,11 @@ export default function PatientRegistration() {
                   <X size={16} />
                   Clear Form
                 </button>
-                <button onClick={handleRegister} className="bg-slate-900 hover:bg-orange-600 text-white px-6 py-2 rounded font-semibold">
-                  Register
+                <button 
+                  onClick={handleRegister} 
+                  className="bg-slate-900 hover:bg-orange-600 text-white px-6 py-2 rounded font-semibold"
+                  title={selectedTests.length === 0 ? "Save patient information" : "Register patient with tests"}>
+                  {selectedTests.length === 0 ? "Save" : "Register"}
                 </button>
               </div>
             </div>
