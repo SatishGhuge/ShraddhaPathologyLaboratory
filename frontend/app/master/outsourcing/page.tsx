@@ -89,7 +89,7 @@ const OutsourcingList = () => {
     <>
       <Header />
 
-      <div className="p-6 bg-cyan-50 min-h-screen">
+      <div className="p-6 bg-white min-h-screen">
         {/* Page Header */}
         <PageHeader 
           title="Outsource Labs" 
@@ -105,12 +105,12 @@ const OutsourcingList = () => {
               placeholder="Search By Lab Name"
               value={searchName}
               onChange={(e) => setSearchName(e.target.value)}
-              className="border border-cyan-600 bg-cyan-50 rounded px-3 py-2 w-48 text-sm placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-cyan-600"
+              className="border border-gray-300 bg-white rounded px-3 py-2 w-48 text-sm placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500"
             />
 
             <button
               onClick={handleReset}
-              className="bg-cyan-600 hover:bg-cyan-700 text-white px-4 py-2 rounded text-sm transition-colors flex items-center gap-1"
+              className="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded text-sm transition-colors flex items-center gap-1"
             >
               <RotateCcw size={16} />
               Reset
@@ -119,7 +119,7 @@ const OutsourcingList = () => {
 
           <button
             onClick={() => router.push("/master/outsourcing/add")}
-            className="bg-cyan-600 text-white px-4 py-2 rounded text-sm hover:bg-cyan-700 transition-colors"
+            className="bg-orange-500 text-white px-4 py-2 rounded text-sm hover:bg-orange-600 transition-colors"
           >
             + Add New
           </button>
@@ -128,15 +128,15 @@ const OutsourcingList = () => {
         {/* Table */}
         <div className="overflow-x-auto bg-white rounded shadow-md">
           <table className="w-full text-sm border-collapse">
-            <thead className="bg-gradient-to-r from-slate-800 via-cyan-700 to-cyan-600 text-white">
+            <thead className="bg-slate-900 text-white">
               <tr>
-                <th className="border border-cyan-800 px-3 py-1 text-left font-semibold">Id</th>
-                <th className="border border-cyan-800 px-3 py-1 text-left font-semibold">Lab Name</th>
-                <th className="border border-cyan-800 px-3 py-1 text-left font-semibold">Code</th>
-                <th className="border border-cyan-800 px-3 py-1 text-left font-semibold">Mobile</th>
-                <th className="border border-cyan-800 px-3 py-1 text-left font-semibold">Address</th>
-                <th className="border border-cyan-800 px-3 py-1 text-left font-semibold">Active</th>
-                <th className="border border-cyan-800 px-3 py-1 text-left font-semibold">Actions</th>
+                <th className="border border-gray-300 px-3 py-1 text-left font-semibold">Id</th>
+                <th className="border border-gray-300 px-3 py-1 text-left font-semibold">Lab Name</th>
+                <th className="border border-gray-300 px-3 py-1 text-left font-semibold">Code</th>
+                <th className="border border-gray-300 px-3 py-1 text-left font-semibold">Mobile</th>
+                <th className="border border-gray-300 px-3 py-1 text-left font-semibold">Address</th>
+                <th className="border border-gray-300 px-3 py-1 text-left font-semibold">Active</th>
+                <th className="border border-gray-300 px-3 py-1 text-left font-semibold">Actions</th>
               </tr>
             </thead>
 
@@ -155,7 +155,7 @@ const OutsourcingList = () => {
                         {/* VIEW */}
                         <button
                           onClick={() => router.push(`/master/outsourcing/view/${lab.id}`)}
-                          className="bg-cyan-600 text-white px-2 py-1 rounded text-xs hover:bg-cyan-700 transition-colors"
+                          className="bg-orange-500 text-white px-2 py-1 rounded text-xs hover:bg-orange-600 transition-colors"
                         >
                           View
                         </button>
@@ -207,3 +207,4 @@ const OutsourcingList = () => {
 };
 
 export default OutsourcingList;
+

@@ -1029,7 +1029,7 @@ export default function BookingPage() {
                       setSearchBarDoctorSearch(doctor.name);
                       setShowSearchBarDoctorDropdown(false);
                     }}
-                    className="px-4 py-2 hover:bg-cyan-50 cursor-pointer border-b last:border-b-0 transition-colors"
+                    className="px-4 py-2 hover:bg-gray-50 cursor-pointer border-b last:border-b-0 transition-colors"
                   >
                     <div className="font-semibold text-gray-800 text-sm">{doctor.name}</div>
                     <div className="text-xs text-gray-500">{doctor.degree} - {doctor.specialization}</div>
@@ -1285,7 +1285,7 @@ export default function BookingPage() {
                       <span className="text-xs font-medium">B2C</span>
                     </label>
                     <label className="flex items-center gap-2 cursor-pointer">
-                      <input type="radio" name="businessType" checked={businessType==="B2B"} onChange={()=>setBusinessType("B2B")} className="accent-cyan-600"/>
+                      <input type="radio" name="businessType" checked={businessType==="B2B"} onChange={()=>setBusinessType("B2B")} className="accent-orange-500"/>
                       <span className="text-xs font-medium">B2B</span>
                     </label>
                   </div>
@@ -1361,7 +1361,7 @@ export default function BookingPage() {
                               handleClickTest(t, null);
                             }
                           }}
-                          className={`grid grid-cols-12 border-b px-2 py-2 items-center text-xs cursor-pointer transition-colors hover:bg-cyan-50`}
+                          className={`grid grid-cols-12 border-b px-2 py-2 items-center text-xs cursor-pointer transition-colors hover:bg-gray-50`}
                           title="Click to add test"
                         >
                           <div className="col-span-5 font-medium text-gray-800 flex items-center gap-2">
@@ -1371,10 +1371,10 @@ export default function BookingPage() {
                                 checked={alreadyAdded}
                                 onChange={()=>{}}
                                 onClick={e=>e.stopPropagation()}
-                                className="w-3.5 h-3.5 accent-cyan-600 cursor-pointer shrink-0"
+                                className="w-3.5 h-3.5 accent-orange-500 cursor-pointer shrink-0"
                               />
                             ) : (
-                              <Plus size={13} className="text-cyan-500 shrink-0"/>
+                              <Plus size={13} className="text-orange-500 shrink-0"/>
                             )}
                             <span>{t.name}</span>
                           </div>
@@ -1393,11 +1393,11 @@ export default function BookingPage() {
                     }) : <div className="flex items-center justify-center h-full text-gray-400 text-xs">No tests found</div>}
                   </div>
                   {(testView==="packages" && selectedPackage) && (
-                    <div className="grid grid-cols-12 border-t-2 border-cyan-600 px-2 py-1.5 bg-cyan-50 text-xs font-semibold">
-                      <div className="col-span-5 text-cyan-700">Package Total</div>
+                    <div className="grid grid-cols-12 border-t-2 border-gray-300 px-2 py-1.5 bg-white text-xs font-semibold">
+                      <div className="col-span-5 text-slate-900">Package Total</div>
                       <div className="col-span-3"></div>
-                      <div className="col-span-2 text-right text-cyan-700">₹{selectedPackage.b2cCharge}</div>
-                      <div className="col-span-2 text-right text-cyan-500">₹{selectedPackage.b2bCharge}</div>
+                      <div className="col-span-2 text-right text-slate-900">₹{selectedPackage.b2cCharge}</div>
+                      <div className="col-span-2 text-right text-orange-500">₹{selectedPackage.b2bCharge}</div>
                     </div>
                   )}
                 </div>
@@ -1430,10 +1430,10 @@ export default function BookingPage() {
                               ) : newTests.map((t,i) => {
                                 const charge = businessType==="B2C"?(t.b2cCharge||t.charge||0):(t.b2bCharge||t.charge||0);
                                 return (
-                                  <tr key={i} className={`border-b hover:bg-gray-50 ${t.fromPackage||t.isPackage?"bg-cyan-50":""}`}>
+                                  <tr key={i} className={`border-b hover:bg-gray-50 ${t.fromPackage||t.isPackage?"bg-white":""}`}>
                                     <td className="px-2 py-1">
                                       <div className="flex items-center gap-1">
-                                        {(t.fromPackage||t.isPackage) && <span className="bg-cyan-600 text-white text-xs px-1 rounded shrink-0">PKG</span>}
+                                        {(t.fromPackage||t.isPackage) && <span className="bg-orange-500 text-white text-xs px-1 rounded shrink-0">PKG</span>}
                                         <span className="font-medium truncate max-w-[120px]" title={t.name}>{t.name}</span>
                                       </div>
                                     </td>
@@ -1442,7 +1442,7 @@ export default function BookingPage() {
                                       <button onClick={()=>handleDeleteTest(t)} className="text-red-500 hover:text-red-700"><X size={13}/></button>
                                     </td>
                                     <td className="px-2 py-1 text-center">
-                                      <input type="checkbox" defaultChecked className="w-3.5 h-3.5 accent-cyan-600"/>
+                                      <input type="checkbox" defaultChecked className="w-3.5 h-3.5 accent-orange-500"/>
                                     </td>
                                   </tr>
                                 );
@@ -1478,11 +1478,11 @@ export default function BookingPage() {
                                 const charge    = businessType==="B2C"?(t.b2cCharge||t.charge):(t.b2bCharge||t.charge);
                                 const isEditing = editingCharge?.testName===t.name;
                                 return (
-                                  <tr key={i} className={`border-b hover:bg-gray-50 ${t.fromPackage||t.isPackage?"bg-cyan-50":""}`}>
+                                  <tr key={i} className={`border-b hover:bg-gray-50 ${t.fromPackage||t.isPackage?"bg-white":""}`}>
                                     <td className="p-2 text-center">{i+1}</td>
                                     <td className="p-2">
                                       <div className="flex items-center gap-1 flex-wrap">
-                                        {(t.fromPackage||t.isPackage) && <span className="bg-cyan-600 text-white text-xs px-1.5 py-0.5 rounded font-semibold shrink-0">PKG</span>}
+                                        {(t.fromPackage||t.isPackage) && <span className="bg-orange-500 text-white text-xs px-1.5 py-0.5 rounded font-semibold shrink-0">PKG</span>}
                                         <span>{t.name}</span>
                                       </div>
                                     </td>
@@ -1494,7 +1494,7 @@ export default function BookingPage() {
                                             onChange={e=>setEditingCharge({...editingCharge,value:e.target.value})}
                                             onBlur={()=>handleSaveCharge(t.name)}
                                             onKeyDown={e=>{if(e.key==="Enter")handleSaveCharge(t.name);if(e.key==="Escape")setEditingCharge(null);}}
-                                            className="w-16 border border-cyan-400 rounded px-1 py-0.5 text-center text-xs focus:outline-none focus:ring-1 focus:ring-cyan-500"/>
+                                            className="w-16 border border-gray-300 rounded px-1 py-0.5 text-center text-xs focus:outline-none focus:ring-1 focus:ring-orange-500"/>
                                         ) : <span className="font-semibold">₹{charge}</span>}
                                         <button onClick={()=>setEditingCharge({testName:t.name,value:charge})}
                                           className="text-blue-500 hover:text-blue-700 ml-1" title="Edit charge"><Pencil size={13}/></button>
@@ -1522,7 +1522,7 @@ export default function BookingPage() {
                 <div className="grid grid-cols-9 gap-2 mb-3 text-xs">
                   {[
                     {label:"Total",         field:"",              val:total,                      ro:true,  color:"text-blue-600"},
-                    {label:"Advance",       field:"advance",       val:billing.advance,            ro:true,  color:"text-cyan-600"},
+                    {label:"Advance",       field:"advance",       val:billing.advance,            ro:true,  color:"text-orange-600"},
                     {label:"Discount",      field:"discount",      val:billing.discount,           ro:false, color:"text-gray-600"},
                     {label:"Refund",        field:"refund",        val:billing.refund,             ro:false, color:"text-gray-600"},
                     {label:"Bal Amt",       field:"balAmt",        val:currentBalanceAmount,       ro:true,  color:"text-red-600"},
@@ -1543,7 +1543,7 @@ export default function BookingPage() {
                   <div>
                     <label className="text-xs font-semibold text-red-600 mb-1 block">Payment Mode</label>
                     <select value={billing.paymentMode} onChange={e=>setBilling({...billing,paymentMode:e.target.value})}
-                      className={`${style.input} w-full bg-cyan-50`}>
+                      className={`${style.input} w-full bg-white`}>
                       <option>Cash</option><option>Card</option><option>UPI</option><option>Cheque</option>
                     </select>
                   </div>
@@ -1553,7 +1553,7 @@ export default function BookingPage() {
                       placeholder="Discount Remark" className="w-full border rounded px-2 py-1 text-xs"/>
                   </div>
                   <div>
-                    <button onClick={handleSavePayment} className="bg-cyan-600 hover:bg-cyan-700 text-white px-6 py-2 rounded w-full font-semibold text-sm">Save</button>
+                    <button onClick={handleSavePayment} className="bg-orange-500 hover:bg-orange-600 text-white px-6 py-2 rounded w-full font-semibold text-sm">Save</button>
                   </div>
                 </div>
               </div>
@@ -1589,7 +1589,7 @@ export default function BookingPage() {
                     onChange={handleInputChange}
                     onBlur={() => setShowDateTimePicker(false)}
                     autoFocus
-                    className="col-span-9 border border-cyan-400 rounded px-3 py-2 bg-cyan-50"
+                    className="col-span-9 border border-gray-300 rounded px-3 py-2 bg-white"
                   />
                 ) : (
                   <input 
@@ -1598,7 +1598,7 @@ export default function BookingPage() {
                     onClick={() => setShowDateTimePicker(true)}
                     readOnly
                     placeholder="Click to select date and time"
-                    className="col-span-9 border border-cyan-400 rounded px-3 py-2 bg-cyan-50 cursor-pointer"
+                    className="col-span-9 border border-gray-300 rounded px-3 py-2 bg-white cursor-pointer"
                   />
                 )}
               </div>
@@ -1611,8 +1611,8 @@ export default function BookingPage() {
                 <div key={i} className={style.formGrid}>
                   <label className="col-span-3 font-semibold">{f[0]}</label>
                   {f[2]==="text"
-                    ? <input type="text" name={f[1] as string} value={formData[f[1] as keyof typeof formData] as any} onChange={handleInputChange} className="col-span-9 border border-cyan-400 rounded px-3 py-2 bg-cyan-50"/>
-                    : <select name={f[1] as string} value={formData[f[1] as keyof typeof formData] as any} onChange={handleInputChange} className="col-span-9 border border-cyan-400 rounded px-3 py-2 bg-cyan-50">
+                    ? <input type="text" name={f[1] as string} value={formData[f[1] as keyof typeof formData] as any} onChange={handleInputChange} className="col-span-9 border border-gray-300 rounded px-3 py-2 bg-white"/>
+                    : <select name={f[1] as string} value={formData[f[1] as keyof typeof formData] as any} onChange={handleInputChange} className="col-span-9 border border-gray-300 rounded px-3 py-2 bg-white">
                         {(Array.isArray(f[3]) ? f[3] : [formData[f[1] as keyof typeof formData]]).map((opt,j)=><option key={j}>{opt}</option>)}
                       </select>}
                 </div>
@@ -1631,25 +1631,25 @@ export default function BookingPage() {
                   }}
                   maxLength={10}
                   placeholder="Enter 10 digit mobile number"
-                  className="col-span-9 border border-cyan-400 rounded px-3 py-2 bg-cyan-50"
+                  className="col-span-9 border border-gray-300 rounded px-3 py-2 bg-white"
                   title="Enter exactly 10 digits"
                 />
               </div>
               <div className={style.formGrid}>
                 <label className="col-span-3 font-semibold">Patient Name</label>
-                <select name="title" value={formData.title} onChange={handleInputChange} className="col-span-2 border border-cyan-400 rounded px-3 py-2 bg-cyan-50">
+                <select name="title" value={formData.title} onChange={handleInputChange} className="col-span-2 border border-gray-300 rounded px-3 py-2 bg-white">
                   <option>MR</option><option>MRS</option><option>MS</option><option>BABY</option>
                 </select>
-                <input type="text" name="firstName" value={formData.firstName} onChange={handleInputChange} className="col-span-4 border border-cyan-400 rounded px-3 py-2 bg-cyan-50"/>
-                <input type="text" name="lastName"  value={formData.lastName}  onChange={handleInputChange} placeholder="LAST NAME" className="col-span-3 border border-cyan-400 rounded px-3 py-2 bg-cyan-50"/>
+                <input type="text" name="firstName" value={formData.firstName} onChange={handleInputChange} className="col-span-4 border border-gray-300 rounded px-3 py-2 bg-white"/>
+                <input type="text" name="lastName"  value={formData.lastName}  onChange={handleInputChange} placeholder="LAST NAME" className="col-span-3 border border-gray-300 rounded px-3 py-2 bg-white"/>
               </div>
               <div className={style.formGrid}>
                 <label className="col-span-3 font-semibold">Age/Gender</label>
-                <input type="text" name="age" value={formData.age} onChange={handleInputChange} className="col-span-2 border border-cyan-400 rounded px-3 py-2 bg-cyan-50"/>
-                <select name="ageUnit" value={formData.ageUnit} onChange={handleInputChange} className="col-span-3 border border-cyan-400 rounded px-3 py-2 bg-cyan-50">
+                <input type="text" name="age" value={formData.age} onChange={handleInputChange} className="col-span-2 border border-gray-300 rounded px-3 py-2 bg-white"/>
+                <select name="ageUnit" value={formData.ageUnit} onChange={handleInputChange} className="col-span-3 border border-gray-300 rounded px-3 py-2 bg-white">
                   <option>Year</option><option>Month</option><option>Day</option>
                 </select>
-                <select name="gender" value={formData.gender} onChange={handleInputChange} className="col-span-4 border border-cyan-400 rounded px-3 py-2 bg-cyan-50">
+                <select name="gender" value={formData.gender} onChange={handleInputChange} className="col-span-4 border border-gray-300 rounded px-3 py-2 bg-white">
                   <option>Male</option><option>Female</option><option>Other</option>
                 </select>
               </div>
@@ -1678,7 +1678,7 @@ export default function BookingPage() {
                       value={formData.referralDoctor} 
                       onChange={handleInputChange} 
                       placeholder="Type referral doctor name"
-                      className="flex-1 border border-cyan-400 rounded px-3 py-2 bg-cyan-50"
+                      className="flex-1 border border-gray-300 rounded px-3 py-2 bg-white"
                     />
                   ) : (
                     // When unchecked: Show searchable dropdown
@@ -1705,7 +1705,7 @@ export default function BookingPage() {
                                 setDoctorSearch(doctor.name);
                                 setShowDoctorDropdown(false);
                               }}
-                              className="px-4 py-2 hover:bg-cyan-50 cursor-pointer border-b last:border-b-0 transition-colors"
+                              className="px-4 py-2 hover:bg-gray-50 cursor-pointer border-b last:border-b-0 transition-colors"
                             >
                               <div className="font-semibold text-gray-800">{doctor.name}</div>
                               <div className="text-xs text-gray-500">{doctor.degree} - {doctor.specialization}</div>
@@ -1725,7 +1725,7 @@ export default function BookingPage() {
                   {/* ===== ADD DOCTOR BUTTON ===== */}
                   <button 
                     onClick={() => setShowAddReferral(true)}
-                    className="bg-cyan-600 hover:bg-cyan-700 text-white rounded-full p-2"
+                    className="bg-orange-500 hover:bg-orange-600 text-white rounded-full p-2"
                     title="Add Referral Doctor">
                     <Plus size={20}/>
                   </button>
@@ -1733,19 +1733,19 @@ export default function BookingPage() {
               </div>
               <div className={style.formGrid}>
                 <label className="col-span-3 font-semibold pt-2">Remark</label>
-                <input type="text" name="remark" value={formData.remark} onChange={handleInputChange} className="col-span-9 border border-cyan-400 rounded px-3 py-2 bg-cyan-50"/>
+                <input type="text" name="remark" value={formData.remark} onChange={handleInputChange} className="col-span-9 border border-gray-300 rounded px-3 py-2 bg-white"/>
               </div>
               <div className={style.formGrid}>
                 <label className="col-span-3 font-semibold pt-2">Email</label>
-                <input type="email" name="email" value={formData.email} onChange={handleInputChange} className="col-span-9 border border-cyan-400 rounded px-3 py-2 bg-cyan-50"/>
+                <input type="email" name="email" value={formData.email} onChange={handleInputChange} className="col-span-9 border border-gray-300 rounded px-3 py-2 bg-white"/>
               </div>
               <div className={style.formGrid}>
                 <label className="col-span-3 font-semibold pt-2">Address</label>
-                <textarea name="address" value={formData.address} onChange={handleInputChange} rows={3} className="col-span-9 border border-cyan-400 rounded px-3 py-2 bg-cyan-50"/>
+                <textarea name="address" value={formData.address} onChange={handleInputChange} rows={3} className="col-span-9 border border-gray-300 rounded px-3 py-2 bg-white"/>
               </div>
             </div>
             <div className="p-6 border-t flex justify-end">
-              <button onClick={handleSaveEdit} className="bg-cyan-600 text-white px-8 py-2 rounded-lg font-semibold">Save</button>
+              <button onClick={handleSaveEdit} className="bg-orange-500 text-white px-8 py-2 rounded-lg font-semibold">Save</button>
             </div>
           </div>
         </div>
@@ -1755,7 +1755,7 @@ export default function BookingPage() {
       {showAddReferral && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60]">
           <div className="bg-white rounded-lg shadow-2xl w-[95%] max-w-md">
-            <div className="bg-gradient-to-r from-cyan-600 to-cyan-700 px-4 py-3 flex justify-between items-center rounded-t-lg">
+            <div className="bg-slate-900 px-4 py-3 flex justify-between items-center rounded-t-lg">
               <h2 className="text-lg font-bold text-white">Add Referral</h2>
               <button onClick={()=>{setShowAddReferral(false); setReferralData({type:"Doctor",name:"",degree:"",compliment:"",mobile:"",email:"",address:"",allowSendReport:false}); setReferralErrors({});}} 
                 className="text-white hover:text-gray-200 transition-colors">
@@ -1775,7 +1775,7 @@ export default function BookingPage() {
                       type="radio" 
                       checked={referralData.type === "Doctor"} 
                       onChange={() => handleReferralChange("type", "Doctor")}
-                      className="w-4 h-4 accent-cyan-600"
+                      className="w-4 h-4 accent-orange-500"
                     />
                     <span className="text-sm">Doctor</span>
                   </label>
@@ -1894,7 +1894,7 @@ export default function BookingPage() {
                     type="checkbox"
                     checked={referralData.allowSendReport}
                     onChange={(e) => handleReferralChange("allowSendReport", e.target.checked)}
-                    className="mt-1 w-4 h-4 accent-cyan-600 cursor-pointer"
+                    className="mt-1 w-4 h-4 accent-orange-500 cursor-pointer"
                   />
                   <span className="text-sm text-gray-700">Allow To Send Report on balance amount</span>
                 </label>
@@ -1905,7 +1905,7 @@ export default function BookingPage() {
             <div className="p-4 border-t flex justify-end">
               <button 
                 onClick={handleSaveReferral}
-                className="bg-cyan-600 hover:bg-cyan-700 text-white px-8 py-2 rounded-lg font-semibold text-sm transition-colors">
+                className="bg-orange-500 hover:bg-orange-600 text-white px-8 py-2 rounded-lg font-semibold text-sm transition-colors">
                 Save
               </button>
             </div>
@@ -2262,7 +2262,7 @@ export default function BookingPage() {
                   value={refundAmount}
                   onChange={e => setRefundAmount(e.target.value)}
                   placeholder=""
-                  className="flex-1 border-2 border-gray-800 rounded px-3 py-1.5 text-sm focus:outline-none focus:border-cyan-500"
+                  className="flex-1 border-2 border-gray-800 rounded px-3 py-1.5 text-sm focus:outline-none focus:border-gray-300"
                 />
               </div>
 
@@ -2272,7 +2272,7 @@ export default function BookingPage() {
                   value={refundRemark}
                   onChange={e => setRefundRemark(e.target.value)}
                   rows={4}
-                  className="flex-1 border-2 border-red-400 rounded px-3 py-1.5 text-sm focus:outline-none focus:border-cyan-500 resize-y"
+                  className="flex-1 border-2 border-red-400 rounded px-3 py-1.5 text-sm focus:outline-none focus:border-gray-300 resize-y"
                 />
               </div>
             </div>
@@ -2318,7 +2318,7 @@ export default function BookingPage() {
             <p className="text-sm text-gray-600 mb-5">{successPopup}</p>
             <button
               onClick={() => setSuccessPopup("")}
-              className="bg-cyan-600 text-white px-8 py-2 rounded-lg hover:bg-cyan-700 text-sm font-medium"
+              className="bg-orange-500 text-white px-8 py-2 rounded-lg hover:bg-orange-600 text-sm font-medium"
             >
               OK
             </button>
@@ -2329,4 +2329,5 @@ export default function BookingPage() {
     </>
   );
 }
+
 

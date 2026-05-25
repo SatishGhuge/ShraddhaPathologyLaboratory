@@ -59,7 +59,7 @@ const RoleList = () => {
   return (
     <>
       <Header />
-      <div className="p-6 min-h-screen bg-cyan-50">
+      <div className="p-6 min-h-screen bg-white">
         <PageHeader title="Role List" icon={ShieldCheck} path="Master" />
 
         <div className="flex flex-wrap items-center justify-between gap-3 mb-4 bg-white p-3 rounded shadow-md">
@@ -69,18 +69,18 @@ const RoleList = () => {
               placeholder="Search by name or code"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="border border-cyan-600 bg-cyan-50 rounded px-3 py-2 w-64 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-600"
+              className="border border-gray-300 bg-white rounded px-3 py-2 w-64 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
             />
             <button
               onClick={() => setSearch("")}
-              className="bg-cyan-600 hover:bg-cyan-700 text-white px-4 py-2 rounded text-sm flex items-center gap-1"
+              className="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded text-sm flex items-center gap-1"
             >
               <RotateCcw size={16} /> Reset
             </button>
           </div>
           <button
             onClick={() => router.push("/master/rolelist/add")}
-            className="bg-cyan-600 text-white px-4 py-2 rounded text-sm hover:bg-cyan-700"
+            className="bg-orange-500 text-white px-4 py-2 rounded text-sm hover:bg-orange-600"
           >
             + New Role
           </button>
@@ -92,16 +92,16 @@ const RoleList = () => {
 
         <div className="overflow-x-auto bg-white rounded shadow-md">
           <table className="w-full text-sm border-collapse">
-            <thead className="bg-gradient-to-r from-slate-800 via-cyan-700 to-cyan-600 text-white">
+            <thead className="bg-slate-900 text-white">
               <tr>
-                <th className="border border-cyan-800 px-3 py-2 text-left">ID</th>
-                <th className="border border-cyan-800 px-3 py-2 text-left">Name</th>
-                <th className="border border-cyan-800 px-3 py-2 text-left">Code</th>
-                <th className="border border-cyan-800 px-3 py-2 text-left">Landing</th>
-                <th className="border border-cyan-800 px-3 py-2 text-left">Fin. Days</th>
-                <th className="border border-cyan-800 px-3 py-2 text-left">Discount</th>
-                <th className="border border-cyan-800 px-3 py-2 text-left">B2B</th>
-                <th className="border border-cyan-800 px-3 py-2 text-left">Action</th>
+                <th className="border border-gray-300 px-3 py-2 text-left">ID</th>
+                <th className="border border-gray-300 px-3 py-2 text-left">Name</th>
+                <th className="border border-gray-300 px-3 py-2 text-left">Code</th>
+                <th className="border border-gray-300 px-3 py-2 text-left">Landing</th>
+                <th className="border border-gray-300 px-3 py-2 text-left">Fin. Days</th>
+                <th className="border border-gray-300 px-3 py-2 text-left">Discount</th>
+                <th className="border border-gray-300 px-3 py-2 text-left">B2B</th>
+                <th className="border border-gray-300 px-3 py-2 text-left">Action</th>
               </tr>
             </thead>
             <tbody>
@@ -123,7 +123,7 @@ const RoleList = () => {
                       <div className="flex gap-1">
                         <button
                           onClick={() => router.push(`/master/rolelist/view/${role.id}`)}
-                          className="bg-cyan-600 text-white px-2 py-1 rounded text-xs hover:bg-cyan-700"
+                          className="bg-orange-500 text-white px-2 py-1 rounded text-xs hover:bg-orange-600"
                         >View</button>
                         <button
                           onClick={() => router.push(`/master/rolelist/edit/${role.id}`)}
@@ -159,7 +159,7 @@ const RoleList = () => {
                   fetchRoles(newPage);
                 }}
                 disabled={currentPage === 1}
-                className={`flex items-center gap-1 px-3 py-1 rounded ${currentPage === 1 ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-cyan-600 text-white hover:bg-cyan-700'}`}
+                className={`flex items-center gap-1 px-3 py-1 rounded ${currentPage === 1 ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-orange-500 text-white hover:bg-orange-600'}`}
               >
                 <ChevronLeft size={14} /> Previous
               </button>
@@ -175,7 +175,7 @@ const RoleList = () => {
                   fetchRoles(newPage);
                 }}
                 disabled={currentPage === pagination.totalPages}
-                className={`flex items-center gap-1 px-3 py-1 rounded ${currentPage === pagination.totalPages ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-cyan-600 text-white hover:bg-cyan-700'}`}
+                className={`flex items-center gap-1 px-3 py-1 rounded ${currentPage === pagination.totalPages ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-orange-500 text-white hover:bg-orange-600'}`}
               >
                 Next <ChevronRight size={14} />
               </button>
@@ -192,3 +192,4 @@ const RoleList = () => {
 };
 
 export default RoleList;
+

@@ -10,7 +10,7 @@ import ClassicEditor from "@ckeditor/ckeditor5-build-classic";
 import { getTestById, createTest, updateTest, getDepartments, getUnits, getTests } from "@/src/api/master.js";
 
 const baseInputClass =
-  "px-2 py-1 border border-cyan-600 rounded text-sm bg-cyan-50 focus:outline-none focus:ring-2 focus:ring-cyan-600";
+  "px-2 py-1 border border-gray-300 rounded text-sm bg-white focus:outline-none focus:ring-2 focus:ring-orange-500";
 
 const AddTest = () => {
   const router = useRouter();
@@ -987,10 +987,10 @@ const AddTest = () => {
     return (
       <>
         <Header />
-        <div className="p-3 sm:p-4 md:p-6 bg-cyan-50 min-h-screen flex items-center justify-center">
+        <div className="p-3 sm:p-4 md:p-6 bg-white min-h-screen flex items-center justify-center">
           <div className="text-center">
-            <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-cyan-600"></div>
-            <p className="mt-4 text-cyan-800 font-semibold">Loading test data...</p>
+            <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500"></div>
+            <p className="mt-4 text-slate-800 font-semibold">Loading test data...</p>
           </div>
         </div>
       </>
@@ -1001,7 +1001,7 @@ const AddTest = () => {
     <>
       <Header />
 
-       <div className="p-3 sm:p-4 md:p-6 bg-cyan-50 min-h-screen">
+       <div className="p-3 sm:p-4 md:p-6 bg-white min-h-screen">
         {/* TOP BAR */}
         {isEditMode || isViewMode ? (
           <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-3 bg-white border rounded shadow-sm p-3 gap-3">

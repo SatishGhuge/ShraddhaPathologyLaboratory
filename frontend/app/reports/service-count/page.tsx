@@ -211,7 +211,7 @@ export default function ServiceCount() {
   return (
     <>
       <Header />
-      <div className="p-2 sm:p-4 bg-cyan-50 min-h-screen">
+      <div className="p-2 sm:p-4 bg-white min-h-screen">
         <PageHeader title="Service Count and Revenue" icon={Activity} path="Reports" />
 
         {/* FILTERS */}
@@ -356,7 +356,7 @@ export default function ServiceCount() {
         <div className="bg-white rounded shadow-md overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-xs border-collapse">
-              <thead className="bg-gradient-to-r from-slate-800 via-cyan-700 to-cyan-600 text-white">
+              <thead className="bg-slate-900 text-white">
                 <tr>
                   {["Sr.No", "Department", "Test Name", "Total Count", "Unit Price", "Total Amount"].map(h => (
                     <th key={h} className={`px-3 py-2 text-xs font-semibold whitespace-nowrap border border-gray-300 ${["Total Count","Unit Price","Total Amount"].includes(h) ? "text-right" : "text-left"}`}>{h}</th>
@@ -384,7 +384,7 @@ export default function ServiceCount() {
                 )}
               </tbody>
               {data.length > 0 && (
-                <tfoot className="bg-gradient-to-r from-slate-800 via-cyan-700 to-cyan-600 text-white font-semibold">
+                <tfoot className="bg-slate-900 text-white font-semibold">
                   <tr>
                     <td colSpan={3} className="px-3 py-1.5 text-right text-xs border border-gray-300">Total</td>
                     <td className="px-3 py-1.5 text-right text-xs border border-gray-300">{calcTotal("totalCount")}</td>

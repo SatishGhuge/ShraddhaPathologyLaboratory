@@ -289,7 +289,7 @@ const TestTemplets = () => {
             </div>
             <button
               onClick={handleCancel}
-              className="text-cyan-700 text-xs sm:text-sm hover:underline flex items-center gap-1"
+              className="text-slate-900 text-xs sm:text-sm hover:underline flex items-center gap-1"
             >
               <X size={16} /> Back to List
             </button>
@@ -305,7 +305,7 @@ const TestTemplets = () => {
                   value={formData.testId}
                   onChange={(e) => handleTestChange(e.target.value)}
                   disabled={editMode}
-                  className="w-full px-3 py-2 border border-gray-300 bg-white rounded text-sm focus:outline-none focus:ring-2 focus:ring-cyan-600 disabled:bg-gray-100 disabled:cursor-not-allowed disabled:text-gray-500"
+                  className="w-full px-3 py-2 border border-gray-300 bg-white rounded text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 disabled:bg-gray-100 disabled:cursor-not-allowed disabled:text-gray-500"
                 >
                   <option value="">Please Select</option>
                   {tests.map(test => (
@@ -324,7 +324,7 @@ const TestTemplets = () => {
                   type="text"
                   value={formData.templateName}
                   onChange={(e) => setFormData({ ...formData, templateName: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 bg-white rounded text-sm focus:outline-none focus:ring-2 focus:ring-cyan-600"
+                  className="w-full px-3 py-2 border border-gray-300 bg-white rounded text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
                   placeholder="Enter template name"
                 />
               </div>
@@ -363,7 +363,7 @@ const TestTemplets = () => {
                                   parameters: updatedParams
                                 });
                               }}
-                              className="w-full px-3 py-2 border border-gray-300 bg-white rounded text-sm focus:outline-none focus:ring-2 focus:ring-cyan-600"
+                              className="w-full px-3 py-2 border border-gray-300 bg-white rounded text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
                               placeholder={`Enter ${param.name.toLowerCase()}`}
                             />
                           ) : param.type === 'Text' ? (
@@ -382,7 +382,7 @@ const TestTemplets = () => {
                                   parameters: updatedParams
                                 });
                               }}
-                              className="w-full px-3 py-2 border border-gray-300 bg-white rounded text-sm focus:outline-none focus:ring-2 focus:ring-cyan-600"
+                              className="w-full px-3 py-2 border border-gray-300 bg-white rounded text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
                               placeholder={`Enter ${param.name.toLowerCase()}`}
                             />
                           ) : (
@@ -434,7 +434,7 @@ const TestTemplets = () => {
               <button
                 onClick={handleSave}
                 disabled={loading}
-                className="px-6 py-2 bg-cyan-600 text-white rounded hover:bg-cyan-700 transition-colors text-sm font-medium disabled:bg-gray-400"
+                className="px-6 py-2 bg-orange-500 text-white rounded hover:bg-orange-600 transition-colors text-sm font-medium disabled:bg-gray-400"
               >
                 {loading ? 'Saving...' : (editMode ? 'Update Template' : 'Save Template')}
               </button>
@@ -459,12 +459,12 @@ const TestTemplets = () => {
                 placeholder="Search by keyword"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="border border-gray-300 bg-white rounded px-3 py-2 w-full sm:w-64 text-xs sm:text-sm placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-cyan-600"
+                className="border border-gray-300 bg-white rounded px-3 py-2 w-full sm:w-64 text-xs sm:text-sm placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500"
               />
 
               <button
                 onClick={handleReset}
-                className="bg-cyan-600 hover:bg-cyan-700 text-white px-4 py-2 rounded text-xs sm:text-sm transition-colors flex items-center justify-center gap-1 w-full sm:w-auto"
+                className="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded text-xs sm:text-sm transition-colors flex items-center justify-center gap-1 w-full sm:w-auto"
               >
                 <RotateCwIcon size={16} className="sm:w-[18px] sm:h-[18px]" />
                 Reset
@@ -473,7 +473,7 @@ const TestTemplets = () => {
 
             <button
               onClick={handleAddNew}
-              className="bg-cyan-600 text-white px-4 py-2 rounded text-xs sm:text-sm hover:bg-cyan-700 transition-colors w-full sm:w-auto"
+              className="bg-orange-500 text-white px-4 py-2 rounded text-xs sm:text-sm hover:bg-orange-600 transition-colors w-full sm:w-auto"
             >
               + Add Template
             </button>
@@ -493,7 +493,7 @@ const TestTemplets = () => {
               <p className="text-gray-600 mb-4">{error}</p>
               <button
                 onClick={() => fetchTemplates(1)}
-                className="bg-cyan-700 text-white px-6 py-2 rounded hover:bg-cyan-800"
+                className="bg-slate-900 text-white px-6 py-2 rounded hover:bg-slate-800"
               >
                 Retry
               </button>
@@ -504,13 +504,13 @@ const TestTemplets = () => {
             <>
               <div className="overflow-x-auto bg-white rounded shadow-md">
                 <table className="w-full text-xs sm:text-sm border-collapse">
-                  <thead className="bg-gradient-to-r from-slate-800 via-cyan-700 to-cyan-600 text-white sticky top-0">
+                  <thead className="bg-slate-900 text-white sticky top-0">
                     <tr>
-                      <th className="border border-cyan-800 px-4 py-3 text-left font-semibold">Template Name</th>
-                      <th className="border border-cyan-800 px-4 py-3 text-left font-semibold">Test Name</th>
-                      <th className="border border-cyan-800 px-4 py-3 text-left font-semibold">Parameters</th>
-                      <th className="border border-cyan-800 px-4 py-3 text-left font-semibold">Created</th>
-                      <th className="border border-cyan-800 px-4 py-3 text-center font-semibold">Action</th>
+                      <th className="border border-gray-300 px-4 py-3 text-left font-semibold">Template Name</th>
+                      <th className="border border-gray-300 px-4 py-3 text-left font-semibold">Test Name</th>
+                      <th className="border border-gray-300 px-4 py-3 text-left font-semibold">Parameters</th>
+                      <th className="border border-gray-300 px-4 py-3 text-left font-semibold">Created</th>
+                      <th className="border border-gray-300 px-4 py-3 text-center font-semibold">Action</th>
                     </tr>
                   </thead>
 
@@ -602,7 +602,7 @@ const TestTemplets = () => {
                         fetchTemplates(newPage);
                       }}
                       disabled={currentPage === 1}
-                      className={`flex items-center gap-1 px-3 py-1 rounded ${currentPage === 1 ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-cyan-600 text-white hover:bg-cyan-700'}`}
+                      className={`flex items-center gap-1 px-3 py-1 rounded ${currentPage === 1 ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-orange-500 text-white hover:bg-orange-600'}`}
                     >
                       <ChevronLeft size={14} /> Previous
                     </button>
@@ -618,7 +618,7 @@ const TestTemplets = () => {
                         fetchTemplates(newPage);
                       }}
                       disabled={currentPage === pagination.totalPages}
-                      className={`flex items-center gap-1 px-3 py-1 rounded ${currentPage === pagination.totalPages ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-cyan-600 text-white hover:bg-cyan-700'}`}
+                      className={`flex items-center gap-1 px-3 py-1 rounded ${currentPage === pagination.totalPages ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-orange-500 text-white hover:bg-orange-600'}`}
                     >
                       Next <ChevronRight size={14} />
                     </button>
@@ -638,3 +638,4 @@ const TestTemplets = () => {
 };
 
 export default TestTemplets;
+

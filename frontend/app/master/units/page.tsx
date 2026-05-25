@@ -131,7 +131,7 @@ export default function ResultUnits() {
     <>
       <Header />
 
-      <div className="min-h-screen bg-cyan-50 p-6">
+      <div className="min-h-screen bg-white p-6">
 
         {/* Header */}
         <PageHeader 
@@ -148,12 +148,12 @@ export default function ResultUnits() {
               placeholder="Search By Units"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="border border-cyan-600 bg-cyan-50 rounded px-3 py-2 w-64 text-sm placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-cyan-600"
+              className="border border-gray-300 bg-white rounded px-3 py-2 w-64 text-sm placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500"
             />
 
              <button
               onClick={handleReset}
-              className="bg-cyan-600 hover:bg-cyan-700 text-white px-4 py-2 rounded text-sm transition-colors flex items-center gap-1"
+              className="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded text-sm transition-colors flex items-center gap-1"
             >
               <RotateCcw size={18} />
               Reset
@@ -162,7 +162,7 @@ export default function ResultUnits() {
 
           <button
             onClick={openAddModal}
-            className="bg-cyan-600 text-white px-4 py-2 rounded text-sm hover:bg-cyan-700 transition-colors"
+            className="bg-orange-500 text-white px-4 py-2 rounded text-sm hover:bg-orange-600 transition-colors"
           >
             + Add
           </button>
@@ -171,10 +171,10 @@ export default function ResultUnits() {
         {/* Table */}
         <div className="overflow-x-auto bg-white rounded shadow-md">
           <table className="w-full text-sm border-collapse">
-            <thead className="bg-gradient-to-r from-slate-800 via-cyan-700 to-cyan-600 text-white">
+            <thead className="bg-slate-900 text-white">
               <tr>
-                <th className="border border-cyan-800 px-3 py-1 text-left font-semibold">Unit Symbol</th>
-                <th className="border border-cyan-800 px-3 py-1 text-center font-semibold">Action</th>
+                <th className="border border-gray-300 px-3 py-1 text-left font-semibold">Unit Symbol</th>
+                <th className="border border-gray-300 px-3 py-1 text-center font-semibold">Action</th>
               </tr>
             </thead>
 
@@ -236,7 +236,7 @@ export default function ResultUnits() {
                   fetchUnits(newPage);
                 }}
                 disabled={currentPage === 1}
-                className={`flex items-center gap-1 px-3 py-1 rounded ${currentPage === 1 ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-cyan-600 text-white hover:bg-cyan-700'}`}
+                className={`flex items-center gap-1 px-3 py-1 rounded ${currentPage === 1 ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-orange-500 text-white hover:bg-orange-600'}`}
               >
                 <ChevronLeft size={14} /> Previous
               </button>
@@ -252,7 +252,7 @@ export default function ResultUnits() {
                   fetchUnits(newPage);
                 }}
                 disabled={currentPage === pagination.totalPages}
-                className={`flex items-center gap-1 px-3 py-1 rounded ${currentPage === pagination.totalPages ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-cyan-600 text-white hover:bg-cyan-700'}`}
+                className={`flex items-center gap-1 px-3 py-1 rounded ${currentPage === pagination.totalPages ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-orange-500 text-white hover:bg-orange-600'}`}
               >
                 Next <ChevronRight size={14} />
               </button>
@@ -279,7 +279,7 @@ export default function ResultUnits() {
               <ArrowLeft size={16} /> Back
             </button>
 
-            <h3 className="text-lg font-semibold text-cyan-700 mb-4">
+            <h3 className="text-lg font-semibold text-slate-900 mb-4">
               {editId ? "Edit Unit" : "Add Unit"}
             </h3>
 
@@ -292,7 +292,7 @@ export default function ResultUnits() {
                   value={unitSymbol}
                   onChange={(e) => setUnitSymbol(e.target.value)}
                   placeholder="e.g., mg/dL, %, /cumm"
-                  className="w-full border px-3 py-2 rounded focus:ring-2 focus:ring-cyan-500"
+                  className="w-full border px-3 py-2 rounded focus:ring-2 focus:ring-orange-500"
                 />
               </div>
 
@@ -303,7 +303,7 @@ export default function ResultUnits() {
                   ${
                     !unitSymbol.trim() || loading
                       ? "bg-gray-400 cursor-not-allowed"
-                      : "bg-cyan-600 hover:bg-cyan-700"
+                      : "bg-orange-500 hover:bg-orange-600"
                   }
                 `}
               >
@@ -329,4 +329,5 @@ export default function ResultUnits() {
     </>
   );
 }
+
 

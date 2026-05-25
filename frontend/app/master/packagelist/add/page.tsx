@@ -238,11 +238,11 @@ const AddPackage = () => {
   return (
     <>
       <Header />
-      <div className="p-3 sm:p-4 md:p-6 bg-cyan-50 min-h-screen flex justify-center">
+      <div className="p-3 sm:p-4 md:p-6 bg-white min-h-screen flex justify-center">
         <div className="bg-white rounded-lg shadow-md border border-gray-200 max-w-3xl w-full">
           {/* Header */}
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between px-3 py-2 border-b border-gray-300 gap-2">
-            <h2 className="text-sm sm:text-base font-semibold text-cyan-700">
+            <h2 className="text-sm sm:text-base font-semibold text-slate-900">
               {getTitle()}
             </h2>
 
@@ -286,7 +286,7 @@ const AddPackage = () => {
           {/* Loading State */}
           {loading && (isEditMode || isViewMode) && (
             <div className="mx-3 mt-3 p-4 text-center">
-              <div className="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-cyan-600"></div>
+              <div className="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-gray-300"></div>
               <p className="mt-2 text-gray-600 text-sm">Loading package data...</p>
             </div>
           )}
@@ -296,7 +296,7 @@ const AddPackage = () => {
             <div className="max-w-2xl space-y-3 sm:space-y-4">
               {/* Center */}
               <div className="grid grid-cols-1 md:grid-cols-3 items-start md:items-center gap-2 sm:gap-3">
-                <label className="text-xs sm:text-sm font-medium flex items-center gap-1.5 text-cyan-800">
+                <label className="text-xs sm:text-sm font-medium flex items-center gap-1.5 text-gray-700">
                   <Building2 size={14} className="text-cyan-600" />
                   Center
                 </label>
@@ -306,7 +306,7 @@ const AddPackage = () => {
                   value={formData.center}
                   onChange={handleChange}
                   disabled={isViewMode}
-                  className="md:col-span-2 border border-cyan-600 rounded-md px-2 py-1.5 sm:py-1 text-xs sm:text-sm bg-cyan-50 focus:ring-2 focus:ring-cyan-600 outline-none disabled:bg-gray-100 disabled:cursor-not-allowed"
+                  className="md:col-span-2 border border-gray-300 rounded-md px-2 py-1.5 sm:py-1 text-xs sm:text-sm bg-white focus:ring-2 focus:ring-orange-500 outline-none disabled:bg-gray-100 disabled:cursor-not-allowed"
                 >
                   <option>All Centers</option>
                   <option>SILVERLEAF DIAGNOSTICS</option>
@@ -316,7 +316,7 @@ const AddPackage = () => {
 
               {/* Department */}
               <div className="grid grid-cols-1 md:grid-cols-3 items-start md:items-center gap-2 sm:gap-3">
-                <label className="text-xs sm:text-sm font-medium flex items-center gap-1.5 text-cyan-800">
+                <label className="text-xs sm:text-sm font-medium flex items-center gap-1.5 text-gray-700">
                   <Building2 size={14} className="text-cyan-600" />
                   Department
                 </label>
@@ -326,7 +326,7 @@ const AddPackage = () => {
                   value={formData.departmentId}
                   onChange={handleChange}
                   disabled={isViewMode}
-                  className="md:col-span-2 border border-cyan-600 rounded-md px-2 py-1.5 sm:py-1 text-xs sm:text-sm bg-cyan-50 focus:ring-2 focus:ring-cyan-600 outline-none disabled:bg-gray-100 disabled:cursor-not-allowed"
+                  className="md:col-span-2 border border-gray-300 rounded-md px-2 py-1.5 sm:py-1 text-xs sm:text-sm bg-white focus:ring-2 focus:ring-orange-500 outline-none disabled:bg-gray-100 disabled:cursor-not-allowed"
                 >
                   <option value="">Select Department</option>
                   {departments.map(dept => (
@@ -339,7 +339,7 @@ const AddPackage = () => {
 
               {/* Package Name */}
               <div className="grid grid-cols-1 md:grid-cols-3 items-start md:items-center gap-2 sm:gap-4">
-                <label className="text-xs sm:text-sm font-medium flex items-center gap-1.5 text-cyan-800">
+                <label className="text-xs sm:text-sm font-medium flex items-center gap-1.5 text-gray-700">
                   <Package size={14} className="text-cyan-600" />
                   Package Name
                 </label>
@@ -350,13 +350,13 @@ const AddPackage = () => {
                   value={formData.packageName}
                   onChange={handleChange}
                   disabled={isViewMode}
-                  className="md:col-span-2 border border-cyan-600 rounded-md px-2 py-1.5 sm:py-1 text-xs sm:text-sm bg-cyan-50 focus:ring-2 focus:ring-cyan-600 outline-none disabled:bg-gray-100 disabled:cursor-not-allowed"
+                  className="md:col-span-2 border border-gray-300 rounded-md px-2 py-1.5 sm:py-1 text-xs sm:text-sm bg-white focus:ring-2 focus:ring-orange-500 outline-none disabled:bg-gray-100 disabled:cursor-not-allowed"
                 />
               </div>
 
               {/* Package Code */}
               <div className="grid grid-cols-1 md:grid-cols-3 items-start md:items-center gap-2 sm:gap-4">
-                <label className="text-xs sm:text-sm font-medium flex items-center gap-1.5 sm:gap-2 text-cyan-800">
+                <label className="text-xs sm:text-sm font-medium flex items-center gap-1.5 sm:gap-2 text-gray-700">
                   <Hash size={16} className="text-cyan-600" />
                   Package Code
                 </label>
@@ -367,13 +367,13 @@ const AddPackage = () => {
                   value={formData.packageCode}
                   onChange={handleChange}
                   disabled={isViewMode}
-                  className="md:col-span-2 border border-cyan-600 rounded-md px-2 py-1.5 sm:py-1 text-xs sm:text-sm bg-cyan-50 focus:ring-2 focus:ring-cyan-600 outline-none disabled:bg-gray-100 disabled:cursor-not-allowed"
+                  className="md:col-span-2 border border-gray-300 rounded-md px-2 py-1.5 sm:py-1 text-xs sm:text-sm bg-white focus:ring-2 focus:ring-orange-500 outline-none disabled:bg-gray-100 disabled:cursor-not-allowed"
                 />
               </div>
 
               {/* Lab Tests */}
               <div className="grid grid-cols-1 md:grid-cols-3 items-start gap-2 sm:gap-4 relative">
-                <label className="text-xs sm:text-sm font-medium flex items-center gap-1.5 mt-0 md:mt-2 text-cyan-800">
+                <label className="text-xs sm:text-sm font-medium flex items-center gap-1.5 mt-0 md:mt-2 text-gray-700">
                   <FlaskConical size={14} className="text-cyan-600" />
                   Lab Tests
                 </label>
@@ -386,7 +386,7 @@ const AddPackage = () => {
                     onChange={handleChange}
                     placeholder="Search Laboratory"
                     disabled={isViewMode}
-                    className="w-full border border-cyan-600 rounded-md px-2 py-1.5 sm:py-1 text-xs sm:text-sm bg-cyan-50 focus:ring-2 focus:ring-cyan-600 outline-none disabled:bg-gray-100 disabled:cursor-not-allowed"
+                    className="w-full border border-gray-300 rounded-md px-2 py-1.5 sm:py-1 text-xs sm:text-sm bg-white focus:ring-2 focus:ring-orange-500 outline-none disabled:bg-gray-100 disabled:cursor-not-allowed"
                   />
                   
                   {/* Dropdown for search results */}
@@ -396,7 +396,7 @@ const AddPackage = () => {
                         <div
                           key={test.id}
                           onClick={() => handleAddTest(test)}
-                          className="px-3 py-2 text-xs sm:text-sm hover:bg-cyan-50 cursor-pointer border-b last:border-b-0"
+                          className="px-3 py-2 text-xs sm:text-sm hover:bg-gray-50 cursor-pointer border-b last:border-b-0"
                         >
                           {test.name}
                         </div>
@@ -457,7 +457,7 @@ const AddPackage = () => {
               <button 
                 type="submit"
                 disabled={loading}
-                className="bg-cyan-600 hover:bg-cyan-700 text-white px-4 py-1.5 text-xs sm:text-sm rounded-md transition-colors w-full sm:w-auto disabled:opacity-50 disabled:cursor-not-allowed"
+                className="bg-orange-500 hover:bg-orange-600 text-white px-4 py-1.5 text-xs sm:text-sm rounded-md transition-colors w-full sm:w-auto disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {loading ? 'Saving...' : (isAddMode ? "Save" : "Update")}
               </button>
@@ -470,6 +470,7 @@ const AddPackage = () => {
 };
 
 export default AddPackage;
+
 
 
 

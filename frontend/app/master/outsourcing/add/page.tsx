@@ -124,18 +124,18 @@ const AddOutsourcing = () => {
     <>
       <Header />
 
-      <div className="p-6 min-h-screen bg-cyan-50 flex justify-center items-start">
+      <div className="p-6 min-h-screen bg-white flex justify-center items-start">
         <div className="bg-white border border-gray-200 rounded-lg shadow-md p-4 max-w-xl w-full">
           <form onSubmit={handleSubmit} className="space-y-4">
             {/* Header */}
             <div className="flex justify-between items-center border-b border-gray-300 pb-2">
-              <h2 className="flex items-center gap-2 font-semibold text-cyan-700">
+              <h2 className="flex items-center gap-2 font-semibold text-slate-900">
                 {getTitleIcon()} {getTitle()}
               </h2>
               <button
                 type="button"
                 onClick={() => router.back()}
-                className="hover:bg-cyan-100 p-1 rounded"
+                className="hover:bg-orange-100 p-1 rounded"
               >
                 <ArrowLeft size={20} />
               </button>
@@ -150,7 +150,7 @@ const AddOutsourcing = () => {
 
             {/* Lab Name */}
             <div>
-              <label className="flex gap-2 items-center text-sm font-medium text-cyan-800">
+              <label className="flex gap-2 items-center text-sm font-medium text-gray-700">
                 <FlaskConical size={16} /> Lab Name *
               </label>
               <input
@@ -160,14 +160,14 @@ const AddOutsourcing = () => {
                 onChange={handleChange}
                 disabled={isViewMode}
                 placeholder="Enter Lab Name"
-                className="w-full border border-cyan-600 rounded px-2 py-1 bg-cyan-50 focus:outline-none focus:ring-2 focus:ring-cyan-600 disabled:bg-gray-100 disabled:cursor-not-allowed"
+                className="w-full border border-gray-300 rounded px-2 py-1 bg-white focus:outline-none focus:ring-2 focus:ring-orange-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
                 required={!isViewMode}
               />
             </div>
 
             {/* Code */}
             <div>
-              <label className="flex gap-2 items-center text-sm font-medium text-cyan-800">
+              <label className="flex gap-2 items-center text-sm font-medium text-gray-700">
                 <Hash size={16} /> Code *
               </label>
               <input
@@ -177,14 +177,14 @@ const AddOutsourcing = () => {
                 onChange={handleChange}
                 disabled={isViewMode}
                 placeholder="Enter code"
-                className="w-full border border-cyan-600 rounded px-2 py-1 bg-cyan-50 focus:outline-none focus:ring-2 focus:ring-cyan-600 disabled:bg-gray-100 disabled:cursor-not-allowed"
+                className="w-full border border-gray-300 rounded px-2 py-1 bg-white focus:outline-none focus:ring-2 focus:ring-orange-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
                 required={!isViewMode}
               />
             </div>
 
             {/* Mobile */}
             <div>
-              <label className="flex gap-2 items-center text-sm font-medium text-cyan-800">
+              <label className="flex gap-2 items-center text-sm font-medium text-gray-700">
                 <Phone size={16} /> Mobile
               </label>
               <input
@@ -196,13 +196,13 @@ const AddOutsourcing = () => {
                 pattern="\d{10}"
                 maxLength={10}
                 placeholder="Mobile"
-                className="w-full border border-cyan-600 rounded px-2 py-1 bg-cyan-50 focus:outline-none focus:ring-2 focus:ring-cyan-600 disabled:bg-gray-100 disabled:cursor-not-allowed"
+                className="w-full border border-gray-300 rounded px-2 py-1 bg-white focus:outline-none focus:ring-2 focus:ring-orange-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
               />
             </div>
 
             {/* Address */}
             <div>
-              <label className="flex gap-2 items-center text-sm font-medium text-cyan-800">
+              <label className="flex gap-2 items-center text-sm font-medium text-gray-700">
                 <MapPin size={16} /> Address
               </label>
               <textarea
@@ -212,7 +212,7 @@ const AddOutsourcing = () => {
                 disabled={isViewMode}
                 placeholder="Address"
                 rows={3}
-                className="w-full border border-cyan-600 rounded px-2 py-1 bg-cyan-50 focus:outline-none focus:ring-2 focus:ring-cyan-600 disabled:bg-gray-100 disabled:cursor-not-allowed resize-none"
+                className="w-full border border-gray-300 rounded px-2 py-1 bg-white focus:outline-none focus:ring-2 focus:ring-orange-500 disabled:bg-gray-100 disabled:cursor-not-allowed resize-none"
               />
             </div>
 
@@ -221,7 +221,7 @@ const AddOutsourcing = () => {
               <div className="flex justify-end">
                 <button
                   type="submit"
-                  className="bg-cyan-600 hover:bg-cyan-700 text-white px-4 py-2 rounded flex items-center gap-2 transition-colors"
+                  className="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded flex items-center gap-2 transition-colors"
                 >
                   <Save size={16} />
                   {getButtonText()}
@@ -236,4 +236,5 @@ const AddOutsourcing = () => {
 };
 
 export default AddOutsourcing;
+
 

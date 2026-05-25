@@ -147,7 +147,7 @@ const TestList = () => {
     <>
       <Header />
 
-      <div className="p-3 sm:p-4 md:p-6 bg-cyan-50 min-h-screen">
+      <div className="p-3 sm:p-4 md:p-6 bg-white min-h-screen">
         {/* Page Header */}
         <PageHeader 
           title="Test List" 
@@ -163,25 +163,25 @@ const TestList = () => {
               placeholder="Search by keyword"            
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="border border-cyan-600 bg-cyan-50 rounded px-3 py-2 w-full sm:w-64 text-xs sm:text-sm
+              className="border border-gray-300 bg-white rounded px-3 py-2 w-full sm:w-64 text-xs sm:text-sm
            placeholder:text-gray-500
-           focus:outline-none focus:ring-2 focus:ring-cyan-600"
+           focus:outline-none focus:ring-2 focus:ring-orange-500"
             />
 
             <button
               onClick={handleReset}
-              className="bg-cyan-600 hover:bg-cyan-700 text-white px-4 py-2 rounded text-xs sm:text-sm transition-colors flex items-center justify-center gap-1 w-full sm:w-auto"
+              className="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded text-xs sm:text-sm transition-colors flex items-center justify-center gap-1 w-full sm:w-auto"
             >
               <RotateCwIcon size={16} className="sm:w-[18px] sm:h-[18px]" />
               Reset
             </button>
 
-            <label className="flex items-center gap-2 px-3 py-2 bg-cyan-50 border border-cyan-600 rounded text-xs sm:text-sm cursor-pointer hover:bg-cyan-100 transition-colors w-full sm:w-auto">
+            <label className="flex items-center gap-2 px-3 py-2 bg-white border border-gray-300 rounded text-xs sm:text-sm cursor-pointer hover:bg-gray-50 transition-colors w-full sm:w-auto">
               <input
                 type="checkbox"
                 checked={showInactive}
                 onChange={(e) => setShowInactive(e.target.checked)}
-                className="w-4 h-4 accent-cyan-600"
+                className="w-4 h-4 accent-orange-500"
               />
               <span className="text-gray-700">Show Inactive</span>
             </label>
@@ -189,7 +189,7 @@ const TestList = () => {
 
           <button
             onClick={() => router.push("/master/testlist/add")}
-            className="bg-cyan-600 text-white px-4 py-2 rounded text-xs sm:text-sm hover:bg-cyan-700 transition-colors w-full sm:w-auto"
+            className="bg-orange-500 text-white px-4 py-2 rounded text-xs sm:text-sm hover:bg-orange-600 transition-colors w-full sm:w-auto"
           >
             + Add Test
           </button>
@@ -228,7 +228,7 @@ const TestList = () => {
               </span>
             </div>
             <table className="w-full text-xs sm:text-sm border-collapse min-w-[800px]">
-              <thead className="bg-gradient-to-r from-slate-800 via-cyan-700 to-cyan-600 text-white">
+              <thead className="bg-slate-900 text-white">
                 <tr>
                   {[
                     "Id",
@@ -242,7 +242,7 @@ const TestList = () => {
                   ].map((head) => (
                     <th
                       key={head}
-                      className="border border-cyan-800 px-3 py-1 text-left font-semibold"
+                      className="border border-gray-300 px-3 py-1 text-left font-semibold"
                     >
                       {head}
                     </th>
@@ -274,7 +274,7 @@ const TestList = () => {
                         </td>
 
                         <td className="border border-gray-300 px-3 py-1 text-center">
-                          <span className="bg-cyan-600 text-white px-2 rounded font-bold cursor-pointer">
+                          <span className="bg-orange-500 text-white px-2 rounded font-bold cursor-pointer">
                             +
                           </span>
                         </td>
@@ -292,7 +292,7 @@ const TestList = () => {
                             type="text"
                             value={test.sortOrder || ''}
                             readOnly
-                            className="border border-cyan-600 w-12 sm:w-16 px-2 py-1 text-xs sm:text-sm rounded"
+                            className="border border-gray-300 w-12 sm:w-16 px-2 py-1 text-xs sm:text-sm rounded"
                           />
                         </td>
 
@@ -358,7 +358,7 @@ const TestList = () => {
                 <button
                   onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
                   disabled={currentPage === 1}
-                  className={`px-3 py-1 rounded ${currentPage === 1 ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-cyan-600 text-white hover:bg-cyan-700'}`}
+                  className={`px-3 py-1 rounded ${currentPage === 1 ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-orange-500 text-white hover:bg-orange-600'}`}
                 >
                   ← Previous
                 </button>
@@ -387,7 +387,7 @@ const TestList = () => {
                         <button
                           key={idx}
                           onClick={() => setCurrentPage(page as number)}
-                          className={`w-7 h-7 rounded ${currentPage === page ? 'bg-cyan-600 text-white font-bold' : 'bg-white border hover:bg-gray-100'}`}
+                          className={`w-7 h-7 rounded ${currentPage === page ? 'bg-orange-500 text-white font-bold' : 'bg-white border hover:bg-gray-100'}`}
                         >
                           {page}
                         </button>
@@ -399,7 +399,7 @@ const TestList = () => {
                 <button
                   onClick={() => setCurrentPage(p => Math.min(pagination.totalPages, p + 1))}
                   disabled={currentPage === pagination.totalPages}
-                  className={`px-3 py-1 rounded ${currentPage === pagination.totalPages ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-cyan-600 text-white hover:bg-cyan-700'}`}
+                  className={`px-3 py-1 rounded ${currentPage === pagination.totalPages ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-orange-500 text-white hover:bg-orange-600'}`}
                 >
                   Next →
                 </button>
@@ -414,3 +414,4 @@ const TestList = () => {
 };
 
 export default TestList;
+

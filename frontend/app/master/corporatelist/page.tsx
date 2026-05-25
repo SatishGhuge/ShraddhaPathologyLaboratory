@@ -73,7 +73,7 @@ const CorporateList = () => {
   return (
     <>
       <Header />
-      <div className="p-6 bg-cyan-50 min-h-screen">
+      <div className="p-6 bg-white min-h-screen">
         <PageHeader title="Corporate" icon={Building} path="Master" />
 
         <div className="flex flex-wrap items-center justify-between gap-3 mb-4 bg-white p-3 rounded shadow-md">
@@ -81,18 +81,18 @@ const CorporateList = () => {
             <input type="text" placeholder="Search By Name" value={searchName}
               onChange={e => setSearchName(e.target.value)}
               onKeyDown={e => e.key === "Enter" && handleSearch()}
-              className="border border-cyan-600 bg-cyan-50 rounded px-3 py-2 w-48 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-600" />
+              className="border border-gray-300 bg-white rounded px-3 py-2 w-48 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500" />
             <button onClick={handleSearch}
-              className="bg-cyan-600 hover:bg-cyan-700 text-white px-4 py-2 rounded text-sm transition-colors">
+              className="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded text-sm transition-colors">
               Search
             </button>
             <button onClick={handleReset}
-              className="bg-cyan-600 hover:bg-cyan-700 text-white px-4 py-2 rounded text-sm transition-colors flex items-center gap-1">
+              className="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded text-sm transition-colors flex items-center gap-1">
               <RotateCcw size={16}/> Reset
             </button>
           </div>
           <button onClick={() => router.push("/master/corporate/add")}
-            className="bg-cyan-600 text-white px-4 py-2 rounded text-sm hover:bg-cyan-700 transition-colors">
+            className="bg-orange-500 text-white px-4 py-2 rounded text-sm hover:bg-orange-600 transition-colors">
             + New Corporate
           </button>
         </div>
@@ -101,13 +101,13 @@ const CorporateList = () => {
 
         <div className="overflow-x-auto bg-white rounded shadow-md">
           <table className="w-full text-sm border-collapse">
-            <thead className="bg-gradient-to-r from-slate-800 via-cyan-700 to-cyan-600 text-white">
+            <thead className="bg-slate-900 text-white">
               <tr>
-                <th className="border border-cyan-800 px-3 py-1 text-left">ID</th>
-                <th className="border border-cyan-800 px-3 py-1 text-left">Name</th>
-                <th className="border border-cyan-800 px-3 py-1 text-left">Created</th>
-                <th className="border border-cyan-800 px-3 py-1 text-left">Active</th>
-                <th className="border border-cyan-800 px-3 py-1 text-left">Actions</th>
+                <th className="border border-gray-300 px-3 py-1 text-left">ID</th>
+                <th className="border border-gray-300 px-3 py-1 text-left">Name</th>
+                <th className="border border-gray-300 px-3 py-1 text-left">Created</th>
+                <th className="border border-gray-300 px-3 py-1 text-left">Active</th>
+                <th className="border border-gray-300 px-3 py-1 text-left">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -124,7 +124,7 @@ const CorporateList = () => {
                   <td className="border border-gray-300 px-3 py-1">
                     <div className="flex gap-1 flex-wrap">
                       <button onClick={() => router.push(`/master/corporate/view/${c.id}`)}
-                        className="bg-cyan-600 text-white px-2 py-1 rounded text-xs hover:bg-cyan-700">View</button>
+                        className="bg-orange-500 text-white px-2 py-1 rounded text-xs hover:bg-orange-600">View</button>
                       <button onClick={() => router.push(`/master/corporate/edit/${c.id}`)}
                         className="bg-blue-600 text-white px-2 py-1 rounded text-xs hover:bg-blue-700">Edit</button>
                       <button onClick={() => handleToggleActive(c)}
@@ -146,7 +146,7 @@ const CorporateList = () => {
             <button
               onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
               disabled={currentPage === 1}
-              className="bg-cyan-600 hover:bg-cyan-700 disabled:bg-gray-400 text-white px-3 py-1 rounded transition-colors"
+              className="bg-orange-500 hover:bg-orange-600 disabled:bg-gray-400 text-white px-3 py-1 rounded transition-colors"
             >
               Previous
             </button>
@@ -156,7 +156,7 @@ const CorporateList = () => {
             <button
               onClick={() => setCurrentPage(p => Math.min(pagination.totalPages, p + 1))}
               disabled={currentPage === pagination.totalPages}
-              className="bg-cyan-600 hover:bg-cyan-700 disabled:bg-gray-400 text-white px-3 py-1 rounded transition-colors"
+              className="bg-orange-500 hover:bg-orange-600 disabled:bg-gray-400 text-white px-3 py-1 rounded transition-colors"
             >
               Next
             </button>

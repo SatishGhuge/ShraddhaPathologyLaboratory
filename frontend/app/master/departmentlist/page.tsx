@@ -141,7 +141,7 @@ const DepartmentTable = () => {
   return ( 
         <>
       <Header />
-            <div className="p-4 sm:p-6 bg-cyan-50 min-h-screen">
+            <div className="p-4 sm:p-6 bg-white min-h-screen">
 
       {/* Header */}
       <PageHeader 
@@ -158,23 +158,23 @@ const DepartmentTable = () => {
             value={search}
             onChange={handleSearch}
             placeholder="Search By Keywords"
-            className="border border-cyan-600 bg-cyan-50 rounded px-3 py-2 w-full sm:w-64 text-sm placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-cyan-600"
+            className="border border-gray-300 bg-white rounded px-3 py-2 w-full sm:w-64 text-sm placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500"
           />
           <button
             onClick={handleReset}
             disabled={loading}
-            className="bg-cyan-600 hover:bg-cyan-700 text-white px-4 py-2 rounded text-sm transition-colors flex items-center justify-center gap-1 w-full sm:w-auto disabled:opacity-50"
+            className="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded text-sm transition-colors flex items-center justify-center gap-1 w-full sm:w-auto disabled:opacity-50"
           >
             <RotateCcw size={16} />
             Reset
           </button>
 
-          <label className="flex items-center gap-2 px-3 py-2 bg-cyan-50 border border-cyan-600 rounded text-sm cursor-pointer hover:bg-cyan-100 transition-colors w-full sm:w-auto">
+          <label className="flex items-center gap-2 px-3 py-2 bg-white border border-gray-300 rounded text-sm cursor-pointer hover:bg-orange-100 transition-colors w-full sm:w-auto">
             <input
               type="checkbox"
               checked={showInactive}
               onChange={(e) => setShowInactive(e.target.checked)}
-              className="w-4 h-4 accent-cyan-600"
+              className="w-4 h-4 accent-orange-500"
             />
             <span className="text-gray-700">Show Inactive</span>
           </label>
@@ -183,7 +183,7 @@ const DepartmentTable = () => {
         <button
           onClick={() => router.push("/master/departmentlist/add")}
           disabled={loading}
-          className="bg-cyan-600 text-white px-4 py-2 rounded text-sm hover:bg-cyan-700 transition-colors w-full sm:w-auto disabled:opacity-50"
+          className="bg-orange-500 text-white px-4 py-2 rounded text-sm hover:bg-orange-600 transition-colors w-full sm:w-auto disabled:opacity-50"
         >
           + Add Department
         </button>
@@ -199,7 +199,7 @@ const DepartmentTable = () => {
       {/* Loading State */}
       {loading && (
         <div className="mb-4 p-4 bg-white rounded shadow-md text-center">
-          <div className="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-cyan-600"></div>
+          <div className="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-gray-300"></div>
           <p className="mt-2 text-gray-600">Loading departments...</p>
         </div>
       )}
@@ -214,14 +214,14 @@ const DepartmentTable = () => {
         </div>
         <div className="min-w-[700px]">
         <table className="w-full text-sm border-collapse">
-          <thead className="bg-gradient-to-r from-slate-800 via-cyan-700 to-cyan-600 text-white">
+          <thead className="bg-slate-900 text-white">
             <tr>
-              <th className="border border-cyan-800 px-3 py-1 text-left font-semibold">Id</th>
-              <th className="border border-cyan-800 px-3 py-1 text-left font-semibold">Name</th>
-              <th className="border border-cyan-800 px-3 py-1 text-left font-semibold">Code</th>
-              <th className="border border-cyan-800 px-3 py-1 text-left font-semibold">Sort Order</th>
-              <th className="border border-cyan-800 px-3 py-1 text-left font-semibold">Active</th>
-              <th className="border border-cyan-800 px-3 py-1 text-left font-semibold">Action</th>
+              <th className="border border-gray-300 px-3 py-1 text-left font-semibold">Id</th>
+              <th className="border border-gray-300 px-3 py-1 text-left font-semibold">Name</th>
+              <th className="border border-gray-300 px-3 py-1 text-left font-semibold">Code</th>
+              <th className="border border-gray-300 px-3 py-1 text-left font-semibold">Sort Order</th>
+              <th className="border border-gray-300 px-3 py-1 text-left font-semibold">Active</th>
+              <th className="border border-gray-300 px-3 py-1 text-left font-semibold">Action</th>
             </tr>
           </thead>
           <tbody>
@@ -257,7 +257,7 @@ const DepartmentTable = () => {
                       <button 
                         onClick={() => router.push(`/master/departmentlist/view/${dept.id}`)}
                         disabled={loading}
-                        className="bg-cyan-600 text-white px-2 py-1 rounded text-xs hover:bg-cyan-700 transition-colors flex items-center gap-1 disabled:opacity-50"
+                        className="bg-orange-500 text-white px-2 py-1 rounded text-xs hover:bg-orange-600 transition-colors flex items-center gap-1 disabled:opacity-50"
                       >
                         <Eye size={14} /> View
                       </button>
@@ -306,7 +306,7 @@ const DepartmentTable = () => {
             <button
               onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
               disabled={currentPage === 1}
-              className={`px-3 py-1 rounded ${currentPage === 1 ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-cyan-600 text-white hover:bg-cyan-700'}`}
+              className={`px-3 py-1 rounded ${currentPage === 1 ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-orange-500 text-white hover:bg-orange-600'}`}
             >
               ← Previous
             </button>
@@ -335,7 +335,7 @@ const DepartmentTable = () => {
                     <button
                       key={idx}
                       onClick={() => setCurrentPage(page as number)}
-                      className={`w-7 h-7 rounded ${currentPage === page ? 'bg-cyan-600 text-white font-bold' : 'bg-white border hover:bg-gray-100'}`}
+                      className={`w-7 h-7 rounded ${currentPage === page ? 'bg-orange-500 text-white font-bold' : 'bg-white border hover:bg-gray-100'}`}
                     >
                       {page}
                     </button>
@@ -347,7 +347,7 @@ const DepartmentTable = () => {
             <button
               onClick={() => setCurrentPage(p => Math.min(pagination.totalPages, p + 1))}
               disabled={currentPage === pagination.totalPages}
-              className={`px-3 py-1 rounded ${currentPage === pagination.totalPages ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-cyan-600 text-white hover:bg-cyan-700'}`}
+              className={`px-3 py-1 rounded ${currentPage === pagination.totalPages ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-orange-500 text-white hover:bg-orange-600'}`}
             >
               Next →
             </button>
@@ -360,3 +360,4 @@ const DepartmentTable = () => {
 };
 
 export default DepartmentTable;
+

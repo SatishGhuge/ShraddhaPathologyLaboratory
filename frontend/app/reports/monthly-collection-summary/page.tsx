@@ -167,7 +167,7 @@ export default function MonthlyCollectionSummary() {
   return (
     <>
       <Header />
-      <div className="p-2 sm:p-3 md:p-4 lg:p-6 bg-cyan-50 min-h-screen">
+      <div className="p-2 sm:p-3 md:p-4 lg:p-6 bg-white min-h-screen">
         <PageHeader title="Monthly Collection Summary" icon={Calendar} path="Reports / Other Reports" />
 
         {/* FILTERS */}
@@ -291,7 +291,7 @@ export default function MonthlyCollectionSummary() {
         <div className="bg-white rounded shadow-md overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-xs sm:text-sm border-collapse">
-              <thead className="bg-gradient-to-r from-slate-800 via-cyan-700 to-cyan-600 text-white">
+              <thead className="bg-slate-900 text-white">
                 <tr>
                   <th className="px-2 sm:px-3 py-1.5 text-left font-semibold whitespace-nowrap border border-gray-300">Payment Date</th>
                   {has("center")     && <th className="px-2 sm:px-3 py-1.5 text-left font-semibold whitespace-nowrap border border-gray-300">Center</th>}
@@ -326,7 +326,7 @@ export default function MonthlyCollectionSummary() {
                 ))}
               </tbody>
               {data.length > 0 && (
-                <tfoot className="bg-gradient-to-r from-slate-800 via-cyan-700 to-cyan-600 text-white font-semibold">
+                <tfoot className="bg-slate-900 text-white font-semibold">
                   <tr>
                     <td className="px-2 sm:px-3 py-1.5 text-left text-xs border border-gray-300">Total</td>
                     {has("center")     && <td className="px-2 sm:px-3 py-1.5 border border-gray-300"/>}

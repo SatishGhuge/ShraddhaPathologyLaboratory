@@ -1717,7 +1717,7 @@ export default function Result() {
             <div className="bg-white rounded shadow-md overflow-hidden">
               <div className="overflow-x-auto">
                 <table className="w-full text-xs sm:text-sm border-collapse">
-                  <thead className="bg-gradient-to-r from-slate-800 via-cyan-700 to-cyan-600 shadow-xl text-white">
+                  <thead className="bg-slate-900 text-white shadow-xl">
                     <tr>
                       <th className="px-1 sm:px-2 py-1.5 sm:py-2 text-center font-semibold text-xs whitespace-nowrap border border-gray-300">
                         <input type="checkbox" className="w-3 h-3 cursor-pointer accent-white" />

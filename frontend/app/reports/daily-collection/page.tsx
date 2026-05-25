@@ -237,7 +237,7 @@ export default function DailyCollection() {
   return (
     <>
       <Header />
-      <div className="p-2 sm:p-3 bg-cyan-50 min-h-screen">
+      <div className="p-2 sm:p-3 bg-white min-h-screen">
         <PageHeader title="Daily Collection" icon={DollarSign} path="Reports / MIS Reports" />
 
         {/* FILTERS */}
@@ -374,7 +374,7 @@ export default function DailyCollection() {
         <div className="bg-white rounded shadow-md overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-xs border-collapse">
-              <thead className="bg-gradient-to-r from-slate-800 via-cyan-700 to-cyan-600 text-white">
+              <thead className="bg-slate-900 text-white">
                 <tr>
                   <TH>Sr.No</TH>
                   <TH>Reg. Date</TH>
@@ -439,7 +439,7 @@ export default function DailyCollection() {
                 )}
               </tbody>
               {data.length > 0 && (
-                <tfoot className="bg-gradient-to-r from-slate-800 via-cyan-700 to-cyan-600 text-white font-semibold">
+                <tfoot className="bg-slate-900 text-white font-semibold">
                   <tr>
                     {/* Fixed: Sr.No + Reg.Date + Patient = 3, plus optional non-numeric cols before cash */}
                     <td colSpan={3 + ["paymentDate","billNo","center","corporate","cashCollectedBy","lrNumber"].filter(c=>selectedColumns.includes(c)).length}

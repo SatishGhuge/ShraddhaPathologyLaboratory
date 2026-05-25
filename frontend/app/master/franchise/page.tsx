@@ -67,7 +67,7 @@ const FranchiseList = () => {
     <>
       <Header />
 
-      <div className="p-6 bg-cyan-50 min-h-screen">
+      <div className="p-6 bg-white min-h-screen">
         {/* Page Header */}
         <PageHeader 
           title="Franchise List" 
@@ -83,7 +83,7 @@ const FranchiseList = () => {
               placeholder="Search By Name"
               value={searchName}
               onChange={(e) => setSearchName(e.target.value)}
-              className="border border-cyan-600 bg-cyan-50 rounded px-3 py-2 w-48 text-sm placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-cyan-600"
+              className="border border-gray-300 bg-white rounded px-3 py-2 w-48 text-sm placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500"
             />
 
             <input
@@ -91,12 +91,12 @@ const FranchiseList = () => {
               placeholder="Search By Location"
               value={searchLocation}
               onChange={(e) => setSearchLocation(e.target.value)}
-              className="border border-cyan-600 bg-cyan-50 rounded px-3 py-2 w-48 text-sm placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-cyan-600"
+              className="border border-gray-300 bg-white rounded px-3 py-2 w-48 text-sm placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500"
             />
 
             <button
               onClick={handleReset}
-              className="bg-cyan-600 hover:bg-cyan-700 text-white px-4 py-2 rounded text-sm transition-colors flex items-center gap-1"
+              className="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded text-sm transition-colors flex items-center gap-1"
             >
               <RotateCcw size={16} />
               Reset
@@ -105,7 +105,7 @@ const FranchiseList = () => {
 
           <button
             onClick={() => router.push("/master/franchise/add")}
-            className="bg-cyan-600 text-white px-4 py-2 rounded text-sm hover:bg-cyan-700 transition-colors"
+            className="bg-orange-500 text-white px-4 py-2 rounded text-sm hover:bg-orange-600 transition-colors"
           >
             + New Franchise
           </button>
@@ -114,17 +114,17 @@ const FranchiseList = () => {
         {/* Table */}
         <div className="overflow-x-auto bg-white rounded shadow-md">
           <table className="w-full text-sm border-collapse">
-            <thead className="bg-gradient-to-r from-slate-800 via-cyan-700 to-cyan-600 text-white">
+            <thead className="bg-slate-900 text-white">
               <tr>
-                <th className="border border-cyan-800 px-3 py-1 text-left font-semibold">id</th>
-                <th className="border border-cyan-800 px-3 py-1 text-left font-semibold">Name</th>
-                <th className="border border-cyan-800 px-3 py-1 text-left font-semibold">Code</th>
-                <th className="border border-cyan-800 px-3 py-1 text-left font-semibold">Location</th>
-                <th className="border border-cyan-800 px-3 py-1 text-left font-semibold">Address</th>
-                <th className="border border-cyan-800 px-3 py-1 text-left font-semibold">Mobile No</th>
-                <th className="border border-cyan-800 px-3 py-1 text-left font-semibold">Date</th>
-                <th className="border border-cyan-800 px-3 py-1 text-left font-semibold">Active</th>
-                <th className="border border-cyan-800 px-3 py-1 text-left font-semibold">Actions</th>
+                <th className="border border-gray-300 px-3 py-1 text-left font-semibold">id</th>
+                <th className="border border-gray-300 px-3 py-1 text-left font-semibold">Name</th>
+                <th className="border border-gray-300 px-3 py-1 text-left font-semibold">Code</th>
+                <th className="border border-gray-300 px-3 py-1 text-left font-semibold">Location</th>
+                <th className="border border-gray-300 px-3 py-1 text-left font-semibold">Address</th>
+                <th className="border border-gray-300 px-3 py-1 text-left font-semibold">Mobile No</th>
+                <th className="border border-gray-300 px-3 py-1 text-left font-semibold">Date</th>
+                <th className="border border-gray-300 px-3 py-1 text-left font-semibold">Active</th>
+                <th className="border border-gray-300 px-3 py-1 text-left font-semibold">Actions</th>
               </tr>
             </thead>
 
@@ -145,7 +145,7 @@ const FranchiseList = () => {
                         {/* VIEW */}
                         <button
                           onClick={() => router.push(`/master/franchise/view/${f.id}`)}
-                          className="bg-cyan-600 text-white px-2 py-1 rounded text-xs hover:bg-cyan-700 transition-colors"
+                          className="bg-orange-500 text-white px-2 py-1 rounded text-xs hover:bg-orange-600 transition-colors"
                         >
                           View
                         </button>
@@ -197,3 +197,4 @@ const FranchiseList = () => {
 };
 
 export default FranchiseList;
+

@@ -30,8 +30,8 @@ export default function AddUserForm() {
   });
   const [errors, setErrors] = useState<any>({});
 
-  const inputClass = "w-full px-2 py-1 text-base border border-cyan-600 rounded-md bg-cyan-50 focus:outline-none focus:ring-2 focus:ring-cyan-600";
-  const labelClass = "text-sm text-cyan-800 font-medium mb-1 block";
+  const inputClass = "w-full px-2 py-1 text-base border border-gray-300 rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-orange-500";
+  const labelClass = "text-sm text-gray-700 font-medium mb-1 block";
 
   // Load roles and centers for dropdowns
   useEffect(() => {
@@ -122,7 +122,7 @@ export default function AddUserForm() {
   if (loading) return (
     <>
       <Header />
-      <div className="p-6 bg-cyan-50 min-h-screen flex justify-center items-center">
+      <div className="p-6 bg-white min-h-screen flex justify-center items-center">
         <div className="text-gray-500">Loading...</div>
       </div>
     </>
@@ -131,14 +131,14 @@ export default function AddUserForm() {
   return (
     <>
       <Header />
-      <div className="p-6 bg-cyan-50 min-h-screen flex justify-center">
+      <div className="p-6 bg-white min-h-screen flex justify-center">
         <div className="w-[500px] bg-white p-4 rounded-lg shadow-lg border border-gray-200 h-fit">
 
-          <div className="flex justify-between items-center border-b border-cyan-600 pb-2 mb-4">
-            <h2 className="text-xl text-cyan-700 font-semibold">
+          <div className="flex justify-between items-center border-b border-gray-300 pb-2 mb-4">
+            <h2 className="text-xl text-slate-900 font-semibold">
               {isEditMode ? "Edit User Details" : "Enter User Details"}
             </h2>
-            <button onClick={() => router.push("/master/userlist")} className="text-cyan-700 hover:text-cyan-900">
+            <button onClick={() => router.push("/master/userlist")} className="text-slate-700 hover:text-slate-900">
               <ArrowLeft size={24} />
             </button>
           </div>
@@ -255,7 +255,7 @@ export default function AddUserForm() {
             <button
               onClick={handleSubmit}
               disabled={saving}
-              className="bg-cyan-600 hover:bg-cyan-700 disabled:opacity-60 text-white px-5 py-1.5 text-sm rounded-md"
+              className="bg-orange-500 hover:bg-orange-600 disabled:opacity-60 text-white px-5 py-1.5 text-sm rounded-md"
             >
               {saving ? "Saving..." : isEditMode ? "Update" : "Save"}
             </button>
@@ -269,3 +269,4 @@ export default function AddUserForm() {
     </>
   );
 }
+

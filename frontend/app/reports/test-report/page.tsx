@@ -213,7 +213,7 @@ export default function TestReport() {
   return (
     <>
       <Header />
-      <div className="p-2 sm:p-3 md:p-4 lg:p-6 bg-cyan-50 min-h-screen">
+      <div className="p-2 sm:p-3 md:p-4 lg:p-6 bg-white min-h-screen">
 
         <PageHeader title="Patient Test Report" icon={FlaskConical} path="Reports" />
 
@@ -375,7 +375,7 @@ export default function TestReport() {
         <div className="bg-white rounded shadow-md overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-xs sm:text-sm border-collapse">
-              <thead className="bg-gradient-to-r from-slate-800 via-cyan-700 to-cyan-600 shadow-xl text-white">
+              <thead className="bg-slate-900 text-white shadow-xl">
                 <tr>
                   <th className="px-2 sm:px-3 py-1.5 sm:py-2 text-left font-semibold text-xs sm:text-sm whitespace-nowrap border border-gray-300">Sr.No.</th>
                   <th className="px-2 sm:px-3 py-1.5 sm:py-2 text-left font-semibold text-xs sm:text-sm whitespace-nowrap border border-gray-300">Date</th>

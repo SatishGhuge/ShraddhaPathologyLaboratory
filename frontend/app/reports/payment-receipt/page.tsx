@@ -90,7 +90,7 @@ export default function ReceiptReport() {
   return (
     <>
       <Header />
-      <div className="p-2 sm:p-3 md:p-4 lg:p-6 bg-cyan-50 min-h-screen">
+      <div className="p-2 sm:p-3 md:p-4 lg:p-6 bg-white min-h-screen">
 
         {/* PAGE HEADING */}
         <PageHeader 
@@ -193,7 +193,7 @@ export default function ReceiptReport() {
           <div className="overflow-x-auto">
             <table className="w-full text-sm border-collapse">
 
-              <thead className="bg-gradient-to-r from-slate-800 via-cyan-700 to-cyan-600 shadow-xl text-white">
+              <thead className="bg-slate-900 text-white shadow-xl">
                 <tr>
                   <th className="px-3 py-2 text-left font-semibold text-sm whitespace-nowrap border border-gray-300">Sr.No</th>
                   <th className="px-3 py-2 text-left font-semibold text-sm whitespace-nowrap border border-gray-300">Date</th>
@@ -227,7 +227,7 @@ export default function ReceiptReport() {
               </tbody>
 
               {/* TOTAL ROW */}
-              <tfoot className="bg-gradient-to-r from-slate-800 via-cyan-700 to-cyan-600 shadow-xl text-white font-semibold">
+              <tfoot className="bg-slate-900 text-white font-semibold shadow-xl">
                 <tr>
                   <td colSpan={3} className="px-3 py-2 text-left text-sm border border-gray-300">
                     <span className="hidden sm:inline">Total Receipt Amount</span>

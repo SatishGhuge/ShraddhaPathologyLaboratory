@@ -149,7 +149,7 @@ const PackagesTable = () => {
   return (
     <>
     <Header/>
-    <div className="p-3 sm:p-4 md:p-6 bg-cyan-50 min-h-screen">
+    <div className="p-3 sm:p-4 md:p-6 bg-white min-h-screen">
       {/* Header */}
       <PageHeader 
         title="Packages" 
@@ -165,24 +165,24 @@ const PackagesTable = () => {
             placeholder="Search By Name"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="border border-cyan-600 bg-cyan-50 rounded px-3 py-2 w-full sm:w-64 text-xs sm:text-sm placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-cyan-600"
+            className="border border-gray-300 bg-white rounded px-3 py-2 w-full sm:w-64 text-xs sm:text-sm placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500"
           />
 
           <button 
             onClick={handleReset}
             disabled={loading}
-            className="bg-cyan-600 hover:bg-cyan-700 text-white px-4 py-2 rounded text-xs sm:text-sm transition-colors flex items-center justify-center gap-1 w-full sm:w-auto disabled:opacity-50"
+            className="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded text-xs sm:text-sm transition-colors flex items-center justify-center gap-1 w-full sm:w-auto disabled:opacity-50"
           >
             <RotateCcw size={16} />
             Reset
           </button>
 
-          <label className="flex items-center gap-2 px-3 py-2 bg-cyan-50 border border-cyan-600 rounded text-xs sm:text-sm cursor-pointer hover:bg-cyan-100 transition-colors w-full sm:w-auto">
+          <label className="flex items-center gap-2 px-3 py-2 bg-white border border-gray-300 rounded text-xs sm:text-sm cursor-pointer hover:bg-orange-100 transition-colors w-full sm:w-auto">
             <input
               type="checkbox"
               checked={showInactive}
               onChange={(e) => setShowInactive(e.target.checked)}
-              className="w-4 h-4 accent-cyan-600"
+              className="w-4 h-4 accent-orange-500"
             />
             <span className="text-gray-700">Show Inactive</span>
           </label>
@@ -191,7 +191,7 @@ const PackagesTable = () => {
         <button
           onClick={() => router.push("/master/packagelist/add")}
           disabled={loading}
-          className="bg-cyan-600 text-white px-4 py-2 rounded text-xs sm:text-sm hover:bg-cyan-700 transition-colors w-full sm:w-auto disabled:opacity-50"
+          className="bg-orange-500 text-white px-4 py-2 rounded text-xs sm:text-sm hover:bg-orange-600 transition-colors w-full sm:w-auto disabled:opacity-50"
         >
           + Add New Package
         </button>
@@ -207,7 +207,7 @@ const PackagesTable = () => {
       {/* Loading State */}
       {loading && (
         <div className="mb-4 p-4 bg-white rounded shadow-md text-center">
-          <div className="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-cyan-600"></div>
+          <div className="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-gray-300"></div>
           <p className="mt-2 text-gray-600">Loading packages...</p>
         </div>
       )}
@@ -221,16 +221,16 @@ const PackagesTable = () => {
           </span>
         </div>
         <table className="w-full text-xs sm:text-sm border-collapse min-w-[700px]">
-          <thead className="bg-gradient-to-r from-slate-800 via-cyan-700 to-cyan-600 text-white">
+          <thead className="bg-slate-900 text-white">
             <tr>
-              <th className="border border-cyan-800 px-3 py-1 text-left font-semibold">Sr.No</th>
-              <th className="border border-cyan-800 px-3 py-1 text-left font-semibold">Name</th>
-              <th className="border border-cyan-800 px-3 py-1 text-left font-semibold">Code</th>
-              <th className="border border-cyan-800 px-3 py-1 text-left font-semibold">Department</th>
-              <th className="border border-cyan-800 px-3 py-1 text-left font-semibold">Center</th>
-              <th className="border border-cyan-800 px-3 py-1 text-left font-semibold">Tests</th>
-              <th className="border border-cyan-800 px-3 py-1 text-left font-semibold">Active</th>
-              <th className="border border-cyan-800 px-3 py-1 text-center font-semibold">Actions</th>
+              <th className="border border-gray-300 px-3 py-1 text-left font-semibold">Sr.No</th>
+              <th className="border border-gray-300 px-3 py-1 text-left font-semibold">Name</th>
+              <th className="border border-gray-300 px-3 py-1 text-left font-semibold">Code</th>
+              <th className="border border-gray-300 px-3 py-1 text-left font-semibold">Department</th>
+              <th className="border border-gray-300 px-3 py-1 text-left font-semibold">Center</th>
+              <th className="border border-gray-300 px-3 py-1 text-left font-semibold">Tests</th>
+              <th className="border border-gray-300 px-3 py-1 text-left font-semibold">Active</th>
+              <th className="border border-gray-300 px-3 py-1 text-center font-semibold">Actions</th>
             </tr>
           </thead>
 
@@ -257,7 +257,7 @@ const PackagesTable = () => {
                   <td className="border border-gray-300 px-3 py-1">{item.department?.name || '-'}</td>
                   <td className="border border-gray-300 px-3 py-1">{item.center || '-'}</td>
                   <td className="border border-gray-300 px-3 py-1">
-                    <span className="bg-cyan-100 text-cyan-800 px-2 py-1 rounded text-xs">
+                    <span className="bg-orange-100 text-gray-700 px-2 py-1 rounded text-xs">
                       {item.packageTests?.length || 0} tests
                     </span>
                   </td>
@@ -272,7 +272,7 @@ const PackagesTable = () => {
                       <button 
                         onClick={() => router.push(`/master/packagelist/view/${item.id}`)}
                         disabled={loading}
-                        className="bg-cyan-600 text-white px-2 py-1 rounded text-[10px] sm:text-xs hover:bg-cyan-700 transition-colors flex items-center gap-1 disabled:opacity-50"
+                        className="bg-orange-500 text-white px-2 py-1 rounded text-[10px] sm:text-xs hover:bg-orange-600 transition-colors flex items-center gap-1 disabled:opacity-50"
                       >
                         <Eye size={12} /> View
                       </button>
@@ -329,7 +329,7 @@ const PackagesTable = () => {
             <button
               onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
               disabled={currentPage === 1}
-              className={`px-3 py-1 rounded ${currentPage === 1 ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-cyan-600 text-white hover:bg-cyan-700'}`}
+              className={`px-3 py-1 rounded ${currentPage === 1 ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-orange-500 text-white hover:bg-orange-600'}`}
             >
               ← Previous
             </button>
@@ -358,7 +358,7 @@ const PackagesTable = () => {
                     <button
                       key={idx}
                       onClick={() => setCurrentPage(page as number)}
-                      className={`w-7 h-7 rounded ${currentPage === page ? 'bg-cyan-600 text-white font-bold' : 'bg-white border hover:bg-gray-100'}`}
+                      className={`w-7 h-7 rounded ${currentPage === page ? 'bg-orange-500 text-white font-bold' : 'bg-white border hover:bg-gray-100'}`}
                     >
                       {page}
                     </button>
@@ -370,7 +370,7 @@ const PackagesTable = () => {
             <button
               onClick={() => setCurrentPage(p => Math.min(pagination.totalPages, p + 1))}
               disabled={currentPage === pagination.totalPages}
-              className={`px-3 py-1 rounded ${currentPage === pagination.totalPages ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-cyan-600 text-white hover:bg-cyan-700'}`}
+              className={`px-3 py-1 rounded ${currentPage === pagination.totalPages ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-orange-500 text-white hover:bg-orange-600'}`}
             >
               Next →
             </button>
@@ -383,3 +383,4 @@ const PackagesTable = () => {
 };
 
 export default PackagesTable;
+

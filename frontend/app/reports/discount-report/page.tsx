@@ -86,7 +86,7 @@ export default function DiscountReport() {
   return (
     <>
       <Header />
-      <div className="p-3 bg-cyan-50 min-h-screen">
+      <div className="p-3 bg-white min-h-screen">
         <PageHeader title="Patient Discount List" icon={Percent} path="Reports / Other Reports" />
 
         {/* FILTERS */}
@@ -198,7 +198,7 @@ export default function DiscountReport() {
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-sm border-collapse">
-                  <thead className="bg-gradient-to-r from-slate-800 via-cyan-700 to-cyan-600 text-white">
+                  <thead className="bg-slate-900 text-white">
                     <tr>
                       {columns.map((h) => (
                         <th key={h} className="px-3 py-1.5 text-left font-semibold text-xs whitespace-nowrap border border-gray-300">{h}</th>
@@ -223,7 +223,7 @@ export default function DiscountReport() {
                       </tr>
                     ))}
                   </tbody>
-                  <tfoot className="bg-gradient-to-r from-slate-800 via-cyan-700 to-cyan-600 text-white font-semibold">
+                  <tfoot className="bg-slate-900 text-white font-semibold">
                     <tr>
                       <td colSpan={8} className="px-3 py-1.5 text-right text-xs border border-gray-300">Total</td>
                       <td className="px-3 py-1.5 text-right text-xs border border-gray-300">{totalAmount.toFixed(2)}</td>

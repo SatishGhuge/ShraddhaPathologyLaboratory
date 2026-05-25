@@ -57,7 +57,7 @@ export default function ReferralListing() {
   return (
     <>
     <Header />
-    <div className="min-h-screen bg-cyan-50 p-6">
+    <div className="min-h-screen bg-white p-6">
 
       <PageHeader title="Referral Doctor List" icon={UserCheck} path="Master" />
 
@@ -69,18 +69,18 @@ export default function ReferralListing() {
             placeholder="Search By Name"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="border border-cyan-600 bg-cyan-50 rounded px-3 py-2 w-64 text-sm placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-cyan-600"
+            className="border border-gray-300 bg-white rounded px-3 py-2 w-64 text-sm placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500"
           />
           <button
             onClick={handleReset}
-            className="bg-cyan-600 hover:bg-cyan-700 text-white px-4 py-2 rounded text-sm transition-colors flex items-center gap-1"
+            className="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded text-sm transition-colors flex items-center gap-1"
           >
             <RotateCcw size={16} /> Reset
           </button>
         </div>
         <button
           onClick={() => router.push("/master/referral-doctor/add")}
-          className="bg-cyan-600 text-white px-4 py-2 rounded text-sm hover:bg-cyan-700 transition-colors"
+          className="bg-orange-500 text-white px-4 py-2 rounded text-sm hover:bg-orange-600 transition-colors"
         >
           + Add New
         </button>
@@ -89,13 +89,13 @@ export default function ReferralListing() {
       {/* Table */}
       <div className="overflow-x-auto bg-white rounded shadow-md">
         <table className="w-full text-sm border-collapse">
-          <thead className="bg-gradient-to-r from-slate-800 via-cyan-700 to-cyan-600 text-white">
+          <thead className="bg-slate-900 text-white">
             <tr>
-              <th className="border border-cyan-800 px-3 py-1 text-left font-semibold">Name</th>
-              <th className="border border-cyan-800 px-3 py-1 text-left font-semibold">Degree</th>
-              <th className="border border-cyan-800 px-3 py-1 text-left font-semibold">Compliment %</th>
-              <th className="border border-cyan-800 px-3 py-1 text-left font-semibold">Mobile</th>
-              <th className="border border-cyan-800 px-3 py-1 text-center font-semibold">Action</th>
+              <th className="border border-gray-300 px-3 py-1 text-left font-semibold">Name</th>
+              <th className="border border-gray-300 px-3 py-1 text-left font-semibold">Degree</th>
+              <th className="border border-gray-300 px-3 py-1 text-left font-semibold">Compliment %</th>
+              <th className="border border-gray-300 px-3 py-1 text-left font-semibold">Mobile</th>
+              <th className="border border-gray-300 px-3 py-1 text-center font-semibold">Action</th>
             </tr>
           </thead>
           <tbody>
@@ -142,7 +142,7 @@ export default function ReferralListing() {
           <button
             onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
             disabled={currentPage === 1}
-            className="bg-cyan-600 hover:bg-cyan-700 disabled:bg-gray-400 text-white px-3 py-1 rounded transition-colors"
+            className="bg-orange-500 hover:bg-orange-600 disabled:bg-gray-400 text-white px-3 py-1 rounded transition-colors"
           >
             Previous
           </button>
@@ -152,7 +152,7 @@ export default function ReferralListing() {
           <button
             onClick={() => setCurrentPage(p => Math.min(pagination.totalPages, p + 1))}
             disabled={currentPage === pagination.totalPages}
-            className="bg-cyan-600 hover:bg-cyan-700 disabled:bg-gray-400 text-white px-3 py-1 rounded transition-colors"
+            className="bg-orange-500 hover:bg-orange-600 disabled:bg-gray-400 text-white px-3 py-1 rounded transition-colors"
           >
             Next
           </button>
@@ -162,3 +162,4 @@ export default function ReferralListing() {
     </>
   );
 }
+

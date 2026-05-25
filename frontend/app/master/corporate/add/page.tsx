@@ -63,15 +63,15 @@ const AddCorporate = () => {
   return (
     <>
       <Header />
-      <div className="p-6 min-h-screen bg-cyan-50 flex justify-center items-start">
+      <div className="p-6 min-h-screen bg-white flex justify-center items-start">
         <div className="bg-white border border-gray-200 rounded-lg shadow-md p-4 max-w-xl w-full">
           <form onSubmit={handleSubmit} className="space-y-4">
 
             <div className="flex justify-between items-center border-b border-gray-300 pb-2">
-              <h2 className="flex items-center gap-2 font-semibold text-cyan-700">
+              <h2 className="flex items-center gap-2 font-semibold text-slate-900">
                 <TitleIcon size={20}/> {getTitle()}
               </h2>
-              <button type="button" onClick={() => router.back()} className="hover:bg-cyan-100 p-1 rounded">
+              <button type="button" onClick={() => router.back()} className="hover:bg-orange-100 p-1 rounded">
                 <ArrowLeft size={20}/>
               </button>
             </div>
@@ -80,19 +80,19 @@ const AddCorporate = () => {
             {success && <div className="bg-green-100 border border-green-400 text-green-700 p-2 rounded text-sm">✓ {success}</div>}
 
             <div>
-              <label className="flex gap-2 items-center text-sm font-medium text-cyan-800 mb-1">
+              <label className="flex gap-2 items-center text-sm font-medium text-gray-700 mb-1">
                 <Building2 size={16}/> Corporate Name *
               </label>
               <input type="text" name="name" value={formData.name} onChange={handleChange}
                 disabled={isViewMode}
-                className="w-full border border-cyan-600 rounded px-2 py-1 bg-cyan-50 focus:outline-none focus:ring-2 focus:ring-cyan-600 disabled:bg-gray-100 disabled:cursor-not-allowed"
+                className="w-full border border-gray-300 rounded px-2 py-1 bg-white focus:outline-none focus:ring-2 focus:ring-orange-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
                 required={!isViewMode}/>
             </div>
 
             {!isViewMode && (
               <div className="flex justify-end">
                 <button type="submit" disabled={loading}
-                  className="bg-cyan-600 hover:bg-cyan-700 disabled:opacity-50 text-white px-4 py-2 rounded flex items-center gap-2 transition-colors">
+                  className="bg-orange-500 hover:bg-orange-600 disabled:opacity-50 text-white px-4 py-2 rounded flex items-center gap-2 transition-colors">
                   <Save size={16}/> {loading ? "Saving..." : isEditMode ? "Update" : "Save"}
                 </button>
               </div>
@@ -105,3 +105,4 @@ const AddCorporate = () => {
 };
 
 export default AddCorporate;
+

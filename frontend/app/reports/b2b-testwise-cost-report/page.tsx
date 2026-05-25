@@ -199,7 +199,7 @@ export default function B2BTestwiseCostReport() {
   return (
     <>
       <Header/>
-      <div className="p-2 sm:p-3 md:p-4 lg:p-6 bg-cyan-50 min-h-screen">
+      <div className="p-2 sm:p-3 md:p-4 lg:p-6 bg-white min-h-screen">
         <PageHeader title="B2B Testwise Cost Report" icon={BarChart3} path="Reports / Cost Related Reports"/>
 
         <div className="bg-white p-2 sm:p-3 md:p-4 rounded shadow-md mb-2 sm:mb-3">
@@ -334,7 +334,7 @@ export default function B2BTestwiseCostReport() {
         <div className="bg-white rounded shadow-md overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-xs sm:text-sm border-collapse">
-              <thead className="bg-gradient-to-r from-slate-800 via-cyan-700 to-cyan-600 shadow-xl text-white">
+              <thead className="bg-slate-900 text-white shadow-xl">
                 <tr>
                   <th className="px-2 sm:px-3 py-1.5 sm:py-2 text-left font-semibold text-xs sm:text-sm whitespace-nowrap border border-gray-300">Sr.</th>
                   {selCols.includes("date")      && <th className="px-2 sm:px-3 py-1.5 sm:py-2 text-left font-semibold text-xs sm:text-sm whitespace-nowrap border border-gray-300">Date</th>}
@@ -377,7 +377,7 @@ export default function B2BTestwiseCostReport() {
                 )}
               </tbody>
               {data.length > 0 && (
-                <tfoot className="bg-gradient-to-r from-slate-800 via-cyan-700 to-cyan-600 text-white font-semibold">
+                <tfoot className="bg-slate-900 text-white font-semibold">
                   <tr>
                     <td colSpan={1+optCount+fixedCount} className="px-2 sm:px-3 py-1.5 sm:py-2 text-right text-xs sm:text-sm border border-gray-300">Grand Total</td>
                     {selCols.includes("total")     && <td className="px-2 sm:px-3 py-1.5 sm:py-2 text-right text-xs sm:text-sm border border-gray-300">₹{totalAmt.toFixed(2)}</td>}

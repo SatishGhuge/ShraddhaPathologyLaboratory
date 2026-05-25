@@ -136,7 +136,7 @@ const SignatureList = () => {
             <div className="relative flex-1 min-w-[200px]">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
               <input type="text" placeholder="Search..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)}
-                className="w-full pl-9 pr-3 py-2 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-primary-500 outline-none" />
+                className="w-full pl-9 pr-3 py-2 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-orange-500 outline-none" />
             </div>
             <button onClick={() => setSearchTerm('')} className="bg-primary-600 text-white px-3 py-2 rounded text-sm flex items-center gap-1"><RotateCcw size={14} /> Reset</button>
             <button onClick={() => { setIsEditMode(false); setEditingId(null); setImagePreview(null); setFormData(empty); setShowModal(true); }}
@@ -205,13 +205,13 @@ const SignatureList = () => {
                   <label className="font-semibold text-gray-700">{f.label}</label>
                   {f.type === 'select' ? (
                     <select name={f.name} value={(formData[f.name as keyof typeof formData] as any) || ''} onChange={e => setFormData(p => ({ ...p, [f.name]: e.target.value }))}
-                      className="col-span-2 border border-gray-300 rounded px-2 py-1.5 focus:ring-1 focus:ring-primary-500 outline-none">
+                      className="col-span-2 border border-gray-300 rounded px-2 py-1.5 focus:ring-1 focus:ring-orange-500 outline-none">
                       <option value="">Select</option>
                       {(f.options || []).map((o: any) => <option key={o} value={o}>{o}</option>)}
                     </select>
                   ) : (
                     <input type="text" name={f.name} value={(formData[f.name as keyof typeof formData] as any) || ''} onChange={e => setFormData(p => ({ ...p, [f.name]: e.target.value }))}
-                      className="col-span-2 border border-gray-300 rounded px-2 py-1.5 focus:ring-1 focus:ring-primary-500 outline-none" />
+                      className="col-span-2 border border-gray-300 rounded px-2 py-1.5 focus:ring-1 focus:ring-orange-500 outline-none" />
                   )}
                 </div>
               ))}
@@ -220,7 +220,7 @@ const SignatureList = () => {
                 <label className="font-semibold text-gray-700 pt-1">Signature Text</label>
                 <textarea name="signatureText" value={formData.signatureText} rows={3}
                   onChange={e => setFormData(p => ({ ...p, signatureText: e.target.value }))}
-                  className="col-span-2 border border-gray-300 rounded px-2 py-1.5 focus:ring-1 focus:ring-primary-500 outline-none" />
+                  className="col-span-2 border border-gray-300 rounded px-2 py-1.5 focus:ring-1 focus:ring-orange-500 outline-none" />
               </div>
 
               <div className="grid grid-cols-3 gap-3 items-start">
@@ -249,14 +249,14 @@ const SignatureList = () => {
                   <label className="font-semibold text-gray-700">{f.label}</label>
                   <input type={f.type} name={f.name} value={(formData[f.name as keyof typeof formData] as any) || ''}
                     onChange={e => setFormData(p => ({ ...p, [f.name]: e.target.value }))}
-                    className="col-span-2 border border-gray-300 rounded px-2 py-1.5 focus:ring-1 focus:ring-primary-500 outline-none" />
+                    className="col-span-2 border border-gray-300 rounded px-2 py-1.5 focus:ring-1 focus:ring-orange-500 outline-none" />
                 </div>
               ))}
 
               <div className="grid grid-cols-3 gap-3 items-center">
                 <label className="font-semibold text-gray-700">Status</label>
                 <select value={String(formData.isActive)} onChange={e => setFormData(p => ({ ...p, isActive: e.target.value === 'true' }))}
-                  className="col-span-2 border border-gray-300 rounded px-2 py-1.5 focus:ring-1 focus:ring-primary-500 outline-none">
+                  className="col-span-2 border border-gray-300 rounded px-2 py-1.5 focus:ring-1 focus:ring-orange-500 outline-none">
                   <option value="true">Active</option>
                   <option value="false">Inactive</option>
                 </select>

@@ -138,7 +138,7 @@ export default function OutsourceTests() {
 
   /* Responsive input style */
   const inputStyle =
-    "border border-gray-300 rounded-md px-3 py-2 text-sm w-full h-10 focus:outline-none focus:ring-2 focus:ring-cyan-500";
+    "border border-gray-300 rounded-md px-3 py-2 text-sm w-full h-10 focus:outline-none focus:ring-2 focus:ring-orange-500";
 
 
   /* Responsive button style */
@@ -206,7 +206,7 @@ export default function OutsourceTests() {
               {showDoctors && (
                 <div className="absolute top-full left-0 right-0 bg-white border border-gray-300 rounded-md shadow-lg mt-1 z-10 max-h-48 overflow-y-auto">
                   {DOCTORS.filter(d => d.name.toLowerCase().includes(docInput.toLowerCase())).map((doc, i) => (
-                    <div key={i} onClick={() => { setDocInput(doc.name); setShowDoctors(false); }} className="p-2 hover:bg-cyan-50 cursor-pointer border-b last:border-b-0">
+                    <div key={i} onClick={() => { setDocInput(doc.name); setShowDoctors(false); }} className="p-2 hover:bg-gray-50 cursor-pointer border-b last:border-b-0">
                       <div className="text-sm font-semibold">{doc.name}</div>
                       <div className="text-xs text-gray-500">{doc.specialty}</div>
                     </div>
@@ -227,7 +227,7 @@ export default function OutsourceTests() {
               {showLabs && (
                 <div className="absolute top-full left-0 right-0 bg-white border border-gray-300 rounded-md shadow-lg mt-1 z-10 max-h-48 overflow-y-auto">
                   {LABS.filter(l => l.name.toLowerCase().includes(labInput.toLowerCase())).map((lab, i) => (
-                    <div key={i} onClick={() => { setLabInput(lab.name); setShowLabs(false); }} className="p-2 hover:bg-cyan-50 cursor-pointer border-b last:border-b-0">
+                    <div key={i} onClick={() => { setLabInput(lab.name); setShowLabs(false); }} className="p-2 hover:bg-gray-50 cursor-pointer border-b last:border-b-0">
                       <div className="text-sm font-semibold">{lab.name}</div>
                       <div className="text-xs text-gray-500">{lab.city}</div>
                     </div>
@@ -252,12 +252,12 @@ export default function OutsourceTests() {
             {/* Buttons */}
             <div className="flex flex-wrap gap-3 w-full sm:w-auto">
 
-              <button onClick={handleSearch} className={`${btnStyle} bg-cyan-600`}>
+              <button onClick={handleSearch} className={`${btnStyle} bg-orange-500 hover:bg-orange-600`}>
                 <Search size={16} />
                 Search
               </button>
 
-              <button onClick={handleReset} className={`${btnStyle} bg-red-500`}>
+              <button onClick={handleReset} className={`${btnStyle} bg-red-500 hover:bg-red-600`}>
                 <RotateCcw size={16} />
                 Reset
               </button>
@@ -297,17 +297,17 @@ export default function OutsourceTests() {
 
             <table className="min-w-[700px] w-full text-sm">
 
-              <thead className="bg-gradient-to-r from-slate-800 via-cyan-700 to-cyan-600 text-white rounded-t-lg">
+              <thead className="bg-slate-900 text-white rounded-t-lg">
 
                 <tr>
 
-                  <th className="p-2 text-left rounded-tl-lg">Sr.No.</th>
-                  <th className="p-2 text-left">Outsource ID</th>
-                  <th className="p-2 text-left">Patient Name</th>
-                  <th className="p-2 text-left">Lab Name</th>
-                  <th className="p-2 text-left">Test Name</th>
-                  <th className="p-2 text-left">Outsource Charge</th>
-                  <th className="p-2 text-left rounded-tr-lg">Status</th>
+                  <th className="p-2 text-left rounded-tl-lg font-semibold">Sr.No.</th>
+                  <th className="p-2 text-left font-semibold">Outsource ID</th>
+                  <th className="p-2 text-left font-semibold">Patient Name</th>
+                  <th className="p-2 text-left font-semibold">Lab Name</th>
+                  <th className="p-2 text-left font-semibold">Test Name</th>
+                  <th className="p-2 text-left font-semibold">Outsource Charge</th>
+                  <th className="p-2 text-left rounded-tr-lg font-semibold">Status</th>
 
                 </tr>
 
@@ -385,3 +385,4 @@ export default function OutsourceTests() {
     </>
   );
 }
+

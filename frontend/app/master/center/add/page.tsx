@@ -17,10 +17,10 @@ const Toast = ({ type, message, credentials, onClose }: { type: string; message:
         <div className="flex-1">
           <p className={`font-semibold text-sm ${type === "success" ? "text-green-700" : "text-red-700"}`}>{message}</p>
           {credentials && (
-            <div className="mt-3 bg-cyan-50 border border-cyan-200 rounded p-3 text-xs space-y-1">
+            <div className="mt-3 bg-white border border-cyan-200 rounded p-3 text-xs space-y-1">
               <p className="font-semibold text-gray-700">Login Credentials (sent to email):</p>
-              <p>Username: <span className="font-bold text-cyan-700">{credentials.username}</span></p>
-              <p>Password: <span className="font-bold text-cyan-700">{credentials.password}</span></p>
+              <p>Username: <span className="font-bold text-slate-900">{credentials.username}</span></p>
+              <p>Password: <span className="font-bold text-slate-900">{credentials.password}</span></p>
             </div>
           )}
         </div>
@@ -119,7 +119,7 @@ const AddCenter = () => {
   if (loading) return (
     <>
       <Header />
-      <div className="p-6 bg-cyan-50 min-h-screen flex justify-center items-center">
+      <div className="p-6 bg-white min-h-screen flex justify-center items-center">
         <div className="text-gray-500">Loading...</div>
       </div>
     </>
@@ -129,15 +129,15 @@ const AddCenter = () => {
     <>
       <Header />
       {toast && <Toast {...toast} onClose={closeToast} />}
-      <div className="p-6 bg-cyan-50 min-h-screen flex justify-center">
+      <div className="p-6 bg-white min-h-screen flex justify-center">
         <div className="bg-white rounded-lg shadow py-3 px-4 w-full max-w-2xl h-fit">
 
           <div className="flex justify-between items-center mb-3">
-            <h2 className="text-xl font-semibold text-cyan-700 flex items-center gap-2">
+            <h2 className="text-xl font-semibold text-slate-900 flex items-center gap-2">
               {isViewMode && <Eye size={20} />} {getTitle()}
             </h2>
-            <button type="button" onClick={() => router.push("/master/centerlist")} className="p-1.5 rounded-full bg-cyan-100 hover:bg-cyan-200">
-              <ArrowLeft size={18} className="text-cyan-700" />
+            <button type="button" onClick={() => router.push("/master/centerlist")} className="p-1.5 rounded-full bg-orange-100 hover:bg-cyan-200">
+              <ArrowLeft size={18} className="text-slate-900" />
             </button>
           </div>
 
@@ -147,8 +147,8 @@ const AddCenter = () => {
 
             {/* Name */}
             <div>
-              <label className="font-medium text-cyan-800 text-sm">Name *</label>
-              <div className="flex items-center border border-cyan-600 rounded px-2 bg-cyan-50">
+              <label className="font-medium text-gray-700 text-sm">Name *</label>
+              <div className="flex items-center border border-gray-300 rounded px-2 bg-white">
                 <Building2 size={14} className="text-cyan-600" />
                 <input type="text" name="name" value={formData.name} onChange={handleChange} disabled={isViewMode}
                   className="w-full px-2 py-1.5 outline-none text-sm disabled:bg-gray-50 bg-transparent" />
@@ -157,8 +157,8 @@ const AddCenter = () => {
 
             {/* Code */}
             <div>
-              <label className="font-medium text-cyan-800 text-sm">Code</label>
-              <div className="flex items-center border border-cyan-600 rounded px-2 bg-cyan-50">
+              <label className="font-medium text-gray-700 text-sm">Code</label>
+              <div className="flex items-center border border-gray-300 rounded px-2 bg-white">
                 <Hash size={14} className="text-cyan-600" />
                 <input type="text" name="code" value={formData.code} onChange={handleChange} disabled={isViewMode}
                   className="w-full px-2 py-1.5 outline-none text-sm disabled:bg-gray-50 bg-transparent" />
@@ -167,8 +167,8 @@ const AddCenter = () => {
 
             {/* Location */}
             <div>
-              <label className="font-medium text-cyan-800 text-sm">Location</label>
-              <div className="flex items-center border border-cyan-600 rounded px-2 bg-cyan-50">
+              <label className="font-medium text-gray-700 text-sm">Location</label>
+              <div className="flex items-center border border-gray-300 rounded px-2 bg-white">
                 <MapPin size={14} className="text-cyan-600" />
                 <input type="text" name="location" value={formData.location} onChange={handleChange} disabled={isViewMode}
                   className="w-full px-2 py-1.5 outline-none text-sm disabled:bg-gray-50 bg-transparent" />
@@ -177,8 +177,8 @@ const AddCenter = () => {
 
             {/* Mobile */}
             <div>
-              <label className="font-medium text-cyan-800 text-sm">Mobile No.</label>
-              <div className="flex items-center border border-cyan-600 rounded px-2 bg-cyan-50">
+              <label className="font-medium text-gray-700 text-sm">Mobile No.</label>
+              <div className="flex items-center border border-gray-300 rounded px-2 bg-white">
                 <Phone size={14} className="text-cyan-600" />
                 <input type="tel" name="mobile" value={formData.mobile} onChange={handleChange} disabled={isViewMode}
                   maxLength={10} placeholder="10 digit mobile"
@@ -188,8 +188,8 @@ const AddCenter = () => {
 
             {/* Date */}
             <div>
-              <label className="font-medium text-cyan-800 text-sm">Date of Establishment</label>
-              <div className="flex items-center border border-cyan-600 rounded px-2 bg-cyan-50">
+              <label className="font-medium text-gray-700 text-sm">Date of Establishment</label>
+              <div className="flex items-center border border-gray-300 rounded px-2 bg-white">
                 <CalendarDays size={14} className="text-cyan-600" />
                 <input type="date" name="date" value={formData.date} onChange={handleChange} disabled={isViewMode}
                   className="w-full px-2 py-1.5 outline-none text-sm disabled:bg-gray-50 bg-transparent" />
@@ -198,8 +198,8 @@ const AddCenter = () => {
 
             {/* Active Status */}
             <div>
-              <label className="font-medium text-cyan-800 text-sm">Active Status</label>
-              <div className="flex items-center border border-cyan-600 rounded px-2 bg-cyan-50">
+              <label className="font-medium text-gray-700 text-sm">Active Status</label>
+              <div className="flex items-center border border-gray-300 rounded px-2 bg-white">
                 <select name="isActive" value={formData.isActive ? "Yes" : "No"} onChange={handleChange} disabled={isViewMode}
                   className="w-full px-2 py-1.5 outline-none text-sm disabled:bg-gray-50 bg-transparent">
                   <option value="Yes">Yes</option>
@@ -210,8 +210,8 @@ const AddCenter = () => {
 
             {/* Email */}
             <div className="md:col-span-2">
-              <label className="font-medium text-cyan-800 text-sm">Email Address</label>
-              <div className="flex items-center border border-cyan-600 rounded px-2 bg-cyan-50">
+              <label className="font-medium text-gray-700 text-sm">Email Address</label>
+              <div className="flex items-center border border-gray-300 rounded px-2 bg-white">
                 <Mail size={14} className="text-cyan-600" />
                 <input type="email" name="email" value={formData.email} onChange={handleChange} disabled={isViewMode}
                   placeholder="example@domain.com"
@@ -221,15 +221,15 @@ const AddCenter = () => {
 
             {/* Address */}
             <div className="md:col-span-2">
-              <label className="font-medium text-cyan-800 text-sm">Address</label>
+              <label className="font-medium text-gray-700 text-sm">Address</label>
               <textarea name="address" value={formData.address} onChange={handleChange} disabled={isViewMode} rows={2}
-                className="w-full border border-cyan-600 rounded px-2 py-1.5 text-sm disabled:bg-gray-50 bg-cyan-50" />
+                className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm disabled:bg-gray-50 bg-white" />
             </div>
 
             {!isViewMode && (
               <div className="md:col-span-2 flex gap-3 mt-2">
                 <button type="submit" disabled={saving}
-                  className="flex items-center gap-2 bg-cyan-600 hover:bg-cyan-700 disabled:opacity-60 text-white px-4 py-1.5 rounded text-sm">
+                  className="flex items-center gap-2 bg-orange-500 hover:bg-orange-600 disabled:opacity-60 text-white px-4 py-1.5 rounded text-sm">
                   <Save size={14} /> {saving ? "Saving..." : isEditMode ? "Update" : "Save"}
                 </button>
                 <button type="button" onClick={() => router.push("/master/centerlist")}
@@ -246,3 +246,4 @@ const AddCenter = () => {
 };
 
 export default AddCenter;
+

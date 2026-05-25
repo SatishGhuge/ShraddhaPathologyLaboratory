@@ -264,7 +264,7 @@ export default function CenterWiseCostReport() {
   return (
     <>
       <Header />
-      <div className="p-2 sm:p-3 md:p-4 lg:p-6 bg-cyan-50 min-h-screen">
+      <div className="p-2 sm:p-3 md:p-4 lg:p-6 bg-white min-h-screen">
         <PageHeader title="Center Wise Cost Report" icon={BarChart3} path="Reports / Cost Related Reports"/>
 
         {/* FILTER CARD */}
@@ -412,7 +412,7 @@ export default function CenterWiseCostReport() {
         <div className="bg-white rounded shadow-md overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-xs sm:text-sm border-collapse">
-              <thead className="bg-gradient-to-r from-slate-800 via-cyan-700 to-cyan-600 text-white">
+              <thead className="bg-slate-900 text-white">
                 <tr>
                   <th className={th + " text-left"}>Sr.</th>
                   <th className={th + " text-left"}>Date</th>

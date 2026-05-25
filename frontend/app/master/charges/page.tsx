@@ -307,7 +307,7 @@ export default function AddLabCharges() {
         body: tableData,
         theme: 'grid',
         headStyles: {
-          fillColor: [14, 116, 144], // Cyan color
+          fillColor: [249, 115, 22], // Orange color
           textColor: 255,
           fontStyle: 'bold'
         },
@@ -341,7 +341,7 @@ export default function AddLabCharges() {
     <>
       <Header />
       
-      <div className="p-6 bg-cyan-100 min-h-screen">
+      <div className="p-6 bg-white min-h-screen">
         {/* Page Header */}
         <PageHeader 
           title="Lab Charges" 
@@ -354,12 +354,12 @@ export default function AddLabCharges() {
           <div className="border-b border-gray-300 p-4">
             <div className="flex gap-3 items-center">
               <div className="flex-1 gap-2 flex flex-wrap items-end">
-                <label className="block text-sm font-medium text-cyan-800 mb-1">Select Type</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Select Type</label>
                 <select 
                   value={selectedType}
                   onChange={handleTypeChange}
                   disabled={loading}
-                  className=" max-w-xs px-2 py-1 text-sm border border-cyan-600 rounded bg-cyan-50 focus:outline-none focus:ring-2 focus:ring-cyan-600 disabled:opacity-50"
+                  className=" max-w-xs px-2 py-1 text-sm border border-gray-300 rounded bg-white focus:outline-none focus:ring-2 focus:ring-orange-500 disabled:opacity-50"
                 >
                   <option>Walkin</option>
                   <option>Corporate 1</option>
@@ -369,14 +369,14 @@ export default function AddLabCharges() {
                 <button
                   onClick={handleSearch}
                   disabled={loading}
-                  className="bg-cyan-600 text-white px-6 py-1.5 text-sm rounded hover:bg-cyan-700 transition-colors disabled:opacity-50"
+                  className="bg-orange-500 text-white px-6 py-1.5 text-sm rounded hover:bg-orange-600 transition-colors disabled:opacity-50"
                 >
                   Search
                 </button>
                 <button
                   onClick={handleReset}
                   disabled={loading}
-                  className="bg-cyan-600 text-white px-6 py-1.5 text-sm rounded hover:bg-cyan-700 transition-colors flex items-center gap-1 disabled:opacity-50"
+                  className="bg-orange-500 text-white px-6 py-1.5 text-sm rounded hover:bg-orange-600 transition-colors flex items-center gap-1 disabled:opacity-50"
                 >
                   <RotateCcw size={16} />
                   Reset
@@ -386,14 +386,14 @@ export default function AddLabCharges() {
                 <button
                   onClick={handleSave}
                   disabled={loading}
-                  className="bg-cyan-600 hover:bg-cyan-700 text-white px-6 py-1.5 text-sm rounded transition-colors disabled:opacity-50"
+                  className="bg-orange-500 hover:bg-orange-600 text-white px-6 py-1.5 text-sm rounded transition-colors disabled:opacity-50"
                 >
                   {loading ? 'Saving...' : 'Save'}
                 </button>
                  <div className="flex gap-2">
             <button 
               onClick={() => router.push("/master/corporate-wise-charges")}
-              className="bg-cyan-600 text-white px-4 py-1.5 text-sm rounded hover:bg-cyan-700 transition-colors"
+              className="bg-orange-500 text-white px-4 py-1.5 text-sm rounded hover:bg-orange-600 transition-colors"
             >
               Corporate Wise Charges
             </button>
@@ -420,7 +420,7 @@ export default function AddLabCharges() {
               <span>PDF</span>
             </button>
 
-            <button className="bg-cyan-600 text-white px-4 py-1.5 text-sm rounded hover:bg-cyan-700 transition-colors">
+            <button className="bg-orange-500 text-white px-4 py-1.5 text-sm rounded hover:bg-orange-600 transition-colors">
               Copy Charges
             </button>
           </div>
@@ -432,48 +432,48 @@ export default function AddLabCharges() {
           <div className="overflow-x-auto">
             {loading ? (
               <div className="p-8 text-center">
-                <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-cyan-600"></div>
+                <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-gray-300"></div>
                 <p className="mt-2 text-gray-600">Loading tests and charges...</p>
               </div>
             ) : (
               <div className="overflow-y-auto" style={{ maxHeight: '500px' }}>
                 <table className="w-full border-collapse text-sm">
-                  <thead className="bg-gradient-to-r from-slate-800 via-cyan-700 to-cyan-600 text-white sticky top-0">
+                  <thead className="bg-slate-900 text-white sticky top-0">
                     <tr>
-                      <th className="border border-cyan-800 px-3 py-2 text-left font-semibold" style={{ width: '35%' }}>
+                      <th className="border border-gray-300 px-3 py-2 text-left font-semibold" style={{ width: '35%' }}>
                         <div className="mb-1">Name</div>
                         <input
                           placeholder="Search By Test Name"
                           value={searchName}
                           onChange={(e) => setSearchName(e.target.value)}
-                          className="w-full px-2 py-1 text-sm text-black rounded bg-white focus:outline-none border border-cyan-300"
+                          className="w-full px-2 py-1 text-sm text-black rounded bg-white focus:outline-none border border-gray-300"
                         />
                       </th>
-                      <th className="border border-cyan-800 px-3 py-2 text-left font-semibold" style={{ width: '20%' }}>
+                      <th className="border border-gray-300 px-3 py-2 text-left font-semibold" style={{ width: '20%' }}>
                         <div className="mb-1">TestCode</div>
                         <input
                           placeholder="Search By TestCode"
                           value={searchCode}
                           onChange={(e) => setSearchCode(e.target.value)}
-                          className="w-full px-2 py-1 text-sm text-black rounded bg-white focus:outline-none border border-cyan-300"
+                          className="w-full px-2 py-1 text-sm text-black rounded bg-white focus:outline-none border border-gray-300"
                         />
                       </th>
-                      <th className="border border-cyan-800 px-3 py-2 text-left font-semibold" style={{ width: '20%' }}>
+                      <th className="border border-gray-300 px-3 py-2 text-left font-semibold" style={{ width: '20%' }}>
                         <div className="mb-1">Group</div>
                         <input
                           placeholder="Search By Group"
                           value={searchGroup}
                           onChange={(e) => setSearchGroup(e.target.value)}
-                          className="w-full px-2 py-1 text-sm text-black rounded bg-white focus:outline-none border border-cyan-300"
+                          className="w-full px-2 py-1 text-sm text-black rounded bg-white focus:outline-none border border-gray-300"
                         />
                       </th>
-                      <th className="border border-cyan-800 px-3 py-2 text-center font-semibold" style={{ width: '12%' }}>Charges</th>
-                      <th className="border border-cyan-800 px-3 py-2 text-center font-semibold" style={{ width: '13%' }}>B2B</th>
+                      <th className="border border-gray-300 px-3 py-2 text-center font-semibold" style={{ width: '12%' }}>Charges</th>
+                      <th className="border border-gray-300 px-3 py-2 text-center font-semibold" style={{ width: '13%' }}>B2B</th>
                     </tr>
                   </thead>
                   <tbody>
                     {filteredData.map((item) => (
-                      <tr key={item.id} className="hover:bg-cyan-50 border-b border-gray-200">
+                      <tr key={item.id} className="hover:bg-gray-50 border-b border-gray-200">
                         <td className="border border-gray-300 px-3 py-2 font-medium">{item.name}</td>
                         <td className="border border-gray-300 px-3 py-2">{item.code}</td>
                         <td className="border border-gray-300 px-3 py-2">{item.group}</td>
@@ -482,7 +482,7 @@ export default function AddLabCharges() {
                             type="number"
                             value={item.charges}
                             onChange={(e) => handleChargeChange(item.id, 'charges', e.target.value)}
-                            className="w-full border border-cyan-600 px-2 py-1 text-sm rounded bg-cyan-50 focus:outline-none focus:ring-2 focus:ring-cyan-600 text-center"
+                            className="w-full border border-gray-300 px-2 py-1 text-sm rounded bg-white focus:outline-none focus:ring-2 focus:ring-orange-500 text-center"
                           />
                         </td>
                         <td className="border border-gray-300 px-2 py-1">
@@ -490,7 +490,7 @@ export default function AddLabCharges() {
                             type="number"
                             value={item.b2b}
                             onChange={(e) => handleChargeChange(item.id, 'b2b', e.target.value)}
-                            className={`w-full border px-2 py-1 text-sm rounded bg-cyan-50 focus:outline-none focus:ring-2 focus:ring-cyan-600 text-center ${parseFloat(item.b2b) > parseFloat(item.charges) && item.charges > 0 ? 'border-red-500 bg-red-50' : 'border-cyan-600'}`}
+                            className={`w-full border px-2 py-1 text-sm rounded bg-white focus:outline-none focus:ring-2 focus:ring-orange-500 text-center ${parseFloat(item.b2b) > parseFloat(item.charges) && item.charges > 0 ? 'border-red-500 bg-red-50' : 'border-gray-300'}`}
                             title={parseFloat(item.b2b) > parseFloat(item.charges) && item.charges > 0 ? 'B2B cannot exceed B2C' : ''}
                           />
                         </td>
@@ -533,7 +533,7 @@ export default function AddLabCharges() {
                   type="number"
                   value={bulkCharge}
                   onChange={(e) => setBulkCharge(e.target.value)}
-                  className="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-cyan-600"
+                  className="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500"
                   placeholder="Enter B2C charge"
                 />
               </div>
@@ -546,7 +546,7 @@ export default function AddLabCharges() {
                   type="number"
                   value={bulkB2BCharge}
                   onChange={(e) => setBulkB2BCharge(e.target.value)}
-                  className="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-cyan-600"
+                  className="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500"
                   placeholder="Enter B2B charge"
                 />
               </div>
@@ -565,7 +565,7 @@ export default function AddLabCharges() {
               </button>
               <button
                 onClick={handleBulkApply}
-                className="px-4 py-2 bg-cyan-600 text-white rounded hover:bg-cyan-700"
+                className="px-4 py-2 bg-orange-500 text-white rounded hover:bg-orange-600"
               >
                 Apply to All
               </button>
@@ -580,10 +580,11 @@ export default function AddLabCharges() {
             <div className="text-red-500 text-4xl mb-3">⚠️</div>
             <h3 className="text-base font-semibold text-gray-800 mb-2">Invalid Charge</h3>
             <p className="text-sm text-gray-600 mb-4">{b2bError}</p>
-            <button onClick={() => setB2bError("")} className="bg-cyan-600 text-white px-6 py-2 rounded hover:bg-cyan-700 text-sm">OK</button>
+            <button onClick={() => setB2bError("")} className="bg-orange-500 text-white px-6 py-2 rounded hover:bg-orange-600 text-sm">OK</button>
           </div>
         </div>
       )}
     </>
   );
 }
+

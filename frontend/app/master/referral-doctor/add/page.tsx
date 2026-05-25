@@ -125,7 +125,7 @@ export default function AddReferralForm() {
   return (
     <>
     <Header />
-    <div className="min-h-screen bg-cyan-50 flex justify-center items-start p-6">
+    <div className="min-h-screen bg-white flex justify-center items-start p-6">
       <div className="bg-white w-full max-w-xl rounded shadow border border-gray-200 relative">
 
         {/* Notification */}
@@ -144,12 +144,12 @@ export default function AddReferralForm() {
 
         {/* Header */}
         <div className="border-b border-gray-300 px-4 py-2 flex justify-between items-center">
-          <h2 className="text-cyan-700 font-semibold text-lg">
+          <h2 className="text-slate-900 font-semibold text-lg">
             {isEditMode ? "Edit Referral Details" : "Add Referral Details"}
           </h2>
           <button
             onClick={() => router.push("/master/referral-doctor-list")}
-            className="flex items-center gap-1 text-cyan-700 hover:text-cyan-900 text-sm font-semibold"
+            className="flex items-center gap-1 text-slate-900 hover:text-cyan-900 text-sm font-semibold"
           >
             <ArrowLeft size={18} /> Back to List
           </button>
@@ -163,11 +163,11 @@ export default function AddReferralForm() {
             <label className="font-semibold text-gray-700">Referral Type *</label>
             <div className="flex items-center gap-6">
               <label className="flex items-center gap-1.5 cursor-pointer">
-                <input type="radio" value="Doctor" checked={type === "Doctor"} onChange={() => setType("Doctor")} className="accent-cyan-600" />
+                <input type="radio" value="Doctor" checked={type === "Doctor"} onChange={() => setType("Doctor")} className="accent-orange-500" />
                 <User size={16} className="text-cyan-600" /> Doctor
               </label>
               <label className="flex items-center gap-1.5 cursor-pointer">
-                <input type="radio" value="Hospital" checked={type === "Hospital"} onChange={() => setType("Hospital")} className="accent-cyan-600" />
+                <input type="radio" value="Hospital" checked={type === "Hospital"} onChange={() => setType("Hospital")} className="accent-orange-500" />
                 <Hospital size={16} className="text-cyan-600" /> Hospital
               </label>
             </div>
@@ -183,7 +183,7 @@ export default function AddReferralForm() {
                 value={formData.name}
                 onChange={handleChange}
                 placeholder="Please Enter Name"
-                className={`w-full border px-3 py-1.5 rounded bg-cyan-50 focus:ring-2 outline-none ${errors.name ? "border-red-500 focus:ring-red-400" : "border-cyan-600 focus:ring-cyan-600"}`}
+                className={`w-full border px-3 py-1.5 rounded bg-white focus:ring-2 outline-none ${errors.name ? "border-red-500 focus:ring-red-400" : "border-gray-300 focus:ring-orange-500"}`}
               />
               {errors.name
                 ? <p className="text-xs text-red-500 mt-1 flex items-center gap-1"><AlertCircle size={12}/>{errors.name}</p>
@@ -194,7 +194,7 @@ export default function AddReferralForm() {
           {/* Degree */}
           <div className="grid grid-cols-[160px_1fr] items-center gap-3">
             <label className="font-semibold text-gray-700">Degree</label>
-            <div className="flex items-center border border-cyan-600 rounded px-2 bg-cyan-50">
+            <div className="flex items-center border border-gray-300 rounded px-2 bg-white">
               <GraduationCap size={16} className="text-cyan-600 mr-2 flex-shrink-0" />
               <input type="text" name="degree" value={formData.degree} onChange={handleChange} className="w-full py-1.5 outline-none bg-transparent" />
             </div>
@@ -204,7 +204,7 @@ export default function AddReferralForm() {
           <div className="grid grid-cols-[160px_1fr] items-start gap-3">
             <label className="font-semibold text-gray-700 mt-1.5">Compliment %</label>
             <div>
-              <div className={`flex items-center border rounded px-2 bg-cyan-50 ${errors.compliment ? "border-red-500" : "border-cyan-600"}`}>
+              <div className={`flex items-center border rounded px-2 bg-white ${errors.compliment ? "border-red-500" : "border-gray-300"}`}>
                 <Percent size={16} className="text-cyan-600 mr-2 flex-shrink-0" />
                 <input type="number" name="compliment" value={formData.compliment} onChange={handleChange} min="0" max="100" className="w-full py-1.5 outline-none bg-transparent" />
               </div>
@@ -216,7 +216,7 @@ export default function AddReferralForm() {
           <div className="grid grid-cols-[160px_1fr] items-start gap-3">
             <label className="font-semibold text-gray-700 mt-1.5">Mobile</label>
             <div>
-              <div className={`flex items-center border rounded px-2 bg-cyan-50 ${errors.mobile ? "border-red-500" : "border-cyan-600"}`}>
+              <div className={`flex items-center border rounded px-2 bg-white ${errors.mobile ? "border-red-500" : "border-gray-300"}`}>
                 <Phone size={16} className="text-cyan-600 mr-2 flex-shrink-0" />
                 <input type="text" name="mobile" value={formData.mobile} onChange={handleChange} maxLength={10} className="w-full py-1.5 outline-none bg-transparent" />
               </div>
@@ -228,7 +228,7 @@ export default function AddReferralForm() {
           <div className="grid grid-cols-[160px_1fr] items-start gap-3">
             <label className="font-semibold text-gray-700 mt-1.5">Email</label>
             <div>
-              <div className={`flex items-center border rounded px-2 bg-cyan-50 ${errors.email ? "border-red-500" : "border-cyan-600"}`}>
+              <div className={`flex items-center border rounded px-2 bg-white ${errors.email ? "border-red-500" : "border-gray-300"}`}>
                 <Mail size={16} className="text-cyan-600 mr-2 flex-shrink-0" />
                 <input type="email" name="email" value={formData.email} onChange={handleChange} className="w-full py-1.5 outline-none bg-transparent" />
               </div>
@@ -239,7 +239,7 @@ export default function AddReferralForm() {
           {/* Address */}
           <div className="grid grid-cols-[160px_1fr] items-start gap-3">
             <label className="font-semibold text-gray-700 mt-1.5">Address</label>
-            <div className="flex items-start border border-cyan-600 rounded px-2 bg-cyan-50">
+            <div className="flex items-start border border-gray-300 rounded px-2 bg-white">
               <MapPin size={16} className="text-cyan-600 mt-2 mr-2 flex-shrink-0" />
               <textarea name="address" value={formData.address} onChange={handleChange} rows={3} placeholder="Address" className="w-full py-1.5 outline-none resize-none bg-transparent" />
             </div>
@@ -247,14 +247,14 @@ export default function AddReferralForm() {
 
           {/* Checkbox */}
           <div className="flex items-center gap-2 pl-1">
-            <input type="checkbox" name="allowBalance" checked={formData.allowBalance} onChange={handleChange} className="w-4 h-4 accent-cyan-600" />
+            <input type="checkbox" name="allowBalance" checked={formData.allowBalance} onChange={handleChange} className="w-4 h-4 accent-orange-500" />
             <span className="text-gray-700">Allow To Send Report on balance amount</span>
           </div>
 
           {/* Buttons */}
           <div className="flex justify-end gap-3 pt-2">
             <button onClick={handleSave} disabled={loading}
-              className="flex items-center gap-1.5 bg-cyan-600 hover:bg-cyan-700 disabled:opacity-60 text-white px-5 py-1.5 rounded text-sm">
+              className="flex items-center gap-1.5 bg-orange-500 hover:bg-orange-600 disabled:opacity-60 text-white px-5 py-1.5 rounded text-sm">
               <Save size={16}/> {loading ? "Saving..." : isEditMode ? "Update" : "Save"}
             </button>
             <button onClick={() => router.push("/master/referral-doctor-list")}
@@ -268,4 +268,5 @@ export default function AddReferralForm() {
     </>
   );
 }
+
 

@@ -10,7 +10,7 @@ import ClassicEditor from "@ckeditor/ckeditor5-build-classic";
 import { getTestById, createTest, updateTest, getDepartments, getUnits, getTests } from "@/src/api/master.js";
 
 const baseInputClass =
-  "px-2 py-1 border border-cyan-600 rounded text-sm bg-cyan-50 focus:outline-none focus:ring-2 focus:ring-cyan-600";
+  "px-2 py-1 border border-gray-300 rounded text-sm bg-white focus:outline-none focus:ring-2 focus:ring-orange-500";
 
 const AddTest = () => {
   const router = useRouter();
@@ -991,10 +991,10 @@ const AddTest = () => {
     return (
       <>
         <Header />
-        <div className="p-3 sm:p-4 md:p-6 bg-cyan-50 min-h-screen flex items-center justify-center">
+        <div className="p-3 sm:p-4 md:p-6 bg-white min-h-screen flex items-center justify-center">
           <div className="text-center">
-            <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-cyan-600"></div>
-            <p className="mt-4 text-cyan-800 font-semibold">Loading test data...</p>
+            <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500"></div>
+            <p className="mt-4 text-slate-800 font-semibold">Loading test data...</p>
           </div>
         </div>
       </>
@@ -1005,7 +1005,7 @@ const AddTest = () => {
     <>
       <Header />
 
-       <div className="p-3 sm:p-4 md:p-6 bg-cyan-50 min-h-screen">
+       <div className="p-3 sm:p-4 md:p-6 bg-white min-h-screen">
         {/* TOP BAR */}
         {isEditMode || isViewMode ? (
           <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-3 bg-white border rounded shadow-sm p-3 gap-3">
@@ -1017,7 +1017,7 @@ const AddTest = () => {
               {!isViewMode && (
                 <button
                   onClick={handlePreview}
-                  className="bg-cyan-600 text-white px-3 sm:px-4 py-1.5 rounded text-xs sm:text-sm hover:bg-cyan-700 transition-colors"
+                  className="bg-orange-500 text-white px-3 sm:px-4 py-1.5 rounded text-xs sm:text-sm hover:bg-orange-600 transition-colors"
                 >
                   Preview
                 </button>
@@ -1025,7 +1025,7 @@ const AddTest = () => {
 
               <button
                 onClick={handleCancel}
-                className="text-cyan-700 px-3 sm:px-4 py-1.5 rounded text-xs sm:text-sm hover:bg-cyan-100 w-full sm:w-auto"
+                className="text-slate-900 px-3 sm:px-4 py-1.5 rounded text-xs sm:text-sm hover:bg-orange-100 w-full sm:w-auto"
               >
                 Back to list
               </button>
@@ -1036,7 +1036,7 @@ const AddTest = () => {
             <h2 className="text-base sm:text-lg font-semibold text-slate-800">Add Test</h2>
             <button
               onClick={handleCancel}
-              className="text-cyan-700 text-xs sm:text-sm hover:underline"
+              className="text-slate-900 text-xs sm:text-sm hover:underline"
             >
               ← Back to List
             </button>
@@ -1112,11 +1112,11 @@ const AddTest = () => {
                   {/* Image size field — only when Attach File = Yes */}
                   {formData.attachFile === 'Yes' && (
                     <div className="flex flex-col gap-1">
-                      <label className="font-semibold text-cyan-800 text-xs sm:text-sm">
+                      <label className="font-semibold text-gray-700 text-xs sm:text-sm">
                         Image width/height :
                       </label>
                       <input
-                        className="px-2 py-1.5 border border-cyan-400 rounded text-xs sm:text-sm w-48 focus:outline-none focus:ring-2 focus:ring-cyan-500 bg-cyan-50"
+                        className="px-2 py-1.5 border border-cyan-400 rounded text-xs sm:text-sm w-48 focus:outline-none focus:ring-2 focus:ring-orange-500 bg-white"
                         placeholder="width|height (Optional)"
                         name="imageSize"
                         value={formData.imageSize || ''}
@@ -1128,7 +1128,7 @@ const AddTest = () => {
 
                   {/* Cost For Lab – inline */}
                   <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-3">
-                    <label className="font-semibold text-cyan-800 text-xs sm:text-sm whitespace-nowrap">
+                    <label className="font-semibold text-gray-700 text-xs sm:text-sm whitespace-nowrap">
                       Cost For Lab
                     </label>
                     <input 
@@ -1136,7 +1136,7 @@ const AddTest = () => {
                       type="number"
                       value={formData.costForLab}
                       onChange={handleChange}
-                      className="w-full sm:w-32 px-2 py-1.5 sm:py-1 border border-cyan-600 rounded text-xs sm:text-sm bg-cyan-50" 
+                      className="w-full sm:w-32 px-2 py-1.5 sm:py-1 border border-gray-300 rounded text-xs sm:text-sm bg-white" 
                       disabled={isViewMode} 
                     required={false}/>
                   </div>
@@ -1180,7 +1180,7 @@ const AddTest = () => {
                       disabled={isViewMode} 
                     />
                     <div className="flex items-center gap-2">
-                      <label className="font-semibold text-cyan-800 text-xs sm:text-sm">
+                      <label className="font-semibold text-gray-700 text-xs sm:text-sm">
                         Line Height
                       </label>
                       <input 
@@ -1189,7 +1189,7 @@ const AddTest = () => {
                         step="0.1"
                         value={formData.lineHeight}
                         onChange={handleChange}
-                        className="w-20 px-2 py-1.5 sm:py-1 border border-cyan-600 rounded text-xs sm:text-sm bg-cyan-50" 
+                        className="w-20 px-2 py-1.5 sm:py-1 border border-gray-300 rounded text-xs sm:text-sm bg-white" 
                         disabled={isViewMode} 
                       required={false}/>
                     </div>
@@ -1210,9 +1210,9 @@ const AddTest = () => {
                   {/* Test to add - Only show when Profile Test is Yes */}
                   {formData.profileTest === "Yes" && (
                     <div>
-                      <label className="font-semibold text-cyan-800 text-xs sm:text-sm block mb-1">Test to add</label>
+                      <label className="font-semibold text-gray-700 text-xs sm:text-sm block mb-1">Test to add</label>
                       {/* Combined tag + select box */}
-                      <div className="flex flex-wrap items-center gap-1 px-2 py-1 border border-cyan-600 rounded bg-cyan-50 min-h-[32px] focus-within:ring-2 focus-within:ring-cyan-600">
+                      <div className="flex flex-wrap items-center gap-1 px-2 py-1 border border-gray-300 rounded bg-white min-h-[32px] focus-within:ring-2 focus-within:ring-cyan-600">
                         {/* Tags inside the box */}
                         {selectedTestsToAdd.map(t => (
                           <span key={t.id} className="flex items-center gap-0.5 bg-cyan-200 text-cyan-900 text-xs px-1.5 py-0.5 rounded-full whitespace-nowrap">
@@ -1263,12 +1263,12 @@ const AddTest = () => {
                   />
                   {/* Sample Type - Custom dropdown with colored test tube */}
                   <div className="relative sample-type-dropdown">
-                    <label className="font-semibold text-cyan-800 text-xs sm:text-sm">Sample Type</label>
+                    <label className="font-semibold text-gray-700 text-xs sm:text-sm">Sample Type</label>
                     <button
                       type="button"
                       disabled={isViewMode}
                       onClick={() => setShowSampleTypeDropdown(v => !v)}
-                      className="w-full px-2 py-1.5 border border-cyan-600 rounded text-xs sm:text-sm bg-cyan-50 focus:outline-none focus:ring-2 focus:ring-cyan-600 disabled:bg-gray-100 disabled:cursor-not-allowed flex items-center gap-2 text-left"
+                      className="w-full px-2 py-1.5 border border-gray-300 rounded text-xs sm:text-sm bg-white focus:outline-none focus:ring-2 focus:ring-orange-500 disabled:bg-gray-100 disabled:cursor-not-allowed flex items-center gap-2 text-left"
                     >
                       {formData.sampleType ? (
                         <>
@@ -1284,7 +1284,7 @@ const AddTest = () => {
                       )}
                     </button>
                     {showSampleTypeDropdown && !isViewMode && (
-                      <div className="absolute z-50 top-full left-0 right-0 bg-white border border-cyan-600 rounded shadow-lg mt-1 max-h-48 overflow-y-auto">
+                      <div className="absolute z-50 top-full left-0 right-0 bg-white border border-gray-300 rounded shadow-lg mt-1 max-h-48 overflow-y-auto">
                         <div
                           className="px-3 py-2 text-xs text-gray-400 hover:bg-gray-50 cursor-pointer border-b"
                           onClick={() => { handleChange({ target: { name: 'sampleType', value: '' } } as any); setShowSampleTypeDropdown(false); }}
@@ -1294,7 +1294,7 @@ const AddTest = () => {
                         {specimenTypes.map((type, i) => (
                           <div
                             key={i}
-                            className="flex items-center gap-2 px-3 py-2 text-xs hover:bg-cyan-50 cursor-pointer border-b last:border-b-0"
+                            className="flex items-center gap-2 px-3 py-2 text-xs hover:bg-gray-50 cursor-pointer border-b last:border-b-0"
                             onClick={() => { handleChange({ target: { name: 'sampleType', value: type.Sample_Type } } as any); setShowSampleTypeDropdown(false); }}
                           >
                             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" style={{ transform: 'rotate(45deg)', flexShrink: 0 }}>
@@ -1389,8 +1389,8 @@ const AddTest = () => {
 
             {/* ========== RIGHT SIDE - INTERPRETATION AREA ========== */}
             <div className="w-full xl:w-96 xl:border-l xl:border-gray-200 xl:pl-4 mt-6 xl:mt-0">
-              <div className="bg-cyan-50 border border-cyan-200 rounded-lg p-4 space-y-4">
-                <h3 className="text-lg font-semibold text-cyan-800 border-b border-cyan-300 pb-2">
+              <div className="bg-white border border-cyan-200 rounded-lg p-4 space-y-4">
+                <h3 className="text-lg font-semibold text-gray-700 border-b border-gray-300 pb-2">
                   Interpretation Section
                 </h3>
                 
@@ -1406,7 +1406,7 @@ const AddTest = () => {
                 {/* CKEditor for Interpretation */}
                 <div>
                   <div className="flex justify-between items-center mb-2">
-                    <label className="font-semibold text-cyan-800 text-xs sm:text-sm">
+                    <label className="font-semibold text-gray-700 text-xs sm:text-sm">
                       Interpretation
                     </label>
                     {!isViewMode && (
@@ -1434,7 +1434,7 @@ const AddTest = () => {
                             }
                           }}
                           id="interpretation-expand-btn"
-                          className="px-3 py-1 bg-cyan-600 text-white text-xs rounded hover:bg-cyan-700 focus:outline-none"
+                          className="px-3 py-1 bg-orange-500 text-white text-xs rounded hover:bg-orange-600 focus:outline-none"
                         >
                           ⛶ Expand
                         </button>
@@ -1470,7 +1470,7 @@ const AddTest = () => {
                     )}
                   </div>
                   {!isViewMode ? (
-                    <div id="interpretation-editor" className="border border-cyan-600 rounded bg-white p-2 min-h-[400px]">
+                    <div id="interpretation-editor" className="border border-gray-300 rounded bg-white p-2 min-h-[400px]">
                       {editorLoaded ? (
                         <CKEditor
                           editor={ClassicEditor as any}
@@ -1525,12 +1525,12 @@ const AddTest = () => {
                             value={formData.interpretation}
                             onChange={handleChange}
                             placeholder="Enter interpretation details here..."
-                            className="w-full min-h-[20rem] px-3 py-2 border border-gray-300 rounded text-sm resize focus:outline-none focus:ring-2 focus:ring-cyan-600"
+                            className="w-full min-h-[20rem] px-3 py-2 border border-gray-300 rounded text-sm resize focus:outline-none focus:ring-2 focus:ring-orange-500"
                           />
                           <button
                             type="button"
                             onClick={() => setEditorLoaded(true)}
-                            className="mt-2 px-3 py-1 bg-cyan-600 text-white text-xs rounded hover:bg-cyan-700"
+                            className="mt-2 px-3 py-1 bg-orange-500 text-white text-xs rounded hover:bg-orange-600"
                           >
                             Load Rich Editor
                           </button>
@@ -1539,7 +1539,7 @@ const AddTest = () => {
                     </div>
                   ) : (
                     <div 
-                      className="w-full px-3 py-1.5 border border-cyan-800 rounded h-96 overflow-y-auto bg-gray-100 text-xs sm:text-sm"
+                      className="w-full px-3 py-1.5 border border-gray-300 rounded h-96 overflow-y-auto bg-gray-100 text-xs sm:text-sm"
                       dangerouslySetInnerHTML={{ __html: formData.interpretation }}
                     />
                   )}
@@ -1552,10 +1552,10 @@ const AddTest = () => {
 
         {/* ================= CATEGORY SECTION ================= */}
         {categories.map((category, categoryIndex) => (
-          <div key={categoryIndex} className="mt-4 bg-white border border-cyan-800 rounded">
+          <div key={categoryIndex} className="mt-4 bg-white border border-gray-300 rounded">
             {/* HEADER */}
-            <div className="flex justify-between items-center px-3 py-2 bg-cyan-100">
-              <span className="font-semibold text-cyan-800 text-xs sm:text-sm">
+            <div className="flex justify-between items-center px-3 py-2 bg-orange-100">
+              <span className="font-semibold text-gray-700 text-xs sm:text-sm">
                 Category {categoryIndex + 1}
               </span>
 
@@ -1591,7 +1591,7 @@ const AddTest = () => {
                   {category.isCategory && (
                     <div className="space-y-3 mt-3">
                       <div>
-                        <label className="block font-semibold text-cyan-800 text-xs sm:text-sm mb-1">
+                        <label className="block font-semibold text-gray-700 text-xs sm:text-sm mb-1">
                           Category Name
                         </label>
                         <input 
@@ -1603,7 +1603,7 @@ const AddTest = () => {
                         />
                       </div>
                       <div>
-                        <label className="block font-semibold text-cyan-800 text-xs sm:text-sm mb-1">
+                        <label className="block font-semibold text-gray-700 text-xs sm:text-sm mb-1">
                           Sort Order
                         </label>
                         <input 
@@ -1632,7 +1632,7 @@ const AddTest = () => {
                 {/* COLUMN 2: Parameters */}
                 <div className="flex-1 space-y-3">
                   <div className="flex justify-between items-center mb-4">
-                    <h3 className="font-semibold text-cyan-800 text-xs sm:text-sm">Parameters</h3>
+                    <h3 className="font-semibold text-gray-700 text-xs sm:text-sm">Parameters</h3>
                     {!isViewMode && (
                       <button
                         onClick={() => addParameter(categoryIndex)}
@@ -1662,7 +1662,7 @@ const AddTest = () => {
                           )}
                           {/* Select Unit Dropdown */}
                           <select 
-                            className="px-2 py-1.5 sm:py-1 border border-gray-300 rounded text-xs sm:text-sm w-32 bg-white focus:outline-none focus:ring-2 focus:ring-cyan-600" 
+                            className="px-2 py-1.5 sm:py-1 border border-gray-300 rounded text-xs sm:text-sm w-32 bg-white focus:outline-none focus:ring-2 focus:ring-orange-500" 
                             value={parameter.units || ""}
                             onChange={(e) => handleParameterChange(categoryIndex, paramIndex, 'units', e.target.value)}
                             disabled={isViewMode}
@@ -1702,7 +1702,7 @@ const AddTest = () => {
                                   <li
                                     key={s.id}
                                     onMouseDown={() => applyParamSuggestion(categoryIndex, paramIndex, s)}
-                                    className="px-3 py-1.5 cursor-pointer hover:bg-cyan-50 border-b border-gray-100 last:border-0"
+                                    className="px-3 py-1.5 cursor-pointer hover:bg-gray-50 border-b border-gray-100 last:border-0"
                                   >
                                     <span className="font-medium text-gray-800">{s.parameterName}</span>
                                     {s.units && <span className="text-gray-400 ml-1">({s.units})</span>}
@@ -2092,7 +2092,7 @@ const AddTest = () => {
                         <div className="space-y-3 mb-3">
                           <div className="flex items-start gap-3">
                             <textarea 
-                              className="flex-1 px-2 py-1.5 border border-gray-300 rounded text-xs sm:text-sm min-h-[4rem] resize focus:outline-none focus:ring-2 focus:ring-cyan-600" 
+                              className="flex-1 px-2 py-1.5 border border-gray-300 rounded text-xs sm:text-sm min-h-[4rem] resize focus:outline-none focus:ring-2 focus:ring-orange-500" 
                               placeholder="This is for Range text"
                               value={parameter.rangeText || ""}
                               onChange={(e) => handleParameterChange(categoryIndex, paramIndex, 'rangeText', e.target.value)}
@@ -2100,7 +2100,7 @@ const AddTest = () => {
                               style={{ resize: 'both', overflow: 'auto' }}
                             />
                             <textarea 
-                              className="flex-1 px-2 py-1.5 border border-gray-300 rounded text-xs sm:text-sm min-h-[4rem] resize focus:outline-none focus:ring-2 focus:ring-cyan-600" 
+                              className="flex-1 px-2 py-1.5 border border-gray-300 rounded text-xs sm:text-sm min-h-[4rem] resize focus:outline-none focus:ring-2 focus:ring-orange-500" 
                               placeholder="Enter text content here..."
                               value={parameter.textContent || ""}
                               onChange={(e) => handleParameterChange(categoryIndex, paramIndex, 'textContent', e.target.value)}
@@ -2152,7 +2152,7 @@ const AddTest = () => {
                                       }
                                     }}
                                     id={`expand-btn-${categoryIndex}-${paramIndex}`}
-                                    className="px-3 py-1 bg-cyan-600 text-white text-xs rounded hover:bg-cyan-700 focus:outline-none"
+                                    className="px-3 py-1 bg-orange-500 text-white text-xs rounded hover:bg-orange-600 focus:outline-none"
                                     disabled={isViewMode}
                                   >
                                     ⛶ Expand
@@ -2603,7 +2603,7 @@ const AddTest = () => {
                     <div className="border-r border-gray-400 p-2 font-bold text-xs underline">Result</div>
                     <div 
                       id="preview-unit-column"
-                      className="border-r border-gray-400 p-2 font-bold text-xs underline transition-colors duration-500 cursor-pointer hover:bg-cyan-100"
+                      className="border-r border-gray-400 p-2 font-bold text-xs underline transition-colors duration-500 cursor-pointer hover:bg-orange-100"
                       onClick={() => {
                         const unitsSection = document.querySelector('h3[title="Click to navigate to Unit column in preview table"]');
                         if (unitsSection) {
@@ -2848,7 +2848,7 @@ const AddTest = () => {
               Cancel
             </button>
             {!isViewMode && (
-              <button onClick={handleSave} className="bg-cyan-600 text-white px-4 py-2 rounded hover:bg-cyan-700 transition-colors text-xs sm:text-sm w-full sm:w-auto" disabled={loading}>
+              <button onClick={handleSave} className="bg-orange-500 text-white px-4 py-2 rounded hover:bg-orange-600 transition-colors text-xs sm:text-sm w-full sm:w-auto" disabled={loading}>
                 {loading ? "Saving..." : (isAddMode ? "Save" : "Save Changes")}
               </button>
             )}
@@ -2863,7 +2863,7 @@ const AddTest = () => {
 
 const Input = ({ label, required, disabled, ...props }) => (
   <div>
-    <label className="font-semibold text-cyan-800 text-xs sm:text-sm">
+    <label className="font-semibold text-gray-700 text-xs sm:text-sm">
       {label}
       {required && <span className="text-red-500"> *</span>}
     </label>
@@ -2871,21 +2871,21 @@ const Input = ({ label, required, disabled, ...props }) => (
       {...props}
       disabled={disabled}
       autoComplete="off"
-      className="w-full px-2 py-1.5 sm:py-1 border border-cyan-600 rounded text-xs sm:text-sm bg-cyan-50 focus:outline-none focus:ring-2 focus:ring-cyan-600 disabled:bg-gray-100 disabled:cursor-not-allowed"
+      className="w-full px-2 py-1.5 sm:py-1 border border-gray-300 rounded text-xs sm:text-sm bg-white focus:outline-none focus:ring-2 focus:ring-orange-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
     />
   </div>
 );
 
 const Select = ({ label, options = [], required, disabled, ...props }) => (
   <div>
-    <label className="font-semibold text-cyan-800 text-xs sm:text-sm">
+    <label className="font-semibold text-gray-700 text-xs sm:text-sm">
       {label}
       {required && <span className="text-red-500"> *</span>}
     </label>
     <select
       {...props}
       disabled={disabled}
-      className="w-full px-2 py-1.5 sm:py-1 border border-cyan-600 rounded text-xs sm:text-sm bg-cyan-50 focus:outline-none focus:ring-2 focus:ring-cyan-600 disabled:bg-gray-100 disabled:cursor-not-allowed"
+      className="w-full px-2 py-1.5 sm:py-1 border border-gray-300 rounded text-xs sm:text-sm bg-white focus:outline-none focus:ring-2 focus:ring-orange-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
     >
       <option value="">Please Select</option>
       {options.map((opt, i) => {
@@ -2903,14 +2903,14 @@ const Select = ({ label, options = [], required, disabled, ...props }) => (
 );
 
 const Checkbox = ({ label, checked, onChange, name, disabled }) => (
-  <label className="flex items-center gap-2 font-semibold text-cyan-800 text-xs sm:text-sm">
+  <label className="flex items-center gap-2 font-semibold text-gray-700 text-xs sm:text-sm">
     <input
       type="checkbox"
       name={name}
       checked={checked}
       onChange={(e) => onChange && onChange({ target: { name, value: e.target.checked, type: 'checkbox', checked: e.target.checked } })}
       disabled={disabled}
-      className="accent-cyan-600 disabled:bg-gray-100 disabled:cursor-not-allowed"
+      className="accent-orange-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
     />
     {label}
   </label>
@@ -2918,7 +2918,7 @@ const Checkbox = ({ label, checked, onChange, name, disabled }) => (
 
 const Radio = ({ label, name, value, onChange, disabled }) => (
   <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-4">
-    <label className="font-semibold text-cyan-800 text-xs sm:text-sm">{label} :</label>
+    <label className="font-semibold text-gray-700 text-xs sm:text-sm">{label} :</label>
     <div className="flex gap-3">
       <label className="flex items-center gap-1 text-xs sm:text-sm">
         <input 
@@ -2944,13 +2944,14 @@ const Radio = ({ label, name, value, onChange, disabled }) => (
   </div>
 );
 const RadioSimple = ({ label, disabled }) => (
-  <label className="flex items-center gap-1 text-xs sm:text-sm text-cyan-800">
+  <label className="flex items-center gap-1 text-xs sm:text-sm text-gray-700">
     <input type="radio" disabled={disabled} />
     {label}
   </label>
 );
 
 export default AddTest;
+
 
 
 

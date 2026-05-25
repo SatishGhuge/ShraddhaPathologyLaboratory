@@ -96,7 +96,7 @@ function InlineDatePicker({ value, onChange, placeholder = "DD-MM-YYYY", maxDate
   return (
     <div className={`relative ${className}`} ref={ref}>
       <div className={`h-8 rounded border flex items-center bg-white overflow-hidden
-        ${inputError ? "border-red-400 ring-1 ring-red-400" : "border-slate-300 focus-within:ring-1 focus-within:ring-cyan-600 focus-within:border-cyan-600"}`}>
+        ${inputError ? "border-red-400 ring-1 ring-red-400" : "border-slate-300 focus-within:ring-1 focus-within:ring-orange-500 focus-within:border-gray-300"}`}>
         <input type="text" value={inputText} onChange={handleInputChange}
           onBlur={() => { const d=inputText.replace(/\D/g,""); if(d.length>0&&d.length<8) setInputError(true); else if(d.length===0){setInputError(false);onChange("");} }}
           placeholder={placeholder} maxLength={10}
@@ -111,7 +111,7 @@ function InlineDatePicker({ value, onChange, placeholder = "DD-MM-YYYY", maxDate
         <div className="absolute top-full left-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-xl z-50 p-3 w-64">
           <div className="flex items-center justify-between mb-3">
             <button type="button" onClick={() => setShowMonthYear(v=>!v)}
-              className="flex items-center gap-1 text-sm font-bold text-gray-800 hover:text-cyan-700">
+              className="flex items-center gap-1 text-sm font-bold text-gray-800 hover:text-slate-900">
               {DP_MONTHS[viewMonth]} {viewYear}
               <svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor"><path d="M5 7L1 3h8z"/></svg>
             </button>
@@ -131,7 +131,7 @@ function InlineDatePicker({ value, onChange, placeholder = "DD-MM-YYYY", maxDate
               <div className="grid grid-cols-3 gap-1 mb-3">
                 {DP_MONTHS.map((m,i) => (
                   <button type="button" key={m} onClick={() => { setViewMonth(i); setShowMonthYear(false); }}
-                    className={`text-xs py-1.5 rounded-lg ${viewMonth===i?"bg-cyan-600 text-white font-semibold":"hover:bg-gray-100 text-gray-700"}`}>
+                    className={`text-xs py-1.5 rounded-lg ${viewMonth===i?"bg-orange-500 text-white font-semibold":"hover:bg-gray-100 text-gray-700"}`}>
                     {m.slice(0,3)}
                   </button>
                 ))}
@@ -139,7 +139,7 @@ function InlineDatePicker({ value, onChange, placeholder = "DD-MM-YYYY", maxDate
               <div className="max-h-32 overflow-y-auto grid grid-cols-3 gap-1">
                 {years.map(y => (
                   <button type="button" key={y} onClick={() => { setViewYear(y); setShowMonthYear(false); }}
-                    className={`text-xs py-1.5 rounded-lg ${viewYear===y?"bg-cyan-600 text-white font-semibold":"hover:bg-gray-100 text-gray-700"}`}>
+                    className={`text-xs py-1.5 rounded-lg ${viewYear===y?"bg-orange-500 text-white font-semibold":"hover:bg-gray-100 text-gray-700"}`}>
                     {y}
                   </button>
                 ))}
@@ -156,7 +156,7 @@ function InlineDatePicker({ value, onChange, placeholder = "DD-MM-YYYY", maxDate
                   <button type="button" key={day} disabled={isDisabled(day)} onClick={() => handleDayClick(day)}
                     className={`flex items-center justify-center text-xs rounded-full mx-auto w-7 h-7
                       ${isSelected(day)?"bg-blue-200 text-blue-800 font-semibold":""}
-                      ${isToday(day)&&!isSelected(day)?"border border-cyan-500 text-cyan-700":""}
+                      ${isToday(day)&&!isSelected(day)?"border border-gray-300 text-slate-900":""}
                       ${!isSelected(day)&&!isDisabled(day)?"hover:bg-gray-100":""}
                       ${isDisabled(day)?"text-gray-300 cursor-not-allowed":"text-gray-800 cursor-pointer"}`}>
                     {day}
@@ -185,7 +185,7 @@ function InlineSelect({ value, onChange, options, placeholder = "Select", classN
   return (
     <div className={`relative ${className}`} ref={ref}>
       <button type="button" onClick={() => setOpen(o=>!o)}
-        className="h-8 w-full rounded border border-slate-300 px-2 text-xs flex items-center justify-between bg-white focus:outline-none focus:ring-1 focus:ring-cyan-600 focus:border-cyan-600">
+        className="h-8 w-full rounded border border-slate-300 px-2 text-xs flex items-center justify-between bg-white focus:outline-none focus:ring-1 focus:ring-orange-500 focus:border-gray-300">
         <span className={label ? "text-gray-800 truncate" : "text-gray-400"}>{label || placeholder}</span>
         <ChevronDown size={13} className={`shrink-0 ml-1 text-gray-400 transition-transform ${open?"rotate-180":""}`} />
       </button>
@@ -198,7 +198,7 @@ function InlineSelect({ value, onChange, options, placeholder = "Select", classN
               return (
                 <div key={i} onClick={() => { onChange(val); setOpen(false); }}
                   className={`px-4 py-2.5 text-xs cursor-pointer transition-colors
-                    ${isSel ? "bg-cyan-50 text-cyan-800 font-semibold" : "text-gray-700 hover:bg-cyan-50"}
+                    ${isSel ? "bg-white text-gray-700 font-semibold" : "text-gray-700 hover:bg-gray-50"}
                     ${i < options.length-1 ? "border-b border-gray-100" : ""}`}>
                   {lbl}
                 </div>
@@ -649,7 +649,7 @@ export default function PatientRegistration() {
     setPaid(amount);
   };
 
-  const input = "h-8 rounded border border-slate-300 px-2 text-xs focus:outline-none focus:ring-1 focus:ring-cyan-600 w-full";
+  const input = "h-8 rounded border border-slate-300 px-2 text-xs focus:outline-none focus:ring-1 focus:ring-orange-500 w-full";
 
   const handleDobChange = (value: any) => {
     setDob(value);
@@ -1099,8 +1099,8 @@ export default function PatientRegistration() {
                 <input className={input} placeholder="Mobile *" value={mobile} onChange={(e) => handleMobileChange(e.target.value)} maxLength={10} required />
                 {showSimilarPatientsDropdown && foundPatients.length > 0 && (
                   <div className="absolute top-full left-0 right-0 bg-white border border-gray-200 rounded-xl shadow-xl mt-0.5 z-50 overflow-hidden">
-                    <div className="bg-cyan-50 px-4 py-2 border-b border-cyan-100">
-                      <p className="text-xs font-semibold text-cyan-800">{foundPatients.length} patient{foundPatients.length > 1 ? 's' : ''} found</p>
+                    <div className="bg-white px-4 py-2 border-b border-gray-200">
+                      <p className="text-xs font-semibold text-gray-700">{foundPatients.length} patient{foundPatients.length > 1 ? 's' : ''} found</p>
                     </div>
                     <div className="max-h-48 overflow-y-auto py-1">
                       {foundPatients.map((patient, i) => (
@@ -1111,7 +1111,7 @@ export default function PatientRegistration() {
                             fillPatientData(patient);
                             setShowSimilarPatientsDropdown(false);
                           }}
-                          className={`px-4 py-2.5 cursor-pointer hover:bg-cyan-50 ${i < foundPatients.length - 1 ? "border-b border-gray-100" : ""}`}
+                          className={`px-4 py-2.5 cursor-pointer hover:bg-gray-50 ${i < foundPatients.length - 1 ? "border-b border-gray-100" : ""}`}
                         >
                           <div className="text-xs font-semibold text-gray-800">{patient.title} {patient.firstName} {patient.lastName}</div>
                           <div className="text-xs text-gray-400">{patient.mobile}</div>
@@ -1139,7 +1139,7 @@ export default function PatientRegistration() {
               <input className={input} placeholder="Email" value={email} onChange={(e) => handleEmailChange(e.target.value)} />
               <div className="flex flex-col">
                 <label className="text-xs text-gray-500 mb-0.5">Created By</label>
-                <div className="text-cyan-700 font-medium text-sm cursor-not-allowed select-none">
+                <div className="text-slate-900 font-medium text-sm cursor-not-allowed select-none">
                   {createdBy || '—'}
                 </div>
               </div>
@@ -1181,7 +1181,7 @@ export default function PatientRegistration() {
                               name="createdAtType"
                               checked={createdAtType === type}
                               onChange={() => handleCreatedAtTypeChange(type)}
-                              className="accent-cyan-600"
+                              className="accent-orange-500"
                             />
                             <span className="text-xs font-medium text-gray-700">
                               {type === "CollectionCenter" ? "Collection Center" : type}
@@ -1206,7 +1206,7 @@ export default function PatientRegistration() {
                               return (
                                 <div key={opt.id} onClick={() => handleCreatedAtSelect(opt.name)}
                                   className={`px-4 py-2.5 text-xs cursor-pointer transition-colors
-                                    ${isSelected ? 'bg-cyan-50 text-cyan-800 font-semibold' : 'text-gray-700 hover:bg-cyan-50'}
+                                    ${isSelected ? 'bg-white text-gray-700 font-semibold' : 'text-gray-700 hover:bg-gray-50'}
                                     ${i < arr.length - 1 ? 'border-b border-gray-100' : ''}
                                   `}>
                                   <div className="font-medium">{opt.name}</div>
@@ -1297,7 +1297,7 @@ export default function PatientRegistration() {
                               .map((doc, i, arr) => (
                                 <div key={doc.id}
                                   onClick={() => { setRefDoctor(`Dr. ${doc.name}`); setShowDoctorList(false); }}
-                                  className={`px-4 py-2.5 cursor-pointer hover:bg-cyan-50 ${i < arr.length - 1 ? "border-b border-gray-100" : ""}`}>
+                                  className={`px-4 py-2.5 cursor-pointer hover:bg-gray-50 ${i < arr.length - 1 ? "border-b border-gray-100" : ""}`}>
                                   <div className="font-semibold text-xs text-gray-800">Dr. {doc.name}</div>
                                   <div className="text-xs text-gray-400">{doc.degree}{doc.degree && doc.type ? ' · ' : ''}{doc.type}</div>
                                 </div>
@@ -1313,7 +1313,7 @@ export default function PatientRegistration() {
                 </div>
                 <button
                   onClick={() => setShowRefModal(true)}
-                  className="bg-cyan-700 hover:bg-cyan-600 text-white px-3 rounded h-8 shrink-0 flex items-center justify-center font-bold"
+                  className="bg-slate-900 hover:bg-orange-500 text-white px-3 rounded h-8 shrink-0 flex items-center justify-center font-bold"
                   title="Add New Referral Doctor"
                 >+</button>
               </div>
@@ -1367,7 +1367,7 @@ export default function PatientRegistration() {
             </div>
             <div className="flex justify-end gap-2 mt-4">
               <button onClick={() => setShowPackageModal(false)} className="px-4 py-2 border rounded">Cancel</button>
-              <button onClick={saveNewPackage} className="bg-cyan-700 text-white px-4 py-2 rounded">Save Package</button>
+              <button onClick={saveNewPackage} className="bg-slate-900 text-white px-4 py-2 rounded">Save Package</button>
             </div>
           </div>
         </div>
@@ -1378,7 +1378,7 @@ export default function PatientRegistration() {
         <div className="fixed inset-0 bg-black bg-opacity-40 flex items-start justify-center z-50 p-6 overflow-y-auto">
           <div className="bg-white rounded-lg w-full max-w-2xl p-6 my-8">
             <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-semibold text-cyan-800">Add Referral Doctor</h3>
+              <h3 className="text-lg font-semibold text-gray-700">Add Referral Doctor</h3>
               <button 
                 onClick={() => {
                   setShowRefModal(false);
@@ -1495,7 +1495,7 @@ export default function PatientRegistration() {
               </button>
               <button 
                 onClick={saveRef} 
-                className="bg-cyan-700 hover:bg-cyan-800 text-white px-6 py-2 rounded transition-colors font-semibold"
+                className="bg-slate-900 hover:bg-orange-600 text-white px-6 py-2 rounded transition-colors font-semibold"
               >
                 Save
               </button>
@@ -1511,9 +1511,9 @@ export default function PatientRegistration() {
         <div className="md:col-span-3 col-span-12 bg-white rounded-xl shadow flex flex-col">
           <div className="flex text-xs font-semibold rounded-tl-xl rounded-tr-xl overflow-hidden">
             <button onClick={() => { setActiveTab("tests"); setShowAllTests(true); setSelectedDept(null); setSelectedPackage(null); }}
-              className={`flex-1 p-2 ${activeTab === "tests" ? "bg-cyan-700 text-white" : "bg-gray-200"}`}>Department</button>
+              className={`flex-1 p-2 ${activeTab === "tests" ? "bg-slate-900 text-white" : "bg-gray-200"}`}>Department</button>
             <button onClick={() => { setActiveTab("packages"); setSelectedPackage(null); setShowAllTests(false); }}
-              className={`flex-1 p-2 ${activeTab === "packages" ? "bg-cyan-700 text-white" : "bg-gray-200"}`}>Packages</button>
+              className={`flex-1 p-2 ${activeTab === "packages" ? "bg-slate-900 text-white" : "bg-gray-200"}`}>Packages</button>
           </div>
           <div className="flex-1 overflow-auto text-xs" style={{ maxHeight: 'calc(75vh - 40px)' }}>
             {activeTab === "tests" && (loading ? (
@@ -1524,7 +1524,7 @@ export default function PatientRegistration() {
               departments.map((d) => (
                 <div key={d.name}
                   onClick={() => { setSelectedDept(d); setShowAllTests(false); setSelectedPackage(null); }}
-                  className={`p-2 border-b cursor-pointer hover:bg-cyan-50 ${selectedDept?.name === d.name && !showAllTests ? 'bg-cyan-100 font-semibold' : ''}`}
+                  className={`p-2 border-b cursor-pointer hover:bg-gray-50 ${selectedDept?.name === d.name && !showAllTests ? 'bg-orange-100 font-semibold' : ''}`}
                 >{d.name}</div>
               ))
             ))}
@@ -1535,7 +1535,7 @@ export default function PatientRegistration() {
                 </div>
                 {displayPackages.map((pkg, idx) => (
                   <div key={idx}
-                    className={`p-2 border-b hover:bg-cyan-50 cursor-pointer ${selectedPackage?.name === pkg.name ? 'bg-cyan-100 font-semibold' : ''}`}
+                    className={`p-2 border-b hover:bg-gray-50 cursor-pointer ${selectedPackage?.name === pkg.name ? 'bg-orange-100 font-semibold' : ''}`}
                     onClick={() => setSelectedPackage(pkg)}
                   >
                     <div className="font-semibold">{pkg.name}</div>
@@ -1554,21 +1554,21 @@ export default function PatientRegistration() {
           <div className="p-2 flex gap-2 border-b">
             <input className={`${input} flex-1`} placeholder="Search Test" value={search} onChange={(e) => setSearch(e.target.value)} />
             <div className="relative group/refresh">
-              <button onClick={() => { setSearch(""); setFilterFrequent(false); }} className="bg-cyan-700 hover:bg-cyan-600 text-white p-1 rounded transition-colors"><RefreshCcw size={16} /></button>
+              <button onClick={() => { setSearch(""); setFilterFrequent(false); }} className="bg-slate-900 hover:bg-orange-500 text-white p-1 rounded transition-colors"><RefreshCcw size={16} /></button>
               <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 text-xs text-white bg-slate-800 rounded whitespace-nowrap opacity-0 group-hover/refresh:opacity-100 pointer-events-none transition-opacity z-50">
                 Reload Complete Test List
                 <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-slate-800"/>
               </div>
             </div>
             <div className="relative group/star">
-              <button onClick={() => setFilterFrequent(!filterFrequent)} className={`${filterFrequent ? 'bg-cyan-500' : 'bg-cyan-700 hover:bg-cyan-600'} text-white p-1 rounded transition-colors`}><Star size={16} /></button>
+              <button onClick={() => setFilterFrequent(!filterFrequent)} className={`${filterFrequent ? 'bg-white0' : 'bg-slate-900 hover:bg-orange-500'} text-white p-1 rounded transition-colors`}><Star size={16} /></button>
               <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 text-xs text-white bg-slate-800 rounded whitespace-nowrap opacity-0 group-hover/star:opacity-100 pointer-events-none transition-opacity z-50">
                 Frequently Used Tests
                 <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-slate-800"/>
               </div>
             </div>
           </div>
-          <div className="grid grid-cols-12 bg-cyan-700 text-white font-semibold p-2 text-xs">
+          <div className="grid grid-cols-12 bg-slate-900 text-white font-semibold p-2 text-xs">
               <div className="col-span-5 flex items-center gap-2">
                 {selectedPackage && (
                   <input 
@@ -1614,11 +1614,11 @@ export default function PatientRegistration() {
                   const deptTests = departments.flatMap(d => d.tests.map(t => ({...t, department: d.name})));
                   const pkgTests = selectedPackage.tests.map(testName => deptTests.find(t => t.name === testName)).filter(Boolean);
                   return pkgTests.map((t, i) => (
-                    <div key={t.name} className="grid grid-cols-12 border-b p-2 hover:bg-cyan-50 items-center">
+                    <div key={t.name} className="grid grid-cols-12 border-b p-2 hover:bg-gray-50 items-center">
                       <div className="col-span-5 flex gap-2 items-center">
                         <input 
                           type="checkbox" 
-                          className="w-3 h-3 cursor-pointer accent-cyan-600"
+                          className="w-3 h-3 cursor-pointer accent-orange-500"
                           checked={selectedTests.find(st => st.name === t.name) !== undefined}
                           onChange={(e) => {
                             e.stopPropagation();
@@ -1653,7 +1653,7 @@ export default function PatientRegistration() {
                     </div>
                   ));
                 })()}
-                <div className="grid grid-cols-12 border-t-2 border-cyan-700 p-2 bg-gray-50 font-bold items-center">
+                <div className="grid grid-cols-12 border-t-2 border-slate-900 p-2 bg-gray-50 font-bold items-center">
                   <div className="col-span-7 text-right">Total Package Cost</div>
                   <div className="col-span-4 text-right">₹{businessType === "B2C" ? selectedPackage.b2cCharge : selectedPackage.b2bCharge}</div>
                   <div className="col-span-1"></div>
@@ -1665,11 +1665,11 @@ export default function PatientRegistration() {
                   ? dept.tests.filter(t => frequentTests.find(f => f.name === t.name) && t.name.toLowerCase().includes(search.toLowerCase()))
                   : dept.tests.filter(t => t.name.toLowerCase().includes(search.toLowerCase()));
                 return filteredTests.map((t) => (
-                  <div key={t.name} className="grid grid-cols-12 border-b p-2 hover:bg-cyan-50 items-center">
+                  <div key={t.name} className="grid grid-cols-12 border-b p-2 hover:bg-gray-50 items-center">
                     <div className="col-span-5 flex gap-2 items-center">
                       <input 
                         type="checkbox" 
-                        className="w-3 h-3 cursor-pointer accent-cyan-600"
+                        className="w-3 h-3 cursor-pointer accent-orange-500"
                         checked={selectedTests.find(st => st.name === t.name) !== undefined}
                         onChange={(e) => {
                           e.stopPropagation();
@@ -1709,7 +1709,7 @@ export default function PatientRegistration() {
               <col style={{ width: '15%' }} />
               <col style={{ width: '25%' }} />
             </colgroup>
-            <thead className="bg-cyan-700 text-white">
+            <thead className="bg-slate-900 text-white">
               <tr>
                 <th className="p-2 text-left">Test</th>
                 <th className="p-2 text-center">Charge</th>
@@ -1728,11 +1728,11 @@ export default function PatientRegistration() {
               </colgroup>
               <tbody>
                 {selectedTests.map((t) => (
-                  <tr key={t.name} className={`border-b hover:bg-gray-50 ${t.fromPackage ? 'bg-cyan-50' : ''}`}>
+                  <tr key={t.name} className={`border-b hover:bg-gray-50 ${t.fromPackage ? 'bg-white' : ''}`}>
                     <td className="p-2">
                       <div className="flex items-center gap-2">
                         {t.fromPackage && (
-                          <span className="bg-cyan-600 text-white text-xs px-1.5 py-0.5 rounded font-semibold shrink-0" title={`Package: ${t.fromPackage}`}>PKG</span>
+                          <span className="bg-orange-500 text-white text-xs px-1.5 py-0.5 rounded font-semibold shrink-0" title={`Package: ${t.fromPackage}`}>PKG</span>
                         )}
                         <span>{t.name}</span>
                       </div>
@@ -1823,7 +1823,7 @@ export default function PatientRegistration() {
                   <X size={16} />
                   Clear Form
                 </button>
-                <button onClick={handleRegister} className="bg-cyan-700 hover:bg-cyan-800 text-white px-6 py-2 rounded font-semibold">
+                <button onClick={handleRegister} className="bg-slate-900 hover:bg-orange-600 text-white px-6 py-2 rounded font-semibold">
                   Register
                 </button>
               </div>
@@ -1838,7 +1838,7 @@ export default function PatientRegistration() {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg w-full max-w-4xl h-[85vh] flex flex-col shadow-2xl">
             {/* Header - Fixed */}
-            <div className="bg-gradient-to-r from-cyan-700 to-cyan-600 text-white p-3 flex justify-between items-center rounded-t-lg shrink-0">
+            <div className="bg-gradient-to-r from-slate-800 via-orange-700 to-orange-600 text-white p-3 flex justify-between items-center rounded-t-lg shrink-0">
               <h2 className="text-lg font-bold">Multiple Patients Found - Select One</h2>
               <button onClick={() => { setShowPatientSelectionModal(false); setFoundPatients([]); }} className="text-white hover:text-gray-200">
                 <X size={20} />
@@ -1856,7 +1856,7 @@ export default function PatientRegistration() {
             <div className="flex-1 overflow-y-auto p-4">
               <div className="space-y-2">
                 {foundPatients.map((patient, index) => (
-                  <div key={patient.id} className="border border-gray-300 rounded-lg p-3 hover:border-cyan-500 hover:bg-cyan-50 transition-all cursor-pointer"
+                  <div key={patient.id} className="border border-gray-300 rounded-lg p-3 hover:border-gray-300 hover:bg-gray-50 transition-all cursor-pointer"
                     onClick={() => {
                       fillPatientData(patient);
                       setShowPatientSelectionModal(false);
@@ -1866,7 +1866,7 @@ export default function PatientRegistration() {
                       <div className="flex-1 min-w-0">
                         {/* Patient ID and Name */}
                         <div className="flex items-center gap-2 mb-2">
-                          <span className="bg-cyan-600 text-white px-2 py-0.5 rounded-full font-bold text-xs shrink-0">
+                          <span className="bg-orange-500 text-white px-2 py-0.5 rounded-full font-bold text-xs shrink-0">
                             {patient.patientId}
                           </span>
                           <h3 className="text-sm font-bold text-gray-800 truncate">
@@ -1925,7 +1925,7 @@ export default function PatientRegistration() {
                       </div>
 
                       {/* Select Button */}
-                      <button className="bg-cyan-600 hover:bg-cyan-700 text-white px-3 py-1.5 rounded text-xs font-semibold shrink-0">
+                      <button className="bg-orange-500 hover:bg-orange-600 text-white px-3 py-1.5 rounded text-xs font-semibold shrink-0">
                         Select
                       </button>
                     </div>
@@ -2059,9 +2059,9 @@ export default function PatientRegistration() {
               }
               
               /* Ensure backgrounds print */
-              .bg-cyan-700,
-              .bg-cyan-600,
-              .bg-cyan-50,
+              .bg-slate-900,
+              .bg-orange-500,
+              .bg-white,
               .bg-gray-50,
               .bg-gray-100 {
                 -webkit-print-color-adjust: exact !important;
@@ -2072,7 +2072,7 @@ export default function PatientRegistration() {
           
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 print-modal-overlay print-modal-wrapper">
             <div className="bg-white rounded-lg w-full max-w-4xl max-h-[90vh] overflow-y-auto shadow-2xl print-modal">
-            <div className="bg-gradient-to-r from-cyan-700 to-cyan-600 text-white p-4 flex justify-between items-center sticky top-0 z-10">
+            <div className="bg-gradient-to-r from-slate-800 via-orange-700 to-orange-600 text-white p-4 flex justify-between items-center sticky top-0 z-10">
               <h2 className="text-xl font-bold">Registration Summary</h2>
               <button onClick={() => setShowRegistrationModal(false)} className="text-white hover:text-gray-200 print-hide">
                 <X size={24} />
@@ -2082,7 +2082,7 @@ export default function PatientRegistration() {
             <div className="p-6 space-y-6">
               {/* Patient Information */}
               <div>
-                <h3 className="text-lg font-semibold text-cyan-700 mb-3 border-b pb-2">Patient Information</h3>
+                <h3 className="text-lg font-semibold text-slate-900 mb-3 border-b pb-2">Patient Information</h3>
                 <div className="grid grid-cols-2 gap-4 text-sm">
                   <div className="flex">
                     <span className="font-semibold w-32">Name:</span>
@@ -2117,7 +2117,7 @@ export default function PatientRegistration() {
 
               {/* Registration Details */}
               <div>
-                <h3 className="text-lg font-semibold text-cyan-700 mb-3 border-b pb-2">Registration Details</h3>
+                <h3 className="text-lg font-semibold text-slate-900 mb-3 border-b pb-2">Registration Details</h3>
                 <div className="grid grid-cols-2 gap-4 text-sm">
                   <div className="flex">
                     <span className="font-semibold w-32">Visit Type:</span>
@@ -2148,10 +2148,10 @@ export default function PatientRegistration() {
 
               {/* Tests/Packages */}
               <div>
-                <h3 className="text-lg font-semibold text-cyan-700 mb-3 border-b pb-2">Selected Tests & Packages</h3>
+                <h3 className="text-lg font-semibold text-slate-900 mb-3 border-b pb-2">Selected Tests & Packages</h3>
                 <div className="border rounded-lg overflow-hidden">
                   <table className="w-full text-sm">
-                    <thead className="bg-cyan-700 text-white">
+                    <thead className="bg-slate-900 text-white">
                       <tr>
                         <th className="p-2 text-left">Sr.</th>
                         <th className="p-2 text-left">Test/Package Name</th>
@@ -2161,7 +2161,7 @@ export default function PatientRegistration() {
                     </thead>
                     <tbody>
                       {selectedTests.map((t, idx) => (
-                        <tr key={idx} className={`border-b ${t.fromPackage ? 'bg-cyan-50' : ''}`}>
+                        <tr key={idx} className={`border-b ${t.fromPackage ? 'bg-white' : ''}`}>
                           <td className="p-2">{idx + 1}</td>
                           <td className="p-2">
                             {t.name}
@@ -2171,7 +2171,7 @@ export default function PatientRegistration() {
                           </td>
                           <td className="p-2 text-center">
                             {t.fromPackage ? (
-                              <span className="bg-cyan-600 text-white text-xs px-2 py-1 rounded font-semibold">PKG</span>
+                              <span className="bg-orange-500 text-white text-xs px-2 py-1 rounded font-semibold">PKG</span>
                             ) : (
                               <span className="text-gray-600">Test</span>
                             )}
@@ -2186,7 +2186,7 @@ export default function PatientRegistration() {
 
               {/* Billing Summary */}
               <div>
-                <h3 className="text-lg font-semibold text-cyan-700 mb-3 border-b pb-2">Billing Summary</h3>
+                <h3 className="text-lg font-semibold text-slate-900 mb-3 border-b pb-2">Billing Summary</h3>
                 <div className="bg-gray-50 rounded-lg p-4 space-y-2 text-sm">
                   <div className="flex justify-between">
                     <span className="font-semibold">Total Amount:</span>
@@ -2204,7 +2204,7 @@ export default function PatientRegistration() {
                   )}
                   <div className="flex justify-between border-t pt-2">
                     <span className="font-semibold">Net Amount:</span>
-                    <span className="font-bold text-lg text-cyan-700">₹{total - discount}</span>
+                    <span className="font-bold text-lg text-slate-900">₹{total - discount}</span>
                   </div>
                   <div className="flex justify-between text-green-600">
                     <span className="font-semibold">Payment ({paymentMode}):</span>
@@ -2231,7 +2231,7 @@ export default function PatientRegistration() {
                 </button>
                 <button 
                   onClick={handleSaveRegistration}
-                  className="px-8 py-2 bg-cyan-700 hover:bg-cyan-800 text-white rounded-lg font-semibold transition-colors flex items-center gap-2">
+                  className="px-8 py-2 bg-slate-900 hover:bg-orange-600 text-white rounded-lg font-semibold transition-colors flex items-center gap-2">
                   <span>Save Registration</span>
                 </button>
               </div>
@@ -2244,3 +2244,4 @@ export default function PatientRegistration() {
     </>
   );
 }
+

@@ -88,7 +88,7 @@ const AddRole = () => {
     return (
       <>
         <Header />
-        <div className="p-6 min-h-screen bg-cyan-50 flex justify-center items-center">
+        <div className="p-6 min-h-screen bg-white flex justify-center items-center">
           <div className="text-gray-500">Loading...</div>
         </div>
       </>
@@ -98,16 +98,16 @@ const AddRole = () => {
   return (
     <>
       <Header />
-      <div className="p-6 min-h-screen bg-cyan-50 flex justify-center items-start">
+      <div className="p-6 min-h-screen bg-white flex justify-center items-start">
         <div className="bg-white border border-gray-200 rounded-lg shadow-md p-4 max-w-xl w-full">
           <form onSubmit={handleSubmit} className="space-y-4">
 
             {/* HEADER */}
             <div className="flex justify-between items-center border-b border-gray-300 pb-2">
-              <h2 className="flex items-center gap-2 font-semibold text-cyan-700">
+              <h2 className="flex items-center gap-2 font-semibold text-slate-900">
                 {getIcon()} {getTitle()}
               </h2>
-              <button type="button" onClick={() => router.push("/master/rolelist")} className="hover:bg-cyan-100 p-1 rounded">
+              <button type="button" onClick={() => router.push("/master/rolelist")} className="hover:bg-orange-100 p-1 rounded">
                 <ArrowLeft size={20} />
               </button>
             </div>
@@ -123,7 +123,7 @@ const AddRole = () => {
 
             {/* ROLE NAME */}
             <div>
-              <label className="flex gap-2 items-center text-sm font-medium text-cyan-800 mb-1">
+              <label className="flex gap-2 items-center text-sm font-medium text-gray-700 mb-1">
                 <UserPlus size={16} /> Role Name *
               </label>
               <input
@@ -132,13 +132,13 @@ const AddRole = () => {
                 value={formData.name}
                 onChange={handleChange}
                 disabled={isViewMode}
-                className="w-full border border-cyan-600 rounded px-2 py-1 bg-cyan-50 disabled:bg-gray-100 text-sm"
+                className="w-full border border-gray-300 rounded px-2 py-1 bg-white disabled:bg-gray-100 text-sm"
               />
             </div>
 
             {/* CODE NAME */}
             <div>
-              <label className="flex gap-2 items-center text-sm font-medium text-cyan-800 mb-1">
+              <label className="flex gap-2 items-center text-sm font-medium text-gray-700 mb-1">
                 <Code size={16} /> Code Name *
               </label>
               <input
@@ -147,13 +147,13 @@ const AddRole = () => {
                 value={formData.codeName}
                 onChange={handleChange}
                 disabled={isViewMode}
-                className="w-full border border-cyan-600 rounded px-2 py-1 bg-cyan-50 disabled:bg-gray-100 text-sm"
+                className="w-full border border-gray-300 rounded px-2 py-1 bg-white disabled:bg-gray-100 text-sm"
               />
             </div>
 
             {/* ROLE LANDING */}
             <div>
-              <label className="flex gap-2 items-center text-sm font-medium text-cyan-800 mb-1">
+              <label className="flex gap-2 items-center text-sm font-medium text-gray-700 mb-1">
                 <Compass size={16} /> Role Landing *
               </label>
               <select
@@ -161,7 +161,7 @@ const AddRole = () => {
                 value={formData.roleLanding}
                 onChange={handleChange}
                 disabled={isViewMode}
-                className="w-full border border-cyan-600 rounded px-2 py-1 bg-cyan-50 disabled:bg-gray-100 text-sm"
+                className="w-full border border-gray-300 rounded px-2 py-1 bg-white disabled:bg-gray-100 text-sm"
               >
                 <option value="">Select</option>
                 <option value="dashboard">Dashboard</option>
@@ -172,7 +172,7 @@ const AddRole = () => {
 
             {/* FINANCIAL DAYS */}
             <div>
-              <label className="flex gap-2 items-center text-sm font-medium text-cyan-800 mb-1">
+              <label className="flex gap-2 items-center text-sm font-medium text-gray-700 mb-1">
                 <Calendar size={16} /> View Financial Days
               </label>
               <input
@@ -181,7 +181,7 @@ const AddRole = () => {
                 value={formData.viewFinancialDays}
                 onChange={handleChange}
                 disabled={isViewMode}
-                className="w-32 border border-cyan-600 rounded px-2 py-1 bg-cyan-50 disabled:bg-gray-100 text-sm"
+                className="w-32 border border-gray-300 rounded px-2 py-1 bg-white disabled:bg-gray-100 text-sm"
               />
             </div>
 
@@ -214,7 +214,7 @@ const AddRole = () => {
                 <button
                   type="submit"
                   disabled={saving}
-                  className="bg-cyan-600 hover:bg-cyan-700 disabled:opacity-60 text-white px-4 py-2 rounded flex items-center gap-2 text-sm"
+                  className="bg-orange-500 hover:bg-orange-600 disabled:opacity-60 text-white px-4 py-2 rounded flex items-center gap-2 text-sm"
                 >
                   <Save size={16} /> {saving ? "Saving..." : isEditMode ? "Update Role" : "Save Role"}
                 </button>
@@ -229,5 +229,6 @@ const AddRole = () => {
 };
 
 export default AddRole;
+
 
 

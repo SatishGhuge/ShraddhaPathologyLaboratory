@@ -221,34 +221,34 @@ export default function CorporateWiseCharges() {
     <>
       <Header />
 
-      <div className="p-4 bg-cyan-50 min-h-screen flex justify-center">
+      <div className="p-4 bg-white min-h-screen flex justify-center">
         {/* WIDER WIDTH HERE */}
         <div className="w-full max-w-5xl">
 
           {/* Header */}
           <div className="flex justify-between items-center mb-3">
-            <h2 className="text-lg font-semibold text-cyan-700">
+            <h2 className="text-lg font-semibold text-slate-900">
               ADD LAB TEST CHARGES
             </h2>
             <button
               onClick={() => window.history.back()}
-              className="bg-cyan-600 text-white px-4 py-1 text-sm rounded hover:bg-cyan-700"
+              className="bg-orange-500 text-white px-4 py-1 text-sm rounded hover:bg-orange-600"
             >
               Back
             </button>
           </div>
 
           {/* Test Selection */}
-          <div className="bg-white rounded shadow p-4 mb-3 border border-cyan-200">
+          <div className="bg-white rounded shadow p-4 mb-3 border border-gray-300">
             <div className="flex items-center gap-3">
-              <label className="font-semibold text-cyan-700 text-sm whitespace-nowrap">
+              <label className="font-semibold text-slate-900 text-sm whitespace-nowrap">
                 Search Test :
               </label>
               <select
                 value={selectedTest}
                 onChange={handleTestChange}
                 disabled={loading}
-                className="flex-1 max-w-md px-3 py-1 border border-cyan-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500 disabled:opacity-50"
+                className="flex-1 max-w-md px-3 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 disabled:opacity-50"
               >
                 <option value="">Please select Test</option>
                 {tests.map(test => (
@@ -260,7 +260,7 @@ export default function CorporateWiseCharges() {
             </div>
 
             {message && (
-              <div className="mt-3 text-sm text-center rounded p-2 bg-cyan-100 text-cyan-800">
+              <div className="mt-3 text-sm text-center rounded p-2 bg-orange-100 text-orange-800">
                 {message}
               </div>
             )}
@@ -268,31 +268,31 @@ export default function CorporateWiseCharges() {
 
           {/* Table */}
           {loading ? (
-            <div className="bg-white rounded shadow border border-cyan-300 p-8 text-center">
-              <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-cyan-600"></div>
+            <div className="bg-white rounded shadow border border-gray-300 p-8 text-center">
+              <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-orange-600"></div>
               <p className="mt-2 text-gray-600">Loading...</p>
             </div>
           ) : (
-            <div className="bg-white rounded shadow border border-cyan-300">
+            <div className="bg-white rounded shadow border border-gray-300">
               <table className="w-full border-collapse text-sm">
                 <thead>
-                  <tr className="bg-cyan-600 text-white">
-                    <th className="border border-cyan-500 px-3 py-2 text-left">
+                  <tr className="bg-slate-900 text-white">
+                    <th className="border border-gray-300 px-3 py-2 text-left font-semibold">
                       <div className="mb-1">Name</div>
                       <input
                         type="text"
                         placeholder="Search Corporate"
                         value={searchCorporate}
                         onChange={(e) => setSearchCorporate(e.target.value)}
-                        className="w-full px-2 py-1 text-black rounded focus:outline-none border border-cyan-300"
+                        className="w-full px-2 py-1 text-black rounded focus:outline-none border border-gray-300"
                       />
                     </th>
 
-                    <th className="border border-cyan-500 px-3 py-2 text-center w-40">
+                    <th className="border border-gray-300 px-3 py-2 text-center font-semibold w-40">
                       Charges
                     </th>
 
-                    <th className="border border-cyan-500 px-3 py-2 text-center w-40">
+                    <th className="border border-gray-300 px-3 py-2 text-center font-semibold w-40">
                       B2B Charges
                     </th>
                   </tr>
@@ -308,34 +308,34 @@ export default function CorporateWiseCharges() {
                         key={item.id}
                         className={
                           index % 2 === 0
-                            ? "bg-white hover:bg-cyan-50"
-                            : "bg-cyan-50 hover:bg-cyan-100"
+                            ? "bg-white hover:bg-gray-50"
+                            : "bg-gray-50 hover:bg-gray-100"
                         }
                       >
-                        <td className="border border-cyan-300 px-3 py-2">
+                        <td className="border border-gray-300 px-3 py-2">
                           {item.name}
                         </td>
 
-                        <td className="border border-cyan-300 px-2 py-1">
+                        <td className="border border-gray-300 px-2 py-1">
                           <input
                             type="number"
                             value={item.charges}
                             onChange={(e) =>
                               handleChargeChange(item.id, "charges", e.target.value)
                             }
-                            className="w-full border border-cyan-300 px-2 py-1 rounded focus:outline-none focus:ring-1 focus:ring-cyan-500 text-center"
+                            className="w-full border border-gray-300 px-2 py-1 rounded focus:outline-none focus:ring-1 focus:ring-orange-500 text-center"
                             placeholder="Charges"
                           />
                         </td>
 
-                        <td className="border border-cyan-300 px-2 py-1">
+                        <td className="border border-gray-300 px-2 py-1">
                           <input
                             type="number"
                             value={item.b2bCharges}
                             onChange={(e) =>
                               handleChargeChange(item.id, "b2bCharges", e.target.value)
                             }
-                            className="w-full border border-cyan-300 px-2 py-1 rounded focus:outline-none focus:ring-1 focus:ring-cyan-500 text-center"
+                            className="w-full border border-gray-300 px-2 py-1 rounded focus:outline-none focus:ring-1 focus:ring-orange-500 text-center"
                             placeholder="B2B"
                           />
                         </td>
@@ -346,7 +346,7 @@ export default function CorporateWiseCharges() {
                     item.name.toLowerCase().includes(searchCorporate.toLowerCase())
                   ).length === 0 && (
                     <tr>
-                      <td colSpan={3} className="text-center py-6 text-gray-500 border border-cyan-300">
+                      <td colSpan={3} className="text-center py-6 text-gray-500 border border-gray-300">
                         No corporates found matching your search
                       </td>
                     </tr>
@@ -359,7 +359,7 @@ export default function CorporateWiseCharges() {
                 <button
                   onClick={handleSave}
                   disabled={loading || !selectedTest}
-                  className="bg-cyan-600 hover:bg-cyan-700 text-white px-6 py-2 text-sm rounded disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="bg-orange-500 hover:bg-orange-600 text-white px-6 py-2 text-sm rounded disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {loading ? 'Saving...' : 'Save Charges'}
                 </button>

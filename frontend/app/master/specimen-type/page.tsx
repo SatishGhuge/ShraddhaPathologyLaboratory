@@ -197,7 +197,7 @@ export default function SampleTypes() {
     <>
       <Header />
 
-      <div className="min-h-screen bg-cyan-50 p-6">
+      <div className="min-h-screen bg-white p-6">
 
         {/* Header */}
         <PageHeader 
@@ -227,12 +227,12 @@ export default function SampleTypes() {
               placeholder="Search By Sample Types"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="border border-cyan-600 bg-cyan-50 rounded px-3 py-2 w-64 text-sm placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-cyan-600"
+              className="border border-gray-300 bg-white rounded px-3 py-2 w-64 text-sm placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500"
             />
 
             <button
               onClick={handleReset}
-              className="bg-cyan-600 hover:bg-cyan-700 text-white px-4 py-2 rounded text-sm transition-colors flex items-center gap-1"
+              className="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded text-sm transition-colors flex items-center gap-1"
             >
               <RotateCwIcon size={18} />
               Reset
@@ -241,7 +241,7 @@ export default function SampleTypes() {
 
           <button
             onClick={openAddModal}
-            className="bg-cyan-600 text-white px-4 py-2 rounded text-sm hover:bg-cyan-700 transition-colors"
+            className="bg-orange-500 text-white px-4 py-2 rounded text-sm hover:bg-orange-600 transition-colors"
           >
             + Add
           </button>
@@ -251,16 +251,16 @@ export default function SampleTypes() {
         <div className="overflow-x-auto bg-white rounded shadow-md">
           {loading ? (
             <div className="text-center py-8">
-              <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-cyan-600"></div>
+              <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-gray-300"></div>
               <p className="mt-2 text-gray-600">Loading specimen types...</p>
             </div>
           ) : (
             <table className="w-full text-sm border-collapse">
-              <thead className="bg-gradient-to-r from-slate-800 via-cyan-700 to-cyan-600 text-white">
+              <thead className="bg-slate-900 text-white">
                 <tr>
-                  <th className="border border-cyan-800 px-3 py-1 text-left font-semibold">Sample Type</th>
-                  <th className="border border-cyan-800 px-3 py-1 text-left font-semibold">Sample Color</th>
-                  <th className="border border-cyan-800 px-3 py-1 text-center font-semibold">Action</th>
+                  <th className="border border-gray-300 px-3 py-1 text-left font-semibold">Sample Type</th>
+                  <th className="border border-gray-300 px-3 py-1 text-left font-semibold">Sample Color</th>
+                  <th className="border border-gray-300 px-3 py-1 text-center font-semibold">Action</th>
                 </tr>
               </thead>
 
@@ -327,7 +327,7 @@ export default function SampleTypes() {
                     fetchSpecimenTypes(newPage);
                   }}
                   disabled={currentPage === 1}
-                  className={`flex items-center gap-1 px-3 py-1 rounded ${currentPage === 1 ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-cyan-600 text-white hover:bg-cyan-700'}`}
+                  className={`flex items-center gap-1 px-3 py-1 rounded ${currentPage === 1 ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-orange-500 text-white hover:bg-orange-600'}`}
                 >
                   <ChevronLeft size={14} /> Previous
                 </button>
@@ -343,7 +343,7 @@ export default function SampleTypes() {
                     fetchSpecimenTypes(newPage);
                   }}
                   disabled={currentPage === pagination.totalPages}
-                  className={`flex items-center gap-1 px-3 py-1 rounded ${currentPage === pagination.totalPages ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-cyan-600 text-white hover:bg-cyan-700'}`}
+                  className={`flex items-center gap-1 px-3 py-1 rounded ${currentPage === pagination.totalPages ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-orange-500 text-white hover:bg-orange-600'}`}
                 >
                   Next <ChevronRight size={14} />
                 </button>
@@ -366,12 +366,12 @@ export default function SampleTypes() {
             {/* Back Button Right */}
             <button
               onClick={() => setShowModal(false)}
-              className="absolute top-3 right-3 flex items-center gap-1 text-cyan-600 hover:underline"
+              className="absolute top-3 right-3 flex items-center gap-1 text-slate-900 hover:underline"
             >
               <ArrowLeft size={16} /> Back
             </button>
 
-            <h3 className="text-lg font-semibold text-cyan-700 mb-4">
+            <h3 className="text-lg font-semibold text-slate-900 mb-4">
               {editId ? "Edit Sample Type" : "Add Sample Type"}
             </h3>
 
@@ -383,7 +383,7 @@ export default function SampleTypes() {
                   type="text"
                   value={sampleType}
                   onChange={(e) => setSampleType(e.target.value)}
-                  className="w-full border px-3 py-2 rounded focus:ring-2 focus:ring-cyan-500"
+                  className="w-full border px-3 py-2 rounded focus:ring-2 focus:ring-orange-500"
                 />
               </div>
 
@@ -401,7 +401,7 @@ export default function SampleTypes() {
                     value={sampleColor}
                     onChange={(e) => setSampleColor(e.target.value)}
                     placeholder="e.g. red or #ff0000"
-                    className="flex-1 border px-3 py-2 rounded focus:ring-2 focus:ring-cyan-500 text-sm"
+                    className="flex-1 border px-3 py-2 rounded focus:ring-2 focus:ring-orange-500 text-sm"
                   />
                   <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none">
                     <path d="M9 3h6v11a3 3 0 0 1-6 0V3z" fill={sampleColor || '#cccccc'} stroke="#555" strokeWidth="1.2"/>
@@ -418,7 +418,7 @@ export default function SampleTypes() {
                   ${
                     !sampleType.trim() || !sampleColor.trim()
                       ? "bg-gray-400 cursor-not-allowed"
-                      : "bg-cyan-600 hover:bg-cyan-700"
+                      : "bg-orange-500 hover:bg-orange-600"
                   }
                 `}
               >
@@ -440,4 +440,5 @@ export default function SampleTypes() {
     </>
   );
 }
+
 

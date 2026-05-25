@@ -166,9 +166,9 @@ const AddDepartment = () => {
 
   // Dynamic styling based on mode
   const headerBgColor = "border-b";
-  const inputBorder = "border-cyan-600";
-  const inputBg = "bg-cyan-50";
-  const focusRing = "focus:ring-cyan-600";
+  const inputBorder = "border-gray-300";
+  const inputBg = "bg-white";
+  const focusRing = "focus:ring-orange-500";
   const messageBg = "bg-green-100 border-green-400 text-green-700";
   const messageHover = "text-green-700 hover:text-green-900";
   const displayImage = isAddMode ? img_department : departmentImg;
@@ -188,20 +188,20 @@ const AddDepartment = () => {
   return (
     <>
       <Header/>
-      <div className="min-h-screen bg-cyan-50 p-3 sm:p-4 md:p-6 pt-4 sm:pt-6 md:pt-8">
+      <div className="min-h-screen bg-white p-3 sm:p-4 md:p-6 pt-4 sm:pt-6 md:pt-8">
         <div className="max-w-xl mx-auto bg-white rounded shadow-lg border">
           {/* Header */}
           <div className={`flex flex-col sm:flex-row justify-between items-start sm:items-center px-3 sm:px-4 py-3 gap-2 sm:gap-0 ${headerBgColor}`}>
             <div className="flex items-center gap-2">
-              <Building2 className="text-cyan-700" size={20} />
-              <h2 className={`text-base sm:text-lg font-semibold text-cyan-700`}>
+              <Building2 className="text-slate-900" size={20} />
+              <h2 className={`text-base sm:text-lg font-semibold text-slate-900`}>
                 {getTitle()}
               </h2>
             </div>
 
             <button
               onClick={() => router.back()}
-              className="flex items-center gap-1 bg-cyan-600 hover:bg-cyan-700 text-xs sm:text-sm px-3 py-1.5 sm:py-1 border rounded text-white transition-colors w-full sm:w-auto justify-center"
+              className="flex items-center gap-1 bg-orange-500 hover:bg-orange-600 text-xs sm:text-sm px-3 py-1.5 sm:py-1 border rounded text-white transition-colors w-full sm:w-auto justify-center"
             >
               <ArrowLeft size={16} />
               Back
@@ -246,7 +246,7 @@ const AddDepartment = () => {
           {/* Loading State */}
           {loading && (isEditMode || isViewMode) && (
             <div className="mx-3 sm:mx-4 mb-4 p-4 text-center">
-              <div className="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-cyan-600"></div>
+              <div className="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-gray-300"></div>
               <p className="mt-2 text-gray-600 text-sm">Loading department data...</p>
             </div>
           )}
@@ -257,7 +257,7 @@ const AddDepartment = () => {
               {/* ID Field - Only shown in View Mode */}
               {isViewMode && (
                 <div>
-                  <label className="block text-xs sm:text-sm font-medium mb-1 text-cyan-800">ID</label>
+                  <label className="block text-xs sm:text-sm font-medium mb-1 text-gray-700">ID</label>
                   <div className="relative">
                     <Hash
                       className="absolute left-2 top-2.5 text-gray-400"
@@ -267,7 +267,7 @@ const AddDepartment = () => {
                       type="text"
                       value={id || ''}
                       disabled
-                      className="w-full pl-8 border border-cyan-600 rounded px-2 py-1.5 sm:py-1 bg-gray-100 cursor-not-allowed font-semibold text-sm"
+                      className="w-full pl-8 border border-gray-300 rounded px-2 py-1.5 sm:py-1 bg-gray-100 cursor-not-allowed font-semibold text-sm"
                     />
                   </div>
                 </div>
@@ -275,7 +275,7 @@ const AddDepartment = () => {
 
               {/* Code */}
               <div className={isViewMode ? "" : "sm:col-span-2"}>
-                <label className="block text-xs sm:text-sm font-medium mb-1 text-cyan-800">Code</label>
+                <label className="block text-xs sm:text-sm font-medium mb-1 text-gray-700">Code</label>
                 <div className="relative">
                   <Hash
                     className="absolute left-2 top-2.5 text-gray-400"
@@ -298,7 +298,7 @@ const AddDepartment = () => {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
               {/* Name */}
               <div>
-                <label className="block text-xs sm:text-sm font-medium mb-1 text-cyan-800">Name</label>
+                <label className="block text-xs sm:text-sm font-medium mb-1 text-gray-700">Name</label>
                 <div className="relative">
                   <Layers
                     className="absolute left-2 top-2.5 text-gray-400"
@@ -319,7 +319,7 @@ const AddDepartment = () => {
 
               {/* Sort Order */}
               <div>
-                <label className="block text-xs sm:text-sm font-medium mb-1 text-cyan-800">
+                <label className="block text-xs sm:text-sm font-medium mb-1 text-gray-700">
                   Sort Order
                 </label>
                 <div className="relative">
@@ -344,7 +344,7 @@ const AddDepartment = () => {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 items-end">
                 {/* Group Name */}
                 <div>
-                  <label className="block text-xs sm:text-sm font-medium mb-1 text-cyan-800">Group Name</label>
+                  <label className="block text-xs sm:text-sm font-medium mb-1 text-gray-700">Group Name</label>
                   <div className="relative">
                     <Layers
                       className="absolute left-2 top-2.5 text-gray-400"
@@ -391,7 +391,7 @@ const AddDepartment = () => {
                 <button
                   type="submit"
                   disabled={loading}
-                  className="flex items-center justify-center gap-2 bg-cyan-600 hover:bg-cyan-700 text-white px-4 py-2 sm:py-1.5 rounded transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="flex items-center justify-center gap-2 bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 sm:py-1.5 rounded transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <Save size={16} />
                   {loading ? 'Saving...' : (isAddMode ? "Save" : "Update")}
@@ -406,4 +406,5 @@ const AddDepartment = () => {
 };
 
 export default AddDepartment;
+
 

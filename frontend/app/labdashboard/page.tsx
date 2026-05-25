@@ -6,6 +6,7 @@ import Header from "@/src/components/Header";
 import { createAdmin } from "@/src/api/admin.js";
 import { getTestStatistics } from "@/src/api/result.js";
 import { getPatientStatistics } from "@/src/api/patient.js";
+import { colorTheme, colorClasses } from "@/config/colorTheme";
 import {
   FaUserCircle,
   FaCalendarAlt,
@@ -27,20 +28,20 @@ import { Eye, EyeOff, Clock, Bell, LogOut, Rocket, FileText, Package, UserPlus, 
 /* ================= DATA ================= */
 
 const staticStatCards = [
-  { title: "Total", color: "pink-coral", icon: FaCalendarAlt, link: "/reports/patient-list" },
-  { title: "Registered", color: "slate-blue", icon: FaUserCircle, link: "/result?status=REGISTERED" },
-  { title: "Collected", value: "0", sub: "More info", color: "purple-magenta", icon: FaVials, link: null },
-  { title: "Sample Tracking", value: "0", sub: "More info", color: "blue-teal", icon: FaHourglassHalf, link: null },
-  { title: "Authenticated", color: "yellow-orange", icon: FaCheck, link: "/result?status=AUTHENTICATED" },
-  { title: "Delivered", color: "green-emerald", icon: FaProjectDiagram, link: "/result?status=DELIVERED" },
+  { title: "Total", color: "blue", icon: FaCalendarAlt, link: "/reports/patient-list" },
+  { title: "Registered", color: "slate", icon: FaUserCircle, link: "/result?status=REGISTERED" },
+  { title: "Collected", value: "0", sub: "More info", color: "orange", icon: FaVials, link: null },
+  { title: "Sample Tracking", value: "0", sub: "More info", color: "purple", icon: FaHourglassHalf, link: null },
+  { title: "Authenticated", color: "green", icon: FaCheck, link: "/result?status=AUTHENTICATED" },
+  { title: "Delivered", color: "cyan", icon: FaProjectDiagram, link: "/result?status=DELIVERED" },
 ];
 
 const YESTERDAY_GRADIENTS = [
-  "from-pink-400 to-orange-300",
-  "from-slate-600 to-slate-400",
-  "from-purple-500 to-purple-300",
-  "from-blue-400 to-cyan-300",
-  "from-orange-400 to-yellow-300",
+  "from-blue-400 to-blue-600",
+  "from-slate-600 to-slate-800",
+  "from-orange-400 to-orange-600",
+  "from-green-400 to-green-600",
+  "from-cyan-400 to-cyan-600",
 ];
 
 const deptData = [
@@ -49,7 +50,7 @@ const deptData = [
   { name: "Microbiology", value: 20 },
 ];
 
-const COLORS1 = ["#0891b2", "#16a34a", "#4f46e5"];
+const COLORS1 = [colorTheme.departments.pathology, colorTheme.departments.radiology, colorTheme.departments.microbiology];
 
 /* ================= DASHBOARD ================= */
 
@@ -297,20 +298,20 @@ const Dashboard = () => {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         
         {/* Yesterday Summary */}
-        <div className="bg-white rounded-lg shadow-lg p-4">
-          <h3 className="font-bold text-slate-700 text-base mb-3">Yesterday Summary</h3>
+        <div className="bg-white rounded-lg shadow-lg p-4 border border-gray-200">
+          <h3 className="font-bold text-slate-900 text-base mb-3">Yesterday Summary</h3>
           <div className="space-y-2">
             {yesterdayBars.map((item, i) => (
               <button
                 key={i}
                 onClick={() => {}}
-                className="w-full text-left p-2 rounded-lg transition-all duration-200 hover:bg-gray-50 hover:shadow-md cursor-pointer border border-transparent hover:border-gray-200"
+                className="w-full text-left p-2 rounded-lg transition-all duration-200 hover:bg-gray-50 hover:shadow-md cursor-pointer border border-transparent hover:border-gray-300"
               >
                 <div className="flex justify-between text-xs mb-1">
                   <span className="font-medium text-gray-700">{item.label}</span>
-                  <span className="font-bold text-gray-800">{item.value}</span>
+                  <span className="font-bold text-gray-900">{item.value}</span>
                 </div>
-                <div className="h-4 bg-slate-100 rounded-full overflow-hidden shadow-inner">
+                <div className="h-4 bg-gray-100 rounded-full overflow-hidden shadow-inner">
                   <div
                     className={`h-full bg-gradient-to-r ${item.gradient} rounded-full transition-all duration-500`}
                     style={{ width: `${Math.min(Math.max(item.value, 1), 100)}%` }}
@@ -325,18 +326,18 @@ const Dashboard = () => {
         <PieChartCard title="Department-wise Tests" data={deptData} colors={COLORS1} />
 
         {/* Quick Navigation Links */}
-        <div className="bg-white rounded-xl shadow-lg p-4">
-          <h3 className="font-bold text-slate-700 text-lg mb-3 flex items-center gap-2">
-            <Rocket className="text-cyan-600" size={20} />
+        <div className="bg-white rounded-xl shadow-lg p-4 border border-gray-200">
+          <h3 className="font-bold text-slate-900 text-lg mb-3 flex items-center gap-2">
+            <Rocket className="text-orange-600" size={20} />
             Quick Navigation
           </h3>
           <div className="space-y-2">
            
              <button
               onClick={() => router.push("/master/testlist")}
-              className="w-full text-left px-3 py-2 text-sm text-cyan-700 hover:bg-cyan-50 rounded-lg transition-colors border border-cyan-200 hover:border-cyan-400 flex items-center gap-2"
+              className="w-full text-left px-3 py-2 text-sm text-blue-700 hover:bg-blue-50 rounded-lg transition-colors border border-blue-200 hover:border-blue-400 flex items-center gap-2"
             >
-              <FileText size={16} className="text-cyan-600" />
+              <FileText size={16} className="text-blue-600" />
               Test List
             </button>
             <button
@@ -383,13 +384,13 @@ const Dashboard = () => {
     {/* Add Admin Form Modal */}
     {showAddAdminForm && (
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-        <div className="bg-white rounded-lg shadow-2xl border-2 border-cyan-200 w-full max-w-md max-h-[90vh] overflow-y-auto">
+        <div className="bg-white rounded-lg shadow-2xl border-2 border-orange-300 w-full max-w-md max-h-[90vh] overflow-y-auto">
           {/* Modal Header */}
-          <div className="sticky top-0 bg-gradient-to-r from-cyan-50 to-blue-50 border-b-2 border-cyan-200 px-6 py-4 flex justify-between items-center">
-            <h2 className="text-xl font-bold text-cyan-700">Add New Admin</h2>
+          <div className="sticky top-0 bg-gradient-to-r from-slate-900 to-slate-800 border-b-2 border-orange-300 px-6 py-4 flex justify-between items-center">
+            <h2 className="text-xl font-bold text-white">Add New Admin</h2>
             <button 
               onClick={handleCloseForm}
-              className="text-gray-500 hover:text-gray-700 text-2xl"
+              className="text-gray-300 hover:text-white text-2xl"
             >
               ×
             </button>
@@ -407,7 +408,7 @@ const Dashboard = () => {
                 name="name"
                 value={formData.name}
                 onChange={handleFormChange}
-                className={`w-full border ${(formErrors as any).name ? 'border-red-500' : 'border-gray-300'} rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-cyan-500`}
+                className={`w-full border ${(formErrors as any).name ? 'border-red-500' : 'border-gray-300'} rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500`}
                 placeholder="Enter full name"
               />
               {(formErrors as any).name && (
@@ -425,7 +426,7 @@ const Dashboard = () => {
                 name="email"
                 value={formData.email}
                 onChange={handleFormChange}
-                className={`w-full border ${(formErrors as any).email ? 'border-red-500' : 'border-gray-300'} rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-cyan-500`}
+                className={`w-full border ${(formErrors as any).email ? 'border-red-500' : 'border-gray-300'} rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500`}
                 placeholder="Enter email address"
               />
               {(formErrors as any).email && (
@@ -443,7 +444,7 @@ const Dashboard = () => {
                 name="username"
                 value={formData.username}
                 onChange={handleFormChange}
-                className={`w-full border ${(formErrors as any).username ? 'border-red-500' : 'border-gray-300'} rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-cyan-500`}
+                className={`w-full border ${(formErrors as any).username ? 'border-red-500' : 'border-gray-300'} rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500`}
                 placeholder="Enter username"
               />
               {(formErrors as any).username && (
@@ -462,7 +463,7 @@ const Dashboard = () => {
                   name="password"
                   value={formData.password}
                   onChange={handleFormChange}
-                  className={`w-full border ${(formErrors as any).password ? 'border-red-500' : 'border-gray-300'} rounded-md px-3 py-2 pr-10 focus:outline-none focus:ring-2 focus:ring-cyan-500`}
+                  className={`w-full border ${(formErrors as any).password ? 'border-red-500' : 'border-gray-300'} rounded-md px-3 py-2 pr-10 focus:outline-none focus:ring-2 focus:ring-orange-500`}
                   placeholder="Enter password"
                 />
                 <button
@@ -489,7 +490,7 @@ const Dashboard = () => {
                   name="confirmPassword"
                   value={formData.confirmPassword}
                   onChange={handleFormChange}
-                  className={`w-full border ${(formErrors as any).confirmPassword ? 'border-red-500' : 'border-gray-300'} rounded-md px-3 py-2 pr-10 focus:outline-none focus:ring-2 focus:ring-cyan-500`}
+                  className={`w-full border ${(formErrors as any).confirmPassword ? 'border-red-500' : 'border-gray-300'} rounded-md px-3 py-2 pr-10 focus:outline-none focus:ring-2 focus:ring-orange-500`}
                   placeholder="Confirm password"
                 />
                 <button
@@ -515,7 +516,7 @@ const Dashboard = () => {
                 name="phone"
                 value={formData.phone}
                 onChange={handleFormChange}
-                className={`w-full border ${(formErrors as any).phone ? 'border-red-500' : 'border-gray-300'} rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-cyan-500`}
+                className={`w-full border ${(formErrors as any).phone ? 'border-red-500' : 'border-gray-300'} rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500`}
                 placeholder="Enter 10-digit phone number"
                 maxLength={10}
               />
@@ -535,7 +536,7 @@ const Dashboard = () => {
               </button>
               <button
                 type="submit"
-                className="flex-1 bg-gradient-to-r from-cyan-500 to-cyan-600 hover:from-cyan-600 hover:to-cyan-700 text-white font-semibold py-2 px-4 rounded-md transition-all"
+                className="flex-1 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white font-semibold py-2 px-4 rounded-md transition-all"
               >
                 Add Admin
               </button>
@@ -554,13 +555,13 @@ const Dashboard = () => {
 const StatCard = ({ title, value, sub, color, icon: Icon, link, router }: any) => {
   const [showDropdown, setShowDropdown] = React.useState(false);
   
-  const map = {
-    "pink-coral": "from-pink-400 to-orange-400",
-    "slate-blue": "from-slate-600 to-blue-700",
-    "purple-magenta": "from-purple-600 to-pink-600",
-    "blue-teal": "from-blue-600 to-teal-500",
-    "yellow-orange": "from-yellow-400 to-orange-500",
-    "green-emerald": "from-green-600 to-emerald-500",
+  const iconColorMap = {
+    "blue": "text-blue-500",
+    "slate": "text-slate-700",
+    "orange": "text-orange-500",
+    "purple": "text-purple-600",
+    "green": "text-green-600",
+    "cyan": "text-teal-600",
   };
   
   const sampleTrackingOptions = [
@@ -584,21 +585,21 @@ const StatCard = ({ title, value, sub, color, icon: Icon, link, router }: any) =
     <div className="relative">
       <div 
         onClick={handleClick}
-        className={`bg-gradient-to-br ${map[color as keyof typeof map]} rounded-lg p-3 text-white shadow-md hover:shadow-xl hover:scale-105 transition-all duration-300 cursor-pointer`}
+        className="bg-white rounded-lg p-4 shadow-md hover:shadow-lg transition-all duration-300 cursor-pointer min-h-[120px] flex flex-col justify-between border border-gray-100"
       >
-        <div className="flex flex-col h-full">
-          <div className="flex items-center justify-between mb-2">
-            <p className="text-sm font-semibold opacity-90">{title}</p>
-            {Icon && <Icon className="text-2xl opacity-80" />}
-          </div>
-          <p className="text-3xl font-bold mb-1">{value}</p>
-          <p className="text-sm opacity-80">{sub}</p>
+        <div className="flex items-start justify-between mb-3">
+          <p className="text-xs font-bold text-gray-700 uppercase tracking-wide">{title}</p>
+          {Icon && <Icon className={`text-2xl ${iconColorMap[color as keyof typeof iconColorMap]}`} />}
+        </div>
+        <div>
+          <p className="text-4xl font-bold text-gray-900 mb-2">{value}</p>
+          <p className="text-xs text-orange-500 font-medium">{sub}</p>
         </div>
       </div>
       
       {/* Dropdown Menu for Sample Tracking */}
       {title === "Sample Tracking" && showDropdown && (
-        <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-lg shadow-2xl z-50 overflow-hidden border-2 border-cyan-200">
+        <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-lg shadow-2xl z-50 overflow-hidden border-2 border-orange-300">
           {sampleTrackingOptions.map((option, index) => (
             <button
               key={index}
@@ -607,7 +608,7 @@ const StatCard = ({ title, value, sub, color, icon: Icon, link, router }: any) =
                 console.log(`Clicked: ${option.label}`);
                 setShowDropdown(false);
               }}
-              className="w-full px-3 py-2 hover:bg-cyan-50 transition-colors text-left border-b border-gray-200 last:border-b-0"
+              className="w-full px-3 py-2 hover:bg-orange-50 transition-colors text-left border-b border-gray-200 last:border-b-0"
             >
               <span className="font-medium text-gray-800 text-sm">{option.label}</span>
             </button>
