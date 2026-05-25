@@ -5,7 +5,7 @@ import { useRouter, useParams, usePathname } from "next/navigation";
 
 import Header from "@/src/components/Header";
 import { User, Hospital, Mail, Phone, MapPin, Percent, GraduationCap, Save, X, ArrowLeft, AlertCircle, CheckCircle } from "lucide-react";
-import { createDoctor, updateDoctor, getDoctors } from "@/src/api/master.js";
+import { createDoctor, updateDoctor, getDoctors } from "@/src/api/master";
 
 export default function AddReferralForm() {
   const router = useRouter();
@@ -268,5 +268,6 @@ export default function AddReferralForm() {
     </>
   );
 }
+
 
 

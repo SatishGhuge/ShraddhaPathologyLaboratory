@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { Search, RotateCcw, Printer, FileSpreadsheet, DollarSign, ChevronDown, Calendar, ChevronLeft, ChevronRight } from "lucide-react";
 import Header from "@/src/components/Header";
 import PageHeader from "@/src/components/BreadCrumb";
-import { getAllPatients, getCollectionCenters } from "@/src/api/patient.js";
+import { getAllPatients, getCollectionCenters } from "@/src/api/patient";
 
 /* ── Date helpers ── */
 const fmtISO = (d: any) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
@@ -471,3 +471,4 @@ export default function DailyCollection() {
     </>
   );
 }
+

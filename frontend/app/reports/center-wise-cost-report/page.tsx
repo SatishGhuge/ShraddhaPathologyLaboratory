@@ -4,8 +4,8 @@ import { useState, useRef, useEffect } from "react";
 import { Search, RotateCcw, Printer, FileText, FileSpreadsheet, BarChart3, ChevronDown, Calendar, ChevronLeft, ChevronRight } from "lucide-react";
 import Header from "@/src/components/Header";
 import PageHeader from "@/src/components/BreadCrumb";
-import { getAllPatients, getCollectionCenters } from "@/src/api/patient.js";
-import { getTests } from "@/src/api/master.js";
+import { getAllPatients, getCollectionCenters } from "@/src/api/patient";
+import { getTests } from "@/src/api/master";
 
 const fmtISO = (d: any) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
 const today0 = () => { const d = new Date(); d.setHours(0,0,0,0); return d; };
@@ -502,3 +502,4 @@ export default function CenterWiseCostReport() {
     </>
   );
 }
+

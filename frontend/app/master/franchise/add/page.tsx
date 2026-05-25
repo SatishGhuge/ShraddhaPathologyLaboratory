@@ -8,7 +8,7 @@ import {
   CalendarDays, Eye, Mail, CheckCircle, XCircle, X,
 } from "lucide-react";
 import Header from "@/src/components/Header";
-import { updateFranchise, getFranchiseById, createFranchiseWithCredentials } from "@/src/api/master.js";
+import { updateFranchise, getFranchiseById, createFranchiseWithCredentials } from "@/src/api/master";
 
 const Toast = ({ type, message, credentials, onClose }: { type: string; message: string; credentials?: any; onClose: () => void }) => (
   <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
@@ -254,6 +254,7 @@ const AddFranchise = () => {
 };
 
 export default AddFranchise;
+
 
 
 

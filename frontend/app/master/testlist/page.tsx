@@ -6,7 +6,7 @@ import React, { useState, useEffect } from "react";
 import Header from "@/src/components/Header";
 import PageHeader from "@/src/components/BreadCrumb";
 import { FlaskConical, RotateCwIcon } from "lucide-react";
-import { getTests, deleteTest, updateTest } from "@/src/api/master.js";
+import { getTests, deleteTest, updateTest } from "@/src/api/master";
 
 const TestList = () => {
   const router = useRouter();
@@ -414,4 +414,5 @@ const TestList = () => {
 };
 
 export default TestList;
+
 

@@ -4,8 +4,8 @@ import { useState, useRef, useEffect } from "react";
 import { Search, RotateCcw, Printer, FileSpreadsheet, ChevronDown, Calendar, ChevronLeft, ChevronRight } from "lucide-react";
 import Header from "@/src/components/Header";
 import PageHeader from "@/src/components/BreadCrumb";
-import { getMonthlyCollectionSummary } from "@/src/api/admin.js";
-import { getCollectionCenters } from "@/src/api/patient.js";
+import { getMonthlyCollectionSummary } from "@/src/api/admin";
+import { getCollectionCenters } from "@/src/api/patient";
 
 /* ── date helpers ── */
 const fmtISO = (d: any) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
@@ -268,7 +268,7 @@ export default function MonthlyCollectionSummary() {
 
           {/* Buttons */}
           <div className="flex flex-wrap gap-1.5">
-            <button onClick={handleSearch} disabled={loading}
+            <button onClick={() => handleSearch(1)} disabled={loading}
               className="flex gap-1 items-center bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white px-3 py-1.5 rounded text-xs">
               <Search size={13}/> {loading ? "Searching..." : "Search"}
             </button>
@@ -446,3 +446,4 @@ export default function MonthlyCollectionSummary() {
     </>
   );
 }
+

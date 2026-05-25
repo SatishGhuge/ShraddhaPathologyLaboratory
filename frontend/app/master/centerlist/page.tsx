@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { RotateCcw, Building2 } from "lucide-react";
 import Header from "@/src/components/Header";
 import PageHeader from "@/src/components/BreadCrumb";
-import { getCollectionCenters, deleteCollectionCenter, updateCollectionCenter } from "@/src/api/master.js";
+import { getCollectionCenters, deleteCollectionCenter, updateCollectionCenter } from "@/src/api/master";
 
 const CenterList = () => {
   const router = useRouter();
@@ -224,3 +224,4 @@ const CenterList = () => {
 };
 
 export default CenterList;
+

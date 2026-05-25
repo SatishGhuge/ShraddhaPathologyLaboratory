@@ -7,7 +7,7 @@ import Header from "@/src/components/Header";
 import PageHeader from "@/src/components/BreadCrumb";
 import { CKEditor } from "@ckeditor/ckeditor5-react";
 import ClassicEditor from "@ckeditor/ckeditor5-build-classic";
-import { getTestById, createTest, updateTest, getDepartments, getUnits, getTests } from "@/src/api/master.js";
+import { getTestById, createTest, updateTest, getDepartments, getUnits, getTests } from "@/src/api/master";
 
 const baseInputClass =
   "px-2 py-1 border border-gray-300 rounded text-sm bg-white focus:outline-none focus:ring-2 focus:ring-orange-500";
@@ -1068,7 +1068,7 @@ const AddTest = () => {
                     name="department"
                     value={formData.department}
                     onChange={handleChange}
-                    options={departments.map(dept => ({ value: dept.id, label: dept.name }))}
+                    options={(departments || []).map(dept => ({ value: dept.id, label: dept.name }))}
                     required 
                     disabled={isViewMode} 
                   />
@@ -1291,7 +1291,7 @@ const AddTest = () => {
                         >
                           Please Select
                         </div>
-                        {specimenTypes.map((type, i) => (
+                        {(specimenTypes || []).map((type, i) => (
                           <div
                             key={i}
                             className="flex items-center gap-2 px-3 py-2 text-xs hover:bg-gray-50 cursor-pointer border-b last:border-b-0"
@@ -1669,7 +1669,7 @@ const AddTest = () => {
                             title="Select unit - linked to Unit column in preview table"
                           >
                             <option value="">Select Unit 🔗</option>
-                            {units.map((unit) => (
+                            {(units || []).map((unit) => (
                               <option key={unit.id} value={unit.symbol}>
                                 {unit.symbol}
                               </option>
@@ -2255,7 +2255,7 @@ const AddTest = () => {
                               </tr>
                             </thead>
                             <tbody>
-                              {parameter.ageRanges && parameter.ageRanges.map((ageRange, ageIndex) => (
+                              {(parameter.ageRanges || []).map((ageRange, ageIndex) => (
                                 <tr key={ageIndex} className="bg-white">
                                   <td className="border border-gray-300 px-2 py-1">
                                     <div className="flex items-center gap-1">
@@ -2397,7 +2397,7 @@ const AddTest = () => {
                                 </tr>
                               </thead>
                               <tbody>
-                                {parameter.rangeValues && parameter.rangeValues.map((rangeValue, rangeIndex) => (
+                                {(parameter.rangeValues || []).map((rangeValue, rangeIndex) => (
                                   <tr key={rangeIndex} className="bg-white">
                                     <td className="border border-gray-300 px-2 py-1">
                                       <label className="flex items-center gap-1">
@@ -2482,7 +2482,7 @@ const AddTest = () => {
                               </tr>
                             </thead>
                             <tbody>
-                              {parameter.normalRanges && parameter.normalRanges.map((range, rangeIndex) => (
+                              {(parameter.normalRanges || []).map((range, rangeIndex) => (
                                 <tr key={rangeIndex} className="bg-white">
                                   <td className="border border-gray-300 px-2 py-1">
                                     <label className="flex items-center gap-1">
@@ -2951,6 +2951,7 @@ const RadioSimple = ({ label, disabled }) => (
 );
 
 export default AddTest;
+
 
 
 

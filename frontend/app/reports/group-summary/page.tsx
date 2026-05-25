@@ -5,7 +5,9 @@ import { Search, RotateCcw, FileSpreadsheet, Layers, Calendar, ChevronLeft, Chev
 import Header from "@/src/components/Header";
 import PageHeader from "@/src/components/BreadCrumb";
 import * as XLSX from "xlsx";
-import { getGroupSummaryReport } from "@/src/api/admin.js";
+import { getGroupSummaryReport } from "@/src/api/admin";
+
+const API = process.env.NEXT_PUBLIC_API_URL || "/api";
 
 const fmtISO = (d: any) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
 const today0 = () => { const d = new Date(); d.setHours(0,0,0,0); return d; };
@@ -253,7 +255,7 @@ export default function GroupSummary() {
           </div>
 
           <div className="flex flex-wrap gap-2">
-            <button onClick={fetchData} disabled={loading}
+            <button onClick={() => fetchData(1)} disabled={loading}
               className="flex gap-1.5 items-center bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white px-3 py-1.5 rounded text-xs">
               <Search size={13}/> {loading ? "Searching..." : "Search"}
             </button>

@@ -3,9 +3,9 @@
 import { useRouter } from "next/navigation";
 import React, { useEffect, useState } from "react";
 import Header from "@/src/components/Header";
-import { createAdmin } from "@/src/api/admin.js";
-import { getTestStatistics } from "@/src/api/result.js";
-import { getPatientStatistics } from "@/src/api/patient.js";
+import { createAdmin } from "@/src/api/admin";
+import { getTestStatistics } from "@/src/api/result";
+import { getPatientStatistics } from "@/src/api/patient";
 import { colorTheme, colorClasses } from "@/config/colorTheme";
 import {
   FaUserCircle,
@@ -640,3 +640,4 @@ const PieChartCard = ({ title, data, colors }: any) => (
 );
 
 export default Dashboard;
+

@@ -58,9 +58,7 @@ const AdminLogin = ({ onLogin }: { onLogin?: () => void }) => {
     setErrors({});
 
     try {
-      console.log('🔐 Attempting login with:', { username: formData.username });
       const response = await adminLogin(formData.username, formData.password);
-      console.log('✅ Login successful:', response);
       
       document.cookie = `token=${response.token}; path=/; max-age=86400; SameSite=Lax`;
       localStorage.setItem('token', response.token);
@@ -82,8 +80,8 @@ const AdminLogin = ({ onLogin }: { onLogin?: () => void }) => {
       console.log('🚀 Routing to', dashboardPath);
       router.replace(dashboardPath);
     } catch (error: any) {
-      console.error('❌ Login error:', error);
-      setErrors({ submit: error.message || 'Login failed. Please check your credentials.' });
+      // Show user-friendly error message without console.error
+      setErrors({ submit: 'Invalid credentials. Please try again.' });
       setLoading(false);
     }
   };
@@ -106,7 +104,6 @@ const AdminLogin = ({ onLogin }: { onLogin?: () => void }) => {
     setSuccessMessage("");
 
     try {
-      console.log('🔐 Sending forgot password request for:', formData.email);
       await forgotPassword(formData.email);
       setSuccessMessage("OTP sent to your email. Valid for 1 minute.");
       setOtpTimer(60);
@@ -119,8 +116,8 @@ const AdminLogin = ({ onLogin }: { onLogin?: () => void }) => {
       }, 1000);
       setCurrentView("verifyCode");
     } catch (error) {
-      console.error('❌ Forgot password error:', error);
-      setErrors({ submit: error.message || 'Failed to send OTP' });
+      // Show user-friendly error message without console.error
+      setErrors({ submit: 'Failed to send OTP. Please check your email and try again.' });
     } finally {
       setLoading(false);
     }

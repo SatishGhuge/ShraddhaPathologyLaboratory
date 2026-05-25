@@ -6,7 +6,7 @@ import Header from "@/src/components/Header";
 import PageHeader from "@/src/components/BreadCrumb";
 
 import { UserCheck, RotateCcw } from "lucide-react";
-import { getDoctors, deleteDoctor } from "@/src/api/master.js";
+import { getDoctors, deleteDoctor } from "@/src/api/master";
 
 export default function ReferralListing() {
   const [search, setSearch] = useState("");
@@ -162,4 +162,5 @@ export default function ReferralListing() {
     </>
   );
 }
+
 

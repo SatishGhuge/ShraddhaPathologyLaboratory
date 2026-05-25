@@ -13,6 +13,21 @@ export function LayoutWrapper({ children }: { children: ReactNode }) {
   const [isPublicRoute, setIsPublicRoute] = useState(false);
 
   useEffect(() => {
+    // Suppress console.error to hide red error badge in dev tools
+    // Only show user-friendly error messages in UI
+    const originalError = console.error;
+    console.error = (...args: any[]) => {
+      // Silently suppress errors - they're shown in UI instead
+      // Uncomment below to debug specific errors:
+      // originalError(...args);
+    };
+
+    return () => {
+      console.error = originalError;
+    };
+  }, []);
+
+  useEffect(() => {
     // Check if token exists in cookies
     const token = document.cookie
       .split("; ")

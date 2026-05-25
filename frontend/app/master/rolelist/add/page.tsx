@@ -5,7 +5,7 @@ import { useRouter, useParams, usePathname } from "next/navigation";
 
 import { ArrowLeft, Save, UserPlus, Code, Compass, Calendar, Percent, Building2, Edit, Eye } from "lucide-react";
 import Header from "@/src/components/Header";
-import { getRoleById, createRole, updateRole } from "@/src/api/master.js";
+import { getRoleById, createRole, updateRole } from "@/src/api/master";
 
 const AddRole = () => {
   const router = useRouter();
@@ -229,6 +229,7 @@ const AddRole = () => {
 };
 
 export default AddRole;
+
 
 
 

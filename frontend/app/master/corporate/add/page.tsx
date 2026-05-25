@@ -5,7 +5,7 @@ import { useRouter, useParams, usePathname } from "next/navigation";
 
 import { Save, ArrowLeft, Eye, Building2, Edit } from "lucide-react";
 import Header from "@/src/components/Header";
-import { getCorporateById, createCorporate, updateCorporate } from "@/src/api/master.js";
+import { getCorporateById, createCorporate, updateCorporate } from "@/src/api/master";
 
 const AddCorporate = () => {
   const router = useRouter();
@@ -105,4 +105,5 @@ const AddCorporate = () => {
 };
 
 export default AddCorporate;
+
 

@@ -5,7 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { Search, RotateCcw, Printer, FileSpreadsheet, Users, ChevronDown, Calendar, ChevronLeft, ChevronRight } from "lucide-react";
 import Header from "@/src/components/Header";
 import PageHeader from "@/src/components/BreadCrumb";
-import { getAllPatients, getCollectionCenters } from "@/src/api/patient.js";
+import { getAllPatients, getCollectionCenters } from "@/src/api/patient";
 
 /* ── helpers ── */
 const toYMD = (iso: any) => {
@@ -499,3 +499,4 @@ export default function PatientList() {
     </>
   );
 }
+

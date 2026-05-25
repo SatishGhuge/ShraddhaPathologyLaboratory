@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { Users, RotateCcw, ChevronLeft, ChevronRight } from "lucide-react";
 import Header from "@/src/components/Header";
 import PageHeader from "@/src/components/BreadCrumb";
-import { getUsers, deleteUser } from "@/src/api/master.js";
+import { getUsers, deleteUser } from "@/src/api/master";
 
 const UserList = () => {
   const router = useRouter();
@@ -187,4 +187,5 @@ const UserList = () => {
 };
 
 export default UserList;
+
 

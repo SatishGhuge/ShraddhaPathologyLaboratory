@@ -13,9 +13,9 @@ import {
   UserPlus,
   ChevronDown,
 } from "lucide-react";
-import { createPatient, searchPatient } from "@/src/api/patient.js";
-import { getDoctors, createDoctor, getSpecimenTypes, getFranchises, getCollectionCenters } from "@/src/api/master.js";
-import API_BASE_URL from "@/src/api/config.js";
+import { createPatient, searchPatient } from "@/src/api/patient";
+import { getDoctors, createDoctor, getSpecimenTypes, getFranchises, getCollectionCenters } from "@/src/api/master";
+import API_BASE_URL from "@/src/api/config";
 
 /* ------------------ INLINE DATE PICKER ------------------ */
 const DP_MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
@@ -2244,4 +2244,5 @@ export default function PatientRegistration() {
     </>
   );
 }
+
 
