@@ -123,10 +123,10 @@ function DateRangePicker({ value, onChange }: { value?: { start?: Date; end?: Da
     const inRange  = s && e && date>s && date<e;
     const isToday  = sameDay(date, today);
     let cls = "w-8 h-8 flex items-center justify-center text-xs cursor-pointer select-none transition-all ";
-    if (isStart || isEnd) cls += "bg-primary-700 text-white rounded-full font-bold ";
-    else if (inRange)     cls += "bg-primary-100 text-primary-800 ";
-    else if (isToday)     cls += "border border-primary-400 rounded-full text-primary-700 font-semibold ";
-    else                  cls += "hover:bg-primary-50 rounded-full ";
+    if (isStart || isEnd) cls += "bg-orange-500 text-white rounded-full font-bold ";
+    else if (inRange)     cls += "bg-orange-100 text-orange-800 ";
+    else if (isToday)     cls += "border border-orange-400 rounded-full text-orange-700 font-semibold ";
+    else                  cls += "hover:bg-orange-50 rounded-full ";
     return cls;
   }
 
@@ -139,9 +139,9 @@ function DateRangePicker({ value, onChange }: { value?: { start?: Date; end?: Da
       <button
         type="button"
         onClick={() => setOpen(o=>!o)}
-        className="flex items-center gap-2 border rounded px-3 py-1 text-sm bg-white hover:border-primary-400 transition-colors min-w-[200px]"
+        className="flex items-center gap-2 border rounded px-3 py-1 text-sm bg-white hover:border-orange-400 transition-colors min-w-[200px]"
       >
-        <CalendarDays size={15} className="text-primary-600 shrink-0"/>
+        <CalendarDays size={15} className="text-orange-600 shrink-0"/>
         <span className={value?.start ? "text-gray-800" : "text-gray-400"}>{displayLabel}</span>
       </button>
 
@@ -153,7 +153,7 @@ function DateRangePicker({ value, onChange }: { value?: { start?: Date; end?: Da
               <button key={p.label}
                 onClick={() => { setActivePreset(p.label); p.fn(); }}
                 className={`text-left px-4 py-2 text-sm transition-colors
-                  ${activePreset===p.label ? "bg-primary-600 text-white font-semibold" : "text-gray-700 hover:bg-primary-50"}`}
+                  ${activePreset===p.label ? "bg-orange-500 text-white font-semibold" : "text-gray-700 hover:bg-orange-50"}`}
               >{p.label}</button>
             ))}
           </div>
@@ -211,7 +211,7 @@ function DateRangePicker({ value, onChange }: { value?: { start?: Date; end?: Da
                 <button onClick={() => { setTempStart(null); setTempEnd(null); setSelecting(false); setOpen(false); onChange(null); }}
                   className="px-4 py-1 border rounded text-sm text-gray-600 hover:bg-gray-50">Cancel</button>
                 <button onClick={handleApply} disabled={!tempStart||!tempEnd}
-                  className="px-4 py-1 bg-primary-700 hover:bg-primary-800 disabled:opacity-40 text-white rounded text-sm font-semibold">Apply</button>
+                  className="px-4 py-1 bg-orange-500 hover:bg-orange-600 disabled:opacity-40 text-white rounded text-sm font-semibold">Apply</button>
               </div>
             </div>
           </div>
@@ -235,7 +235,7 @@ const INIT_BOOKING = [];
 
 const style = {
   input:    "border px-3 py-1 rounded text-sm",
-  header:   "bg-gradient-to-r from-slate-800 via-primary-700 to-primary-600 text-white",
+  header:   "bg-orange-500 text-white",
   btn:      "text-white px-4 py-1 rounded flex items-center gap-1 text-sm",
   formGrid: "grid grid-cols-12 gap-4 items-center"
 };
@@ -1045,19 +1045,19 @@ export default function BookingPage() {
             )}
           </div>
           
-          <label className="flex items-center gap-2 border px-3 py-1 rounded text-sm bg-primary-50 cursor-pointer hover:bg-primary-100">
+          <label className="flex items-center gap-2 border px-3 py-1 rounded text-sm bg-orange-50 cursor-pointer hover:bg-orange-100">
             <input 
               type="checkbox" 
               checked={showOutstanding}
               onChange={(e) => setShowOutstanding(e.target.checked)}
               className="w-4 h-4 cursor-pointer"
             />
-            <span className="font-semibold text-blue-700">Outstandings</span>
+            <span className="font-semibold text-orange-700">Outstandings</span>
           </label>
           
           <button 
             onClick={handleSearch}
-            className={`${style.btn} bg-primary-600 hover:bg-primary-700 transition-colors`}>
+            className={`${style.btn} bg-slate-900 hover:bg-orange-600 transition-colors`}>
             <Search size={15}/> Search
           </button>
           
@@ -1067,7 +1067,7 @@ export default function BookingPage() {
             <RotateCcw size={15}/> Reset
           </button>
           
-          <div className="ml-auto flex items-center gap-2 bg-primary-100 text-primary-700 px-4 py-1 rounded font-semibold">
+          <div className="ml-auto flex items-center gap-2 bg-orange-100 text-orange-700 px-4 py-1 rounded font-semibold">
             <span>Total Patients:</span>
             <span className="text-lg font-bold">{filteredBookings.length}</span>
           </div>
@@ -1079,13 +1079,13 @@ export default function BookingPage() {
 
         {/* LEFT - BOOKING LIST */}
         <div className="col-span-4 bg-white rounded shadow flex flex-col overflow-hidden">
-          <div className={`${style.header} p-2 font-semibold flex justify-between items-center`}>
+          <div className="bg-slate-900 text-white p-2 font-semibold flex justify-between items-center">
             <span>Booking List</span>
             <span className="text-yellow-300 text-xs">Page {currentPage} of {Math.ceil(filteredBookings.length / ITEMS_PER_PAGE) || 1}</span>
           </div>
           <div className="overflow-y-auto overflow-x-hidden flex-1">
             <table className="w-full text-xs table-fixed">
-              <thead className={`${style.header} sticky top-0`}>
+              <thead className="bg-slate-900 text-white sticky top-0">
                 <tr>
                   <th className="p-2 w-8 text-center">No</th>
                   <th className="p-2 text-left">Name / ID</th>
@@ -1105,7 +1105,7 @@ export default function BookingPage() {
                   const paginatedBookings = filteredBookings.slice(startIndex, endIndex);
                   
                   return paginatedBookings.map((b,i) => (
-                    <tr key={i} className={`border-b hover:bg-gray-50 ${selectedBooking?.bookingId===b.bookingId ? "bg-primary-50" : ""}`}>
+                    <tr key={i} className={`border-b hover:bg-gray-50 ${selectedBooking?.bookingId===b.bookingId ? "bg-orange-50" : ""}`}>
                       <td className="p-2 text-center">{startIndex + i + 1}</td>
                       <td className="p-2">
                         <div className="flex items-center gap-1">
@@ -1120,17 +1120,17 @@ export default function BookingPage() {
                           <div>
                             <div className="font-medium">{b.name}</div>
                             <div className="text-gray-400 text-[10px]">{b.patientId}</div>
-                            <div className="text-blue-600 text-[10px] font-semibold">Visit: {b.visitId}</div>
+                            <div className="text-orange-600 text-[10px] font-semibold">Visit: {b.visitId}</div>
                           </div>
                         </div>
                       </td>
                       <td className="p-2 whitespace-nowrap">{b.date}</td>
                       <td className="p-1">
                         <div className="flex flex-wrap gap-0.5 justify-center">
-                          <button onClick={()=>setSelectedBooking(b)} className="bg-primary-600 hover:bg-primary-700 text-white p-1 rounded" title="View"><Eye size={12}/></button>
-                          <button onClick={()=>{setEditingPatient(b);setFormData(b.patientData);}} className="bg-indigo-500 hover:bg-indigo-600 text-white p-1 rounded" title="Edit"><Pencil size={12}/></button>
+                          <button onClick={()=>setSelectedBooking(b)} className="bg-slate-900 hover:bg-orange-600 text-white p-1 rounded" title="View"><Eye size={12}/></button>
+                          <button onClick={()=>{setEditingPatient(b);setFormData(b.patientData);}} className="bg-slate-900 hover:bg-orange-600 text-white p-1 rounded" title="Edit"><Pencil size={12}/></button>
                           <button onClick={()=>handleDeleteBooking(b)} className="bg-red-500 hover:bg-red-600 text-white p-1 rounded" title="Delete"><Trash2 size={12}/></button>
-                          <button onClick={()=>handlePrintBooking(b)} className="bg-blue-700 hover:bg-blue-800 text-white p-1 rounded" title="Print"><Printer size={12}/></button>
+                          <button onClick={()=>handlePrintBooking(b)} className="bg-slate-900 hover:bg-orange-600 text-white p-1 rounded" title="Print"><Printer size={12}/></button>
                           <button onClick={()=>handleRebooking(b)} className="bg-green-600 hover:bg-green-700 text-white p-1 rounded" title="Rebook"><RefreshCw size={12}/></button>
                         </div>
                       </td>
@@ -1147,7 +1147,7 @@ export default function BookingPage() {
               <button
                 onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
                 disabled={currentPage === 1}
-                className={`flex items-center gap-1 px-3 py-1 rounded ${currentPage === 1 ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-primary-600 text-white hover:bg-primary-700'}`}>
+                className={`flex items-center gap-1 px-3 py-1 rounded ${currentPage === 1 ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-slate-900 hover:bg-orange-600 text-white'}`}>
                 <ChevronLeft size={14} />
                 Previous
               </button>
@@ -1177,7 +1177,7 @@ export default function BookingPage() {
                       <button
                         key={idx}
                         onClick={() => setCurrentPage(page)}
-                        className={`w-7 h-7 rounded ${currentPage === page ? 'bg-primary-600 text-white font-bold' : 'bg-white border hover:bg-gray-100'}`}>
+                        className={`w-7 h-7 rounded ${currentPage === page ? 'bg-orange-500 text-white font-bold' : 'bg-white border hover:bg-gray-100'}`}>
                         {page}
                       </button>
                     )
@@ -1188,7 +1188,7 @@ export default function BookingPage() {
               <button
                 onClick={() => setCurrentPage(p => Math.min(Math.ceil(filteredBookings.length / ITEMS_PER_PAGE), p + 1))}
                 disabled={currentPage === Math.ceil(filteredBookings.length / ITEMS_PER_PAGE)}
-                className={`flex items-center gap-1 px-3 py-1 rounded ${currentPage === Math.ceil(filteredBookings.length / ITEMS_PER_PAGE) ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-primary-600 text-white hover:bg-primary-700'}`}>
+                className={`flex items-center gap-1 px-3 py-1 rounded ${currentPage === Math.ceil(filteredBookings.length / ITEMS_PER_PAGE) ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-slate-900 hover:bg-orange-600 text-white'}`}>
                 Next
                 <ChevronRight size={14} />
               </button>
@@ -1201,12 +1201,12 @@ export default function BookingPage() {
           {selectedBooking ? (
             <>
               <div className="bg-white rounded shadow">
-                <div className={`${style.header} p-2 flex justify-between items-center`}>
+                <div className="bg-slate-900 text-white p-2 flex justify-between items-center">
                   <div>{selectedBooking.name} <span className="text-yellow-300">UID: {selectedBooking.visitId || selectedBooking.bookingId}</span></div>
                   <div className="flex gap-1">
-                    <button onClick={handleBill}    className="bg-primary-100 text-black px-3 py-1 rounded text-xs font-semibold">Bill</button>
-                    <button onClick={handleReceipt} className="bg-primary-100 text-black px-3 py-1 rounded text-xs font-semibold">Receipts</button>
-                    <button onClick={handleRefund}  className="bg-primary-100 text-black px-3 py-1 rounded text-xs font-semibold">Refund</button>
+                    <button onClick={handleBill}    className="bg-orange-100 text-black px-3 py-1 rounded text-xs font-semibold">Bill</button>
+                    <button onClick={handleReceipt} className="bg-orange-100 text-black px-3 py-1 rounded text-xs font-semibold">Receipts</button>
+                    <button onClick={handleRefund}  className="bg-orange-100 text-black px-3 py-1 rounded text-xs font-semibold">Refund</button>
                     <button onClick={()=>setSelectedBooking(null)} className="bg-red-500 p-1 rounded"><X size={16}/></button>
                   </div>
                 </div>
@@ -1238,7 +1238,7 @@ export default function BookingPage() {
                                   onMouseDown={e => e.preventDefault()}
                                   onClick={() => { setSelectedPackage(pkg); setPackageSearch(pkg.name); setShowPkgDropdown(false); setSearchTest(""); }}
                                   className={`px-3 py-2 cursor-pointer border-b last:border-b-0 text-sm transition-colors
-                                    ${selectedPackage?.id === pkg.id ? "bg-primary-100 font-semibold" : "hover:bg-primary-50"}`}
+                                    ${selectedPackage?.id === pkg.id ? "bg-orange-100 font-semibold" : "hover:bg-orange-50"}`}
                                 >
                                   <div className="font-medium text-gray-800">{pkg.name}</div>
                                   <div className="text-xs text-gray-500">
@@ -1273,15 +1273,15 @@ export default function BookingPage() {
                         setSelectedBooking(updated.find(b => b.bookingId === selectedBooking.bookingId));
                       }
                     }}
-                      className={`${testView==="all"?"bg-primary-700":"bg-primary-600"} text-white px-2 py-1 rounded shrink-0`}><RefreshCcw size={16}/></button>
+                      className={`${testView==="all"?"bg-orange-600":"bg-slate-900"} text-white px-2 py-1 rounded shrink-0`}><RefreshCcw size={16}/></button>
                     <button onClick={()=>{setTestView("packages");setSearchTest("");setPackageSearch("");setSelectedPackage(null);setTimeout(()=>setShowPkgDropdown(true),50);}}
-                      className={`${testView==="packages"?"bg-primary-700":"bg-primary-600"} text-white px-2 py-1 rounded shrink-0`} title="Packages"><Plus size={16}/></button>
+                      className={`${testView==="packages"?"bg-orange-600":"bg-slate-900"} text-white px-2 py-1 rounded shrink-0`} title="Packages"><Plus size={16}/></button>
                   </div>
 
                   <div className="p-2 border-b bg-gray-50 flex gap-3 items-center">
                     <span className="text-xs font-semibold text-gray-700">Category:</span>
                     <label className="flex items-center gap-2 cursor-pointer">
-                      <input type="radio" name="businessType" checked={businessType==="B2C"} onChange={()=>setBusinessType("B2C")} className="accent-primary-600"/>
+                      <input type="radio" name="businessType" checked={businessType==="B2C"} onChange={()=>setBusinessType("B2C")} className="accent-orange-600"/>
                       <span className="text-xs font-medium">B2C</span>
                     </label>
                     <label className="flex items-center gap-2 cursor-pointer">
@@ -1289,7 +1289,7 @@ export default function BookingPage() {
                       <span className="text-xs font-medium">B2B</span>
                     </label>
                   </div>
-                  <div className={`grid grid-cols-12 ${style.header} text-xs font-semibold px-2 py-1 items-center`}>
+                  <div className="grid grid-cols-12 bg-slate-900 text-white text-xs font-semibold px-2 py-1 items-center">
                     <div className="col-span-5 flex items-center gap-2">
                       {testView==="packages" && selectedPackage && (
                         <input
@@ -1410,13 +1410,13 @@ export default function BookingPage() {
                     const newTests = selectedBooking.tests.filter(t => !t.isExisting);
                     return (
                       <div className="bg-white rounded shadow flex flex-col" style={{maxHeight:"220px"}}>
-                        <div className={`${style.header} px-2 py-1 font-semibold text-xs flex justify-between items-center`}>
+                        <div className="bg-slate-900 text-white px-2 py-1 font-semibold text-xs flex justify-between items-center">
                           <span>New Tests Added</span>
                           <span className="text-yellow-300 text-xs">{newTests.length} test{newTests.length!==1?"s":""}</span>
                         </div>
                         <div className="overflow-y-auto flex-1">
                           <table className="w-full text-xs">
-                            <thead className={`${style.header} sticky top-0`}>
+                            <thead className="bg-slate-900 text-white sticky top-0">
                               <tr>
                                 <th className="px-2 py-1 text-left">Test</th>
                                 <th className="px-2 py-1 text-center">Charge</th>
@@ -1459,10 +1459,10 @@ export default function BookingPage() {
                     const existingTests = selectedBooking.tests.filter(t => t.isExisting);
                     return (
                       <div className="bg-white rounded shadow flex flex-col flex-1 overflow-hidden" style={{maxHeight:"220px"}}>
-                        <div className={`${style.header} px-2 py-1 font-semibold text-xs`}>Investigation(s)</div>
+                        <div className="bg-slate-900 text-white px-2 py-1 font-semibold text-xs">Investigation(s)</div>
                         <div className="flex-1 overflow-y-auto">
                           <table className="w-full text-xs">
-                            <thead className={`${style.header} sticky top-0`}>
+                            <thead className="bg-slate-900 text-white sticky top-0">
                               <tr>
                                 <th className="p-2 text-left">Sr.No</th>
                                 <th className="p-2 text-left">Investigation(s)</th>
@@ -1497,7 +1497,7 @@ export default function BookingPage() {
                                             className="w-16 border border-gray-300 rounded px-1 py-0.5 text-center text-xs focus:outline-none focus:ring-1 focus:ring-orange-500"/>
                                         ) : <span className="font-semibold">₹{charge}</span>}
                                         <button onClick={()=>setEditingCharge({testName:t.name,value:charge})}
-                                          className="text-blue-500 hover:text-blue-700 ml-1" title="Edit charge"><Pencil size={13}/></button>
+                                          className="text-primary-600 hover:text-primary-700 ml-1" title="Edit charge"><Pencil size={13}/></button>
                                       </div>
                                     </td>
                                     <td className="p-2 text-center">
@@ -1521,7 +1521,7 @@ export default function BookingPage() {
               <div className="bg-white rounded shadow p-3">
                 <div className="grid grid-cols-9 gap-2 mb-3 text-xs">
                   {[
-                    {label:"Total",         field:"",              val:total,                      ro:true,  color:"text-blue-600"},
+                    {label:"Total",         field:"",              val:total,                      ro:true,  color:"text-orange-600"},
                     {label:"Advance",       field:"advance",       val:billing.advance,            ro:true,  color:"text-orange-600"},
                     {label:"Discount",      field:"discount",      val:billing.discount,           ro:false, color:"text-gray-600"},
                     {label:"Refund",        field:"refund",        val:billing.refund,             ro:false, color:"text-gray-600"},
@@ -2049,7 +2049,7 @@ export default function BookingPage() {
                       setShowDownloadDropdown(!showDownloadDropdown);
                       setShowPrintDropdown(false);
                     }}
-                    className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-1.5 rounded text-sm font-semibold flex items-center gap-2"
+                    className="bg-slate-900 hover:bg-orange-600 text-white px-4 py-1.5 rounded text-sm font-semibold flex items-center gap-2"
                   >
                     <Download size={16} />
                     Download PDF
@@ -2180,7 +2180,7 @@ export default function BookingPage() {
                     
                     <div className="flex justify-between gap-8">
                       <span>Amount Paid:</span>
-                      <span className="font-semibold text-blue-600">Rs.{Math.round(billPaidAmount).toLocaleString()}</span>
+                      <span className="font-semibold text-orange-600">Rs.{Math.round(billPaidAmount).toLocaleString()}</span>
                     </div>
                     
                     <div className="flex justify-between gap-8">
