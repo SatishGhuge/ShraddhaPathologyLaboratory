@@ -822,6 +822,16 @@ export default function BookingPage() {
           sampleType: t.sample,
           businessType: businessType
         });
+        
+        // Check if new test has a different sample type than existing tests
+        const existingSamples = selectedBooking.tests.map(test => test.sample);
+        const newSampleType = t.sample;
+        const hasDifferentSample = !existingSamples.includes(newSampleType);
+        
+        // If different sample type, automatically show barcode modal
+        if (hasDifferentSample && updatedSelected) {
+          setTimeout(() => handlePrintBarcode(updatedSelected), 500);
+        }
       } catch (err) {
         console.error('Failed to save test to backend:', err);
         // Still keep it in local state even if backend save fails

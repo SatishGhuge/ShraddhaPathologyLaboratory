@@ -15,7 +15,7 @@ import {
   Barcode,
 } from "lucide-react";
 import { createPatient, searchPatient } from "@/src/api/patient";
-import { getDoctors, createDoctor, getSpecimenTypes, getFranchises, getCollectionCenters } from "@/src/api/master";
+import { getDoctors, createDoctor, getSpecimenTypes, getFranchises, getCollectionCenters, getOrganizations } from "@/src/api/master";
 import API_BASE_URL from "@/src/api/config";
 
 /* ------------------ INLINE DATE PICKER ------------------ */
@@ -314,7 +314,8 @@ export default function PatientRegistration() {
   const [selectedCreatedAt, setSelectedCreatedAt] = useState("");
   const [createdAtSearch, setCreatedAtSearch] = useState("");
   const [franchiseOptions, setFranchiseOptions] = useState<any[]>([]);
-  const [collectionCenterOptions, setCollectionCenterOptions] = useState<any[]>([]);  /* --- Departments and Packages from API --- */
+  const [collectionCenterOptions, setCollectionCenterOptions] = useState<any[]>([]);
+  const [organizationOptions, setOrganizationOptions] = useState<any[]>([]);  /* --- Departments and Packages from API --- */
   const [departments, setDepartments] = useState<any[]>([]);
   const [doctorsList, setDoctorsList] = useState<any[]>([]);
   const [specimenTypes, setSpecimenTypes] = useState<any[]>([]);
@@ -327,6 +328,7 @@ export default function PatientRegistration() {
     getSpecimenTypes().then(setSpecimenTypes).catch(console.error);
     getFranchises().then((res: any) => setFranchiseOptions(Array.isArray(res) ? res : res?.data || [])).catch(console.error);
     getCollectionCenters().then((res: any) => setCollectionCenterOptions(Array.isArray(res) ? res : res?.data || [])).catch(console.error);
+    getOrganizations().then((res: any) => setOrganizationOptions(Array.isArray(res) ? res : res?.data || [])).catch(console.error);
   }, []);
 
   const fetchDepartmentsData = async () => {
@@ -454,7 +456,12 @@ export default function PatientRegistration() {
   };
 
   const filteredCreatedAtOptions = () => {
-    const list = createdAtType === "Franchise" ? franchiseOptions : collectionCenterOptions;
+    let list;
+    if (createdAtType === "Franchise") list = franchiseOptions;
+    else if (createdAtType === "CollectionCenter") list = collectionCenterOptions;
+    else if (createdAtType === "Organization") list = organizationOptions;
+    else list = [];
+    
     return list.filter(o => 
       o.name.toLowerCase().includes(createdAtSearch.toLowerCase()) ||
       (o.location && o.location.toLowerCase().includes(createdAtSearch.toLowerCase()))
@@ -1364,6 +1371,7 @@ export default function PatientRegistration() {
                     if (!showCreatedAtDropdown && selectedCreatedAt) {
                       if (selectedCreatedAt.startsWith("Franchise:")) setCreatedAtType("Franchise");
                       else if (selectedCreatedAt.startsWith("Collection Center:")) setCreatedAtType("CollectionCenter");
+                      else if (selectedCreatedAt.startsWith("Organization:")) setCreatedAtType("Organization");
                       else if (selectedCreatedAt === "Lab") setCreatedAtType("Lab");
                       else setCreatedAtType("");
                     } else {
@@ -1384,7 +1392,7 @@ export default function PatientRegistration() {
                     <div className="p-3 border-b bg-gray-50 rounded-t-lg">
                       <p className="text-xs font-semibold text-gray-600 mb-2">Select Type</p>
                       <div className="flex flex-col gap-2">
-                        {["Franchise", "CollectionCenter", "Lab"].map((type) => (
+                        {["Franchise", "CollectionCenter", "Organization", "Lab"].map((type) => (
                           <label key={type} className="flex items-center gap-2 cursor-pointer hover:bg-gray-100 p-1 rounded">
                             <input
                               type="radio"
@@ -1400,11 +1408,11 @@ export default function PatientRegistration() {
                         ))}
                       </div>
                     </div>
-                    {(createdAtType === "Franchise" || createdAtType === "CollectionCenter") && (
+                    {(createdAtType === "Franchise" || createdAtType === "CollectionCenter" || createdAtType === "Organization") && (
                       <div className="p-2">
                         <input
                           className={`${input} mb-2`}
-                          placeholder={`Search ${createdAtType === "Franchise" ? "Franchise" : "Collection Center"}...`}
+                          placeholder={`Search ${createdAtType === "Franchise" ? "Franchise" : createdAtType === "CollectionCenter" ? "Collection Center" : "Organization"}...`}
                           value={createdAtSearch}
                           onChange={(e) => setCreatedAtSearch(e.target.value)}
                           autoFocus
@@ -1412,7 +1420,8 @@ export default function PatientRegistration() {
                         <div className="max-h-40 overflow-auto py-1">
                           {filteredCreatedAtOptions().length > 0 ? (
                             filteredCreatedAtOptions().map((opt, i, arr) => {
-                              const isSelected = selectedCreatedAt === `${createdAtType === "CollectionCenter" ? "Collection Center" : createdAtType}: ${opt.name}`;
+                              const displayType = createdAtType === "CollectionCenter" ? "Collection Center" : createdAtType;
+                              const isSelected = selectedCreatedAt === `${displayType}: ${opt.name}`;
                               return (
                                 <div key={opt.id} onClick={() => handleCreatedAtSelect(opt.name)}
                                   className={`px-4 py-2.5 text-xs cursor-pointer transition-colors
