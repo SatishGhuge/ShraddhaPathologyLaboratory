@@ -1,5 +1,5 @@
 import prisma from '../config/database.js';
-import { sendUserCredentialsEmail, sendFranchiseCredentialsEmail, sendCenterCredentialsEmail, sendStaffCredentialsEmail } from '../utils/email.js';
+import { sendUserCredentialsEmail, sendFranchiseCredentialsEmail, sendCenterCredentialsEmail, sendStaffCredentialsEmail, sendOrganizationCredentialsEmail } from '../utils/email.js';
 import { getPaginationParams, buildPaginatedResponse } from '../utils/pagination.js';
 
 // Helper function to process age ranges and auto-assign gender based on label
@@ -1262,6 +1262,169 @@ export const deleteFranchise = async (req, res) => {
   } catch (error) {
     console.error('Delete franchise error:', error);
     res.status(500).json({ success: false, message: 'Failed to delete franchise' });
+  }
+};
+
+/* ===============================================
+ * ORGANIZATION OPERATIONS
+ * =============================================== */
+
+// Helper: generate next ORG-XXX id
+async function generateOrganizationId() {
+  const last = await prisma.organization.findFirst({
+    where: { id: { startsWith: 'ORG-' } },
+    orderBy: { id: 'desc' },
+  });
+  let nextId = 'ORG-AAA';
+  if (last) {
+    const suffix = last.id.replace('ORG-', '');
+    if (suffix.length === 3 && /^[A-Z]{3}$/.test(suffix)) {
+      const chars = suffix.split('');
+      let i = 2;
+      while (i >= 0) {
+        if (chars[i] < 'Z') { chars[i] = String.fromCharCode(chars[i].charCodeAt(0) + 1); break; }
+        chars[i] = 'A'; i--;
+      }
+      nextId = 'ORG-' + chars.join('');
+    }
+  }
+  return nextId;
+}
+
+// Get all organizations
+export const getOrganizations = async (req, res) => {
+  try {
+    const organizations = await prisma.organization.findMany({ orderBy: { name: 'asc' } });
+    res.json({ success: true, data: organizations });
+  } catch (error) {
+    console.error('Get organizations error:', error);
+    res.status(500).json({ success: false, message: 'Failed to fetch organizations' });
+  }
+};
+
+// Get organization by ID
+export const getOrganizationById = async (req, res) => {
+  try {
+    const organization = await prisma.organization.findUnique({ where: { id: req.params.id } });
+    if (!organization) return res.status(404).json({ success: false, message: 'Organization not found' });
+    res.json({ success: true, data: organization });
+  } catch (error) {
+    console.error('Get organization error:', error);
+    res.status(500).json({ success: false, message: 'Failed to fetch organization' });
+  }
+};
+
+// Create organization
+export const createOrganization = async (req, res) => {
+  try {
+    const { name, code, location, address, mobile, email, date, isActive } = req.body;
+    if (!name) return res.status(400).json({ success: false, message: 'Name is required' });
+
+    const newId = await generateOrganizationId();
+    const suffix = newId.replace('ORG-', '');
+    const username = newId;           // ORG-AAA
+    const plainPassword = `${suffix}@123`;  // AAA@123
+
+    console.log('Creating organization:', { newId, name, email });
+
+    // Check if organization already exists
+    const existingOrg = await prisma.organization.findUnique({ where: { id: newId } });
+    if (existingOrg) {
+      return res.status(400).json({ success: false, message: 'Organization ID already exists' });
+    }
+
+    const organization = await prisma.organization.create({
+      data: {
+        id: newId,
+        name: name.trim(), code: code || null, location: location || null,
+        address: address || null, mobile: mobile || null,
+        email: email || null, date: date ? new Date(date) : null,
+        isActive: isActive !== false,
+      },
+    });
+
+    console.log('Organization created:', organization);
+
+    // Create user account for this organization
+    const bcrypt = await import('bcryptjs');
+    const hashed = await bcrypt.default.hash(plainPassword, 10);
+    
+    try {
+      await prisma.user.upsert({
+        where: { username },
+        update: { password: hashed, email: email || null, name: name.trim(), center: name.trim(), role: 'Organization' },
+        create: { username, name: name.trim(), center: name.trim(), role: 'Organization', password: hashed, email: email || null, mobile: mobile || null, gender: null, address: address || null },
+      });
+      console.log('User created for organization:', username);
+    } catch (userError) {
+      console.error('User creation error:', userError);
+      // Delete the organization if user creation fails
+      await prisma.organization.delete({ where: { id: newId } });
+      throw userError;
+    }
+
+    // Send credentials email if provided
+    if (email) {
+      sendOrganizationCredentialsEmail(email, name.trim(), username, plainPassword, false).catch(console.error);
+    }
+
+    res.status(201).json({
+      success: true,
+      message: 'Organization created successfully',
+      data: organization,
+      credentials: { username, password: plainPassword },
+    });
+  } catch (error) {
+    if (error.code === 'P2002') {
+      const field = error.meta?.target?.[0] || 'field';
+      return res.status(400).json({ success: false, message: `Organization ${field} already exists` });
+    }
+    console.error('Create organization error:', error);
+    res.status(500).json({ success: false, message: error.message || 'Failed to create organization' });
+  }
+};
+
+// Update organization
+export const updateOrganization = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name, code, location, address, mobile, email, date, isActive } = req.body;
+    const existing = await prisma.organization.findUnique({ where: { id } });
+    if (!existing) return res.status(404).json({ success: false, message: 'Organization not found' });
+
+    const organization = await prisma.organization.update({
+      where: { id },
+      data: {
+        name: name ? name.trim() : undefined,
+        code: code || null,
+        location: location || null,
+        address: address || null,
+        mobile: mobile || null,
+        email: email || null,
+        date: date ? new Date(date) : null,
+        isActive: isActive !== undefined ? isActive : undefined,
+      },
+    });
+
+    res.json({ success: true, message: 'Organization updated successfully', data: organization });
+  } catch (error) {
+    if (error.code === 'P2002') return res.status(400).json({ success: false, message: 'Organization name already exists' });
+    console.error('Update organization error:', error);
+    res.status(500).json({ success: false, message: 'Failed to update organization' });
+  }
+};
+
+// Delete organization
+export const deleteOrganization = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const existing = await prisma.organization.findUnique({ where: { id } });
+    if (!existing) return res.status(404).json({ success: false, message: 'Organization not found' });
+    await prisma.organization.update({ where: { id }, data: { isActive: false } });
+    res.json({ success: true, message: 'Organization deleted successfully' });
+  } catch (error) {
+    console.error('Delete organization error:', error);
+    res.status(500).json({ success: false, message: 'Failed to delete organization' });
   }
 };
 

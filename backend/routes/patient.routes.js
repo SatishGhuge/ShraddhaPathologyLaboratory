@@ -8,7 +8,8 @@ import {
   updatePatient,
   updatePayment,
   getPatientStatistics,
-  getPatientLocationStatistics
+  getPatientLocationStatistics,
+  addTestToVisit
 } from '../controllers/patient.controller.js';
 
 const router = express.Router();
@@ -43,5 +44,8 @@ router.put('/:patientId', updatePatient);
 
 // Update payment for a visit
 router.patch('/:patientId/payment', updatePayment);
+
+// Add test to existing visit
+router.post('/:patientId/visits/:visitId/tests', addTestToVisit);
 
 export default router;

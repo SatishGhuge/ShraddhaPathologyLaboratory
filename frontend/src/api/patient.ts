@@ -188,3 +188,11 @@ export const getPatientStatistics = async (filters: Filters = {}, page: number =
   
   return response;
 };
+
+// Add test to existing patient visit
+export const addTestToVisit = async (patientId: string, visitId: string, testData: any): Promise<ApiResponse> => {
+  return apiCall(`/patients/${patientId}/visits/${visitId}/tests`, {
+    method: 'POST',
+    body: JSON.stringify(testData),
+  });
+};

@@ -271,6 +271,22 @@ model Franchise {
   @@map("franchise")
 }
 
+model Organization {
+  id          String       @id
+  name        String       @unique
+  code        String?
+  location    String?
+  address     String?      @db.Text
+  mobile      String?
+  email       String?
+  date        DateTime?
+  isActive    Boolean      @default(true)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  @@map("organizations")
+}
+
 model CollectionCenter {
   id          String       @id
   name        String       @unique

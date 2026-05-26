@@ -649,3 +649,98 @@ export const getPatientLocationStatistics = async (req, res) => {
     });
   }
 };
+
+// Add test to existing patient visit
+export const addTestToVisit = async (req, res) => {
+  try {
+    const { patientId, visitId } = req.params;
+    const { testId, testName, charge, sampleType, businessType } = req.body;
+
+    // Verify patient exists
+    const patient = await prisma.patient.findUnique({
+      where: { patientId }
+    });
+
+    if (!patient) {
+      return res.status(404).json({
+        success: false,
+        message: 'Patient not found'
+      });
+    }
+
+    // Find existing tests for this visit to get visit details
+    const existingTests = await prisma.patientTest.findMany({
+      where: {
+        patientId,
+        visitId
+      }
+    });
+
+    if (!existingTests.length) {
+      return res.status(404).json({
+        success: false,
+        message: 'Visit not found for this patient'
+      });
+    }
+
+    const existingTest = existingTests[0];
+
+    // Create new test entry for this visit
+    const newTest = await prisma.patientTest.create({
+      data: {
+        patientId,
+        visitId,
+        testId: parseInt(testId),
+        departmentId: existingTest.departmentId,
+        sample: sampleType || existingTest.sample,
+        charge: parseFloat(charge) || 0,
+        status: 'REGISTERED',
+        visitType: existingTest.visitType,
+        reportMode: existingTest.reportMode,
+        referralDoctor: existingTest.referralDoctor,
+        visitDate: existingTest.visitDate,
+        visitTime: existingTest.visitTime,
+        paymentMode: existingTest.paymentMode,
+        businessType: businessType || existingTest.businessType,
+        totalAmount: parseFloat(charge) || 0,
+        paidAmount: existingTest.paidAmount || 0,
+        balanceAmount: existingTest.balanceAmount || 0,
+        discountAmount: existingTest.discountAmount || 0,
+        discountPercent: existingTest.discountPercent || 0,
+        discountRemark: existingTest.discountRemark || '',
+      }
+    });
+
+    // Recalculate balance for all tests in this visit
+    const allTests = await prisma.patientTest.findMany({
+      where: { patientId, visitId }
+    });
+
+    const totalAmount = allTests.reduce((sum, t) => sum + (t.totalAmount || 0), 0);
+    const paidAmount = existingTest.paidAmount || 0;
+    const discountAmount = existingTest.discountAmount || 0;
+    const newBalanceAmount = Math.max(0, totalAmount - discountAmount - paidAmount);
+
+    // Update all tests with the new balance
+    await prisma.patientTest.updateMany({
+      where: { patientId, visitId },
+      data: {
+        balanceAmount: newBalanceAmount
+      }
+    });
+
+    res.status(201).json({
+      success: true,
+      message: 'Test added to visit successfully',
+      data: newTest
+    });
+
+  } catch (error) {
+    console.error('Add test to visit error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to add test to visit',
+      error: error.message
+    });
+  }
+};

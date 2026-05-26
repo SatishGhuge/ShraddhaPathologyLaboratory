@@ -192,3 +192,17 @@ export const createFranchise = async (d: ApiData): Promise<any> => { const r = a
 export const createFranchiseWithCredentials = async (d: ApiData): Promise<ApiResponse> => apiCall('/master/franchises', { method: 'POST', body: JSON.stringify(d) });
 export const updateFranchise = async (id: string, d: ApiData): Promise<any> => { const r = await apiCall(`/master/franchises/${id}`, { method: 'PUT', body: JSON.stringify(d) }); return r.data || r; };
 export const deleteFranchise = async (id: string): Promise<ApiResponse> => apiCall(`/master/franchises/${id}`, { method: 'DELETE' });
+
+// ==================== ORGANIZATIONS ====================
+export const getOrganizations = async (page: number = 1, limit: number = 20): Promise<any> => { 
+  const params = new URLSearchParams();
+  params.append('page', page.toString());
+  params.append('limit', limit.toString());
+  const r = await apiCall(`/master/organizations?${params.toString()}`, { method: 'GET' }); 
+  return r; 
+};
+export const getOrganizationById = async (id: string): Promise<any | null> => { const r = await apiCall(`/master/organizations/${id}`, { method: 'GET' }); return r.data || null; };
+export const createOrganization = async (d: ApiData): Promise<any> => { const r = await apiCall('/master/organizations', { method: 'POST', body: JSON.stringify(d) }); return r.data || r; };
+export const createOrganizationWithCredentials = async (d: ApiData): Promise<ApiResponse> => apiCall('/master/organizations', { method: 'POST', body: JSON.stringify(d) });
+export const updateOrganization = async (id: string, d: ApiData): Promise<any> => { const r = await apiCall(`/master/organizations/${id}`, { method: 'PUT', body: JSON.stringify(d) }); return r.data || r; };
+export const deleteOrganization = async (id: string): Promise<ApiResponse> => apiCall(`/master/organizations/${id}`, { method: 'DELETE' });

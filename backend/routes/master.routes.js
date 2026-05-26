@@ -3,6 +3,7 @@ import {
   getDepartments, getAllDepartments, getDepartmentById, createDepartment, updateDepartment, deleteDepartment,
   getDoctors, createDoctor, updateDoctor, deleteDoctor,
   getFranchises, createFranchise, updateFranchise, deleteFranchise, getFranchiseById,
+  getOrganizations, createOrganization, updateOrganization, deleteOrganization, getOrganizationById,
   getCollectionCenters, getCollectionCenterById, createCollectionCenter, updateCollectionCenter, deleteCollectionCenter,
   getCorporates, getCorporateById, createCorporate, updateCorporate, deleteCorporate,
   getTests, getTestById, createTest, updateTest, deleteTest,
@@ -45,6 +46,13 @@ router.get('/franchises/:id', getFranchiseById);
 router.post('/franchises', createFranchise);
 router.put('/franchises/:id', updateFranchise);
 router.delete('/franchises/:id', deleteFranchise);
+
+// Organization routes
+router.get('/organizations', getOrganizations);
+router.get('/organizations/:id', getOrganizationById);
+router.post('/organizations', createOrganization);
+router.put('/organizations/:id', updateOrganization);
+router.delete('/organizations/:id', deleteOrganization);
 
 // Collection center routes
 router.get('/collection-centers', getCollectionCenters);

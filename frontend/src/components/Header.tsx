@@ -50,6 +50,7 @@ const modules: NavModule[] = [
       { label: "Centers", path: "/master/centerlist" },
       { label: "Corporates", path: "/master/corporatelist" },
       { label: "Franchise List", path: "/master/franchise" },
+      { label: "Organization", path: "/master/organization" },
       { label: "Specimen Type", path: "/master/specimen-type" },
       { label: "Units", path: "/master/units" },
     ],

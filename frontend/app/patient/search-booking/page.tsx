@@ -652,7 +652,8 @@ export default function BookingPage() {
     : (parseFloat(billing.discount) || 0);
   const netAmount = Math.max(0, total - discountAmount);
   const currentPaidAmount = selectedBooking?.paidAmount || 0;
-  const currentBalanceAmount = selectedBooking?.balanceAmount || netAmount;
+  // Calculate balance as: netAmount - paidAmount (not from database)
+  const currentBalanceAmount = Math.max(0, netAmount - currentPaidAmount);
 
   const handleBillingChange = (field: any, value: any) => setBilling(prev=>({...prev,[field]:value}));
 
@@ -786,9 +787,10 @@ export default function BookingPage() {
     }
   };
 
-  const handleClickTest = (t: any, pkg: any) => {
+  const handleClickTest = async (t: any, pkg: any) => {
     if (!selectedBooking) return alert("Please select a booking first");
     if (selectedBooking.tests.find(x => x.name === t.name && !x.isExisting)) return;
+    
     let testEntry = { ...t };
     if (pkg) {
       // divide package total across all its tests
@@ -800,11 +802,31 @@ export default function BookingPage() {
         fromPackage: pkg.name,
       };
     }
+    
+    // Add to local state first
     const updated = bookings.map(b=>
       b.bookingId===selectedBooking.bookingId ? {...b,tests:[...b.tests,testEntry]} : b
     );
     setBookings(updated);
-    setSelectedBooking(updated.find(b=>b.bookingId===selectedBooking.bookingId));
+    const updatedSelected = updated.find(b=>b.bookingId===selectedBooking.bookingId);
+    setSelectedBooking(updatedSelected);
+    
+    // Save to backend if this is an existing visit (has visitId)
+    if (selectedBooking.visitId) {
+      try {
+        const { addTestToVisit } = await import('@/src/api/patient');
+        await addTestToVisit(selectedBooking.patientId, selectedBooking.visitId, {
+          testId: t.id,
+          testName: t.name,
+          charge: testEntry.b2cCharge || testEntry.b2bCharge || 0,
+          sampleType: t.sample,
+          businessType: businessType
+        });
+      } catch (err) {
+        console.error('Failed to save test to backend:', err);
+        // Still keep it in local state even if backend save fails
+      }
+    }
   };
 
   const handleClickPackage = (pkg: any) => {
@@ -1390,15 +1412,7 @@ export default function BookingPage() {
                   </div>
 
                   <div className="p-2 border-b bg-gray-50 flex gap-3 items-center">
-                    <span className="text-xs font-semibold text-gray-700">Category:</span>
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input type="radio" name="businessType" checked={businessType==="B2C"} onChange={()=>setBusinessType("B2C")} className="accent-orange-600"/>
-                      <span className="text-xs font-medium">B2C</span>
-                    </label>
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input type="radio" name="businessType" checked={businessType==="B2B"} onChange={()=>setBusinessType("B2B")} className="accent-orange-500"/>
-                      <span className="text-xs font-medium">B2B</span>
-                    </label>
+                    {/* Category section removed - B2C/B2B selection removed */}
                   </div>
                   <div className="grid grid-cols-12 bg-slate-900 text-white text-xs font-semibold px-2 py-1 items-center">
                     <div className="col-span-5 flex items-center gap-2">
@@ -1513,64 +1527,18 @@ export default function BookingPage() {
                   )}
                 </div>
 
-                {/* RIGHT COLUMN — new tests on top, existing tests below */}
+                {/* RIGHT COLUMN — merged investigation table with new tests */}
                 <div className="flex flex-col gap-2 overflow-hidden">
 
-                  {/* TOP — newly added tests this session */}
+                  {/* MERGED — all tests (new + existing) */}
                   {(() => {
-                    const newTests = selectedBooking.tests.filter(t => !t.isExisting);
+                    const allTests = selectedBooking.tests;
                     return (
-                      <div className="bg-white rounded shadow flex flex-col" style={{maxHeight:"220px"}}>
+                      <div className="bg-white rounded shadow flex flex-col flex-1 overflow-hidden">
                         <div className="bg-slate-900 text-white px-2 py-1 font-semibold text-xs flex justify-between items-center">
-                          <span>New Tests Added</span>
-                          <span className="text-yellow-300 text-xs">{newTests.length} test{newTests.length!==1?"s":""}</span>
+                          <span>Investigation(s)</span>
+                          <span className="text-yellow-300 text-xs">{allTests.length} test{allTests.length!==1?"s":""}</span>
                         </div>
-                        <div className="overflow-y-auto flex-1">
-                          <table className="w-full text-xs">
-                            <thead className="bg-slate-900 text-white sticky top-0">
-                              <tr>
-                                <th className="px-2 py-1 text-left">Test</th>
-                                <th className="px-2 py-1 text-center">Charge</th>
-                                <th className="px-2 py-1 text-center">Action</th>
-                                <th className="px-2 py-1 text-center">Sample</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {newTests.length === 0 ? (
-                                <tr><td colSpan={4} className="p-3 text-center text-gray-400 text-xs">No new tests added</td></tr>
-                              ) : newTests.map((t,i) => {
-                                const charge = businessType==="B2C"?(t.b2cCharge||t.charge||0):(t.b2bCharge||t.charge||0);
-                                return (
-                                  <tr key={i} className={`border-b hover:bg-gray-50 ${t.fromPackage||t.isPackage?"bg-white":""}`}>
-                                    <td className="px-2 py-1">
-                                      <div className="flex items-center gap-1">
-                                        {(t.fromPackage||t.isPackage) && <span className="bg-orange-500 text-white text-xs px-1 rounded shrink-0">PKG</span>}
-                                        <span className="font-medium truncate max-w-[120px]" title={t.name}>{t.name}</span>
-                                      </div>
-                                    </td>
-                                    <td className="px-2 py-1 text-center font-semibold">{charge}</td>
-                                    <td className="px-2 py-1 text-center">
-                                      <button onClick={()=>handleDeleteTest(t)} className="text-red-500 hover:text-red-700"><X size={13}/></button>
-                                    </td>
-                                    <td className="px-2 py-1 text-center">
-                                      <input type="checkbox" defaultChecked className="w-3.5 h-3.5 accent-orange-500"/>
-                                    </td>
-                                  </tr>
-                                );
-                              })}
-                            </tbody>
-                          </table>
-                        </div>
-                      </div>
-                    );
-                  })()}
-
-                  {/* BOTTOM — existing (previously registered) tests */}
-                  {(() => {
-                    const existingTests = selectedBooking.tests.filter(t => t.isExisting);
-                    return (
-                      <div className="bg-white rounded shadow flex flex-col flex-1 overflow-hidden" style={{maxHeight:"220px"}}>
-                        <div className="bg-slate-900 text-white px-2 py-1 font-semibold text-xs">Investigation(s)</div>
                         <div className="flex-1 overflow-y-auto">
                           <table className="w-full text-xs">
                             <thead className="bg-slate-900 text-white sticky top-0">
@@ -1578,19 +1546,27 @@ export default function BookingPage() {
                                 <th className="p-2 text-left">Sr.No</th>
                                 <th className="p-2 text-left">Investigation(s)</th>
                                 <th className="p-2 text-center">Date</th>
-                                <th className="p-2 text-center">Charges</th>
+                                <th className="p-2 text-center">Amount</th>
                                 <th className="p-2 text-center">Action</th>
                               </tr>
                             </thead>
                             <tbody>
-                              {existingTests.length === 0 ? (
-                                <tr><td colSpan={5} className="p-3 text-center text-gray-400 text-xs">No previous investigations</td></tr>
-                              ) : existingTests.map((t,i) => {
-                                const charge    = businessType==="B2C"?(t.b2cCharge||t.charge):(t.b2bCharge||t.charge);
+                              {allTests.length === 0 ? (
+                                <tr><td colSpan={5} className="p-3 text-center text-gray-400 text-xs">No investigations added</td></tr>
+                              ) : allTests.map((t,i) => {
+                                const charge    = businessType==="B2C"?(t.b2cCharge||t.charge||0):(t.b2bCharge||t.charge||0);
                                 const isEditing = editingCharge?.testName===t.name;
+                                const isNewTest = !t.isExisting;
                                 return (
-                                  <tr key={i} className={`border-b hover:bg-gray-50 ${t.fromPackage||t.isPackage?"bg-white":""}`}>
-                                    <td className="p-2 text-center">{i+1}</td>
+                                  <tr key={i} className={`border-b hover:bg-gray-50 ${t.fromPackage||t.isPackage?"bg-orange-50":""}`}>
+                                    <td className="p-2 text-center">
+                                      <div className="flex items-center justify-center gap-1">
+                                        <span>{i+1}</span>
+                                        {isNewTest && (
+                                          <span className="text-blue-600 font-bold text-sm" title="Newly added test">N</span>
+                                        )}
+                                      </div>
+                                    </td>
                                     <td className="p-2">
                                       <div className="flex items-center gap-1 flex-wrap">
                                         {(t.fromPackage||t.isPackage) && <span className="bg-orange-500 text-white text-xs px-1.5 py-0.5 rounded font-semibold shrink-0">PKG</span>}
@@ -1633,7 +1609,7 @@ export default function BookingPage() {
                 <div className="grid grid-cols-9 gap-2 mb-3 text-xs">
                   {[
                     {label:"Total",         field:"",              val:total,                      ro:true,  color:"text-orange-600"},
-                    {label:"Advance",       field:"advance",       val:billing.advance,            ro:true,  color:"text-orange-600"},
+                    {label:"Advance",       field:"advance",       val:billing.advance,            ro:false, color:"text-blue-600"},
                     {label:"Discount",      field:"discount",      val:billing.discount,           ro:false, color:"text-gray-600"},
                     {label:"Refund",        field:"refund",        val:billing.refund,             ro:false, color:"text-gray-600"},
                     {label:"Bal Amt",       field:"balAmt",        val:currentBalanceAmount,       ro:true,  color:"text-red-600"},
@@ -2112,7 +2088,8 @@ export default function BookingPage() {
         
         const billNetAmount = Math.max(0, billTotal - billDiscountAmount);
         const billPaidAmount = selectedBooking.paidAmount || 0;
-        const billBalanceAmount = selectedBooking.balanceAmount || Math.max(0, billNetAmount - billPaidAmount);
+        // Calculate balance as: billNetAmount - billPaidAmount (not from database)
+        const billBalanceAmount = Math.max(0, billNetAmount - billPaidAmount);
         const isFullyPaid = billBalanceAmount <= 0;
         
         return (

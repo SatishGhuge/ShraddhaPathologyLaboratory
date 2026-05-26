@@ -422,3 +422,44 @@ export const sendFranchiseCredentialsEmail = async (email, franchiseName, userna
     console.error('❌ Failed to send franchise credentials email:', error.message);
   }
 };
+
+// Send organization credentials email (different format from franchise)
+export const sendOrganizationCredentialsEmail = async (email, organizationName, username, password, isUpdate = false) => {
+  try {
+    const transporter = createTransporter();
+    await transporter.sendMail({
+      from: `"Shraddha Pathology Laboratory" <${process.env.EMAIL_USER}>`,
+      to: email,
+      subject: isUpdate ? `Organization Account Updated — ${organizationName}` : `Welcome Organization Partner — ${organizationName}`,
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <div style="background: linear-gradient(135deg, #1e40af 0%, #f97316 100%); padding: 20px; text-align: center;">
+            <h1 style="color: white; margin: 0;">Shraddha Pathology Laboratory</h1>
+            <p style="color: #fed7aa; margin: 5px 0;">Organization Partner Portal</p>
+          </div>
+          <div style="padding: 30px; background: #fffbeb;">
+            <p style="color: #374151; font-size: 16px;">Hello,</p>
+            <p style="color: #374151; font-size: 16px;">
+              ${isUpdate
+                ? `The organization account for <strong>${organizationName}</strong> has been updated.`
+                : `Welcome! Your Organization account for <strong>${organizationName}</strong> has been created.`}
+            </p>
+            <div style="background: white; border: 2px solid #f97316; border-radius: 8px; padding: 20px; margin: 20px 0;">
+              <p style="margin: 8px 0; color: #374151; font-size: 15px;"><strong>Organization Name:</strong> ${organizationName}</p>
+              <p style="margin: 8px 0; color: #374151; font-size: 15px;"><strong>Username:</strong> ${username}</p>
+              ${!isUpdate ? `<p style="margin: 8px 0; color: #374151; font-size: 15px;"><strong>Password:</strong> ${password}</p>` : ''}
+            </div>
+            <p style="color: #374151; font-size: 15px;">Use these credentials to log in to the Shraddha Pathology Laboratory Organization portal.</p>
+            <p style="color: #374151; font-size: 15px;">Thank you for partnering with us.</p>
+          </div>
+          <div style="background: #fed7aa; padding: 15px; text-align: center;">
+            <p style="color: #92400e; font-size: 12px; margin: 0;">Shraddha Pathology Laboratory | Plot No-38, Sector-1, New Panvel - 410 206 | 📞 8779295302</p>
+          </div>
+        </div>
+      `,
+    });
+    console.log(`✅ Organization credentials email sent to ${email}`);
+  } catch (error) {
+    console.error('❌ Failed to send organization credentials email:', error.message);
+  }
+};
