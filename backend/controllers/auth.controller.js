@@ -51,7 +51,7 @@ export const login = async (req, res) => {
       if (!valid) return res.status(401).json({ success: false, message: 'Invalid credentials' });
       const token = jwt.sign({ id: user.id, userType: 'user' }, process.env.JWT_SECRET, { expiresIn: process.env.JWT_EXPIRE || '7d' });
       const { password: _, ...userData } = user;
-      return res.json({ success: true, message: 'Login successful', token, admin: { ...userData, userType: 'user' } });
+      return res.json({ success: true, message: 'Login successful', token, admin: { ...userData, userType: 'user', moduleAllocation: user.moduleAllocation } });
     }
 
     return res.status(401).json({ success: false, message: 'Invalid credentials' });

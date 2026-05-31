@@ -14,6 +14,7 @@ import {
   Search,
   Bell,
 } from "lucide-react";
+import { getAccessibleModules } from "@/utils/modulePermissions";
 
 const logo = "/logo.png";
 
@@ -24,7 +25,7 @@ interface NavModule {
   items: { label: string; path: string }[];
 }
 
-const modules: NavModule[] = [
+const allModules: NavModule[] = [
   {
     id: "patient",
     title: "Patient",
@@ -106,6 +107,7 @@ const Header = () => {
   const [showNotifications, setShowNotifications] = useState(false);
   const [sortOrder, setSortOrder] = useState("newest");
   const [notifications, setNotifications] = useState<any[]>([]);
+  const [modules, setModules] = useState<NavModule[]>(allModules);
 
   // Check if on public route
   const publicRoutes = ["/", "/login", "/seed-data"];
@@ -119,6 +121,98 @@ const Header = () => {
     const timer = setInterval(() => setDateTime(new Date()), 1000);
     return () => clearInterval(timer);
   }, []);
+
+  // Filter modules based on user module allocation
+  useEffect(() => {
+    const user = JSON.parse(localStorage.getItem("admin") || "{}");
+    const moduleAllocation = user.moduleAllocation;
+    
+    if (moduleAllocation) {
+      const accessible = getAccessibleModules(moduleAllocation);
+      
+      const filteredModules = allModules.map(module => {
+        if (module.id === "patient") {
+          return {
+            ...module,
+            items: module.items.filter(item => {
+              if (item.path.includes("registration")) return accessible.patient.registration;
+              if (item.path.includes("search-booking")) return accessible.patient.tests;
+              return true;
+            })
+          };
+        }
+        
+        if (module.id === "master") {
+          return {
+            ...module,
+            items: module.items.filter(item => {
+              if (item.path.includes("testlist")) return accessible.masters.testlist;
+              if (item.path.includes("units")) return accessible.masters.units;
+              if (item.path.includes("referral-doctor")) return accessible.masters.referralDoctorList;
+              if (item.path.includes("specimen-type")) return accessible.masters.specimenType;
+              if (item.path.includes("test-templets")) return accessible.masters.testTemplates;
+              if (item.path.includes("departmentlist")) return accessible.masters.departmentlist;
+              if (item.path.includes("packagelist")) return accessible.masters.packagelist;
+              if (item.path.includes("rolelist")) return accessible.masters.rolelist;
+              if (item.path.includes("userlist")) return accessible.masters.userlist;
+              if (item.path.includes("charges")) return accessible.masters.charges;
+              if (item.path.includes("centerlist")) return accessible.masters.centerlist;
+              if (item.path.includes("corporatelist")) return accessible.masters.corporatelist;
+              if (item.path.includes("franchise")) return accessible.masters.franchise;
+              if (item.path.includes("microbiology")) return accessible.masters.microbiologyOrganism;
+              if (item.path.includes("outsourcing")) return accessible.masters.outsourcing;
+              return true;
+            })
+          };
+        }
+        
+        if (module.id === "report") {
+          return {
+            ...module,
+            items: module.items.filter(item => {
+              if (item.path.includes("report-dashboard")) return accessible.reports.dashboard;
+              if (item.path.includes("daily-collection")) return accessible.reports.dailyCollection;
+              if (item.path.includes("monthly-collection")) return accessible.reports.monthlyCollectionSummary;
+              if (item.path.includes("patient-list")) return accessible.reports.patientList;
+              if (item.path.includes("center-wise")) return accessible.reports.centerWiseCostReport;
+              if (item.path.includes("b2b-testwise")) return accessible.reports.b2bTestwiseCostReport;
+              if (item.path.includes("discount-report")) return accessible.reports.discountReport;
+              if (item.path.includes("test-report")) return accessible.reports.testReport;
+              if (item.path.includes("test-compliment")) return accessible.reports.testCompliment;
+              if (item.path.includes("service-count")) return accessible.reports.serviceCountReport;
+              if (item.path.includes("payment-receipt")) return accessible.reports.paymentReceipt;
+              if (item.path.includes("sample-rejection")) return accessible.reports.sampleRejectionReport;
+              if (item.path.includes("worksheet")) return accessible.reports.detailedWorksheet;
+              if (item.path.includes("hospital-bills")) return accessible.reports.hospitalBills;
+              return true;
+            })
+          };
+        }
+        
+        if (module.id === "configuration") {
+          return accessible.signature ? module : { ...module, items: [] };
+        }
+        
+        if (module.id === "help") {
+          return accessible.help ? module : { ...module, items: [] };
+        }
+        
+        if (module.id === "result") {
+          return accessible.result ? module : { ...module, items: [] };
+        }
+        
+        return module;
+      }).filter(module => {
+        // Hide modules with no accessible items
+        if (module.items.length === 0 && ["patient", "master", "report", "configuration", "help"].includes(module.id)) {
+          return false;
+        }
+        return true;
+      });
+      
+      setModules(filteredModules);
+    }
+  }, [currentUser]);
 
   // Determine active module based on current pathname
   useEffect(() => {
@@ -141,7 +235,7 @@ const Header = () => {
         setActiveModule(moduleId);
       }
     }
-  }, [pathname]);
+  }, [pathname, modules]);
 
   // Load notifications from localStorage
   useEffect(() => {
@@ -180,7 +274,7 @@ const Header = () => {
   const isUser = currentUser.userType === "user" && !isCollectionCenter && !isFranchise;
   const isRestricted = isCollectionCenter || isFranchise;
 
-  // Filter modules based on user role
+  // Filter modules based on user role (legacy role-based filtering)
   const getVisibleModules = () => {
     return modules.filter((module) => {
       if (module.id === "master" && (isRestricted || isUser)) {
@@ -330,7 +424,15 @@ const Header = () => {
             {/* Admin Section */}
             <div className="flex items-center gap-3 pl-6 border-l border-gray-200 relative admin-popup-container">
               <div className="text-right">
-                <p className="text-sm font-semibold text-gray-800">Shraddha Admin</p>
+                <p className="text-sm font-semibold text-gray-800">
+                  {(() => {
+                    const user = JSON.parse(localStorage.getItem('admin') || '{}');
+                    const isAdmin = user.userType === 'admin' || !user.userType;
+                    const displayName = user.name || user.username || 'User';
+                    const role = user.role || (isAdmin ? 'Admin' : 'User');
+                    return isAdmin ? 'Shraddha Admin' : displayName;
+                  })()}
+                </p>
                 <p className="text-xs text-gray-500">
                   {dateTime.toLocaleDateString("en-IN", {
                     day: "2-digit",
@@ -343,7 +445,14 @@ const Header = () => {
                 className="w-10 h-10 bg-gradient-to-br from-primary-400 to-primary-600 rounded-full flex items-center justify-center text-white font-bold cursor-pointer hover:shadow-lg transition-shadow"
                 onClick={() => setShowAdminPopup(!showAdminPopup)}
               >
-                SA
+                {(() => {
+                  const user = JSON.parse(localStorage.getItem('admin') || '{}');
+                  const isAdmin = user.userType === 'admin' || !user.userType;
+                  if (isAdmin) return 'SA';
+                  const name = user.name || user.username || 'U';
+                  const initials = name.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2);
+                  return initials || 'U';
+                })()}
               </div>
 
               {/* Admin Popup */}

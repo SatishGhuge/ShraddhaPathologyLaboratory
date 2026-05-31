@@ -4451,15 +4451,26 @@ export const getUserById = async (req, res) => {
 
 export const createUser = async (req, res) => {
   try {
-    const { center, name, username, role, mobile, gender, email, address, password } = req.body;
+    const { center, name, username, role, mobile, gender, email, address, password, moduleAllocation } = req.body;
     if (!center || !name || !username || !role || !password) {
       return res.status(400).json({ success: false, message: 'Center, Name, Username, Role and Password are required' });
     }
     const bcrypt = await import('bcryptjs');
     const hashed = await bcrypt.default.hash(password, 10);
     const user = await prisma.user.create({
-      data: { center, name, username: username.trim(), role, mobile: mobile || null, gender: gender || null, email: email || null, address: address || null, password: hashed },
-      select: { id: true, center: true, name: true, username: true, role: true, mobile: true, gender: true, email: true, address: true },
+      data: { 
+        center, 
+        name, 
+        username: username.trim(), 
+        role, 
+        mobile: mobile || null, 
+        gender: gender || null, 
+        email: email || null, 
+        address: address || null, 
+        password: hashed,
+        moduleAllocation: moduleAllocation || null
+      },
+      select: { id: true, center: true, name: true, username: true, role: true, mobile: true, gender: true, email: true, address: true, moduleAllocation: true },
     });
 
     // Send credentials email if email is provided (non-blocking — don't fail user creation if email fails)
@@ -4480,11 +4491,21 @@ export const createUser = async (req, res) => {
 export const updateUser = async (req, res) => {
   try {
     const { id } = req.params;
-    const { center, name, username, role, mobile, gender, email, address, password } = req.body;
+    const { center, name, username, role, mobile, gender, email, address, password, moduleAllocation } = req.body;
     const existing = await prisma.user.findUnique({ where: { id: parseInt(id) } });
     if (!existing) return res.status(404).json({ success: false, message: 'User not found' });
 
-    const updateData = { center, name, username: username?.trim(), role, mobile: mobile || null, gender: gender || null, email: email || null, address: address || null };
+    const updateData = { 
+      center, 
+      name, 
+      username: username?.trim(), 
+      role, 
+      mobile: mobile || null, 
+      gender: gender || null, 
+      email: email || null, 
+      address: address || null,
+      moduleAllocation: moduleAllocation || null
+    };
     if (password) {
       const bcrypt = await import('bcryptjs');
       updateData.password = await bcrypt.default.hash(password, 10);
@@ -4493,7 +4514,7 @@ export const updateUser = async (req, res) => {
     const user = await prisma.user.update({
       where: { id: parseInt(id) },
       data: updateData,
-      select: { id: true, center: true, name: true, username: true, role: true, mobile: true, gender: true, email: true, address: true },
+      select: { id: true, center: true, name: true, username: true, role: true, mobile: true, gender: true, email: true, address: true, moduleAllocation: true },
     });
 
     // Send updated credentials email (non-blocking)
