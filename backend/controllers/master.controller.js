@@ -770,7 +770,7 @@ export const updateTest = async (req, res) => {
         name: name || undefined,
         shortName: shortName || undefined,
         testCode: testCode !== undefined ? (testCode || null) : undefined,
-        departmentId: departmentId ? parseInt(departmentId) : undefined,
+        department: departmentId ? { connect: { id: parseInt(departmentId) } } : undefined,
         sampleType: sampleType !== undefined ? (sampleType || null) : undefined,
         testMethod: testMethod !== undefined ? (testMethod || null) : undefined,
         machineName: machineName !== undefined ? (machineName || null) : undefined,
@@ -793,7 +793,7 @@ export const updateTest = async (req, res) => {
         isNABL: isNABL !== undefined ? isNABL : undefined,
         lineHeight: lineHeight !== undefined ? (lineHeight ? parseFloat(lineHeight) : null) : undefined,
         isActive: isActive !== undefined ? isActive : undefined,
-        linkedTestIds: req.body.linkedTestIds !== undefined ? JSON.stringify(req.body.linkedTestIds) : undefined
+        linkedTestIds: req.body.linkedTestIds ? JSON.stringify(req.body.linkedTestIds) : undefined
       }
     });
 
@@ -1124,147 +1124,6 @@ export const deleteDoctor = async (req, res) => {
   }
 };
 
-// Get all franchises
-export const getFranchises = async (req, res) => {
-  try {
-    const franchises = await prisma.franchise.findMany({ orderBy: { name: 'asc' } });
-    res.json({ success: true, data: franchises });
-  } catch (error) {
-    console.error('Get franchises error:', error);
-    res.status(500).json({ success: false, message: 'Failed to fetch franchises' });
-  }
-};
-
-// Get franchise by ID
-export const getFranchiseById = async (req, res) => {
-  try {
-    const franchise = await prisma.franchise.findUnique({ where: { id: req.params.id } });
-    if (!franchise) return res.status(404).json({ success: false, message: 'Franchise not found' });
-    res.json({ success: true, data: franchise });
-  } catch (error) {
-    console.error('Get franchise by id error:', error);
-    res.status(500).json({ success: false, message: 'Failed to fetch franchise' });
-  }
-};
-
-// Helper: generate next FR-XXX id
-async function generateFranchiseId() {
-  const last = await prisma.franchise.findFirst({
-    where: { id: { startsWith: 'FR-' } },
-    orderBy: { id: 'desc' },
-  });
-  let nextId = 'FR-AAA';
-  if (last) {
-    const suffix = last.id.replace('FR-', '');
-    if (suffix.length === 3 && /^[A-Z]{3}$/.test(suffix)) {
-      const chars = suffix.split('');
-      let i = 2;
-      while (i >= 0) {
-        if (chars[i] < 'Z') { chars[i] = String.fromCharCode(chars[i].charCodeAt(0) + 1); break; }
-        chars[i] = 'A'; i--;
-      }
-      nextId = 'FR-' + chars.join('');
-    }
-  }
-  return nextId;
-}
-
-// Create franchise
-export const createFranchise = async (req, res) => {
-  try {
-    const { name, code, location, address, mobile, email, date, isActive } = req.body;
-    if (!name) return res.status(400).json({ success: false, message: 'Name is required' });
-
-    const newId = await generateFranchiseId();
-    const suffix = newId.replace('FR-', '');
-    const username = newId;           // FR-AAA
-    const plainPassword = `${suffix}@123`;  // AAA@123
-
-    const franchise = await prisma.franchise.create({
-      data: {
-        id: newId,
-        name: name.trim(), code: code || null, location: location || null,
-        address: address || null, mobile: mobile || null,
-        email: email || null, date: date ? new Date(date) : null,
-        isActive: isActive !== false,
-      },
-    });
-
-    // Create user account for this franchise
-    const bcrypt = await import('bcryptjs');
-    const hashed = await bcrypt.default.hash(plainPassword, 10);
-    await prisma.user.upsert({
-      where: { username },
-      update: { password: hashed, email: email || null, name: name.trim(), center: name.trim(), role: 'Franchise' },
-      create: { username, name: name.trim(), center: name.trim(), role: 'Franchise', password: hashed, email: email || null, mobile: mobile || null, gender: null, address: address || null },
-    });
-
-    // Send credentials email if provided
-    if (email) {
-      sendFranchiseCredentialsEmail(email, name.trim(), username, plainPassword, false).catch(console.error);
-    }
-
-    res.status(201).json({
-      success: true,
-      message: 'Franchise created successfully',
-      data: franchise,
-      credentials: { username, password: plainPassword },
-    });
-  } catch (error) {
-    if (error.code === 'P2002') return res.status(400).json({ success: false, message: 'Franchise name already exists' });
-    console.error('Create franchise error:', error);
-    res.status(500).json({ success: false, message: 'Failed to create franchise' });
-  }
-};
-
-// Update franchise
-export const updateFranchise = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { name, code, location, address, mobile, email, date, isActive } = req.body;
-    const existing = await prisma.franchise.findUnique({ where: { id } });
-    if (!existing) return res.status(404).json({ success: false, message: 'Franchise not found' });
-
-    const franchise = await prisma.franchise.update({
-      where: { id },
-      data: {
-        name: name?.trim(), code: code || null, location: location || null,
-        address: address || null, mobile: mobile || null,
-        email: email || null, date: date ? new Date(date) : null,
-        isActive: isActive !== undefined ? isActive : existing.isActive,
-      },
-    });
-
-    // Send update notification email
-    const emailTo = email || existing.email;
-    if (emailTo) {
-      const franchiseUser = await prisma.user.findFirst({ where: { username: id } });
-      const username = franchiseUser?.username || id;
-      sendFranchiseCredentialsEmail(emailTo, name?.trim() || existing.name, username, null, true).catch(console.error);
-    }
-
-    res.json({ success: true, message: 'Franchise updated successfully', data: franchise });
-  } catch (error) {
-    if (error.code === 'P2002') return res.status(400).json({ success: false, message: 'Franchise name already exists' });
-    console.error('Update franchise error:', error);
-    res.status(500).json({ success: false, message: 'Failed to update franchise' });
-  }
-};
-
-// Delete franchise
-export const deleteFranchise = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const existing = await prisma.franchise.findUnique({ where: { id } });
-    if (!existing) return res.status(404).json({ success: false, message: 'Franchise not found' });
-    await prisma.franchise.update({ where: { id }, data: { isActive: false } });
-    res.json({ success: true, message: 'Franchise deleted successfully' });
-  } catch (error) {
-    console.error('Delete franchise error:', error);
-    res.status(500).json({ success: false, message: 'Failed to delete franchise' });
-  }
-};
-
 /* ===============================================
  * ORGANIZATION OPERATIONS
  * =============================================== */
@@ -1317,7 +1176,7 @@ export const getOrganizationById = async (req, res) => {
 // Create organization
 export const createOrganization = async (req, res) => {
   try {
-    const { name, code, location, address, mobile, email, date, isActive } = req.body;
+    const { name, code, location, address, mobile, email, date, isActive, testCharges } = req.body;
     if (!name) return res.status(400).json({ success: false, message: 'Name is required' });
 
     const newId = await generateOrganizationId();
@@ -1363,6 +1222,63 @@ export const createOrganization = async (req, res) => {
       throw userError;
     }
 
+    // Create test charges if provided, otherwise copy DEFAULT charges
+    let chargesCreated = 0;
+    
+    if (Array.isArray(testCharges) && testCharges.length > 0) {
+      // Use provided charges
+      for (const charge of testCharges) {
+        try {
+          await prisma.testCharge.create({
+            data: {
+              testId: parseInt(charge.testId),
+              organizationId: newId,
+              b2cCharge: parseFloat(charge.b2cCharge) || 0,
+              b2bCharge: parseFloat(charge.b2bCharge) || 0,
+              discountPercent: charge.discountPercent ? parseFloat(charge.discountPercent) : 0,
+              specialPrice: charge.specialPrice ? parseFloat(charge.specialPrice) : null,
+              isActive: true
+            }
+          });
+          chargesCreated++;
+        } catch (chargeError) {
+          console.warn(`Failed to create charge for test ${charge.testId}:`, chargeError.message);
+        }
+      }
+    } else {
+      // Copy DEFAULT charges (organizationId = null) to this new organization
+      try {
+        const defaultCharges = await prisma.testCharge.findMany({
+          where: { organizationId: null }
+        });
+        
+        for (const defaultCharge of defaultCharges) {
+          try {
+            await prisma.testCharge.create({
+              data: {
+                testId: defaultCharge.testId,
+                organizationId: newId,
+                b2cCharge: defaultCharge.b2cCharge,
+                b2bCharge: defaultCharge.b2bCharge,
+                discountPercent: defaultCharge.discountPercent || 0,
+                specialPrice: defaultCharge.specialPrice || null,
+                isActive: true
+              }
+            });
+            chargesCreated++;
+          } catch (chargeError) {
+            console.warn(`Failed to copy default charge for test ${defaultCharge.testId}:`, chargeError.message);
+          }
+        }
+        
+        if (chargesCreated > 0) {
+          console.log(`Copied ${chargesCreated} default charges to organization ${newId}`);
+        }
+      } catch (error) {
+        console.warn('Failed to copy default charges:', error.message);
+      }
+    }
+
     // Send credentials email if provided
     if (email) {
       sendOrganizationCredentialsEmail(email, name.trim(), username, plainPassword, false).catch(console.error);
@@ -1370,9 +1286,10 @@ export const createOrganization = async (req, res) => {
 
     res.status(201).json({
       success: true,
-      message: 'Organization created successfully',
+      message: `Organization created successfully${chargesCreated > 0 ? ` with ${chargesCreated} test charges` : ''}`,
       data: organization,
       credentials: { username, password: plainPassword },
+      chargesCreated
     });
   } catch (error) {
     if (error.code === 'P2002') {
@@ -1428,230 +1345,6 @@ export const deleteOrganization = async (req, res) => {
   }
 };
 
-// Get all collection centers
-export const getCollectionCenters = async (req, res) => {
-  try {
-    const centers = await prisma.collectionCenter.findMany({
-      orderBy: { name: 'asc' }
-    });
-    res.json({ success: true, data: centers });
-  } catch (error) {
-    console.error('Get collection centers error:', error);
-    res.status(500).json({ success: false, message: 'Failed to fetch collection centers' });
-  }
-};
-
-export const getCollectionCenterById = async (req, res) => {
-  try {
-    const center = await prisma.collectionCenter.findUnique({ where: { id: req.params.id } });
-    if (!center) return res.status(404).json({ success: false, message: 'Center not found' });
-    res.json({ success: true, data: center });
-  } catch (error) {
-    res.status(500).json({ success: false, message: 'Failed to fetch center' });
-  }
-};
-
-export const createCollectionCenter = async (req, res) => {
-  try {
-    const { name, code, location, address, mobile, email, date } = req.body;
-    if (!name) return res.status(400).json({ success: false, message: 'Name is required' });
-
-    // Generate next CT-XXX id — only look at existing CT- prefixed IDs
-    const last = await prisma.collectionCenter.findFirst({
-      where: { id: { startsWith: 'CT-' } },
-      orderBy: { id: 'desc' },
-    });
-    let nextId = 'CT-AAA';
-    if (last) {
-      const suffix = last.id.replace('CT-', ''); // e.g. "AAA"
-      if (suffix.length === 3 && /^[A-Z]{3}$/.test(suffix)) {
-        const chars = suffix.split('');
-        let i = 2;
-        while (i >= 0) {
-          if (chars[i] < 'Z') { chars[i] = String.fromCharCode(chars[i].charCodeAt(0) + 1); break; }
-          chars[i] = 'A'; i--;
-        }
-        nextId = 'CT-' + chars.join('');
-      }
-    }
-
-    const center = await prisma.collectionCenter.create({
-      data: {
-        id: nextId,
-        name: name.trim(),
-        code: code || null,
-        location: location || null,
-        address: address || null,
-        mobile: mobile || null,
-        email: email || null,
-        date: date ? new Date(date) : null,
-        isActive: true,
-      },
-    });
-
-    // Auto-generate user credentials: username = CT-AAA, password = AAA@123
-    const suffix = nextId.replace('CT-', '');
-    const username = nextId;
-    const plainPassword = `${suffix}@123`;
-
-    // Create user account for this center
-    const bcrypt = await import('bcryptjs');
-    const hashed = await bcrypt.default.hash(plainPassword, 10);
-    await prisma.user.upsert({
-      where: { username },
-      update: { password: hashed, email: email || null, name: name.trim(), center: name.trim(), role: 'Collection Center' },
-      create: { username, name: name.trim(), center: name.trim(), role: 'Collection Center', password: hashed, email: email || null, mobile: mobile || null, gender: null, address: address || null },
-    });
-
-    // Send credentials email if email provided
-    if (email) {
-      sendCenterCredentialsEmail(email, name.trim(), username, plainPassword, false).catch(console.error);
-    }
-
-    res.status(201).json({
-      success: true,
-      message: 'Center created successfully',
-      data: center,
-      credentials: { username, password: plainPassword },
-    });
-  } catch (error) {
-    if (error.code === 'P2002') return res.status(400).json({ success: false, message: 'Center name already exists' });
-    console.error('Create center error:', error);
-    res.status(500).json({ success: false, message: 'Failed to create center' });
-  }
-};
-
-export const updateCollectionCenter = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { name, code, location, address, mobile, email, date, isActive } = req.body;
-    const existing = await prisma.collectionCenter.findUnique({ where: { id } });
-    if (!existing) return res.status(404).json({ success: false, message: 'Center not found' });
-    const center = await prisma.collectionCenter.update({
-      where: { id },
-      data: {
-        name: name?.trim(),
-        code: code || null,
-        location: location || null,
-        address: address || null,
-        mobile: mobile || null,
-        email: email || null,
-        date: date ? new Date(date) : null,
-        isActive: isActive !== undefined ? isActive : existing.isActive,
-      },
-    });
-
-    // Send update notification email if email exists
-    const emailTo = email || existing.email;
-    const centerName = name?.trim() || existing.name;
-    if (emailTo) {
-      const centerUser = await prisma.user.findFirst({ where: { center: existing.name, role: 'Collection Center' } });
-      const username = centerUser?.username || id;
-      sendCenterCredentialsEmail(emailTo, centerName, username, null, true).catch(console.error);
-    }
-
-    res.json({ success: true, message: 'Center updated successfully', data: center });
-  } catch (error) {
-    if (error.code === 'P2002') return res.status(400).json({ success: false, message: 'Center name already exists' });
-    res.status(500).json({ success: false, message: 'Failed to update center' });
-  }
-};
-
-export const deleteCollectionCenter = async (req, res) => {
-  try {
-    const existing = await prisma.collectionCenter.findUnique({ where: { id: req.params.id } });
-    if (!existing) return res.status(404).json({ success: false, message: 'Center not found' });
-    await prisma.collectionCenter.update({ where: { id: req.params.id }, data: { isActive: false } });
-    res.json({ success: true, message: 'Center deleted successfully' });
-  } catch (error) {
-    res.status(500).json({ success: false, message: 'Failed to delete center' });
-  }
-};
-
-// Get all corporates
-export const getCorporates = async (req, res) => {
-  try {
-    const corporates = await prisma.corporate.findMany({
-      orderBy: { name: 'asc' }
-    });
-    res.json({ success: true, data: corporates });
-  } catch (error) {
-    console.error('Get corporates error:', error);
-    res.status(500).json({ success: false, message: 'Failed to fetch corporates' });
-  }
-};
-
-// Get corporate by ID
-export const getCorporateById = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const corporate = await prisma.corporate.findUnique({ where: { id: parseInt(id) } });
-    if (!corporate) return res.status(404).json({ success: false, message: 'Corporate not found' });
-    res.json({ success: true, data: corporate });
-  } catch (error) {
-    console.error('Get corporate error:', error);
-    res.status(500).json({ success: false, message: 'Failed to fetch corporate' });
-  }
-};
-
-// Create corporate
-export const createCorporate = async (req, res) => {
-  try {
-    const { name } = req.body;
-    if (!name?.trim()) return res.status(400).json({ success: false, message: 'Corporate name is required' });
-
-    const existing = await prisma.corporate.findUnique({ where: { name: name.trim() } });
-    if (existing) return res.status(400).json({ success: false, message: 'Corporate name already exists' });
-
-    const corporate = await prisma.corporate.create({ data: { name: name.trim(), isActive: true } });
-    res.status(201).json({ success: true, message: 'Corporate created successfully', data: corporate });
-  } catch (error) {
-    console.error('Create corporate error:', error);
-    res.status(500).json({ success: false, message: 'Failed to create corporate' });
-  }
-};
-
-// Update corporate
-export const updateCorporate = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { name, isActive } = req.body;
-
-    const existing = await prisma.corporate.findUnique({ where: { id: parseInt(id) } });
-    if (!existing) return res.status(404).json({ success: false, message: 'Corporate not found' });
-
-    if (name && name.trim() !== existing.name) {
-      const dup = await prisma.corporate.findUnique({ where: { name: name.trim() } });
-      if (dup) return res.status(400).json({ success: false, message: 'Corporate name already exists' });
-    }
-
-    const corporate = await prisma.corporate.update({
-      where: { id: parseInt(id) },
-      data: {
-        ...(name && { name: name.trim() }),
-        ...(isActive !== undefined && { isActive }),
-      }
-    });
-    res.json({ success: true, message: 'Corporate updated successfully', data: corporate });
-  } catch (error) {
-    console.error('Update corporate error:', error);
-    res.status(500).json({ success: false, message: 'Failed to update corporate' });
-  }
-};
-
-// Delete corporate
-export const deleteCorporate = async (req, res) => {
-  try {
-    const { id } = req.params;
-    await prisma.corporate.delete({ where: { id: parseInt(id) } });
-    res.json({ success: true, message: 'Corporate deleted successfully' });
-  } catch (error) {
-    console.error('Delete corporate error:', error);
-    if (error.code === 'P2025') return res.status(404).json({ success: false, message: 'Corporate not found' });
-    res.status(500).json({ success: false, message: 'Failed to delete corporate' });
-  }
-};
-
 // Get seed data summary
 export const getSeedDataSummary = async (req, res) => {
   try {
@@ -1659,9 +1352,7 @@ export const getSeedDataSummary = async (req, res) => {
       departmentCount,
       testCount,
       doctorCount,
-      franchiseCount,
-      collectionCenterCount,
-      corporateCount,
+      organizationCount,
       adminCount,
       sampleDepartments,
       sampleTests,
@@ -1670,9 +1361,7 @@ export const getSeedDataSummary = async (req, res) => {
       prisma.department.count(),
       prisma.test.count({ where: { isDeleted: false } }),
       prisma.doctor.count(),
-      prisma.franchise.count(),
-      prisma.collectionCenter.count(),
-      prisma.corporate.count(),
+      prisma.organization.count(),
       prisma.admin.count(),
       prisma.department.findMany({ take: 3, include: { tests: { take: 2 } } }),
       prisma.test.findMany({ take: 5, include: { department: true } }),
@@ -1684,11 +1373,9 @@ export const getSeedDataSummary = async (req, res) => {
         departments: departmentCount,
         tests: testCount,
         doctors: doctorCount,
-        franchises: franchiseCount,
-        collectionCenters: collectionCenterCount,
-        corporates: corporateCount,
+        organizations: organizationCount,
         admins: adminCount,
-        totalRecords: departmentCount + testCount + doctorCount + franchiseCount + collectionCenterCount + corporateCount + adminCount
+        totalRecords: departmentCount + testCount + doctorCount + organizationCount + adminCount
       },
       sampleData: {
         departments: sampleDepartments,
@@ -1711,45 +1398,59 @@ export const getSeedDataSummary = async (req, res) => {
       message: 'Failed to fetch seed data summary'
     });
   }
-};/* ==
-=============================================
+};
+
+/* ===============================================
  * TEST CHARGES OPERATIONS
  * =============================================== */
 
 // Get test charges
+// Get test charges - with optional filters by testId or organizationId
 export const getTestCharges = async (req, res) => {
   try {
-    const { testId } = req.params;
+    const { testId, organizationId } = req.params;
+    const { orgId } = req.query; // Alternative query param for organization filter
+    
+    const where = {};
+    
+    if (testId) {
+      where.testId = parseInt(testId);
+    }
+    
+    if (organizationId) {
+      where.organizationId = organizationId;
+    } else if (orgId) {
+      where.organizationId = orgId;
+    }
     
     const charges = await prisma.testCharge.findMany({
-      where: { testId: parseInt(testId) },
+      where,
       include: {
         test: {
           select: {
             id: true,
-            name: true
+            name: true,
+            shortName: true,
+            departmentId: true,
+            department: {
+              select: {
+                name: true
+              }
+            }
           }
         },
-        franchise: {
+        organization: {
           select: {
             id: true,
-            name: true
-          }
-        },
-        corporate: {
-          select: {
-            id: true,
-            name: true
-          }
-        },
-        collectionCenter: {
-          select: {
-            id: true,
-            name: true
+            name: true,
+            location: true
           }
         }
       },
-      orderBy: { createdAt: 'desc' }
+      orderBy: [
+        { organizationId: 'asc' },
+        { createdAt: 'desc' }
+      ]
     });
 
     res.json({
@@ -1765,16 +1466,61 @@ export const getTestCharges = async (req, res) => {
   }
 };
 
-// Create test charge
+// Get all test charges with test details
+export const getAllTestCharges = async (req, res) => {
+  try {
+    const { organizationId } = req.query;
+    
+    const where = { isDeleted: false };
+    
+    const tests = await prisma.test.findMany({
+      where,
+      include: {
+        department: {
+          select: {
+            name: true
+          }
+        },
+        charges: {
+          where: organizationId ? { organizationId } : {},
+          include: {
+            organization: {
+              select: {
+                id: true,
+                name: true,
+                location: true
+              }
+            }
+          }
+        }
+      },
+      orderBy: [
+        { sortOrder: 'asc' },
+        { name: 'asc' }
+      ]
+    });
+
+    res.json({
+      success: true,
+      data: tests
+    });
+  } catch (error) {
+    console.error('Get all test charges error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch test charges'
+    });
+  }
+};
+
+// Create test charge for organization
 export const createTestCharge = async (req, res) => {
   try {
     const {
       testId,
+      organizationId,
       b2cCharge,
       b2bCharge,
-      franchiseId,
-      corporateId,
-      collectionCenterId,
       discountPercent,
       specialPrice,
       effectiveFrom,
@@ -1782,15 +1528,18 @@ export const createTestCharge = async (req, res) => {
     } = req.body;
 
     // Validate required fields
-    if (!testId || (!b2cCharge && !b2bCharge)) {
+    if (!testId || !organizationId) {
       return res.status(400).json({
         success: false,
-        message: 'Test ID and at least one charge (B2C or B2B) are required'
+        message: 'Test ID and Organization ID are required'
       });
     }
 
-    if (b2cCharge && b2bCharge && parseFloat(b2bCharge) > parseFloat(b2cCharge)) {
-      return res.status(400).json({ success: false, message: 'B2B charge cannot be greater than B2C charge' });
+    if (!b2cCharge && !b2bCharge) {
+      return res.status(400).json({
+        success: false,
+        message: 'At least one charge (B2C or B2B) is required'
+      });
     }
 
     // Check if test exists
@@ -1805,42 +1554,53 @@ export const createTestCharge = async (req, res) => {
       });
     }
 
+    // Check if organization exists
+    const organization = await prisma.organization.findUnique({
+      where: { id: organizationId }
+    });
+
+    if (!organization) {
+      return res.status(404).json({
+        success: false,
+        message: 'Organization not found'
+      });
+    }
+
+    const finalB2C = parseFloat(b2cCharge) || 0;
+    const finalB2B = parseFloat(b2bCharge) || 0;
+    
+    if (finalB2B > finalB2C && finalB2C > 0) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'B2B charge cannot be greater than B2C charge' 
+      });
+    }
+
     const charge = await prisma.testCharge.create({
       data: {
         testId: parseInt(testId),
-        b2cCharge: parseFloat(b2cCharge) || 0,
-        b2bCharge: parseFloat(b2bCharge) || 0,
-        franchiseId: franchiseId || null,
-        corporateId: corporateId ? parseInt(corporateId) : null,
-        collectionCenterId: collectionCenterId || null,
+        organizationId,
+        b2cCharge: finalB2C,
+        b2bCharge: finalB2B,
         discountPercent: discountPercent ? parseFloat(discountPercent) : 0,
         specialPrice: specialPrice ? parseFloat(specialPrice) : null,
         effectiveFrom: effectiveFrom ? new Date(effectiveFrom) : new Date(),
-        effectiveTo: effectiveTo ? new Date(effectiveTo) : null
+        effectiveTo: effectiveTo ? new Date(effectiveTo) : null,
+        isActive: true
       },
       include: {
         test: {
           select: {
             id: true,
-            name: true
+            name: true,
+            shortName: true
           }
         },
-        franchise: {
+        organization: {
           select: {
             id: true,
-            name: true
-          }
-        },
-        corporate: {
-          select: {
-            id: true,
-            name: true
-          }
-        },
-        collectionCenter: {
-          select: {
-            id: true,
-            name: true
+            name: true,
+            location: true
           }
         }
       }
@@ -1857,7 +1617,7 @@ export const createTestCharge = async (req, res) => {
     if (error.code === 'P2002') {
       return res.status(400).json({
         success: false,
-        message: 'Charge configuration already exists for this combination'
+        message: 'Charge already exists for this test and organization combination'
       });
     }
 
@@ -1875,9 +1635,6 @@ export const updateTestCharge = async (req, res) => {
     const {
       b2cCharge,
       b2bCharge,
-      franchiseId,
-      corporateId,
-      collectionCenterId,
       discountPercent,
       specialPrice,
       effectiveFrom,
@@ -1899,8 +1656,12 @@ export const updateTestCharge = async (req, res) => {
 
     const finalB2C = b2cCharge ? parseFloat(b2cCharge) : existingCharge.b2cCharge;
     const finalB2B = b2bCharge ? parseFloat(b2bCharge) : existingCharge.b2bCharge;
-    if (finalB2B > finalB2C) {
-      return res.status(400).json({ success: false, message: 'B2B charge cannot be greater than B2C charge' });
+    
+    if (finalB2B > finalB2C && finalB2C > 0) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'B2B charge cannot be greater than B2C charge' 
+      });
     }
 
     const charge = await prisma.testCharge.update({
@@ -1908,9 +1669,6 @@ export const updateTestCharge = async (req, res) => {
       data: {
         b2cCharge: b2cCharge ? parseFloat(b2cCharge) : undefined,
         b2bCharge: b2bCharge ? parseFloat(b2bCharge) : undefined,
-        franchiseId: franchiseId || null,
-        corporateId: corporateId ? parseInt(corporateId) : null,
-        collectionCenterId: collectionCenterId || null,
         discountPercent: discountPercent ? parseFloat(discountPercent) : undefined,
         specialPrice: specialPrice ? parseFloat(specialPrice) : null,
         effectiveFrom: effectiveFrom ? new Date(effectiveFrom) : undefined,
@@ -1921,25 +1679,15 @@ export const updateTestCharge = async (req, res) => {
         test: {
           select: {
             id: true,
-            name: true
+            name: true,
+            shortName: true
           }
         },
-        franchise: {
+        organization: {
           select: {
             id: true,
-            name: true
-          }
-        },
-        corporate: {
-          select: {
-            id: true,
-            name: true
-          }
-        },
-        collectionCenter: {
-          select: {
-            id: true,
-            name: true
+            name: true,
+            location: true
           }
         }
       }
@@ -1964,7 +1712,6 @@ export const deleteTestCharge = async (req, res) => {
   try {
     const { id } = req.params;
 
-    // Check if charge exists
     const existingCharge = await prisma.testCharge.findUnique({
       where: { id: parseInt(id) }
     });
@@ -1993,408 +1740,124 @@ export const deleteTestCharge = async (req, res) => {
   }
 };
 
-// Get all test charges with test details
-export const getAllTestCharges = async (req, res) => {
+// Bulk create/update test charges for an organization
+export const bulkCreateTestCharges = async (req, res) => {
   try {
-    // Get all tests with their charges
-    const tests = await prisma.test.findMany({
-      where: { isDeleted: false },
-      include: {
-        department: {
-          select: {
-            name: true
-          }
-        },
-        charges: {
-          include: {
-            franchise: {
-              select: {
-                id: true,
-                name: true
-              }
-            },
-            corporate: {
-              select: {
-                id: true,
-                name: true
-              }
-            },
-            collectionCenter: {
-              select: {
-                id: true,
-                name: true
-              }
-            }
-          }
-        }
-      },
-      orderBy: [
-        { sortOrder: 'asc' },
-        { name: 'asc' }
-      ]
-    });
+    const { organizationId, charges } = req.body;
 
-    res.json({
-      success: true,
-      data: tests
-    });
-  } catch (error) {
-    console.error('Get all test charges error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to fetch test charges'
-    });
-  }
-};
-
-// Bulk update test charges
-export const bulkUpdateTestCharges = async (req, res) => {
-  try {
-    const { charges } = req.body; // Array of charge objects
-
-    if (!charges || !Array.isArray(charges)) {
+    // organizationId is optional - if not provided, these are DEFAULT charges
+    if (!Array.isArray(charges) || charges.length === 0) {
       return res.status(400).json({
         success: false,
         message: 'Charges array is required'
       });
     }
 
-    let updatedCount = 0;
-    let createdCount = 0;
+    // If organizationId is provided, verify it exists
+    if (organizationId) {
+      const organization = await prisma.organization.findUnique({
+        where: { id: organizationId }
+      });
 
-    // Process each charge in a transaction
-    await prisma.$transaction(async (prisma) => {
-      for (const charge of charges) {
-        const { testId, b2cCharge, b2bCharge, franchiseId, corporateId, collectionCenterId, chargeId } = charge;
+      if (!organization) {
+        return res.status(404).json({
+          success: false,
+          message: 'Organization not found'
+        });
+      }
+    }
 
-        if (parseFloat(b2bCharge) > parseFloat(b2cCharge)) {
-          throw new Error(`B2B charge cannot be greater than B2C charge for testId: ${testId}`);
+    const results = [];
+    const errors = [];
+    let created = 0;
+    let updated = 0;
+
+    for (const charge of charges) {
+      try {
+        const { testId, b2cCharge, b2bCharge, discountPercent, specialPrice } = charge;
+
+        if (!testId || (!b2cCharge && !b2bCharge)) {
+          errors.push({ testId, error: 'Test ID and at least one charge required' });
+          continue;
         }
 
-        if (chargeId) {
+        // Check if test exists
+        const test = await prisma.test.findUnique({
+          where: { id: parseInt(testId) }
+        });
+
+        if (!test) {
+          errors.push({ testId, error: 'Test not found' });
+          continue;
+        }
+
+        // For default charges (no organizationId), use null
+        const chargeOrgId = organizationId || null;
+
+        // Check if charge already exists
+        const existingCharge = await prisma.testCharge.findFirst({
+          where: {
+            testId: parseInt(testId),
+            organizationId: chargeOrgId
+          }
+        });
+
+        let result;
+        if (existingCharge) {
           // Update existing charge
-          await prisma.testCharge.update({
-            where: { id: parseInt(chargeId) },
+          result = await prisma.testCharge.update({
+            where: { id: existingCharge.id },
             data: {
-              b2cCharge: parseFloat(b2cCharge) || 0,
-              b2bCharge: parseFloat(b2bCharge) || 0
-            }
-          });
-          updatedCount++;
-        } else {
-          // Create new charge
-          await prisma.testCharge.create({
-            data: {
-              testId: parseInt(testId),
               b2cCharge: parseFloat(b2cCharge) || 0,
               b2bCharge: parseFloat(b2bCharge) || 0,
-              franchiseId: franchiseId || null,
-              corporateId: corporateId ? parseInt(corporateId) : null,
-              collectionCenterId: collectionCenterId || null
+              discountPercent: discountPercent ? parseFloat(discountPercent) : 0,
+              specialPrice: specialPrice ? parseFloat(specialPrice) : null
             }
           });
-          createdCount++;
-        }
-      }
-    });
-
-    res.json({
-      success: true,
-      message: `Bulk update completed: ${updatedCount} updated, ${createdCount} created`,
-      data: {
-        updated: updatedCount,
-        created: createdCount
-      }
-    });
-  } catch (error) {
-    console.error('Bulk update test charges error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to bulk update test charges'
-    });
-  }
-};/* 
-===============================================
- * CORPORATE CHARGES OPERATIONS
- * =============================================== */
-
-// Corporate charges functions
-export const getCorporateCharges = async (req, res) => {
-  try {
-    const { corporateId } = req.params;
-    
-    const charges = await prisma.corporateCharge.findMany({
-      where: { corporateId: parseInt(corporateId) },
-      include: {
-        test: {
-          select: {
-            id: true,
-            name: true,
-            testCode: true,
-            department: {
-              select: {
-                name: true
-              }
+          updated++;
+        } else {
+          // Create new charge
+          result = await prisma.testCharge.create({
+            data: {
+              testId: parseInt(testId),
+              organizationId: chargeOrgId,
+              b2cCharge: parseFloat(b2cCharge) || 0,
+              b2bCharge: parseFloat(b2bCharge) || 0,
+              discountPercent: discountPercent ? parseFloat(discountPercent) : 0,
+              specialPrice: specialPrice ? parseFloat(specialPrice) : null,
+              isActive: true
             }
-          }
-        },
-        corporate: {
-          select: {
-            id: true,
-            name: true
-          }
+          });
+          created++;
         }
-      },
-      orderBy: { createdAt: 'desc' }
-    });
+
+        results.push(result);
+      } catch (error) {
+        errors.push({ testId: charge.testId, error: error.message });
+      }
+    }
 
     res.json({
       success: true,
-      data: charges
-    });
-  } catch (error) {
-    console.error('Get corporate charges error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to fetch corporate charges'
-    });
-  }
-};
-
-// Get all corporate charges with test details
-export const getAllCorporateCharges = async (req, res) => {
-  try {
-    const tests = await prisma.test.findMany({
-      where: { isDeleted: false },
-      include: {
-        department: {
-          select: {
-            name: true
-          }
-        },
-        corporateCharges: {
-          include: {
-            corporate: {
-              select: {
-                id: true,
-                name: true
-              }
-            }
-          }
-        }
-      },
-      orderBy: [
-        { sortOrder: 'asc' },
-        { name: 'asc' }
-      ]
-    });
-
-    res.json({
-      success: true,
-      data: tests
-    });
-  } catch (error) {
-    console.error('Get all corporate charges error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to fetch corporate charges'
-    });
-  }
-};
-
-// Create corporate charge
-export const createCorporateCharge = async (req, res) => {
-  try {
-    const {
-      testId,
-      corporateId,
-      charges,
-      b2bCharges,
-      discountPercent,
-      specialPrice,
-      effectiveFrom,
-      effectiveTo
-    } = req.body;
-
-    if (!testId || !corporateId) {
-      return res.status(400).json({
-        success: false,
-        message: 'Test ID and Corporate ID are required'
-      });
-    }
-
-    const test = await prisma.test.findUnique({
-      where: { id: parseInt(testId) }
-    });
-
-    if (!test) {
-      return res.status(404).json({
-        success: false,
-        message: 'Test not found'
-      });
-    }
-
-    const corporate = await prisma.corporate.findUnique({
-      where: { id: parseInt(corporateId) }
-    });
-
-    if (!corporate) {
-      return res.status(404).json({
-        success: false,
-        message: 'Corporate not found'
-      });
-    }
-
-    const charge = await prisma.corporateCharge.create({
+      message: `Processed ${results.length} charges successfully${errors.length > 0 ? ` with ${errors.length} errors` : ''}`,
       data: {
-        testId: parseInt(testId),
-        corporateId: parseInt(corporateId),
-        charges: parseFloat(charges) || 0,
-        b2bCharges: parseFloat(b2bCharges) || 0,
-        discountPercent: discountPercent ? parseFloat(discountPercent) : 0,
-        specialPrice: specialPrice ? parseFloat(specialPrice) : null,
-        effectiveFrom: effectiveFrom ? new Date(effectiveFrom) : new Date(),
-        effectiveTo: effectiveTo ? new Date(effectiveTo) : null
-      },
-      include: {
-        test: {
-          select: {
-            id: true,
-            name: true,
-            testCode: true
-          }
-        },
-        corporate: {
-          select: {
-            id: true,
-            name: true
-          }
-        }
+        created,
+        updated,
+        total: results.length,
+        errors: errors.length > 0 ? errors : null,
+        charges: results
       }
     });
-
-    res.status(201).json({
-      success: true,
-      message: 'Corporate charge created successfully',
-      data: charge
-    });
   } catch (error) {
-    console.error('Create corporate charge error:', error);
-    
-    if (error.code === 'P2002') {
-      return res.status(400).json({
-        success: false,
-        message: 'Corporate charge already exists for this test'
-      });
-    }
-
+    console.error('Bulk create test charges error:', error);
     res.status(500).json({
       success: false,
-      message: 'Failed to create corporate charge'
+      message: 'Failed to bulk create test charges'
     });
   }
 };
 
-// Update corporate charge
-export const updateCorporateCharge = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const {
-      charges,
-      b2bCharges,
-      discountPercent,
-      specialPrice,
-      effectiveFrom,
-      effectiveTo,
-      isActive
-    } = req.body;
-
-    const existingCharge = await prisma.corporateCharge.findUnique({
-      where: { id: parseInt(id) }
-    });
-
-    if (!existingCharge) {
-      return res.status(404).json({
-        success: false,
-        message: 'Corporate charge not found'
-      });
-    }
-
-    const charge = await prisma.corporateCharge.update({
-      where: { id: parseInt(id) },
-      data: {
-        charges: charges ? parseFloat(charges) : undefined,
-        b2bCharges: b2bCharges ? parseFloat(b2bCharges) : undefined,
-        discountPercent: discountPercent ? parseFloat(discountPercent) : undefined,
-        specialPrice: specialPrice ? parseFloat(specialPrice) : null,
-        effectiveFrom: effectiveFrom ? new Date(effectiveFrom) : undefined,
-        effectiveTo: effectiveTo ? new Date(effectiveTo) : null,
-        isActive: isActive !== undefined ? isActive : undefined
-      },
-      include: {
-        test: {
-          select: {
-            id: true,
-            name: true,
-            testCode: true
-          }
-        },
-        corporate: {
-          select: {
-            id: true,
-            name: true
-          }
-        }
-      }
-    });
-
-    res.json({
-      success: true,
-      message: 'Corporate charge updated successfully',
-      data: charge
-    });
-  } catch (error) {
-    console.error('Update corporate charge error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to update corporate charge'
-    });
-  }
-};
-
-// Delete corporate charge
-export const deleteCorporateCharge = async (req, res) => {
-  try {
-    const { id } = req.params;
-
-    const existingCharge = await prisma.corporateCharge.findUnique({
-      where: { id: parseInt(id) }
-    });
-
-    if (!existingCharge) {
-      return res.status(404).json({
-        success: false,
-        message: 'Corporate charge not found'
-      });
-    }
-
-    await prisma.corporateCharge.delete({
-      where: { id: parseInt(id) }
-    });
-
-    res.json({
-      success: true,
-      message: 'Corporate charge deleted successfully'
-    });
-  } catch (error) {
-    console.error('Delete corporate charge error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to delete corporate charge'
-    });
-  }
-};/* =
-==============================================
+/* ===============================================
  * PACKAGE OPERATIONS
  * =============================================== */
 

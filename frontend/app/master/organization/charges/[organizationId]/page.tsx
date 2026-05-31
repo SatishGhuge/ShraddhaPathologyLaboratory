@@ -1,19 +1,21 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
-
+import { useRouter, useParams } from "next/navigation";
+import { DollarSign, RotateCcw, FileSpreadsheet, FileText } from "lucide-react";
 import Header from "@/src/components/Header";
 import PageHeader from "@/src/components/BreadCrumb";
-import { DollarSign, RotateCcw, FileSpreadsheet, FileText } from "lucide-react";
 
-export default function AddLabCharges() {
+export default function OrganizationCharges() {
   const router = useRouter();
+  const params = useParams();
+  const organizationId = params.organizationId as string;
+
   const [tests, setTests] = useState<any[]>([]);
   const [charges, setCharges] = useState<any[]>([]);
+  const [organization, setOrganization] = useState<any>(null);
   const [b2bError, setB2bError] = useState("");
   const [filteredData, setFilteredData] = useState<any[]>([]);
-  const [selectedType, setSelectedType] = useState("Walkin");
   const [loading, setLoading] = useState(false);
 
   const [searchName, setSearchName] = useState("");
@@ -24,43 +26,51 @@ export default function AddLabCharges() {
   const [bulkB2BCharge, setBulkB2BCharge] = useState("");
   const [showBulkModal, setShowBulkModal] = useState(false);
 
-  // Fetch tests and charges on component mount
+  // Fetch organization, tests and charges on component mount
   useEffect(() => {
-    fetchTestsAndCharges();
-  }, []);
+    fetchData();
+  }, [organizationId]);
 
-  const fetchTestsAndCharges = async () => {
+  const fetchData = async () => {
     try {
       setLoading(true);
       setError("");
-      
-      // Fetch all tests with their charges
-      const chargesResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/master/test-charges/all`);
-      const chargesResult = await chargesResponse.json();
-      
-      if (chargesResult.success) {
-        // chargesResult.data is an array of tests with charges nested
-        const testsData = chargesResult.data;
-        setTests(testsData);
-        
-        // Extract charges from tests
-        const chargesMap: any = {};
-        testsData.forEach((test: any) => {
-          if (test.charges && test.charges.length > 0) {
-            chargesMap[test.id] = test.charges;
-          }
-        });
-        
-        setCharges(Object.entries(chargesMap).map(([testId, charges]: [string, any]) => ({
-          testId: parseInt(testId),
-          charges
-        })));
+
+      // Fetch organization details
+      const orgResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/master/organizations/${organizationId}`);
+      const orgResult = await orgResponse.json();
+
+      if (orgResult.success) {
+        setOrganization(orgResult.data);
       } else {
-        setError('Failed to load charges from server');
+        setError("Failed to load organization");
+        return;
+      }
+
+      // Fetch all tests
+      const testsResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/master/tests`);
+      const testsResult = await testsResponse.json();
+
+      if (testsResult.success) {
+        setTests(testsResult.data);
+
+        // Fetch charges for this organization
+        const chargesResponse = await fetch(
+          `${process.env.NEXT_PUBLIC_API_URL}/master/organizations/${organizationId}/charges`
+        );
+        const chargesResult = await chargesResponse.json();
+
+        if (chargesResult.success) {
+          setCharges(chargesResult.data || []);
+        } else {
+          setCharges([]);
+        }
+      } else {
+        setError("Failed to load tests from server");
       }
     } catch (error) {
-      console.error('Error fetching data:', error);
-      setError('Failed to connect to server. Please make sure the backend is running on port 5000.');
+      console.error("Error fetching data:", error);
+      setError("Failed to connect to server. Please make sure the backend is running on port 5000.");
     } finally {
       setLoading(false);
     }
@@ -69,55 +79,37 @@ export default function AddLabCharges() {
   // Search - Real-time filtering as user types
   useEffect(() => {
     if (!tests.length) return;
-    
-    const result = tests.map(test => {
-      // Get charges from test.charges array (from API response)
-      const testCharges = test.charges || [];
-      // Get default charge (organizationId is null)
-      const defaultCharge = testCharges.find((c: any) => !c.organizationId);
-      
-      return {
-        id: test.id,
-        name: test.name,
-        code: test.testCode || '',
-        group: test.group || test.department?.name || '',
-        charges: defaultCharge?.b2cCharge || 0,
-        b2b: defaultCharge?.b2bCharge || 0,
-        chargeId: defaultCharge?.id || null
-      };
-    }).filter((item) =>
-      item.name.toLowerCase().includes(searchName.toLowerCase()) &&
-      item.code.toLowerCase().includes(searchCode.toLowerCase()) &&
-      item.group.toLowerCase().includes(searchGroup.toLowerCase())
-    );
-    
+
+    const result = tests
+      .map((test) => {
+        const testCharge = charges.find((c: any) => c.testId === test.id);
+
+        return {
+          id: test.id,
+          name: test.name,
+          code: test.testCode || "",
+          group: test.group || test.department?.name || "",
+          charges: testCharge?.b2cCharge || 0,
+          b2b: testCharge?.b2bCharge || 0,
+          chargeId: testCharge?.id || null,
+        };
+      })
+      .filter(
+        (item) =>
+          item.name.toLowerCase().includes(searchName.toLowerCase()) &&
+          item.code.toLowerCase().includes(searchCode.toLowerCase()) &&
+          item.group.toLowerCase().includes(searchGroup.toLowerCase())
+      );
+
     setFilteredData(result);
-  }, [tests, searchName, searchCode, searchGroup]);
+  }, [tests, charges, searchName, searchCode, searchGroup]);
 
-  // Manual search button (for consistency with UI)
-  const handleSearch = () => {
-    // Search is already handled by useEffect above
-    console.log('Search triggered');
-  };
-
-  // Reset
+  // Handle Dropdown Change
   const handleReset = () => {
     setSearchName("");
     setSearchCode("");
     setSearchGroup("");
-    setSelectedType("Walkin");
     setError("");
-    // Data will be re-filtered automatically by useEffect
-  };
-
-  // Handle Dropdown Change
-  const handleTypeChange = (e: any) => {
-    const type = e.target.value;
-    setSelectedType(type);
-    console.log("Selected Type:", type);
-    
-    // For now, just reload data - you can implement type-specific filtering later
-    fetchTestsAndCharges();
   };
 
   // Change Charges
@@ -144,9 +136,9 @@ export default function AddLabCharges() {
     const updated = filteredData.map((item) => ({
       ...item,
       charges: bulkCharge ? parseFloat(bulkCharge) : item.charges,
-      b2b: bulkB2BCharge ? parseFloat(bulkB2BCharge) : item.b2b
+      b2b: bulkB2BCharge ? parseFloat(bulkB2BCharge) : item.b2b,
     }));
-    
+
     setFilteredData(updated);
     setShowBulkModal(false);
     setBulkCharge("");
@@ -157,8 +149,8 @@ export default function AddLabCharges() {
   // Save charges to database
   const handleSave = async () => {
     // Validate B2B <= B2C for all rows
-    const invalid = filteredData.find(item =>
-      item.charges > 0 && item.b2b > 0 && parseFloat(item.b2b) > parseFloat(item.charges)
+    const invalid = filteredData.find(
+      (item) => item.charges > 0 && item.b2b > 0 && parseFloat(item.b2b) > parseFloat(item.charges)
     );
     if (invalid) {
       setB2bError(`B2B charge cannot be greater than B2C charge for test: "${invalid.name}"`);
@@ -167,45 +159,45 @@ export default function AddLabCharges() {
     try {
       setLoading(true);
       setError("");
-      
-      // Prepare bulk update data for DEFAULT charges (no organizationId)
+
+      // Prepare bulk update data
       const bulkCharges = filteredData
-        .filter(item => (item.charges && item.charges > 0) || (item.b2b && item.b2b > 0))
-        .map(item => ({
+        .filter((item) => (item.charges && item.charges > 0) || (item.b2b && item.b2b > 0))
+        .map((item) => ({
           testId: item.id,
           b2cCharge: parseFloat(item.charges) || 0,
-          b2bCharge: parseFloat(item.b2b) || 0
+          b2bCharge: parseFloat(item.b2b) || 0,
         }));
 
       if (bulkCharges.length === 0) {
         alert("No charges to save. Please enter some charges first.");
         return;
       }
-      
+
       const token = localStorage.getItem('token');
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/master/test-charges/bulk`, {
-        method: 'POST',
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
           ...(token && { 'Authorization': `Bearer ${token}` })
         },
         body: JSON.stringify({
-          // No organizationId - these are DEFAULT charges
-          charges: bulkCharges
-        })
+          organizationId,
+          charges: bulkCharges,
+        }),
       });
-      
+
       const result = await response.json();
-      
+
       if (result.success) {
-        alert(`✅ ${result.data.updated + result.data.created} charges saved successfully!`);
-        fetchTestsAndCharges(); // Reload data to get updated charge IDs
+        alert(`✅ ${result.data.created + result.data.updated} charges saved successfully!`);
+        fetchData(); // Reload data to get updated charge IDs
       } else {
-        setError(result.message || 'Failed to save charges');
+        setError(result.message || "Failed to save charges");
       }
     } catch (error) {
-      console.error('Error saving charges:', error);
-      setError('Failed to save charges');
+      console.error("Error saving charges:", error);
+      setError("Failed to save charges");
     } finally {
       setLoading(false);
     }
@@ -214,162 +206,125 @@ export default function AddLabCharges() {
   // Export to Excel
   const handleExportExcel = async () => {
     try {
-      // Check if xlsx is available
-      const XLSX = await import('xlsx').catch(() => null);
-      
+      const XLSX = await import("xlsx").catch(() => null);
+
       if (!XLSX) {
         alert('Excel export feature requires the "xlsx" package to be installed.\n\nPlease run: npm install xlsx');
         return;
       }
-      
-      // Prepare data for export
+
       const exportData = filteredData.map((item, index) => ({
-        'Sr.No': index + 1,
-        'Test Name': item.name,
-        'Test Code': item.code,
-        'Group': item.group,
-        'Charges': item.charges,
-        'B2B': item.b2b
+        "Sr.No": index + 1,
+        "Test Name": item.name,
+        "Test Code": item.code,
+        Group: item.group,
+        Charges: item.charges,
+        B2B: item.b2b,
       }));
 
-      // Create worksheet
       const ws = XLSX.utils.json_to_sheet(exportData);
-      
-      // Set column widths
-      ws['!cols'] = [
-        { wch: 8 },  // Sr.No
-        { wch: 30 }, // Test Name
-        { wch: 15 }, // Test Code
-        { wch: 20 }, // Group
-        { wch: 12 }, // Charges
-        { wch: 12 }  // B2B
+
+      ws["!cols"] = [
+        { wch: 8 },
+        { wch: 30 },
+        { wch: 15 },
+        { wch: 20 },
+        { wch: 12 },
+        { wch: 12 },
       ];
 
-      // Create workbook
       const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, "Lab Charges");
+      XLSX.utils.book_append_sheet(wb, ws, "Organization Charges");
 
-      // Generate filename with date
-      const date = new Date().toISOString().split('T')[0];
-      const filename = `Lab_Charges_${selectedType}_${date}.xlsx`;
+      const date = new Date().toISOString().split("T")[0];
+      const filename = `${organization?.name}_Charges_${date}.xlsx`;
 
-      // Save file
       XLSX.writeFile(wb, filename);
     } catch (error) {
-      console.error('Error exporting to Excel:', error);
-      alert('Error exporting to Excel. Please try again.');
+      console.error("Error exporting to Excel:", error);
+      alert("Error exporting to Excel. Please try again.");
     }
   };
 
   // Export to PDF
   const handleExportPDF = async () => {
     try {
-      // Check if jsPDF is available
-      const jsPDFModule = await import('jspdf').catch(() => null);
-      const autoTableModule = await import('jspdf-autotable').catch(() => null);
-      
+      const jsPDFModule = await import("jspdf").catch(() => null);
+      const autoTableModule = await import("jspdf-autotable").catch(() => null);
+
       if (!jsPDFModule || !autoTableModule) {
         alert('PDF export feature requires "jspdf" and "jspdf-autotable" packages to be installed.\n\nPlease run: npm install jspdf jspdf-autotable');
         return;
       }
-      
+
       const jsPDF = jsPDFModule.default;
       const autoTable = autoTableModule.default;
-      
+
       const doc = new jsPDF();
 
-      // Add title
       doc.setFontSize(18);
-      doc.text('Lab Charges Report', 14, 20);
-      
-      // Add type and date
-      doc.setFontSize(11);
-      doc.text(`Type: ${selectedType}`, 14, 30);
-      doc.text(`Date: ${new Date().toLocaleDateString()}`, 14, 37);
+      doc.text(`${organization?.name} - Charges Report`, 14, 20);
 
-      // Prepare table data
+      doc.setFontSize(11);
+      doc.text(`Date: ${new Date().toLocaleDateString()}`, 14, 30);
+
       const tableData = filteredData.map((item, index) => [
         index + 1,
         item.name,
         item.code,
         item.group,
         item.charges,
-        item.b2b
+        item.b2b,
       ]);
 
-      // Add table using autoTable
       autoTable(doc, {
-        startY: 45,
-        head: [['Sr.No', 'Test Name', 'Test Code', 'Group', 'Charges', 'B2B']],
+        startY: 40,
+        head: [["Sr.No", "Test Name", "Test Code", "Group", "Charges", "B2B"]],
         body: tableData,
-        theme: 'grid',
+        theme: "grid",
         headStyles: {
-          fillColor: [249, 115, 22], // Orange color
+          fillColor: [249, 115, 22],
           textColor: 255,
-          fontStyle: 'bold'
+          fontStyle: "bold",
         },
         styles: {
           fontSize: 9,
-          cellPadding: 3
+          cellPadding: 3,
         },
         columnStyles: {
-          0: { cellWidth: 15 },  // Sr.No
-          1: { cellWidth: 60 },  // Test Name
-          2: { cellWidth: 30 },  // Test Code
-          3: { cellWidth: 35 },  // Group
-          4: { cellWidth: 25 },  // Charges
-          5: { cellWidth: 20 }   // B2B
-        }
+          0: { cellWidth: 15 },
+          1: { cellWidth: 60 },
+          2: { cellWidth: 30 },
+          3: { cellWidth: 35 },
+          4: { cellWidth: 25 },
+          5: { cellWidth: 20 },
+        },
       });
 
-      // Generate filename with date
-      const date = new Date().toISOString().split('T')[0];
-      const filename = `Lab_Charges_${selectedType}_${date}.pdf`;
+      const date = new Date().toISOString().split("T")[0];
+      const filename = `${organization?.name}_Charges_${date}.pdf`;
 
-      // Save PDF
       doc.save(filename);
     } catch (error) {
-      console.error('Error exporting to PDF:', error);
-      alert('Error exporting to PDF. Please try again.');
+      console.error("Error exporting to PDF:", error);
+      alert("Error exporting to PDF. Please try again.");
     }
   };
 
   return (
     <>
       <Header />
-      
+
       <div className="p-6 bg-white min-h-screen">
         {/* Page Header */}
-        <PageHeader 
-          title="Lab Charges" 
-          icon={DollarSign}
-          path="Master"
-        />
+        <PageHeader title={`${organization?.name} - Test Charges`} icon={DollarSign} path="Master" />
+
         {/* Main Content Card */}
         <div className="bg-white rounded shadow-md border border-gray-200">
           {/* Controls Section */}
           <div className="border-b border-gray-300 p-4">
-            <div className="flex gap-3 items-center">
+            <div className="flex gap-3 items-center flex-wrap">
               <div className="flex-1 gap-2 flex flex-wrap items-end">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Select Type</label>
-                <select 
-                  value={selectedType}
-                  onChange={handleTypeChange}
-                  disabled={loading}
-                  className=" max-w-xs px-2 py-1 text-sm border border-gray-300 rounded bg-white focus:outline-none focus:ring-2 focus:ring-orange-500 disabled:opacity-50"
-                >
-                  <option>Walkin</option>
-                  <option>Corporate 1</option>
-                  <option>Corporate 2</option>
-                </select>
-            
-                <button
-                  onClick={handleSearch}
-                  disabled={loading}
-                  className="bg-orange-500 text-white px-6 py-1.5 text-sm rounded hover:bg-orange-600 transition-colors disabled:opacity-50"
-                >
-                  Search
-                </button>
                 <button
                   onClick={handleReset}
                   disabled={loading}
@@ -378,49 +333,45 @@ export default function AddLabCharges() {
                   <RotateCcw size={16} />
                   Reset
                 </button>
-                 </div>
-                 <div className="flex gap-2 items-end">
+              </div>
+              <div className="flex gap-2 items-end">
                 <button
                   onClick={handleSave}
                   disabled={loading}
                   className="bg-orange-500 hover:bg-orange-600 text-white px-6 py-1.5 text-sm rounded transition-colors disabled:opacity-50"
                 >
-                  {loading ? 'Saving...' : 'Save'}
+                  {loading ? "Saving..." : "Save"}
                 </button>
-                 <div className="flex gap-2">
-            <button 
-              onClick={() => router.push("/master/corporate-wise-charges")}
-              className="bg-orange-500 text-white px-4 py-1.5 text-sm rounded hover:bg-orange-600 transition-colors"
-            >
-              Corporate Wise Charges
-            </button>
-            
-            <button 
-              onClick={() => setShowBulkModal(true)}
-              className="bg-purple-600 text-white px-4 py-1.5 text-sm rounded hover:bg-purple-700 transition-colors"
-            >
-              Bulk Apply
-            </button>
-            <button 
-              onClick={handleExportExcel}
-              className="flex gap-1 sm:gap-1.5 items-center bg-green-600 hover:bg-green-700 text-white px-2 sm:px-3 py-1.5 sm:py-2 rounded text-xs sm:text-sm transition-colors"
-            >
-              <FileSpreadsheet size={14} className="sm:w-4 sm:h-4"/> 
-              <span>Excel</span>
-            </button>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setShowBulkModal(true)}
+                    className="bg-purple-600 text-white px-4 py-1.5 text-sm rounded hover:bg-purple-700 transition-colors"
+                  >
+                    Bulk Apply
+                  </button>
+                  <button
+                    onClick={handleExportExcel}
+                    className="flex gap-1 sm:gap-1.5 items-center bg-green-600 hover:bg-green-700 text-white px-2 sm:px-3 py-1.5 sm:py-2 rounded text-xs sm:text-sm transition-colors"
+                  >
+                    <FileSpreadsheet size={14} className="sm:w-4 sm:h-4" />
+                    <span>Excel</span>
+                  </button>
 
-            <button 
-              onClick={handleExportPDF}
-              className="flex gap-1 sm:gap-1.5 items-center bg-red-600 hover:bg-red-700 text-white px-2 sm:px-3 py-1.5 sm:py-2 rounded text-xs sm:text-sm transition-colors"
-            >
-              <FileText size={14} className="sm:w-4 sm:h-4"/> 
-              <span>PDF</span>
-            </button>
+                  <button
+                    onClick={handleExportPDF}
+                    className="flex gap-1 sm:gap-1.5 items-center bg-red-600 hover:bg-red-700 text-white px-2 sm:px-3 py-1.5 sm:py-2 rounded text-xs sm:text-sm transition-colors"
+                  >
+                    <FileText size={14} className="sm:w-4 sm:h-4" />
+                    <span>PDF</span>
+                  </button>
 
-            <button className="bg-orange-500 text-white px-4 py-1.5 text-sm rounded hover:bg-orange-600 transition-colors">
-              Copy Charges
-            </button>
-          </div>
+                  <button
+                    onClick={() => router.back()}
+                    className="bg-gray-500 text-white px-4 py-1.5 text-sm rounded hover:bg-gray-600 transition-colors"
+                  >
+                    Back
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -433,11 +384,11 @@ export default function AddLabCharges() {
                 <p className="mt-2 text-gray-600">Loading tests and charges...</p>
               </div>
             ) : (
-              <div className="overflow-y-auto" style={{ maxHeight: '500px' }}>
+              <div className="overflow-y-auto" style={{ maxHeight: "500px" }}>
                 <table className="w-full border-collapse text-sm">
                   <thead className="bg-slate-900 text-white sticky top-0">
                     <tr>
-                      <th className="border border-gray-300 px-3 py-2 text-left font-semibold" style={{ width: '35%' }}>
+                      <th className="border border-gray-300 px-3 py-2 text-left font-semibold" style={{ width: "35%" }}>
                         <div className="mb-1">Name</div>
                         <input
                           placeholder="Search By Test Name"
@@ -446,7 +397,7 @@ export default function AddLabCharges() {
                           className="w-full px-2 py-1 text-sm text-black rounded bg-white focus:outline-none border border-gray-300"
                         />
                       </th>
-                      <th className="border border-gray-300 px-3 py-2 text-left font-semibold" style={{ width: '20%' }}>
+                      <th className="border border-gray-300 px-3 py-2 text-left font-semibold" style={{ width: "20%" }}>
                         <div className="mb-1">TestCode</div>
                         <input
                           placeholder="Search By TestCode"
@@ -455,7 +406,7 @@ export default function AddLabCharges() {
                           className="w-full px-2 py-1 text-sm text-black rounded bg-white focus:outline-none border border-gray-300"
                         />
                       </th>
-                      <th className="border border-gray-300 px-3 py-2 text-left font-semibold" style={{ width: '20%' }}>
+                      <th className="border border-gray-300 px-3 py-2 text-left font-semibold" style={{ width: "20%" }}>
                         <div className="mb-1">Group</div>
                         <input
                           placeholder="Search By Group"
@@ -464,8 +415,12 @@ export default function AddLabCharges() {
                           className="w-full px-2 py-1 text-sm text-black rounded bg-white focus:outline-none border border-gray-300"
                         />
                       </th>
-                      <th className="border border-gray-300 px-3 py-2 text-center font-semibold" style={{ width: '12%' }}>Charges</th>
-                      <th className="border border-gray-300 px-3 py-2 text-center font-semibold" style={{ width: '13%' }}>B2B</th>
+                      <th className="border border-gray-300 px-3 py-2 text-center font-semibold" style={{ width: "12%" }}>
+                        Charges
+                      </th>
+                      <th className="border border-gray-300 px-3 py-2 text-center font-semibold" style={{ width: "13%" }}>
+                        B2B
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
@@ -478,7 +433,7 @@ export default function AddLabCharges() {
                           <input
                             type="number"
                             value={item.charges}
-                            onChange={(e) => handleChargeChange(item.id, 'charges', e.target.value)}
+                            onChange={(e) => handleChargeChange(item.id, "charges", e.target.value)}
                             className="w-full border border-gray-300 px-2 py-1 text-sm rounded bg-white focus:outline-none focus:ring-2 focus:ring-orange-500 text-center"
                           />
                         </td>
@@ -486,9 +441,17 @@ export default function AddLabCharges() {
                           <input
                             type="number"
                             value={item.b2b}
-                            onChange={(e) => handleChargeChange(item.id, 'b2b', e.target.value)}
-                            className={`w-full border px-2 py-1 text-sm rounded bg-white focus:outline-none focus:ring-2 focus:ring-orange-500 text-center ${parseFloat(item.b2b) > parseFloat(item.charges) && item.charges > 0 ? 'border-red-500 bg-red-50' : 'border-gray-300'}`}
-                            title={parseFloat(item.b2b) > parseFloat(item.charges) && item.charges > 0 ? 'B2B cannot exceed B2C' : ''}
+                            onChange={(e) => handleChargeChange(item.id, "b2b", e.target.value)}
+                            className={`w-full border px-2 py-1 text-sm rounded bg-white focus:outline-none focus:ring-2 focus:ring-orange-500 text-center ${
+                              parseFloat(item.b2b) > parseFloat(item.charges) && item.charges > 0
+                                ? "border-red-500 bg-red-50"
+                                : "border-gray-300"
+                            }`}
+                            title={
+                              parseFloat(item.b2b) > parseFloat(item.charges) && item.charges > 0
+                                ? "B2B cannot exceed B2C"
+                                : ""
+                            }
                           />
                         </td>
                       </tr>
@@ -520,7 +483,7 @@ export default function AddLabCharges() {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg shadow-lg p-6 w-96">
             <h3 className="text-lg font-semibold text-gray-800 mb-4">Bulk Apply Charges</h3>
-            
+
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -534,7 +497,7 @@ export default function AddLabCharges() {
                   placeholder="Enter B2C charge"
                 />
               </div>
-              
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   B2B Charges (Apply to all tests)
@@ -547,12 +510,12 @@ export default function AddLabCharges() {
                   placeholder="Enter B2B charge"
                 />
               </div>
-              
+
               <p className="text-sm text-gray-600">
                 Note: This will apply the charges to all currently filtered tests. Leave empty to keep existing values.
               </p>
             </div>
-            
+
             <div className="flex justify-end gap-3 mt-6">
               <button
                 onClick={() => setShowBulkModal(false)}
@@ -577,11 +540,15 @@ export default function AddLabCharges() {
             <div className="text-red-500 text-4xl mb-3">⚠️</div>
             <h3 className="text-base font-semibold text-gray-800 mb-2">Invalid Charge</h3>
             <p className="text-sm text-gray-600 mb-4">{b2bError}</p>
-            <button onClick={() => setB2bError("")} className="bg-orange-500 text-white px-6 py-2 rounded hover:bg-orange-600 text-sm">OK</button>
+            <button
+              onClick={() => setB2bError("")}
+              className="bg-orange-500 text-white px-6 py-2 rounded hover:bg-orange-600 text-sm"
+            >
+              OK
+            </button>
           </div>
         </div>
       )}
     </>
   );
 }
-

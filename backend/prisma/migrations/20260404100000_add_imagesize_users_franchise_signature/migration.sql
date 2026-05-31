@@ -1,5 +1,5 @@
--- Step 1: Add imageSize column to tests table
-ALTER TABLE `tests` ADD COLUMN `imageSize` VARCHAR(191) NULL DEFAULT '800|600';
+-- Step 1: Add imageSize column to tests table (if not exists)
+ALTER TABLE `tests` ADD COLUMN IF NOT EXISTS `imageSize` VARCHAR(191) NULL DEFAULT '800|600';
 
 -- Step 2: Create users table
 CREATE TABLE IF NOT EXISTS `users` (
@@ -38,10 +38,11 @@ CREATE TABLE IF NOT EXISTS `signatures` (
     PRIMARY KEY (`id`)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
--- Step 4: Add signatureId column to tests table
-ALTER TABLE `tests` ADD COLUMN `signatureId` INTEGER NULL;
+-- Step 4: Add signatureId column to tests table (if not exists)
+ALTER TABLE `tests` ADD COLUMN IF NOT EXISTS `signatureId` INTEGER NULL;
 
--- Step 5: Add foreign key from tests.signatureId -> signatures.id
+-- Step 5: Drop existing foreign key if it exists, then add it
+ALTER TABLE `tests` DROP FOREIGN KEY IF EXISTS `tests_signatureId_fkey`;
 ALTER TABLE `tests` ADD CONSTRAINT `tests_signatureId_fkey`
     FOREIGN KEY (`signatureId`) REFERENCES `signatures`(`id`)
     ON DELETE SET NULL ON UPDATE CASCADE;

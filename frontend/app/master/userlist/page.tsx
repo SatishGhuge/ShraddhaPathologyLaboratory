@@ -23,13 +23,8 @@ const UserList = () => {
     setError(null);
     try {
       const data = await getUsers(page, ITEMS_PER_PAGE);
-      if (data.success) {
-        setUsers(data.data || []);
-        setPagination(data.pagination || null);
-      } else {
-        setUsers(data.data || []);
-        setPagination(null);
-      }
+      setUsers(data);
+      setPagination(null);
     } catch (err) {
       setError(err.message || "Failed to fetch users");
     } finally {

@@ -21,9 +21,8 @@ export default function ReferralListing() {
     setLoading(true);
     getDoctors(page, ITEMS_PER_PAGE)
       .then((res: any) => {
-        const doctors = Array.isArray(res) ? res : res?.data || [];
-        setData(doctors);
-        setPagination(res?.pagination || null);
+        setData(res);
+        setPagination(null);
       })
       .catch((err) => console.error("Failed to fetch doctors:", err))
       .finally(() => setLoading(false));

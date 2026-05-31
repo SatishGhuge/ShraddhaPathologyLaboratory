@@ -390,8 +390,8 @@ export default function BookingPage() {
   useEffect(() => {
     Promise.all([getAllPatients(), getDoctors()])
       .then(([patientsRes, doctorsRes]) => {
-        const patients = patientsRes?.data || [];
-        const doctors = doctorsRes?.data || [];
+        const patients = Array.isArray(patientsRes) ? patientsRes : [];
+        const doctors = Array.isArray(doctorsRes) ? doctorsRes : [];
         const mapped = [];
         
         patients.forEach((p) => {
@@ -520,8 +520,8 @@ export default function BookingPage() {
   useEffect(() => {
     Promise.all([getTests(), getPackages(), getSpecimenTypes()])
       .then(([testsRes, packagesRes, specimens]) => {
-        const tests = testsRes?.data || [];
-        const packages = packagesRes?.data || [];
+        const tests = Array.isArray(testsRes) ? testsRes : [];
+        const packages = Array.isArray(packagesRes) ? packagesRes : [];
         setSpecimenTypes(specimens);
         const mappedTests = tests.map(t => ({
           id: t.id,
@@ -538,7 +538,7 @@ export default function BookingPage() {
           b2bCharge: pkg.b2bCharge || 0,
           // keep full test objects for display
           tests: (pkg.tests || []).map(pt => {
-            const full = mappedTests.find(t => t.id === pt.id) || {};
+            const full = mappedTests.find(t => t.id === pt.id) || { sample: "N/A", b2cCharge: 0, b2bCharge: 0 };
             return {
               id: pt.id,
               name: pt.name,

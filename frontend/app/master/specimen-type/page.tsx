@@ -78,13 +78,8 @@ export default function SampleTypes() {
     try {
       setLoading(true);
       const response = await getSpecimenTypes(page, ITEMS_PER_PAGE);
-      
-      if (response.success) {
-        setData(response.data || []);
-        setPagination(response.pagination || null);
-      } else {
-        setErrorMsg('Failed to fetch specimen types');
-      }
+      setData(response);
+      setPagination(null);
     } catch (error) {
       console.error('Error fetching specimen types:', error);
       setErrorMsg('Failed to fetch specimen types');

@@ -5,8 +5,7 @@ import { useState, useEffect } from "react";
 import { useRouter, useParams, usePathname } from "next/navigation";
 
 import Header from "@/src/components/Header";
-import { getUserById, createUser, updateUser } from "@/src/api/master.js";
-import { getRoles, getCollectionCenters } from "@/src/api/master.js";
+import { getUserById, createUser, updateUser, getRoles } from "@/src/api/master.js";
 
 export default function AddUserForm() {
   const router = useRouter();
@@ -21,7 +20,6 @@ export default function AddUserForm() {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [roles, setRoles] = useState<any[]>([]);
-  const [centers, setCenters] = useState<any[]>([]);
 
   const [formData, setFormData] = useState({
     center: "", role: "", username: "", gender: "",
@@ -33,10 +31,9 @@ export default function AddUserForm() {
   const inputClass = "w-full px-2 py-1 text-base border border-gray-300 rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-orange-500";
   const labelClass = "text-sm text-gray-700 font-medium mb-1 block";
 
-  // Load roles and centers for dropdowns
+  // Load roles for dropdown
   useEffect(() => {
     getRoles().then(setRoles).catch(() => {});
-    getCollectionCenters().then((res) => setCenters(res?.data || res || [])).catch(() => {});
   }, []);
 
   // Load user in edit mode
@@ -147,12 +144,7 @@ export default function AddUserForm() {
           <div className="grid grid-cols-2 gap-4 mb-2">
             <div>
               <label className={labelClass}>Center *</label>
-              <select name="center" value={formData.center} onChange={handleChange} className={inputClass}>
-                <option value="">Please Select</option>
-                {centers.map(c => (
-                  <option key={c.id} value={c.name}>{c.name}</option>
-                ))}
-              </select>
+              <input name="center" value={formData.center} onChange={handleChange} className={inputClass} placeholder="Enter center name" />
               {errors.center && <p className="text-red-700 text-xs">{errors.center}</p>}
             </div>
             <div>

@@ -23,13 +23,8 @@ const RoleList = () => {
     setError(null);
     try {
       const data = await getRoles(page, ITEMS_PER_PAGE);
-      if (data.success) {
-        setRoles(data.data || []);
-        setPagination(data.pagination || null);
-      } else {
-        setRoles(data.data || []);
-        setPagination(null);
-      }
+      setRoles(data);
+      setPagination(null);
     } catch (err) {
       setError(err.message || "Failed to fetch roles");
     } finally {

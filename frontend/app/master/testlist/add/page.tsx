@@ -73,6 +73,7 @@ const AddTest = () => {
   const [tests, setTests] = useState<any[]>([]);
   const [selectedTestToAdd, setSelectedTestToAdd] = useState("");
   const [selectedTestsToAdd, setSelectedTestsToAdd] = useState<any[]>([]);
+  const [pendingTestIds, setPendingTestIds] = useState<number[]>([]);
   const [showPreview, setShowPreview] = useState(false);
   const [specimenTypes, setSpecimenTypes] = useState<any[]>([]);
   const [showSampleTypeDropdown, setShowSampleTypeDropdown] = useState(false);
@@ -215,9 +216,8 @@ const AddTest = () => {
       try {
         console.log("📡 Fetching departments from API...");
         const res = await getDepartments();
-        const deptData = Array.isArray(res) ? res : res?.data || [];
-        console.log("✅ Departments loaded:", deptData);
-        setDepartments(deptData);
+        console.log("✅ Departments loaded:", res);
+        setDepartments(res);
       } catch (err) {
         console.error('❌ Error fetching departments:', err);
         console.error('Department error details:', {
@@ -232,9 +232,10 @@ const AddTest = () => {
     const fetchUnits = async () => {
       try {
         console.log("📡 Fetching units from API...");
-        const unitsData = await getUnits();
-        console.log("✅ Units loaded:", unitsData);
-        setUnits(unitsData);
+        const unitsResponse = await getUnits();
+        console.log("✅ Units loaded:", unitsResponse);
+        // Extract data array from response
+        setUnits(unitsResponse);
       } catch (err) {
         console.error('❌ Error fetching units:', err);
         console.error('Units error details:', {
@@ -250,9 +251,8 @@ const AddTest = () => {
       try {
         console.log("📡 Fetching tests from API...");
         const res = await getTests();
-        const testsData = Array.isArray(res) ? res : res?.data || [];
-        console.log("✅ Tests loaded:", testsData);
-        setTests(testsData);
+        console.log("✅ Tests loaded:", res);
+        setTests(res);
       } catch (err) {
         console.error('❌ Error fetching tests:', err);
         console.error('Tests error details:', {
@@ -468,14 +468,21 @@ const AddTest = () => {
             }
             
             // Load linked tests if present (edit mode)
-            if (testData.linkedTestIds && testData.linkedTestIds.length > 0) {
-              // tests may not be loaded yet — store IDs and resolve names once tests load
-              setSelectedTestsToAdd(
-                testData.linkedTestIds.map(id => {
-                  const found = tests.find(t => t.id === id);
-                  return found ? { id: found.id, name: found.name } : { id, name: `Test #${id}` };
-                })
-              );
+            if (testData.linkedTestIds) {
+              let linkedIds = testData.linkedTestIds;
+              // Parse if it's a JSON string
+              if (typeof linkedIds === 'string') {
+                try {
+                  linkedIds = JSON.parse(linkedIds);
+                } catch (e) {
+                  linkedIds = [];
+                }
+              }
+              
+              if (Array.isArray(linkedIds) && linkedIds.length > 0) {
+                // Store the IDs to resolve later when tests are loaded
+                setPendingTestIds(linkedIds);
+              }
             }
 
             setDataLoaded(true);
@@ -502,6 +509,33 @@ const AddTest = () => {
     
     fetchTestData();
   }, [id, isEditMode, isViewMode]);
+
+  // Resolve test names after tests are loaded
+  useEffect(() => {
+    if (tests.length > 0) {
+      // Resolve pending test IDs
+      if (pendingTestIds.length > 0) {
+        const resolved = pendingTestIds.map(id => {
+          const found = tests.find(t => t.id === id);
+          return found ? { id: found.id, name: found.name } : { id, name: `Test #${id}` };
+        });
+        setSelectedTestsToAdd(resolved);
+        setPendingTestIds([]);
+      }
+      
+      // Also resolve any existing selected tests that still have placeholder names
+      if (selectedTestsToAdd.length > 0) {
+        const resolved = selectedTestsToAdd.map(selected => {
+          if (selected.name.startsWith('Test #')) {
+            const found = tests.find(t => t.id === selected.id);
+            return found ? { id: found.id, name: found.name } : selected;
+          }
+          return selected;
+        });
+        setSelectedTestsToAdd(resolved);
+      }
+    }
+  }, [tests]);
 
   /* ================= HANDLERS ================= */
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
@@ -941,23 +975,12 @@ const AddTest = () => {
         console.log("🆕 Creating new test...");
         const response = await createTest(completeTestData);
         console.log("✅ Test created successfully:", response);
-        const testId = response.id || response._id;
-        const goToCharges = window.confirm(`Test created successfully! ✅\n\nTest ID: ${testId}\nCategories saved: ${categoryData.length}\nParameters saved: ${categoryData.reduce((total, cat) => total + (cat.parameters?.length || 0), 0)}\n\nDo you want to add charges for this test now?`);
-        if (goToCharges && testId) {
-          router.push(`/master/test-charges/${testId}`);
-        } else {
-          router.push("/master/testlist");
-        }
+        router.push("/master/testlist");
       } else if (isEditMode) {
         console.log("✏️ Updating existing test with ID:", id);
         const response = await updateTest((Array.isArray(id) ? id[0] : id) as string, completeTestData);
         console.log("✅ Test updated successfully:", response);
-        const goToCharges = window.confirm(`Test updated successfully! ✅\n\nCategories updated: ${categoryData.length}\nParameters updated: ${categoryData.reduce((total, cat) => total + (cat.parameters?.length || 0), 0)}\n\nDo you want to manage charges for this test?`);
-        if (goToCharges) {
-          router.push(`/master/test-charges/${id}`);
-        } else {
-          router.push("/master/testlist");
-        }
+        router.push("/master/testlist");
       }
     } catch (err) {
       console.error("❌ Error saving test:", err);
@@ -1216,7 +1239,7 @@ const AddTest = () => {
                         {/* Tags inside the box */}
                         {selectedTestsToAdd.map(t => (
                           <span key={t.id} className="flex items-center gap-0.5 bg-cyan-200 text-cyan-900 text-xs px-1.5 py-0.5 rounded-full whitespace-nowrap">
-                            {t.name}
+                            {t.name || `Test #${t.id}`}
                             {!isViewMode && (
                               <button
                                 type="button"
@@ -1236,7 +1259,10 @@ const AddTest = () => {
                               const id = parseInt(val);
                               if (!selectedTestsToAdd.find(t => t.id === id)) {
                                 const test = tests.find(t => t.id === id);
-                                if (test) setSelectedTestsToAdd(prev => [...prev, { id: test.id, name: test.name }]);
+                                if (test) {
+                                  const testName = test.name || test.shortName || `Test #${test.id}`;
+                                  setSelectedTestsToAdd(prev => [...prev, { id: test.id, name: testName }]);
+                                }
                               }
                             }}
                             className="flex-1 min-w-[120px] bg-transparent border-none outline-none text-xs text-gray-500 cursor-pointer"
@@ -1245,7 +1271,7 @@ const AddTest = () => {
                             {tests
                               .filter(t => !selectedTestsToAdd.find(s => s.id === t.id))
                               .map(test => (
-                                <option key={test.id} value={test.id}>{test.name}</option>
+                                <option key={test.id} value={test.id}>{test.name || test.shortName || `Test #${test.id}`}</option>
                               ))}
                           </select>
                         )}

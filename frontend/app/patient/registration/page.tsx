@@ -15,7 +15,8 @@ import {
   Barcode,
 } from "lucide-react";
 import { createPatient, searchPatient } from "@/src/api/patient";
-import { getDoctors, createDoctor, getSpecimenTypes, getFranchises, getCollectionCenters, getOrganizations } from "@/src/api/master";
+import { getDoctors, createDoctor, getSpecimenTypes } from "@/src/api/master";
+import { getCities, getSubSections, getDistricts, getVillages, formatLocation, parseLocation, searchLocations } from "@/src/data/maharashtraLocations";
 import API_BASE_URL from "@/src/api/config";
 
 /* ------------------ INLINE DATE PICKER ------------------ */
@@ -226,7 +227,6 @@ const getSampleColor = (sample: any, specimenTypes: any) => {
 export default function PatientRegistration() {
   const mobileInputRef = useRef(null);
   const doctorDropdownRef = useRef(null);
-  const createdAtRef = useRef(null);
   const router = useRouter();
   const rebookingData = null; // location.state is not available in Next.js App Router
   const hideHeader = false; // Check if header should be hidden
@@ -250,8 +250,10 @@ export default function PatientRegistration() {
   const [email, setEmail] = useState(rebookingData?.email || "");
   const [address, setAddress] = useState(rebookingData?.address || "");
   const [location, setLocation] = useState(rebookingData?.location || "");
+  const [locationSearch, setLocationSearch] = useState("");
   const [locationSuggestions, setLocationSuggestions] = useState<any[]>([]);
   const [showLocationDropdown, setShowLocationDropdown] = useState(false);
+  const locationDropdownRef = useRef(null);
 
   const [remarks, setRemarks] = useState(rebookingData?.remark || "");
   const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
@@ -299,23 +301,7 @@ export default function PatientRegistration() {
 
   /* --- Referral Doctor Checkbox Logic --- */
   const [isManualRefDoctor, setIsManualRefDoctor] = useState(false);
-  const [manualRefDoctorName, setManualRefDoctorName] = useState("");
-
-  const handleRefDoctorCheckbox = (checked: any) => {
-    setIsManualRefDoctor(checked);
-    setRefDoctor("");
-    setManualRefDoctorName("");
-    setShowDoctorList(false);
-  };
-
-  /* --- Created At States --- */
-  const [showCreatedAtDropdown, setShowCreatedAtDropdown] = useState(false);
-  const [createdAtType, setCreatedAtType] = useState("");
-  const [selectedCreatedAt, setSelectedCreatedAt] = useState("");
-  const [createdAtSearch, setCreatedAtSearch] = useState("");
-  const [franchiseOptions, setFranchiseOptions] = useState<any[]>([]);
-  const [collectionCenterOptions, setCollectionCenterOptions] = useState<any[]>([]);
-  const [organizationOptions, setOrganizationOptions] = useState<any[]>([]);  /* --- Departments and Packages from API --- */
+  const [manualRefDoctorName, setManualRefDoctorName] = useState("");  /* --- Departments and Packages from API --- */
   const [departments, setDepartments] = useState<any[]>([]);
   const [doctorsList, setDoctorsList] = useState<any[]>([]);
   const [specimenTypes, setSpecimenTypes] = useState<any[]>([]);
@@ -326,9 +312,6 @@ export default function PatientRegistration() {
     fetchDepartmentsData();
     getDoctors().then((res: any) => setDoctorsList(Array.isArray(res) ? res : res?.data || [])).catch(console.error);
     getSpecimenTypes().then(setSpecimenTypes).catch(console.error);
-    getFranchises().then((res: any) => setFranchiseOptions(Array.isArray(res) ? res : res?.data || [])).catch(console.error);
-    getCollectionCenters().then((res: any) => setCollectionCenterOptions(Array.isArray(res) ? res : res?.data || [])).catch(console.error);
-    getOrganizations().then((res: any) => setOrganizationOptions(Array.isArray(res) ? res : res?.data || [])).catch(console.error);
   }, []);
 
   const fetchDepartmentsData = async () => {
@@ -420,17 +403,6 @@ export default function PatientRegistration() {
 
   useEffect(() => {
     const handleClickOutside = (e: any) => {
-      if (createdAtRef.current && !createdAtRef.current.contains(e.target)) {
-        setShowCreatedAtDropdown(false);
-        setCreatedAtSearch("");
-      }
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
-
-  useEffect(() => {
-    const handleClickOutside = (e: any) => {
       if (doctorDropdownRef.current && !doctorDropdownRef.current.contains(e.target)) {
         setShowDoctorList(false);
       }
@@ -438,35 +410,6 @@ export default function PatientRegistration() {
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
-
-  const handleCreatedAtTypeChange = (type: any) => {
-    setCreatedAtType(type);
-    setCreatedAtSearch("");
-    if (type === "Lab") {
-      setSelectedCreatedAt("Lab");
-      setShowCreatedAtDropdown(false);
-    }
-  };
-
-  const handleCreatedAtSelect = (name: any) => {
-    setSelectedCreatedAt(`${createdAtType === "CollectionCenter" ? "Collection Center" : createdAtType}: ${name}`);
-    setShowCreatedAtDropdown(false);
-    setCreatedAtSearch("");
-    setCreatedAtType("");
-  };
-
-  const filteredCreatedAtOptions = () => {
-    let list;
-    if (createdAtType === "Franchise") list = franchiseOptions;
-    else if (createdAtType === "CollectionCenter") list = collectionCenterOptions;
-    else if (createdAtType === "Organization") list = organizationOptions;
-    else list = [];
-    
-    return list.filter(o => 
-      o.name.toLowerCase().includes(createdAtSearch.toLowerCase()) ||
-      (o.location && o.location.toLowerCase().includes(createdAtSearch.toLowerCase()))
-    );
-  };
 
   const saveRef = async () => {
     if (!newRef.name) return alert("Please enter name");
@@ -505,6 +448,13 @@ export default function PatientRegistration() {
     }
   };
 
+  const handleRefDoctorCheckbox = (checked: boolean) => {
+    setIsManualRefDoctor(checked);
+    if (!checked) {
+      setManualRefDoctorName("");
+    }
+  };
+
   /* ============ LOCALSTORAGE PERSISTENCE ============ */
   const STORAGE_KEY = 'patientRegistrationDraft';
 
@@ -535,7 +485,6 @@ export default function PatientRegistration() {
         if (data.gender) setGender(data.gender);
         if (data.remarks) setRemarks(data.remarks);
         if (data.createdBy) setCreatedBy(data.createdBy);
-        if (data.selectedCreatedAt) setSelectedCreatedAt(data.selectedCreatedAt);
         
         // Restore registration details
         if (data.visitType) setVisitType(data.visitType);
@@ -577,7 +526,7 @@ export default function PatientRegistration() {
         }
         const dataToSave = {
           firstName, lastName, title, dob, age, mobile, email, address, location,
-          gender, remarks, selectedCreatedAt, visitType, reportMode,
+          gender, remarks, visitType, reportMode,
           sampleBarcodeNo, refDoctor, isManualRefDoctor, manualRefDoctorName,
           selectedTests, discount, discountPercent, discountRemark,
           paid, paymentMode, businessType,
@@ -592,7 +541,7 @@ export default function PatientRegistration() {
     return () => clearTimeout(timeoutId);
   }, [
     firstName, lastName, title, dob, age, mobile, email, address, location, gender, remarks,
-    selectedCreatedAt, visitType, reportMode, sampleBarcodeNo,
+    visitType, reportMode, sampleBarcodeNo,
     refDoctor, isManualRefDoctor, manualRefDoctorName, selectedTests,
     discount, discountPercent, discountRemark, paid, paymentMode, businessType
   ]);
@@ -627,7 +576,6 @@ export default function PatientRegistration() {
     setGender("");
     setRemarks("");
     setCreatedBy(loggedUser);
-    setSelectedCreatedAt("");
     setVisitType("");
     setReportMode("");
     setSampleBarcodeNo("");
@@ -797,7 +745,6 @@ export default function PatientRegistration() {
     setMobile(patient.mobile || "");
     setEmail(patient.email || "");
     setCreatedBy(patient.createdBy || "");
-    setSelectedCreatedAt(patient.createdAtLocation || "");
     setAddress(patient.address || "");
     
     // DO NOT fill Registration Details - leave empty for new registration
@@ -830,43 +777,46 @@ export default function PatientRegistration() {
     }
   };
 
-  // Handle location search - fetch from collection centers
-  const handleLocationSearch = async (value: string) => {
-    setLocation(value);
+  // Handle location search input
+  const handleLocationSearchChange = (value: string) => {
+    setLocationSearch(value);
+    setLocation(value); // Update location as user types
     
-    if (value.length < 1) {
+    if (value.trim()) {
+      const suggestions = searchLocations(value);
+      setLocationSuggestions(suggestions);
+      setShowLocationDropdown(true);
+    } else {
       setLocationSuggestions([]);
-      return;
-    }
-
-    try {
-      // Get unique locations from collection centers
-      const uniqueLocations = Array.from(
-        new Set(
-          collectionCenterOptions
-            .map(center => center.location)
-            .filter(loc => loc && loc.trim() !== '')
-        )
-      ).sort();
-      
-      // Filter based on user input
-      const filtered = uniqueLocations.filter(loc => 
-        loc.toLowerCase().includes(value.toLowerCase())
-      );
-      
-      setLocationSuggestions(filtered);
-      setShowLocationDropdown(filtered.length > 0);
-    } catch (error) {
-      console.error('Location search error:', error);
-      setLocationSuggestions([]);
+      setShowLocationDropdown(false);
     }
   };
 
+  // Handle location selection from dropdown
   const handleLocationSelect = (selectedLocation: string) => {
     setLocation(selectedLocation);
+    setLocationSearch(selectedLocation);
     setLocationSuggestions([]);
     setShowLocationDropdown(false);
   };
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e: any) => {
+      if (locationDropdownRef.current && !locationDropdownRef.current.contains(e.target)) {
+        setShowLocationDropdown(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  // Initialize location search from stored location
+  useEffect(() => {
+    if (location && !locationSearch) {
+      setLocationSearch(location);
+    }
+  }, []);
 
   const handleRegister = () => {
     // Validate ALL Patient Identity fields as mandatory
@@ -877,7 +827,6 @@ export default function PatientRegistration() {
     if (!age) missingFields.push("Age");
     if (!gender) missingFields.push("Gender");
     if (!mobile) missingFields.push("Mobile");
-    if (!selectedCreatedAt) missingFields.push("Created At");
     if (!address) missingFields.push("Address");
     
     if (missingFields.length > 0) {
@@ -911,7 +860,6 @@ export default function PatientRegistration() {
         mobile: mobile,
         email: email || null,
         createdBy: createdBy || null,
-        createdAtLocation: selectedCreatedAt || null,
         address: address || null,
         location: location || null,
         visitType: visitType || "General",
@@ -984,7 +932,6 @@ export default function PatientRegistration() {
         mobile: mobile,
         email: email || null,
         createdBy: createdBy || null,
-        createdAtLocation: selectedCreatedAt || null,
         address: address || null,
         location: location || null,  // Add location field
         // Registration Details (optional if no tests)
@@ -1361,111 +1308,59 @@ export default function PatientRegistration() {
                 </div>
               </div>
 
-              {/* Created At - Custom Dropdown */}
-              <div className="relative" ref={createdAtRef}>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowCreatedAtDropdown(!showCreatedAtDropdown);
-                    // Pre-select the type based on current selection when reopening
-                    if (!showCreatedAtDropdown && selectedCreatedAt) {
-                      if (selectedCreatedAt.startsWith("Franchise:")) setCreatedAtType("Franchise");
-                      else if (selectedCreatedAt.startsWith("Collection Center:")) setCreatedAtType("CollectionCenter");
-                      else if (selectedCreatedAt.startsWith("Organization:")) setCreatedAtType("Organization");
-                      else if (selectedCreatedAt === "Lab") setCreatedAtType("Lab");
-                      else setCreatedAtType("");
-                    } else {
-                      setCreatedAtType("");
-                    }
-                    setCreatedAtSearch("");
-                  }}
-                  className={`${input} flex items-center justify-between cursor-pointer bg-white text-left overflow-hidden`}
-                >
-                  <span className={`truncate ${selectedCreatedAt ? "text-gray-800" : "text-gray-400"}`}>
-                    {selectedCreatedAt || "Created At *"}
-                  </span>
-                  <ChevronDown size={14} className="text-gray-400 shrink-0 ml-1" />
-                </button>
-
-                {showCreatedAtDropdown && (
-                  <div className="absolute top-full left-0 right-0 bg-white border border-gray-300 rounded-lg shadow-xl mt-1 z-50 min-w-[260px]">
-                    <div className="p-3 border-b bg-gray-50 rounded-t-lg">
-                      <p className="text-xs font-semibold text-gray-600 mb-2">Select Type</p>
-                      <div className="flex flex-col gap-2">
-                        {["Franchise", "CollectionCenter", "Organization", "Lab"].map((type) => (
-                          <label key={type} className="flex items-center gap-2 cursor-pointer hover:bg-gray-100 p-1 rounded">
-                            <input
-                              type="radio"
-                              name="createdAtType"
-                              checked={createdAtType === type}
-                              onChange={() => handleCreatedAtTypeChange(type)}
-                              className="accent-orange-500"
-                            />
-                            <span className="text-xs font-medium text-gray-700">
-                              {type === "CollectionCenter" ? "Collection Center" : type}
-                            </span>
-                          </label>
-                        ))}
-                      </div>
-                    </div>
-                    {(createdAtType === "Franchise" || createdAtType === "CollectionCenter" || createdAtType === "Organization") && (
-                      <div className="p-2">
-                        <input
-                          className={`${input} mb-2`}
-                          placeholder={`Search ${createdAtType === "Franchise" ? "Franchise" : createdAtType === "CollectionCenter" ? "Collection Center" : "Organization"}...`}
-                          value={createdAtSearch}
-                          onChange={(e) => setCreatedAtSearch(e.target.value)}
-                          autoFocus
-                        />
-                        <div className="max-h-40 overflow-auto py-1">
-                          {filteredCreatedAtOptions().length > 0 ? (
-                            filteredCreatedAtOptions().map((opt, i, arr) => {
-                              const displayType = createdAtType === "CollectionCenter" ? "Collection Center" : createdAtType;
-                              const isSelected = selectedCreatedAt === `${displayType}: ${opt.name}`;
-                              return (
-                                <div key={opt.id} onClick={() => handleCreatedAtSelect(opt.name)}
-                                  className={`px-4 py-2.5 text-xs cursor-pointer transition-colors
-                                    ${isSelected ? 'bg-white text-gray-700 font-semibold' : 'text-gray-700 hover:bg-gray-50'}
-                                    ${i < arr.length - 1 ? 'border-b border-gray-100' : ''}
-                                  `}>
-                                  <div className="font-medium">{opt.name}</div>
-                                  {opt.location && <div className="text-gray-400 text-[10px]">{opt.location}</div>}
-                                </div>
-                              );
-                            })
-                          ) : (
-                            <div className="px-4 py-3 text-xs text-gray-400 text-center">No options found</div>
-                          )}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-
               <textarea className={input} placeholder="Address *" value={address} onChange={(e) => setAddress(e.target.value)} rows={3} required></textarea>
               
-              {/* Location Field with Autocomplete */}
-              <div className="relative">
-                <input 
-                  className={input} 
-                  placeholder="Location (Optional)" 
-                  value={location} 
-                  onChange={(e) => handleLocationSearch(e.target.value)}
-                  onFocus={() => location && setShowLocationDropdown(true)}
-                  autoComplete="off"
-                />
+              {/* Location Field - Searchable Input (Simple City-Village Format) */}
+              <div className="relative" ref={locationDropdownRef}>
+                <div className="relative">
+                  <input
+                    type="text"
+                    placeholder="Location *"
+                    value={locationSearch}
+                    onChange={(e) => handleLocationSearchChange(e.target.value)}
+                    onFocus={() => {
+                      if (locationSearch.trim()) {
+                        setShowLocationDropdown(true);
+                      }
+                    }}
+                    className={`${input} w-full`}
+                  />
+                  {locationSearch && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setLocationSearch("");
+                        setLocation("");
+                        setLocationSuggestions([]);
+                        setShowLocationDropdown(false);
+                      }}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    >
+                      <X size={16} />
+                    </button>
+                  )}
+                </div>
+
+                {/* Location Suggestions Dropdown */}
                 {showLocationDropdown && locationSuggestions.length > 0 && (
-                  <div className="absolute top-full left-0 right-0 bg-white border border-slate-300 rounded mt-1 shadow-lg z-50 max-h-40 overflow-y-auto">
+                  <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-50 max-h-64 overflow-y-auto">
                     {locationSuggestions.map((suggestion, idx) => (
-                      <div
+                      <button
                         key={idx}
-                        onClick={() => handleLocationSelect(suggestion)}
-                        className="px-3 py-2 text-xs hover:bg-orange-50 cursor-pointer border-b last:border-b-0"
+                        type="button"
+                        onClick={() => handleLocationSelect(suggestion.display)}
+                        className="w-full text-left px-3 py-2 hover:bg-orange-50 border-b border-gray-100 last:border-b-0 transition-colors"
                       >
-                        {suggestion}
-                      </div>
+                        <div className="text-sm font-medium text-gray-800">{suggestion.display}</div>
+                      </button>
                     ))}
+                  </div>
+                )}
+
+                {/* No suggestions message */}
+                {showLocationDropdown && locationSearch.trim() && locationSuggestions.length === 0 && (
+                  <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-50 p-3 text-center text-gray-500 text-sm">
+                    No locations found matching "{locationSearch}"
                   </div>
                 )}
               </div>
@@ -2384,10 +2279,6 @@ export default function PatientRegistration() {
                   <div className="flex col-span-2">
                     <span className="font-semibold w-32">Remarks:</span>
                     <span>{remarks || "N/A"}</span>
-                  </div>
-                  <div className="flex">
-                    <span className="font-semibold w-32">Created At:</span>
-                    <span>{selectedCreatedAt || "N/A"}</span>
                   </div>
                 </div>
               </div>

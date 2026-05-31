@@ -21,7 +21,7 @@ CREATE TABLE IF NOT EXISTS `signatures` (
 
 -- Add signatureId to tests (was missing from migration history)
 ALTER TABLE `tests` ADD COLUMN IF NOT EXISTS `signatureId` INTEGER NULL;
-ALTER TABLE `tests` MODIFY COLUMN `imageSize` VARCHAR(191) NULL DEFAULT '800|600';
+ALTER TABLE `tests` ADD COLUMN IF NOT EXISTS `imageSize` VARCHAR(191) NULL DEFAULT '800|600';
 
 -- Add foreign key for signatureId if not exists
 ALTER TABLE `tests` ADD CONSTRAINT `tests_signatureId_fkey` 

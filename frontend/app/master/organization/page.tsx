@@ -19,9 +19,8 @@ const OrganizationList = () => {
   useEffect(() => {
     getOrganizations()
       .then((res: any) => {
-        const data = Array.isArray(res) ? res : res?.data || [];
-        setOrganizations(data);
-        setFilteredOrganizations(data);
+        setOrganizations(res);
+        setFilteredOrganizations(res);
       })
       .catch(console.error);
   }, []);
@@ -156,6 +155,14 @@ const OrganizationList = () => {
                           className="bg-blue-600 text-white px-2 py-1 rounded text-xs hover:bg-blue-700 transition-colors"
                         >
                           Edit
+                        </button>
+
+                        {/* CHARGES */}
+                        <button
+                          onClick={() => router.push(`/master/organization/charges/${o.id}`)}
+                          className="bg-purple-600 text-white px-2 py-1 rounded text-xs hover:bg-purple-700 transition-colors"
+                        >
+                          Charges
                         </button>
 
                         {/* ACTIVE/INACTIVE */}

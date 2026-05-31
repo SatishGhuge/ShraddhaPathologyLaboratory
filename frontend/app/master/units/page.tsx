@@ -30,13 +30,8 @@ export default function ResultUnits() {
     try {
       setLoading(true);
       const response = await getUnits(page, ITEMS_PER_PAGE);
-      if (response.success) {
-        setData(response.data || []);
-        setPagination(response.pagination || null);
-      } else {
-        setData(response.data || []);
-        setPagination(null);
-      }
+      setData(response);
+      setPagination(null);
     } catch (error) {
       console.error('Error fetching units:', error);
       setErrorMsg('Failed to load units');

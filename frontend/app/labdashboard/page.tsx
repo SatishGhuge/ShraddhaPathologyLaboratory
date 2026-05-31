@@ -31,7 +31,6 @@ const staticStatCards = [
   { title: "Total", color: "blue", icon: FaCalendarAlt, link: "/reports/patient-list" },
   { title: "Registered", color: "slate", icon: FaUserCircle, link: "/result?status=REGISTERED" },
   { title: "Collected", value: "0", sub: "More info", color: "orange", icon: FaVials, link: null },
-  { title: "Sample Tracking", value: "0", sub: "More info", color: "purple", icon: FaHourglassHalf, link: null },
   { title: "Authenticated", color: "green", icon: FaCheck, link: "/result?status=AUTHENTICATED" },
   { title: "Delivered", color: "cyan", icon: FaProjectDiagram, link: "/result?status=DELIVERED" },
 ];
@@ -64,9 +63,8 @@ const Dashboard = () => {
   const [yesterdayBars, setYesterdayBars] = useState([
     { label: "Total",         value: 0, gradient: YESTERDAY_GRADIENTS[0] },
     { label: "Registered",    value: 0, gradient: YESTERDAY_GRADIENTS[1] },
-    { label: "Provisional",   value: 0, gradient: YESTERDAY_GRADIENTS[2] },
-    { label: "Authenticated", value: 0, gradient: YESTERDAY_GRADIENTS[3] },
-    { label: "Delivered",     value: 0, gradient: YESTERDAY_GRADIENTS[4] },
+    { label: "Authenticated", value: 0, gradient: YESTERDAY_GRADIENTS[2] },
+    { label: "Delivered",     value: 0, gradient: YESTERDAY_GRADIENTS[3] },
   ]);
   const [showAdminPopup, setShowAdminPopup] = useState(false);
   const [showAddAdminForm, setShowAddAdminForm] = useState(false);
@@ -97,6 +95,8 @@ const Dashboard = () => {
     phone: ''
   });
   const [formErrors, setFormErrors] = useState({});
+  const [locationData, setLocationData] = useState<any[]>([]);
+  const [departmentData, setDepartmentData] = useState<any[]>([]);
 
   // Daily health thoughts
   const healthThoughts = [
@@ -138,10 +138,28 @@ const Dashboard = () => {
       setYesterdayBars([
         { label: "Total",         value: yesterdayPatientStats.total || 0,  gradient: YESTERDAY_GRADIENTS[0] },
         { label: "Registered",    value: s.REGISTERED    || 0,     gradient: YESTERDAY_GRADIENTS[1] },
-        { label: "Provisional",   value: s.PROVISIONAL   || 0,     gradient: YESTERDAY_GRADIENTS[2] },
-        { label: "Authenticated", value: s.AUTHENTICATED || 0,     gradient: YESTERDAY_GRADIENTS[3] },
-        { label: "Delivered",     value: s.DELIVERED     || 0,     gradient: YESTERDAY_GRADIENTS[4] },
+        { label: "Authenticated", value: s.AUTHENTICATED || 0,     gradient: YESTERDAY_GRADIENTS[2] },
+        { label: "Delivered",     value: s.DELIVERED     || 0,     gradient: YESTERDAY_GRADIENTS[3] },
       ]);
+      
+      // Extract location data (top 5)
+      if (todayPatientStats.locationStats) {
+        const topLocations = todayPatientStats.locationStats.slice(0, 5).map((loc: any) => ({
+          name: loc.location || 'Not Specified',
+          value: loc.count,
+          percentage: loc.percentage
+        }));
+        setLocationData(topLocations);
+      }
+      
+      // Extract department data
+      if (todayTestStats.byDepartment) {
+        const depts = Object.entries(todayTestStats.byDepartment).map(([dept, count]: any) => ({
+          name: dept,
+          value: count
+        }));
+        setDepartmentData(depts);
+      }
     })
     .catch((error) => {
       console.error('Error fetching statistics:', error);
@@ -284,34 +302,34 @@ const Dashboard = () => {
   return (
     <>
     <Header />
-    <div className="fixed top-0 left-48 right-0 bottom-0 bg-gray-50 overflow-auto pt-14">
-      <div className="p-4 space-y-4">
+    <div className="fixed top-0 left-48 right-0 bottom-0 bg-gray-50 pt-14 overflow-hidden">
+      <div className="p-3 h-full overflow-hidden flex flex-col">
 
       {/* ===== STAT CARDS ===== */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-1.5 flex-shrink-0">
         {statCards.map((item, i) => (
           <StatCard key={i} {...item} router={router} />
         ))}
       </div>
 
       {/* ===== CHARTS ROW ===== */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-2 flex-1 overflow-hidden mt-2">
         
         {/* Yesterday Summary */}
-        <div className="bg-white rounded-lg shadow-lg p-4 border border-gray-200">
-          <h3 className="font-bold text-slate-900 text-base mb-3">Yesterday Summary</h3>
-          <div className="space-y-2">
+        <div className="bg-white rounded-lg shadow-lg p-3 border border-gray-200 overflow-y-auto">
+          <h3 className="font-bold text-slate-900 text-sm mb-2">Yesterday Summary</h3>
+          <div className="space-y-1">
             {yesterdayBars.map((item, i) => (
               <button
                 key={i}
                 onClick={() => {}}
-                className="w-full text-left p-2 rounded-lg transition-all duration-200 hover:bg-gray-50 hover:shadow-md cursor-pointer border border-transparent hover:border-gray-300"
+                className="w-full text-left p-1.5 rounded-lg transition-all duration-200 hover:bg-gray-50 hover:shadow-md cursor-pointer border border-transparent hover:border-gray-300"
               >
-                <div className="flex justify-between text-xs mb-1">
+                <div className="flex justify-between text-xs mb-0.5">
                   <span className="font-medium text-gray-700">{item.label}</span>
                   <span className="font-bold text-gray-900">{item.value}</span>
                 </div>
-                <div className="h-4 bg-gray-100 rounded-full overflow-hidden shadow-inner">
+                <div className="h-3 bg-gray-100 rounded-full overflow-hidden shadow-inner">
                   <div
                     className={`h-full bg-gradient-to-r ${item.gradient} rounded-full transition-all duration-500`}
                     style={{ width: `${Math.min(Math.max(item.value, 1), 100)}%` }}
@@ -322,58 +340,83 @@ const Dashboard = () => {
           </div>
         </div>
 
+        {/* Top 5 Patient Locations Pie Chart */}
+        <PieChartCard 
+          title="Top 5 Patient Capture Locations" 
+          data={locationData.length > 0 ? locationData : [{ name: "No Data", value: 1 }]} 
+          colors={["#F24E1E", "#FF6B35", "#FF8C42", "#FFA500", "#FFB84D"]}
+        />
+
         {/* Department-wise Tests Pie Chart */}
-        <PieChartCard title="Department-wise Tests" data={deptData} colors={COLORS1} />
+        <PieChartCard 
+          title="Department-wise Tests" 
+          data={departmentData.length > 0 ? departmentData : deptData} 
+          colors={COLORS1}
+        />
 
         {/* Quick Navigation Links */}
-        <div className="bg-white rounded-xl shadow-lg p-4 border border-gray-200">
-          <h3 className="font-bold text-slate-900 text-lg mb-3 flex items-center gap-2">
-            <Rocket className="text-orange-600" size={20} />
+        <div className="bg-white rounded-xl shadow-lg p-3 border border-gray-200 overflow-y-auto">
+          <h3 className="font-bold text-slate-900 text-sm mb-2 flex items-center gap-2">
+            <Rocket className="text-orange-600" size={16} />
             Quick Navigation
           </h3>
-          <div className="space-y-2">
+          <div className="space-y-1">
            
              <button
               onClick={() => router.push("/master/testlist")}
-              className="w-full text-left px-3 py-2 text-sm text-blue-700 hover:bg-blue-50 rounded-lg transition-colors border border-blue-200 hover:border-blue-400 flex items-center gap-2"
+              className="w-full text-left px-2 py-1.5 text-xs text-blue-700 hover:bg-blue-50 rounded-lg transition-colors border border-blue-200 hover:border-blue-400 flex items-center gap-2"
             >
-              <FileText size={16} className="text-blue-600" />
+              <FileText size={14} className="text-blue-600" />
               Test List
             </button>
             <button
               onClick={() => router.push("/master/packagelist")}
-              className="w-full text-left px-3 py-2 text-sm text-purple-700 hover:bg-purple-50 rounded-lg transition-colors border border-purple-200 hover:border-purple-400 flex items-center gap-2"
+              className="w-full text-left px-2 py-1.5 text-xs text-purple-700 hover:bg-purple-50 rounded-lg transition-colors border border-purple-200 hover:border-purple-400 flex items-center gap-2"
             >
-              <Package size={16} className="text-purple-600" />
+              <Package size={14} className="text-purple-600" />
               Package List
             </button>
             <button
               onClick={() => router.push("/patient/registration")}
-              className="w-full text-left px-3 py-2 text-sm text-green-700 hover:bg-green-50 rounded-lg transition-colors border border-green-200 hover:border-green-400 flex items-center gap-2"
+              className="w-full text-left px-2 py-1.5 text-xs text-green-700 hover:bg-green-50 rounded-lg transition-colors border border-green-200 hover:border-green-400 flex items-center gap-2"
             >
-              <UserPlus size={16} className="text-green-600" />
+              <UserPlus size={14} className="text-green-600" />
               Patient Registration
             </button>
             <button
               onClick={() => router.push("/patient/search-booking")}
-              className="w-full text-left px-3 py-2 text-sm text-orange-700 hover:bg-orange-50 rounded-lg transition-colors border border-orange-200 hover:border-orange-400 flex items-center gap-2"
+              className="w-full text-left px-2 py-1.5 text-xs text-orange-700 hover:bg-orange-50 rounded-lg transition-colors border border-orange-200 hover:border-orange-400 flex items-center gap-2"
             >
-              <Search size={16} className="text-orange-600" />
+              <Search size={14} className="text-orange-600" />
               Search Booking
             </button>
             <button
               onClick={() => router.push("/result")}
-              className="w-full text-left px-3 py-2 text-sm text-pink-700 hover:bg-pink-50 rounded-lg transition-colors border border-pink-200 hover:border-pink-400 flex items-center gap-2"
+              className="w-full text-left px-2 py-1.5 text-xs text-pink-700 hover:bg-pink-50 rounded-lg transition-colors border border-pink-200 hover:border-pink-400 flex items-center gap-2"
             >
-              <TestTube size={16} className="text-pink-600" />
+              <TestTube size={14} className="text-pink-600" />
               Result Entry
             </button>
             <button
               onClick={() => router.push("/reports/daily-collection")}
-              className="w-full text-left px-3 py-2 text-sm text-teal-700 hover:bg-teal-50 rounded-lg transition-colors border border-teal-200 hover:border-teal-400 flex items-center gap-2"
+              className="w-full text-left px-2 py-1.5 text-xs text-teal-700 hover:bg-teal-50 rounded-lg transition-colors border border-teal-200 hover:border-teal-400 flex items-center gap-2"
             >
-              <DollarSign size={16} className="text-teal-600" />
+              <DollarSign size={14} className="text-teal-600" />
               Daily Collection
+            </button>
+            <button
+              onClick={() => router.push("/reports/patient-location-report")}
+              className="w-full text-left px-2 py-1.5 text-xs text-indigo-700 hover:bg-indigo-50 rounded-lg transition-colors border border-indigo-200 hover:border-indigo-400 flex items-center gap-2"
+            >
+              <FileText size={14} className="text-indigo-600" />
+              Location Report
+            </button>
+            <button
+              onClick={() => router.push("/master/departmentlist")}
+              className="w-full text-left px-2 py-1.5 text-xs text-red-700 hover:bg-red-50 rounded-lg transition-colors border border-red-200 hover:border-red-400 flex items-center gap-2"
+            >
+              <FileText size={14} className="text-red-600" />
+              Department List
             </button>
           </div>
         </div>
@@ -585,14 +628,14 @@ const StatCard = ({ title, value, sub, color, icon: Icon, link, router }: any) =
     <div className="relative">
       <div 
         onClick={handleClick}
-        className="bg-white rounded-lg p-4 shadow-md hover:shadow-lg transition-all duration-300 cursor-pointer min-h-[120px] flex flex-col justify-between border border-gray-100"
+        className="bg-white rounded-lg p-2 shadow-md hover:shadow-lg transition-all duration-300 cursor-pointer min-h-[90px] flex flex-col justify-between border border-gray-100"
       >
-        <div className="flex items-start justify-between mb-3">
+        <div className="flex items-start justify-between mb-2">
           <p className="text-xs font-bold text-gray-700 uppercase tracking-wide">{title}</p>
-          {Icon && <Icon className={`text-2xl ${iconColorMap[color as keyof typeof iconColorMap]}`} />}
+          {Icon && <Icon className={`text-lg ${iconColorMap[color as keyof typeof iconColorMap]}`} />}
         </div>
         <div>
-          <p className="text-4xl font-bold text-gray-900 mb-2">{value}</p>
+          <p className="text-2xl font-bold text-gray-900 mb-1">{value}</p>
           <p className="text-xs text-orange-500 font-medium">{sub}</p>
         </div>
       </div>
@@ -620,18 +663,18 @@ const StatCard = ({ title, value, sub, color, icon: Icon, link, router }: any) =
 };
 
 const PieChartCard = ({ title, data, colors }: any) => (
-  <div className="bg-white rounded-lg shadow-lg p-4">
-    <h3 className="font-bold text-slate-700 text-base mb-2">{title}</h3>
-    <div className="h-[180px]">
+  <div className="bg-white rounded-lg shadow-lg p-2">
+    <h3 className="font-bold text-slate-700 text-xs mb-1">{title}</h3>
+    <div className="h-[140px]">
       <ResponsiveContainer width="100%" height="100%">
         <PieChart>
-          <Pie data={data || []} dataKey="value" innerRadius={35} outerRadius={70}>
+          <Pie data={data || []} dataKey="value" innerRadius={25} outerRadius={50}>
             {(data || []).map((_: any, i: any) => (
               <Cell key={i} fill={colors?.[i] || '#cccccc'} />
             ))}
           </Pie>
-          <Tooltip />
-          <Legend />
+          <Tooltip contentStyle={{ fontSize: '10px' }} />
+          <Legend wrapperStyle={{ fontSize: '10px' }} />
         </PieChart>
       </ResponsiveContainer>
     </div>
