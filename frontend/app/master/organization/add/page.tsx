@@ -62,9 +62,27 @@ const AddOrganization = () => {
 
   // Load tests on mount
   useEffect(() => {
-    getTests().then(tests => {
-      setAvailableTests(Array.isArray(tests) ? tests : tests?.data || []);
-    }).catch(console.error);
+    const loadTests = async () => {
+      try {
+        const tests = await getTests();
+        console.log('📋 Loaded tests:', tests, 'Type:', typeof tests, 'IsArray:', Array.isArray(tests));
+        
+        // Ensure tests is an array
+        if (Array.isArray(tests)) {
+          setAvailableTests(tests);
+        } else if (tests && typeof tests === 'object' && (tests as any).data && Array.isArray((tests as any).data)) {
+          setAvailableTests((tests as any).data);
+        } else {
+          console.warn('⚠️ Tests response is not an array:', tests);
+          setAvailableTests([]);
+        }
+      } catch (error) {
+        console.error('❌ Error loading tests:', error);
+        setAvailableTests([]);
+      }
+    };
+    
+    loadTests();
   }, []);
 
   useEffect(() => {
@@ -196,84 +214,85 @@ const AddOrganization = () => {
             {/* Organization Details */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
 
-            <div>
-              <label className="font-medium text-gray-700 text-sm">Name</label>
-              <div className="flex items-center border border-gray-300 rounded px-2 bg-white">
-                <Building2 size={14} className="text-cyan-600" />
-                <input type="text" name="name" value={formData.name} onChange={handleChange}
-                  disabled={isViewMode} required={!isViewMode}
-                  className="w-full px-2 py-1.5 outline-none text-sm disabled:bg-gray-50 bg-transparent" />
+              <div>
+                <label className="font-medium text-gray-700 text-sm">Name</label>
+                <div className="flex items-center border border-gray-300 rounded px-2 bg-white">
+                  <Building2 size={14} className="text-cyan-600" />
+                  <input type="text" name="name" value={formData.name} onChange={handleChange}
+                    disabled={isViewMode} required={!isViewMode}
+                    className="w-full px-2 py-1.5 outline-none text-sm disabled:bg-gray-50 bg-transparent" />
+                </div>
               </div>
-            </div>
 
-            <div>
-              <label className="font-medium text-gray-700 text-sm">Code</label>
-              <div className="flex items-center border border-gray-300 rounded px-2 bg-white">
-                <Hash size={14} className="text-cyan-600" />
-                <input type="text" name="code" value={formData.code} onChange={handleChange}
-                  disabled={isViewMode} required={!isViewMode}
-                  className="w-full px-2 py-1.5 outline-none text-sm disabled:bg-gray-50 bg-transparent" />
+              <div>
+                <label className="font-medium text-gray-700 text-sm">Code</label>
+                <div className="flex items-center border border-gray-300 rounded px-2 bg-white">
+                  <Hash size={14} className="text-cyan-600" />
+                  <input type="text" name="code" value={formData.code} onChange={handleChange}
+                    disabled={isViewMode} required={!isViewMode}
+                    className="w-full px-2 py-1.5 outline-none text-sm disabled:bg-gray-50 bg-transparent" />
+                </div>
               </div>
-            </div>
 
-            <div>
-              <label className="font-medium text-gray-700 text-sm">Location</label>
-              <div className="flex items-center border border-gray-300 rounded px-2 bg-white">
-                <MapPin size={14} className="text-cyan-600" />
-                <input type="text" name="location" value={formData.location} onChange={handleChange}
-                  disabled={isViewMode} required={!isViewMode}
-                  className="w-full px-2 py-1.5 outline-none text-sm disabled:bg-gray-50 bg-transparent" />
+              <div>
+                <label className="font-medium text-gray-700 text-sm">Location</label>
+                <div className="flex items-center border border-gray-300 rounded px-2 bg-white">
+                  <MapPin size={14} className="text-cyan-600" />
+                  <input type="text" name="location" value={formData.location} onChange={handleChange}
+                    disabled={isViewMode} required={!isViewMode}
+                    className="w-full px-2 py-1.5 outline-none text-sm disabled:bg-gray-50 bg-transparent" />
+                </div>
               </div>
-            </div>
 
-            <div>
-              <label className="font-medium text-gray-700 text-sm">Mobile No.</label>
-              <div className="flex items-center border border-gray-300 rounded px-2 bg-white">
-                <Phone size={14} className="text-cyan-600" />
-                <input type="tel" name="mobile" value={formData.mobile} onChange={handleChange}
-                  disabled={isViewMode} maxLength={10} placeholder="10 digit mobile number"
-                  required={!isViewMode}
-                  className="w-full px-2 py-1.5 outline-none text-sm disabled:bg-gray-50 bg-transparent" />
+              <div>
+                <label className="font-medium text-gray-700 text-sm">Mobile No.</label>
+                <div className="flex items-center border border-gray-300 rounded px-2 bg-white">
+                  <Phone size={14} className="text-cyan-600" />
+                  <input type="tel" name="mobile" value={formData.mobile} onChange={handleChange}
+                    disabled={isViewMode} maxLength={10} placeholder="10 digit mobile number"
+                    required={!isViewMode}
+                    className="w-full px-2 py-1.5 outline-none text-sm disabled:bg-gray-50 bg-transparent" />
+                </div>
               </div>
-            </div>
 
-            <div>
-              <label className="font-medium text-gray-700 text-sm">Date of Establishment</label>
-              <div className="flex items-center border border-gray-300 rounded px-2 bg-white">
-                <CalendarDays size={14} className="text-cyan-600" />
-                <input type="date" name="date" value={formData.date} onChange={handleChange}
-                  disabled={isViewMode} required={!isViewMode}
-                  className="w-full px-2 py-1.5 outline-none text-sm disabled:bg-gray-50 bg-transparent" />
+              <div>
+                <label className="font-medium text-gray-700 text-sm">Date of Establishment</label>
+                <div className="flex items-center border border-gray-300 rounded px-2 bg-white">
+                  <CalendarDays size={14} className="text-cyan-600" />
+                  <input type="date" name="date" value={formData.date} onChange={handleChange}
+                    disabled={isViewMode} required={!isViewMode}
+                    className="w-full px-2 py-1.5 outline-none text-sm disabled:bg-gray-50 bg-transparent" />
+                </div>
               </div>
-            </div>
 
-            <div>
-              <label className="font-medium text-gray-700 text-sm">Active Status</label>
-              <div className="flex items-center border border-gray-300 rounded px-2 bg-white">
-                <select name="active" value={formData.active} onChange={handleChange}
-                  disabled={isViewMode}
-                  className="w-full px-2 py-1.5 outline-none text-sm disabled:bg-gray-50 bg-transparent">
-                  <option value="Yes">Yes</option>
-                  <option value="No">No</option>
-                </select>
+              <div>
+                <label className="font-medium text-gray-700 text-sm">Active Status</label>
+                <div className="flex items-center border border-gray-300 rounded px-2 bg-white">
+                  <select name="active" value={formData.active} onChange={handleChange}
+                    disabled={isViewMode}
+                    className="w-full px-2 py-1.5 outline-none text-sm disabled:bg-gray-50 bg-transparent">
+                    <option value="Yes">Yes</option>
+                    <option value="No">No</option>
+                  </select>
+                </div>
               </div>
-            </div>
 
-            <div className="md:col-span-2">
-              <label className="font-medium text-gray-700 text-sm">Email Address</label>
-              <div className="flex items-center border border-gray-300 rounded px-2 bg-white">
-                <Mail size={14} className="text-cyan-600" />
-                <input type="email" name="email" value={formData.email} onChange={handleChange}
-                  disabled={isViewMode} placeholder="example@domain.com" required={!isViewMode}
-                  className="w-full px-2 py-1.5 outline-none text-sm disabled:bg-gray-50 bg-transparent" />
+              <div className="md:col-span-2">
+                <label className="font-medium text-gray-700 text-sm">Email Address</label>
+                <div className="flex items-center border border-gray-300 rounded px-2 bg-white">
+                  <Mail size={14} className="text-cyan-600" />
+                  <input type="email" name="email" value={formData.email} onChange={handleChange}
+                    disabled={isViewMode} placeholder="example@domain.com" required={!isViewMode}
+                    className="w-full px-2 py-1.5 outline-none text-sm disabled:bg-gray-50 bg-transparent" />
+                </div>
               </div>
-            </div>
 
-            <div className="md:col-span-2">
-              <label className="font-medium text-gray-700 text-sm">Address</label>
-              <textarea name="address" value={formData.address} onChange={handleChange}
-                disabled={isViewMode} rows={2} required={!isViewMode}
-                className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm disabled:bg-gray-50 bg-white" />
+              <div className="md:col-span-2">
+                <label className="font-medium text-gray-700 text-sm">Address</label>
+                <textarea name="address" value={formData.address} onChange={handleChange}
+                  disabled={isViewMode} rows={2} required={!isViewMode}
+                  className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm disabled:bg-gray-50 bg-white" />
+              </div>
             </div>
 
             {/* Test Charges Section - Only for Add Mode */}
@@ -304,7 +323,7 @@ const AddOrganization = () => {
                         </tr>
                       </thead>
                       <tbody>
-                        {testCharges.map((charge, index) => (
+                        {Array.isArray(testCharges) && testCharges.map((charge, index) => (
                           <tr key={index} className="border-b border-gray-200 hover:bg-gray-50">
                             <td className="px-2 py-1">
                               <select
@@ -313,7 +332,7 @@ const AddOrganization = () => {
                                 className="w-full border border-gray-300 rounded px-1 py-0.5 text-xs bg-white"
                               >
                                 <option value="">Select Test</option>
-                                {availableTests.map((test) => (
+                                {Array.isArray(availableTests) && availableTests.map((test) => (
                                   <option key={test.id} value={test.id}>
                                     {test.name}
                                   </option>

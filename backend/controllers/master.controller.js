@@ -955,6 +955,7 @@ export const getTests = async (req, res) => {
           orderBy: { sortOrder: 'asc' }
         },
         charges: {
+          where: { organizationId: null }, // Only get DEFAULT charges
           select: {
             id: true,
             b2cCharge: true,

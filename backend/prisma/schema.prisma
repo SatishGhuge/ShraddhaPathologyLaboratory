@@ -61,16 +61,17 @@ model Patient {
 }
 
 model PatientTest {
-  id              Int          @id @default(autoincrement())
+  id              Int           @id @default(autoincrement())
   patientId       String
   visitId         String
   testId          Int
   departmentId    Int
+  organizationId  String?       // Track which organization/lab patient came from
   sample          String
   charge          Float
-  status          String       @default("REGISTERED")
-  isExcluded      Boolean      @default(false)
-  result          String?      @db.Text
+  status          String        @default("REGISTERED")
+  isExcluded      Boolean       @default(false)
+  result          String?       @db.Text
   resultDate      DateTime?
   visitType       String?
   reportMode      String?
@@ -80,27 +81,29 @@ model PatientTest {
   sampleTaken     DateTime?
   sampleReceived  DateTime?
   sampleBarcodeNo String?
-  remarks         String?      @db.Text
-  totalAmount     Float        @default(0)
-  discountPercent Float        @default(0)
-  discountAmount  Float        @default(0)
+  remarks         String?       @db.Text
+  totalAmount     Float         @default(0)
+  discountPercent Float         @default(0)
+  discountAmount  Float         @default(0)
   discountRemark  String?
-  paidAmount      Float        @default(0)
-  balanceAmount   Float        @default(0)
+  paidAmount      Float         @default(0)
+  balanceAmount   Float         @default(0)
   paymentMode     String?
   businessType    String?
   packageName     String?
   attachmentPath  String?
-  createdAt       DateTime     @default(now())
-  updatedAt       DateTime     @updatedAt
-  department      Department   @relation(fields: [departmentId], references: [id])
-  patient         Patient      @relation(fields: [patientId], references: [patientId], onDelete: Cascade)
-  test            Test         @relation(fields: [testId], references: [id])
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  department      Department    @relation(fields: [departmentId], references: [id])
+  patient         Patient       @relation(fields: [patientId], references: [patientId], onDelete: Cascade)
+  test            Test          @relation(fields: [testId], references: [id])
+  organization    Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
   testResults     TestResult[]
 
   @@index([departmentId], map: "patient_tests_departmentId_fkey")
   @@index([patientId], map: "patient_tests_patientId_fkey")
   @@index([testId], map: "patient_tests_testId_fkey")
+  @@index([organizationId], map: "patient_tests_organizationId_fkey")
   @@index([status], map: "patient_tests_status_idx")
   @@index([visitDate], map: "patient_tests_visitDate_idx")
   @@index([visitId], map: "patient_tests_visitId_idx")
@@ -249,18 +252,19 @@ model Doctor {
 }
 
 model Organization {
-  id          String       @id
-  name        String       @unique
+  id          String         @id
+  name        String         @unique
   code        String?
   location    String?
-  address     String?      @db.Text
+  address     String?        @db.Text
   mobile      String?
   email       String?
   date        DateTime?
-  isActive    Boolean      @default(true)
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
+  isActive    Boolean        @default(true)
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
   testCharges TestCharge[]
+  patientTests PatientTest[]
 
   @@map("organizations")
 }

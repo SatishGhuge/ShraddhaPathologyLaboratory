@@ -15,7 +15,7 @@ import {
   Barcode,
 } from "lucide-react";
 import { createPatient, searchPatient } from "@/src/api/patient";
-import { getDoctors, createDoctor, getSpecimenTypes } from "@/src/api/master";
+import { getDoctors, createDoctor, getSpecimenTypes, getOrganizations, getTestCharges } from "@/src/api/master";
 import { getCities, getSubSections, getDistricts, getVillages, formatLocation, parseLocation, searchLocations } from "@/src/data/maharashtraLocations";
 import API_BASE_URL from "@/src/api/config";
 
@@ -305,6 +305,9 @@ export default function PatientRegistration() {
   const [departments, setDepartments] = useState<any[]>([]);
   const [doctorsList, setDoctorsList] = useState<any[]>([]);
   const [specimenTypes, setSpecimenTypes] = useState<any[]>([]);
+  const [organizations, setOrganizations] = useState<any[]>([]);
+  const [selectedOrganization, setSelectedOrganization] = useState<string>("");
+  const [organizationCharges, setOrganizationCharges] = useState<any>({});
   const [loading, setLoading] = useState(false);
 
   // Fetch departments with tests and packages from API
@@ -312,9 +315,46 @@ export default function PatientRegistration() {
     fetchDepartmentsData();
     getDoctors().then((res: any) => setDoctorsList(Array.isArray(res) ? res : res?.data || [])).catch(console.error);
     getSpecimenTypes().then(setSpecimenTypes).catch(console.error);
+    getOrganizations().then((res: any) => {
+      const orgs = Array.isArray(res) ? res : res?.data || [];
+      setOrganizations(orgs);
+      console.log('📋 Organizations loaded:', orgs);
+    }).catch(console.error);
   }, []);
 
-  const fetchDepartmentsData = async () => {
+  // Fetch organization-specific charges when organization is selected
+  useEffect(() => {
+    if (selectedOrganization) {
+      getTestCharges(undefined, selectedOrganization).then((charges: any) => {
+        const chargeMap: any = {};
+        charges.forEach((charge: any) => {
+          chargeMap[charge.testId] = {
+            b2cCharge: charge.b2cCharge,
+            b2bCharge: charge.b2bCharge
+          };
+        });
+        setOrganizationCharges(chargeMap);
+        console.log('💰 Organization charges loaded:', chargeMap);
+        
+        // Update selected tests with organization charges
+        setSelectedTests(prevTests => 
+          prevTests.map(test => {
+            const orgCharge = chargeMap[test.id];
+            if (orgCharge) {
+              return {
+                ...test,
+                b2cCharge: orgCharge.b2cCharge,
+                b2bCharge: orgCharge.b2bCharge
+              };
+            }
+            return test;
+          })
+        );
+      }).catch(console.error);
+    } else {
+      setOrganizationCharges({});
+    }
+  }, [selectedOrganization]);
     try {
       setLoading(true);
       console.log('🔄 Fetching departments, tests, and packages...');
@@ -862,6 +902,7 @@ export default function PatientRegistration() {
         createdBy: createdBy || null,
         address: address || null,
         location: location || null,
+        organizationId: selectedOrganization || null,
         visitType: visitType || "General",
         reportMode: reportMode || "Email",
         referralDoctor: isManualRefDoctor ? manualRefDoctorName : refDoctor || null,
@@ -934,6 +975,7 @@ export default function PatientRegistration() {
         createdBy: createdBy || null,
         address: address || null,
         location: location || null,  // Add location field
+        organizationId: selectedOrganization || null,
         // Registration Details (optional if no tests)
         visitType: visitType || "General",  // Default value
         reportMode: reportMode || "Email",  // Default value
@@ -1306,6 +1348,23 @@ export default function PatientRegistration() {
                 <div className="text-slate-900 font-medium text-sm cursor-not-allowed select-none">
                   {createdBy || '—'}
                 </div>
+              </div>
+
+              {/* Organization Selector */}
+              <div className="flex flex-col">
+                <label className="text-xs text-gray-500 mb-0.5">Organization / Lab</label>
+                <select 
+                  value={selectedOrganization} 
+                  onChange={(e) => setSelectedOrganization(e.target.value)}
+                  className={input}
+                >
+                  <option value="">Select Organization (Optional)</option>
+                  {Array.isArray(organizations) && organizations.map((org) => (
+                    <option key={org.id} value={org.id}>
+                      {org.name}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               <textarea className={input} placeholder="Address *" value={address} onChange={(e) => setAddress(e.target.value)} rows={3} required></textarea>
