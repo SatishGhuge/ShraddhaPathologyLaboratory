@@ -60,6 +60,9 @@ const AdminLogin = ({ onLogin }: { onLogin?: () => void }) => {
     try {
       const response = await adminLogin(formData.username, formData.password);
       
+      // Clear all localStorage data on login
+      localStorage.clear();
+      
       document.cookie = `token=${response.token}; path=/; max-age=86400; SameSite=Lax`;
       localStorage.setItem('token', response.token);
       localStorage.setItem('admin', JSON.stringify(response.admin));

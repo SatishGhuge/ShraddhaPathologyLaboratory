@@ -34,36 +34,29 @@ export default function AddLabCharges() {
       setLoading(true);
       setError("");
       
-      // Fetch all tests
-      const testsResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/master/tests`);
-      const testsResult = await testsResponse.json();
+      // Fetch all tests with their charges
+      const chargesResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/master/test-charges/all`);
+      const chargesResult = await chargesResponse.json();
       
-      if (testsResult.success) {
-        setTests(testsResult.data);
+      if (chargesResult.success) {
+        // chargesResult.data is an array of tests with charges nested
+        const testsData = chargesResult.data;
+        setTests(testsData);
         
-        // Fetch charges for all tests
-        const chargesPromises = testsResult.data.map(async (test: any) => {
-          try {
-            const chargesResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/master/tests/${test.id}/charges`);
-            const chargesResult = await chargesResponse.json();
-            return {
-              testId: test.id,
-              charges: chargesResult.success ? chargesResult.data : []
-            };
-          } catch (error) {
-            console.error(`Error fetching charges for test ${test.id}:`, error);
-            return {
-              testId: test.id,
-              charges: []
-            };
+        // Extract charges from tests
+        const chargesMap: any = {};
+        testsData.forEach((test: any) => {
+          if (test.charges && test.charges.length > 0) {
+            chargesMap[test.id] = test.charges;
           }
         });
         
-        const allCharges = await Promise.all(chargesPromises);
-        setCharges(allCharges);
-        
+        setCharges(Object.entries(chargesMap).map(([testId, charges]: [string, any]) => ({
+          testId: parseInt(testId),
+          charges
+        })));
       } else {
-        setError('Failed to load tests from server');
+        setError('Failed to load charges from server');
       }
     } catch (error) {
       console.error('Error fetching data:', error);
@@ -78,8 +71,10 @@ export default function AddLabCharges() {
     if (!tests.length) return;
     
     const result = tests.map(test => {
-      const testCharges = charges.find((c: any) => c.testId === test.id)?.charges || [];
-      const defaultCharge = testCharges.find((c: any) => !c.franchiseId && !c.corporateId && !c.collectionCenterId);
+      // Get charges from test.charges array (from API response)
+      const testCharges = test.charges || [];
+      // Get default charge (organizationId is null)
+      const defaultCharge = testCharges.find((c: any) => !c.organizationId);
       
       return {
         id: test.id,
@@ -97,7 +92,7 @@ export default function AddLabCharges() {
     );
     
     setFilteredData(result);
-  }, [tests, charges, searchName, searchCode, searchGroup]);
+  }, [tests, searchName, searchCode, searchGroup]);
 
   // Manual search button (for consistency with UI)
   const handleSearch = () => {
@@ -173,14 +168,13 @@ export default function AddLabCharges() {
       setLoading(true);
       setError("");
       
-      // Prepare bulk update data
+      // Prepare bulk update data for DEFAULT charges (no organizationId)
       const bulkCharges = filteredData
         .filter(item => (item.charges && item.charges > 0) || (item.b2b && item.b2b > 0))
         .map(item => ({
           testId: item.id,
           b2cCharge: parseFloat(item.charges) || 0,
-          b2bCharge: parseFloat(item.b2b) || 0,
-          chargeId: item.chargeId
+          b2bCharge: parseFloat(item.b2b) || 0
         }));
 
       if (bulkCharges.length === 0) {
@@ -188,12 +182,15 @@ export default function AddLabCharges() {
         return;
       }
       
+      const token = localStorage.getItem('token');
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/master/test-charges/bulk`, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          ...(token && { 'Authorization': `Bearer ${token}` })
         },
         body: JSON.stringify({
+          // No organizationId - these are DEFAULT charges
           charges: bulkCharges
         })
       });

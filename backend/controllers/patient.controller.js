@@ -27,7 +27,7 @@ export const createPatient = async (req, res) => {
       existingPatientId,
       // Patient Identity
       title, firstName, lastName, dob, age, gender, mobile, email,
-      createdBy, createdAtLocation, address,
+      createdBy, createdAtLocation, address, location,
       // Registration Details (will be saved with each test)
       visitType, reportMode, referralDoctor, visitDate, visitTime,
       sampleTaken, sampleReceived, sampleBarcodeNo, remarks,
@@ -229,6 +229,7 @@ export const createPatient = async (req, res) => {
           createdBy,
           createdAtLocation,
           address,
+          location,  // Add location field
           // Tests with registration & billing details
           tests: {
             create: tests?.map(test => ({
@@ -573,6 +574,173 @@ export const getPatientStatistics = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Failed to fetch patient statistics'
+    });
+  }
+};
+
+// Get patient location-wise statistics
+export const getPatientLocationStatistics = async (req, res) => {
+  try {
+    const { fromDate, toDate } = req.query;
+
+    // Build date filter
+    const dateFilter = {};
+    if (fromDate && toDate) {
+      const start = new Date(fromDate);
+      start.setHours(0, 0, 0, 0);
+      const end = new Date(toDate);
+      end.setHours(23, 59, 59, 999);
+      dateFilter.createdAt = { gte: start, lte: end };
+    } else if (fromDate) {
+      const start = new Date(fromDate);
+      start.setHours(0, 0, 0, 0);
+      dateFilter.createdAt = { gte: start };
+    } else if (toDate) {
+      const end = new Date(toDate);
+      end.setHours(23, 59, 59, 999);
+      dateFilter.createdAt = { lte: end };
+    }
+
+    // Get all patients with location
+    const patients = await prisma.patient.findMany({
+      where: dateFilter,
+      select: {
+        location: true,
+        patientId: true,
+        firstName: true,
+        lastName: true
+      }
+    });
+
+    // Group by location and count
+    const locationStats = {};
+    patients.forEach(patient => {
+      const location = patient.location || 'Not Specified';
+      if (!locationStats[location]) {
+        locationStats[location] = 0;
+      }
+      locationStats[location]++;
+    });
+
+    // Convert to array and sort by count (descending)
+    const locationArray = Object.entries(locationStats)
+      .map(([location, count]) => ({
+        location,
+        count,
+        percentage: ((count / patients.length) * 100).toFixed(2)
+      }))
+      .sort((a, b) => b.count - a.count);
+
+    res.json({
+      success: true,
+      data: {
+        totalPatients: patients.length,
+        locationStats: locationArray,
+        topLocation: locationArray[0] || null
+      }
+    });
+
+  } catch (error) {
+    console.error('Get patient location statistics error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch patient location statistics',
+      error: error.message
+    });
+  }
+};
+
+// Add test to existing patient visit
+export const addTestToVisit = async (req, res) => {
+  try {
+    const { patientId, visitId } = req.params;
+    const { testId, testName, charge, sampleType, businessType } = req.body;
+
+    // Verify patient exists
+    const patient = await prisma.patient.findUnique({
+      where: { patientId }
+    });
+
+    if (!patient) {
+      return res.status(404).json({
+        success: false,
+        message: 'Patient not found'
+      });
+    }
+
+    // Find existing tests for this visit to get visit details
+    const existingTests = await prisma.patientTest.findMany({
+      where: {
+        patientId,
+        visitId
+      }
+    });
+
+    if (!existingTests.length) {
+      return res.status(404).json({
+        success: false,
+        message: 'Visit not found for this patient'
+      });
+    }
+
+    const existingTest = existingTests[0];
+
+    // Create new test entry for this visit
+    const newTest = await prisma.patientTest.create({
+      data: {
+        patientId,
+        visitId,
+        testId: parseInt(testId),
+        departmentId: existingTest.departmentId,
+        sample: sampleType || existingTest.sample,
+        charge: parseFloat(charge) || 0,
+        status: 'REGISTERED',
+        visitType: existingTest.visitType,
+        reportMode: existingTest.reportMode,
+        referralDoctor: existingTest.referralDoctor,
+        visitDate: existingTest.visitDate,
+        visitTime: existingTest.visitTime,
+        paymentMode: existingTest.paymentMode,
+        businessType: businessType || existingTest.businessType,
+        totalAmount: parseFloat(charge) || 0,
+        paidAmount: existingTest.paidAmount || 0,
+        balanceAmount: existingTest.balanceAmount || 0,
+        discountAmount: existingTest.discountAmount || 0,
+        discountPercent: existingTest.discountPercent || 0,
+        discountRemark: existingTest.discountRemark || '',
+      }
+    });
+
+    // Recalculate balance for all tests in this visit
+    const allTests = await prisma.patientTest.findMany({
+      where: { patientId, visitId }
+    });
+
+    const totalAmount = allTests.reduce((sum, t) => sum + (t.totalAmount || 0), 0);
+    const paidAmount = existingTest.paidAmount || 0;
+    const discountAmount = existingTest.discountAmount || 0;
+    const newBalanceAmount = Math.max(0, totalAmount - discountAmount - paidAmount);
+
+    // Update all tests with the new balance
+    await prisma.patientTest.updateMany({
+      where: { patientId, visitId },
+      data: {
+        balanceAmount: newBalanceAmount
+      }
+    });
+
+    res.status(201).json({
+      success: true,
+      message: 'Test added to visit successfully',
+      data: newTest
+    });
+
+  } catch (error) {
+    console.error('Add test to visit error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to add test to visit',
+      error: error.message
     });
   }
 };

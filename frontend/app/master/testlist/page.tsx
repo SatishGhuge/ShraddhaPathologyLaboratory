@@ -31,19 +31,9 @@ const TestList = () => {
       setError(null);
       const response = await getTests(page, ITEMS_PER_PAGE);
       
-      // Handle API response - getTests returns { success, data, pagination }
-      if (response?.success && response?.data) {
-        setTests(response.data);
-        if (response.pagination) {
-          setPagination(response.pagination);
-        }
-      } else if (Array.isArray(response)) {
-        // Fallback if response is directly an array
-        setTests(response);
-      } else {
-        setError('Invalid response format from server');
-        setTests([]);
-      }
+      // Handle API response - getTests now returns an array directly
+      setTests(response);
+      setPagination(null);
     } catch (err) {
       console.error('Error fetching tests:', err);
       setError(err instanceof Error ? err.message : 'Failed to load tests. Please try again.');
@@ -310,13 +300,6 @@ const TestList = () => {
                               >
                                 Edit
                               </button>
-
-                            <button 
-                              onClick={() => router.push(`/master/test-charges/${test.id}`)}
-                              className="bg-purple-600 text-white px-2 py-1 rounded text-[10px] sm:text-xs hover:bg-purple-700 transition-colors"
-                            >
-                              Charges
-                            </button>
 
                             <button 
                               onClick={() => handleCopyTest(test.id)}

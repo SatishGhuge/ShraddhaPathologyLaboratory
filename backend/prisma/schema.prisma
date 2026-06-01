@@ -47,6 +47,7 @@ model Patient {
   createdBy         String?
   createdAtLocation String?
   address           String?       @db.Text
+  location          String?       // Patient location (from Google Places)
   createdAt         DateTime?     @default(now())
   updatedAt         DateTime      @updatedAt
   tests             PatientTest[]
@@ -55,6 +56,7 @@ model Patient {
   @@index([email], map: "patients_email_idx")
   @@index([firstName, lastName], map: "patients_name_idx")
   @@index([createdAt], map: "patients_createdAt_idx")
+  @@index([location], map: "patients_location_idx")
   @@map("patients")
 }
 
@@ -153,10 +155,10 @@ model Test {
   lineHeight             Float?
   isActive               Boolean           @default(true)
   isDeleted              Boolean           @default(false)
+  linkedTestIds          String?           @db.Text
   createdAt              DateTime          @default(now())
   updatedAt              DateTime          @updatedAt
   testparameters         testparameters[]
-  corporateCharges       CorporateCharge[]
   packageTests           PackageTest[]
   patientTests           PatientTest[]
   categories             TestCategory[]
@@ -208,29 +210,23 @@ model PackageTest {
 }
 
 model TestCharge {
-  id                 Int               @id @default(autoincrement())
-  testId             Int
-  b2cCharge          Float
-  b2bCharge          Float
-  franchiseId        String?
-  corporateId        Int?
-  collectionCenterId String?
-  discountPercent    Float?            @default(0)
-  specialPrice       Float?
-  effectiveFrom      DateTime          @default(now())
-  effectiveTo        DateTime?
-  isActive           Boolean           @default(true)
-  createdAt          DateTime          @default(now())
-  updatedAt          DateTime          @updatedAt
-  collectionCenter   CollectionCenter? @relation(fields: [collectionCenterId], references: [id], onDelete: Cascade)
-  corporate          Corporate?        @relation(fields: [corporateId], references: [id], onDelete: Cascade)
-  franchise          Franchise?        @relation(fields: [franchiseId], references: [id], onDelete: Cascade)
-  test               Test              @relation(fields: [testId], references: [id], onDelete: Cascade)
+  id                Int           @id @default(autoincrement())
+  testId            Int
+  organizationId    String?
+  b2cCharge         Float
+  b2bCharge         Float
+  discountPercent   Float?        @default(0)
+  specialPrice      Float?
+  effectiveFrom     DateTime      @default(now())
+  effectiveTo       DateTime?
+  isActive          Boolean       @default(true)
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+  organization      Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  test              Test          @relation(fields: [testId], references: [id], onDelete: Cascade)
 
-  @@unique([testId, franchiseId, corporateId, collectionCenterId])
-  @@index([collectionCenterId], map: "test_charges_collectionCenterId_fkey")
-  @@index([corporateId], map: "test_charges_corporateId_fkey")
-  @@index([franchiseId], map: "test_charges_franchiseId_fkey")
+  @@unique([testId, organizationId])
+  @@index([organizationId], map: "test_charges_organizationId_fkey")
   @@map("test_charges")
 }
 
@@ -252,7 +248,7 @@ model Doctor {
   @@map("doctors")
 }
 
-model Franchise {
+model Organization {
   id          String       @id
   name        String       @unique
   code        String?
@@ -266,57 +262,7 @@ model Franchise {
   updatedAt   DateTime     @updatedAt
   testCharges TestCharge[]
 
-  @@map("franchise")
-}
-
-model CollectionCenter {
-  id          String       @id
-  name        String       @unique
-  code        String?
-  location    String?
-  address     String?      @db.Text
-  mobile      String?
-  email       String?
-  date        DateTime?
-  isActive    Boolean      @default(true)
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
-  testCharges TestCharge[]
-
-  @@map("collection_centers")
-}
-
-model Corporate {
-  id               Int               @id @default(autoincrement())
-  name             String            @unique
-  isActive         Boolean           @default(true)
-  createdAt        DateTime          @default(now())
-  updatedAt        DateTime          @updatedAt
-  corporateCharges CorporateCharge[]
-  testCharges      TestCharge[]
-
-  @@map("corporates")
-}
-
-model CorporateCharge {
-  id              Int       @id @default(autoincrement())
-  testId          Int
-  corporateId     Int
-  charges         Float     @default(0)
-  b2bCharges      Float     @default(0)
-  discountPercent Float?    @default(0)
-  specialPrice    Float?
-  effectiveFrom   DateTime  @default(now())
-  effectiveTo     DateTime?
-  isActive        Boolean   @default(true)
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
-  corporate       Corporate @relation(fields: [corporateId], references: [id], onDelete: Cascade)
-  test            Test      @relation(fields: [testId], references: [id], onDelete: Cascade)
-
-  @@unique([testId, corporateId])
-  @@index([corporateId], map: "corporate_charges_corporateId_fkey")
-  @@map("corporate_charges")
+  @@map("organizations")
 }
 
 model TestParameter {

@@ -1,0 +1,5 @@
+-- Add missing columns to signatures table
+ALTER TABLE `signatures` ADD COLUMN IF NOT EXISTS `imageSize` VARCHAR(191) NULL DEFAULT '800|600';
+ALTER TABLE `signatures` ADD COLUMN IF NOT EXISTS `width` INT NULL DEFAULT 150;
+ALTER TABLE `signatures` ADD COLUMN IF NOT EXISTS `height` INT NULL DEFAULT 80;
+ALTER TABLE `signatures` ADD COLUMN IF NOT EXISTS `sortOrder` INT NULL DEFAULT 1;

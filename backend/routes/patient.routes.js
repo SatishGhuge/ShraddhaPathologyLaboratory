@@ -7,7 +7,9 @@ import {
   searchPatient,
   updatePatient,
   updatePayment,
-  getPatientStatistics
+  getPatientStatistics,
+  getPatientLocationStatistics,
+  addTestToVisit
 } from '../controllers/patient.controller.js';
 
 const router = express.Router();
@@ -18,6 +20,9 @@ router.get('/search', searchPatient);
 // Get patient statistics for dashboard
 router.get('/statistics', getPatientStatistics);
 
+// Get patient location-wise statistics
+router.get('/statistics/location', getPatientLocationStatistics);
+
 // Get all patients
 router.get('/', getAllPatients);
 
@@ -26,7 +31,7 @@ router.post('/',
   [
     body('firstName').trim().notEmpty().withMessage('First name is required'),
     body('mobile').trim().notEmpty().withMessage('Mobile is required'),
-    body('tests').isArray({ min: 1 }).withMessage('At least one test is required')
+    body('tests').isArray().withMessage('Tests must be an array')  // Allow empty array
   ],
   createPatient
 );
@@ -39,5 +44,8 @@ router.put('/:patientId', updatePatient);
 
 // Update payment for a visit
 router.patch('/:patientId/payment', updatePayment);
+
+// Add test to existing visit
+router.post('/:patientId/visits/:visitId/tests', addTestToVisit);
 
 export default router;

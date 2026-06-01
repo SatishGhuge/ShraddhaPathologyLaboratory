@@ -5,8 +5,7 @@ import { useState, useEffect } from "react";
 import { useRouter, useParams, usePathname } from "next/navigation";
 
 import Header from "@/src/components/Header";
-import { getUserById, createUser, updateUser } from "@/src/api/master.js";
-import { getRoles, getCollectionCenters } from "@/src/api/master.js";
+import { getUserById, createUser, updateUser, getRoles } from "@/src/api/master.js";
 
 const defaultModuleAllocation = {
   patient: {
@@ -71,8 +70,11 @@ export default function AddUserForm() {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [roles, setRoles] = useState<any[]>([]);
+<<<<<<< HEAD
   const [centers, setCenters] = useState<any[]>([]);
   const [moduleAllocation, setModuleAllocation] = useState(defaultModuleAllocation);
+=======
+>>>>>>> 7a2f561488eacfe2f91ae815840bc257a654c92f
 
   const [formData, setFormData] = useState({
     center: "", role: "", username: "", gender: "",
@@ -84,6 +86,7 @@ export default function AddUserForm() {
   const inputClass = "w-full px-2 py-1 text-base border border-gray-300 rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-orange-500";
   const labelClass = "text-sm text-gray-700 font-medium mb-1 block";
 
+<<<<<<< HEAD
   useEffect(() => {
     getRoles().then((res) => {
       const rolesArray = Array.isArray(res) ? res : res?.data || [];
@@ -93,6 +96,11 @@ export default function AddUserForm() {
       const centersArray = Array.isArray(res) ? res : res?.data || res || [];
       setCenters(centersArray);
     }).catch(() => setCenters([]));
+=======
+  // Load roles for dropdown
+  useEffect(() => {
+    getRoles().then(setRoles).catch(() => {});
+>>>>>>> 7a2f561488eacfe2f91ae815840bc257a654c92f
   }, []);
 
   useEffect(() => {
@@ -223,12 +231,16 @@ export default function AddUserForm() {
           <div className="grid grid-cols-2 gap-4 mb-4">
             <div>
               <label className={labelClass}>Center *</label>
+<<<<<<< HEAD
               <select name="center" value={formData.center} onChange={handleChange} className={inputClass}>
                 <option value="">Please Select</option>
                 {Array.isArray(centers) && centers.map(c => (
                   <option key={c.id} value={c.name}>{c.name}</option>
                 ))}
               </select>
+=======
+              <input name="center" value={formData.center} onChange={handleChange} className={inputClass} placeholder="Enter center name" />
+>>>>>>> 7a2f561488eacfe2f91ae815840bc257a654c92f
               {errors.center && <p className="text-red-700 text-xs">{errors.center}</p>}
             </div>
             <div>

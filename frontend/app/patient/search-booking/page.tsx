@@ -9,7 +9,7 @@ import {
   Search, RotateCcw, Eye, Pencil, Trash2, Printer,
   Download, ChevronDown,
   RefreshCcw, Plus, X, RefreshCw,
-  ChevronLeft, ChevronRight, CalendarDays, AlertCircle
+  ChevronLeft, ChevronRight, CalendarDays, AlertCircle, Barcode
 } from "lucide-react";
 import { getAllPatients, updatePayment, updatePatient } from "@/src/api/patient";
 import { getDoctors, getTests, getPackages, getSpecimenTypes } from "@/src/api/master";
@@ -242,6 +242,66 @@ const style = {
 
 const numInput = "w-full border rounded px-2 py-1 text-center text-xs [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none";
 
+// Generate Code128 barcode bars as SVG path data
+const buildCode128Svg = (text: any) => {
+  // Code128B encoding table (char code 32-127)
+  const CODE128B = [
+    '11011001100','11001101100','11001100110','10010011000','10010001100',
+    '10001001100','10011001000','10011000100','10001100100','11001001000',
+    '11001000100','11000100100','10110011100','10011011100','10011001110',
+    '10111001100','10011101100','10011100110','11001110010','11001011100',
+    '11001001110','11011100100','11001110100','11101101110','11101001100',
+    '11100101100','11100100110','11101100100','11100110100','11100110010',
+    '11011011000','11011000110','11000110110','10100011000','10001011000',
+    '10001000110','10110001000','10001101000','10001100010','11010001000',
+    '11000101000','11000100010','10110111000','10110001110','10001101110',
+    '10111011000','10111000110','10001110110','11101110110','11010001110',
+    '11000101110','11011101000','11011100010','11011101110','11101011000',
+    '11101000110','11100010110','11101101000','11101100010','11100011010',
+    '11101111010','11001000010','11110001010','10100110000','10100001100',
+    '10010110000','10010000110','10000101100','10000100110','10110010000',
+    '10110000100','10011010000','10011000010','10000110100','10000110010',
+    '11000010010','11001010000','11110111010','11000010100','10001111010',
+    '10100111100','10010111100','10010011110','10111100100','10011110100',
+    '10011110010','11110100100','11110010100','11110010010','11011011110',
+    '11011110110','11110110110','10101111000','10100011110','10001011110',
+    '10111101000','10111100010','11110101000','11110100010','10111011110',
+    '10111101110','11101011110','11110101110','11010000100','11010010000',
+    '11010011100','1100011101011'
+  ];
+  const START_B = 104;
+  const STOP = 106;
+
+  const codes = [START_B];
+  let checksum = START_B;
+  for (let i = 0; i < text.length; i++) {
+    const c = text.charCodeAt(i) - 32;
+    codes.push(c);
+    checksum += c * (i + 1);
+  }
+  codes.push(checksum % 103);
+  codes.push(STOP);
+
+  const barWidth = 2;
+  let x = 0;
+  let bars = '';
+  const height = 60;
+
+  codes.forEach(code => {
+    const pattern = CODE128B[code];
+    if (!pattern) return;
+    for (let i = 0; i < pattern.length; i++) {
+      const w = parseInt(pattern[i]) * barWidth;
+      if (i % 2 === 0) {
+        bars += `<rect x="${x}" y="0" width="${w}" height="${height}" fill="black"/>`;
+      }
+      x += w;
+    }
+  });
+
+  return { svg: bars, width: x, height };
+};
+
 /* ─────────────────── main page ─────────────────── */
 export default function BookingPage() {
   const router = useRouter();
@@ -252,6 +312,12 @@ export default function BookingPage() {
   const [doctorsList,     setDoctorsList]     = useState<any[]>([]);
   const [loadingBookings, setLoadingBookings] = useState(true);
   const [selectedBooking, setSelectedBooking] = useState<any>(null);
+  
+  // Barcode states
+  const [showBarcodeModal, setShowBarcodeModal] = useState(false);
+  const [barcodeLabels, setBarcodeLabels] = useState<any[]>([]);
+  const [barcodePatientInfo, setBarcodePatientInfo] = useState<any>(null);
+  
   const [editingPatient,  setEditingPatient]  = useState<any>(null);
   const [formData,        setFormData]        = useState(INIT_FORM);
   const [testView,        setTestView]        = useState("all");
@@ -324,8 +390,8 @@ export default function BookingPage() {
   useEffect(() => {
     Promise.all([getAllPatients(), getDoctors()])
       .then(([patientsRes, doctorsRes]) => {
-        const patients = patientsRes?.data || [];
-        const doctors = doctorsRes?.data || [];
+        const patients = Array.isArray(patientsRes) ? patientsRes : [];
+        const doctors = Array.isArray(doctorsRes) ? doctorsRes : [];
         const mapped = [];
         
         patients.forEach((p) => {
@@ -454,8 +520,8 @@ export default function BookingPage() {
   useEffect(() => {
     Promise.all([getTests(), getPackages(), getSpecimenTypes()])
       .then(([testsRes, packagesRes, specimens]) => {
-        const tests = testsRes?.data || [];
-        const packages = packagesRes?.data || [];
+        const tests = Array.isArray(testsRes) ? testsRes : [];
+        const packages = Array.isArray(packagesRes) ? packagesRes : [];
         setSpecimenTypes(specimens);
         const mappedTests = tests.map(t => ({
           id: t.id,
@@ -472,7 +538,7 @@ export default function BookingPage() {
           b2bCharge: pkg.b2bCharge || 0,
           // keep full test objects for display
           tests: (pkg.tests || []).map(pt => {
-            const full = mappedTests.find(t => t.id === pt.id) || {};
+            const full = mappedTests.find(t => t.id === pt.id) || { sample: "N/A", b2cCharge: 0, b2bCharge: 0 };
             return {
               id: pt.id,
               name: pt.name,
@@ -586,7 +652,8 @@ export default function BookingPage() {
     : (parseFloat(billing.discount) || 0);
   const netAmount = Math.max(0, total - discountAmount);
   const currentPaidAmount = selectedBooking?.paidAmount || 0;
-  const currentBalanceAmount = selectedBooking?.balanceAmount || netAmount;
+  // Calculate balance as: netAmount - paidAmount (not from database)
+  const currentBalanceAmount = Math.max(0, netAmount - currentPaidAmount);
 
   const handleBillingChange = (field: any, value: any) => setBilling(prev=>({...prev,[field]:value}));
 
@@ -720,9 +787,10 @@ export default function BookingPage() {
     }
   };
 
-  const handleClickTest = (t: any, pkg: any) => {
+  const handleClickTest = async (t: any, pkg: any) => {
     if (!selectedBooking) return alert("Please select a booking first");
     if (selectedBooking.tests.find(x => x.name === t.name && !x.isExisting)) return;
+    
     let testEntry = { ...t };
     if (pkg) {
       // divide package total across all its tests
@@ -734,11 +802,41 @@ export default function BookingPage() {
         fromPackage: pkg.name,
       };
     }
+    
+    // Add to local state first
     const updated = bookings.map(b=>
       b.bookingId===selectedBooking.bookingId ? {...b,tests:[...b.tests,testEntry]} : b
     );
     setBookings(updated);
-    setSelectedBooking(updated.find(b=>b.bookingId===selectedBooking.bookingId));
+    const updatedSelected = updated.find(b=>b.bookingId===selectedBooking.bookingId);
+    setSelectedBooking(updatedSelected);
+    
+    // Save to backend if this is an existing visit (has visitId)
+    if (selectedBooking.visitId) {
+      try {
+        const { addTestToVisit } = await import('@/src/api/patient');
+        await addTestToVisit(selectedBooking.patientId, selectedBooking.visitId, {
+          testId: t.id,
+          testName: t.name,
+          charge: testEntry.b2cCharge || testEntry.b2bCharge || 0,
+          sampleType: t.sample,
+          businessType: businessType
+        });
+        
+        // Check if new test has a different sample type than existing tests
+        const existingSamples = selectedBooking.tests.map(test => test.sample);
+        const newSampleType = t.sample;
+        const hasDifferentSample = !existingSamples.includes(newSampleType);
+        
+        // If different sample type, automatically show barcode modal
+        if (hasDifferentSample && updatedSelected) {
+          setTimeout(() => handlePrintBarcode(updatedSelected), 500);
+        }
+      } catch (err) {
+        console.error('Failed to save test to backend:', err);
+        // Still keep it in local state even if backend save fails
+      }
+    }
   };
 
   const handleClickPackage = (pkg: any) => {
@@ -970,6 +1068,50 @@ export default function BookingPage() {
     router.push('/patient/registration');
   };
 
+  // Show barcode modal for booking
+  const handlePrintBarcode = (booking: any) => {
+    if (!booking.tests || booking.tests.length === 0) {
+      alert('No tests in this booking');
+      return;
+    }
+
+    const now = new Date();
+    const dateStr = now.toLocaleDateString('en-GB');
+    const timeStr = now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: true }).toUpperCase();
+
+    // Group by specimen type
+    const specimenGroups: any = {};
+    booking.tests.forEach((t: any) => {
+      const key = t.sample || 'Unknown';
+      if (!specimenGroups[key]) specimenGroups[key] = [];
+      specimenGroups[key].push(t.name);
+    });
+
+    // Build labels
+    const specimenEntries = Object.entries(specimenGroups);
+    const labels = specimenEntries.map(([specimen, shortNames], idx) => ({
+      barcodeValue: idx === 0 ? booking.visitId : `${booking.visitId}-${idx + 1}`,
+      specimen,
+      shortNamesStr: (shortNames as any[]).join(' / '),
+      dateStr,
+      timeStr,
+    }));
+
+    const genderInitial = booking.patientData?.gender ? booking.patientData.gender.charAt(0).toUpperCase() : '';
+    const age = booking.patientData?.age || '';
+    const ageGender = genderInitial && age ? `${genderInitial}/${age} Yrs` : genderInitial || (age ? `${age} Yrs` : '');
+
+    setBarcodePatientInfo({
+      patientName: booking.name || '',
+      visitId: booking.visitId || booking.bookingId,
+      age,
+      gender: booking.patientData?.gender || '',
+      ageGender,
+    });
+    setBarcodeLabels(labels);
+    setShowBarcodeModal(true);
+  };
+
   return (
     <>
     <style>{`
@@ -1131,6 +1273,7 @@ export default function BookingPage() {
                           <button onClick={()=>{setEditingPatient(b);setFormData(b.patientData);}} className="bg-slate-900 hover:bg-orange-600 text-white p-1 rounded" title="Edit"><Pencil size={12}/></button>
                           <button onClick={()=>handleDeleteBooking(b)} className="bg-red-500 hover:bg-red-600 text-white p-1 rounded" title="Delete"><Trash2 size={12}/></button>
                           <button onClick={()=>handlePrintBooking(b)} className="bg-slate-900 hover:bg-orange-600 text-white p-1 rounded" title="Print"><Printer size={12}/></button>
+                          <button onClick={()=>handlePrintBarcode(b)} className="bg-slate-900 hover:bg-orange-600 text-white p-1 rounded" title="Barcode"><Barcode size={12}/></button>
                           <button onClick={()=>handleRebooking(b)} className="bg-green-600 hover:bg-green-700 text-white p-1 rounded" title="Rebook"><RefreshCw size={12}/></button>
                         </div>
                       </td>
@@ -1279,15 +1422,7 @@ export default function BookingPage() {
                   </div>
 
                   <div className="p-2 border-b bg-gray-50 flex gap-3 items-center">
-                    <span className="text-xs font-semibold text-gray-700">Category:</span>
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input type="radio" name="businessType" checked={businessType==="B2C"} onChange={()=>setBusinessType("B2C")} className="accent-orange-600"/>
-                      <span className="text-xs font-medium">B2C</span>
-                    </label>
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input type="radio" name="businessType" checked={businessType==="B2B"} onChange={()=>setBusinessType("B2B")} className="accent-orange-500"/>
-                      <span className="text-xs font-medium">B2B</span>
-                    </label>
+                    {/* Category section removed - B2C/B2B selection removed */}
                   </div>
                   <div className="grid grid-cols-12 bg-slate-900 text-white text-xs font-semibold px-2 py-1 items-center">
                     <div className="col-span-5 flex items-center gap-2">
@@ -1402,64 +1537,18 @@ export default function BookingPage() {
                   )}
                 </div>
 
-                {/* RIGHT COLUMN — new tests on top, existing tests below */}
+                {/* RIGHT COLUMN — merged investigation table with new tests */}
                 <div className="flex flex-col gap-2 overflow-hidden">
 
-                  {/* TOP — newly added tests this session */}
+                  {/* MERGED — all tests (new + existing) */}
                   {(() => {
-                    const newTests = selectedBooking.tests.filter(t => !t.isExisting);
+                    const allTests = selectedBooking.tests;
                     return (
-                      <div className="bg-white rounded shadow flex flex-col" style={{maxHeight:"220px"}}>
+                      <div className="bg-white rounded shadow flex flex-col flex-1 overflow-hidden">
                         <div className="bg-slate-900 text-white px-2 py-1 font-semibold text-xs flex justify-between items-center">
-                          <span>New Tests Added</span>
-                          <span className="text-yellow-300 text-xs">{newTests.length} test{newTests.length!==1?"s":""}</span>
+                          <span>Investigation(s)</span>
+                          <span className="text-yellow-300 text-xs">{allTests.length} test{allTests.length!==1?"s":""}</span>
                         </div>
-                        <div className="overflow-y-auto flex-1">
-                          <table className="w-full text-xs">
-                            <thead className="bg-slate-900 text-white sticky top-0">
-                              <tr>
-                                <th className="px-2 py-1 text-left">Test</th>
-                                <th className="px-2 py-1 text-center">Charge</th>
-                                <th className="px-2 py-1 text-center">Action</th>
-                                <th className="px-2 py-1 text-center">Sample</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {newTests.length === 0 ? (
-                                <tr><td colSpan={4} className="p-3 text-center text-gray-400 text-xs">No new tests added</td></tr>
-                              ) : newTests.map((t,i) => {
-                                const charge = businessType==="B2C"?(t.b2cCharge||t.charge||0):(t.b2bCharge||t.charge||0);
-                                return (
-                                  <tr key={i} className={`border-b hover:bg-gray-50 ${t.fromPackage||t.isPackage?"bg-white":""}`}>
-                                    <td className="px-2 py-1">
-                                      <div className="flex items-center gap-1">
-                                        {(t.fromPackage||t.isPackage) && <span className="bg-orange-500 text-white text-xs px-1 rounded shrink-0">PKG</span>}
-                                        <span className="font-medium truncate max-w-[120px]" title={t.name}>{t.name}</span>
-                                      </div>
-                                    </td>
-                                    <td className="px-2 py-1 text-center font-semibold">{charge}</td>
-                                    <td className="px-2 py-1 text-center">
-                                      <button onClick={()=>handleDeleteTest(t)} className="text-red-500 hover:text-red-700"><X size={13}/></button>
-                                    </td>
-                                    <td className="px-2 py-1 text-center">
-                                      <input type="checkbox" defaultChecked className="w-3.5 h-3.5 accent-orange-500"/>
-                                    </td>
-                                  </tr>
-                                );
-                              })}
-                            </tbody>
-                          </table>
-                        </div>
-                      </div>
-                    );
-                  })()}
-
-                  {/* BOTTOM — existing (previously registered) tests */}
-                  {(() => {
-                    const existingTests = selectedBooking.tests.filter(t => t.isExisting);
-                    return (
-                      <div className="bg-white rounded shadow flex flex-col flex-1 overflow-hidden" style={{maxHeight:"220px"}}>
-                        <div className="bg-slate-900 text-white px-2 py-1 font-semibold text-xs">Investigation(s)</div>
                         <div className="flex-1 overflow-y-auto">
                           <table className="w-full text-xs">
                             <thead className="bg-slate-900 text-white sticky top-0">
@@ -1467,19 +1556,27 @@ export default function BookingPage() {
                                 <th className="p-2 text-left">Sr.No</th>
                                 <th className="p-2 text-left">Investigation(s)</th>
                                 <th className="p-2 text-center">Date</th>
-                                <th className="p-2 text-center">Charges</th>
+                                <th className="p-2 text-center">Amount</th>
                                 <th className="p-2 text-center">Action</th>
                               </tr>
                             </thead>
                             <tbody>
-                              {existingTests.length === 0 ? (
-                                <tr><td colSpan={5} className="p-3 text-center text-gray-400 text-xs">No previous investigations</td></tr>
-                              ) : existingTests.map((t,i) => {
-                                const charge    = businessType==="B2C"?(t.b2cCharge||t.charge):(t.b2bCharge||t.charge);
+                              {allTests.length === 0 ? (
+                                <tr><td colSpan={5} className="p-3 text-center text-gray-400 text-xs">No investigations added</td></tr>
+                              ) : allTests.map((t,i) => {
+                                const charge    = businessType==="B2C"?(t.b2cCharge||t.charge||0):(t.b2bCharge||t.charge||0);
                                 const isEditing = editingCharge?.testName===t.name;
+                                const isNewTest = !t.isExisting;
                                 return (
-                                  <tr key={i} className={`border-b hover:bg-gray-50 ${t.fromPackage||t.isPackage?"bg-white":""}`}>
-                                    <td className="p-2 text-center">{i+1}</td>
+                                  <tr key={i} className={`border-b hover:bg-gray-50 ${t.fromPackage||t.isPackage?"bg-orange-50":""}`}>
+                                    <td className="p-2 text-center">
+                                      <div className="flex items-center justify-center gap-1">
+                                        <span>{i+1}</span>
+                                        {isNewTest && (
+                                          <span className="text-blue-600 font-bold text-sm" title="Newly added test">N</span>
+                                        )}
+                                      </div>
+                                    </td>
                                     <td className="p-2">
                                       <div className="flex items-center gap-1 flex-wrap">
                                         {(t.fromPackage||t.isPackage) && <span className="bg-orange-500 text-white text-xs px-1.5 py-0.5 rounded font-semibold shrink-0">PKG</span>}
@@ -1522,7 +1619,7 @@ export default function BookingPage() {
                 <div className="grid grid-cols-9 gap-2 mb-3 text-xs">
                   {[
                     {label:"Total",         field:"",              val:total,                      ro:true,  color:"text-orange-600"},
-                    {label:"Advance",       field:"advance",       val:billing.advance,            ro:true,  color:"text-orange-600"},
+                    {label:"Advance",       field:"advance",       val:billing.advance,            ro:false, color:"text-blue-600"},
                     {label:"Discount",      field:"discount",      val:billing.discount,           ro:false, color:"text-gray-600"},
                     {label:"Refund",        field:"refund",        val:billing.refund,             ro:false, color:"text-gray-600"},
                     {label:"Bal Amt",       field:"balAmt",        val:currentBalanceAmount,       ro:true,  color:"text-red-600"},
@@ -2001,7 +2098,8 @@ export default function BookingPage() {
         
         const billNetAmount = Math.max(0, billTotal - billDiscountAmount);
         const billPaidAmount = selectedBooking.paidAmount || 0;
-        const billBalanceAmount = selectedBooking.balanceAmount || Math.max(0, billNetAmount - billPaidAmount);
+        // Calculate balance as: billNetAmount - billPaidAmount (not from database)
+        const billBalanceAmount = Math.max(0, billNetAmount - billPaidAmount);
         const isFullyPaid = billBalanceAmount <= 0;
         
         return (
@@ -2322,6 +2420,104 @@ export default function BookingPage() {
             >
               OK
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Barcode Preview Modal */}
+      {showBarcodeModal && barcodePatientInfo && (
+        <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col">
+            {/* Header */}
+            <div className="flex items-center justify-between px-5 py-3 border-b bg-gray-800 rounded-t-lg">
+              <h2 className="text-sm font-semibold text-white flex items-center gap-2">
+                <Barcode size={16} /> Barcode Labels — {barcodePatientInfo.patientName} | {barcodePatientInfo.visitId}
+              </h2>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => {
+                    const printArea = document.getElementById('barcode-print-area');
+                    const win = window.open('', '_blank');
+                    win.document.write(`<!DOCTYPE html><html><head><title>Barcode Labels</title>
+                      <style>
+                        * { margin:0; padding:0; box-sizing:border-box; }
+                        body { font-family: Arial, sans-serif; background: white; }
+                        .labels-wrap { display: flex; flex-wrap: wrap; gap: 8mm; padding: 8mm; }
+                        .label { width: 80mm; border: 0.5px solid #999; page-break-inside: avoid; }
+                        @page { size: A4; margin: 8mm; }
+                      </style>
+                    </head><body>${printArea.innerHTML}</body></html>`);
+                    win.document.close();
+                    win.focus();
+                    win.print();
+                    win.close();
+                  }}
+                  className="bg-blue-600 text-white px-4 py-1.5 rounded text-xs font-semibold hover:bg-blue-700"
+                >
+                  🖨️ Print
+                </button>
+                <button
+                  onClick={() => setShowBarcodeModal(false)}
+                  className="text-gray-300 hover:text-white text-xl font-bold leading-none px-1"
+                >×</button>
+              </div>
+            </div>
+
+            {/* Labels */}
+            <div className="overflow-y-auto flex-1 p-5 bg-gray-100">
+              <div id="barcode-print-area" className="flex flex-wrap gap-4 justify-start">
+                {barcodeLabels.map((label, idx) => {
+                  const { svg, width, height } = buildCode128Svg(label.barcodeValue);
+                  return (
+                    <div
+                      key={idx}
+                      className="bg-white border border-gray-300 shadow"
+                      style={{ width: '302px', fontFamily: 'Arial, sans-serif' }}
+                    >
+                      {/* Barcode — centered, horizontal, full width */}
+                      <div className="flex justify-center px-2 pt-2 pb-0">
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          width="100%"
+                          height="52"
+                          viewBox={`0 0 ${width} ${height}`}
+                          preserveAspectRatio="none"
+                          dangerouslySetInnerHTML={{ __html: svg }}
+                        />
+                      </div>
+
+                      {/* Barcode number centered */}
+                      <div className="text-center font-bold text-sm tracking-widest py-0.5 px-2">
+                        {label.barcodeValue}
+                      </div>
+
+                      {/* Date time (left) + specimen type (right) */}
+                      <div className="flex justify-between items-center px-3 pb-0.5">
+                        <span className="text-xs text-gray-700">{label.dateStr} {label.timeStr}</span>
+                        <span className="text-xs text-gray-600 font-medium">({label.specimen})</span>
+                      </div>
+
+                      {/* Patient name (left) + gender initial / age (right) */}
+                      <div className="flex justify-between items-center px-3 pb-2">
+                        <span className="font-bold text-xs leading-tight truncate max-w-[170px]">
+                          {barcodePatientInfo.patientName}
+                        </span>
+                        <span className="text-xs font-semibold whitespace-nowrap ml-1">
+                          {barcodePatientInfo.ageGender}
+                        </span>
+                      </div>
+
+                      {/* Short test names */}
+                      {label.shortNamesStr && (
+                        <div className="px-3 pb-2 text-[10px] text-gray-500 truncate">
+                          {label.shortNamesStr}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
           </div>
         </div>
       )}

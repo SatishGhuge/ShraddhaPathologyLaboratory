@@ -95,13 +95,8 @@ const TestTemplets = () => {
       setLoading(true);
       setError(null);
       const data = await getTemplates(page, ITEMS_PER_PAGE);
-      if (data.success) {
-        setTemplates(data.data || []);
-        setPagination(data.pagination || null);
-      } else {
-        setTemplates(data.data || []);
-        setPagination(null);
-      }
+      setTemplates(data);
+      setPagination(null);
     } catch (err) {
       console.error('Error fetching templates:', err);
       setError('Failed to load templates. Please try again.');
