@@ -355,6 +355,9 @@ export default function PatientRegistration() {
       setOrganizationCharges({});
     }
   }, [selectedOrganization]);
+
+  // Fetch departments with tests and packages from API
+  const fetchDepartmentsData = async () => {
     try {
       setLoading(true);
       console.log('🔄 Fetching departments, tests, and packages...');

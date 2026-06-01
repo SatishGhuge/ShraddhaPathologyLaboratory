@@ -5868,13 +5868,123 @@
   "sampleTypes": [
     {
       "id": 1,
-      "Sample_Type": "Bood",
-      "Sample_Color": "Red"
+      "Sample_Type": "Body fluid",
+      "Sample_Color": ""
     },
     {
       "id": 2,
+      "Sample_Type": "Campylobacter jejuni",
+      "Sample_Color": "gray"
+    },
+    {
+      "id": 3,
+      "Sample_Type": "Drain fluid",
+      "Sample_Color": ""
+    },
+    {
+      "id": 4,
+      "Sample_Type": "EDTA Plasma",
+      "Sample_Color": "purple"
+    },
+    {
+      "id": 5,
+      "Sample_Type": "EDTA WB",
+      "Sample_Color": "purple"
+    },
+    {
+      "id": 6,
+      "Sample_Type": "Fluoride Plasma-F",
+      "Sample_Color": "gray"
+    },
+    {
+      "id": 7,
+      "Sample_Type": "Fluoride Plasma-PP",
+      "Sample_Color": "gray"
+    },
+    {
+      "id": 8,
+      "Sample_Type": "Fluoride Plasma-RBS",
+      "Sample_Color": "gray"
+    },
+    {
+      "id": 9,
+      "Sample_Type": "Heparinised Blood",
+      "Sample_Color": ""
+    },
+    {
+      "id": 10,
+      "Sample_Type": "Lithium Heparin",
+      "Sample_Color": "green"
+    },
+    {
+      "id": 11,
+      "Sample_Type": "Nasopharyngeal swab",
+      "Sample_Color": ""
+    },
+    {
+      "id": 12,
+      "Sample_Type": "PUS",
+      "Sample_Color": ""
+    },
+    {
+      "id": 13,
+      "Sample_Type": "Serum",
+      "Sample_Color": "red"
+    },
+    {
+      "id": 14,
+      "Sample_Type": "Skin biopsy sample",
+      "Sample_Color": ""
+    },
+    {
+      "id": 15,
+      "Sample_Type": "Sodium Citrate 3.2 % plasma specimen",
+      "Sample_Color": "blue"
+    },
+    {
+      "id": 16,
+      "Sample_Type": "Stool",
+      "Sample_Color": "Yellow"
+    },
+    {
+      "id": 17,
+      "Sample_Type": "Swab",
+      "Sample_Color": ""
+    },
+    {
+      "id": 18,
+      "Sample_Type": "Throat swab",
+      "Sample_Color": ""
+    },
+    {
+      "id": 19,
+      "Sample_Type": "Tissue specimen (Formalin)",
+      "Sample_Color": ""
+    },
+    {
+      "id": 20,
+      "Sample_Type": "Tissue specimen (Saline)",
+      "Sample_Color": ""
+    },
+    {
+      "id": 21,
       "Sample_Type": "Urine",
-      "Sample_Color": "yellow"
+      "Sample_Color": ""
+    },
+    {
+      "id": 22,
+      "Sample_Type": "Vaginal swab",
+      "Sample_Color": ""
+    },
+    {
+      "id": 23,
+      "Sample_Type": "WB in Culture Bottle",
+      "Sample_Color": ""
+    },
+    {
+      "id": 24,
+      "Sample_Type": "Wound Swab",
+      "Sample_Color": ""
     }
   ],
   "roles": [
