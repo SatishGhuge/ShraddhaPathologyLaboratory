@@ -1,0 +1,223 @@
+================================================================================
+ORGANIZATION CHARGES DEBUGGING GUIDE
+================================================================================
+
+COMPLETED TASKS:
+================================================================================
+✅ TASK 1: Seeded 32 Test Unit Symbols
+   - Fixed seed-data.json: Changed "unitName" to "symbol"
+   - Fixed seed-units.js: Updated field names to match Prisma schema
+   - All 32 units successfully seeded to database
+   - Database now has: /cumm, /dL, /mL, g/dL, g/L, IU/L, U/L, etc.
+
+✅ TASK 2: Organization Charges System (Partially Working)
+   - Backend API is working correctly ✓
+   - Database has organization-specific charges ✓
+   - Frontend receives charges correctly ✓
+   - Issue: Charges not displaying in Patient Registration when org selected
+
+================================================================================
+KNOWN GOOD STATE:
+================================================================================
+Backend:
+  - Database has 3 organizations (ORG-AAA, ORG-AAB, ORG-AAC)
+  - Each organization has 3+ test charges
+  - API endpoint: GET /master/organizations/{orgId}/charges
+  - Response format: { success: true, data: [...charges] }
+  - Example: Test 1 B2C=330, B2B=105 (for ORG-AAA)
+
+Frontend:
+  - getTestCharges() API function works correctly
+  - extractDataArray() properly extracts data from response
+  - organizationSearch state is defined and persisted in localStorage
+  - selectedOrganization state is defined and persisted in localStorage
+  - String conversion logic for test IDs is in place
+
+
+================================================================================
+DEBUGGING STEPS FOR USER:
+================================================================================
+
+Step 1: VERIFY API RESPONSES
+-----------------
+Open browser DevTools (F12) and go to Network tab, then:
+
+1. Go to Patient Registration page
+2. Select an organization from dropdown
+3. Look for API call: GET /master/organizations/{orgId}/charges
+4. Check response in DevTools:
+   ✓ Should see "success": true
+   ✓ Should see "data": [array of charges]
+   ✓ Each charge should have: testId, b2cCharge, b2bCharge
+   ✓ NO errors or empty array
+
+If API response is wrong, check backend logs:
+   - Backend might not be returning charges for that organization
+   - Run: node test-charges-api.js (in backend folder)
+
+
+Step 2: VERIFY FRONTEND CONSOLE LOGS
+-----------------
+1. Open browser DevTools Console (F12)
+2. Clear console (type: clear())
+3. Select different organization
+4. Look for logs with 📡 📥 💰 🔄 emojis:
+   
+   Should see:
+   📡 Fetching charges for organization: ORG-AAA
+   📥 Raw charges response: [array with charges]
+   💰 Organization charges map created: {key: value pairs}
+   🔄 Updating X selected tests with org charges...
+   
+   Each test should show: ✅ Test "Name" (ID: 1): B2C 100→330
+   
+   If seeing ❓ instead of ✅ means:
+   - Test ID in selectedTests doesn't match charge testId
+   - String conversion failed
+   - ChargeMap is empty
+
+
+Step 3: TEST COMPLETE FLOW (FRESH PAGE)
+-----------------
+1. Clear browser cache: CTRL+SHIFT+DEL → select All time, Cookies & cache
+2. Clear localStorage: Open DevTools Console and run:
+   localStorage.clear()
+3. Refresh page (F5)
+4. Manually add 2-3 tests (don't select organization yet)
+5. Verify tests show DEFAULT charges (e.g., 100, 150, 200)
+6. Select organization from dropdown
+7. Check DevTools console for logs (Step 2)
+8. Verify tests NOW show ORGANIZATION charges (e.g., 330, 313, 554)
+9. Refresh page (F5)
+10. Check if organization and tests are still selected
+11. Check if charges match ORGANIZATION charges (not defaults)
+
+
+Step 4: CHECK BROWSER STORAGE
+-----------------
+In DevTools → Application → Local Storage → http://localhost:3000
+
+Look for key: "patientRegistration_v2"
+
+It should contain:
+   {
+     "selectedOrganization": "ORG-AAA",
+     "organizationSearch": "Main Lab",
+     "selectedTests": [
+       {"id": 1, "name": "Test 1", "b2cCharge": 330, ...},
+       {"id": 2, "name": "Test 2", "b2cCharge": 313, ...}
+     ]
+   }
+
+If localStorage shows DEFAULT charges instead of ORG charges:
+   - Tests are being saved before organization charges are applied
+   - May need to wait for async charge fetch to complete before saving
+
+
+================================================================================
+POSSIBLE ROOT CAUSES:
+================================================================================
+
+Issue: Charges not updating
+  Possible Cause 1: Organization selected but charges API returns empty array
+    - Check: Run node backend/scripts/verify-org-charges-complete.js
+    - Fix: Ensure organizations are linked to tests in database
+    
+  Possible Cause 2: Test IDs don't match between chargeMap and selectedTests
+    - Check: DevTools console logs show ❓ instead of ✅
+    - Fix: Verify test.id is always a number, convert to string properly
+    
+  Possible Cause 3: Tests loaded from localStorage override org charges
+    - Check: Select org, see charges update, then refresh
+    - Fix: Don't restore selectedTests if organization is selected
+
+  Possible Cause 4: Race condition - tests updated before charges fetched
+    - Check: Console shows charges fetch takes time
+    - Fix: Ensure Promise completes before state update
+
+  Possible Cause 5: Multiple organizations in localStorage causing confusion
+    - Check: localStorage has old organization data
+    - Fix: Clear localStorage, start fresh
+
+
+================================================================================
+FRONTEND CODE LOCATIONS:
+================================================================================
+
+File: frontend/app/patient/registration/page.tsx
+
+Organization Selection:
+  Line 310-313: State definitions
+  Line 328-378: useEffect for fetching charges
+  Line 1415-1461: Organization dropdown render
+
+Tests Display:
+  Line 2032-2065: Selected tests table render
+  Line 2046: Shows t.b2cCharge and t.b2bCharge
+
+
+================================================================================
+QUICK FIX IF CHARGES NOT UPDATING:
+================================================================================
+
+If tests show default charges instead of organization charges after selection:
+
+1. Add this to the organization charges useEffect (after chargeMap is built):
+   console.log('🔍 Test IDs from chargeMap:', Object.keys(chargeMap).map(k => `${k} (${typeof k})`));
+   console.log('🔍 Test IDs from selectedTests:', selectedTests.map(t => `${t.id} (${typeof t.id})`));
+   
+   This will show if ID type mismatch is happening.
+
+2. Force re-render by:
+   - Calling setSelectedTests with a new array object (not modifying existing)
+   - Using [...selectedTests] spread operator to create new array reference
+   - Currently code does this correctly: return prevTests.map(test => ...)
+
+
+================================================================================
+IF CHARGES ARE SHOWING CORRECTLY:
+================================================================================
+
+Then the issue is SAVING to localStorage/displaying after refresh.
+
+The useEffect dependency array should include 'organizationCharges':
+   Current: [selectedOrganization]
+   Might need: [selectedOrganization, organizationCharges]
+
+But also update dependencies for the localStorage save useEffect.
+
+
+================================================================================
+VERIFICATION COMMANDS:
+================================================================================
+
+Backend - Verify database has charges:
+  cd backend
+  node
+  > const {PrismaClient} = require('@prisma/client')
+  > const p = new PrismaClient()
+  > p.testCharge.count({where:{organizationId:'ORG-AAA'}})
+  > Should return 3+
+
+Frontend - Check state in DevTools:
+  > localStorage.getItem('patientRegistration_v2')
+  > Should show selectedOrganization and selectedTests with org charges
+
+
+================================================================================
+IMPORTANT FILES:
+================================================================================
+
+backend/controllers/master.controller.js (Line 1409-1460)
+  - getTestCharges function returns organization charges
+
+frontend/src/api/master.ts (Line 181-188)
+  - getTestCharges API call
+  - extractDataArray helper
+
+frontend/app/patient/registration/page.tsx (Line 328-378)
+  - Organization charges useEffect
+  - Where charges are mapped to tests
+
+
+================================================================================

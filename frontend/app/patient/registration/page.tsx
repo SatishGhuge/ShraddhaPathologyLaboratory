@@ -308,6 +308,9 @@ export default function PatientRegistration() {
   const [organizations, setOrganizations] = useState<any[]>([]);
   const [selectedOrganization, setSelectedOrganization] = useState<string>("");
   const [organizationCharges, setOrganizationCharges] = useState<any>({});
+  const [organizationSearch, setOrganizationSearch] = useState<string>("");
+  const [showOrgDropdown, setShowOrgDropdown] = useState(false);
+  const organizationDropdownRef = useRef(null);
   const [loading, setLoading] = useState(false);
 
   // Fetch departments with tests and packages from API
@@ -325,34 +328,62 @@ export default function PatientRegistration() {
   // Fetch organization-specific charges when organization is selected
   useEffect(() => {
     if (selectedOrganization) {
+      console.log('📡 Fetching charges for organization:', selectedOrganization);
       getTestCharges(undefined, selectedOrganization).then((charges: any) => {
+        console.log('📥 Raw charges response type:', typeof charges, 'Array:', Array.isArray(charges));
+        console.log('📥 Raw charges response:', charges);
+        
+        if (!Array.isArray(charges)) {
+          console.error('❌ ERROR: Charges response is not an array!', charges);
+          return;
+        }
+        
         const chargeMap: any = {};
-        charges.forEach((charge: any) => {
-          chargeMap[charge.testId] = {
-            b2cCharge: charge.b2cCharge,
-            b2bCharge: charge.b2bCharge
-          };
+        charges.forEach((charge: any, idx: number) => {
+          const testId = charge.testId || charge.test?.id;
+          const key = String(testId); // Convert to string to ensure consistent key type
+          console.log(`   [${idx}] testId: ${testId} (key: "${key}"), B2C: ${charge.b2cCharge}, B2B: ${charge.b2bCharge}`);
+          if (testId) {
+            chargeMap[key] = {
+              b2cCharge: charge.b2cCharge,
+              b2bCharge: charge.b2bCharge
+            };
+          }
         });
         setOrganizationCharges(chargeMap);
-        console.log('💰 Organization charges loaded:', chargeMap);
+        console.log('💰 Organization charges map created:', chargeMap);
+        console.log('   Keys in map:', Object.keys(chargeMap));
+        console.log('   Test IDs from chargeMap keys:', Object.keys(chargeMap).map(k => `"${k}"`).join(', '));
+        console.log('   Test IDs from selectedTests:', selectedTests.map(t => `"${String(t.id)}"`).join(', '));
         
         // Update selected tests with organization charges
-        setSelectedTests(prevTests => 
-          prevTests.map(test => {
-            const orgCharge = chargeMap[test.id];
+        setSelectedTests(prevTests => {
+          console.log(`🔄 Updating ${prevTests.length} selected tests with org charges...`);
+          const updatedTests = prevTests.map(test => {
+            const key = String(test.id); // Convert test.id to string
+            const orgCharge = chargeMap[key];
             if (orgCharge) {
+              console.log(`   ✅ Test "${test.name}" (ID: ${test.id}, key: "${key}"): B2C ${test.b2cCharge}→${orgCharge.b2cCharge}, B2B ${test.b2bCharge}→${orgCharge.b2bCharge}`);
               return {
                 ...test,
                 b2cCharge: orgCharge.b2cCharge,
                 b2bCharge: orgCharge.b2bCharge
               };
+            } else {
+              console.log(`   ❓ Test "${test.name}" (ID: ${test.id}, key: "${key}"): No custom charge found in chargeMap keys: [${Object.keys(chargeMap).join(', ')}]`);
+              return test;
             }
-            return test;
-          })
-        );
-      }).catch(console.error);
+          });
+          console.log('✅ Updated tests:', updatedTests.map(t => `${t.name}(B2C:${t.b2cCharge})`).join(', '));
+          return updatedTests;
+        });
+      }).catch((err) => {
+        console.error('❌ Error fetching charges:', err);
+      });
     } else {
+      // Clear organization charges and keep original test charges
       setOrganizationCharges({});
+      console.log('🧹 Organization charges cleared');
     }
   }, [selectedOrganization]);
 
@@ -537,6 +568,10 @@ export default function PatientRegistration() {
         if (data.isManualRefDoctor !== undefined) setIsManualRefDoctor(data.isManualRefDoctor);
         if (data.manualRefDoctorName) setManualRefDoctorName(data.manualRefDoctorName);
         
+        // Restore organization selection
+        if (data.selectedOrganization) setSelectedOrganization(data.selectedOrganization);
+        if (data.organizationSearch) setOrganizationSearch(data.organizationSearch);
+        
         // Restore selected tests
         if (data.selectedTests && Array.isArray(data.selectedTests)) {
           setSelectedTests(data.selectedTests);
@@ -571,6 +606,7 @@ export default function PatientRegistration() {
           firstName, lastName, title, dob, age, mobile, email, address, location,
           gender, remarks, visitType, reportMode,
           sampleBarcodeNo, refDoctor, isManualRefDoctor, manualRefDoctorName,
+          selectedOrganization, organizationSearch,
           selectedTests, discount, discountPercent, discountRemark,
           paid, paymentMode, businessType,
           timestamp: Date.now()
@@ -586,6 +622,7 @@ export default function PatientRegistration() {
     firstName, lastName, title, dob, age, mobile, email, address, location, gender, remarks,
     visitType, reportMode, sampleBarcodeNo,
     refDoctor, isManualRefDoctor, manualRefDoctorName, selectedTests,
+    selectedOrganization, organizationSearch,
     discount, discountPercent, discountRemark, paid, paymentMode, businessType
   ]);
 
@@ -848,6 +885,17 @@ export default function PatientRegistration() {
     const handleClickOutside = (e: any) => {
       if (locationDropdownRef.current && !locationDropdownRef.current.contains(e.target)) {
         setShowLocationDropdown(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  // Close organization dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e: any) => {
+      if (organizationDropdownRef.current && !organizationDropdownRef.current.contains(e.target)) {
+        setShowOrgDropdown(false);
       }
     };
     document.addEventListener("mousedown", handleClickOutside);
@@ -1140,13 +1188,23 @@ export default function PatientRegistration() {
   /* ---------------- ADD REMOVE ---------------- */
 
   const addTest = (test: any) => {
+    // Check if organization has custom charges for this test
+    const key = String(test.id); // Convert to string for consistent key lookup
+    const orgCharge = selectedOrganization && organizationCharges[key];
+    const testWithCharges = {
+      ...test,
+      b2cCharge: orgCharge?.b2cCharge ?? test.b2cCharge,
+      b2bCharge: orgCharge?.b2bCharge ?? test.b2bCharge
+    };
+    console.log(`➕ Adding test: ${test.name} (ID: ${test.id}, key: "${key}") with charges B2C=${testWithCharges.b2cCharge}, B2B=${testWithCharges.b2bCharge}`);
+    
     if (!selectedTests.find((t) => t.name === test.name))
-      setSelectedTests([...selectedTests, test]);
+      setSelectedTests([...selectedTests, testWithCharges]);
     const exists = frequentTests.find(t => t.name === test.name);
     if (exists) {
       setFrequentTests(frequentTests.map(t => t.name === test.name ? {...t, count: (t.count || 1) + 1} : t).sort((a, b) => (b.count || 0) - (a.count || 0)));
     } else {
-      setFrequentTests([...frequentTests, {...test, count: 1}].sort((a, b) => (b.count || 0) - (a.count || 0)));
+      setFrequentTests([...frequentTests, {...testWithCharges, count: 1}].sort((a, b) => (b.count || 0) - (a.count || 0)));
     }
   };
 
@@ -1353,21 +1411,66 @@ export default function PatientRegistration() {
                 </div>
               </div>
 
-              {/* Organization Selector */}
-              <div className="flex flex-col">
-                <label className="text-xs text-gray-500 mb-0.5">Organization / Lab</label>
-                <select 
-                  value={selectedOrganization} 
-                  onChange={(e) => setSelectedOrganization(e.target.value)}
-                  className={input}
-                >
-                  <option value="">Select Organization (Optional)</option>
-                  {Array.isArray(organizations) && organizations.map((org) => (
-                    <option key={org.id} value={org.id}>
-                      {org.name}
-                    </option>
-                  ))}
-                </select>
+              {/* Organization Selector - Searchable */}
+              <div className="flex flex-col relative" ref={organizationDropdownRef}>
+                <div className="relative">
+                  <input
+                    type="text"
+                    placeholder="Created At"
+                    value={organizationSearch}
+                    onChange={(e) => {
+                      setOrganizationSearch(e.target.value);
+                      setShowOrgDropdown(true);
+                    }}
+                    onFocus={() => setShowOrgDropdown(true)}
+                    className={`${input} pr-8`}
+                  />
+                  {organizationSearch && (
+                    <button
+                      onClick={() => {
+                        setSelectedOrganization("");
+                        setOrganizationSearch("");
+                        setOrganizationCharges({});
+                      }}
+                      className="absolute right-2 top-2 text-gray-400 hover:text-gray-600 p-1"
+                      title="Clear selection"
+                    >
+                      <X size={16} />
+                    </button>
+                  )}
+                  {!organizationSearch && (
+                    <ChevronDown size={16} className="absolute right-2 top-2 text-gray-400 pointer-events-none" />
+                  )}
+                </div>
+                
+                {/* Organization Dropdown */}
+                {showOrgDropdown && (
+                  <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-300 rounded shadow-lg z-50 max-h-48 overflow-y-auto">
+                    {organizations.length === 0 ? (
+                      <div className="p-2 text-gray-500 text-sm">No organizations found</div>
+                    ) : (
+                      organizations
+                        .filter(org => 
+                          org.name.toLowerCase().includes(organizationSearch.toLowerCase()) ||
+                          (org.code && org.code.toLowerCase().includes(organizationSearch.toLowerCase()))
+                        )
+                        .map((org) => (
+                          <div
+                            key={org.id}
+                            onClick={() => {
+                              setSelectedOrganization(org.id);
+                              setOrganizationSearch(org.name);
+                              setShowOrgDropdown(false);
+                            }}
+                            className="p-2 cursor-pointer hover:bg-orange-50 border-b border-gray-100 text-sm"
+                          >
+                            <div className="font-medium">{org.name}</div>
+                            {org.code && <div className="text-xs text-gray-500">{org.code}</div>}
+                          </div>
+                        ))
+                    )}
+                  </div>
+                )}
               </div>
 
               <textarea className={input} placeholder="Address *" value={address} onChange={(e) => setAddress(e.target.value)} rows={3} required></textarea>
@@ -1904,27 +2007,30 @@ export default function PatientRegistration() {
         <div className="md:col-span-4 col-span-12 bg-white rounded-xl shadow flex flex-col">
           <table className="w-full text-xs">
             <colgroup>
-              <col style={{ width: '40%' }} />
-              <col style={{ width: '20%' }} />
+              <col style={{ width: '35%' }} />
               <col style={{ width: '15%' }} />
-              <col style={{ width: '25%' }} />
+              <col style={{ width: '15%' }} />
+              <col style={{ width: '15%' }} />
+              <col style={{ width: '20%' }} />
             </colgroup>
             <thead className="bg-slate-900 text-white">
               <tr>
                 <th className="p-2 text-left">Test</th>
-                <th className="p-2 text-center">Charge</th>
-                <th className="p-2 text-center">Action</th>
+                <th className="p-2 text-center">B2C Charges</th>
+                <th className="p-2 text-center">B2B Charges</th>
                 <th className="p-2 text-center">Sample</th>
+                <th className="p-2 text-center">Action</th>
               </tr>
             </thead>
           </table>
           <div className="flex-1 overflow-auto text-xs" style={{ maxHeight: 'calc(75vh - 160px)' }}>
             <table className="w-full text-xs">
               <colgroup>
-                <col style={{ width: '40%' }} />
-                <col style={{ width: '20%' }} />
+                <col style={{ width: '35%' }} />
                 <col style={{ width: '15%' }} />
-                <col style={{ width: '25%' }} />
+                <col style={{ width: '15%' }} />
+                <col style={{ width: '15%' }} />
+                <col style={{ width: '20%' }} />
               </colgroup>
               <tbody>
                 {selectedTests.map((t) => (
@@ -1940,10 +2046,8 @@ export default function PatientRegistration() {
                         <div className="text-xs text-gray-400 mt-0.5 ml-8">{t.fromPackage}</div>
                       )}
                     </td>
-                    <td className="p-2 text-center font-semibold">₹{businessType === "B2C" ? t.b2cCharge : t.b2bCharge}</td>
-                    <td className="p-2 text-center">
-                      <button onClick={() => removeTest(t.name)} className="text-red-500 hover:text-red-700"><X size={14} /></button>
-                    </td>
+                    <td className="p-2 text-center font-semibold">₹{t.b2cCharge}</td>
+                    <td className="p-2 text-center font-semibold">₹{t.b2bCharge}</td>
                     <td className="p-2 text-center">
                       <div className="flex items-center justify-center gap-1">
                         <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" style={{ transform: 'rotate(45deg)', flexShrink: 0 }}>
@@ -1953,6 +2057,9 @@ export default function PatientRegistration() {
                         </svg>
                         {t.sample}
                       </div>
+                    </td>
+                    <td className="p-2 text-center">
+                      <button onClick={() => removeTest(t.name)} className="text-red-500 hover:text-red-700"><X size={14} /></button>
                     </td>
                   </tr>
                 ))}

@@ -382,8 +382,10 @@ export default function BookingPage() {
 
   useEffect(() => {
     const today = new Date(); today.setHours(0,0,0,0);
-    // Default to show only today's patients
-    setDateRange({ start: today, end: today });
+    const sevenDaysAgo = new Date(today);
+    sevenDaysAgo.setDate(today.getDate() - 6); // Last 7 days (today - 6 = 7 days total)
+    // Default to show last 7 days of patients (to ensure newly registered patients appear)
+    setDateRange({ start: sevenDaysAgo, end: today });
   }, []);
 
   // Fetch real patients and doctors from API
@@ -707,8 +709,10 @@ export default function BookingPage() {
   const handleReset = () => {
     const today = new Date(); 
     today.setHours(0,0,0,0);
-    // Reset to show only today's patients
-    setDateRange({ start: today, end: today });
+    const sevenDaysAgo = new Date(today);
+    sevenDaysAgo.setDate(today.getDate() - 6);
+    // Reset to show last 7 days of patients
+    setDateRange({ start: sevenDaysAgo, end: today });
     setPatientNameSearch('');
     setMobileSearch('');
     setSearchBarDoctorSearch('');
