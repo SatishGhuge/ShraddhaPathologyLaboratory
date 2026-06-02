@@ -1,40 +1,145 @@
 "use client";
 
-import { Eye, EyeOff, ArrowLeft } from "lucide-react";
+import { Eye, EyeOff, ArrowLeft, ChevronDown, User, Settings, BarChart3, HelpCircle, ClipboardCheck, Lock } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useRouter, useParams, usePathname } from "next/navigation";
 
 import Header from "@/src/components/Header";
-import { getUserById, createUser, updateUser, getRoles } from "@/src/api/master.js";
+import { getUserById, createUser, updateUser, getRoles, getOrganizations } from "@/src/api/master.js";
+
+// Module Accordion Component
+const ModuleAccordion = ({ title, icon: Icon, color, items, moduleAllocation, toggleModule }: any) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const enabledCount = items.filter((item: any) => {
+    const keys = item.key.split('.');
+    let current = moduleAllocation;
+    for (const key of keys) {
+      if (current && typeof current === 'object' && key in current) {
+        current = current[key];
+      } else {
+        return false;
+      }
+    }
+    return current;
+  }).length;
+
+  const colorMap: any = {
+    blue: 'bg-blue-50 border-blue-200',
+    green: 'bg-green-50 border-green-200',
+    purple: 'bg-purple-50 border-purple-200',
+    orange: 'bg-orange-50 border-orange-200',
+  };
+
+  return (
+    <div className={`border rounded-lg ${colorMap[color] || 'bg-gray-50 border-gray-200'}`}>
+      <button
+        type="button"
+        onClick={() => setIsOpen(!isOpen)}
+        className="w-full flex items-center justify-between p-4 hover:bg-white/50 transition-colors"
+      >
+        <div className="flex items-center gap-3">
+          <Icon size={24} className="text-gray-700" />
+          <div className="text-left">
+            <h4 className="font-semibold text-slate-800">{title}</h4>
+            <p className="text-xs text-gray-500">{enabledCount} of {items.length} enabled</p>
+          </div>
+        </div>
+        <ChevronDown size={20} className={`text-gray-600 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+      </button>
+
+      {isOpen && (
+        <div className="border-t border-gray-200 p-4 space-y-2 bg-white/50">
+          {items.map((item: any) => {
+            const keys = item.key.split('.');
+            let current = moduleAllocation;
+            for (const key of keys) {
+              if (current && typeof current === 'object' && key in current) {
+                current = current[key];
+              } else {
+                current = false;
+                break;
+              }
+            }
+            const isEnabled = current;
+
+            return (
+              <div key={item.key} className="flex items-center justify-between p-2 hover:bg-gray-100 rounded">
+                <span className="text-sm text-gray-700">{item.label}</span>
+                <button
+                  type="button"
+                  onClick={() => toggleModule(item.key)}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                    isEnabled ? 'bg-orange-500' : 'bg-gray-300'
+                  }`}
+                >
+                  <span
+                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                      isEnabled ? 'translate-x-6' : 'translate-x-1'
+                    }`}
+                  />
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// Single Toggle Component for Configuration, Help, Result
+const SingleToggle = ({ title, icon: Icon, color, moduleKey, moduleAllocation, toggleModule }: any) => {
+  const isEnabled = moduleAllocation[moduleKey];
+
+  const colorMap: any = {
+    blue: 'bg-blue-50 border-blue-200',
+    green: 'bg-green-50 border-green-200',
+    purple: 'bg-purple-50 border-purple-200',
+    orange: 'bg-orange-50 border-orange-200',
+  };
+
+  return (
+    <div className={`border rounded-lg ${colorMap[color] || 'bg-gray-50 border-gray-200'} p-4`}>
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <Icon size={24} className="text-gray-700" />
+          <h4 className="font-semibold text-slate-800">{title}</h4>
+        </div>
+        <button
+          type="button"
+          onClick={() => toggleModule(moduleKey)}
+          className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+            isEnabled ? 'bg-orange-500' : 'bg-gray-300'
+          }`}
+        >
+          <span
+            className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+              isEnabled ? 'translate-x-6' : 'translate-x-1'
+            }`}
+          />
+        </button>
+      </div>
+    </div>
+  );
+};
 
 const defaultModuleAllocation = {
   patient: {
     registration: false,
     tests: false,
-    outsourcing: false,
   },
   masters: {
-    center: false,
-    centerlist: false,
-    charges: false,
-    corporate: false,
-    corporateWiseCharges: false,
-    corporatelist: false,
-    departmentlist: false,
-    franchise: false,
-    microbiologyOrganism: false,
-    outsourcing: false,
-    packagelist: false,
-    referralDoctor: false,
-    referralDoctorList: false,
-    rolelist: false,
-    specimenType: false,
-    testCharges: false,
-    testTemplates: false,
     testlist: false,
-    units: false,
-    user: false,
+    testTemplates: false,
+    departmentlist: false,
+    packagelist: false,
+    charges: false,
+    rolelist: false,
     userlist: false,
+    referralDoctorList: false,
+    organization: false,
+    specimenType: false,
+    units: false,
   },
   reports: {
     dashboard: false,
@@ -45,15 +150,15 @@ const defaultModuleAllocation = {
     b2bTestwiseCostReport: false,
     discountReport: false,
     testReport: false,
-    testCompliment: false,
-    serviceCountReport: false,
-    paymentReceipt: false,
-    sampleRejectionReport: false,
-    detailedWorksheet: false,
-    hospitalBills: false,
   },
-  signature: false,
-  help: false,
+  configuration: {
+    signature: false,
+  },
+  help: {
+    userManual: false,
+    ultraviewer: false,
+    anydesk: false,
+  },
   result: false,
 };
 
@@ -70,11 +175,8 @@ export default function AddUserForm() {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [roles, setRoles] = useState<any[]>([]);
-<<<<<<< HEAD
-  const [centers, setCenters] = useState<any[]>([]);
+  const [organizations, setOrganizations] = useState<any[]>([]);
   const [moduleAllocation, setModuleAllocation] = useState(defaultModuleAllocation);
-=======
->>>>>>> 7a2f561488eacfe2f91ae815840bc257a654c92f
 
   const [formData, setFormData] = useState({
     center: "", role: "", username: "", gender: "",
@@ -86,21 +188,15 @@ export default function AddUserForm() {
   const inputClass = "w-full px-2 py-1 text-base border border-gray-300 rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-orange-500";
   const labelClass = "text-sm text-gray-700 font-medium mb-1 block";
 
-<<<<<<< HEAD
   useEffect(() => {
-    getRoles().then((res) => {
+    getRoles().then((res: any) => {
       const rolesArray = Array.isArray(res) ? res : res?.data || [];
       setRoles(rolesArray);
     }).catch(() => setRoles([]));
-    getCollectionCenters().then((res) => {
-      const centersArray = Array.isArray(res) ? res : res?.data || res || [];
-      setCenters(centersArray);
-    }).catch(() => setCenters([]));
-=======
-  // Load roles for dropdown
-  useEffect(() => {
-    getRoles().then(setRoles).catch(() => {});
->>>>>>> 7a2f561488eacfe2f91ae815840bc257a654c92f
+    getOrganizations().then((res: any) => {
+      const orgsArray = Array.isArray(res) ? res : res?.data || res || [];
+      setOrganizations(orgsArray);
+    }).catch(() => setOrganizations([]));
   }, []);
 
   useEffect(() => {
@@ -159,7 +255,7 @@ export default function AddUserForm() {
 
   const validate = () => {
     const newErrors: any = {};
-    if (!formData.center) newErrors.center = "Center is required";
+    if (!formData.center) newErrors.center = "Organization is required";
     if (!formData.role) newErrors.role = "Role is required";
     if (!formData.username) newErrors.username = "Username is required";
     if (!formData.gender) newErrors.gender = "Gender is required";
@@ -230,17 +326,13 @@ export default function AddUserForm() {
 
           <div className="grid grid-cols-2 gap-4 mb-4">
             <div>
-              <label className={labelClass}>Center *</label>
-<<<<<<< HEAD
+              <label className={labelClass}>Organization *</label>
               <select name="center" value={formData.center} onChange={handleChange} className={inputClass}>
                 <option value="">Please Select</option>
-                {Array.isArray(centers) && centers.map(c => (
-                  <option key={c.id} value={c.name}>{c.name}</option>
+                {Array.isArray(organizations) && organizations.map(org => (
+                  <option key={org.id} value={org.name}>{org.name}</option>
                 ))}
               </select>
-=======
-              <input name="center" value={formData.center} onChange={handleChange} className={inputClass} placeholder="Enter center name" />
->>>>>>> 7a2f561488eacfe2f91ae815840bc257a654c92f
               {errors.center && <p className="text-red-700 text-xs">{errors.center}</p>}
             </div>
             <div>
@@ -330,210 +422,97 @@ export default function AddUserForm() {
           <div className="border-t border-gray-300 pt-4 mt-4">
             <h3 className="text-lg font-semibold text-slate-900 mb-4">Module Allocation</h3>
             
-            <div className="grid grid-cols-1 gap-6">
+            <div className="space-y-3">
               {/* Patient Module */}
-              <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
-                <h4 className="font-semibold text-slate-800 mb-3 flex items-center gap-2">
-                  <span className="w-3 h-3 bg-blue-500 rounded-full"></span>
-                  Patient Module
-                </h4>
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                  <label className="flex items-center gap-3 cursor-pointer hover:bg-white p-2 rounded">
-                    <input type="checkbox" checked={moduleAllocation.patient.registration} onChange={() => toggleModule('patient.registration')} className="w-4 h-4 accent-orange-500" />
-                    <span className="text-sm text-gray-700">Registration</span>
-                  </label>
-                  <label className="flex items-center gap-3 cursor-pointer hover:bg-white p-2 rounded">
-                    <input type="checkbox" checked={moduleAllocation.patient.tests} onChange={() => toggleModule('patient.tests')} className="w-4 h-4 accent-orange-500" />
-                    <span className="text-sm text-gray-700">Tests</span>
-                  </label>
-                  <label className="flex items-center gap-3 cursor-pointer hover:bg-white p-2 rounded">
-                    <input type="checkbox" checked={moduleAllocation.patient.outsourcing} onChange={() => toggleModule('patient.outsourcing')} className="w-4 h-4 accent-orange-500" />
-                    <span className="text-sm text-gray-700">Outsourcing</span>
-                  </label>
-                </div>
-              </div>
+              <ModuleAccordion
+                title="Patient"
+                icon={User}
+                color="blue"
+                items={[
+                  { key: 'patient.registration', label: 'Registration' },
+                  { key: 'patient.tests', label: 'Tests' },
+                  { key: 'patient.outsourcing', label: 'Outsourcing' },
+                ]}
+                moduleAllocation={moduleAllocation}
+                toggleModule={toggleModule}
+              />
 
               {/* Masters Module */}
-              <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
-                <h4 className="font-semibold text-slate-800 mb-3 flex items-center gap-2">
-                  <span className="w-3 h-3 bg-green-500 rounded-full"></span>
-                  Masters Module
-                </h4>
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-                  <label className="flex items-center gap-3 cursor-pointer hover:bg-white p-2 rounded">
-                    <input type="checkbox" checked={moduleAllocation.masters.center} onChange={() => toggleModule('masters.center')} className="w-4 h-4 accent-orange-500" />
-                    <span className="text-sm text-gray-700">Center</span>
-                  </label>
-                  <label className="flex items-center gap-3 cursor-pointer hover:bg-white p-2 rounded">
-                    <input type="checkbox" checked={moduleAllocation.masters.centerlist} onChange={() => toggleModule('masters.centerlist')} className="w-4 h-4 accent-orange-500" />
-                    <span className="text-sm text-gray-700">Center List</span>
-                  </label>
-                  <label className="flex items-center gap-3 cursor-pointer hover:bg-white p-2 rounded">
-                    <input type="checkbox" checked={moduleAllocation.masters.charges} onChange={() => toggleModule('masters.charges')} className="w-4 h-4 accent-orange-500" />
-                    <span className="text-sm text-gray-700">Charges</span>
-                  </label>
-                  <label className="flex items-center gap-3 cursor-pointer hover:bg-white p-2 rounded">
-                    <input type="checkbox" checked={moduleAllocation.masters.corporate} onChange={() => toggleModule('masters.corporate')} className="w-4 h-4 accent-orange-500" />
-                    <span className="text-sm text-gray-700">Corporate</span>
-                  </label>
-                  <label className="flex items-center gap-3 cursor-pointer hover:bg-white p-2 rounded">
-                    <input type="checkbox" checked={moduleAllocation.masters.corporateWiseCharges} onChange={() => toggleModule('masters.corporateWiseCharges')} className="w-4 h-4 accent-orange-500" />
-                    <span className="text-sm text-gray-700">Corp. Wise Charges</span>
-                  </label>
-                  <label className="flex items-center gap-3 cursor-pointer hover:bg-white p-2 rounded">
-                    <input type="checkbox" checked={moduleAllocation.masters.corporatelist} onChange={() => toggleModule('masters.corporatelist')} className="w-4 h-4 accent-orange-500" />
-                    <span className="text-sm text-gray-700">Corporate List</span>
-                  </label>
-                  <label className="flex items-center gap-3 cursor-pointer hover:bg-white p-2 rounded">
-                    <input type="checkbox" checked={moduleAllocation.masters.departmentlist} onChange={() => toggleModule('masters.departmentlist')} className="w-4 h-4 accent-orange-500" />
-                    <span className="text-sm text-gray-700">Department</span>
-                  </label>
-                  <label className="flex items-center gap-3 cursor-pointer hover:bg-white p-2 rounded">
-                    <input type="checkbox" checked={moduleAllocation.masters.franchise} onChange={() => toggleModule('masters.franchise')} className="w-4 h-4 accent-orange-500" />
-                    <span className="text-sm text-gray-700">Franchise</span>
-                  </label>
-                  <label className="flex items-center gap-3 cursor-pointer hover:bg-white p-2 rounded">
-                    <input type="checkbox" checked={moduleAllocation.masters.microbiologyOrganism} onChange={() => toggleModule('masters.microbiologyOrganism')} className="w-4 h-4 accent-orange-500" />
-                    <span className="text-sm text-gray-700">Microbiology</span>
-                  </label>
-                  <label className="flex items-center gap-3 cursor-pointer hover:bg-white p-2 rounded">
-                    <input type="checkbox" checked={moduleAllocation.masters.outsourcing} onChange={() => toggleModule('masters.outsourcing')} className="w-4 h-4 accent-orange-500" />
-                    <span className="text-sm text-gray-700">Outsourcing</span>
-                  </label>
-                  <label className="flex items-center gap-3 cursor-pointer hover:bg-white p-2 rounded">
-                    <input type="checkbox" checked={moduleAllocation.masters.packagelist} onChange={() => toggleModule('masters.packagelist')} className="w-4 h-4 accent-orange-500" />
-                    <span className="text-sm text-gray-700">Package</span>
-                  </label>
-                  <label className="flex items-center gap-3 cursor-pointer hover:bg-white p-2 rounded">
-                    <input type="checkbox" checked={moduleAllocation.masters.referralDoctor} onChange={() => toggleModule('masters.referralDoctor')} className="w-4 h-4 accent-orange-500" />
-                    <span className="text-sm text-gray-700">Referral Doctor</span>
-                  </label>
-                  <label className="flex items-center gap-3 cursor-pointer hover:bg-white p-2 rounded">
-                    <input type="checkbox" checked={moduleAllocation.masters.referralDoctorList} onChange={() => toggleModule('masters.referralDoctorList')} className="w-4 h-4 accent-orange-500" />
-                    <span className="text-sm text-gray-700">Ref. Doctor List</span>
-                  </label>
-                  <label className="flex items-center gap-3 cursor-pointer hover:bg-white p-2 rounded">
-                    <input type="checkbox" checked={moduleAllocation.masters.rolelist} onChange={() => toggleModule('masters.rolelist')} className="w-4 h-4 accent-orange-500" />
-                    <span className="text-sm text-gray-700">Role</span>
-                  </label>
-                  <label className="flex items-center gap-3 cursor-pointer hover:bg-white p-2 rounded">
-                    <input type="checkbox" checked={moduleAllocation.masters.specimenType} onChange={() => toggleModule('masters.specimenType')} className="w-4 h-4 accent-orange-500" />
-                    <span className="text-sm text-gray-700">Specimen Type</span>
-                  </label>
-                  <label className="flex items-center gap-3 cursor-pointer hover:bg-white p-2 rounded">
-                    <input type="checkbox" checked={moduleAllocation.masters.testCharges} onChange={() => toggleModule('masters.testCharges')} className="w-4 h-4 accent-orange-500" />
-                    <span className="text-sm text-gray-700">Test Charges</span>
-                  </label>
-                  <label className="flex items-center gap-3 cursor-pointer hover:bg-white p-2 rounded">
-                    <input type="checkbox" checked={moduleAllocation.masters.testTemplates} onChange={() => toggleModule('masters.testTemplates')} className="w-4 h-4 accent-orange-500" />
-                    <span className="text-sm text-gray-700">Test Template</span>
-                  </label>
-                  <label className="flex items-center gap-3 cursor-pointer hover:bg-white p-2 rounded">
-                    <input type="checkbox" checked={moduleAllocation.masters.testlist} onChange={() => toggleModule('masters.testlist')} className="w-4 h-4 accent-orange-500" />
-                    <span className="text-sm text-gray-700">Test List</span>
-                  </label>
-                  <label className="flex items-center gap-3 cursor-pointer hover:bg-white p-2 rounded">
-                    <input type="checkbox" checked={moduleAllocation.masters.units} onChange={() => toggleModule('masters.units')} className="w-4 h-4 accent-orange-500" />
-                    <span className="text-sm text-gray-700">Units</span>
-                  </label>
-                  <label className="flex items-center gap-3 cursor-pointer hover:bg-white p-2 rounded">
-                    <input type="checkbox" checked={moduleAllocation.masters.user} onChange={() => toggleModule('masters.user')} className="w-4 h-4 accent-orange-500" />
-                    <span className="text-sm text-gray-700">User</span>
-                  </label>
-                  <label className="flex items-center gap-3 cursor-pointer hover:bg-white p-2 rounded">
-                    <input type="checkbox" checked={moduleAllocation.masters.userlist} onChange={() => toggleModule('masters.userlist')} className="w-4 h-4 accent-orange-500" />
-                    <span className="text-sm text-gray-700">User List</span>
-                  </label>
-                </div>
-              </div>
+              <ModuleAccordion
+                title="Masters"
+                icon={Settings}
+                color="green"
+                items={[
+                  { key: 'masters.testlist', label: 'Tests' },
+                  { key: 'masters.testTemplates', label: 'Test Template' },
+                  { key: 'masters.departmentlist', label: 'Department' },
+                  { key: 'masters.packagelist', label: 'Packages' },
+                  { key: 'masters.charges', label: 'Charges' },
+                  { key: 'masters.rolelist', label: 'Roles' },
+                  { key: 'masters.userlist', label: 'Users' },
+                  { key: 'masters.referralDoctorList', label: 'Referral Doctors' },
+                  { key: 'masters.organization', label: 'Organization' },
+                  { key: 'masters.specimenType', label: 'Specimen Type' },
+                  { key: 'masters.units', label: 'Units' },
+                ]}
+                moduleAllocation={moduleAllocation}
+                toggleModule={toggleModule}
+              />
 
               {/* Reports Module */}
-              <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
-                <h4 className="font-semibold text-slate-800 mb-3 flex items-center gap-2">
-                  <span className="w-3 h-3 bg-purple-500 rounded-full"></span>
-                  Reports Module
-                </h4>
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-                  <label className="flex items-center gap-3 cursor-pointer hover:bg-white p-2 rounded">
-                    <input type="checkbox" checked={moduleAllocation.reports.dashboard} onChange={() => toggleModule('reports.dashboard')} className="w-4 h-4 accent-orange-500" />
-                    <span className="text-sm text-gray-700">Dashboard</span>
-                  </label>
-                  <label className="flex items-center gap-3 cursor-pointer hover:bg-white p-2 rounded">
-                    <input type="checkbox" checked={moduleAllocation.reports.dailyCollection} onChange={() => toggleModule('reports.dailyCollection')} className="w-4 h-4 accent-orange-500" />
-                    <span className="text-sm text-gray-700">Daily Collection</span>
-                  </label>
-                  <label className="flex items-center gap-3 cursor-pointer hover:bg-white p-2 rounded">
-                    <input type="checkbox" checked={moduleAllocation.reports.monthlyCollectionSummary} onChange={() => toggleModule('reports.monthlyCollectionSummary')} className="w-4 h-4 accent-orange-500" />
-                    <span className="text-sm text-gray-700">Monthly Summary</span>
-                  </label>
-                  <label className="flex items-center gap-3 cursor-pointer hover:bg-white p-2 rounded">
-                    <input type="checkbox" checked={moduleAllocation.reports.patientList} onChange={() => toggleModule('reports.patientList')} className="w-4 h-4 accent-orange-500" />
-                    <span className="text-sm text-gray-700">Patient List</span>
-                  </label>
-                  <label className="flex items-center gap-3 cursor-pointer hover:bg-white p-2 rounded">
-                    <input type="checkbox" checked={moduleAllocation.reports.centerWiseCostReport} onChange={() => toggleModule('reports.centerWiseCostReport')} className="w-4 h-4 accent-orange-500" />
-                    <span className="text-sm text-gray-700">Center Cost</span>
-                  </label>
-                  <label className="flex items-center gap-3 cursor-pointer hover:bg-white p-2 rounded">
-                    <input type="checkbox" checked={moduleAllocation.reports.b2bTestwiseCostReport} onChange={() => toggleModule('reports.b2bTestwiseCostReport')} className="w-4 h-4 accent-orange-500" />
-                    <span className="text-sm text-gray-700">B2B Cost</span>
-                  </label>
-                  <label className="flex items-center gap-3 cursor-pointer hover:bg-white p-2 rounded">
-                    <input type="checkbox" checked={moduleAllocation.reports.discountReport} onChange={() => toggleModule('reports.discountReport')} className="w-4 h-4 accent-orange-500" />
-                    <span className="text-sm text-gray-700">Discount</span>
-                  </label>
-                  <label className="flex items-center gap-3 cursor-pointer hover:bg-white p-2 rounded">
-                    <input type="checkbox" checked={moduleAllocation.reports.testReport} onChange={() => toggleModule('reports.testReport')} className="w-4 h-4 accent-orange-500" />
-                    <span className="text-sm text-gray-700">Test Report</span>
-                  </label>
-                  <label className="flex items-center gap-3 cursor-pointer hover:bg-white p-2 rounded">
-                    <input type="checkbox" checked={moduleAllocation.reports.testCompliment} onChange={() => toggleModule('reports.testCompliment')} className="w-4 h-4 accent-orange-500" />
-                    <span className="text-sm text-gray-700">Test Compliment</span>
-                  </label>
-                  <label className="flex items-center gap-3 cursor-pointer hover:bg-white p-2 rounded">
-                    <input type="checkbox" checked={moduleAllocation.reports.serviceCountReport} onChange={() => toggleModule('reports.serviceCountReport')} className="w-4 h-4 accent-orange-500" />
-                    <span className="text-sm text-gray-700">Service Count</span>
-                  </label>
-                  <label className="flex items-center gap-3 cursor-pointer hover:bg-white p-2 rounded">
-                    <input type="checkbox" checked={moduleAllocation.reports.paymentReceipt} onChange={() => toggleModule('reports.paymentReceipt')} className="w-4 h-4 accent-orange-500" />
-                    <span className="text-sm text-gray-700">Payment Receipt</span>
-                  </label>
-                  <label className="flex items-center gap-3 cursor-pointer hover:bg-white p-2 rounded">
-                    <input type="checkbox" checked={moduleAllocation.reports.sampleRejectionReport} onChange={() => toggleModule('reports.sampleRejectionReport')} className="w-4 h-4 accent-orange-500" />
-                    <span className="text-sm text-gray-700">Sample Rejection</span>
-                  </label>
-                  <label className="flex items-center gap-3 cursor-pointer hover:bg-white p-2 rounded">
-                    <input type="checkbox" checked={moduleAllocation.reports.detailedWorksheet} onChange={() => toggleModule('reports.detailedWorksheet')} className="w-4 h-4 accent-orange-500" />
-                    <span className="text-sm text-gray-700">Worksheet</span>
-                  </label>
-                  <label className="flex items-center gap-3 cursor-pointer hover:bg-white p-2 rounded">
-                    <input type="checkbox" checked={moduleAllocation.reports.hospitalBills} onChange={() => toggleModule('reports.hospitalBills')} className="w-4 h-4 accent-orange-500" />
-                    <span className="text-sm text-gray-700">Hospital Bills</span>
-                  </label>
-                </div>
-              </div>
+              <ModuleAccordion
+                title="Reports"
+                icon={BarChart3}
+                color="purple"
+                items={[
+                  { key: 'reports.dashboard', label: 'Dashboard' },
+                  { key: 'reports.dailyCollection', label: 'Daily Collection' },
+                  { key: 'reports.monthlyCollectionSummary', label: 'Monthly Summary' },
+                  { key: 'reports.patientList', label: 'Patient List' },
+                  { key: 'reports.centerWiseCostReport', label: 'Center Cost' },
+                  { key: 'reports.b2bTestwiseCostReport', label: 'B2B Cost' },
+                  { key: 'reports.discountReport', label: 'Discount' },
+                  { key: 'reports.testReport', label: 'Test Report' },
+                ]}
+                moduleAllocation={moduleAllocation}
+                toggleModule={toggleModule}
+              />
 
-              {/* Other Modules */}
-              <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
-                <h4 className="font-semibold text-slate-800 mb-3 flex items-center gap-2">
-                  <span className="w-3 h-3 bg-red-500 rounded-full"></span>
-                  Other Modules
-                </h4>
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                  <label className="flex items-center gap-3 cursor-pointer hover:bg-white p-2 rounded">
-                    <input type="checkbox" checked={moduleAllocation.result} onChange={() => toggleModule('result')} className="w-4 h-4 accent-orange-500" />
-                    <span className="text-sm text-gray-700">Result</span>
-                  </label>
-                  <label className="flex items-center gap-3 cursor-pointer hover:bg-white p-2 rounded">
-                    <input type="checkbox" checked={moduleAllocation.signature} onChange={() => toggleModule('signature')} className="w-4 h-4 accent-orange-500" />
-                    <span className="text-sm text-gray-700">Signature</span>
-                  </label>
-                  <label className="flex items-center gap-3 cursor-pointer hover:bg-white p-2 rounded">
-                    <input type="checkbox" checked={moduleAllocation.help} onChange={() => toggleModule('help')} className="w-4 h-4 accent-orange-500" />
-                    <span className="text-sm text-gray-700">Help</span>
-                  </label>
-                </div>
-              </div>
+              {/* Configuration Module */}
+              <ModuleAccordion
+                title="Configuration"
+                icon={Lock}
+                color="orange"
+                items={[
+                  { key: 'configuration.signature', label: 'Signature' },
+                ]}
+                moduleAllocation={moduleAllocation}
+                toggleModule={toggleModule}
+              />
+
+              {/* Help Module */}
+              <ModuleAccordion
+                title="Help"
+                icon={HelpCircle}
+                color="blue"
+                items={[
+                  { key: 'help.userManual', label: 'User Manual' },
+                  { key: 'help.ultraviewer', label: 'Download Ultraviewer' },
+                  { key: 'help.anydesk', label: 'Download Anydesk' },
+                ]}
+                moduleAllocation={moduleAllocation}
+                toggleModule={toggleModule}
+              />
+
+              {/* Result Module */}
+              <SingleToggle
+                title="Result"
+                icon={ClipboardCheck}
+                color="green"
+                moduleKey="result"
+                moduleAllocation={moduleAllocation}
+                toggleModule={toggleModule}
+              />
             </div>
           </div>
 

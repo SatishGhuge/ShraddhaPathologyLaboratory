@@ -2,14 +2,120 @@
 
 import { useState, useEffect } from "react";
 import { useRouter, useParams, usePathname } from "next/navigation";
-
 import {
   Save, ArrowLeft, Building2, MapPin, Hash, Phone,
   CalendarDays, Eye, Mail, CheckCircle, XCircle, X,
-  Plus, Trash2, DollarSign,
+  Plus, Trash2, DollarSign, ChevronDown, User, Settings, BarChart3, HelpCircle, ClipboardCheck, Lock
 } from "lucide-react";
 import Header from "@/src/components/Header";
 import { updateOrganization, getOrganizationById, createOrganizationWithCredentials, getTests } from "@/src/api/master";
+
+// Module Accordion Component
+const ModuleAccordion = ({ title, icon: Icon, color, items, moduleAllocation, toggleModule }: any) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const enabledCount = items.filter((item: any) => {
+    const keys = item.key.split('.');
+    let current = moduleAllocation;
+    for (const key of keys) {
+      current = current[key];
+    }
+    return current;
+  }).length;
+
+  const colorMap: any = {
+    blue: 'bg-blue-50 border-blue-200',
+    green: 'bg-green-50 border-green-200',
+    purple: 'bg-purple-50 border-purple-200',
+    orange: 'bg-orange-50 border-orange-200',
+  };
+
+  return (
+    <div className={`border rounded-lg ${colorMap[color] || 'bg-gray-50 border-gray-200'}`}>
+      <button
+        type="button"
+        onClick={() => setIsOpen(!isOpen)}
+        className="w-full flex items-center justify-between p-4 hover:bg-white/50 transition-colors"
+      >
+        <div className="flex items-center gap-3">
+          <Icon size={24} className="text-gray-700" />
+          <div className="text-left">
+            <h4 className="font-semibold text-slate-800">{title}</h4>
+            <p className="text-xs text-gray-500">{enabledCount} of {items.length} enabled</p>
+          </div>
+        </div>
+        <ChevronDown size={20} className={`text-gray-600 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+      </button>
+
+      {isOpen && (
+        <div className="border-t border-gray-200 p-4 space-y-2 bg-white/50">
+          {items.map((item: any) => {
+            const keys = item.key.split('.');
+            let current = moduleAllocation;
+            for (const key of keys) {
+              current = current[key];
+            }
+            const isEnabled = current;
+
+            return (
+              <div key={item.key} className="flex items-center justify-between p-2 hover:bg-gray-100 rounded">
+                <span className="text-sm text-gray-700">{item.label}</span>
+                <button
+                  type="button"
+                  onClick={() => toggleModule(item.key)}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                    isEnabled ? 'bg-orange-500' : 'bg-gray-300'
+                  }`}
+                >
+                  <span
+                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                      isEnabled ? 'translate-x-6' : 'translate-x-1'
+                    }`}
+                  />
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// Single Toggle Component for Configuration, Help, Result
+const SingleToggle = ({ title, icon: Icon, color, moduleKey, moduleAllocation, toggleModule }: any) => {
+  const isEnabled = moduleAllocation[moduleKey];
+
+  const colorMap: any = {
+    blue: 'bg-blue-50 border-blue-200',
+    green: 'bg-green-50 border-green-200',
+    purple: 'bg-purple-50 border-purple-200',
+    orange: 'bg-orange-50 border-orange-200',
+  };
+
+  return (
+    <div className={`border rounded-lg ${colorMap[color] || 'bg-gray-50 border-gray-200'} p-4`}>
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <Icon size={24} className="text-gray-700" />
+          <h4 className="font-semibold text-slate-800">{title}</h4>
+        </div>
+        <button
+          type="button"
+          onClick={() => toggleModule(moduleKey)}
+          className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+            isEnabled ? 'bg-orange-500' : 'bg-gray-300'
+          }`}
+        >
+          <span
+            className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+              isEnabled ? 'translate-x-6' : 'translate-x-1'
+            }`}
+          />
+        </button>
+      </div>
+    </div>
+  );
+};
 
 const Toast = ({ type, message, credentials, onClose }: { type: string; message: string; credentials?: any; onClose: () => void }) => (
   <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
@@ -17,7 +123,8 @@ const Toast = ({ type, message, credentials, onClose }: { type: string; message:
       <div className="flex items-start gap-3">
         {type === "success"
           ? <CheckCircle className="text-green-500 mt-0.5 flex-shrink-0" size={22} />
-          : <XCircle className="text-red-500 mt-0.5 flex-shrink-0" size={22} />}
+          : <XCircle className="text-red-500 mt-0.5 flex-shrink-0" size={22} />
+        }
         <div className="flex-1">
           <p className={`font-semibold text-sm ${type === "success" ? "text-green-700" : "text-red-700"}`}>{message}</p>
           {credentials && (
@@ -42,53 +149,126 @@ const Toast = ({ type, message, credentials, onClose }: { type: string; message:
   </div>
 );
 
+const defaultModuleAllocation = {
+  patient: {
+    registration: false,
+    tests: false,
+  },
+  masters: {
+    testlist: false,
+    testTemplates: false,
+    departmentlist: false,
+    packagelist: false,
+    charges: false,
+    rolelist: false,
+    userlist: false,
+    referralDoctorList: false,
+    organization: false,
+    specimenType: false,
+    units: false,
+  },
+  reports: {
+    dashboard: false,
+    dailyCollection: false,
+    monthlyCollectionSummary: false,
+    patientList: false,
+    centerWiseCostReport: false,
+    b2bTestwiseCostReport: false,
+    discountReport: false,
+    testReport: false,
+  },
+  configuration: {
+    signature: false,
+  },
+  help: {
+    userManual: false,
+    ultraviewer: false,
+    anydesk: false,
+  },
+  result: false,
+};
+
 const AddOrganization = () => {
   const router = useRouter();
   const { id } = useParams();
   const pathname = usePathname();
-
   const isViewMode = pathname.includes("/view/");
   const isEditMode = pathname.includes("/edit/");
 
   const [formData, setFormData] = useState({
-    name: "", address: "", code: "",
-    location: "", mobile: "", email: "", date: "", active: "Yes",
+    name: "",
+    address: "",
+    code: "",
+    location: "",
+    mobile: "",
+    email: "",
+    date: "",
+    active: "Yes",
   });
 
   const [testCharges, setTestCharges] = useState<any[]>([]);
   const [availableTests, setAvailableTests] = useState<any[]>([]);
   const [toast, setToast] = useState<any>(null);
   const [saving, setSaving] = useState(false);
+  const [moduleAllocation, setModuleAllocation] = useState(defaultModuleAllocation);
 
   // Load tests on mount
   useEffect(() => {
-    getTests().then(tests => {
+    getTests().then((tests: any) => {
       setAvailableTests(Array.isArray(tests) ? tests : tests?.data || []);
     }).catch(console.error);
   }, []);
 
   useEffect(() => {
     if (id && (isViewMode || isEditMode)) {
-      getOrganizationById((Array.isArray(id) ? id[0] : id) as string).then(organization => {
-        if (organization) {
-          setFormData({
-            name: organization.name || "",
-            address: organization.address || "",
-            code: organization.code || "",
-            location: organization.location || "",
-            mobile: organization.mobile || "",
-            email: organization.email || "",
-            date: organization.date ? new Date(organization.date).toISOString().split("T")[0] : "",
-            active: organization.isActive ? "Yes" : "No",
+      const orgId = Array.isArray(id) ? id[0] : id;
+      if (orgId) {
+        getOrganizationById(orgId as string)
+          .then((organization: any) => {
+            if (organization) {
+              setFormData({
+                name: organization.name || "",
+                address: organization.address || "",
+                code: organization.code || "",
+                location: organization.location || "",
+                mobile: organization.mobile || "",
+                email: organization.email || "",
+                date: organization.date ? new Date(organization.date).toISOString().split("T")[0] : "",
+                active: organization.isActive ? "Yes" : "No",
+              });
+              if (organization.moduleAllocation) {
+                try {
+                  const allocation = typeof organization.moduleAllocation === 'string' 
+                    ? JSON.parse(organization.moduleAllocation) 
+                    : organization.moduleAllocation;
+                  setModuleAllocation(allocation);
+                } catch (e) {
+                  setModuleAllocation(defaultModuleAllocation);
+                }
+              }
+            }
+          })
+          .catch((err: any) => {
+            console.error("Error loading organization:", err);
           });
-        }
-      }).catch(console.error);
+      }
     }
   }, [id, isViewMode, isEditMode]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     if (isViewMode) return;
     setFormData({ ...formData, [e.target.name]: e.target.value });
+  };
+
+  const toggleModule = (path: string) => {
+    const keys = path.split('.');
+    const newAllocation = JSON.parse(JSON.stringify(moduleAllocation));
+    let current = newAllocation;
+    for (let i = 0; i < keys.length - 1; i++) {
+      current = current[keys[i]];
+    }
+    current[keys[keys.length - 1]] = !current[keys[keys.length - 1]];
+    setModuleAllocation(newAllocation);
   };
 
   const addTestCharge = () => {
@@ -102,13 +282,10 @@ const AddOrganization = () => {
   const updateTestCharge = (index: number, field: string, value: any) => {
     const updated = [...testCharges];
     updated[index][field] = value;
-    
-    // If testId changed, update testName
     if (field === "testId") {
       const test = availableTests.find(t => t.id === parseInt(value));
       updated[index].testName = test?.name || "";
     }
-    
     setTestCharges(updated);
   };
 
@@ -126,6 +303,7 @@ const AddOrganization = () => {
       setToast({ type: "error", message: "Mobile number must be exactly 10 digits!" });
       return;
     }
+
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
       setToast({ type: "error", message: "Please enter a valid email address!" });
       return;
@@ -142,9 +320,9 @@ const AddOrganization = () => {
         email: formData.email,
         date: formData.date || null,
         isActive: formData.active === "Yes",
+        moduleAllocation: JSON.stringify(moduleAllocation),
       };
 
-      // Add test charges if creating new organization
       if (!isEditMode && testCharges.length > 0) {
         payload.testCharges = testCharges.map(tc => ({
           testId: parseInt(tc.testId),
@@ -164,7 +342,7 @@ const AddOrganization = () => {
           credentials: (res as any)?.credentials || (res as any)?.data?.credentials || null,
         });
       }
-    } catch (err) {
+    } catch (err: any) {
       setToast({ type: "error", message: err.message || "Failed to save organization" });
     } finally {
       setSaving(false);
@@ -177,10 +355,8 @@ const AddOrganization = () => {
     <>
       <Header />
       {toast && <Toast {...toast} onClose={closeToast} />}
-
       <div className="p-6 bg-white min-h-screen flex justify-center">
-        <div className="bg-white rounded-lg shadow py-3 px-4 w-full max-w-2xl h-fit">
-
+        <div className="bg-white rounded-lg shadow py-3 px-4 w-full max-w-4xl h-fit">
           <div className="flex justify-between items-center mb-3">
             <h2 className="text-xl font-semibold text-slate-900 flex items-center gap-2">
               {isViewMode && <Eye size={20} className="inline" />} {getTitle()}
@@ -192,93 +368,191 @@ const AddOrganization = () => {
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4 text-sm">
-
             {/* Organization Details */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div>
+                <label className="font-medium text-gray-700 text-sm">Name</label>
+                <div className="flex items-center border border-gray-300 rounded px-2 bg-white">
+                  <Building2 size={14} className="text-cyan-600" />
+                  <input type="text" name="name" value={formData.name} onChange={handleChange}
+                    disabled={isViewMode} required={!isViewMode}
+                    className="w-full px-2 py-1.5 outline-none text-sm disabled:bg-gray-50 bg-transparent" />
+                </div>
+              </div>
 
-            <div>
-              <label className="font-medium text-gray-700 text-sm">Name</label>
-              <div className="flex items-center border border-gray-300 rounded px-2 bg-white">
-                <Building2 size={14} className="text-cyan-600" />
-                <input type="text" name="name" value={formData.name} onChange={handleChange}
-                  disabled={isViewMode} required={!isViewMode}
-                  className="w-full px-2 py-1.5 outline-none text-sm disabled:bg-gray-50 bg-transparent" />
+              <div>
+                <label className="font-medium text-gray-700 text-sm">Code</label>
+                <div className="flex items-center border border-gray-300 rounded px-2 bg-white">
+                  <Hash size={14} className="text-cyan-600" />
+                  <input type="text" name="code" value={formData.code} onChange={handleChange}
+                    disabled={isViewMode} required={!isViewMode}
+                    className="w-full px-2 py-1.5 outline-none text-sm disabled:bg-gray-50 bg-transparent" />
+                </div>
+              </div>
+
+              <div>
+                <label className="font-medium text-gray-700 text-sm">Location</label>
+                <div className="flex items-center border border-gray-300 rounded px-2 bg-white">
+                  <MapPin size={14} className="text-cyan-600" />
+                  <input type="text" name="location" value={formData.location} onChange={handleChange}
+                    disabled={isViewMode} required={!isViewMode}
+                    className="w-full px-2 py-1.5 outline-none text-sm disabled:bg-gray-50 bg-transparent" />
+                </div>
+              </div>
+
+              <div>
+                <label className="font-medium text-gray-700 text-sm">Mobile No.</label>
+                <div className="flex items-center border border-gray-300 rounded px-2 bg-white">
+                  <Phone size={14} className="text-cyan-600" />
+                  <input type="tel" name="mobile" value={formData.mobile} onChange={handleChange}
+                    disabled={isViewMode} maxLength={10} placeholder="10 digit mobile number"
+                    required={!isViewMode}
+                    className="w-full px-2 py-1.5 outline-none text-sm disabled:bg-gray-50 bg-transparent" />
+                </div>
+              </div>
+
+              <div>
+                <label className="font-medium text-gray-700 text-sm">Date of Establishment</label>
+                <div className="flex items-center border border-gray-300 rounded px-2 bg-white">
+                  <CalendarDays size={14} className="text-cyan-600" />
+                  <input type="date" name="date" value={formData.date} onChange={handleChange}
+                    disabled={isViewMode} required={!isViewMode}
+                    className="w-full px-2 py-1.5 outline-none text-sm disabled:bg-gray-50 bg-transparent" />
+                </div>
+              </div>
+
+              <div>
+                <label className="font-medium text-gray-700 text-sm">Active Status</label>
+                <div className="flex items-center border border-gray-300 rounded px-2 bg-white">
+                  <select name="active" value={formData.active} onChange={handleChange}
+                    disabled={isViewMode}
+                    className="w-full px-2 py-1.5 outline-none text-sm disabled:bg-gray-50 bg-transparent">
+                    <option value="Yes">Yes</option>
+                    <option value="No">No</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="md:col-span-2">
+                <label className="font-medium text-gray-700 text-sm">Email Address</label>
+                <div className="flex items-center border border-gray-300 rounded px-2 bg-white">
+                  <Mail size={14} className="text-cyan-600" />
+                  <input type="email" name="email" value={formData.email} onChange={handleChange}
+                    disabled={isViewMode} placeholder="example@domain.com" required={!isViewMode}
+                    className="w-full px-2 py-1.5 outline-none text-sm disabled:bg-gray-50 bg-transparent" />
+                </div>
+              </div>
+
+              <div className="md:col-span-2">
+                <label className="font-medium text-gray-700 text-sm">Address</label>
+                <textarea name="address" value={formData.address} onChange={handleChange}
+                  disabled={isViewMode} rows={2} required={!isViewMode}
+                  className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm disabled:bg-gray-50 bg-white" />
               </div>
             </div>
 
-            <div>
-              <label className="font-medium text-gray-700 text-sm">Code</label>
-              <div className="flex items-center border border-gray-300 rounded px-2 bg-white">
-                <Hash size={14} className="text-cyan-600" />
-                <input type="text" name="code" value={formData.code} onChange={handleChange}
-                  disabled={isViewMode} required={!isViewMode}
-                  className="w-full px-2 py-1.5 outline-none text-sm disabled:bg-gray-50 bg-transparent" />
-              </div>
-            </div>
+            {/* Module Allocation Section */}
+            {!isViewMode && (
+              <div className="border-t border-gray-300 pt-4 mt-4">
+                <h3 className="text-lg font-semibold text-slate-900 mb-4">Module Allocation</h3>
+                
+                <div className="space-y-3">
+                  {/* Patient Module */}
+                  <ModuleAccordion
+                    title="Patient"
+                    icon={User}
+                    color="blue"
+                    items={[
+                      { key: 'patient.registration', label: 'Patient Registration' },
+                      { key: 'patient.tests', label: 'Search for Test' },
+                    ]}
+                    moduleAllocation={moduleAllocation}
+                    toggleModule={toggleModule}
+                  />
 
-            <div>
-              <label className="font-medium text-gray-700 text-sm">Location</label>
-              <div className="flex items-center border border-gray-300 rounded px-2 bg-white">
-                <MapPin size={14} className="text-cyan-600" />
-                <input type="text" name="location" value={formData.location} onChange={handleChange}
-                  disabled={isViewMode} required={!isViewMode}
-                  className="w-full px-2 py-1.5 outline-none text-sm disabled:bg-gray-50 bg-transparent" />
-              </div>
-            </div>
+                  {/* Masters Module */}
+                  <ModuleAccordion
+                    title="Masters"
+                    icon={Settings}
+                    color="green"
+                    items={[
+                      { key: 'masters.testlist', label: 'Tests' },
+                      { key: 'masters.testTemplates', label: 'Test Template' },
+                      { key: 'masters.departmentlist', label: 'Department' },
+                      { key: 'masters.packagelist', label: 'Packages' },
+                      { key: 'masters.charges', label: 'Charges' },
+                      { key: 'masters.rolelist', label: 'Roles' },
+                      { key: 'masters.userlist', label: 'Users' },
+                      { key: 'masters.referralDoctorList', label: 'Referral Doctors' },
+                      { key: 'masters.organization', label: 'Organization' },
+                      { key: 'masters.specimenType', label: 'Specimen Type' },
+                      { key: 'masters.units', label: 'Units' },
+                    ]}
+                    moduleAllocation={moduleAllocation}
+                    toggleModule={toggleModule}
+                  />
 
-            <div>
-              <label className="font-medium text-gray-700 text-sm">Mobile No.</label>
-              <div className="flex items-center border border-gray-300 rounded px-2 bg-white">
-                <Phone size={14} className="text-cyan-600" />
-                <input type="tel" name="mobile" value={formData.mobile} onChange={handleChange}
-                  disabled={isViewMode} maxLength={10} placeholder="10 digit mobile number"
-                  required={!isViewMode}
-                  className="w-full px-2 py-1.5 outline-none text-sm disabled:bg-gray-50 bg-transparent" />
-              </div>
-            </div>
+                  {/* Reports Module */}
+                  <ModuleAccordion
+                    title="Reports"
+                    icon={BarChart3}
+                    color="purple"
+                    items={[
+                      { key: 'reports.dashboard', label: 'Dashboard' },
+                      { key: 'reports.dailyCollection', label: 'Daily Collection' },
+                      { key: 'reports.monthlyCollectionSummary', label: 'Monthly Summary' },
+                      { key: 'reports.patientList', label: 'Patient List' },
+                      { key: 'reports.centerWiseCostReport', label: 'Center Cost' },
+                      { key: 'reports.b2bTestwiseCostReport', label: 'B2B Cost' },
+                      { key: 'reports.discountReport', label: 'Discount' },
+                      { key: 'reports.testReport', label: 'Test Report' },
+                    ]}
+                    moduleAllocation={moduleAllocation}
+                    toggleModule={toggleModule}
+                  />
 
-            <div>
-              <label className="font-medium text-gray-700 text-sm">Date of Establishment</label>
-              <div className="flex items-center border border-gray-300 rounded px-2 bg-white">
-                <CalendarDays size={14} className="text-cyan-600" />
-                <input type="date" name="date" value={formData.date} onChange={handleChange}
-                  disabled={isViewMode} required={!isViewMode}
-                  className="w-full px-2 py-1.5 outline-none text-sm disabled:bg-gray-50 bg-transparent" />
-              </div>
-            </div>
+                  {/* Configuration Module */}
+                  <ModuleAccordion
+                    title="Configuration"
+                    icon={Lock}
+                    color="orange"
+                    items={[
+                      { key: 'configuration.signature', label: 'Signature' },
+                    ]}
+                    moduleAllocation={moduleAllocation}
+                    toggleModule={toggleModule}
+                  />
 
-            <div>
-              <label className="font-medium text-gray-700 text-sm">Active Status</label>
-              <div className="flex items-center border border-gray-300 rounded px-2 bg-white">
-                <select name="active" value={formData.active} onChange={handleChange}
-                  disabled={isViewMode}
-                  className="w-full px-2 py-1.5 outline-none text-sm disabled:bg-gray-50 bg-transparent">
-                  <option value="Yes">Yes</option>
-                  <option value="No">No</option>
-                </select>
-              </div>
-            </div>
+                  {/* Help Module */}
+                  <ModuleAccordion
+                    title="Help"
+                    icon={HelpCircle}
+                    color="blue"
+                    items={[
+                      { key: 'help.userManual', label: 'User Manual' },
+                      { key: 'help.ultraviewer', label: 'Download Ultraviewer' },
+                      { key: 'help.anydesk', label: 'Download Anydesk' },
+                    ]}
+                    moduleAllocation={moduleAllocation}
+                    toggleModule={toggleModule}
+                  />
 
-            <div className="md:col-span-2">
-              <label className="font-medium text-gray-700 text-sm">Email Address</label>
-              <div className="flex items-center border border-gray-300 rounded px-2 bg-white">
-                <Mail size={14} className="text-cyan-600" />
-                <input type="email" name="email" value={formData.email} onChange={handleChange}
-                  disabled={isViewMode} placeholder="example@domain.com" required={!isViewMode}
-                  className="w-full px-2 py-1.5 outline-none text-sm disabled:bg-gray-50 bg-transparent" />
+                  {/* Result Module */}
+                  <SingleToggle
+                    title="Result"
+                    icon={ClipboardCheck}
+                    color="green"
+                    moduleKey="result"
+                    moduleAllocation={moduleAllocation}
+                    toggleModule={toggleModule}
+                  />
+                </div>
               </div>
-            </div>
-
-            <div className="md:col-span-2">
-              <label className="font-medium text-gray-700 text-sm">Address</label>
-              <textarea name="address" value={formData.address} onChange={handleChange}
-                disabled={isViewMode} rows={2} required={!isViewMode}
-                className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm disabled:bg-gray-50 bg-white" />
-            </div>
+            )}
 
             {/* Test Charges Section - Only for Add Mode */}
             {!isViewMode && !isEditMode && (
-              <div className="md:col-span-2 border-t pt-4">
+              <div className="border-t pt-4">
                 <div className="flex items-center justify-between mb-3">
                   <h3 className="font-semibold text-gray-800 flex items-center gap-2">
                     <DollarSign size={16} /> Test Charges (Optional)
@@ -314,9 +588,7 @@ const AddOrganization = () => {
                               >
                                 <option value="">Select Test</option>
                                 {availableTests.map((test) => (
-                                  <option key={test.id} value={test.id}>
-                                    {test.name}
-                                  </option>
+                                  <option key={test.id} value={test.id}>{test.name}</option>
                                 ))}
                               </select>
                             </td>
@@ -361,7 +633,7 @@ const AddOrganization = () => {
             )}
 
             {!isViewMode && (
-              <div className="md:col-span-2 flex gap-3 mt-2">
+              <div className="flex gap-3 mt-4">
                 <button type="submit" disabled={saving}
                   className="flex items-center gap-2 bg-orange-500 hover:bg-orange-600 disabled:opacity-60 text-white px-4 py-1.5 rounded text-sm transition-colors">
                   <Save size={14} /> {saving ? "Saving..." : isEditMode ? "Update" : "Save"}

@@ -115,101 +115,153 @@ const Header = () => {
   useEffect(() => {
     const user = JSON.parse(localStorage.getItem("admin") || "{}");
     setCurrentUser(user);
+    console.log('🔍 Header - Initial user load:', user);
     
     const timer = setInterval(() => setDateTime(new Date()), 1000);
     return () => clearInterval(timer);
   }, []);
 
+  // Listen for storage changes (when user logs in from another tab or updates)
+  useEffect(() => {
+    const handleStorageChange = () => {
+      const user = JSON.parse(localStorage.getItem("admin") || "{}");
+      setCurrentUser(user);
+      console.log('🔍 Header - Storage changed, user updated:', user);
+    };
+    
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, []);
+
   // Filter modules based on user module allocation
   useEffect(() => {
-    const user = JSON.parse(localStorage.getItem("admin") || "{}");
-    const moduleAllocation = user.moduleAllocation;
-    
-    if (moduleAllocation) {
-      const accessible = getAccessibleModules(moduleAllocation);
+    const filterModulesByAllocation = () => {
+      const user = JSON.parse(localStorage.getItem("admin") || "{}");
+      const moduleAllocation = user.moduleAllocation;
       
-      const filteredModules = allModules.map(module => {
-        if (module.id === "patient") {
-          return {
-            ...module,
-            items: module.items.filter(item => {
-              if (item.path.includes("registration")) return accessible.patient.registration;
-              if (item.path.includes("search-booking")) return accessible.patient.tests;
-              return true;
-            })
-          };
-        }
-        
-        if (module.id === "master") {
-          return {
-            ...module,
-            items: module.items.filter(item => {
-              if (item.path.includes("testlist")) return accessible.masters.testlist;
-              if (item.path.includes("units")) return accessible.masters.units;
-              if (item.path.includes("referral-doctor")) return accessible.masters.referralDoctorList;
-              if (item.path.includes("specimen-type")) return accessible.masters.specimenType;
-              if (item.path.includes("test-templets")) return accessible.masters.testTemplates;
-              if (item.path.includes("departmentlist")) return accessible.masters.departmentlist;
-              if (item.path.includes("packagelist")) return accessible.masters.packagelist;
-              if (item.path.includes("rolelist")) return accessible.masters.rolelist;
-              if (item.path.includes("userlist")) return accessible.masters.userlist;
-              if (item.path.includes("charges")) return accessible.masters.charges;
-              if (item.path.includes("centerlist")) return accessible.masters.centerlist;
-              if (item.path.includes("corporatelist")) return accessible.masters.corporatelist;
-              if (item.path.includes("franchise")) return accessible.masters.franchise;
-              if (item.path.includes("microbiology")) return accessible.masters.microbiologyOrganism;
-              if (item.path.includes("outsourcing")) return accessible.masters.outsourcing;
-              return true;
-            })
-          };
-        }
-        
-        if (module.id === "report") {
-          return {
-            ...module,
-            items: module.items.filter(item => {
-              if (item.path.includes("report-dashboard")) return accessible.reports.dashboard;
-              if (item.path.includes("daily-collection")) return accessible.reports.dailyCollection;
-              if (item.path.includes("monthly-collection")) return accessible.reports.monthlyCollectionSummary;
-              if (item.path.includes("patient-list")) return accessible.reports.patientList;
-              if (item.path.includes("center-wise")) return accessible.reports.centerWiseCostReport;
-              if (item.path.includes("b2b-testwise")) return accessible.reports.b2bTestwiseCostReport;
-              if (item.path.includes("discount-report")) return accessible.reports.discountReport;
-              if (item.path.includes("test-report")) return accessible.reports.testReport;
-              if (item.path.includes("test-compliment")) return accessible.reports.testCompliment;
-              if (item.path.includes("service-count")) return accessible.reports.serviceCountReport;
-              if (item.path.includes("payment-receipt")) return accessible.reports.paymentReceipt;
-              if (item.path.includes("sample-rejection")) return accessible.reports.sampleRejectionReport;
-              if (item.path.includes("worksheet")) return accessible.reports.detailedWorksheet;
-              if (item.path.includes("hospital-bills")) return accessible.reports.hospitalBills;
-              return true;
-            })
-          };
-        }
-        
-        if (module.id === "configuration") {
-          return accessible.signature ? module : { ...module, items: [] };
-        }
-        
-        if (module.id === "help") {
-          return accessible.help ? module : { ...module, items: [] };
-        }
-        
-        if (module.id === "result") {
-          return accessible.result ? module : { ...module, items: [] };
-        }
-        
-        return module;
-      }).filter(module => {
-        // Hide modules with no accessible items
-        if (module.items.length === 0 && ["patient", "master", "report", "configuration", "help"].includes(module.id)) {
-          return false;
-        }
-        return true;
-      });
+      console.log('🔍 Header - User:', user);
+      console.log('🔍 Header - moduleAllocation (raw):', moduleAllocation);
+      console.log('🔍 Header - moduleAllocation type:', typeof moduleAllocation);
       
-      setModules(filteredModules);
+      // Only filter if moduleAllocation exists and is not empty
+      if (moduleAllocation && (typeof moduleAllocation === 'string' || typeof moduleAllocation === 'object')) {
+      try {
+        const accessible = getAccessibleModules(moduleAllocation);
+        console.log('🔍 Header - accessible (parsed):', accessible);
+        console.log('🔍 Header - accessible.masters:', accessible.masters);
+        console.log('🔍 Header - accessible.masters.hasAccess:', accessible.masters.hasAccess);
+        
+        const filteredModules = allModules.map(module => {
+          if (module.id === "patient") {
+            const filtered = {
+              ...module,
+              items: module.items.filter(item => {
+                if (item.path.includes("registration")) return accessible.patient.registration;
+                if (item.path.includes("search-booking")) return accessible.patient.tests;
+                return false;
+              })
+            };
+            console.log('🔍 Header - patient filtered:', filtered);
+            return filtered;
+          }
+          
+          if (module.id === "master") {
+            const filtered = {
+              ...module,
+              items: module.items.filter(item => {
+                if (item.path.includes("testlist")) return accessible.masters.testlist;
+                if (item.path.includes("units")) return accessible.masters.units;
+                if (item.path.includes("referral-doctor")) return accessible.masters.referralDoctorList;
+                if (item.path.includes("specimen-type")) return accessible.masters.specimenType;
+                if (item.path.includes("test-templets")) return accessible.masters.testTemplates;
+                if (item.path.includes("departmentlist")) return accessible.masters.departmentlist;
+                if (item.path.includes("packagelist")) return accessible.masters.packagelist;
+                if (item.path.includes("rolelist")) return accessible.masters.rolelist;
+                if (item.path.includes("userlist")) return accessible.masters.userlist;
+                if (item.path.includes("charges")) return accessible.masters.charges;
+                if (item.path.includes("organization")) return accessible.masters.organization;
+                return false;
+              })
+            };
+            console.log('🔍 Header - master filtered:', filtered);
+            console.log('🔍 Header - master items count:', filtered.items.length);
+            return filtered;
+          }
+          
+          if (module.id === "report") {
+            const filtered = {
+              ...module,
+              items: module.items.filter(item => {
+                if (item.path.includes("report-dashboard")) return accessible.reports.dashboard;
+                if (item.path.includes("daily-collection")) return accessible.reports.dailyCollection;
+                if (item.path.includes("monthly-collection")) return accessible.reports.monthlyCollectionSummary;
+                if (item.path.includes("patient-list")) return accessible.reports.patientList;
+                if (item.path.includes("center-wise")) return accessible.reports.centerWiseCostReport;
+                if (item.path.includes("b2b-testwise")) return accessible.reports.b2bTestwiseCostReport;
+                if (item.path.includes("discount-report")) return accessible.reports.discountReport;
+                if (item.path.includes("test-report")) return accessible.reports.testReport;
+                return false;
+              })
+            };
+            console.log('🔍 Header - report filtered:', filtered);
+            return filtered;
+          }
+          
+          if (module.id === "configuration") {
+            const filtered = {
+              ...module,
+              items: module.items.filter(item => {
+                if (item.label === "Signature") return accessible.configuration.signature;
+                return false;
+              })
+            };
+            console.log('🔍 Header - configuration filtered:', filtered);
+            return filtered;
+          }
+          
+          if (module.id === "help") {
+            const filtered = {
+              ...module,
+              items: module.items.filter(item => {
+                if (item.label === "User Manual") return accessible.help.userManual;
+                if (item.label === "Download Ultraviewer") return accessible.help.ultraviewer;
+                if (item.label === "Download Anydesk") return accessible.help.anydesk;
+                return false;
+              })
+            };
+            console.log('🔍 Header - help filtered:', filtered);
+            return filtered;
+          }
+          
+          if (module.id === "result") {
+            return accessible.result ? module : { ...module, items: [] };
+          }
+          
+          return module;
+        }).filter(module => {
+          // Hide modules with no accessible items
+          const shouldHide = module.items.length === 0 && ["patient", "master", "report", "configuration", "help"].includes(module.id);
+          console.log(`🔍 Header - module ${module.id}: items=${module.items.length}, shouldHide=${shouldHide}`);
+          if (shouldHide) {
+            return false;
+          }
+          return true;
+        });
+        
+        console.log('🔍 Header - filteredModules:', filteredModules);
+        setModules(filteredModules);
+      } catch (error) {
+        console.error('🔍 Header - Error parsing moduleAllocation:', error);
+        setModules(allModules);
+      }
+    } else {
+      console.log('🔍 Header - No moduleAllocation found, showing all modules');
+      setModules(allModules);
     }
+    };
+
+    // Filter modules immediately when component mounts or user changes
+    filterModulesByAllocation();
   }, [currentUser]);
 
   // Determine active module based on current pathname
@@ -274,12 +326,7 @@ const Header = () => {
 
   // Filter modules based on user role (legacy role-based filtering)
   const getVisibleModules = () => {
-    return modules.filter((module) => {
-      if (module.id === "master" && (isRestricted || isUser)) {
-        return false;
-      }
-      return true;
-    });
+    return modules;
   };
 
   const visibleModules = getVisibleModules();
@@ -427,7 +474,6 @@ const Header = () => {
                     const user = JSON.parse(localStorage.getItem('admin') || '{}');
                     const isAdmin = user.userType === 'admin' || !user.userType;
                     const displayName = user.name || user.username || 'User';
-                    const role = user.role || (isAdmin ? 'Admin' : 'User');
                     return isAdmin ? 'Shraddha Admin' : displayName;
                   })()}
                 </p>

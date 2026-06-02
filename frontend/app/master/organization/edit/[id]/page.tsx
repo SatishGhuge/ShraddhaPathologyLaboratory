@@ -6,9 +6,165 @@ import { useRouter, useParams, usePathname } from "next/navigation";
 import {
   Save, ArrowLeft, Building2, MapPin, Hash, Phone,
   CalendarDays, Eye, Mail, CheckCircle, XCircle, X,
+  Plus, Trash2, DollarSign, ChevronDown, User, Settings, BarChart3, HelpCircle, ClipboardCheck, Lock
 } from "lucide-react";
 import Header from "@/src/components/Header";
 import { updateOrganization, getOrganizationById, createOrganizationWithCredentials } from "@/src/api/master";
+
+// Module Accordion Component
+const ModuleAccordion = ({ title, icon: Icon, color, items, moduleAllocation, toggleModule }: any) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const enabledCount = items.filter((item: any) => {
+    const keys = item.key.split('.');
+    let current = moduleAllocation;
+    for (const key of keys) {
+      if (current && typeof current === 'object' && key in current) {
+        current = current[key];
+      } else {
+        return false;
+      }
+    }
+    return current;
+  }).length;
+
+  const colorMap: any = {
+    blue: 'bg-blue-50 border-blue-200',
+    green: 'bg-green-50 border-green-200',
+    purple: 'bg-purple-50 border-purple-200',
+    orange: 'bg-orange-50 border-orange-200',
+  };
+
+  return (
+    <div className={`border rounded-lg ${colorMap[color] || 'bg-gray-50 border-gray-200'}`}>
+      <button
+        type="button"
+        onClick={() => setIsOpen(!isOpen)}
+        className="w-full flex items-center justify-between p-4 hover:bg-white/50 transition-colors"
+      >
+        <div className="flex items-center gap-3">
+          <Icon size={24} className="text-gray-700" />
+          <div className="text-left">
+            <h4 className="font-semibold text-slate-800">{title}</h4>
+            <p className="text-xs text-gray-500">{enabledCount} of {items.length} enabled</p>
+          </div>
+        </div>
+        <ChevronDown size={20} className={`text-gray-600 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+      </button>
+
+      {isOpen && (
+        <div className="border-t border-gray-200 p-4 space-y-2 bg-white/50">
+          {items.map((item: any) => {
+            const keys = item.key.split('.');
+            let current = moduleAllocation;
+            for (const key of keys) {
+              if (current && typeof current === 'object' && key in current) {
+                current = current[key];
+              } else {
+                current = false;
+                break;
+              }
+            }
+            const isEnabled = current;
+
+            return (
+              <div key={item.key} className="flex items-center justify-between p-2 hover:bg-gray-100 rounded">
+                <span className="text-sm text-gray-700">{item.label}</span>
+                <button
+                  type="button"
+                  onClick={() => toggleModule(item.key)}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                    isEnabled ? 'bg-orange-500' : 'bg-gray-300'
+                  }`}
+                >
+                  <span
+                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                      isEnabled ? 'translate-x-6' : 'translate-x-1'
+                    }`}
+                  />
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// Single Toggle Component for Configuration, Help, Result
+const SingleToggle = ({ title, icon: Icon, color, moduleKey, moduleAllocation, toggleModule }: any) => {
+  const isEnabled = moduleAllocation[moduleKey];
+
+  const colorMap: any = {
+    blue: 'bg-blue-50 border-blue-200',
+    green: 'bg-green-50 border-green-200',
+    purple: 'bg-purple-50 border-purple-200',
+    orange: 'bg-orange-50 border-orange-200',
+  };
+
+  return (
+    <div className={`border rounded-lg ${colorMap[color] || 'bg-gray-50 border-gray-200'} p-4`}>
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <Icon size={24} className="text-gray-700" />
+          <h4 className="font-semibold text-slate-800">{title}</h4>
+        </div>
+        <button
+          type="button"
+          onClick={() => toggleModule(moduleKey)}
+          className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+            isEnabled ? 'bg-orange-500' : 'bg-gray-300'
+          }`}
+        >
+          <span
+            className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+              isEnabled ? 'translate-x-6' : 'translate-x-1'
+            }`}
+          />
+        </button>
+      </div>
+    </div>
+  );
+};
+
+const defaultModuleAllocation = {
+  patient: {
+    registration: false,
+    tests: false,
+  },
+  masters: {
+    testlist: false,
+    testTemplates: false,
+    departmentlist: false,
+    packagelist: false,
+    charges: false,
+    rolelist: false,
+    userlist: false,
+    referralDoctorList: false,
+    organization: false,
+    specimenType: false,
+    units: false,
+  },
+  reports: {
+    dashboard: false,
+    dailyCollection: false,
+    monthlyCollectionSummary: false,
+    patientList: false,
+    centerWiseCostReport: false,
+    b2bTestwiseCostReport: false,
+    discountReport: false,
+    testReport: false,
+  },
+  configuration: {
+    signature: false,
+  },
+  help: {
+    userManual: false,
+    ultraviewer: false,
+    anydesk: false,
+  },
+  result: false,
+};
 
 const Toast = ({ type, message, credentials, onClose }: { type: string; message: string; credentials?: any; onClose: () => void }) => (
   <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
@@ -56,6 +212,7 @@ const EditOrganization = () => {
 
   const [toast, setToast] = useState<any>(null); // { type, message, credentials }
   const [saving, setSaving] = useState(false);
+  const [moduleAllocation, setModuleAllocation] = useState(defaultModuleAllocation);
 
   useEffect(() => {
     if (id && (isViewMode || isEditMode)) {
@@ -72,6 +229,16 @@ const EditOrganization = () => {
             date: organization.date ? new Date(organization.date).toISOString().split("T")[0] : "",
             active: organization.isActive ? "Yes" : "No",
           });
+          if (organization.moduleAllocation) {
+            try {
+              const allocation = typeof organization.moduleAllocation === 'string' 
+                ? JSON.parse(organization.moduleAllocation) 
+                : organization.moduleAllocation;
+              setModuleAllocation(allocation);
+            } catch (e) {
+              setModuleAllocation(defaultModuleAllocation);
+            }
+          }
         }
       }).catch(console.error);
     }
@@ -80,6 +247,28 @@ const EditOrganization = () => {
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     if (isViewMode) return;
     setFormData({ ...formData, [e.target.name]: e.target.value });
+  };
+
+  const toggleModule = (path: string) => {
+    const keys = path.split('.');
+    const newAllocation = JSON.parse(JSON.stringify(moduleAllocation));
+    let current = newAllocation;
+    
+    // Navigate to the parent object
+    for (let i = 0; i < keys.length - 1; i++) {
+      if (!current[keys[i]]) {
+        current[keys[i]] = {};
+      }
+      current = current[keys[i]];
+    }
+    
+    // Toggle the final key
+    const lastKey = keys[keys.length - 1];
+    if (current && typeof current === 'object') {
+      current[lastKey] = !current[lastKey];
+    }
+    
+    setModuleAllocation(newAllocation);
   };
 
   const closeToast = () => {
@@ -112,6 +301,7 @@ const EditOrganization = () => {
         email: formData.email,
         date: formData.date || null,
         isActive: formData.active === "Yes",
+        moduleAllocation: JSON.stringify(moduleAllocation),
       };
 
       if (isEditMode) {
@@ -140,7 +330,7 @@ const EditOrganization = () => {
       {toast && <Toast {...toast} onClose={closeToast} />}
 
       <div className="p-6 bg-white min-h-screen flex justify-center">
-        <div className="bg-white rounded-lg shadow py-3 px-4 w-full max-w-2xl h-fit">
+        <div className="bg-white rounded-lg shadow py-3 px-4 w-full max-w-4xl h-fit">
 
           <div className="flex justify-between items-center mb-3">
             <h2 className="text-xl font-semibold text-slate-900 flex items-center gap-2">
@@ -152,9 +342,10 @@ const EditOrganization = () => {
             </button>
           </div>
 
-          <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+          <form onSubmit={handleSubmit} className="space-y-4 text-sm">
 
-            <div>
+            {/* Organization Details */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <label className="font-medium text-gray-700 text-sm">Name</label>
               <div className="flex items-center border border-gray-300 rounded px-2 bg-white">
                 <Building2 size={14} className="text-cyan-600" />
@@ -234,8 +425,107 @@ const EditOrganization = () => {
                 className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm disabled:bg-gray-50 bg-white" />
             </div>
 
+            {/* Module Allocation Section */}
             {!isViewMode && (
-              <div className="md:col-span-2 flex gap-3 mt-2">
+              <div className="border-t border-gray-300 pt-4 mt-4">
+                <h3 className="text-lg font-semibold text-slate-900 mb-4">Module Allocation</h3>
+                
+                <div className="space-y-3">
+                  {/* Patient Module */}
+                  <ModuleAccordion
+                    title="Patient"
+                    icon={User}
+                    color="blue"
+                    items={[
+                      { key: 'patient.registration', label: 'Patient Registration' },
+                      { key: 'patient.tests', label: 'Search for Test' },
+                    ]}
+                    moduleAllocation={moduleAllocation}
+                    toggleModule={toggleModule}
+                  />
+
+                  {/* Masters Module */}
+                  <ModuleAccordion
+                    title="Masters"
+                    icon={Settings}
+                    color="green"
+                    items={[
+                      { key: 'masters.testlist', label: 'Tests' },
+                      { key: 'masters.testTemplates', label: 'Test Template' },
+                      { key: 'masters.departmentlist', label: 'Department' },
+                      { key: 'masters.packagelist', label: 'Packages' },
+                      { key: 'masters.charges', label: 'Charges' },
+                      { key: 'masters.rolelist', label: 'Roles' },
+                      { key: 'masters.userlist', label: 'Users' },
+                      { key: 'masters.referralDoctorList', label: 'Referral Doctors' },
+                      { key: 'masters.organization', label: 'Organization' },
+                      { key: 'masters.specimenType', label: 'Specimen Type' },
+                      { key: 'masters.units', label: 'Units' },
+                    ]}
+                    moduleAllocation={moduleAllocation}
+                    toggleModule={toggleModule}
+                  />
+
+                  {/* Reports Module */}
+                  <ModuleAccordion
+                    title="Reports"
+                    icon={BarChart3}
+                    color="purple"
+                    items={[
+                      { key: 'reports.dashboard', label: 'Dashboard' },
+                      { key: 'reports.dailyCollection', label: 'Daily Collection' },
+                      { key: 'reports.monthlyCollectionSummary', label: 'Monthly Summary' },
+                      { key: 'reports.patientList', label: 'Patient List' },
+                      { key: 'reports.centerWiseCostReport', label: 'Center Cost' },
+                      { key: 'reports.b2bTestwiseCostReport', label: 'B2B Cost' },
+                      { key: 'reports.discountReport', label: 'Discount' },
+                      { key: 'reports.testReport', label: 'Test Report' },
+                    ]}
+                    moduleAllocation={moduleAllocation}
+                    toggleModule={toggleModule}
+                  />
+
+                  {/* Configuration Module */}
+                  <ModuleAccordion
+                    title="Configuration"
+                    icon={Lock}
+                    color="orange"
+                    items={[
+                      { key: 'configuration.signature', label: 'Signature' },
+                    ]}
+                    moduleAllocation={moduleAllocation}
+                    toggleModule={toggleModule}
+                  />
+
+                  {/* Help Module */}
+                  <ModuleAccordion
+                    title="Help"
+                    icon={HelpCircle}
+                    color="blue"
+                    items={[
+                      { key: 'help.userManual', label: 'User Manual' },
+                      { key: 'help.ultraviewer', label: 'Download Ultraviewer' },
+                      { key: 'help.anydesk', label: 'Download Anydesk' },
+                    ]}
+                    moduleAllocation={moduleAllocation}
+                    toggleModule={toggleModule}
+                  />
+
+                  {/* Result Module */}
+                  <SingleToggle
+                    title="Result"
+                    icon={ClipboardCheck}
+                    color="green"
+                    moduleKey="result"
+                    moduleAllocation={moduleAllocation}
+                    toggleModule={toggleModule}
+                  />
+                </div>
+              </div>
+            )}
+
+            {!isViewMode && (
+              <div className="flex gap-3 mt-4">
                 <button type="submit" disabled={saving}
                   className="flex items-center gap-2 bg-orange-500 hover:bg-orange-600 disabled:opacity-60 text-white px-4 py-1.5 rounded text-sm transition-colors">
                   <Save size={14} /> {saving ? "Saving..." : isEditMode ? "Update" : "Save"}

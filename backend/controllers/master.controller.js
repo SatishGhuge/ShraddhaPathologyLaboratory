@@ -1130,24 +1130,45 @@ export const deleteDoctor = async (req, res) => {
 
 // Helper: generate next ORG-XXX id
 async function generateOrganizationId() {
-  const last = await prisma.organization.findFirst({
-    where: { id: { startsWith: 'ORG-' } },
-    orderBy: { id: 'desc' },
-  });
-  let nextId = 'ORG-AAA';
-  if (last) {
-    const suffix = last.id.replace('ORG-', '');
-    if (suffix.length === 3 && /^[A-Z]{3}$/.test(suffix)) {
-      const chars = suffix.split('');
-      let i = 2;
-      while (i >= 0) {
-        if (chars[i] < 'Z') { chars[i] = String.fromCharCode(chars[i].charCodeAt(0) + 1); break; }
-        chars[i] = 'A'; i--;
+  let attempts = 0;
+  const maxAttempts = 100;
+  
+  while (attempts < maxAttempts) {
+    const last = await prisma.organization.findFirst({
+      where: { id: { startsWith: 'ORG-' } },
+      orderBy: { id: 'desc' },
+    });
+    
+    let nextId = 'ORG-AAA';
+    if (last) {
+      const suffix = last.id.replace('ORG-', '');
+      if (suffix.length === 3 && /^[A-Z]{3}$/.test(suffix)) {
+        const chars = suffix.split('');
+        let i = 2;
+        while (i >= 0) {
+          if (chars[i] < 'Z') { 
+            chars[i] = String.fromCharCode(chars[i].charCodeAt(0) + 1); 
+            break; 
+          }
+          chars[i] = 'A'; 
+          i--;
+        }
+        nextId = 'ORG-' + chars.join('');
       }
-      nextId = 'ORG-' + chars.join('');
     }
+    
+    // Check if this ID already exists
+    const exists = await prisma.organization.findUnique({ where: { id: nextId } });
+    if (!exists) {
+      return nextId;
+    }
+    
+    attempts++;
   }
-  return nextId;
+  
+  // Fallback: generate random ID if we can't find a unique one
+  const randomSuffix = Math.random().toString(36).substring(2, 5).toUpperCase();
+  return `ORG-${randomSuffix}`;
 }
 
 // Get all organizations
@@ -1176,7 +1197,7 @@ export const getOrganizationById = async (req, res) => {
 // Create organization
 export const createOrganization = async (req, res) => {
   try {
-    const { name, code, location, address, mobile, email, date, isActive, testCharges } = req.body;
+    const { name, code, location, address, mobile, email, date, isActive, testCharges, moduleAllocation } = req.body;
     if (!name) return res.status(400).json({ success: false, message: 'Name is required' });
 
     const newId = await generateOrganizationId();
@@ -1199,6 +1220,7 @@ export const createOrganization = async (req, res) => {
         address: address || null, mobile: mobile || null,
         email: email || null, date: date ? new Date(date) : null,
         isActive: isActive !== false,
+        moduleAllocation: moduleAllocation || null,
       },
     });
 
@@ -1211,8 +1233,8 @@ export const createOrganization = async (req, res) => {
     try {
       await prisma.user.upsert({
         where: { username },
-        update: { password: hashed, email: email || null, name: name.trim(), center: name.trim(), role: 'Organization' },
-        create: { username, name: name.trim(), center: name.trim(), role: 'Organization', password: hashed, email: email || null, mobile: mobile || null, gender: null, address: address || null },
+        update: { password: hashed, email: email || null, name: name.trim(), center: name.trim(), role: 'Organization', moduleAllocation: moduleAllocation || null },
+        create: { username, name: name.trim(), center: name.trim(), role: 'Organization', password: hashed, email: email || null, mobile: mobile || null, gender: null, address: address || null, moduleAllocation: moduleAllocation || null },
       });
       console.log('User created for organization:', username);
     } catch (userError) {
@@ -1305,7 +1327,7 @@ export const createOrganization = async (req, res) => {
 export const updateOrganization = async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, code, location, address, mobile, email, date, isActive } = req.body;
+    const { name, code, location, address, mobile, email, date, isActive, moduleAllocation } = req.body;
     const existing = await prisma.organization.findUnique({ where: { id } });
     if (!existing) return res.status(404).json({ success: false, message: 'Organization not found' });
 
@@ -1320,8 +1342,32 @@ export const updateOrganization = async (req, res) => {
         email: email || null,
         date: date ? new Date(date) : null,
         isActive: isActive !== undefined ? isActive : undefined,
+        moduleAllocation: moduleAllocation || null,
       },
     });
+
+    // Also update the associated user account
+    try {
+      await prisma.user.update({
+        where: { username: id },
+        data: {
+          name: name ? name.trim() : undefined,
+          center: name ? name.trim() : undefined,
+          email: email || null,
+          mobile: mobile || null,
+          moduleAllocation: moduleAllocation || null,
+        },
+      });
+    } catch (userError) {
+      console.warn('Failed to update user for organization:', userError.message);
+    }
+
+    // Send update notification email (non-blocking)
+    const emailTo = email || existing.email;
+    if (emailTo) {
+      sendOrganizationCredentialsEmail(emailTo, name || existing.name, id, null, true)
+        .catch(e => console.error('Failed to send organization update email:', e.message));
+    }
 
     res.json({ success: true, message: 'Organization updated successfully', data: organization });
   } catch (error) {
@@ -4044,12 +4090,12 @@ export const getUsers = async (req, res) => {
 
     // Get total count
     const total = await prisma.user.count({
-      where: { isActive: true, NOT: { role: { in: ['Collection Center', 'Franchise'] } } }
+      where: { isActive: true, NOT: { role: { in: ['Collection Center', 'Franchise', 'Organization'] } } }
     });
 
     // Get paginated users
     const users = await prisma.user.findMany({
-      where: { isActive: true, NOT: { role: { in: ['Collection Center', 'Franchise'] } } },
+      where: { isActive: true, NOT: { role: { in: ['Collection Center', 'Franchise', 'Organization'] } } },
       select: { id: true, center: true, name: true, username: true, role: true, mobile: true, gender: true, email: true, address: true, createdAt: true },
       orderBy: { name: 'asc' },
       skip,
@@ -4066,7 +4112,7 @@ export const getUserById = async (req, res) => {
   try {
     const user = await prisma.user.findUnique({
       where: { id: parseInt(req.params.id) },
-      select: { id: true, center: true, name: true, username: true, role: true, mobile: true, gender: true, email: true, address: true },
+      select: { id: true, center: true, name: true, username: true, role: true, mobile: true, gender: true, email: true, address: true, moduleAllocation: true },
     });
     if (!user) return res.status(404).json({ success: false, message: 'User not found' });
     res.json({ success: true, data: user });
@@ -4145,10 +4191,7 @@ export const updateUser = async (req, res) => {
 
     // Send updated credentials email (non-blocking)
     const emailTo = email || existing.email;
-    if (emailTo && password) {
-      sendStaffCredentialsEmail(emailTo, name || existing.name, username?.trim() || existing.username, password, role || existing.role)
-        .catch(e => console.error('Failed to send update email:', e.message));
-    } else if (emailTo) {
+    if (emailTo) {
       sendStaffCredentialsEmail(emailTo, name || existing.name, username?.trim() || existing.username, '(unchanged)', role || existing.role)
         .catch(e => console.error('Failed to send update email:', e.message));
     }
