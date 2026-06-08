@@ -1175,7 +1175,25 @@ async function generateOrganizationId() {
 // Get all organizations
 export const getOrganizations = async (req, res) => {
   try {
-    const organizations = await prisma.organization.findMany({ orderBy: { name: 'asc' } });
+    const organizations = await prisma.organization.findMany({ 
+      select: {
+        id: true,
+        name: true,
+        code: true,
+        location: true,
+        address: true,
+        mobile: true,
+        email: true,
+        date: true,
+        isActive: true,
+        createdAt: true,
+        updatedAt: true,
+        moduleAllocation: {
+          select: { id: true, modules: true }
+        }
+      },
+      orderBy: { name: 'asc' } 
+    });
     res.json({ success: true, data: organizations });
   } catch (error) {
     console.error('Get organizations error:', error);
@@ -1186,7 +1204,25 @@ export const getOrganizations = async (req, res) => {
 // Get organization by ID
 export const getOrganizationById = async (req, res) => {
   try {
-    const organization = await prisma.organization.findUnique({ where: { id: req.params.id } });
+    const organization = await prisma.organization.findUnique({ 
+      where: { id: req.params.id },
+      select: {
+        id: true,
+        name: true,
+        code: true,
+        location: true,
+        address: true,
+        mobile: true,
+        email: true,
+        date: true,
+        isActive: true,
+        createdAt: true,
+        updatedAt: true,
+        moduleAllocation: {
+          select: { id: true, modules: true }
+        }
+      }
+    });
     if (!organization) return res.status(404).json({ success: false, message: 'Organization not found' });
     res.json({ success: true, data: organization });
   } catch (error) {
@@ -1220,23 +1256,42 @@ export const createOrganization = async (req, res) => {
         name: name.trim(), code: code || null, location: location || null,
         address: address || null, mobile: mobile || null,
         email: email || null, date: date ? new Date(date) : null,
-        isActive: isActive !== false,
-        moduleAllocation: moduleAllocation || null,
+        isActive: isActive !== false
       },
     });
 
     console.log('Organization created:', organization);
+
+    // Create module allocation for organization if provided
+    if (moduleAllocation) {
+      await prisma.moduleAllocation.create({
+        data: {
+          organizationId: newId,
+          modules: typeof moduleAllocation === 'string' ? moduleAllocation : JSON.stringify(moduleAllocation)
+        }
+      });
+    }
 
     // Create user account for this organization
     const bcrypt = await import('bcryptjs');
     const hashed = await bcrypt.default.hash(plainPassword, 10);
     
     try {
-      await prisma.user.upsert({
+      const upsertedUser = await prisma.user.upsert({
         where: { username },
-        update: { password: hashed, email: email || null, name: name.trim(), center: name.trim(), role: 'Organization', moduleAllocation: moduleAllocation || null },
-        create: { username, name: name.trim(), center: name.trim(), role: 'Organization', password: hashed, email: email || null, mobile: mobile || null, gender: null, address: address || null, moduleAllocation: moduleAllocation || null },
+        update: { password: hashed, email: email || null, name: name.trim(), center: name.trim(), role: 'Organization' },
+        create: { username, name: name.trim(), center: name.trim(), role: 'Organization', password: hashed, email: email || null, mobile: mobile || null, gender: null, address: address || null }
       });
+      
+      // Handle module allocation for the user
+      if (moduleAllocation) {
+        await prisma.moduleAllocation.upsert({
+          where: { userId: upsertedUser.id },
+          update: { modules: typeof moduleAllocation === 'string' ? moduleAllocation : JSON.stringify(moduleAllocation) },
+          create: { userId: upsertedUser.id, modules: typeof moduleAllocation === 'string' ? moduleAllocation : JSON.stringify(moduleAllocation) }
+        });
+      }
+      
       console.log('User created for organization:', username);
     } catch (userError) {
       console.error('User creation error:', userError);
@@ -1342,23 +1397,50 @@ export const updateOrganization = async (req, res) => {
         mobile: mobile || null,
         email: email || null,
         date: date ? new Date(date) : null,
-        isActive: isActive !== undefined ? isActive : undefined,
-        moduleAllocation: moduleAllocation || null,
+        isActive: isActive !== undefined ? isActive : undefined
       },
     });
 
+    // Update module allocation for organization if provided
+    if (moduleAllocation !== undefined) {
+      if (moduleAllocation) {
+        await prisma.moduleAllocation.upsert({
+          where: { organizationId: id },
+          update: { modules: typeof moduleAllocation === 'string' ? moduleAllocation : JSON.stringify(moduleAllocation) },
+          create: { organizationId: id, modules: typeof moduleAllocation === 'string' ? moduleAllocation : JSON.stringify(moduleAllocation) }
+        });
+      } else {
+        await prisma.moduleAllocation.deleteMany({ where: { organizationId: id } });
+      }
+    }
+
     // Also update the associated user account
     try {
-      await prisma.user.update({
-        where: { username: id },
-        data: {
-          name: name ? name.trim() : undefined,
-          center: name ? name.trim() : undefined,
-          email: email || null,
-          mobile: mobile || null,
-          moduleAllocation: moduleAllocation || null,
-        },
-      });
+      const user = await prisma.user.findUnique({ where: { username: id } });
+      if (user) {
+        await prisma.user.update({
+          where: { username: id },
+          data: {
+            name: name ? name.trim() : undefined,
+            center: name ? name.trim() : undefined,
+            email: email || null,
+            mobile: mobile || null
+          },
+        });
+
+        // Update user's module allocation if organization's module allocation changed
+        if (moduleAllocation !== undefined) {
+          if (moduleAllocation) {
+            await prisma.moduleAllocation.upsert({
+              where: { userId: user.id },
+              update: { modules: typeof moduleAllocation === 'string' ? moduleAllocation : JSON.stringify(moduleAllocation) },
+              create: { userId: user.id, modules: typeof moduleAllocation === 'string' ? moduleAllocation : JSON.stringify(moduleAllocation) }
+            });
+          } else {
+            await prisma.moduleAllocation.deleteMany({ where: { userId: user.id } });
+          }
+        }
+      }
     } catch (userError) {
       console.warn('Failed to update user for organization:', userError.message);
     }
@@ -4094,10 +4176,24 @@ export const getUsers = async (req, res) => {
       where: { isActive: true, NOT: { role: { in: ['Collection Center', 'Franchise', 'Organization'] } } }
     });
 
-    // Get paginated users
+    // Get paginated users with module allocation
     const users = await prisma.user.findMany({
       where: { isActive: true, NOT: { role: { in: ['Collection Center', 'Franchise', 'Organization'] } } },
-      select: { id: true, center: true, name: true, username: true, role: true, mobile: true, gender: true, email: true, address: true, createdAt: true },
+      select: { 
+        id: true, 
+        center: true, 
+        name: true, 
+        username: true, 
+        role: true, 
+        mobile: true, 
+        gender: true, 
+        email: true, 
+        address: true, 
+        createdAt: true,
+        moduleAllocation: {
+          select: { id: true, modules: true }
+        }
+      },
       orderBy: { name: 'asc' },
       skip,
       take: limit
@@ -4113,7 +4209,20 @@ export const getUserById = async (req, res) => {
   try {
     const user = await prisma.user.findUnique({
       where: { id: parseInt(req.params.id) },
-      select: { id: true, center: true, name: true, username: true, role: true, mobile: true, gender: true, email: true, address: true, moduleAllocation: true },
+      select: { 
+        id: true, 
+        center: true, 
+        name: true, 
+        username: true, 
+        role: true, 
+        mobile: true, 
+        gender: true, 
+        email: true, 
+        address: true,
+        moduleAllocation: {
+          select: { id: true, modules: true }
+        }
+      },
     });
     if (!user) return res.status(404).json({ success: false, message: 'User not found' });
     res.json({ success: true, data: user });
@@ -4140,11 +4249,20 @@ export const createUser = async (req, res) => {
         gender: gender || null, 
         email: email || null, 
         address: address || null, 
-        password: hashed,
-        moduleAllocation: moduleAllocation || null
+        password: hashed
       },
-      select: { id: true, center: true, name: true, username: true, role: true, mobile: true, gender: true, email: true, address: true, moduleAllocation: true },
+      select: { id: true, center: true, name: true, username: true, role: true, mobile: true, gender: true, email: true, address: true },
     });
+
+    // Create module allocation if provided
+    if (moduleAllocation) {
+      await prisma.moduleAllocation.create({
+        data: {
+          userId: user.id,
+          modules: typeof moduleAllocation === 'string' ? moduleAllocation : JSON.stringify(moduleAllocation)
+        }
+      });
+    }
 
     // Send credentials email if email is provided (non-blocking — don't fail user creation if email fails)
     if (email) {
@@ -4176,8 +4294,7 @@ export const updateUser = async (req, res) => {
       mobile: mobile || null, 
       gender: gender || null, 
       email: email || null, 
-      address: address || null,
-      moduleAllocation: moduleAllocation || null
+      address: address || null
     };
     if (password) {
       const bcrypt = await import('bcryptjs');
@@ -4187,8 +4304,21 @@ export const updateUser = async (req, res) => {
     const user = await prisma.user.update({
       where: { id: parseInt(id) },
       data: updateData,
-      select: { id: true, center: true, name: true, username: true, role: true, mobile: true, gender: true, email: true, address: true, moduleAllocation: true },
+      select: { id: true, center: true, name: true, username: true, role: true, mobile: true, gender: true, email: true, address: true },
     });
+
+    // Update module allocation if provided
+    if (moduleAllocation !== undefined) {
+      if (moduleAllocation) {
+        await prisma.moduleAllocation.upsert({
+          where: { userId: parseInt(id) },
+          update: { modules: typeof moduleAllocation === 'string' ? moduleAllocation : JSON.stringify(moduleAllocation) },
+          create: { userId: parseInt(id), modules: typeof moduleAllocation === 'string' ? moduleAllocation : JSON.stringify(moduleAllocation) }
+        });
+      } else {
+        await prisma.moduleAllocation.deleteMany({ where: { userId: parseInt(id) } });
+      }
+    }
 
     // Send updated credentials email (non-blocking)
     const emailTo = email || existing.email;

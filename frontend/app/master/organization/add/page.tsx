@@ -5,7 +5,7 @@ import { useRouter, useParams, usePathname } from "next/navigation";
 import {
   Save, ArrowLeft, Building2, MapPin, Hash, Phone,
   CalendarDays, Eye, Mail, CheckCircle, XCircle, X,
-  Plus, Trash2, DollarSign, ChevronDown, User, Settings, BarChart3, HelpCircle, ClipboardCheck, Lock
+  ChevronDown, User, Settings, BarChart3, HelpCircle, ClipboardCheck, Lock
 } from "lucide-react";
 import Header from "@/src/components/Header";
 import { updateOrganization, getOrganizationById, createOrganizationWithCredentials } from "@/src/api/master";
@@ -229,9 +229,10 @@ const AddOrganization = () => {
               });
               if (organization.moduleAllocation) {
                 try {
-                  const allocation = typeof organization.moduleAllocation === 'string' 
-                    ? JSON.parse(organization.moduleAllocation) 
-                    : organization.moduleAllocation;
+                  const allocationData = organization.moduleAllocation.modules || organization.moduleAllocation;
+                  const allocation = typeof allocationData === 'string' 
+                    ? JSON.parse(allocationData) 
+                    : allocationData;
                   setModuleAllocation(allocation);
                 } catch (e) {
                   setModuleAllocation(defaultModuleAllocation);
@@ -304,7 +305,7 @@ const AddOrganization = () => {
         setToast({
           type: "success",
           message: `Organization added successfully!`,
-          credentials: (res as any)?.credentials || (res as any)?.data?.credentials || null,
+          credentials: (res as any)?.credentials || null,
         });
       }
     } catch (err: any) {
@@ -354,25 +355,7 @@ const AddOrganization = () => {
                     className="w-full px-2 py-1.5 outline-none text-sm disabled:bg-gray-50 bg-transparent" />
                 </div>
               </div>
-              <div>
-                <label className="font-medium text-gray-700 text-sm">Code</label>
-                <div className="flex items-center border border-gray-300 rounded px-2 bg-white">
-                  <Hash size={14} className="text-cyan-600" />
-                  <input type="text" name="code" value={formData.code} onChange={handleChange}
-                    disabled={isViewMode} required={!isViewMode}
-                    className="w-full px-2 py-1.5 outline-none text-sm disabled:bg-gray-50 bg-transparent" />
-                </div>
-              </div>
 
-              <div>
-                <label className="font-medium text-gray-700 text-sm">Location</label>
-                <div className="flex items-center border border-gray-300 rounded px-2 bg-white">
-                  <MapPin size={14} className="text-cyan-600" />
-                  <input type="text" name="location" value={formData.location} onChange={handleChange}
-                    disabled={isViewMode} required={!isViewMode}
-                    className="w-full px-2 py-1.5 outline-none text-sm disabled:bg-gray-50 bg-transparent" />
-                </div>
-              </div>
               <div>
                 <label className="font-medium text-gray-700 text-sm">Location</label>
                 <div className="flex items-center border border-gray-300 rounded px-2 bg-white">
@@ -393,26 +376,7 @@ const AddOrganization = () => {
                     className="w-full px-2 py-1.5 outline-none text-sm disabled:bg-gray-50 bg-transparent" />
                 </div>
               </div>
-              <div>
-                <label className="font-medium text-gray-700 text-sm">Mobile No.</label>
-                <div className="flex items-center border border-gray-300 rounded px-2 bg-white">
-                  <Phone size={14} className="text-cyan-600" />
-                  <input type="tel" name="mobile" value={formData.mobile} onChange={handleChange}
-                    disabled={isViewMode} maxLength={10} placeholder="10 digit mobile number"
-                    required={!isViewMode}
-                    className="w-full px-2 py-1.5 outline-none text-sm disabled:bg-gray-50 bg-transparent" />
-                </div>
-              </div>
 
-              <div>
-                <label className="font-medium text-gray-700 text-sm">Date of Establishment</label>
-                <div className="flex items-center border border-gray-300 rounded px-2 bg-white">
-                  <CalendarDays size={14} className="text-cyan-600" />
-                  <input type="date" name="date" value={formData.date} onChange={handleChange}
-                    disabled={isViewMode} required={!isViewMode}
-                    className="w-full px-2 py-1.5 outline-none text-sm disabled:bg-gray-50 bg-transparent" />
-                </div>
-              </div>
               <div>
                 <label className="font-medium text-gray-700 text-sm">Date of Establishment</label>
                 <div className="flex items-center border border-gray-300 rounded px-2 bg-white">
@@ -434,27 +398,7 @@ const AddOrganization = () => {
                   </select>
                 </div>
               </div>
-              <div>
-                <label className="font-medium text-gray-700 text-sm">Active Status</label>
-                <div className="flex items-center border border-gray-300 rounded px-2 bg-white">
-                  <select name="active" value={formData.active} onChange={handleChange}
-                    disabled={isViewMode}
-                    className="w-full px-2 py-1.5 outline-none text-sm disabled:bg-gray-50 bg-transparent">
-                    <option value="Yes">Yes</option>
-                    <option value="No">No</option>
-                  </select>
-                </div>
-              </div>
 
-              <div className="md:col-span-2">
-                <label className="font-medium text-gray-700 text-sm">Email Address</label>
-                <div className="flex items-center border border-gray-300 rounded px-2 bg-white">
-                  <Mail size={14} className="text-cyan-600" />
-                  <input type="email" name="email" value={formData.email} onChange={handleChange}
-                    disabled={isViewMode} placeholder="example@domain.com" required={!isViewMode}
-                    className="w-full px-2 py-1.5 outline-none text-sm disabled:bg-gray-50 bg-transparent" />
-                </div>
-              </div>
               <div className="md:col-span-2">
                 <label className="font-medium text-gray-700 text-sm">Email Address</label>
                 <div className="flex items-center border border-gray-300 rounded px-2 bg-white">

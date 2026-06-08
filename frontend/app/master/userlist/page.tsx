@@ -26,7 +26,7 @@ const UserList = () => {
       setUsers(data);
       setPagination(null);
     } catch (err) {
-      setError(err.message || "Failed to fetch users");
+      setError((err as any).message || "Failed to fetch users");
     } finally {
       setLoading(false);
     }
@@ -34,7 +34,7 @@ const UserList = () => {
 
   useEffect(() => { fetchUsers(1); }, []);
 
-  const handleDelete = async (user) => {
+  const handleDelete = async (user: any) => {
     if (!window.confirm(`Delete "${user.name}"?`)) return;
     try {
       await deleteUser(user.id);
@@ -42,7 +42,7 @@ const UserList = () => {
       setCurrentPage(1);
       fetchUsers(1);
     } catch (err) {
-      alert(err.message || "Failed to delete user");
+      alert((err as any).message || "Failed to delete user");
     }
   };
 

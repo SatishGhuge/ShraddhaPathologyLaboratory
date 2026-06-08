@@ -50,8 +50,24 @@ export const login = async (req, res) => {
       const valid = await bcrypt.compare(password, user.password);
       if (!valid) return res.status(401).json({ success: false, message: 'Invalid credentials' });
       const token = jwt.sign({ id: user.id, userType: 'user' }, process.env.JWT_SECRET, { expiresIn: process.env.JWT_EXPIRE || '7d' });
+      
+      // Fetch module allocation from module_allocations table
+      const moduleAllocation = await prisma.moduleAllocation.findUnique({
+        where: { userId: user.id },
+        select: { modules: true }
+      });
+      
       const { password: _, ...userData } = user;
-      return res.json({ success: true, message: 'Login successful', token, admin: { ...userData, userType: 'user', moduleAllocation: user.moduleAllocation } });
+      return res.json({ 
+        success: true, 
+        message: 'Login successful', 
+        token, 
+        admin: { 
+          ...userData, 
+          userType: 'user', 
+          moduleAllocation: moduleAllocation?.modules || null 
+        } 
+      });
     }
 
     return res.status(401).json({ success: false, message: 'Invalid credentials' });
