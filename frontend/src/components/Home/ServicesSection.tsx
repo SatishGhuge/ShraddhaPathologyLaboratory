@@ -18,12 +18,12 @@ const FALLBACK_SERVICES: LabService[] = [
 
 // Map service name → image in /public/tests/
 const serviceImages: Record<string, string> = {
-  "Hematology":     "haematology.jpg",
-  "Biochemistry":   "biochemistry.jpg",
-  "Microbiology":   "microbiology.jpg",
-  "Immunology":     "immunology.jpg",
-  "Hormones":       "hormones.jpg",
-  "Molecular Tests":"molecular_tests.jpg",
+  "Hematology":     "/haematology.jpg",
+  "Biochemistry":   "/biochemistry.jpg",
+  "Microbiology":   "/microbiology.jpg",
+  "Immunology":     "/immunology.jpg",
+  "Hormones":       "/hormones.jpg",
+  "Molecular Tests":"/molecular_tests.jpg",
 };
 
 // Fallback for any service not in the map
