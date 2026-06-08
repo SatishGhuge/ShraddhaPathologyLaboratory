@@ -17,6 +17,7 @@ export default function OrganizationCharges() {
   const [b2bError, setB2bError] = useState("");
   const [filteredData, setFilteredData] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  const [defaultCharges, setDefaultCharges] = useState<any[]>([]); // Store default charges for comparison
 
   const [searchName, setSearchName] = useState("");
   const [searchCode, setSearchCode] = useState("");
@@ -25,6 +26,11 @@ export default function OrganizationCharges() {
   const [bulkCharge, setBulkCharge] = useState("");
   const [bulkB2BCharge, setBulkB2BCharge] = useState("");
   const [showBulkModal, setShowBulkModal] = useState(false);
+  const [filterType, setFilterType] = useState("all"); // "all", "customized", "default"
+  
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage] = useState(10);
 
   // Fetch organization, tests and charges on component mount
   useEffect(() => {
@@ -47,12 +53,24 @@ export default function OrganizationCharges() {
         return;
       }
 
-      // Fetch all tests
-      const testsResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/master/tests`);
+      // Fetch all tests with DEFAULT charges
+      const testsResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/master/test-charges/all`);
       const testsResult = await testsResponse.json();
 
       if (testsResult.success) {
         setTests(testsResult.data);
+        
+        // Extract default charges (organizationId = null)
+        const defaultChargesMap: any = {};
+        testsResult.data.forEach((test: any) => {
+          if (test.charges && test.charges.length > 0) {
+            const defaultCharge = test.charges.find((c: any) => !c.organizationId);
+            if (defaultCharge) {
+              defaultChargesMap[test.id] = defaultCharge;
+            }
+          }
+        });
+        setDefaultCharges(defaultChargesMap);
 
         // Fetch charges for this organization
         const chargesResponse = await fetch(
@@ -83,26 +101,42 @@ export default function OrganizationCharges() {
     const result = tests
       .map((test) => {
         const testCharge = charges.find((c: any) => c.testId === test.id);
+        const defaultCharge = defaultCharges[test.id];
+        
+        // Check if this test has customized charges (different from default)
+        const isCustomized = testCharge && defaultCharge && 
+          (testCharge.b2cCharge !== defaultCharge.b2cCharge || 
+           testCharge.b2bCharge !== defaultCharge.b2bCharge);
 
         return {
           id: test.id,
           name: test.name,
           code: test.testCode || "",
           group: test.group || test.department?.name || "",
-          charges: testCharge?.b2cCharge || 0,
-          b2b: testCharge?.b2bCharge || 0,
+          charges: testCharge?.b2cCharge || defaultCharge?.b2cCharge || 0,
+          b2b: testCharge?.b2bCharge || defaultCharge?.b2bCharge || 0,
           chargeId: testCharge?.id || null,
+          isCustomized: isCustomized || false,
+          defaultB2C: defaultCharge?.b2cCharge || 0,
+          defaultB2B: defaultCharge?.b2bCharge || 0,
         };
       })
-      .filter(
-        (item) =>
+      .filter((item) => {
+        // Apply filter type
+        if (filterType === "customized" && !item.isCustomized) return false;
+        if (filterType === "default" && item.isCustomized) return false;
+        
+        // Apply search filters
+        return (
           item.name.toLowerCase().includes(searchName.toLowerCase()) &&
           item.code.toLowerCase().includes(searchCode.toLowerCase()) &&
           item.group.toLowerCase().includes(searchGroup.toLowerCase())
-      );
+        );
+      });
 
     setFilteredData(result);
-  }, [tests, charges, searchName, searchCode, searchGroup]);
+    setCurrentPage(1); // Reset to page 1 when filters change
+  }, [tests, charges, defaultCharges, searchName, searchCode, searchGroup, filterType]);
 
   // Handle Dropdown Change
   const handleReset = () => {
@@ -110,7 +144,14 @@ export default function OrganizationCharges() {
     setSearchCode("");
     setSearchGroup("");
     setError("");
+    setCurrentPage(1);
   };
+
+  // Calculate pagination
+  const totalPages = Math.ceil(filteredData.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const paginatedData = filteredData.slice(startIndex, endIndex);
 
   // Change Charges
   const handleChargeChange = (id: any, field: any, value: any) => {
@@ -333,6 +374,41 @@ export default function OrganizationCharges() {
                   <RotateCcw size={16} />
                   Reset
                 </button>
+                
+                {/* Filter Buttons */}
+                <div className="flex gap-2 items-center">
+                  <span className="text-sm font-medium text-gray-700">Filter:</span>
+                  <button
+                    onClick={() => setFilterType("all")}
+                    className={`px-3 py-1.5 text-sm rounded transition-colors ${
+                      filterType === "all"
+                        ? "bg-blue-600 text-white"
+                        : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+                    }`}
+                  >
+                    All Tests ({tests.length})
+                  </button>
+                  <button
+                    onClick={() => setFilterType("customized")}
+                    className={`px-3 py-1.5 text-sm rounded transition-colors ${
+                      filterType === "customized"
+                        ? "bg-green-600 text-white"
+                        : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+                    }`}
+                  >
+                    Customized ({filteredData.filter((t: any) => t.isCustomized).length})
+                  </button>
+                  <button
+                    onClick={() => setFilterType("default")}
+                    className={`px-3 py-1.5 text-sm rounded transition-colors ${
+                      filterType === "default"
+                        ? "bg-amber-600 text-white"
+                        : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+                    }`}
+                  >
+                    Using Defaults ({filteredData.filter((t: any) => !t.isCustomized).length})
+                  </button>
+                </div>
               </div>
               <div className="flex gap-2 items-end">
                 <button
@@ -421,11 +497,14 @@ export default function OrganizationCharges() {
                       <th className="border border-gray-300 px-3 py-2 text-center font-semibold" style={{ width: "13%" }}>
                         B2B
                       </th>
+                      <th className="border border-gray-300 px-3 py-2 text-center font-semibold" style={{ width: "10%" }}>
+                        Status
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
-                    {filteredData.map((item) => (
-                      <tr key={item.id} className="hover:bg-gray-50 border-b border-gray-200">
+                    {paginatedData.map((item) => (
+                      <tr key={item.id} className={`hover:bg-gray-50 border-b border-gray-200 ${item.isCustomized ? 'bg-green-50' : 'bg-amber-50'}`}>
                         <td className="border border-gray-300 px-3 py-2 font-medium">{item.name}</td>
                         <td className="border border-gray-300 px-3 py-2">{item.code}</td>
                         <td className="border border-gray-300 px-3 py-2">{item.group}</td>
@@ -454,9 +533,20 @@ export default function OrganizationCharges() {
                             }
                           />
                         </td>
+                        <td className="border border-gray-300 px-2 py-1 text-center">
+                          {item.isCustomized ? (
+                            <span className="inline-block bg-green-600 text-white px-2 py-1 rounded text-xs font-semibold">
+                              ✓ Customized
+                            </span>
+                          ) : (
+                            <span className="inline-block bg-amber-600 text-white px-2 py-1 rounded text-xs font-semibold">
+                              Default
+                            </span>
+                          )}
+                        </td>
                       </tr>
                     ))}
-                    {filteredData.length === 0 && !loading && (
+                    {paginatedData.length === 0 && !loading && (
                       <tr>
                         <td colSpan={5} className="text-center py-6 text-gray-500 border border-gray-300">
                           No tests found matching your search criteria
@@ -472,6 +562,48 @@ export default function OrganizationCharges() {
             {error && (
               <div className="px-4 py-3 bg-red-50 border-t border-red-200">
                 <p className="text-red-600 text-sm font-medium">{error}</p>
+              </div>
+            )}
+
+            {/* Pagination Controls */}
+            {filteredData.length > 0 && (
+              <div className="px-4 py-3 bg-gray-50 border-t border-gray-300 flex items-center justify-between">
+                <div className="text-sm text-gray-600">
+                  Showing {startIndex + 1} to {Math.min(endIndex, filteredData.length)} of {filteredData.length} tests
+                </div>
+                <div className="flex gap-2 items-center">
+                  <button
+                    onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                    disabled={currentPage === 1}
+                    className="px-3 py-1.5 text-sm bg-gray-300 text-gray-700 rounded hover:bg-gray-400 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    ← Previous
+                  </button>
+                  
+                  <div className="flex gap-1">
+                    {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                      <button
+                        key={page}
+                        onClick={() => setCurrentPage(page)}
+                        className={`px-2.5 py-1.5 text-sm rounded transition-colors ${
+                          currentPage === page
+                            ? "bg-orange-500 text-white font-semibold"
+                            : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+                        }`}
+                      >
+                        {page}
+                      </button>
+                    ))}
+                  </div>
+
+                  <button
+                    onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+                    disabled={currentPage === totalPages}
+                    className="px-3 py-1.5 text-sm bg-gray-300 text-gray-700 rounded hover:bg-gray-400 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    Next →
+                  </button>
+                </div>
               </div>
             )}
           </div>

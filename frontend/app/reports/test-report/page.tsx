@@ -116,10 +116,15 @@ export default function TestReport() {
   useEffect(() => {
     Promise.all([getTests(), getCollectionCenters()])
       .then(([testsData, centersData]) => {
-        setAvailableTests(testsData.map(t => ({ id: t.id, label: t.name })));
-        setCenters(centersData);
+        const testsArray = Array.isArray(testsData) ? testsData : [];
+        setAvailableTests(testsArray.map(t => ({ id: t.id, label: t.name })));
+        setCenters(Array.isArray(centersData) ? centersData : []);
       })
-      .catch(() => {});
+      .catch((err) => {
+        console.error('Error loading tests or centers:', err);
+        setAvailableTests([]);
+        setCenters([]);
+      });
   }, []);
 
   /* ── close dropdowns on outside click ── */

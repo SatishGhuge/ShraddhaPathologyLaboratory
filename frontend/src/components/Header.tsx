@@ -583,32 +583,56 @@ const Header = () => {
                 <button
                   key={module.id}
                   onClick={() => handleModuleClick(module.id)}
-                  className="w-full flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-primary-50 transition-all duration-200 text-left font-medium text-sm group text-gray-700 hover:text-primary-600"
+                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 text-left font-medium text-sm group ${
+                    activeModule === module.id
+                      ? 'bg-primary-50 text-primary-600'
+                      : 'hover:bg-primary-50 text-gray-700 hover:text-primary-600'
+                  }`}
                 >
-                  <span className="text-primary-500 group-hover:text-primary-600 transition-colors">
+                  <span className={`transition-colors ${
+                    activeModule === module.id 
+                      ? 'text-primary-600' 
+                      : 'text-primary-500 group-hover:text-primary-600'
+                  }`}>
                     {module.icon}
                   </span>
                   <span className="flex-1">{module.title}</span>
-                  <ChevronRight size={16} className="text-gray-400 group-hover:text-primary-500" />
+                  <ChevronRight size={16} className={`transition-colors ${
+                    activeModule === module.id 
+                      ? 'text-primary-500' 
+                      : 'text-gray-400 group-hover:text-primary-500'
+                  }`} />
                 </button>
               ))}
             </nav>
           ) : selectedModule ? (
-            // Sub-modules List
+            // Sub-modules List with active module header
             <nav className="p-3 space-y-1" key={`submenu-${selectedModule.id}`}>
-              <h3 className="px-2 py-2 text-xs font-bold text-primary-500 uppercase tracking-wider mb-2">
-                {selectedModule.title}
-              </h3>
-              {selectedModule.items.map((item, index) => (
-                <button
-                  key={`${selectedModule.id}-${index}`}
-                  onClick={() => handleItemClick(item.path)}
-                  className="w-full flex items-center gap-2 px-4 py-2 rounded-lg hover:bg-primary-50 transition-colors text-left text-sm text-gray-600 hover:text-primary-600 group"
-                >
-                  <span className="text-primary-400 group-hover:text-primary-600">▸</span>
-                  <span className="truncate">{item.label}</span>
-                </button>
-              ))}
+              {/* Active Module Header - shows even when viewing submenu */}
+              <div className="bg-primary-50 text-primary-600 px-3 py-2 rounded-lg mb-2 flex items-center gap-2 border border-primary-200">
+                <span className="text-primary-600">{selectedModule.icon}</span>
+                <h3 className="text-xs font-bold text-primary-600 uppercase tracking-wider">
+                  {selectedModule.title}
+                </h3>
+              </div>
+              {selectedModule.items.map((item, index) => {
+                // Check if this item's path matches the current pathname
+                const isActive = pathname === item.path || pathname.startsWith(item.path + '/');
+                return (
+                  <button
+                    key={`${selectedModule.id}-${index}`}
+                    onClick={() => handleItemClick(item.path)}
+                    className={`w-full flex items-center gap-2 px-4 py-2 rounded-lg transition-colors text-left text-sm group ${
+                      isActive
+                        ? 'bg-primary-50 text-primary-600 font-medium'
+                        : 'text-gray-600 hover:bg-primary-50'
+                    }`}
+                  >
+                    <span className={`transition-colors ${isActive ? 'text-primary-600' : 'text-primary-400 group-hover:text-primary-600'}`}>▸</span>
+                    <span className="truncate">{item.label}</span>
+                  </button>
+                );
+              })}
             </nav>
           ) : null}
         </div>

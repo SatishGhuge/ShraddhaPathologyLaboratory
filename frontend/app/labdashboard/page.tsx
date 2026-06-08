@@ -668,18 +668,28 @@ const PieChartCard = ({ title, data, colors }: any) => (
     <div className="h-[140px]">
       <ResponsiveContainer width="100%" height="100%">
         <PieChart>
-          <Pie data={data || []} dataKey="value" innerRadius={25} outerRadius={50}>
+          <Pie 
+            data={data || []} 
+            dataKey="value" 
+            nameKey="name"
+            innerRadius={25} 
+            outerRadius={50}
+          >
             {(data || []).map((_: any, i: any) => (
               <Cell key={i} fill={colors?.[i] || '#cccccc'} />
             ))}
           </Pie>
-          <Tooltip contentStyle={{ fontSize: '10px' }} />
-          <Legend wrapperStyle={{ fontSize: '10px' }} />
+          <Tooltip 
+            contentStyle={{ fontSize: '10px' }}
+            formatter={(value: any) => [`${value} patients`, 'Count']}
+          />
+          <Legend 
+            wrapperStyle={{ fontSize: '9px' }}
+          />
         </PieChart>
       </ResponsiveContainer>
     </div>
   </div>
-
 );
 
 export default Dashboard;

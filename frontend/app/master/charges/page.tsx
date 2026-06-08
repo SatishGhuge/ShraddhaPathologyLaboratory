@@ -13,7 +13,6 @@ export default function AddLabCharges() {
   const [charges, setCharges] = useState<any[]>([]);
   const [b2bError, setB2bError] = useState("");
   const [filteredData, setFilteredData] = useState<any[]>([]);
-  const [selectedType, setSelectedType] = useState("Walkin");
   const [loading, setLoading] = useState(false);
 
   const [searchName, setSearchName] = useState("");
@@ -105,19 +104,8 @@ export default function AddLabCharges() {
     setSearchName("");
     setSearchCode("");
     setSearchGroup("");
-    setSelectedType("Walkin");
     setError("");
     // Data will be re-filtered automatically by useEffect
-  };
-
-  // Handle Dropdown Change
-  const handleTypeChange = (e: any) => {
-    const type = e.target.value;
-    setSelectedType(type);
-    console.log("Selected Type:", type);
-    
-    // For now, just reload data - you can implement type-specific filtering later
-    fetchTestsAndCharges();
   };
 
   // Change Charges
@@ -251,7 +239,7 @@ export default function AddLabCharges() {
 
       // Generate filename with date
       const date = new Date().toISOString().split('T')[0];
-      const filename = `Lab_Charges_${selectedType}_${date}.xlsx`;
+      const filename = `Default_Charges_${date}.xlsx`;
 
       // Save file
       XLSX.writeFile(wb, filename);
@@ -280,12 +268,11 @@ export default function AddLabCharges() {
 
       // Add title
       doc.setFontSize(18);
-      doc.text('Lab Charges Report', 14, 20);
+      doc.text('Default Test Charges Report', 14, 20);
       
-      // Add type and date
+      // Add date
       doc.setFontSize(11);
-      doc.text(`Type: ${selectedType}`, 14, 30);
-      doc.text(`Date: ${new Date().toLocaleDateString()}`, 14, 37);
+      doc.text(`Date: ${new Date().toLocaleDateString()}`, 14, 30);
 
       // Prepare table data
       const tableData = filteredData.map((item, index) => [
@@ -299,7 +286,7 @@ export default function AddLabCharges() {
 
       // Add table using autoTable
       autoTable(doc, {
-        startY: 45,
+        startY: 40,
         head: [['Sr.No', 'Test Name', 'Test Code', 'Group', 'Charges', 'B2B']],
         body: tableData,
         theme: 'grid',
@@ -324,7 +311,7 @@ export default function AddLabCharges() {
 
       // Generate filename with date
       const date = new Date().toISOString().split('T')[0];
-      const filename = `Lab_Charges_${selectedType}_${date}.pdf`;
+      const filename = `Default_Charges_${date}.pdf`;
 
       // Save PDF
       doc.save(filename);
@@ -341,28 +328,17 @@ export default function AddLabCharges() {
       <div className="p-6 bg-white min-h-screen">
         {/* Page Header */}
         <PageHeader 
-          title="Lab Charges" 
+          title="Default Test Charges" 
           icon={DollarSign}
           path="Master"
         />
+        <p className="text-sm text-gray-600 mb-4">Set default charges for all tests. These charges will be applied to new organizations automatically.</p>
         {/* Main Content Card */}
         <div className="bg-white rounded shadow-md border border-gray-200">
           {/* Controls Section */}
           <div className="border-b border-gray-300 p-4">
-            <div className="flex gap-3 items-center">
+            <div className="flex gap-3 items-center flex-wrap">
               <div className="flex-1 gap-2 flex flex-wrap items-end">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Select Type</label>
-                <select 
-                  value={selectedType}
-                  onChange={handleTypeChange}
-                  disabled={loading}
-                  className=" max-w-xs px-2 py-1 text-sm border border-gray-300 rounded bg-white focus:outline-none focus:ring-2 focus:ring-orange-500 disabled:opacity-50"
-                >
-                  <option>Walkin</option>
-                  <option>Corporate 1</option>
-                  <option>Corporate 2</option>
-                </select>
-            
                 <button
                   onClick={handleSearch}
                   disabled={loading}
@@ -378,8 +354,8 @@ export default function AddLabCharges() {
                   <RotateCcw size={16} />
                   Reset
                 </button>
-                 </div>
-                 <div className="flex gap-2 items-end">
+              </div>
+              <div className="flex gap-2 items-end">
                 <button
                   onClick={handleSave}
                   disabled={loading}
@@ -387,40 +363,29 @@ export default function AddLabCharges() {
                 >
                   {loading ? 'Saving...' : 'Save'}
                 </button>
-                 <div className="flex gap-2">
-            <button 
-              onClick={() => router.push("/master/corporate-wise-charges")}
-              className="bg-orange-500 text-white px-4 py-1.5 text-sm rounded hover:bg-orange-600 transition-colors"
-            >
-              Corporate Wise Charges
-            </button>
-            
-            <button 
-              onClick={() => setShowBulkModal(true)}
-              className="bg-purple-600 text-white px-4 py-1.5 text-sm rounded hover:bg-purple-700 transition-colors"
-            >
-              Bulk Apply
-            </button>
-            <button 
-              onClick={handleExportExcel}
-              className="flex gap-1 sm:gap-1.5 items-center bg-green-600 hover:bg-green-700 text-white px-2 sm:px-3 py-1.5 sm:py-2 rounded text-xs sm:text-sm transition-colors"
-            >
-              <FileSpreadsheet size={14} className="sm:w-4 sm:h-4"/> 
-              <span>Excel</span>
-            </button>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setShowBulkModal(true)}
+                    className="bg-purple-600 text-white px-4 py-1.5 text-sm rounded hover:bg-purple-700 transition-colors"
+                  >
+                    Bulk Apply
+                  </button>
+                  <button
+                    onClick={handleExportExcel}
+                    className="flex gap-1 sm:gap-1.5 items-center bg-green-600 hover:bg-green-700 text-white px-2 sm:px-3 py-1.5 sm:py-2 rounded text-xs sm:text-sm transition-colors"
+                  >
+                    <FileSpreadsheet size={14} className="sm:w-4 sm:h-4" />
+                    <span>Excel</span>
+                  </button>
 
-            <button 
-              onClick={handleExportPDF}
-              className="flex gap-1 sm:gap-1.5 items-center bg-red-600 hover:bg-red-700 text-white px-2 sm:px-3 py-1.5 sm:py-2 rounded text-xs sm:text-sm transition-colors"
-            >
-              <FileText size={14} className="sm:w-4 sm:h-4"/> 
-              <span>PDF</span>
-            </button>
-
-            <button className="bg-orange-500 text-white px-4 py-1.5 text-sm rounded hover:bg-orange-600 transition-colors">
-              Copy Charges
-            </button>
-          </div>
+                  <button
+                    onClick={handleExportPDF}
+                    className="flex gap-1 sm:gap-1.5 items-center bg-red-600 hover:bg-red-700 text-white px-2 sm:px-3 py-1.5 sm:py-2 rounded text-xs sm:text-sm transition-colors"
+                  >
+                    <FileText size={14} className="sm:w-4 sm:h-4" />
+                    <span>PDF</span>
+                  </button>
+                </div>
               </div>
             </div>
           </div>
