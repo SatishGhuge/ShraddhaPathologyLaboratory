@@ -1,6 +1,7 @@
 import prisma from '../config/database.js';
 import { validationResult } from 'express-validator';
 import { getPaginationParams, buildPaginatedResponse } from '../utils/pagination.js';
+import { generatePatientId, generateVisitId } from '../utils/idGenerator.js';
 
 // Create new patient with tests OR add tests to existing patient
 export const createPatient = async (req, res) => {
@@ -61,7 +62,8 @@ export const createPatient = async (req, res) => {
         // Found existing patient with same name + mobile
         isExistingPatient = true;
         patient = matchingPatient;
-        console.log(`✅ Found existing patient: ${patient.patientId} (${patient.firstName} ${patient.lastName})`);
+        console.log(`✅ Found EXISTING patient: ${patient.patientId} (${patient.firstName} ${patient.lastName})`);
+        console.log(`📋 Adding new visit to existing patient. New Visit ID will be generated.`);
       }
     }
 
@@ -85,30 +87,7 @@ export const createPatient = async (req, res) => {
 
     if (isExistingPatient && patient) {
       // Add tests to existing patient with NEW Visit ID
-      const today = new Date();
-      const month = String(today.getMonth() + 1).padStart(2, '0');
-      const day = String(today.getDate()).padStart(2, '0');
-      const year = String(today.getFullYear()).slice(-2);
-      const visitDatePrefix = `V${month}${day}${year}`;
-      
-      // Find the last visit created today
-      const lastVisitToday = await prisma.patientTest.findFirst({
-        where: {
-          visitId: {
-            startsWith: visitDatePrefix
-          }
-        },
-        orderBy: { visitId: 'desc' }
-      });
-      
-      let visitSequenceNumber = 1;
-      if (lastVisitToday) {
-        const lastVisitSequence = parseInt(lastVisitToday.visitId.slice(-5));
-        visitSequenceNumber = lastVisitSequence + 1;
-      }
-      
-      // Generate new Visit ID for this visit
-      const visitId = `${visitDatePrefix}${String(visitSequenceNumber).padStart(5, '0')}`;
+      const visitId = await generateVisitId(visitDate);
       
       const testCount = tests?.length || 1;
       const perTestPaid = parseFloat(paidAmount) || 0;
@@ -157,59 +136,13 @@ export const createPatient = async (req, res) => {
       });
 
     } else {
-      // Create new patient with date-based ID: P + MM + DD + YY + 00001
-      // Example: P031226000001 (March 12, 2026, patient #1)
-      const today = new Date();
-      const month = String(today.getMonth() + 1).padStart(2, '0'); // 03
-      const day = String(today.getDate()).padStart(2, '0'); // 12
-      const year = String(today.getFullYear()).slice(-2); // 26 (from 2026)
-      const datePrefix = `P${month}${day}${year}`; // e.g., P031226 for March 12, 2026
+      // Create new patient with new ID format: S + YY + MM + 00001
+      // Example: S260600001 (1st patient in June 2026)
+      const patientId = await generatePatientId();
       
-      // Find the last patient created today with this date prefix
-      const lastPatientToday = await prisma.patient.findFirst({
-        where: {
-          patientId: {
-            startsWith: datePrefix
-          }
-        },
-        orderBy: { patientId: 'desc' }
-      });
-      
-      // Generate sequential number for today
-      let sequenceNumber = 1;
-      if (lastPatientToday) {
-        // Extract the last 5 digits and increment
-        const lastSequence = parseInt(lastPatientToday.patientId.slice(-5));
-        sequenceNumber = lastSequence + 1;
-      }
-      
-      // Format: P + MM + DD + YY + 00001
-      // Example: P03122600001 (March 12, 2026, patient #1)
-      const patientId = `${datePrefix}${String(sequenceNumber).padStart(5, '0')}`;
-
-      // Generate Visit ID with same format but V prefix
-      // Visit ID is unique for each registration/visit
-      const visitDatePrefix = `V${month}${day}${year}`;
-      
-      // Find the last visit created today
-      const lastVisitToday = await prisma.patientTest.findFirst({
-        where: {
-          visitId: {
-            startsWith: visitDatePrefix
-          }
-        },
-        orderBy: { visitId: 'desc' }
-      });
-      
-      let visitSequenceNumber = 1;
-      if (lastVisitToday) {
-        const lastVisitSequence = parseInt(lastVisitToday.visitId.slice(-5));
-        visitSequenceNumber = lastVisitSequence + 1;
-      }
-      
-      // Format: V + MM + DD + YY + 00001
-      // Example: V03122600001 (March 12, 2026, visit #1)
-      const visitId = `${visitDatePrefix}${String(visitSequenceNumber).padStart(5, '0')}`;
+      // Generate Visit ID: YYYYMMDD + 0001
+      // Example: 2606080001 (1st visit on June 8, 2026)
+      const visitId = await generateVisitId(visitDate);
 
       const testCount = tests?.length || 1;
       const perTestPaid = parseFloat(paidAmount) || 0;
@@ -217,7 +150,7 @@ export const createPatient = async (req, res) => {
 
       patient = await prisma.patient.create({
         data: {
-          patientId, // String primary key (P format)
+          patientId,
           // Patient Identity ONLY
           title,
           firstName,
