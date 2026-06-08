@@ -316,6 +316,23 @@ const PatientResult = () => {
       });
       const data = await response.json();
       if (data.success) {
+        // Auto-transition to Entered status when first result is saved
+        try {
+          const transitionResponse = await fetch(`${API_BASE_URL}/results/${patientData.id}/auto-transition/result-saved`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ changedBy: 'result_entry' })
+          });
+          
+          const transitionData = await transitionResponse.json();
+          if (transitionData.success) {
+            console.log('✅ Test auto-transitioned to Entered status');
+          }
+        } catch (error) {
+          console.error('⚠️ Auto-transition failed:', error);
+          // Don't block save if transition fails
+        }
+        
         // Auto set AUTHENTICATED if all results filled
         if (allResultsFilled()) {
           await updateTestStatus(patientData.id, { status: 'AUTHENTICATED' });
