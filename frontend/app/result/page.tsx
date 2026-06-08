@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import Header from "@/src/components/Header";
 import PageHeader from "@/src/components/BreadCrumb";
+import API_BASE_URL from "@/src/api/config";
 
 import { FaWhatsapp } from "react-icons/fa";
 import html2pdf from "html2pdf.js";
@@ -30,6 +31,7 @@ import {
   getPatientTestById,
   sendReport
 } from "@/src/api/result";
+import { getOrganizations } from "@/src/api/master";
 const LetterHead = "/LetterHead.jpeg";
 
 /* ── Per-test row with ALL date fields inside Edit Details modal ── */
@@ -297,25 +299,28 @@ export default function Result() {
   const [statistics, setStatistics] = useState({
     total: 0,
     byStatus: {
-      REGISTERED: 0,
-      RECEIVED: 0,
-      PROVISIONAL: 0,
-      AUTHENTICATED: 0,
-      DELIVERED: 0
+      Registered: 0,
+      Received: 0,
+      Entered: 0,
+      Validation: 0,
+      Authorized: 0,
+      Delivered: 0,
+      Rectified: 0
     }
   });
   
   // Filter states
   const [filters, setFilters] = useState({
-    status: 'All',
     fromDate: new Date().toISOString().split('T')[0],
     toDate: new Date().toISOString().split('T')[0],
-    patientName: '',
-    labRequest: '',
-    corporate: '',
-    department: 'Department',
+    searchQuery: '', // For Patient Name, ID, or Visit ID
+    department: '',
+    organization: '',
     testName: ''
   });
+
+  // Organizations state
+  const [organizations, setOrganizations] = useState<any[]>([]);
   
   const [settingsFormData, setSettingsFormData] = useState({
     selectedTests: {},
@@ -1280,6 +1285,19 @@ export default function Result() {
     fetchStatistics();
   }, [filters]);
 
+  // Fetch organizations on component mount
+  useEffect(() => {
+    const fetchOrganizations = async () => {
+      try {
+        const data = await getOrganizations(1, 100);
+        setOrganizations(data);
+      } catch (err) {
+        console.error('Error fetching organizations:', err);
+      }
+    };
+    fetchOrganizations();
+  }, []);
+
   // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: any) => {
@@ -1339,13 +1357,11 @@ export default function Result() {
   // Handle refresh — reset filters and reload data
   const handleRefresh = () => {
     setFilters({
-      status: 'All',
       fromDate: new Date().toISOString().split('T')[0],
       toDate: new Date().toISOString().split('T')[0],
-      patientName: '',
-      labRequest: '',
-      corporate: '',
-      department: 'Department',
+      searchQuery: '',
+      department: '',
+      organization: '',
       testName: ''
     });
     setSelectedStatus('All');
@@ -1370,18 +1386,22 @@ export default function Result() {
 
   // Get status badge color based on status
   const getStatusBadgeColor = (status: any) => {
-    const upperStatus = status.toUpperCase();
-    switch (upperStatus) {
-      case "REGISTERED":
-        return "bg-primary-100 text-primary-800";
-      case "RECEIVED":
-        return "bg-secondary-100 text-secondary-800";
-      case "PROVISIONAL":
+    const pascalStatus = status.charAt(0).toUpperCase() + status.slice(1).toLowerCase();
+    switch (pascalStatus) {
+      case "Registered":
+        return "bg-cyan-100 text-cyan-800";
+      case "Received":
         return "bg-pink-100 text-pink-800";
-      case "AUTHENTICATED":
+      case "Entered":
         return "bg-purple-100 text-purple-800";
-      case "DELIVERED":
+      case "Validation":
+        return "bg-yellow-100 text-yellow-800";
+      case "Authorized":
+        return "bg-blue-100 text-blue-800";
+      case "Delivered":
         return "bg-green-100 text-green-800";
+      case "Rectified":
+        return "bg-red-100 text-red-800";
       default:
         return "bg-gray-100 text-gray-800";
     }
@@ -1541,55 +1561,75 @@ export default function Result() {
                 All ({statistics.total})
               </button>
               
-              <div className="grid grid-cols-5 gap-2 flex-1">
+              <div className="grid grid-cols-7 gap-2 flex-1">
                 <div 
-                  onClick={() => setSelectedStatus("REGISTERED")}
+                  onClick={() => setSelectedStatus("Registered")}
                   className={`rounded-lg p-2 text-center cursor-pointer hover:shadow-md transition-shadow ${
-                    selectedStatus === "REGISTERED" ? "bg-primary-200 ring-2 ring-primary-600" : "bg-primary-100"
+                    selectedStatus === "Registered" ? "bg-cyan-200 ring-2 ring-cyan-600" : "bg-cyan-100"
                   }`}
                 >
-                  <h3 className="text-primary-800 font-semibold text-xs sm:text-sm">
-                    Registered ({statistics.byStatus.REGISTERED})
+                  <h3 className="text-cyan-800 font-semibold text-xs sm:text-sm">
+                    Registered ({statistics.byStatus.Registered})
                   </h3>
                 </div>
                 <div 
-                  onClick={() => setSelectedStatus("RECEIVED")}
+                  onClick={() => setSelectedStatus("Received")}
                   className={`rounded-lg p-2 text-center cursor-pointer hover:shadow-md transition-shadow ${
-                    selectedStatus === "RECEIVED" ? "bg-secondary-200 ring-2 ring-secondary-600" : "bg-secondary-100"
-                  }`}
-                >
-                  <h3 className="text-secondary-800 font-semibold text-xs sm:text-sm">
-                    Received ({statistics.byStatus.RECEIVED})
-                  </h3>
-                </div>
-                <div 
-                  onClick={() => setSelectedStatus("PROVISIONAL")}
-                  className={`rounded-lg p-2 text-center cursor-pointer hover:shadow-md transition-shadow ${
-                    selectedStatus === "PROVISIONAL" ? "bg-pink-200 ring-2 ring-pink-600" : "bg-pink-100"
+                    selectedStatus === "Received" ? "bg-pink-200 ring-2 ring-pink-600" : "bg-pink-100"
                   }`}
                 >
                   <h3 className="text-pink-800 font-semibold text-xs sm:text-sm">
-                    Provisional ({statistics.byStatus.PROVISIONAL})
+                    Received ({statistics.byStatus.Received})
                   </h3>
                 </div>
                 <div 
-                  onClick={() => setSelectedStatus("AUTHENTICATED")}
+                  onClick={() => setSelectedStatus("Entered")}
                   className={`rounded-lg p-2 text-center cursor-pointer hover:shadow-md transition-shadow ${
-                    selectedStatus === "AUTHENTICATED" ? "bg-purple-200 ring-2 ring-purple-600" : "bg-purple-100"
+                    selectedStatus === "Entered" ? "bg-purple-200 ring-2 ring-purple-600" : "bg-purple-100"
                   }`}
                 >
                   <h3 className="text-purple-800 font-semibold text-xs sm:text-sm">
-                    Authenticated ({statistics.byStatus.AUTHENTICATED})
+                    Entered ({statistics.byStatus.Entered})
                   </h3>
                 </div>
                 <div 
-                  onClick={() => setSelectedStatus("DELIVERED")}
+                  onClick={() => setSelectedStatus("Validation")}
                   className={`rounded-lg p-2 text-center cursor-pointer hover:shadow-md transition-shadow ${
-                    selectedStatus === "DELIVERED" ? "bg-green-200 ring-2 ring-green-600" : "bg-green-100"
+                    selectedStatus === "Validation" ? "bg-yellow-200 ring-2 ring-yellow-600" : "bg-yellow-100"
+                  }`}
+                >
+                  <h3 className="text-yellow-800 font-semibold text-xs sm:text-sm">
+                    Validation ({statistics.byStatus.Validation})
+                  </h3>
+                </div>
+                <div 
+                  onClick={() => setSelectedStatus("Authorized")}
+                  className={`rounded-lg p-2 text-center cursor-pointer hover:shadow-md transition-shadow ${
+                    selectedStatus === "Authorized" ? "bg-blue-200 ring-2 ring-blue-600" : "bg-blue-100"
+                  }`}
+                >
+                  <h3 className="text-blue-800 font-semibold text-xs sm:text-sm">
+                    Authorized ({statistics.byStatus.Authorized})
+                  </h3>
+                </div>
+                <div 
+                  onClick={() => setSelectedStatus("Delivered")}
+                  className={`rounded-lg p-2 text-center cursor-pointer hover:shadow-md transition-shadow ${
+                    selectedStatus === "Delivered" ? "bg-green-200 ring-2 ring-green-600" : "bg-green-100"
                   }`}
                 >
                   <h3 className="text-green-800 font-semibold text-xs sm:text-sm">
-                    Delivered ({statistics.byStatus.DELIVERED})
+                    Delivered ({statistics.byStatus.Delivered})
+                  </h3>
+                </div>
+                <div 
+                  onClick={() => setSelectedStatus("Rectified")}
+                  className={`rounded-lg p-2 text-center cursor-pointer hover:shadow-md transition-shadow ${
+                    selectedStatus === "Rectified" ? "bg-red-200 ring-2 ring-red-600" : "bg-red-100"
+                  }`}
+                >
+                  <h3 className="text-red-800 font-semibold text-xs sm:text-sm">
+                    Rectified ({statistics.byStatus.Rectified})
                   </h3>
                 </div>
               </div>
@@ -1597,94 +1637,68 @@ export default function Result() {
 
             {/* Top Filter Bar */}
             <div className="bg-white rounded shadow-md p-2 sm:p-3">
-              <div className="flex flex-wrap items-center gap-2">
-                <select 
-                  value={filters.status}
-                  onChange={(e) => handleFilterChange('status', e.target.value)}
-                  className="h-8 rounded border border-gray-300 px-2 text-xs sm:text-sm focus:outline-none focus:ring-1 focus:ring-cyan-600"
-                >
-                  <option value="All">All</option>
-                  <option value="REGISTERED">Registered</option>
-                  <option value="RECEIVED">Received</option>
-                  <option value="PROVISIONAL">Provisional</option>
-                  <option value="AUTHENTICATED">Authenticated</option>
-                  <option value="DELIVERED">Delivered</option>
-                </select>
-                
+              <div className="flex flex-wrap items-center gap-1.5">
                 <input 
                   type="date" 
                   value={filters.fromDate}
                   onChange={(e) => handleFilterChange('fromDate', e.target.value)}
-                  className="h-8 rounded border border-gray-300 px-2 text-xs sm:text-sm focus:outline-none focus:ring-1 focus:ring-cyan-600"
+                  className="h-8 rounded border border-gray-300 px-2 text-xs focus:outline-none focus:ring-1 focus:ring-cyan-600"
+                  title="From Date"
                 />
+                
+                <span className="text-xs text-gray-500">to</span>
                 
                 <input 
                   type="date" 
                   value={filters.toDate}
                   onChange={(e) => handleFilterChange('toDate', e.target.value)}
-                  className="h-8 rounded border border-gray-300 px-2 text-xs sm:text-sm focus:outline-none focus:ring-1 focus:ring-cyan-600"
+                  className="h-8 rounded border border-gray-300 px-2 text-xs focus:outline-none focus:ring-1 focus:ring-cyan-600"
+                  title="To Date"
                 />
                 
                 <input 
                   type="text" 
-                  placeholder="Patient Name/ID"
-                  value={filters.patientName}
-                  onChange={(e) => handleFilterChange('patientName', e.target.value)}
-                  className="h-8 rounded border border-gray-300 px-2 text-xs sm:text-sm focus:outline-none focus:ring-1 focus:ring-cyan-600 flex-1 min-w-[180px]"
-                />
-                
-                <input 
-                  type="text" 
-                  placeholder="Visit ID"
-                  value={filters.labRequest}
-                  onChange={(e) => handleFilterChange('labRequest', e.target.value)}
-                  className="h-8 rounded border border-gray-300 px-2 text-xs sm:text-sm focus:outline-none focus:ring-1 focus:ring-cyan-600 w-28"
-                />
-                
-                <input 
-                  type="text" 
-                  placeholder="Search Corporate"
-                  value={filters.corporate}
-                  onChange={(e) => handleFilterChange('corporate', e.target.value)}
-                  className="h-8 rounded border border-gray-300 px-2 text-xs sm:text-sm focus:outline-none focus:ring-1 focus:ring-cyan-600 flex-1 min-w-[140px]"
+                  placeholder="Patient/ID/Visit"
+                  value={filters.searchQuery}
+                  onChange={(e) => handleFilterChange('searchQuery', e.target.value)}
+                  className="h-8 rounded border border-gray-300 px-2 text-xs focus:outline-none focus:ring-1 focus:ring-cyan-600 w-32"
                 />
                 
                 <select 
                   value={filters.department}
                   onChange={(e) => handleFilterChange('department', e.target.value)}
-                  className="h-8 rounded border border-gray-300 px-2 text-xs sm:text-sm focus:outline-none focus:ring-1 focus:ring-cyan-600"
+                  className="h-8 rounded border border-gray-300 px-2 text-xs focus:outline-none focus:ring-1 focus:ring-cyan-600"
                 >
-                  <option value="Department">Department</option>
+                  <option value="">All Dept</option>
                   <option value="Haematology">Haematology</option>
                   <option value="Biochemistry">Biochemistry</option>
                   <option value="Microbiology">Microbiology</option>
                 </select>
                 
+                <select 
+                  value={filters.organization}
+                  onChange={(e) => handleFilterChange('organization', e.target.value)}
+                  className="h-8 rounded border border-gray-300 px-2 text-xs focus:outline-none focus:ring-1 focus:ring-cyan-600"
+                >
+                  <option value="">All Org</option>
+                  {organizations.map(org => (
+                    <option key={org.id} value={org.id}>{org.name}</option>
+                  ))}
+                </select>
+                
                 <input 
                   type="text" 
-                  placeholder="Test Name"
+                  placeholder="Test"
                   value={filters.testName}
                   onChange={(e) => handleFilterChange('testName', e.target.value)}
-                  className="h-8 rounded border border-gray-300 px-2 text-xs sm:text-sm focus:outline-none focus:ring-1 focus:ring-cyan-600 flex-1 min-w-[140px]"
+                  className="h-8 rounded border border-gray-300 px-2 text-xs focus:outline-none focus:ring-1 focus:ring-cyan-600 w-20"
                 />
-                
-                <select 
-                  value={selectedStatus}
-                  onChange={(e) => setSelectedStatus(e.target.value)}
-                  className="h-8 rounded border border-gray-300 px-2 text-xs sm:text-sm focus:outline-none focus:ring-1 focus:ring-cyan-600"
-                >
-                  <option value="All">Status</option>
-                  <option value="REGISTERED">Registered</option>
-                  <option value="RECEIVED">Received</option>
-                  <option value="PROVISIONAL">Provisional</option>
-                  <option value="AUTHENTICATED">Authenticated</option>
-                  <option value="DELIVERED">Delivered</option>
-                </select>
                 
                 <button 
                   onClick={handleSearch}
                   disabled={loading}
-                  className="h-8 px-3 bg-cyan-600 hover:bg-cyan-700 text-white rounded flex items-center gap-1.5 text-xs sm:text-sm disabled:opacity-50"
+                  className="h-8 px-2 bg-cyan-600 hover:bg-cyan-700 text-white rounded flex items-center gap-1 text-xs disabled:opacity-50"
+                  title="Search"
                 >
                   <Search size={14} />
                 </button>
@@ -1692,9 +1706,25 @@ export default function Result() {
                 <button 
                   onClick={handleRefresh}
                   disabled={loading}
-                  className="h-8 px-3 bg-gray-600 hover:bg-gray-700 text-white rounded flex items-center gap-1.5 text-xs sm:text-sm disabled:opacity-50"
+                  className="h-8 px-2 bg-gray-600 hover:bg-gray-700 text-white rounded flex items-center gap-1 text-xs disabled:opacity-50"
+                  title="Refresh"
                 >
                   <RefreshCcw size={14} />
+                </button>
+                
+                <button 
+                  onClick={() => {
+                    if (barcodeSelectedTests.size === 0) {
+                      alert('Please select tests using the barcode checkboxes first');
+                      return;
+                    }
+                    // Just open the barcode modal, without automatic print
+                    handleBarcodePrint();
+                  }}
+                  className="h-8 px-2 bg-green-600 hover:bg-green-700 text-white rounded flex items-center gap-1 text-xs"
+                  title="Print Barcode"
+                >
+                  <Printer size={14} />
                 </button>
                 
                 <button
@@ -2576,7 +2606,8 @@ export default function Result() {
               </h2>
               <div className="flex gap-2">
                 <button
-                  onClick={() => {
+                  onClick={async () => {
+                    // Just print without status transition
                     const printArea = document.getElementById('barcode-print-area');
                     const win = window.open('', '_blank');
                     win.document.write(`<!DOCTYPE html><html><head><title>Barcode Labels</title>
@@ -2591,12 +2622,53 @@ export default function Result() {
                     win.document.close();
                     win.focus();
                     win.print();
-                    win.close();
+                    setShowBarcodeModal(false);
                   }}
-                  className="bg-blue-600 text-white px-4 py-1.5 rounded text-xs font-semibold hover:bg-blue-700"
+                  className="text-white bg-blue-600 hover:bg-blue-700 px-2 py-1 rounded text-xs font-semibold"
                 >
-                  🖨️ Print
+                  Print Only
                 </button>
+
+                <button
+                  onClick={async () => {
+                    try {
+                      // Call API to transition tests to Received status when barcode is printed
+                      const testIds = Array.from(barcodeSelectedTests);
+                      for (const testId of testIds) {
+                        await fetch(`${API_BASE_URL}/results/${testId}/auto-transition/barcode-printed`, {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ changedBy: 'result_page' })
+                        });
+                      }
+                      console.log('✅ Tests auto-transitioned to Received status');
+                    } catch (error) {
+                      console.error('⚠️ Status transition failed:', error);
+                      // Don't block print if status update fails
+                    }
+                    
+                    // Proceed with print
+                    const printArea = document.getElementById('barcode-print-area');
+                    const win = window.open('', '_blank');
+                    win.document.write(`<!DOCTYPE html><html><head><title>Barcode Labels</title>
+                      <style>
+                        * { margin:0; padding:0; box-sizing:border-box; }
+                        body { font-family: Arial, sans-serif; background: white; }
+                        .labels-wrap { display: flex; flex-wrap: wrap; gap: 8mm; padding: 8mm; }
+                        .label { width: 80mm; border: 0.5px solid #999; page-break-inside: avoid; }
+                        @page { size: A4; margin: 8mm; }
+                      </style>
+                    </head><body>${printArea.innerHTML}</body></html>`);
+                    win.document.close();
+                    win.focus();
+                    win.print();
+                    setShowBarcodeModal(false);
+                  }}
+                  className="text-white bg-green-600 hover:bg-green-700 px-2 py-1 rounded text-xs font-semibold"
+                >
+                  Print & Transition
+                </button>
+
                 <button
                   onClick={() => setShowBarcodeModal(false)}
                   className="text-gray-300 hover:text-white text-xl font-bold leading-none px-1"
