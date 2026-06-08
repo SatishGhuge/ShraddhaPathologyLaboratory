@@ -1,11 +1,13 @@
 "use client";
 
+// Fixed API URL integration for backend communication
 import { useRouter, useParams } from "next/navigation";
 import React, { useState, useEffect, useCallback, useRef } from "react";
 
 import Header from "@/src/components/Header";
 import { getPatientTestById } from "@/src/api/result.js";
 import { updateTestStatus } from "@/src/api/result.js";
+import API_BASE_URL from "@/src/api/config";
 const LetterHead = "/LetterHead.jpeg";
 
 // Autocomplete text input with suggestion dropdown and multi-select tags
@@ -300,9 +302,14 @@ const PatientResult = () => {
         selectedOption: results[param.id]?.selectedOption || null,
         isAbnormal: results[param.id]?.isAbnormal || false,
         referenceRange: results[param.id]?.referenceRange || param.normalRange
-      })).filter(r => r.numericValue !== null || r.textValue !== '' || r.selectedOption !== '');
+      })).filter(r => {
+        const hasNumeric = r.numericValue !== null && r.numericValue !== undefined && r.numericValue !== '';
+        const hasText = r.textValue && typeof r.textValue === 'string' && r.textValue.trim() !== '';
+        const hasOption = r.selectedOption && typeof r.selectedOption === 'string' && r.selectedOption.trim() !== '';
+        return hasNumeric || hasText || hasOption;
+      });
 
-      const response = await fetch(`/api/results/${patientData.id}/results`, {
+      const response = await fetch(`${API_BASE_URL}/results/${patientData.id}/results`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ results: resultsData, enteredBy: 'current_user' })
@@ -317,7 +324,7 @@ const PatientResult = () => {
         if (attachedFile) {
           const formData = new FormData();
           formData.append('file', attachedFile);
-          await fetch(`/api/results/${patientData.id}/attachment`, { method: 'POST', body: formData });
+          await fetch(`${API_BASE_URL}/results/${patientData.id}/attachment`, { method: 'POST', body: formData });
         }
         alert('Results saved successfully!');
         fetchPatientTestData();
@@ -343,9 +350,14 @@ const PatientResult = () => {
         selectedOption: results[param.id]?.selectedOption || null,
         isAbnormal: results[param.id]?.isAbnormal || false,
         referenceRange: results[param.id]?.referenceRange || param.normalRange
-      })).filter(r => r.numericValue !== null || r.textValue !== '' || r.selectedOption !== '');
+      })).filter(r => {
+        const hasNumeric = r.numericValue !== null && r.numericValue !== undefined && r.numericValue !== '';
+        const hasText = r.textValue && typeof r.textValue === 'string' && r.textValue.trim() !== '';
+        const hasOption = r.selectedOption && typeof r.selectedOption === 'string' && r.selectedOption.trim() !== '';
+        return hasNumeric || hasText || hasOption;
+      });
 
-      const response = await fetch(`/api/results/${patientData.id}/results`, {
+      const response = await fetch(`${API_BASE_URL}/results/${patientData.id}/results`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ results: resultsData, enteredBy: 'current_user' })
@@ -356,7 +368,7 @@ const PatientResult = () => {
         if (attachedFile) {
           const formData = new FormData();
           formData.append('file', attachedFile);
-          await fetch(`/api/results/${patientData.id}/attachment`, { method: 'POST', body: formData });
+          await fetch(`${API_BASE_URL}/results/${patientData.id}/attachment`, { method: 'POST', body: formData });
         }
         if (allResultsFilled()) {
           await updateTestStatus(patientData.id, { status: 'AUTHENTICATED' });
@@ -537,7 +549,7 @@ const PatientResult = () => {
                     ✅ Attachment saved
                     <button
                       onClick={async () => {
-                        await fetch(`/api/results/${patientData.id}/attachment`, { method: 'DELETE' });
+                        await fetch(`${API_BASE_URL}/results/${patientData.id}/attachment`, { method: 'DELETE' });
                         fetchPatientTestData();
                       }}
                       className="text-red-500 hover:text-red-700 text-xs ml-1"

@@ -885,12 +885,25 @@ export const saveTestResults = async (req, res) => {
         referenceRange
       } = result;
 
+      // Validate required field
+      if (!testParameterId) {
+        console.warn('Skipping result - missing testParameterId');
+        continue;
+      }
+
       // Get parameter details for validation
-      const parameter = await prisma.testParameter.findUnique({
-        where: { id: testParameterId }
-      });
+      let parameter;
+      try {
+        parameter = await prisma.testParameter.findUnique({
+          where: { id: parseInt(testParameterId) }
+        });
+      } catch (err) {
+        console.warn(`Failed to fetch parameter ${testParameterId}:`, err.message);
+        continue;
+      }
 
       if (!parameter) {
+        console.warn(`Parameter not found: ${testParameterId}`);
         continue; // Skip invalid parameters
       }
 
@@ -931,45 +944,50 @@ export const saveTestResults = async (req, res) => {
       }
 
       // Upsert result
-      const savedResult = await prisma.testResult.upsert({
-        where: {
-          patientTestId_testParameterId: {
+      try {
+        const savedResult = await prisma.testResult.upsert({
+          where: {
+            patientTestId_testParameterId: {
+              patientTestId: parseInt(patientTestId),
+              testParameterId: parseInt(testParameterId)
+            }
+          },
+          update: {
+            numericValue: numericValue !== null ? parseFloat(numericValue) : null,
+            textValue: textValue || null,
+            selectedOption: selectedOption || null,
+            isAbnormal: isAbnormal || false,
+            isOutOfRange: isOutOfRange,
+            isPanic: isPanic,
+            referenceRange: referenceRange || null,
+            enteredBy: enteredBy,
+            enteredAt: new Date(),
+            testCategoryId: testCategoryId ? parseInt(testCategoryId) : null
+          },
+          create: {
             patientTestId: parseInt(patientTestId),
-            testParameterId: testParameterId
+            testParameterId: parseInt(testParameterId),
+            testCategoryId: testCategoryId ? parseInt(testCategoryId) : null,
+            numericValue: numericValue !== null ? parseFloat(numericValue) : null,
+            textValue: textValue || null,
+            selectedOption: selectedOption || null,
+            isAbnormal: isAbnormal || false,
+            isOutOfRange: isOutOfRange,
+            isPanic: isPanic,
+            referenceRange: referenceRange || null,
+            enteredBy: enteredBy,
+            enteredAt: new Date()
+          },
+          include: {
+            testParameter: true
           }
-        },
-        update: {
-          numericValue: numericValue,
-          textValue: textValue,
-          selectedOption: selectedOption,
-          isAbnormal: isAbnormal || false,
-          isOutOfRange: isOutOfRange,
-          isPanic: isPanic,
-          referenceRange: referenceRange,
-          enteredBy: enteredBy,
-          enteredAt: new Date(),
-          testCategoryId: testCategoryId || null
-        },
-        create: {
-          patientTestId: parseInt(patientTestId),
-          testParameterId: testParameterId,
-          testCategoryId: testCategoryId || null,
-          numericValue: numericValue,
-          textValue: textValue,
-          selectedOption: selectedOption,
-          isAbnormal: isAbnormal || false,
-          isOutOfRange: isOutOfRange,
-          isPanic: isPanic,
-          referenceRange: referenceRange,
-          enteredBy: enteredBy,
-          enteredAt: new Date()
-        },
-        include: {
-          testParameter: true
-        }
-      });
+        });
 
-      savedResults.push(savedResult);
+        savedResults.push(savedResult);
+      } catch (upsertError) {
+        console.error(`Failed to upsert result for parameter ${testParameterId}:`, upsertError.message);
+        throw upsertError; // Re-throw to be caught by outer catch
+      }
     }
 
     // Update patient test status and result date
@@ -990,9 +1008,12 @@ export const saveTestResults = async (req, res) => {
 
   } catch (error) {
     console.error('Save test results error:', error);
+    console.error('Error message:', error.message);
+    console.error('Error code:', error.code);
     res.status(500).json({
       success: false,
-      message: 'Failed to save test results'
+      message: 'Failed to save test results: ' + (error.message || 'Unknown error'),
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
 };
