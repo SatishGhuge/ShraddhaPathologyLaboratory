@@ -1391,15 +1391,15 @@ export default function Result() {
       case "Registered":
         return "bg-cyan-100 text-cyan-800";
       case "Received":
-        return "bg-pink-100 text-pink-800";
+        return "bg-orange-100 text-orange-800";
       case "Entered":
-        return "bg-purple-100 text-purple-800";
+        return "bg-green-100 text-green-800";
       case "Validation":
         return "bg-yellow-100 text-yellow-800";
       case "Authorized":
         return "bg-blue-100 text-blue-800";
       case "Delivered":
-        return "bg-green-100 text-green-800";
+        return "bg-purple-100 text-purple-800";
       case "Rectified":
         return "bg-red-100 text-red-800";
       default:
@@ -1575,20 +1575,20 @@ export default function Result() {
                 <div 
                   onClick={() => setSelectedStatus("Received")}
                   className={`rounded-lg p-2 text-center cursor-pointer hover:shadow-md transition-shadow ${
-                    selectedStatus === "Received" ? "bg-pink-200 ring-2 ring-pink-600" : "bg-pink-100"
+                    selectedStatus === "Received" ? "bg-orange-200 ring-2 ring-orange-600" : "bg-orange-100"
                   }`}
                 >
-                  <h3 className="text-pink-800 font-semibold text-xs sm:text-sm">
+                  <h3 className="text-orange-800 font-semibold text-xs sm:text-sm">
                     Received ({statistics.byStatus.Received})
                   </h3>
                 </div>
                 <div 
                   onClick={() => setSelectedStatus("Entered")}
                   className={`rounded-lg p-2 text-center cursor-pointer hover:shadow-md transition-shadow ${
-                    selectedStatus === "Entered" ? "bg-purple-200 ring-2 ring-purple-600" : "bg-purple-100"
+                    selectedStatus === "Entered" ? "bg-green-200 ring-2 ring-green-600" : "bg-green-100"
                   }`}
                 >
-                  <h3 className="text-purple-800 font-semibold text-xs sm:text-sm">
+                  <h3 className="text-green-800 font-semibold text-xs sm:text-sm">
                     Entered ({statistics.byStatus.Entered})
                   </h3>
                 </div>
@@ -1615,10 +1615,10 @@ export default function Result() {
                 <div 
                   onClick={() => setSelectedStatus("Delivered")}
                   className={`rounded-lg p-2 text-center cursor-pointer hover:shadow-md transition-shadow ${
-                    selectedStatus === "Delivered" ? "bg-green-200 ring-2 ring-green-600" : "bg-green-100"
+                    selectedStatus === "Delivered" ? "bg-purple-200 ring-2 ring-purple-600" : "bg-purple-100"
                   }`}
                 >
-                  <h3 className="text-green-800 font-semibold text-xs sm:text-sm">
+                  <h3 className="text-purple-800 font-semibold text-xs sm:text-sm">
                     Delivered ({statistics.byStatus.Delivered})
                   </h3>
                 </div>

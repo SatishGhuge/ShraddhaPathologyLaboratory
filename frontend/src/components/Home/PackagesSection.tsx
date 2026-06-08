@@ -13,6 +13,7 @@ import { HealthPackage } from "@/types/homepage";
 import { Swiper, SwiperSlide } from "swiper/react";
 import { Navigation, Autoplay } from "swiper/modules";
 import type { Swiper as SwiperType } from "swiper";
+// @ts-ignore
 import "swiper/css";
 
 /* ─── Fallback data ─────────────────────────────────────── */
