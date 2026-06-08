@@ -212,7 +212,7 @@ const AdminLogin = ({ onLogin }: { onLogin?: () => void }) => {
       </div>
 
       {/* Main Card */}
-      <div className="bg-slate-700/40 backdrop-blur-md border border-slate-600/50 rounded-2xl shadow-2xl w-[90%] max-w-md p-8 relative z-10">
+      <div className="bg-slate-700/40 backdrop-blur-md rounded-2xl shadow-3xl w-[60%] max-w-md p-4 relative z-6">
 
         {/* Home Button */}
         <button

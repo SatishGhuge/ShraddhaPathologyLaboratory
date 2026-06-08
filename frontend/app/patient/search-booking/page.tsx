@@ -12,7 +12,7 @@ import {
   ChevronLeft, ChevronRight, CalendarDays, AlertCircle, Barcode
 } from "lucide-react";
 import { getAllPatients, updatePayment, updatePatient } from "@/src/api/patient";
-import { getDoctors, getTests, getPackages, getSpecimenTypes } from "@/src/api/master";
+import { getDoctors, getTests, getPackages, getSpecimenTypes, getOrganizations } from "@/src/api/master";
 import html2pdf from "html2pdf.js";
 import { jsPDF } from "jspdf";
 const LetterHead = "/LetterHead.jpeg";
@@ -341,6 +341,11 @@ export default function BookingPage() {
   const [searchBarDoctorSearch, setSearchBarDoctorSearch] = useState("");
   const [showSearchBarDoctorDropdown, setShowSearchBarDoctorDropdown] = useState(false);
   const searchBarDoctorDropdownRef = useRef(null);
+  const [organizations, setOrganizations] = useState<any[]>([]);
+  const [searchBarOrganizationSearch, setSearchBarOrganizationSearch] = useState("");
+  const [showSearchBarOrganizationDropdown, setShowSearchBarOrganizationDropdown] = useState(false);
+  const searchBarOrganizationDropdownRef = useRef(null);
+  const [appliedOrganization, setAppliedOrganization] = useState("");
   
   // Applied filters (only updated when Search button is clicked)
   const [appliedPatientName, setAppliedPatientName] = useState("");
@@ -382,16 +387,20 @@ export default function BookingPage() {
 
   useEffect(() => {
     const today = new Date(); today.setHours(0,0,0,0);
-    // Default to show only today's patients
-    setDateRange({ start: today, end: today });
+    const sevenDaysAgo = new Date(today);
+    sevenDaysAgo.setDate(today.getDate() - 6); // Last 7 days (today - 6 = 7 days total)
+    // Default to show last 7 days of patients (to ensure newly registered patients appear)
+    setDateRange({ start: sevenDaysAgo, end: today });
   }, []);
 
   // Fetch real patients and doctors from API
   useEffect(() => {
-    Promise.all([getAllPatients(), getDoctors()])
-      .then(([patientsRes, doctorsRes]) => {
-        const patients = Array.isArray(patientsRes) ? patientsRes : [];
+    Promise.all([getAllPatients(1, 1000), getDoctors(), getOrganizations()])  // Fetch up to 1000 patients and organizations
+      .then(([patientsRes, doctorsRes, orgsRes]: any) => {
+        const patients = Array.isArray(patientsRes) ? patientsRes : (patientsRes?.data ? patientsRes.data : []);
         const doctors = Array.isArray(doctorsRes) ? doctorsRes : [];
+        const orgs = Array.isArray(orgsRes) ? orgsRes : (orgsRes?.data ? orgsRes.data : []);
+        setOrganizations(orgs);
         const mapped = [];
         
         patients.forEach((p) => {
@@ -407,6 +416,7 @@ export default function BookingPage() {
                 visitDate:       t.visitDate,
                 referralDoctor:  t.referralDoctor || "",
                 remarks:         t.remarks || "",
+                organizationId:  t.organizationId || "", // Capture organization ID
                 totalAmount:     0,
                 paidAmount:      t.paidAmount    || 0,
                 balanceAmount:   t.balanceAmount || 0,
@@ -475,6 +485,8 @@ export default function BookingPage() {
                 referralDoctor: visit.referralDoctor,
                 referralDoctorChecked: !!visit.referralDoctor,
                 visitDate: visitDate || "",
+                organizationId: visit.organizationId || "",
+                organizationCode: "", // Will be populated after fetching org data
               },
             });
           });
@@ -487,8 +499,19 @@ export default function BookingPage() {
           return dateA.getTime() - dateB.getTime(); // Ascending order: oldest first
         });
         
-        setAllBookings(mapped);
-        setBookings(mapped.filter(b => !deletedIds.has(b.bookingId)));
+        // Populate organizationCode from organizations list
+        const updatedBookings = mapped.map(booking => {
+          if (booking.patientData?.organizationId && orgs.length > 0) {
+            const org = orgs.find(o => o.id === booking.patientData.organizationId);
+            if (org && org.code) {
+              booking.patientData.organizationCode = org.code;
+            }
+          }
+          return booking;
+        });
+        
+        setAllBookings(updatedBookings);
+        setBookings(updatedBookings.filter(b => !deletedIds.has(b.bookingId)));
         setDoctorsList(doctors.map(d => ({
           id: d.id,
           name: `Dr. ${d.name}`,
@@ -559,6 +582,9 @@ export default function BookingPage() {
       }
       if (searchBarDoctorDropdownRef.current && !searchBarDoctorDropdownRef.current.contains(e.target)) {
         setShowSearchBarDoctorDropdown(false);
+      }
+      if (searchBarOrganizationDropdownRef.current && !searchBarOrganizationDropdownRef.current.contains(e.target)) {
+        setShowSearchBarOrganizationDropdown(false);
       }
       // Close print/download dropdowns when clicking outside
       if (showPrintDropdown || showDownloadDropdown) {
@@ -632,7 +658,10 @@ export default function BookingPage() {
     const matchesReferralDoctor = searchBarDoctorSearch 
       ? booking.patientData?.referralDoctor?.toLowerCase().includes(searchBarDoctorSearch.toLowerCase()) 
       : true;
-    return matchesName && matchesMobile && matchesOutstanding && matchesReferralDoctor;
+    const matchesOrganization = appliedOrganization
+      ? booking.patientData?.organizationId === appliedOrganization
+      : true;
+    return matchesName && matchesMobile && matchesOutstanding && matchesReferralDoctor && matchesOrganization;
   });
 
   const filteredDoctors = doctorsList.filter(doctor => 
@@ -707,8 +736,10 @@ export default function BookingPage() {
   const handleReset = () => {
     const today = new Date(); 
     today.setHours(0,0,0,0);
-    // Reset to show only today's patients
-    setDateRange({ start: today, end: today });
+    const sevenDaysAgo = new Date(today);
+    sevenDaysAgo.setDate(today.getDate() - 6);
+    // Reset to show last 7 days of patients
+    setDateRange({ start: sevenDaysAgo, end: today });
     setPatientNameSearch('');
     setMobileSearch('');
     setSearchBarDoctorSearch('');
@@ -1087,15 +1118,24 @@ export default function BookingPage() {
       specimenGroups[key].push(t.name);
     });
 
-    // Build labels
+    // Build labels - Include organization code if available
     const specimenEntries = Object.entries(specimenGroups);
-    const labels = specimenEntries.map(([specimen, shortNames], idx) => ({
-      barcodeValue: idx === 0 ? booking.visitId : `${booking.visitId}-${idx + 1}`,
-      specimen,
-      shortNamesStr: (shortNames as any[]).join(' / '),
-      dateStr,
-      timeStr,
-    }));
+    const labels = specimenEntries.map(([specimen, shortNames], idx) => {
+      let barcodeValue = idx === 0 ? booking.visitId : `${booking.visitId}-${idx + 1}`;
+      
+      // Add organization code if organization was selected during registration
+      if (booking.patientData?.organizationCode) {
+        barcodeValue = `${booking.patientData.organizationCode}-${barcodeValue}`;
+      }
+      
+      return {
+        barcodeValue,
+        specimen,
+        shortNamesStr: (shortNames as any[]).join(' / '),
+        dateStr,
+        timeStr,
+      };
+    });
 
     const genderInitial = booking.patientData?.gender ? booking.patientData.gender.charAt(0).toUpperCase() : '';
     const age = booking.patientData?.age || '';
@@ -1107,6 +1147,7 @@ export default function BookingPage() {
       age,
       gender: booking.patientData?.gender || '',
       ageGender,
+      organizationCode: booking.patientData?.organizationCode || '', // Add organization code to patient info
     });
     setBarcodeLabels(labels);
     setShowBarcodeModal(true);
@@ -1129,8 +1170,80 @@ export default function BookingPage() {
       <div className="bg-white rounded shadow p-3 mb-4">
         <div className="flex flex-wrap gap-2 items-center">
           <DateRangePicker value={dateRange} onChange={setDateRange} />
-          <select className={style.input}><option>All</option><option>Shraddha Center</option></select>
-          <select className={style.input}><option>Select Corporate</option></select>
+          
+          {/* Organization Filter */}
+          <div className="relative" ref={searchBarOrganizationDropdownRef}>
+            <div className="flex items-center border rounded px-3 py-1 text-sm bg-white hover:border-orange-400 transition-colors min-w-[150px]">
+              <input
+                type="text"
+                placeholder="Organization"
+                value={searchBarOrganizationSearch}
+                onChange={(e) => {
+                  setSearchBarOrganizationSearch(e.target.value);
+                  setShowSearchBarOrganizationDropdown(true);
+                }}
+                onFocus={() => setShowSearchBarOrganizationDropdown(true)}
+                className="outline-none bg-transparent flex-1 text-xs"
+              />
+              {appliedOrganization && (
+                <button
+                  onClick={() => {
+                    setAppliedOrganization("");
+                    setSearchBarOrganizationSearch("");
+                  }}
+                  className="text-gray-400 hover:text-gray-600 ml-1"
+                  title="Clear selection"
+                >
+                  <X size={14} />
+                </button>
+              )}
+              {!appliedOrganization && !searchBarOrganizationSearch && (
+                <ChevronDown size={14} className="text-gray-400 pointer-events-none ml-1" />
+              )}
+            </div>
+            
+            {/* Organization Dropdown */}
+            {showSearchBarOrganizationDropdown && (
+              <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-300 rounded shadow-lg z-50 max-h-48 overflow-y-auto">
+                {organizations.length === 0 ? (
+                  <div className="p-2 text-gray-500 text-xs">No organizations found</div>
+                ) : (
+                  <>
+                    <div
+                      onClick={() => {
+                        setAppliedOrganization("");
+                        setSearchBarOrganizationSearch("");
+                        setShowSearchBarOrganizationDropdown(false);
+                      }}
+                      className="p-2 cursor-pointer hover:bg-orange-50 border-b border-gray-100 text-xs"
+                    >
+                      <div className="font-medium">All Organizations</div>
+                    </div>
+                    {organizations
+                      .filter(org => 
+                        org.name.toLowerCase().includes(searchBarOrganizationSearch.toLowerCase()) ||
+                        (org.code && org.code.toLowerCase().includes(searchBarOrganizationSearch.toLowerCase()))
+                      )
+                      .map((org) => (
+                        <div
+                          key={org.id}
+                          onClick={() => {
+                            setAppliedOrganization(org.id);
+                            setSearchBarOrganizationSearch(org.name);
+                            setShowSearchBarOrganizationDropdown(false);
+                          }}
+                          className="p-2 cursor-pointer hover:bg-orange-50 border-b border-gray-100 text-xs"
+                        >
+                          <div className="font-medium">{org.name}</div>
+                          {org.code && <div className="text-xs text-gray-500">{org.code}</div>}
+                        </div>
+                      ))}
+                  </>
+                )}
+              </div>
+            )}
+          </div>
+          
           <input 
             placeholder="Patient Name" 
             value={patientNameSearch}

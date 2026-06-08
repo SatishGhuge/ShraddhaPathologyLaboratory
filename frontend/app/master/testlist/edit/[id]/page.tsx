@@ -938,22 +938,14 @@ const AddTest = () => {
         const response = await createTest(completeTestData);
         console.log("✅ Test created successfully:", response);
         const testId = response.id || response._id;
-        const goToCharges = window.confirm(`Test created successfully! ✅\n\nTest ID: ${testId}\nCategories saved: ${categoryData.length}\nParameters saved: ${categoryData.reduce((total, cat) => total + (cat.parameters?.length || 0), 0)}\n\nDo you want to add charges for this test now?`);
-        if (goToCharges && testId) {
-          router.push(`/master/test-charges/${testId}`);
-        } else {
-          router.push("/master/testlist");
-        }
+        alert(`Test created successfully! ✅\n\nTest ID: ${testId}\nCategories saved: ${categoryData.length}\nParameters saved: ${categoryData.reduce((total, cat) => total + (cat.parameters?.length || 0), 0)}\n\nManage charges from Master → Charges module.`);
+        router.push("/master/testlist");
       } else if (isEditMode) {
         console.log("✏️ Updating existing test with ID:", id);
         const response = await updateTest((Array.isArray(id) ? id[0] : id) as string, completeTestData);
         console.log("✅ Test updated successfully:", response);
-        const goToCharges = window.confirm(`Test updated successfully! ✅\n\nCategories updated: ${categoryData.length}\nParameters updated: ${categoryData.reduce((total, cat) => total + (cat.parameters?.length || 0), 0)}\n\nDo you want to manage charges for this test?`);
-        if (goToCharges) {
-          router.push(`/master/test-charges/${id}`);
-        } else {
-          router.push("/master/testlist");
-        }
+        alert(`Test updated successfully! ✅\n\nCategories updated: ${categoryData.length}\nParameters updated: ${categoryData.reduce((total, cat) => total + (cat.parameters?.length || 0), 0)}\n\nManage charges from Master → Charges module.`);
+        router.push("/master/testlist");
       }
     } catch (err) {
       console.error("❌ Error saving test:", err);

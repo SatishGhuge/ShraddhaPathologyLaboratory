@@ -8,7 +8,7 @@ import {
   Plus, Trash2, DollarSign, ChevronDown, User, Settings, BarChart3, HelpCircle, ClipboardCheck, Lock
 } from "lucide-react";
 import Header from "@/src/components/Header";
-import { updateOrganization, getOrganizationById, createOrganizationWithCredentials, getTests } from "@/src/api/master";
+import { updateOrganization, getOrganizationById, createOrganizationWithCredentials } from "@/src/api/master";
 
 // Module Accordion Component
 const ModuleAccordion = ({ title, icon: Icon, color, items, moduleAllocation, toggleModule }: any) => {
@@ -206,18 +206,9 @@ const AddOrganization = () => {
     active: "Yes",
   });
 
-  const [testCharges, setTestCharges] = useState<any[]>([]);
-  const [availableTests, setAvailableTests] = useState<any[]>([]);
   const [toast, setToast] = useState<any>(null);
   const [saving, setSaving] = useState(false);
   const [moduleAllocation, setModuleAllocation] = useState(defaultModuleAllocation);
-
-  // Load tests on mount
-  useEffect(() => {
-    getTests().then((tests: any) => {
-      setAvailableTests(Array.isArray(tests) ? tests : tests?.data || []);
-    }).catch(console.error);
-  }, []);
 
   useEffect(() => {
     if (id && (isViewMode || isEditMode)) {
@@ -271,24 +262,6 @@ const AddOrganization = () => {
     setModuleAllocation(newAllocation);
   };
 
-  const addTestCharge = () => {
-    setTestCharges([...testCharges, { testId: "", b2cCharge: "", b2bCharge: "", testName: "" }]);
-  };
-
-  const removeTestCharge = (index: number) => {
-    setTestCharges(testCharges.filter((_, i) => i !== index));
-  };
-
-  const updateTestCharge = (index: number, field: string, value: any) => {
-    const updated = [...testCharges];
-    updated[index][field] = value;
-    if (field === "testId") {
-      const test = availableTests.find(t => t.id === parseInt(value));
-      updated[index].testName = test?.name || "";
-    }
-    setTestCharges(updated);
-  };
-
   const closeToast = () => {
     const wasSuccess = toast?.type === "success";
     setToast(null);
@@ -323,14 +296,6 @@ const AddOrganization = () => {
         moduleAllocation: JSON.stringify(moduleAllocation),
       };
 
-      if (!isEditMode && testCharges.length > 0) {
-        payload.testCharges = testCharges.map(tc => ({
-          testId: parseInt(tc.testId),
-          b2cCharge: parseFloat(tc.b2cCharge) || 0,
-          b2bCharge: parseFloat(tc.b2bCharge) || 0,
-        }));
-      }
-
       if (isEditMode) {
         await updateOrganization((Array.isArray(id) ? id[0] : id) as string, payload);
         setToast({ type: "success", message: "Organization updated successfully! Update notification sent to email." });
@@ -338,7 +303,7 @@ const AddOrganization = () => {
         const res = await createOrganizationWithCredentials(payload);
         setToast({
           type: "success",
-          message: `Organization added successfully!${(res as any)?.chargesCreated ? ` with ${(res as any).chargesCreated} test charges` : ''}`,
+          message: `Organization added successfully!`,
           credentials: (res as any)?.credentials || (res as any)?.data?.credentials || null,
         });
       }
@@ -389,7 +354,25 @@ const AddOrganization = () => {
                     className="w-full px-2 py-1.5 outline-none text-sm disabled:bg-gray-50 bg-transparent" />
                 </div>
               </div>
+              <div>
+                <label className="font-medium text-gray-700 text-sm">Code</label>
+                <div className="flex items-center border border-gray-300 rounded px-2 bg-white">
+                  <Hash size={14} className="text-cyan-600" />
+                  <input type="text" name="code" value={formData.code} onChange={handleChange}
+                    disabled={isViewMode} required={!isViewMode}
+                    className="w-full px-2 py-1.5 outline-none text-sm disabled:bg-gray-50 bg-transparent" />
+                </div>
+              </div>
 
+              <div>
+                <label className="font-medium text-gray-700 text-sm">Location</label>
+                <div className="flex items-center border border-gray-300 rounded px-2 bg-white">
+                  <MapPin size={14} className="text-cyan-600" />
+                  <input type="text" name="location" value={formData.location} onChange={handleChange}
+                    disabled={isViewMode} required={!isViewMode}
+                    className="w-full px-2 py-1.5 outline-none text-sm disabled:bg-gray-50 bg-transparent" />
+                </div>
+              </div>
               <div>
                 <label className="font-medium text-gray-700 text-sm">Location</label>
                 <div className="flex items-center border border-gray-300 rounded px-2 bg-white">
@@ -410,7 +393,26 @@ const AddOrganization = () => {
                     className="w-full px-2 py-1.5 outline-none text-sm disabled:bg-gray-50 bg-transparent" />
                 </div>
               </div>
+              <div>
+                <label className="font-medium text-gray-700 text-sm">Mobile No.</label>
+                <div className="flex items-center border border-gray-300 rounded px-2 bg-white">
+                  <Phone size={14} className="text-cyan-600" />
+                  <input type="tel" name="mobile" value={formData.mobile} onChange={handleChange}
+                    disabled={isViewMode} maxLength={10} placeholder="10 digit mobile number"
+                    required={!isViewMode}
+                    className="w-full px-2 py-1.5 outline-none text-sm disabled:bg-gray-50 bg-transparent" />
+                </div>
+              </div>
 
+              <div>
+                <label className="font-medium text-gray-700 text-sm">Date of Establishment</label>
+                <div className="flex items-center border border-gray-300 rounded px-2 bg-white">
+                  <CalendarDays size={14} className="text-cyan-600" />
+                  <input type="date" name="date" value={formData.date} onChange={handleChange}
+                    disabled={isViewMode} required={!isViewMode}
+                    className="w-full px-2 py-1.5 outline-none text-sm disabled:bg-gray-50 bg-transparent" />
+                </div>
+              </div>
               <div>
                 <label className="font-medium text-gray-700 text-sm">Date of Establishment</label>
                 <div className="flex items-center border border-gray-300 rounded px-2 bg-white">
@@ -432,7 +434,27 @@ const AddOrganization = () => {
                   </select>
                 </div>
               </div>
+              <div>
+                <label className="font-medium text-gray-700 text-sm">Active Status</label>
+                <div className="flex items-center border border-gray-300 rounded px-2 bg-white">
+                  <select name="active" value={formData.active} onChange={handleChange}
+                    disabled={isViewMode}
+                    className="w-full px-2 py-1.5 outline-none text-sm disabled:bg-gray-50 bg-transparent">
+                    <option value="Yes">Yes</option>
+                    <option value="No">No</option>
+                  </select>
+                </div>
+              </div>
 
+              <div className="md:col-span-2">
+                <label className="font-medium text-gray-700 text-sm">Email Address</label>
+                <div className="flex items-center border border-gray-300 rounded px-2 bg-white">
+                  <Mail size={14} className="text-cyan-600" />
+                  <input type="email" name="email" value={formData.email} onChange={handleChange}
+                    disabled={isViewMode} placeholder="example@domain.com" required={!isViewMode}
+                    className="w-full px-2 py-1.5 outline-none text-sm disabled:bg-gray-50 bg-transparent" />
+                </div>
+              </div>
               <div className="md:col-span-2">
                 <label className="font-medium text-gray-700 text-sm">Email Address</label>
                 <div className="flex items-center border border-gray-300 rounded px-2 bg-white">
@@ -547,88 +569,6 @@ const AddOrganization = () => {
                     toggleModule={toggleModule}
                   />
                 </div>
-              </div>
-            )}
-
-            {/* Test Charges Section - Only for Add Mode */}
-            {!isViewMode && !isEditMode && (
-              <div className="border-t pt-4">
-                <div className="flex items-center justify-between mb-3">
-                  <h3 className="font-semibold text-gray-800 flex items-center gap-2">
-                    <DollarSign size={16} /> Test Charges (Optional)
-                  </h3>
-                  <button
-                    type="button"
-                    onClick={addTestCharge}
-                    className="flex items-center gap-1 bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded text-xs transition-colors"
-                  >
-                    <Plus size={14} /> Add Charge
-                  </button>
-                </div>
-
-                {testCharges.length > 0 ? (
-                  <div className="overflow-x-auto border border-gray-300 rounded">
-                    <table className="w-full text-xs">
-                      <thead className="bg-gray-100 border-b border-gray-300">
-                        <tr>
-                          <th className="px-2 py-1 text-left font-semibold">Test Name</th>
-                          <th className="px-2 py-1 text-left font-semibold">B2C Charge</th>
-                          <th className="px-2 py-1 text-left font-semibold">B2B Charge</th>
-                          <th className="px-2 py-1 text-center font-semibold">Action</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {testCharges.map((charge, index) => (
-                          <tr key={index} className="border-b border-gray-200 hover:bg-gray-50">
-                            <td className="px-2 py-1">
-                              <select
-                                value={charge.testId}
-                                onChange={(e) => updateTestCharge(index, "testId", e.target.value)}
-                                className="w-full border border-gray-300 rounded px-1 py-0.5 text-xs bg-white"
-                              >
-                                <option value="">Select Test</option>
-                                {availableTests.map((test) => (
-                                  <option key={test.id} value={test.id}>{test.name}</option>
-                                ))}
-                              </select>
-                            </td>
-                            <td className="px-2 py-1">
-                              <input
-                                type="number"
-                                value={charge.b2cCharge}
-                                onChange={(e) => updateTestCharge(index, "b2cCharge", e.target.value)}
-                                placeholder="0"
-                                className="w-full border border-gray-300 rounded px-1 py-0.5 text-xs bg-white"
-                              />
-                            </td>
-                            <td className="px-2 py-1">
-                              <input
-                                type="number"
-                                value={charge.b2bCharge}
-                                onChange={(e) => updateTestCharge(index, "b2bCharge", e.target.value)}
-                                placeholder="0"
-                                className="w-full border border-gray-300 rounded px-1 py-0.5 text-xs bg-white"
-                              />
-                            </td>
-                            <td className="px-2 py-1 text-center">
-                              <button
-                                type="button"
-                                onClick={() => removeTestCharge(index)}
-                                className="bg-red-500 hover:bg-red-600 text-white px-2 py-0.5 rounded text-xs transition-colors"
-                              >
-                                <Trash2 size={12} />
-                              </button>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                ) : (
-                  <p className="text-gray-500 text-xs italic">
-                    No test charges added. Default charges will be copied from the system defaults.
-                  </p>
-                )}
               </div>
             )}
 

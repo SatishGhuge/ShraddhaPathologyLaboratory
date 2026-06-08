@@ -5868,13 +5868,123 @@
   "sampleTypes": [
     {
       "id": 1,
-      "Sample_Type": "Bood",
-      "Sample_Color": "Red"
+      "Sample_Type": "Body fluid",
+      "Sample_Color": ""
     },
     {
       "id": 2,
+      "Sample_Type": "Campylobacter jejuni",
+      "Sample_Color": "gray"
+    },
+    {
+      "id": 3,
+      "Sample_Type": "Drain fluid",
+      "Sample_Color": ""
+    },
+    {
+      "id": 4,
+      "Sample_Type": "EDTA Plasma",
+      "Sample_Color": "purple"
+    },
+    {
+      "id": 5,
+      "Sample_Type": "EDTA WB",
+      "Sample_Color": "purple"
+    },
+    {
+      "id": 6,
+      "Sample_Type": "Fluoride Plasma-F",
+      "Sample_Color": "gray"
+    },
+    {
+      "id": 7,
+      "Sample_Type": "Fluoride Plasma-PP",
+      "Sample_Color": "gray"
+    },
+    {
+      "id": 8,
+      "Sample_Type": "Fluoride Plasma-RBS",
+      "Sample_Color": "gray"
+    },
+    {
+      "id": 9,
+      "Sample_Type": "Heparinised Blood",
+      "Sample_Color": ""
+    },
+    {
+      "id": 10,
+      "Sample_Type": "Lithium Heparin",
+      "Sample_Color": "green"
+    },
+    {
+      "id": 11,
+      "Sample_Type": "Nasopharyngeal swab",
+      "Sample_Color": ""
+    },
+    {
+      "id": 12,
+      "Sample_Type": "PUS",
+      "Sample_Color": ""
+    },
+    {
+      "id": 13,
+      "Sample_Type": "Serum",
+      "Sample_Color": "red"
+    },
+    {
+      "id": 14,
+      "Sample_Type": "Skin biopsy sample",
+      "Sample_Color": ""
+    },
+    {
+      "id": 15,
+      "Sample_Type": "Sodium Citrate 3.2 % plasma specimen",
+      "Sample_Color": "blue"
+    },
+    {
+      "id": 16,
+      "Sample_Type": "Stool",
+      "Sample_Color": "Yellow"
+    },
+    {
+      "id": 17,
+      "Sample_Type": "Swab",
+      "Sample_Color": ""
+    },
+    {
+      "id": 18,
+      "Sample_Type": "Throat swab",
+      "Sample_Color": ""
+    },
+    {
+      "id": 19,
+      "Sample_Type": "Tissue specimen (Formalin)",
+      "Sample_Color": ""
+    },
+    {
+      "id": 20,
+      "Sample_Type": "Tissue specimen (Saline)",
+      "Sample_Color": ""
+    },
+    {
+      "id": 21,
       "Sample_Type": "Urine",
-      "Sample_Color": "yellow"
+      "Sample_Color": ""
+    },
+    {
+      "id": 22,
+      "Sample_Type": "Vaginal swab",
+      "Sample_Color": ""
+    },
+    {
+      "id": 23,
+      "Sample_Type": "WB in Culture Bottle",
+      "Sample_Color": ""
+    },
+    {
+      "id": 24,
+      "Sample_Type": "Wound Swab",
+      "Sample_Color": ""
     }
   ],
   "roles": [
@@ -5923,6 +6033,40 @@
       "createdAt": "2026-04-03T12:46:04.951Z",
       "updatedAt": "2026-04-03T12:46:04.951Z"
     }
+  ],
+  "units": [
+    {"id": 1, "symbol": "/cumm", "isActive": true},
+    {"id": 2, "symbol": "/dL", "isActive": true},
+    {"id": 3, "symbol": "/mL", "isActive": true},
+    {"id": 4, "symbol": "g/dL", "isActive": true},
+    {"id": 5, "symbol": "g/L", "isActive": true},
+    {"id": 6, "symbol": "GPS UNITS", "isActive": true},
+    {"id": 7, "symbol": "HP", "isActive": true},
+    {"id": 8, "symbol": "Index", "isActive": true},
+    {"id": 9, "symbol": "INR", "isActive": true},
+    {"id": 10, "symbol": "iu/gm Hb", "isActive": true},
+    {"id": 11, "symbol": "IU/L", "isActive": true},
+    {"id": 12, "symbol": "kg/L", "isActive": true},
+    {"id": 13, "symbol": "log 10", "isActive": true},
+    {"id": 14, "symbol": "m/uL", "isActive": true},
+    {"id": 15, "symbol": "mg/24 hr", "isActive": true},
+    {"id": 16, "symbol": "mg/24hr", "isActive": true},
+    {"id": 17, "symbol": "mg/day", "isActive": true},
+    {"id": 18, "symbol": "Min.", "isActive": true},
+    {"id": 19, "symbol": "mDu/kg", "isActive": true},
+    {"id": 20, "symbol": "ng /ml", "isActive": true},
+    {"id": 21, "symbol": "OD Units", "isActive": true},
+    {"id": 22, "symbol": "Sec.", "isActive": true},
+    {"id": 23, "symbol": "SDU", "isActive": true},
+    {"id": 24, "symbol": "U/L", "isActive": true},
+    {"id": 25, "symbol": "u /ml", "isActive": true},
+    {"id": 26, "symbol": "uL/fL", "isActive": true},
+    {"id": 27, "symbol": "ug/L", "isActive": true},
+    {"id": 28, "symbol": "ug/mL", "isActive": true},
+    {"id": 29, "symbol": "umol/L", "isActive": true},
+    {"id": 30, "symbol": "ummol/L", "isActive": true},
+    {"id": 31, "symbol": "Units", "isActive": true},
+    {"id": 32, "symbol": "uU/mL", "isActive": true}
   ],
   "corporates": []
 }

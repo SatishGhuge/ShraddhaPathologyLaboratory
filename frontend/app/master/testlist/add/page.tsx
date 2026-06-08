@@ -14,7 +14,7 @@ const baseInputClass =
 
 const AddTest = () => {
   const router = useRouter();
-  const { id } = useParams();
+  const { id } = useParams()
   const pathname = usePathname();
   
   // Determine mode based on route - more robust detection
