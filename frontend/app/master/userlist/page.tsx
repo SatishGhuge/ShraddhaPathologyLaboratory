@@ -91,7 +91,7 @@ const UserList = () => {
             <thead className="bg-slate-900 text-white">
               <tr>
                 <th className="border border-gray-300 px-3 py-2 text-left">Sr.No</th>
-                <th className="border border-gray-300 px-3 py-2 text-left">Center</th>
+                <th className="border border-gray-300 px-3 py-2 text-left">Organization</th>
                 <th className="border border-gray-300 px-3 py-2 text-left">Name</th>
                 <th className="border border-gray-300 px-3 py-2 text-left">Username</th>
                 <th className="border border-gray-300 px-3 py-2 text-left">Role</th>
