@@ -229,12 +229,24 @@ const AddOrganization = () => {
               });
               if (organization.moduleAllocation) {
                 try {
-                  const allocationData = organization.moduleAllocation.modules || organization.moduleAllocation;
+                  let allocationData = organization.moduleAllocation;
+                  console.log('📦 Raw moduleAllocation:', allocationData, 'Type:', typeof allocationData);
+                  
+                  // If it's an object with modules property, extract it
+                  if (allocationData && typeof allocationData === 'object' && 'modules' in allocationData) {
+                    allocationData = allocationData.modules;
+                    console.log('✅ Extracted modules from object:', allocationData);
+                  }
+                  
+                  // Parse if it's a string
                   const allocation = typeof allocationData === 'string' 
                     ? JSON.parse(allocationData) 
                     : allocationData;
-                  setModuleAllocation(allocation);
+                  console.log('✅ Final parsed allocation:', allocation);
+                    
+                  setModuleAllocation(allocation || defaultModuleAllocation);
                 } catch (e) {
+                  console.error('Error parsing module allocation:', e);
                   setModuleAllocation(defaultModuleAllocation);
                 }
               }
@@ -418,7 +430,7 @@ const AddOrganization = () => {
             </div>
 
             {/* Module Allocation Section */}
-            {!isViewMode && (
+            {(isEditMode || !isViewMode) && (
               <div className="border-t border-gray-300 pt-4 mt-4">
                 <h3 className="text-lg font-semibold text-slate-900 mb-4">Module Allocation</h3>
                 
@@ -516,7 +528,7 @@ const AddOrganization = () => {
               </div>
             )}
 
-            {!isViewMode && (
+            {(isEditMode || !isViewMode) && (
               <div className="flex gap-3 mt-4">
                 <button type="submit" disabled={saving}
                   className="flex items-center gap-2 bg-orange-500 hover:bg-orange-600 disabled:opacity-60 text-white px-4 py-1.5 rounded text-sm transition-colors">

@@ -1219,12 +1219,19 @@ export const getOrganizationById = async (req, res) => {
         createdAt: true,
         updatedAt: true,
         moduleAllocation: {
-          select: { id: true, modules: true }
+          select: { modules: true }
         }
       }
     });
     if (!organization) return res.status(404).json({ success: false, message: 'Organization not found' });
-    res.json({ success: true, data: organization });
+    
+    // Transform response to match frontend expectations
+    const response = {
+      ...organization,
+      moduleAllocation: organization.moduleAllocation?.modules || null
+    };
+    
+    res.json({ success: true, data: response });
   } catch (error) {
     console.error('Get organization error:', error);
     res.status(500).json({ success: false, message: 'Failed to fetch organization' });
@@ -1264,10 +1271,11 @@ export const createOrganization = async (req, res) => {
 
     // Create module allocation for organization if provided
     if (moduleAllocation) {
+      const modulesData = typeof moduleAllocation === 'string' ? JSON.parse(moduleAllocation) : moduleAllocation;
       await prisma.moduleAllocation.create({
         data: {
           organizationId: newId,
-          modules: typeof moduleAllocation === 'string' ? moduleAllocation : JSON.stringify(moduleAllocation)
+          modules: modulesData
         }
       });
     }
@@ -1285,10 +1293,11 @@ export const createOrganization = async (req, res) => {
       
       // Handle module allocation for the user
       if (moduleAllocation) {
+        const modulesData = typeof moduleAllocation === 'string' ? JSON.parse(moduleAllocation) : moduleAllocation;
         await prisma.moduleAllocation.upsert({
           where: { userId: upsertedUser.id },
-          update: { modules: typeof moduleAllocation === 'string' ? moduleAllocation : JSON.stringify(moduleAllocation) },
-          create: { userId: upsertedUser.id, modules: typeof moduleAllocation === 'string' ? moduleAllocation : JSON.stringify(moduleAllocation) }
+          update: { modules: modulesData },
+          create: { userId: upsertedUser.id, modules: modulesData }
         });
       }
       
@@ -4323,7 +4332,7 @@ export const updateUser = async (req, res) => {
     // Send updated credentials email (non-blocking)
     const emailTo = email || existing.email;
     if (emailTo) {
-      sendStaffCredentialsEmail(emailTo, name || existing.name, username?.trim() || existing.username, '(unchanged)', role || existing.role)
+      sendStaffCredentialsEmail(emailTo, name || existing.name, username?.trim() || existing.username, formData.password || '(unchanged)', role || existing.role)
         .catch(e => console.error('Failed to send update email:', e.message));
     }
 

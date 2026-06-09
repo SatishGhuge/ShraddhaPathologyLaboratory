@@ -346,83 +346,85 @@ const EditOrganization = () => {
 
             {/* Organization Details */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <label className="font-medium text-gray-700 text-sm">Name</label>
-              <div className="flex items-center border border-gray-300 rounded px-2 bg-white">
-                <Building2 size={14} className="text-cyan-600" />
-                <input type="text" name="name" value={formData.name} onChange={handleChange}
-                  disabled={isViewMode} required={!isViewMode}
-                  className="w-full px-2 py-1.5 outline-none text-sm disabled:bg-gray-50 bg-transparent" />
+              <div>
+                <label className="font-medium text-gray-700 text-sm">Name</label>
+                <div className="flex items-center border border-gray-300 rounded px-2 bg-white">
+                  <Building2 size={14} className="text-cyan-600" />
+                  <input type="text" name="name" value={formData.name} onChange={handleChange}
+                    disabled={isViewMode} required={!isViewMode}
+                    className="w-full px-2 py-1.5 outline-none text-sm disabled:bg-gray-50 bg-transparent" />
+                </div>
               </div>
-            </div>
 
-            <div>
-              <label className="font-medium text-gray-700 text-sm">Code</label>
-              <div className="flex items-center border border-gray-300 rounded px-2 bg-white">
-                <Hash size={14} className="text-cyan-600" />
-                <input type="text" name="code" value={formData.code} onChange={handleChange}
-                  disabled={isViewMode} required={!isViewMode}
-                  className="w-full px-2 py-1.5 outline-none text-sm disabled:bg-gray-50 bg-transparent" />
+              <div>
+                <label className="font-medium text-gray-700 text-sm">Code</label>
+                <div className="flex items-center border border-gray-300 rounded px-2 bg-white">
+                  <Hash size={14} className="text-cyan-600" />
+                  <input type="text" name="code" value={formData.code} onChange={handleChange}
+                    disabled={isViewMode} required={!isViewMode}
+                    className="w-full px-2 py-1.5 outline-none text-sm disabled:bg-gray-50 bg-transparent" />
+                </div>
               </div>
-            </div>
 
-            <div>
-              <label className="font-medium text-gray-700 text-sm">Location</label>
-              <div className="flex items-center border border-gray-300 rounded px-2 bg-white">
-                <MapPin size={14} className="text-cyan-600" />
-                <input type="text" name="location" value={formData.location} onChange={handleChange}
-                  disabled={isViewMode} required={!isViewMode}
-                  className="w-full px-2 py-1.5 outline-none text-sm disabled:bg-gray-50 bg-transparent" />
+              <div>
+                <label className="font-medium text-gray-700 text-sm">Location</label>
+                <div className="flex items-center border border-gray-300 rounded px-2 bg-white">
+                  <MapPin size={14} className="text-cyan-600" />
+                  <input type="text" name="location" value={formData.location} onChange={handleChange}
+                    disabled={isViewMode} required={!isViewMode}
+                    className="w-full px-2 py-1.5 outline-none text-sm disabled:bg-gray-50 bg-transparent" />
+                </div>
               </div>
-            </div>
 
-            <div>
-              <label className="font-medium text-gray-700 text-sm">Mobile No.</label>
-              <div className="flex items-center border border-gray-300 rounded px-2 bg-white">
-                <Phone size={14} className="text-cyan-600" />
-                <input type="tel" name="mobile" value={formData.mobile} onChange={handleChange}
-                  disabled={isViewMode} maxLength={10} placeholder="10 digit mobile number"
-                  required={!isViewMode}
-                  className="w-full px-2 py-1.5 outline-none text-sm disabled:bg-gray-50 bg-transparent" />
+              <div>
+                <label className="font-medium text-gray-700 text-sm">Mobile No.</label>
+                <div className="flex items-center border border-gray-300 rounded px-2 bg-white">
+                  <Phone size={14} className="text-cyan-600" />
+                  <input type="tel" name="mobile" value={formData.mobile} onChange={handleChange}
+                    disabled={isViewMode} maxLength={10} placeholder="10 digit mobile number"
+                    required={!isViewMode}
+                    className="w-full px-2 py-1.5 outline-none text-sm disabled:bg-gray-50 bg-transparent" />
+                </div>
               </div>
-            </div>
 
-            <div>
-              <label className="font-medium text-gray-700 text-sm">Date of Establishment</label>
-              <div className="flex items-center border border-gray-300 rounded px-2 bg-white">
-                <CalendarDays size={14} className="text-cyan-600" />
-                <input type="date" name="date" value={formData.date} onChange={handleChange}
-                  disabled={isViewMode} required={!isViewMode}
-                  className="w-full px-2 py-1.5 outline-none text-sm disabled:bg-gray-50 bg-transparent" />
+              <div>
+                <label className="font-medium text-gray-700 text-sm">Date of Establishment</label>
+                <div className="flex items-center border border-gray-300 rounded px-2 bg-white">
+                  <CalendarDays size={14} className="text-cyan-600" />
+                  <input type="date" name="date" value={formData.date} onChange={handleChange}
+                    disabled={isViewMode} required={!isViewMode}
+                    className="w-full px-2 py-1.5 outline-none text-sm disabled:bg-gray-50 bg-transparent" />
+                </div>
               </div>
-            </div>
 
-            <div>
-              <label className="font-medium text-gray-700 text-sm">Active Status</label>
-              <div className="flex items-center border border-gray-300 rounded px-2 bg-white">
-                <select name="active" value={formData.active} onChange={handleChange}
-                  disabled={isViewMode}
-                  className="w-full px-2 py-1.5 outline-none text-sm disabled:bg-gray-50 bg-transparent">
-                  <option value="Yes">Yes</option>
-                  <option value="No">No</option>
-                </select>
+              <div>
+                <label className="font-medium text-gray-700 text-sm">Active Status</label>
+                <div className="flex items-center border border-gray-300 rounded px-2 bg-white">
+                  <select name="active" value={formData.active} onChange={handleChange}
+                    disabled={isViewMode}
+                    className="w-full px-2 py-1.5 outline-none text-sm disabled:bg-gray-50 bg-transparent">
+                    <option value="Yes">Yes</option>
+                    <option value="No">No</option>
+                  </select>
+                </div>
               </div>
-            </div>
 
-            <div className="md:col-span-2">
-              <label className="font-medium text-gray-700 text-sm">Email Address</label>
-              <div className="flex items-center border border-gray-300 rounded px-2 bg-white">
-                <Mail size={14} className="text-cyan-600" />
-                <input type="email" name="email" value={formData.email} onChange={handleChange}
-                  disabled={isViewMode} placeholder="example@domain.com" required={!isViewMode}
-                  className="w-full px-2 py-1.5 outline-none text-sm disabled:bg-gray-50 bg-transparent" />
+              <div className="md:col-span-2">
+                <label className="font-medium text-gray-700 text-sm">Email Address</label>
+                <div className="flex items-center border border-gray-300 rounded px-2 bg-white">
+                  <Mail size={14} className="text-cyan-600" />
+                  <input type="email" name="email" value={formData.email} onChange={handleChange}
+                    disabled={isViewMode} placeholder="example@domain.com" required={!isViewMode}
+                    className="w-full px-2 py-1.5 outline-none text-sm disabled:bg-gray-50 bg-transparent" />
+                </div>
               </div>
-            </div>
 
-            <div className="md:col-span-2">
-              <label className="font-medium text-gray-700 text-sm">Address</label>
-              <textarea name="address" value={formData.address} onChange={handleChange}
-                disabled={isViewMode} rows={2} required={!isViewMode}
-                className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm disabled:bg-gray-50 bg-white" />
+              <div className="md:col-span-2">
+                <label className="font-medium text-gray-700 text-sm">Address</label>
+                <textarea name="address" value={formData.address} onChange={handleChange}
+                  disabled={isViewMode} rows={2} required={!isViewMode}
+                  className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm disabled:bg-gray-50 bg-white" />
+              </div>
             </div>
 
             {/* Module Allocation Section */}

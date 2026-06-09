@@ -166,6 +166,7 @@ export default function AddUserForm() {
   const router = useRouter();
   const { id } = useParams();
   const pathname = usePathname();
+  const isViewMode = pathname.includes("/view/");
   const isEditMode = pathname.includes("/edit/");
 
   const [showPassword, setShowPassword] = useState(false);
@@ -200,7 +201,7 @@ export default function AddUserForm() {
   }, []);
 
   useEffect(() => {
-    if (id && isEditMode) {
+    if (id && (isViewMode || isEditMode)) {
       setLoading(true);
       getUserById((Array.isArray(id) ? id[0] : id) as string)
         .then((user) => {
@@ -219,11 +220,24 @@ export default function AddUserForm() {
             });
             if (user.moduleAllocation) {
               try {
-                const allocation = typeof user.moduleAllocation === 'string' 
-                  ? JSON.parse(user.moduleAllocation) 
-                  : user.moduleAllocation;
-                setModuleAllocation(allocation);
+                let allocationData = user.moduleAllocation;
+                console.log('📦 Raw moduleAllocation:', allocationData, 'Type:', typeof allocationData);
+                
+                // If it's an object with modules property, extract it
+                if (allocationData && typeof allocationData === 'object' && 'modules' in allocationData) {
+                  allocationData = allocationData.modules;
+                  console.log('✅ Extracted modules from object:', allocationData);
+                }
+                
+                // Parse if it's a string
+                const allocation = typeof allocationData === 'string' 
+                  ? JSON.parse(allocationData) 
+                  : allocationData;
+                console.log('✅ Final parsed allocation:', allocation);
+                  
+                setModuleAllocation(allocation || defaultModuleAllocation);
               } catch (e) {
+                console.error('Error parsing module allocation:', e);
                 setModuleAllocation(defaultModuleAllocation);
               }
             }
@@ -232,9 +246,10 @@ export default function AddUserForm() {
         .catch((err) => setErrorMessage(err.message || "Failed to load user"))
         .finally(() => setLoading(false));
     }
-  }, [id, isEditMode]);
+  }, [id, isViewMode, isEditMode]);
 
   const handleChange = (e: any) => {
+    if (isViewMode) return;
     const { name, value } = e.target;
     if (name === "name" && !/^[a-zA-Z\s]*$/.test(value)) return;
     if (name === "mobile" && !/^\d*$/.test(value)) return;
@@ -243,6 +258,7 @@ export default function AddUserForm() {
   };
 
   const toggleModule = (path: string) => {
+    if (isViewMode) return;
     const keys = path.split('.');
     const newAllocation = JSON.parse(JSON.stringify(moduleAllocation));
     let current = newAllocation;
@@ -317,7 +333,7 @@ export default function AddUserForm() {
 
           <div className="flex justify-between items-center border-b border-gray-300 pb-2 mb-4">
             <h2 className="text-xl text-slate-900 font-semibold">
-              {isEditMode ? "Edit User Details" : "Enter User Details"}
+              {isViewMode ? "View User Details" : isEditMode ? "Edit User Details" : "Enter User Details"}
             </h2>
             <button onClick={() => router.push("/master/userlist")} className="text-slate-700 hover:text-slate-900">
               <ArrowLeft size={24} />
@@ -327,7 +343,7 @@ export default function AddUserForm() {
           <div className="grid grid-cols-2 gap-4 mb-4">
             <div>
               <label className={labelClass}>Organization *</label>
-              <select name="center" value={formData.center} onChange={handleChange} className={inputClass}>
+              <select name="center" value={formData.center} onChange={handleChange} disabled={isViewMode} className={`${inputClass} ${isViewMode ? 'bg-gray-50 text-gray-600 cursor-not-allowed' : ''}`}>
                 <option value="">Please Select</option>
                 {Array.isArray(organizations) && organizations.map(org => (
                   <option key={org.id} value={org.name}>{org.name}</option>
@@ -337,7 +353,7 @@ export default function AddUserForm() {
             </div>
             <div>
               <label className={labelClass}>Role *</label>
-              <select name="role" value={formData.role} onChange={handleChange} className={inputClass}>
+              <select name="role" value={formData.role} onChange={handleChange} disabled={isViewMode} className={`${inputClass} ${isViewMode ? 'bg-gray-50 text-gray-600 cursor-not-allowed' : ''}`}>
                 <option value="">Please Select</option>
                 {Array.isArray(roles) && roles.map(r => (
                   <option key={r.id} value={r.name}>{r.name}</option>
@@ -350,12 +366,12 @@ export default function AddUserForm() {
           <div className="grid grid-cols-2 gap-3 mb-4">
             <div>
               <label className={labelClass}>Username *</label>
-              <input name="username" value={formData.username} onChange={handleChange} className={inputClass} />
+              <input name="username" value={formData.username} onChange={handleChange} disabled={isViewMode} className={`${inputClass} ${isViewMode ? 'bg-gray-50 text-gray-600 cursor-not-allowed' : ''}`} />
               {errors.username && <p className="text-red-700 text-xs">{errors.username}</p>}
             </div>
             <div>
               <label className={labelClass}>Gender *</label>
-              <select name="gender" value={formData.gender} onChange={handleChange} className={inputClass}>
+              <select name="gender" value={formData.gender} onChange={handleChange} disabled={isViewMode} className={`${inputClass} ${isViewMode ? 'bg-gray-50 text-gray-600 cursor-not-allowed' : ''}`}>
                 <option value="">Select</option>
                 <option>Male</option>
                 <option>Female</option>
@@ -367,24 +383,25 @@ export default function AddUserForm() {
 
           <div className="mb-4">
             <label className={labelClass}>Name *</label>
-            <input name="name" value={formData.name} onChange={handleChange} className={inputClass} />
+            <input name="name" value={formData.name} onChange={handleChange} disabled={isViewMode} className={`${inputClass} ${isViewMode ? 'bg-gray-50 text-gray-600 cursor-not-allowed' : ''}`} />
             {errors.name && <p className="text-red-700 text-xs">{errors.name}</p>}
           </div>
 
           <div className="grid grid-cols-2 gap-3 mb-4">
             <div className="relative">
-              <label className={labelClass}>Password {!isEditMode && "*"}</label>
+              <label className={labelClass}>Password {!isEditMode && !isViewMode && "*"}</label>
               <input
                 name="password"
                 type={showPassword ? "text" : "password"}
                 value={formData.password}
                 onChange={handleChange}
+                disabled={isViewMode}
                 placeholder={isEditMode ? "Leave blank to keep current" : ""}
-                className={`${inputClass} pr-8`}
+                className={`${inputClass} pr-8 ${isViewMode ? 'bg-gray-50 text-gray-600 cursor-not-allowed' : ''}`}
               />
-              <span className="absolute right-2 top-7 cursor-pointer" onClick={() => setShowPassword(!showPassword)}>
+              {!isViewMode && <span className="absolute right-2 top-7 cursor-pointer" onClick={() => setShowPassword(!showPassword)}>
                 {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-              </span>
+              </span>}
               {errors.password && <p className="text-red-700 text-xs">{errors.password}</p>}
             </div>
             <div className="relative">
@@ -394,11 +411,12 @@ export default function AddUserForm() {
                 type={showConfirmPassword ? "text" : "password"}
                 value={formData.confirmPassword}
                 onChange={handleChange}
-                className={`${inputClass} pr-8`}
+                disabled={isViewMode}
+                className={`${inputClass} pr-8 ${isViewMode ? 'bg-gray-50 text-gray-600 cursor-not-allowed' : ''}`}
               />
-              <span className="absolute right-2 top-7 cursor-pointer" onClick={() => setShowConfirmPassword(!showConfirmPassword)}>
+              {!isViewMode && <span className="absolute right-2 top-7 cursor-pointer" onClick={() => setShowConfirmPassword(!showConfirmPassword)}>
                 {showConfirmPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-              </span>
+              </span>}
               {errors.confirmPassword && <p className="text-red-700 text-xs">{errors.confirmPassword}</p>}
             </div>
           </div>
@@ -406,17 +424,17 @@ export default function AddUserForm() {
           <div className="grid grid-cols-2 gap-3 mb-4">
             <div>
               <label className={labelClass}>Mobile Number</label>
-              <input name="mobile" type="tel" value={formData.mobile} onChange={handleChange} maxLength={10} placeholder="10 digit mobile" className={inputClass} />
+              <input name="mobile" type="tel" value={formData.mobile} onChange={handleChange} disabled={isViewMode} maxLength={10} placeholder="10 digit mobile" className={`${inputClass} ${isViewMode ? 'bg-gray-50 text-gray-600 cursor-not-allowed' : ''}`} />
             </div>
             <div>
               <label className={labelClass}>Email Address</label>
-              <input name="email" type="email" value={formData.email} onChange={handleChange} placeholder="example@domain.com" className={inputClass} />
+              <input name="email" type="email" value={formData.email} onChange={handleChange} disabled={isViewMode} placeholder="example@domain.com" className={`${inputClass} ${isViewMode ? 'bg-gray-50 text-gray-600 cursor-not-allowed' : ''}`} />
             </div>
           </div>
 
           <div className="mb-4">
             <label className={labelClass}>Address</label>
-            <textarea name="address" value={formData.address} onChange={handleChange} rows={2} className={inputClass} />
+            <textarea name="address" value={formData.address} onChange={handleChange} disabled={isViewMode} rows={2} className={`${inputClass} ${isViewMode ? 'bg-gray-50 text-gray-600 cursor-not-allowed' : ''}`} />
           </div>
 
           <div className="border-t border-gray-300 pt-4 mt-4">
@@ -524,16 +542,25 @@ export default function AddUserForm() {
           )}
 
           <div className="flex justify-center gap-3 mt-6">
-            <button
-              onClick={handleSubmit}
-              disabled={saving}
-              className="bg-orange-500 hover:bg-orange-600 disabled:opacity-60 text-white px-5 py-1.5 text-sm rounded-md"
-            >
-              {saving ? "Saving..." : isEditMode ? "Update" : "Save"}
-            </button>
-            <button onClick={() => router.push("/master/userlist")} className="bg-gray-500 hover:bg-gray-600 text-white px-5 py-1.5 text-sm rounded-md">
-              Cancel
-            </button>
+            {!isViewMode && (
+              <>
+                <button
+                  onClick={handleSubmit}
+                  disabled={saving}
+                  className="bg-orange-500 hover:bg-orange-600 disabled:opacity-60 text-white px-5 py-1.5 text-sm rounded-md"
+                >
+                  {saving ? "Saving..." : isEditMode ? "Update" : "Save"}
+                </button>
+                <button onClick={() => router.push("/master/userlist")} className="bg-gray-500 hover:bg-gray-600 text-white px-5 py-1.5 text-sm rounded-md">
+                  Cancel
+                </button>
+              </>
+            )}
+            {isViewMode && (
+              <button onClick={() => router.push("/master/userlist")} className="bg-gray-500 hover:bg-gray-600 text-white px-5 py-1.5 text-sm rounded-md">
+                Back
+              </button>
+            )}
           </div>
 
         </div>
