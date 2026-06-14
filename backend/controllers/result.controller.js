@@ -2,6 +2,14 @@ import prisma from '../config/database.js';
 import { sendResultNotificationEmail } from '../utils/email.js';
 import { sendWhatsAppMessage, buildResultMessage } from '../utils/whatsapp.js';
 import { getPaginationParams, buildPaginatedResponse } from '../utils/pagination.js';
+import { 
+  transitionToReceivedOnBarcodePrint, 
+  transitionToEnteredOnResultSave,
+  getStatusHistory,
+  getStatusSummary,
+  WORKFLOW_STAGES,
+  STAGE_METADATA
+} from '../utils/statusWorkflow.js';
 
 /* ===============================================
  * SHRADDHA PATHOLOGY LABORATORY - RESULT CONTROLLER
@@ -24,10 +32,9 @@ export const getPatientTests = async (req, res) => {
       status, 
       fromDate, 
       toDate, 
-      patientName, 
-      labRequest, 
-      corporate, 
+      searchQuery,
       department, 
+      organization,
       testName 
     } = req.query;
 
@@ -50,37 +57,45 @@ export const getPatientTests = async (req, res) => {
       andConditions.push({ visitDate: dateFilter });
     }
 
-    // Filter by patient name or patient ID
-    if (patientName) {
+    // Filter by searchQuery (Patient Name, ID, or Visit ID combined)
+    if (searchQuery) {
       andConditions.push({
-        patient: {
-          OR: [
-            { firstName: { contains: patientName } },
-            { lastName:  { contains: patientName } },
-            { patientId: { contains: patientName } }
-          ]
+        OR: [
+          {
+            patient: {
+              OR: [
+                { firstName: { contains: searchQuery, mode: 'insensitive' } },
+                { lastName:  { contains: searchQuery, mode: 'insensitive' } },
+                { patientId: { contains: searchQuery, mode: 'insensitive' } }
+              ]
+            }
+          },
+          { visitId: { contains: searchQuery, mode: 'insensitive' } }
+        ]
+      });
+    }
+
+    // Filter by department
+    if (department && department !== '') {
+      andConditions.push({ department: { name: { contains: department, mode: 'insensitive' } } });
+    }
+
+    // Filter by organization
+    if (organization && organization !== '') {
+      andConditions.push({ 
+        test: {
+          charges: {
+            some: {
+              organizationId: organization
+            }
+          }
         }
       });
     }
 
-    // Filter by visit ID
-    if (labRequest) {
-      andConditions.push({ visitId: { contains: labRequest } });
-    }
-
-    // Filter by corporate / business type
-    if (corporate) {
-      andConditions.push({ businessType: { contains: corporate } });
-    }
-
-    // Filter by department
-    if (department && department !== 'Department') {
-      andConditions.push({ department: { name: { contains: department } } });
-    }
-
     // Filter by test name
-    if (testName) {
-      andConditions.push({ test: { name: { contains: testName } } });
+    if (testName && testName !== '') {
+      andConditions.push({ test: { name: { contains: testName, mode: 'insensitive' } } });
     }
 
     const whereCondition = andConditions.length > 0 ? { AND: andConditions } : {};
@@ -799,32 +814,45 @@ export const getTestStatistics = async (req, res) => {
       }
     }
 
-    // Get counts by status
+    // Get counts by status (unique patients only)
     const statusCounts = await prisma.patientTest.groupBy({
       by: ['status'],
       where: whereCondition,
       _count: {
-        id: true
+        patientId: true  // Count unique patients instead of tests
       }
     });
 
-    // Get total count
-    const totalTests = await prisma.patientTest.count({
-      where: whereCondition
+    // Get total unique patients
+    const totalPatients = await prisma.patientTest.findMany({
+      where: whereCondition,
+      select: { patientId: true },
+      distinct: ['patientId']
     });
+
+    // Map old status names to new ones
+    const statusMapping = {
+      'REGISTERED': 'Registered',
+      'RECEIVED': 'Received',
+      'PROVISIONAL': 'Entered',
+      'AUTHENTICATED': 'Validation',
+      'DELIVERED': 'Delivered',
+      'RETEST': 'Rectified'
+    };
 
     // Format response
     const statistics = {
-      total: totalTests,
+      total: totalPatients.length,
       byStatus: {}
     };
 
     statusCounts.forEach(item => {
-      statistics.byStatus[item.status] = item._count.id;
+      const newStatus = statusMapping[item.status] || item.status;
+      statistics.byStatus[newStatus] = (statistics.byStatus[newStatus] || 0) + item._count.patientId;
     });
 
-    // Ensure all statuses are represented
-    const allStatuses = ['REGISTERED', 'RECEIVED', 'PROVISIONAL', 'AUTHENTICATED', 'DELIVERED', 'RETEST', 'REVERT', 'HOLD', 'REJECTED'];
+    // Ensure all new statuses are represented
+    const allStatuses = ['Registered', 'Received', 'Entered', 'Validation', 'Authorized', 'Delivered', 'Rectified'];
     allStatuses.forEach(status => {
       if (!statistics.byStatus[status]) {
         statistics.byStatus[status] = 0;

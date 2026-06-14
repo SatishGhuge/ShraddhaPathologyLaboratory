@@ -4,6 +4,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import React, { useState, useRef, useEffect } from "react";
 import Header from "@/src/components/Header";
 import PageHeader from "@/src/components/BreadCrumb";
+import API_BASE_URL from "@/src/api/config";
 
 import { 
   Search, RotateCcw, Eye, Pencil, Trash2, Printer,
@@ -2547,7 +2548,23 @@ export default function BookingPage() {
               </h2>
               <div className="flex gap-2">
                 <button
-                  onClick={() => {
+                  onClick={async () => {
+                    try {
+                      // Call API to transition test to Received status when barcode is printed
+                      if (barcodePatientInfo?.visitId) {
+                        await fetch(`${API_BASE_URL}/results/${barcodePatientInfo.visitId}/auto-transition/barcode-printed`, {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ changedBy: 'search_booking' })
+                        });
+                        console.log('✅ Test auto-transitioned to Received status');
+                      }
+                    } catch (error) {
+                      console.error('⚠️ Status transition failed:', error);
+                      // Don't block print if status update fails
+                    }
+                    
+                    // Proceed with print
                     const printArea = document.getElementById('barcode-print-area');
                     const win = window.open('', '_blank');
                     win.document.write(`<!DOCTYPE html><html><head><title>Barcode Labels</title>

@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Header from "@/src/components/Header";
 import PageHeader from "@/src/components/BreadCrumb";
+import API_BASE_URL from "@/src/api/config";
 
 import {
   RefreshCcw,
@@ -17,7 +18,6 @@ import {
 import { createPatient, searchPatient } from "@/src/api/patient";
 import { getDoctors, createDoctor, getSpecimenTypes, getOrganizations, getTestCharges } from "@/src/api/master";
 import { getCities, getSubSections, getDistricts, getVillages, formatLocation, parseLocation, searchLocations } from "@/src/data/maharashtraLocations";
-import API_BASE_URL from "@/src/api/config";
 
 /* ------------------ INLINE DATE PICKER ------------------ */
 const DP_MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
@@ -2582,7 +2582,27 @@ export default function PatientRegistration() {
               </h2>
               <div className="flex gap-2">
                 <button
-                  onClick={() => {
+                  onClick={async () => {
+                    try {
+                      // Call API to transition each test to Received status when barcode is printed
+                      for (const label of barcodeLabels) {
+                        // Extract test IDs from selected tests
+                        const testIds = selectedTests.map(t => t.id);
+                        for (const testId of testIds) {
+                          await fetch(`${API_BASE_URL}/results/${testId}/auto-transition/barcode-printed`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ changedBy: 'registration' })
+                          });
+                        }
+                      }
+                      console.log('✅ Tests auto-transitioned to Received status');
+                    } catch (error) {
+                      console.error('⚠️ Status transition failed:', error);
+                      // Don't block print if status update fails
+                    }
+                    
+                    // Proceed with print
                     const printArea = document.getElementById('barcode-print-area');
                     const win = window.open('', '_blank');
                     win.document.write(`<!DOCTYPE html><html><head><title>Barcode Labels</title>
