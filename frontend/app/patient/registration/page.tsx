@@ -672,6 +672,9 @@ export default function PatientRegistration() {
     setPaymentMode("Cash");
     setBusinessType("B2C");
     setExistingPatientId(null);
+    setSelectedOrganization("");
+    setSelectedOrganizationCode("");
+    setOrganizationSearch("");
     clearSavedFormData();
   };
   /* ============ END LOCALSTORAGE PERSISTENCE ============ */
@@ -1063,6 +1066,28 @@ export default function PatientRegistration() {
       const visitId = response?.data?.tests?.[0]?.visitId || 'N/A';
       const isExisting = response?.isExistingPatient || false;
       
+      // Get PatientTest objects from response (these have the correct database ID)
+      const patientTests = response?.data?.tests || [];
+      console.log('📋 PatientTests from response:', patientTests);
+      console.log('   Count:', patientTests.length);
+      patientTests.forEach((pt, idx) => {
+        console.log(`   [${idx}] id=${pt.id}, testId=${pt.testId}, name=${pt.test?.name}`);
+      });
+      
+      // Merge PatientTest data with original selectedTests to get both ID and sample type
+      const testsForBarcode = patientTests.map(pt => {
+        const originalTest = selectedTests.find(st => st.id === pt.testId);
+        const result = {
+          id: pt.id, // This is the PatientTest database ID - use this for API calls!
+          testId: pt.testId, // Original test ID for reference
+          name: originalTest?.name || pt.test?.name || 'Unknown',
+          sample: originalTest?.sample || pt.test?.sampleType || 'Unknown'
+        };
+        console.log(`  Mapped: id=${result.id}, name=${result.name}, sample=${result.sample}`);
+        return result;
+      });
+      console.log('🔍 Tests for barcode (with correct IDs):', testsForBarcode);
+      
       // Show success message with indicator of new vs existing patient
       let message = '';
       if (isExisting) {
@@ -1080,13 +1105,13 @@ export default function PatientRegistration() {
       alert(message);
       
       // If tests were added, show barcode modal
-      if (selectedTests.length > 0 && visitId !== 'N/A') {
+      if (testsForBarcode.length > 0 && visitId !== 'N/A') {
         showBarcodeAfterRegistration(
           `${title} ${firstName} ${lastName || ''}`.trim(),
           visitId,
           age,
           gender,
-          selectedTests,
+          testsForBarcode,
           selectedOrganizationCode // Pass organization code to barcode function
         );
       }
@@ -1169,13 +1194,25 @@ export default function PatientRegistration() {
     const dateStr = now.toLocaleDateString('en-GB');
     const timeStr = now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: true }).toUpperCase();
 
-    // Group by specimen type
+    console.log('🎫 showBarcodeAfterRegistration called with tests:', tests);
+
+    // Group by specimen type and collect PATIENTTEST IDs (not test IDs!)
     const specimenGroups: any = {};
-    tests.forEach(t => {
+    const specimenTestIds: any = {};
+    tests.forEach((t, idx) => {
+      console.log(`  Test ${idx}: id=${t.id}, name=${t.name}, sample=${t.sample}`);
       const key = t.sample || 'Unknown';
-      if (!specimenGroups[key]) specimenGroups[key] = [];
+      if (!specimenGroups[key]) {
+        specimenGroups[key] = [];
+        specimenTestIds[key] = [];
+      }
       specimenGroups[key].push(t.name);
+      specimenTestIds[key].push(t.id); // This is now the PatientTest database ID
+      console.log(`  Added test ${t.id} to specimen group "${key}"`);
     });
+
+    console.log('🔍 Specimen groups:', specimenGroups);
+    console.log('🔍 Specimen test IDs:', specimenTestIds);
 
     // Build labels - Use visitId for barcode ONLY (no organization code in barcode)
     const specimenEntries = Object.entries(specimenGroups);
@@ -1183,14 +1220,19 @@ export default function PatientRegistration() {
       // Barcode contains ONLY visitId, not organization code
       let barcodeValue = idx === 0 ? visitId : `${visitId}-${idx + 1}`;
       
-      return {
+      const label = {
         barcodeValue, // Just the visitId-based barcode
         specimen,
         shortNamesStr: (shortNames as any[]).join(' / '),
         dateStr,
         timeStr,
+        testIds: specimenTestIds[specimen] || [], // Include PatientTest IDs for API calls
       };
+      console.log(`  Label ${idx}: testIds=`, label.testIds);
+      return label;
     });
+
+    console.log('✅ Final barcode labels:', labels);
 
     const genderInitial = gender ? gender.charAt(0).toUpperCase() : '';
     const ageGender = genderInitial && age ? `${genderInitial}/${age} Yrs` : genderInitial || (age ? `${age} Yrs` : '');
@@ -2583,20 +2625,53 @@ export default function PatientRegistration() {
               <div className="flex gap-2">
                 <button
                   onClick={async () => {
+                    // Just print without status transition
+                    const printArea = document.getElementById('barcode-print-area');
+                    const win = window.open('', '_blank');
+                    win.document.write(`<!DOCTYPE html><html><head><title>Barcode Labels</title>
+                      <style>
+                        * { margin:0; padding:0; box-sizing:border-box; }
+                        body { font-family: Arial, sans-serif; background: white; }
+                        .labels-wrap { display: flex; flex-wrap: wrap; gap: 8mm; padding: 8mm; }
+                        .label { width: 80mm; border: 0.5px solid #999; page-break-inside: avoid; }
+                        @page { size: A4; margin: 8mm; }
+                      </style>
+                    </head><body>${printArea.innerHTML}</body></html>`);
+                    win.document.close();
+                    win.focus();
+                    win.print();
+                    setShowBarcodeModal(false);
+                  }}
+                  className="text-white bg-blue-600 hover:bg-blue-700 px-2 py-1 rounded text-xs font-semibold"
+                >
+                  Print Only
+                </button>
+
+                <button
+                  onClick={async () => {
                     try {
-                      // Call API to transition each test to Received status when barcode is printed
+                      // Collect all test IDs from all barcode labels
+                      const allTestIds = new Set<number>();
                       for (const label of barcodeLabels) {
-                        // Extract test IDs from selected tests
-                        const testIds = selectedTests.map(t => t.id);
-                        for (const testId of testIds) {
-                          await fetch(`${API_BASE_URL}/results/${testId}/auto-transition/barcode-printed`, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ changedBy: 'registration' })
-                          });
+                        if (label.testIds && Array.isArray(label.testIds)) {
+                          label.testIds.forEach((id: number) => allTestIds.add(id));
                         }
                       }
-                      console.log('✅ Tests auto-transitioned to Received status');
+                      
+                      console.log('📝 Test IDs to update:', Array.from(allTestIds));
+                      
+                      // Call API for each test ID
+                      for (const testId of allTestIds) {
+                        console.log(`🔄 Transitioning test ${testId} to Received status...`);
+                        const response = await fetch(`${API_BASE_URL}/results/${testId}/auto-transition/barcode-printed`, {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ changedBy: 'registration' })
+                        });
+                        const data = await response.json();
+                        console.log(`✅ Test ${testId} response:`, data);
+                      }
+                      console.log('✅ All tests auto-transitioned to Received status');
                     } catch (error) {
                       console.error('⚠️ Status transition failed:', error);
                       // Don't block print if status update fails
@@ -2617,19 +2692,18 @@ export default function PatientRegistration() {
                     win.document.close();
                     win.focus();
                     win.print();
-                    win.close();
-                  }}
-                  className="bg-blue-600 text-white px-4 py-1.5 rounded text-xs font-semibold hover:bg-blue-700"
-                >
-                  🖨️ Print
-                </button>
-                <button
-                  onClick={() => {
                     setShowBarcodeModal(false);
-                    setTimeout(() => {
-                      window.location.reload();
-                    }, 500);
+                    
+                    // Show success message - status has been updated to Received
+                    alert('✅ Tests marked as Received and printed successfully!');
                   }}
+                  className="text-white bg-green-600 hover:bg-green-700 px-2 py-1 rounded text-xs font-semibold"
+                >
+                  Print & Update
+                </button>
+
+                <button
+                  onClick={() => setShowBarcodeModal(false)}
                   className="text-gray-300 hover:text-white text-xl font-bold leading-none px-1"
                 >×</button>
               </div>

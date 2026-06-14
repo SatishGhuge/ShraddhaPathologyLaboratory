@@ -333,10 +333,6 @@ const PatientResult = () => {
           // Don't block save if transition fails
         }
         
-        // Auto set AUTHENTICATED if all results filled
-        if (allResultsFilled()) {
-          await updateTestStatus(patientData.id, { status: 'AUTHENTICATED' });
-        }
         // Upload attachment if a new file was selected
         if (attachedFile) {
           const formData = new FormData();
@@ -386,9 +382,6 @@ const PatientResult = () => {
           const formData = new FormData();
           formData.append('file', attachedFile);
           await fetch(`${API_BASE_URL}/results/${patientData.id}/attachment`, { method: 'POST', body: formData });
-        }
-        if (allResultsFilled()) {
-          await updateTestStatus(patientData.id, { status: 'AUTHENTICATED' });
         }
         setReportWithHeader(withHeader);
         setShowReportModal(true);

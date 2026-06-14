@@ -1,4 +1,5 @@
 import express from 'express';
+import prisma from '../config/database.js';
 import {
   getPatientTests,
   getPatientTestById,
@@ -96,13 +97,47 @@ router.get('/status/summary', async (req, res) => {
 });
 
 // Auto-transition to Received when barcode is printed
+// Accepts numeric patientTestId OR visitId (will auto-detect and handle both)
 router.post('/:id/auto-transition/barcode-printed', async (req, res) => {
   try {
-    const { id } = req.params;
+    let { id } = req.params;
     const { changedBy } = req.body;
     
+    console.log(`📥 Barcode Print - ID received: ${id} (type: ${typeof id}, length: ${id.length})`);
+    
+    const numId = parseInt(id);
+    let patientTest = null;
+    
+    // First, try to find by PatientTest ID (numeric)
+    if (!isNaN(numId) && numId > 0 && numId < 1000000) {
+      // Looks like a small sequential ID (PatientTest PK)
+      patientTest = await prisma.patientTest.findUnique({
+        where: { id: numId }
+      });
+      console.log(`  🔎 Searched by PatientTest ID ${numId}: ${patientTest ? 'Found' : 'Not found'}`);
+    }
+    
+    // If not found and id looks like a visitId (10+ digits), search by visitId
+    if (!patientTest && id.length > 8) {
+      patientTest = await prisma.patientTest.findFirst({
+        where: { visitId: id }
+      });
+      console.log(`  🔎 Searched by visitId ${id}: ${patientTest ? 'Found' : 'Not found'}`);
+    }
+    
+    // Still not found? Return error
+    if (!patientTest) {
+      return res.status(404).json({
+        success: false,
+        message: `Test not found for ID/visitId: ${id}`
+      });
+    }
+    
+    console.log(`✅ Found PatientTest: ID=${patientTest.id}, visitId=${patientTest.visitId}`);
+    
+    // Now update the status
     const updatedTest = await transitionToReceivedOnBarcodePrint(
-      parseInt(id),
+      patientTest.id,
       changedBy || 'SYSTEM'
     );
     
@@ -112,6 +147,7 @@ router.post('/:id/auto-transition/barcode-printed', async (req, res) => {
       data: updatedTest
     });
   } catch (error) {
+    console.error('❌ Error in barcode-printed endpoint:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to transition test status',

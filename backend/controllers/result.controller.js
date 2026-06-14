@@ -7,6 +7,7 @@ import {
   transitionToEnteredOnResultSave,
   getStatusHistory,
   getStatusSummary,
+  normalizeStatus,
   WORKFLOW_STAGES,
   STAGE_METADATA
 } from '../utils/statusWorkflow.js';
@@ -178,7 +179,7 @@ export const getPatientTests = async (req, res) => {
         attachment_path: patientTest.attachmentPath || null,
         specimen_type: patientTest.test.sampleType || patientTest.sample,
         ref_by: patientTest.referralDoctor || 'SELF',
-        result_status: patientTest.status,
+        result_status: normalizeStatus(patientTest.status),
         approved_date: patientTest.visitDate ? (() => {
           const d = patientTest.visitDate;
           const datePart = d.toLocaleDateString('en-GB'); // DD/MM/YYYY
@@ -647,9 +648,32 @@ export const updateTestStatus = async (req, res) => {
     const { id } = req.params;
     const { status, remarks } = req.body;
 
-    // Validate status
-    const validStatuses = ['REGISTERED', 'RECEIVED', 'PROVISIONAL', 'AUTHENTICATED', 'DELIVERED', 'RETEST', 'REVERT', 'HOLD', 'REJECTED'];
-    if (status && !validStatuses.includes(status.toUpperCase())) {
+    // Map old uppercase statuses to new format for backward compatibility
+    const statusMapping = {
+      'REGISTERED': 'Registered',
+      'RECEIVED': 'Received',
+      'PROVISIONAL': 'Entered',
+      'AUTHENTICATED': 'Authorized',
+      'VALIDATED': 'Validation',
+      'VALIDATION': 'Validation',
+      'DELIVERED': 'Delivered',
+      'RETEST': 'Rectified',
+      'RECTIFIED': 'Rectified',
+      'REVERT': 'Rectified',
+      'HOLD': 'Validation',
+      'REJECTED': 'Validation'
+    };
+
+    // Convert status to proper format
+    let properStatus = status;
+    if (status) {
+      const upperStatus = status.toUpperCase();
+      properStatus = statusMapping[upperStatus] || status;
+    }
+
+    // Validate status against allowed stages
+    const validStatuses = ['Registered', 'Received', 'Entered', 'Validation', 'Authorized', 'Delivered', 'Rectified'];
+    if (properStatus && !validStatuses.includes(properStatus)) {
       return res.status(400).json({
         success: false,
         message: 'Invalid status. Valid statuses are: ' + validStatuses.join(', ')
@@ -659,7 +683,7 @@ export const updateTestStatus = async (req, res) => {
     const updatedTest = await prisma.patientTest.update({
       where: { id: parseInt(id) },
       data: {
-        status: status?.toUpperCase(),
+        status: properStatus,
         remarks: remarks || undefined,
         updatedAt: new Date()
       },
@@ -699,11 +723,32 @@ export const updateTestResult = async (req, res) => {
     const { id } = req.params;
     const { result, status } = req.body;
 
+    // Map old uppercase statuses to new format for backward compatibility
+    const statusMapping = {
+      'REGISTERED': 'Registered',
+      'RECEIVED': 'Received',
+      'PROVISIONAL': 'Entered',
+      'AUTHENTICATED': 'Authorized',
+      'VALIDATED': 'Validation',
+      'VALIDATION': 'Validation',
+      'DELIVERED': 'Delivered',
+      'RETEST': 'Rectified',
+      'RECTIFIED': 'Rectified',
+      'REVERT': 'Rectified',
+      'HOLD': 'Validation',
+      'REJECTED': 'Validation'
+    };
+
     const updateData = {
       result: result || undefined,
-      status: status?.toUpperCase() || undefined,
       updatedAt: new Date()
     };
+
+    // Convert status to proper format if provided
+    if (status) {
+      const upperStatus = status.toUpperCase();
+      updateData.status = statusMapping[upperStatus] || status;
+    }
 
     // Automatically set resultDate when result is entered
     if (result && result.trim() !== '') {
@@ -755,9 +800,32 @@ export const bulkUpdateTestStatus = async (req, res) => {
       });
     }
 
-    // Validate status
-    const validStatuses = ['REGISTERED', 'RECEIVED', 'PROVISIONAL', 'AUTHENTICATED', 'DELIVERED', 'RETEST', 'REVERT', 'HOLD', 'REJECTED'];
-    if (status && !validStatuses.includes(status.toUpperCase())) {
+    // Map old uppercase statuses to new format for backward compatibility
+    const statusMapping = {
+      'REGISTERED': 'Registered',
+      'RECEIVED': 'Received',
+      'PROVISIONAL': 'Entered',
+      'AUTHENTICATED': 'Authorized',
+      'VALIDATED': 'Validation',
+      'VALIDATION': 'Validation',
+      'DELIVERED': 'Delivered',
+      'RETEST': 'Rectified',
+      'RECTIFIED': 'Rectified',
+      'REVERT': 'Rectified',
+      'HOLD': 'Validation',
+      'REJECTED': 'Validation'
+    };
+
+    // Convert status to proper format
+    let properStatus = status;
+    if (status) {
+      const upperStatus = status.toUpperCase();
+      properStatus = statusMapping[upperStatus] || status;
+    }
+
+    // Validate status against allowed stages
+    const validStatuses = ['Registered', 'Received', 'Entered', 'Validation', 'Authorized', 'Delivered', 'Rectified'];
+    if (properStatus && !validStatuses.includes(properStatus)) {
       return res.status(400).json({
         success: false,
         message: 'Invalid status. Valid statuses are: ' + validStatuses.join(', ')
@@ -771,7 +839,7 @@ export const bulkUpdateTestStatus = async (req, res) => {
         }
       },
       data: {
-        status: status?.toUpperCase(),
+        status: properStatus,
         remarks: remarks || undefined,
         updatedAt: new Date()
       }
@@ -835,9 +903,23 @@ export const getTestStatistics = async (req, res) => {
       'REGISTERED': 'Registered',
       'RECEIVED': 'Received',
       'PROVISIONAL': 'Entered',
-      'AUTHENTICATED': 'Validation',
+      'AUTHENTICATED': 'Authorized',
+      'VALIDATED': 'Validation',
+      'VALIDATION': 'Validation',
       'DELIVERED': 'Delivered',
-      'RETEST': 'Rectified'
+      'RETEST': 'Rectified',
+      'RECTIFIED': 'Rectified',
+      'REVERT': 'Rectified',
+      'HOLD': 'Validation',
+      'REJECTED': 'Validation',
+      // Handle already mapped statuses (new format)
+      'Registered': 'Registered',
+      'Received': 'Received',
+      'Entered': 'Entered',
+      'Validation': 'Validation',
+      'Authorized': 'Authorized',
+      'Delivered': 'Delivered',
+      'Rectified': 'Rectified'
     };
 
     // Format response
@@ -1018,20 +1100,36 @@ export const saveTestResults = async (req, res) => {
       }
     }
 
-    // Update patient test status and result date
+    // Update patient test result date
     await prisma.patientTest.update({
       where: { id: parseInt(patientTestId) },
       data: {
-        status: 'PROVISIONAL',
         resultDate: new Date(),
         updatedAt: new Date()
+      }
+    });
+
+    // Auto-transition status from Received to Entered
+    const enteredByUser = enteredBy || 'SYSTEM';
+    await transitionToEnteredOnResultSave(parseInt(patientTestId), enteredByUser);
+
+    // Fetch the updated patient test with new status
+    const updatedPatientTest = await prisma.patientTest.findUnique({
+      where: { id: parseInt(patientTestId) },
+      include: {
+        patient: true,
+        test: true,
+        department: true
       }
     });
 
     res.json({
       success: true,
       message: 'Test results saved successfully',
-      data: savedResults
+      data: {
+        savedResults,
+        patientTest: updatedPatientTest
+      }
     });
 
   } catch (error) {

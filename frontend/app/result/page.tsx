@@ -254,6 +254,11 @@ export default function Result() {
   // State for download dropdown
   const [showDownloadDropdown, setShowDownloadDropdown] = useState(false);
 
+  // State for sort dropdown
+  const [showSortDropdown, setShowSortDropdown] = useState(false);
+  const [sortBy, setSortBy] = useState('date'); // 'date', 'uid', 'alphabetic'
+
+
   // State for barcode checkbox selection (separate from result selection)
   const [barcodeSelectedTests, setBarcodeSelectedTests] = useState(new Set());
   const [barcodeLockedPatientUid, setBarcodeLockedPatientUid] = useState<any>(null);
@@ -453,7 +458,7 @@ export default function Result() {
     }
 
     let targetPatient = null;
-    for (const patient of filteredResults) {
+    for (const patient of sortedAndFilteredResults) {
       if (patient.patient_uid === barcodeLockedPatientUid && patient.visit_id === barcodeLockedVisitId) {
         targetPatient = patient;
         break;
@@ -469,10 +474,15 @@ export default function Result() {
     // Group by specimen type — one label per unique specimen
     // Multiple tests with same specimen → one barcode, short names joined with " / "
     const specimenGroups = {};
+    const specimenTestIds = {};
     selectedTestsList.forEach(t => {
       const key = t.specimen_type || 'Unknown';
-      if (!specimenGroups[key]) specimenGroups[key] = [];
+      if (!specimenGroups[key]) {
+        specimenGroups[key] = [];
+        specimenTestIds[key] = [];
+      }
       specimenGroups[key].push(t.test_short_name || t.test_name);
+      specimenTestIds[key].push(t.test_id); // Store test IDs
     });
 
     // Build labels — barcode value = visitId for first specimen, visitId-2, visitId-3 ...
@@ -485,6 +495,7 @@ export default function Result() {
       shortNamesStr: (shortNames as any[]).join(' / '),
       dateStr,
       timeStr,
+      testIds: specimenTestIds[specimen] || [], // Include test IDs for API calls
     }));
 
     const genderInitial = targetPatient.gender ? targetPatient.gender.charAt(0).toUpperCase() : '';
@@ -1282,7 +1293,7 @@ export default function Result() {
   // Load data on component mount and when filters change
   useEffect(() => {
     fetchResults();
-    fetchStatistics();
+    // fetchStatistics is now called inside fetchResults
   }, [filters]);
 
   // Fetch organizations on component mount
@@ -1320,6 +1331,13 @@ export default function Result() {
       
       const data = await getPatientTests(filters);
       setResults(data);
+      
+      // Calculate unique patient registration count
+      const uniquePatients = new Set(data.map(r => r.patient_uid)).size;
+      console.log(`📊 Unique patients registered today: ${uniquePatients}`);
+      
+      // Also fetch and update statistics with the new data
+      await fetchStatisticsWithData(data);
     } catch (err) {
       console.error('Error fetching results:', err);
       setError(err.message);
@@ -1328,14 +1346,43 @@ export default function Result() {
     }
   };
 
-  // Fetch statistics from API
-  const fetchStatistics = async () => {
+  // Fetch statistics from API with provided data
+  const fetchStatisticsWithData = async (data: any[]) => {
     try {
       const stats = await getTestStatistics({
         fromDate: filters.fromDate,
         toDate: filters.toDate
       });
-      setStatistics(stats);
+      
+      // Modify statistics: count unique patients for "Registered" count
+      // Instead of showing all tests with Registered status, show unique patients registered
+      const uniqueRegisteredPatients = new Set(
+        data
+          .filter(r => r.tests?.some(t => t.result_status === 'Registered'))
+          .map(r => r.patient_uid)
+      ).size;
+      
+      console.log(`👥 Unique patients with registered tests: ${uniqueRegisteredPatients}`);
+      console.log(`📊 Total tests with Registered status: ${data.flatMap(r => r.tests || []).filter(t => t.result_status === 'Registered').length}`);
+      
+      // Update stats to show unique patient count instead of test count
+      setStatistics({
+        ...stats,
+        byStatus: {
+          ...stats.byStatus,
+          Registered: uniqueRegisteredPatients  // Override with unique patient count
+        }
+      });
+    } catch (err) {
+      console.error('Error fetching statistics:', err);
+    }
+  };
+
+  // Fetch statistics from API (for manual calls)
+  const fetchStatistics = async () => {
+    try {
+      const data = await getPatientTests(filters);
+      await fetchStatisticsWithData(data);
     } catch (err) {
       console.error('Error fetching statistics:', err);
     }
@@ -1381,13 +1428,50 @@ export default function Result() {
     ? results 
     : results.map(patient => ({
         ...patient,
-        tests: patient.tests.filter(test => test.result_status.toUpperCase() === selectedStatus.toUpperCase())
+        tests: patient.tests.filter(test => {
+          // Map old status names to new ones
+          const statusMap = {
+            'Provisional': 'Entered',
+            'Authenticated': 'Authorized',
+            'Validated': 'Validation'
+          };
+          
+          const testStatus = statusMap[test.result_status] || test.result_status;
+          return testStatus.toUpperCase() === selectedStatus.toUpperCase();
+        })
       })).filter(patient => patient.tests.length > 0);
+
+  // Sort results based on sortBy selection
+  const sortedAndFilteredResults = [...filteredResults].sort((a, b) => {
+    switch (sortBy) {
+      case 'date':
+        // Sort by date (newest first)
+        return new Date(b.tests?.[0]?.order_date || 0).getTime() - new Date(a.tests?.[0]?.order_date || 0).getTime();
+      case 'uid':
+        // Sort by UID alphanumerically
+        return (a.patient_uid || '').localeCompare(b.patient_uid || '');
+      case 'alphabetic':
+        // Sort by patient name alphabetically
+        return (a.patient_name || '').localeCompare(b.patient_name || '');
+      default:
+        return 0;
+    }
+  });
 
   // Get status badge color based on status
   const getStatusBadgeColor = (status: any) => {
     const pascalStatus = status.charAt(0).toUpperCase() + status.slice(1).toLowerCase();
-    switch (pascalStatus) {
+    
+    // Map old status names to new ones for display
+    const statusMap = {
+      'Provisional': 'Entered',
+      'Authenticated': 'Authorized',
+      'Validated': 'Validation'
+    };
+    
+    const displayStatus = statusMap[pascalStatus] || pascalStatus;
+    
+    switch (displayStatus) {
       case "Registered":
         return "bg-cyan-100 text-cyan-800";
       case "Received":
@@ -1712,21 +1796,7 @@ export default function Result() {
                   <RefreshCcw size={14} />
                 </button>
                 
-                <button 
-                  onClick={() => {
-                    if (barcodeSelectedTests.size === 0) {
-                      alert('Please select tests using the barcode checkboxes first');
-                      return;
-                    }
-                    // Just open the barcode modal, without automatic print
-                    handleBarcodePrint();
-                  }}
-                  className="h-8 px-2 bg-green-600 hover:bg-green-700 text-white rounded flex items-center gap-1 text-xs"
-                  title="Print Barcode"
-                >
-                  <Printer size={14} />
-                </button>
-                
+
                 <button
                   onClick={handlePrintPreview}
                   disabled={loading || selectedTests.size === 0}
@@ -1735,8 +1805,47 @@ export default function Result() {
                   <Printer size={14} />
                 </button>
                 
-                <button className="h-8 px-3 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded text-xs sm:text-sm">
+                <button 
+                  onClick={() => setShowSortDropdown(!showSortDropdown)}
+                  className="h-8 px-3 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded text-xs sm:text-sm relative"
+                  title="Sort"
+                >
                   ☰
+                  
+                  {showSortDropdown && (
+                    <div className="absolute top-full right-0 mt-1 bg-white border border-gray-300 rounded shadow-lg z-50 min-w-max">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSortBy('date');
+                          setShowSortDropdown(false);
+                        }}
+                        className={`block w-full text-left px-4 py-2 text-sm hover:bg-blue-100 ${sortBy === 'date' ? 'bg-blue-50 font-semibold' : ''}`}
+                      >
+                        ↓ Sort by Date
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSortBy('uid');
+                          setShowSortDropdown(false);
+                        }}
+                        className={`block w-full text-left px-4 py-2 text-sm hover:bg-blue-100 ${sortBy === 'uid' ? 'bg-blue-50 font-semibold' : ''}`}
+                      >
+                        ↓ Sort by UID
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSortBy('alphabetic');
+                          setShowSortDropdown(false);
+                        }}
+                        className={`block w-full text-left px-4 py-2 text-sm hover:bg-blue-100 ${sortBy === 'alphabetic' ? 'bg-blue-50 font-semibold' : ''}`}
+                      >
+                        ↓ Sort by Alphabetic (Name)
+                      </button>
+                    </div>
+                  )}
                 </button>
               </div>
             </div>
@@ -1787,14 +1896,14 @@ export default function Result() {
                           </div>
                         </td>
                       </tr>
-                    ) : filteredResults.length === 0 ? (
+                    ) : sortedAndFilteredResults.length === 0 ? (
                       <tr>
                         <td colSpan={12} className="text-center p-3 sm:p-4 text-gray-500 text-xs sm:text-sm border border-gray-300">
                           No records found for {selectedStatus} status
                         </td>
                       </tr>
                     ) : (
-                      filteredResults.map((patient, patientIndex) => {
+                      sortedAndFilteredResults.map((patient, patientIndex) => {
                         return patient.tests.map((test, testIndex) => (
                           <tr 
                             key={`${patient.patient_uid}-${test.test_id}`} 
@@ -1966,7 +2075,7 @@ export default function Result() {
                                   </div>
                                 ) : (
                                   /* Show individual test calendar/settings only for specific statuses */
-                                  (test.result_status.toUpperCase() === "AUTHENTICATED" || test.result_status.toUpperCase() === "PROVISIONAL") ? (
+                                  (test.result_status === "Authorized" || test.result_status === "Entered") ? (
                                     <div className="flex items-center gap-1">
                                       <div className="relative">
                                         <Calendar 
@@ -2107,9 +2216,11 @@ export default function Result() {
                 <div className="flex flex-wrap gap-2 items-center text-xs sm:text-sm">
                   <span className="px-2 py-1 bg-cyan-100 text-cyan-800 rounded">Registered</span>
                   <span className="px-2 py-1 bg-orange-100 text-orange-800 rounded">Received</span>
-                  <span className="px-2 py-1 bg-pink-100 text-pink-800 rounded">Provisional</span>
-                  <span className="px-2 py-1 bg-purple-100 text-purple-800 rounded">Authenticated</span>
-                  <span className="px-2 py-1 bg-green-100 text-green-800 rounded">Delivered</span>
+                  <span className="px-2 py-1 bg-green-100 text-green-800 rounded">Entered</span>
+                  <span className="px-2 py-1 bg-yellow-100 text-yellow-800 rounded">Validation</span>
+                  <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded">Authorized</span>
+                  <span className="px-2 py-1 bg-purple-100 text-purple-800 rounded">Delivered</span>
+                  <span className="px-2 py-1 bg-red-100 text-red-800 rounded">Rectified</span>
                 </div>
               </div>
             </div>
@@ -2291,16 +2402,14 @@ export default function Result() {
                                 onChange={(e) => handleSettingsInputChange('testStatuses', test.test_id, e.target.value)}
                                 className="w-full px-3 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500"
                               >
-                                <option value="Please Select">Please Select</option>
-                                <option value="REGISTERED">Registered</option>
-                                <option value="RECEIVED">Received</option>
-                                <option value="PROVISIONAL">Provisional</option>
-                                <option value="AUTHENTICATED">Authenticated</option>
-                                <option value="DELIVERED">Delivered</option>
-                                <option value="RETEST">Retest</option>
-                                <option value="REVERT">Revert</option>
-                                <option value="HOLD">Hold</option>
-                                <option value="REJECTED">Rejected</option>
+                                <option value="">Please Select</option>
+                                <option value="Registered">Registered</option>
+                                <option value="Received">Received</option>
+                                <option value="Entered">Entered</option>
+                                <option value="Validation">Validation</option>
+                                <option value="Authorized">Authorized</option>
+                                <option value="Delivered">Delivered</option>
+                                <option value="Rectified">Rectified</option>
                               </select>
                             </td>
                             
@@ -2632,16 +2741,28 @@ export default function Result() {
                 <button
                   onClick={async () => {
                     try {
-                      // Call API to transition tests to Received status when barcode is printed
-                      const testIds = Array.from(barcodeSelectedTests);
-                      for (const testId of testIds) {
-                        await fetch(`${API_BASE_URL}/results/${testId}/auto-transition/barcode-printed`, {
+                      // Collect all test IDs from all barcode labels
+                      const allTestIds = new Set<number>();
+                      for (const label of barcodeLabels) {
+                        if (label.testIds && Array.isArray(label.testIds)) {
+                          label.testIds.forEach((id: number) => allTestIds.add(id));
+                        }
+                      }
+                      
+                      console.log('📝 Test IDs to update:', Array.from(allTestIds));
+                      
+                      // Call API for each test ID
+                      for (const testId of allTestIds) {
+                        console.log(`🔄 Transitioning test ${testId} to Received status...`);
+                        const response = await fetch(`${API_BASE_URL}/results/${testId}/auto-transition/barcode-printed`, {
                           method: 'POST',
                           headers: { 'Content-Type': 'application/json' },
                           body: JSON.stringify({ changedBy: 'result_page' })
                         });
+                        const data = await response.json();
+                        console.log(`✅ Test ${testId} response:`, data);
                       }
-                      console.log('✅ Tests auto-transitioned to Received status');
+                      console.log('✅ All tests auto-transitioned to Received status');
                     } catch (error) {
                       console.error('⚠️ Status transition failed:', error);
                       // Don't block print if status update fails
@@ -2663,10 +2784,15 @@ export default function Result() {
                     win.focus();
                     win.print();
                     setShowBarcodeModal(false);
+                    
+                    // Refresh page after print to show updated status
+                    setTimeout(() => {
+                      fetchResults(); // Refresh data instead of full page reload
+                    }, 1000);
                   }}
                   className="text-white bg-green-600 hover:bg-green-700 px-2 py-1 rounded text-xs font-semibold"
                 >
-                  Print & Transition
+                  Print & Update
                 </button>
 
                 <button
