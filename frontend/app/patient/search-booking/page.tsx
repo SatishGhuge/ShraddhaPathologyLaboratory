@@ -445,6 +445,7 @@ export default function BookingPage() {
               b2bCharge: t.charge || 0,
               isExisting: true,
               visitId: t.visitId,
+              status: t.status || "Registered",
             });
           });
 
@@ -928,6 +929,63 @@ export default function BookingPage() {
     }
   };
 
+  // Get booking row background color based on minimum test status
+  const getBookingRowColor = (booking: any) => {
+    // If selected, use orange
+    if (selectedBooking?.bookingId === booking.bookingId) {
+      return "bg-orange-50";
+    }
+
+    // Get minimum status from tests (lowest in workflow order)
+    const statusOrder = {
+      'Registered': 0,
+      'Received': 1,
+      'Entered': 2,
+      'Validation': 3,
+      'Authorized': 4,
+      'Delivered': 5,
+      'Rectified': 6
+    };
+
+    const tests = booking.tests || [];
+    if (tests.length === 0) {
+      return ""; // Default
+    }
+
+    // Find the minimum status (earliest in workflow)
+    let minStatus = tests[0]?.status || 'Registered';
+    let minOrder = statusOrder[minStatus] ?? 0;
+
+    for (const test of tests) {
+      const testStatus = test.status || 'Registered';
+      const order = statusOrder[testStatus] ?? 0;
+      if (order < minOrder) {
+        minOrder = order;
+        minStatus = testStatus;
+      }
+    }
+
+    // Map status to color
+    switch (minStatus) {
+      case 'Registered':
+        return "bg-cyan-50"; // Light cyan for gray status
+      case 'Received':
+        return "bg-orange-50"; // Light orange for Received
+      case 'Entered':
+        return "bg-green-50"; // Light green for Entered
+      case 'Validation':
+        return "bg-yellow-50"; // Light yellow for Validation
+      case 'Authorized':
+        return "bg-blue-50"; // Light blue for Authorized
+      case 'Delivered':
+        return "bg-purple-50"; // Light purple for Delivered
+      case 'Rectified':
+        return "bg-red-50"; // Light red for Rectified
+      default:
+        return "";
+    }
+  };
+
   const handlePrintBooking = (b: any) => {
     const invoiceId = b.visitId || b.bookingId;
     const html=`<html><head><title>${invoiceId}</title>
@@ -1111,12 +1169,17 @@ export default function BookingPage() {
     const dateStr = now.toLocaleDateString('en-GB');
     const timeStr = now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: true }).toUpperCase();
 
-    // Group by specimen type
+    // Group by specimen type and collect test IDs
     const specimenGroups: any = {};
+    const specimenTestIds: any = {};
     booking.tests.forEach((t: any) => {
       const key = t.sample || 'Unknown';
-      if (!specimenGroups[key]) specimenGroups[key] = [];
+      if (!specimenGroups[key]) {
+        specimenGroups[key] = [];
+        specimenTestIds[key] = [];
+      }
       specimenGroups[key].push(t.name);
+      specimenTestIds[key].push(t.id); // Store test IDs
     });
 
     // Build labels - Use visitId for barcode ONLY (no organization code in barcode)
@@ -1133,7 +1196,8 @@ export default function BookingPage() {
         specimen,
         shortNamesStr: (shortNames as any[]).join(' / '),
         dateStr,
-        timeStr
+        timeStr,
+        testIds: specimenTestIds[specimen] || [], // Include test IDs for API calls
       };
     });
 
@@ -1360,7 +1424,7 @@ export default function BookingPage() {
                   const paginatedBookings = filteredBookings.slice(startIndex, endIndex);
                   
                   return paginatedBookings.map((b,i) => (
-                    <tr key={i} className={`border-b hover:bg-gray-50 ${selectedBooking?.bookingId===b.bookingId ? "bg-orange-50" : ""}`}>
+                    <tr key={i} className={`border-b hover:bg-gray-50 ${getBookingRowColor(b)}`}>
                       <td className="p-2 text-center">{startIndex + i + 1}</td>
                       <td className="p-2">
                         <div className="flex items-center gap-1">
@@ -2549,15 +2613,156 @@ export default function BookingPage() {
               <div className="flex gap-2">
                 <button
                   onClick={async () => {
+                    // Just print without status transition
+                    const printArea = document.getElementById('barcode-print-area');
+                    const win = window.open('', '_blank');
+                    win.document.write(`<!DOCTYPE html><html><head><title>Barcode Labels</title>
+                      <style>
+                        * { margin:0; padding:0; box-sizing:border-box; }
+                        body { font-family: Arial, sans-serif; background: white; }
+                        .labels-wrap { display: flex; flex-wrap: wrap; gap: 8mm; padding: 8mm; }
+                        .label { width: 80mm; border: 0.5px solid #999; page-break-inside: avoid; }
+                        @page { size: A4; margin: 8mm; }
+                      </style>
+                    </head><body>${printArea.innerHTML}</body></html>`);
+                    win.document.close();
+                    win.focus();
+                    win.print();
+                    setShowBarcodeModal(false);
+                  }}
+                  className="text-white bg-blue-600 hover:bg-blue-700 px-2 py-1 rounded text-xs font-semibold"
+                >
+                  Print Only
+                </button>
+
+                <button
+                  onClick={async () => {
                     try {
-                      // Call API to transition test to Received status when barcode is printed
-                      if (barcodePatientInfo?.visitId) {
-                        await fetch(`${API_BASE_URL}/results/${barcodePatientInfo.visitId}/auto-transition/barcode-printed`, {
+                      // Collect all test IDs from all barcode labels
+                      const allTestIds = new Set<number>();
+                      for (const label of barcodeLabels) {
+                        if (label.testIds && Array.isArray(label.testIds)) {
+                          label.testIds.forEach((id: number) => allTestIds.add(id));
+                        }
+                      }
+                      
+                      console.log('📝 Test IDs to update:', Array.from(allTestIds));
+                      
+                      // Call API for each test ID
+                      for (const testId of allTestIds) {
+                        console.log(`🔄 Transitioning test ${testId} to Received status...`);
+                        const response = await fetch(`${API_BASE_URL}/results/${testId}/auto-transition/barcode-printed`, {
                           method: 'POST',
                           headers: { 'Content-Type': 'application/json' },
                           body: JSON.stringify({ changedBy: 'search_booking' })
                         });
-                        console.log('✅ Test auto-transitioned to Received status');
+                        const data = await response.json();
+                        console.log(`✅ Test ${testId} response:`, data);
+                      }
+                      console.log('✅ All tests auto-transitioned to Received status');
+                      
+                      // Refresh booking data to reflect updated status
+                      try {
+                        const updatedPatients = await getAllPatients(1, 1000);
+                        const patients = Array.isArray(updatedPatients) ? updatedPatients : (updatedPatients?.data ? updatedPatients.data : []);
+                        
+                        // Convert to booking format using the same logic as initial load
+                        const mapped = [];
+                        patients.forEach((p: any) => {
+                          const patientTests = p.tests || [];
+
+                          // Group tests by visitId
+                          const visitMap: any = {};
+                          patientTests.forEach((t: any) => {
+                            const vid = t.visitId || "";
+                            if (!visitMap[vid]) {
+                              visitMap[vid] = {
+                                visitId:         vid,
+                                visitDate:       t.visitDate,
+                                referralDoctor:  t.referralDoctor || "",
+                                remarks:         t.remarks || "",
+                                organizationId:  t.organizationId || "",
+                                totalAmount:     0,
+                                paidAmount:      t.paidAmount    || 0,
+                                balanceAmount:   t.balanceAmount || 0,
+                                paymentMode:     t.paymentMode   || "Cash",
+                                discountAmount:  t.discountAmount  || 0,
+                                discountPercent: t.discountPercent || 0,
+                                discountRemark:  t.discountRemark || "",
+                                tests: []
+                              };
+                            }
+                            visitMap[vid].totalAmount += t.totalAmount || 0;
+                            visitMap[vid].paidAmount      = Math.max(visitMap[vid].paidAmount,      t.paidAmount      || 0);
+                            visitMap[vid].balanceAmount   = Math.max(visitMap[vid].balanceAmount,   t.balanceAmount   || 0);
+                            visitMap[vid].discountAmount  = Math.max(visitMap[vid].discountAmount,  t.discountAmount  || 0);
+                            visitMap[vid].discountPercent = Math.max(visitMap[vid].discountPercent, t.discountPercent || 0);
+                            if (t.discountRemark) visitMap[vid].discountRemark = t.discountRemark;
+                            
+                            // Add test to this visit with status
+                            visitMap[vid].tests.push({
+                              name: t.test?.name || "",
+                              sample: t.test?.sampleType || "N/A",
+                              b2cCharge: t.charge || 0,
+                              b2bCharge: t.charge || 0,
+                              isExisting: true,
+                              visitId: t.visitId,
+                              status: t.status || "Registered",
+                            });
+                          });
+
+                          const visits = Object.values(visitMap);
+                          visits.forEach((visit: any) => {
+                            const visitDate = visit.visitDate || p.createdAt;
+                            const paymentStatus = visit.balanceAmount > 0 ? "Due" : "Paid";
+                            
+                            mapped.push({
+                              bookingId: `${p.patientId}-${visit.visitId}`,
+                              name: `${p.title || ""} ${p.firstName || ""} ${p.lastName || ""}`.trim().toUpperCase(),
+                              patientId: p.patientId,
+                              date: visitDate
+                                ? new Date(visitDate).toLocaleDateString("en-GB")
+                                : new Date(p.createdAt).toLocaleDateString("en-GB"),
+                              tests: visit.tests,
+                              paymentStatus,
+                              rawDate: visitDate || p.createdAt,
+                              balanceAmount: visit.balanceAmount,
+                              paidAmount:    visit.paidAmount,
+                              totalAmount:   visit.totalAmount,
+                              visitId:       visit.visitId,
+                              discountAmount:  visit.discountAmount,
+                              discountPercent: visit.discountPercent,
+                              discountRemark:  visit.discountRemark,
+                              patientData: {
+                                patientId: p.patientId,
+                                title: p.title,
+                                firstName: p.firstName,
+                                lastName: p.lastName,
+                                age: p.age,
+                                gender: p.gender,
+                                mobile: p.mobile,
+                                email: p.email,
+                                referralDoctor: visit.referralDoctor,
+                                organizationId: visit.organizationId,
+                                organizationCode: ""
+                              }
+                            });
+                          });
+                        });
+                        
+                        // Update state with refreshed data
+                        setAllBookings(mapped);
+                        setBookings(mapped.filter(b => !deletedIds.has(b.bookingId)));
+                        
+                        // Update selected booking with new data
+                        const updatedSelected = mapped.find(b => b.bookingId === selectedBooking?.bookingId);
+                        if (updatedSelected) {
+                          setSelectedBooking(updatedSelected);
+                        }
+                        
+                        console.log('✅ Booking data refreshed with updated test statuses');
+                      } catch (refreshError) {
+                        console.error('⚠️ Failed to refresh booking data:', refreshError);
                       }
                     } catch (error) {
                       console.error('⚠️ Status transition failed:', error);
@@ -2579,12 +2784,16 @@ export default function BookingPage() {
                     win.document.close();
                     win.focus();
                     win.print();
-                    win.close();
+                    setShowBarcodeModal(false);
+                    
+                    // Show success message - status has been updated to Received
+                    alert('✅ Tests marked as Received and printed successfully!');
                   }}
-                  className="bg-blue-600 text-white px-4 py-1.5 rounded text-xs font-semibold hover:bg-blue-700"
+                  className="text-white bg-green-600 hover:bg-green-700 px-2 py-1 rounded text-xs font-semibold"
                 >
-                  🖨️ Print
+                  Print & Update
                 </button>
+
                 <button
                   onClick={() => setShowBarcodeModal(false)}
                   className="text-gray-300 hover:text-white text-xl font-bold leading-none px-1"

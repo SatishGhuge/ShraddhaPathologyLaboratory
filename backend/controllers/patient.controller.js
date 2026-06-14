@@ -630,7 +630,7 @@ export const addTestToVisit = async (req, res) => {
         organizationId: existingTest.organizationId || null,
         sample: sampleType || existingTest.sample,
         charge: parseFloat(charge) || 0,
-        status: 'REGISTERED',
+        status: 'Registered',
         visitType: existingTest.visitType,
         reportMode: existingTest.reportMode,
         referralDoctor: existingTest.referralDoctor,

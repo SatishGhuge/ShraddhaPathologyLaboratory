@@ -1,6 +1,34 @@
 import prisma from '../config/database.js';
 
 /**
+ * Normalize status value to proper format
+ * @param {string} status - Status value to normalize
+ * @returns {string} - Normalized status value
+ */
+export const normalizeStatus = (status) => {
+  if (!status) return status;
+  
+  const statusMap = {
+    'REGISTERED': 'Registered',
+    'RECEIVED': 'Received',
+    'PROVISIONAL': 'Entered',
+    'ENTERED': 'Entered',
+    'AUTHENTICATED': 'Authorized',
+    'AUTHORIZED': 'Authorized',
+    'VALIDATION': 'Validation',
+    'VALIDATED': 'Validation',
+    'DELIVERED': 'Delivered',
+    'RETEST': 'Rectified',
+    'RECTIFIED': 'Rectified',
+    'REVERT': 'Rectified',
+    'HOLD': 'Validation',
+    'REJECTED': 'Validation'
+  };
+  
+  return statusMap[status.toUpperCase()] || status;
+};
+
+/**
  * SAMPLE STATUS WORKFLOW DEFINITION
  * 
  * Stages:
