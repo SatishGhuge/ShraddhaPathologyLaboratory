@@ -1059,17 +1059,28 @@ export default function PatientRegistration() {
       
       // Handle response structure correctly - response.data contains the patient object
       const patientId = response?.data?.patientId || response?.patientId || 'N/A';
-      const visitId = response?.data?.visitId || response?.visitId || patientId;
+      // Extract visitId from the first test (all tests have the same visitId for this registration)
+      const visitId = response?.data?.tests?.[0]?.visitId || 'N/A';
+      const isExisting = response?.isExistingPatient || false;
       
-      // Show success message
-      const message = selectedTests.length > 0 
-        ? `Patient Registered Successfully ✅\nPatient ID: ${patientId}\n\nYou can now add more tests or print barcode.`
-        : `Patient Information Saved ✅\nPatient ID: ${patientId}\n\nYou can now select and add tests.`;
+      // Show success message with indicator of new vs existing patient
+      let message = '';
+      if (isExisting) {
+        // Existing patient - new visit/tests added
+        message = selectedTests.length > 0 
+          ? `✅ Tests Added to Existing Patient\nPatient ID: ${patientId}\nNew Visit ID: ${visitId}\n\nYou can now print barcode or add more tests.`
+          : `✅ Patient Found\nPatient ID: ${patientId}\n\nSelect tests to add a new visit.`;
+      } else {
+        // New patient - completely new registration
+        message = selectedTests.length > 0 
+          ? `✅ NEW Patient Registered Successfully\nNew Patient ID: ${patientId}\nVisit ID: ${visitId}\n\nYou can now add more tests or print barcode.`
+          : `✅ Patient Information Saved\nNew Patient ID: ${patientId}\n\nSelect tests to create a visit.`;
+      }
       
       alert(message);
       
       // If tests were added, show barcode modal
-      if (selectedTests.length > 0) {
+      if (selectedTests.length > 0 && visitId !== 'N/A') {
         showBarcodeAfterRegistration(
           `${title} ${firstName} ${lastName || ''}`.trim(),
           visitId,
@@ -1166,18 +1177,14 @@ export default function PatientRegistration() {
       specimenGroups[key].push(t.name);
     });
 
-    // Build labels - Include organization code if available
+    // Build labels - Use visitId for barcode ONLY (no organization code in barcode)
     const specimenEntries = Object.entries(specimenGroups);
     const labels = specimenEntries.map(([specimen, shortNames], idx) => {
+      // Barcode contains ONLY visitId, not organization code
       let barcodeValue = idx === 0 ? visitId : `${visitId}-${idx + 1}`;
       
-      // Add organization code if provided
-      if (organizationCode) {
-        barcodeValue = `${organizationCode}-${barcodeValue}`;
-      }
-      
       return {
-        barcodeValue,
+        barcodeValue, // Just the visitId-based barcode
         specimen,
         shortNamesStr: (shortNames as any[]).join(' / '),
         dateStr,
@@ -1194,7 +1201,7 @@ export default function PatientRegistration() {
       age,
       gender,
       ageGender,
-      organizationCode: organizationCode || '',
+      organizationCode: organizationCode || '', // Store separately for display only
     });
     setBarcodeLabels(labels);
     setShowBarcodeModal(true);
@@ -2617,44 +2624,51 @@ export default function PatientRegistration() {
                     <div
                       key={idx}
                       className="bg-white border border-gray-300 shadow"
-                      style={{ width: '302px', fontFamily: 'Arial, sans-serif' }}
+                      style={{ width: '302px', fontFamily: 'Arial, sans-serif', position: 'relative' }}
                     >
-                      {/* Barcode — centered, horizontal, full width */}
-                      <div className="flex justify-center px-2 pt-2 pb-0">
+                      {/* Organization Code - top right corner, small size */}
+                      {barcodePatientInfo.organizationCode && (
+                        <div className="absolute top-1 right-2 text-[8px] text-gray-600 font-semibold">
+                          {barcodePatientInfo.organizationCode}
+                        </div>
+                      )}
+
+                      {/* Barcode — centered, smaller size */}
+                      <div className="flex justify-center px-2 pt-3 pb-0">
                         <svg
                           xmlns="http://www.w3.org/2000/svg"
-                          width="100%"
-                          height="52"
+                          width="85%"
+                          height="40"
                           viewBox={`0 0 ${width} ${height}`}
                           preserveAspectRatio="none"
                           dangerouslySetInnerHTML={{ __html: svg }}
                         />
                       </div>
 
-                      {/* Barcode number centered */}
-                      <div className="text-center font-bold text-sm tracking-widest py-0.5 px-2">
+                      {/* Barcode number centered - smaller text */}
+                      <div className="text-center font-bold text-xs tracking-widest py-0.5 px-2">
                         {label.barcodeValue}
                       </div>
 
                       {/* Date time (left) + specimen type (right) */}
                       <div className="flex justify-between items-center px-3 pb-0.5">
-                        <span className="text-xs text-gray-700">{label.dateStr} {label.timeStr}</span>
-                        <span className="text-xs text-gray-600 font-medium">({label.specimen})</span>
+                        <span className="text-[10px] text-gray-700">{label.dateStr} {label.timeStr}</span>
+                        <span className="text-[10px] text-gray-600 font-medium">({label.specimen})</span>
                       </div>
 
                       {/* Patient name (left) + gender initial / age (right) */}
                       <div className="flex justify-between items-center px-3 pb-2">
-                        <span className="font-bold text-xs leading-tight truncate max-w-[170px]">
+                        <span className="font-bold text-[10px] leading-tight truncate max-w-[170px]">
                           {barcodePatientInfo.patientName}
                         </span>
-                        <span className="text-xs font-semibold whitespace-nowrap ml-1">
+                        <span className="text-[10px] font-semibold whitespace-nowrap ml-1">
                           {barcodePatientInfo.ageGender}
                         </span>
                       </div>
 
                       {/* Short test names */}
                       {label.shortNamesStr && (
-                        <div className="px-3 pb-2 text-[10px] text-gray-500 truncate">
+                        <div className="px-3 pb-2 text-[9px] text-gray-500 truncate">
                           {label.shortNamesStr}
                         </div>
                       )}
