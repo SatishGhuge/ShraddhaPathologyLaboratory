@@ -1271,7 +1271,7 @@ export const createOrganization = async (req, res) => {
 
     // Create module allocation for organization if provided
     if (moduleAllocation) {
-      const modulesData = typeof moduleAllocation === 'string' ? JSON.parse(moduleAllocation) : moduleAllocation;
+      const modulesData = typeof moduleAllocation === 'string' ? moduleAllocation : JSON.stringify(moduleAllocation);
       await prisma.moduleAllocation.create({
         data: {
           organizationId: newId,
@@ -1293,7 +1293,7 @@ export const createOrganization = async (req, res) => {
       
       // Handle module allocation for the user
       if (moduleAllocation) {
-        const modulesData = typeof moduleAllocation === 'string' ? JSON.parse(moduleAllocation) : moduleAllocation;
+        const modulesData = typeof moduleAllocation === 'string' ? moduleAllocation : JSON.stringify(moduleAllocation);
         await prisma.moduleAllocation.upsert({
           where: { userId: upsertedUser.id },
           update: { modules: modulesData },
