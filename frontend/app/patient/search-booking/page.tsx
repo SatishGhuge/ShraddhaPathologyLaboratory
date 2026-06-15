@@ -394,127 +394,130 @@ export default function BookingPage() {
     setDateRange({ start: sevenDaysAgo, end: today });
   }, []);
 
+  // Helper function to transform patients data to bookings format
+  const transformPatientsToBookings = (patients: any[], orgs: any[]) => {
+    const mapped = [];
+    
+    patients.forEach((p) => {
+      const patientTests = p.tests || [];
+
+      // Group tests by visitId
+      const visitMap: any = {};
+      patientTests.forEach((t: any) => {
+        const vid = t.visitId || "";
+        if (!visitMap[vid]) {
+          visitMap[vid] = {
+            visitId:         vid,
+            visitDate:       t.visitDate,
+            referralDoctor:  t.referralDoctor || "",
+            remarks:         t.remarks || "",
+            organizationId:  t.organizationId || "",
+            totalAmount:     0,
+            paidAmount:      t.paidAmount    || 0,
+            balanceAmount:   t.balanceAmount || 0,
+            paymentMode:     t.paymentMode   || "Cash",
+            discountAmount:  t.discountAmount  || 0,
+            discountPercent: t.discountPercent || 0,
+            discountRemark:  t.discountRemark || "",
+            tests: []
+          };
+        }
+        visitMap[vid].totalAmount += t.totalAmount || 0;
+        visitMap[vid].paidAmount      = Math.max(visitMap[vid].paidAmount,      t.paidAmount      || 0);
+        visitMap[vid].balanceAmount   = Math.max(visitMap[vid].balanceAmount,   t.balanceAmount   || 0);
+        visitMap[vid].discountAmount  = Math.max(visitMap[vid].discountAmount,  t.discountAmount  || 0);
+        visitMap[vid].discountPercent = Math.max(visitMap[vid].discountPercent, t.discountPercent || 0);
+        if (t.discountRemark) visitMap[vid].discountRemark = t.discountRemark;
+        
+        visitMap[vid].tests.push({
+          id: t.id,  // ✅ IMPORTANT: Include the PatientTest ID
+          name: t.test?.name || "",
+          sample: t.test?.sampleType || "N/A",
+          b2cCharge: t.charge || 0,
+          b2bCharge: t.charge || 0,
+          isExisting: true,
+          visitId: t.visitId,
+          status: t.status || "Registered",
+        });
+      });
+
+      const visits = Object.values(visitMap);
+
+      visits.forEach((visit: any) => {
+        const visitDate = visit.visitDate || p.createdAt;
+        const paymentStatus = visit.balanceAmount > 0 ? "Due" : "Paid";
+        
+        mapped.push({
+          bookingId: `${p.patientId}-${visit.visitId}`,
+          name: `${p.title || ""} ${p.firstName || ""} ${p.lastName || ""}`.trim().toUpperCase(),
+          patientId: p.patientId,
+          date: visitDate
+            ? new Date(visitDate).toLocaleDateString("en-GB")
+            : new Date(p.createdAt).toLocaleDateString("en-GB"),
+          tests: visit.tests,
+          paymentStatus,
+          rawDate: visitDate || p.createdAt,
+          balanceAmount: visit.balanceAmount,
+          paidAmount:    visit.paidAmount,
+          totalAmount:   visit.totalAmount,
+          visitId:       visit.visitId,
+          discountAmount:  visit.discountAmount,
+          discountPercent: visit.discountPercent,
+          discountRemark:  visit.discountRemark,
+          patientData: {
+            ...INIT_FORM,
+            title: p.title || "MR",
+            firstName: p.firstName || "",
+            lastName: p.lastName || "",
+            mobile: p.mobile || "",
+            email: p.email || "",
+            age: String(p.age || ""),
+            gender: p.gender || "Male",
+            address: p.address || "",
+            remark: visit.remarks,
+            referralDoctor: visit.referralDoctor,
+            referralDoctorChecked: !!visit.referralDoctor,
+            visitDate: visitDate || "",
+            organizationId: visit.organizationId || "",
+            organizationCode: "",
+          },
+        });
+      });
+    });
+    
+    mapped.sort((a, b) => {
+      const dateA = new Date(a.rawDate);
+      const dateB = new Date(b.rawDate);
+      return dateA.getTime() - dateB.getTime();
+    });
+    
+    const updatedBookings = mapped.map(booking => {
+      if (booking.patientData?.organizationId && orgs.length > 0) {
+        const org = orgs.find((o: any) => o.id === booking.patientData.organizationId);
+        if (org && org.code) {
+          booking.patientData.organizationCode = org.code;
+        }
+      }
+      return booking;
+    });
+    
+    return updatedBookings;
+  };
+
   // Fetch real patients and doctors from API
   useEffect(() => {
-    Promise.all([getAllPatients(1, 1000), getDoctors(), getOrganizations()])  // Fetch up to 1000 patients and organizations
+    Promise.all([getAllPatients(1, 1000), getDoctors(), getOrganizations()])
       .then(([patientsRes, doctorsRes, orgsRes]: any) => {
         const patients = Array.isArray(patientsRes) ? patientsRes : (patientsRes?.data ? patientsRes.data : []);
         const doctors = Array.isArray(doctorsRes) ? doctorsRes : [];
         const orgs = Array.isArray(orgsRes) ? orgsRes : (orgsRes?.data ? orgsRes.data : []);
+        
         setOrganizations(orgs);
-        const mapped = [];
         
-        patients.forEach((p) => {
-          const patientTests = p.tests || [];
-
-          // Group tests by visitId
-          const visitMap = {};
-          patientTests.forEach(t => {
-            const vid = t.visitId || "";
-            if (!visitMap[vid]) {
-              visitMap[vid] = {
-                visitId:         vid,
-                visitDate:       t.visitDate,
-                referralDoctor:  t.referralDoctor || "",
-                remarks:         t.remarks || "",
-                organizationId:  t.organizationId || "", // Capture organization ID
-                totalAmount:     0,
-                paidAmount:      t.paidAmount    || 0,
-                balanceAmount:   t.balanceAmount || 0,
-                paymentMode:     t.paymentMode   || "Cash",
-                discountAmount:  t.discountAmount  || 0,
-                discountPercent: t.discountPercent || 0,
-                discountRemark:  t.discountRemark || "",
-                tests: []
-              };
-            }
-            // Sum totalAmount per visit
-            visitMap[vid].totalAmount += t.totalAmount || 0;
-            // Take max for visit-level amounts (stored on each test row)
-            visitMap[vid].paidAmount      = Math.max(visitMap[vid].paidAmount,      t.paidAmount      || 0);
-            visitMap[vid].balanceAmount   = Math.max(visitMap[vid].balanceAmount,   t.balanceAmount   || 0);
-            visitMap[vid].discountAmount  = Math.max(visitMap[vid].discountAmount,  t.discountAmount  || 0);
-            visitMap[vid].discountPercent = Math.max(visitMap[vid].discountPercent, t.discountPercent || 0);
-            if (t.discountRemark) visitMap[vid].discountRemark = t.discountRemark;
-            
-            // Add test to this visit
-            visitMap[vid].tests.push({
-              name: t.test?.name || "",
-              sample: t.test?.sampleType || "N/A",
-              b2cCharge: t.charge || 0,
-              b2bCharge: t.charge || 0,
-              isExisting: true,
-              visitId: t.visitId,
-              status: t.status || "Registered",
-            });
-          });
-
-          const visits = Object.values(visitMap);
-
-          // Create ONE booking row per VISIT
-          visits.forEach((visit: any) => {
-            const visitDate = visit.visitDate || p.createdAt;
-            const paymentStatus = visit.balanceAmount > 0 ? "Due" : "Paid";
-            
-            mapped.push({
-              bookingId: `${p.patientId}-${visit.visitId}`,
-              name: `${p.title || ""} ${p.firstName || ""} ${p.lastName || ""}`.trim().toUpperCase(),
-              patientId: p.patientId,
-              date: visitDate
-                ? new Date(visitDate).toLocaleDateString("en-GB")
-                : new Date(p.createdAt).toLocaleDateString("en-GB"),
-              tests: visit.tests,
-              paymentStatus,
-              rawDate: visitDate || p.createdAt,
-              balanceAmount: visit.balanceAmount,
-              paidAmount:    visit.paidAmount,
-              totalAmount:   visit.totalAmount,
-              visitId:       visit.visitId,
-              discountAmount:  visit.discountAmount,
-              discountPercent: visit.discountPercent,
-              discountRemark:  visit.discountRemark,
-              patientData: {
-                ...INIT_FORM,
-                title: p.title || "MR",
-                firstName: p.firstName || "",
-                lastName: p.lastName || "",
-                mobile: p.mobile || "",
-                email: p.email || "",
-                age: String(p.age || ""),
-                gender: p.gender || "Male",
-                address: p.address || "",
-                remark: visit.remarks,
-                referralDoctor: visit.referralDoctor,
-                referralDoctorChecked: !!visit.referralDoctor,
-                visitDate: visitDate || "",
-                organizationId: visit.organizationId || "",
-                organizationCode: "", // Will be populated after fetching org data
-              },
-            });
-          });
-        });
-        
-        // Sort bookings by visit date/time (oldest first = first registered appears at #1)
-        mapped.sort((a, b) => {
-          const dateA = new Date(a.rawDate);
-          const dateB = new Date(b.rawDate);
-          return dateA.getTime() - dateB.getTime(); // Ascending order: oldest first
-        });
-        
-        // Populate organizationCode from organizations list
-        const updatedBookings = mapped.map(booking => {
-          if (booking.patientData?.organizationId && orgs.length > 0) {
-            const org = orgs.find(o => o.id === booking.patientData.organizationId);
-            if (org && org.code) {
-              booking.patientData.organizationCode = org.code;
-            }
-          }
-          return booking;
-        });
-        
+        const updatedBookings = transformPatientsToBookings(patients, orgs);
         setAllBookings(updatedBookings);
         setBookings(updatedBookings.filter(b => !deletedIds.has(b.bookingId)));
-        setDoctorsList(doctors.map(d => ({
+        setDoctorsList(doctors.map((d: any) => ({
           id: d.id,
           name: `Dr. ${d.name}`,
           degree: d.degree || "",
@@ -1169,7 +1172,7 @@ export default function BookingPage() {
     const dateStr = now.toLocaleDateString('en-GB');
     const timeStr = now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: true }).toUpperCase();
 
-    // Group by specimen type and collect test IDs
+    // Group by specimen type and collect test IDs (PatientTest IDs)
     const specimenGroups: any = {};
     const specimenTestIds: any = {};
     booking.tests.forEach((t: any) => {
@@ -1179,7 +1182,8 @@ export default function BookingPage() {
         specimenTestIds[key] = [];
       }
       specimenGroups[key].push(t.name);
-      specimenTestIds[key].push(t.id); // Store test IDs
+      // ✨ Store the patientTest ID (from the booking test object which comes from patientTest table)
+      specimenTestIds[key].push(t.id);
     });
 
     // Build labels - Use visitId for barcode ONLY (no organization code in barcode)
@@ -2637,6 +2641,9 @@ export default function BookingPage() {
 
                 <button
                   onClick={async () => {
+                    let successCount = 0;
+                    let errorCount = 0;
+                    
                     try {
                       // Collect all test IDs from all barcode labels
                       const allTestIds = new Set<number>();
@@ -2646,127 +2653,35 @@ export default function BookingPage() {
                         }
                       }
                       
-                      console.log('📝 Test IDs to update:', Array.from(allTestIds));
+                      console.log('📝 Test IDs collected from barcode labels:', Array.from(allTestIds));
+                      console.log('📝 Barcode Labels:', barcodeLabels);
                       
                       // Call API for each test ID
                       for (const testId of allTestIds) {
                         console.log(`🔄 Transitioning test ${testId} to Received status...`);
-                        const response = await fetch(`${API_BASE_URL}/results/${testId}/auto-transition/barcode-printed`, {
-                          method: 'POST',
-                          headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify({ changedBy: 'search_booking' })
-                        });
-                        const data = await response.json();
-                        console.log(`✅ Test ${testId} response:`, data);
-                      }
-                      console.log('✅ All tests auto-transitioned to Received status');
-                      
-                      // Refresh booking data to reflect updated status
-                      try {
-                        const updatedPatients = await getAllPatients(1, 1000);
-                        const patients = Array.isArray(updatedPatients) ? updatedPatients : (updatedPatients?.data ? updatedPatients.data : []);
-                        
-                        // Convert to booking format using the same logic as initial load
-                        const mapped = [];
-                        patients.forEach((p: any) => {
-                          const patientTests = p.tests || [];
-
-                          // Group tests by visitId
-                          const visitMap: any = {};
-                          patientTests.forEach((t: any) => {
-                            const vid = t.visitId || "";
-                            if (!visitMap[vid]) {
-                              visitMap[vid] = {
-                                visitId:         vid,
-                                visitDate:       t.visitDate,
-                                referralDoctor:  t.referralDoctor || "",
-                                remarks:         t.remarks || "",
-                                organizationId:  t.organizationId || "",
-                                totalAmount:     0,
-                                paidAmount:      t.paidAmount    || 0,
-                                balanceAmount:   t.balanceAmount || 0,
-                                paymentMode:     t.paymentMode   || "Cash",
-                                discountAmount:  t.discountAmount  || 0,
-                                discountPercent: t.discountPercent || 0,
-                                discountRemark:  t.discountRemark || "",
-                                tests: []
-                              };
-                            }
-                            visitMap[vid].totalAmount += t.totalAmount || 0;
-                            visitMap[vid].paidAmount      = Math.max(visitMap[vid].paidAmount,      t.paidAmount      || 0);
-                            visitMap[vid].balanceAmount   = Math.max(visitMap[vid].balanceAmount,   t.balanceAmount   || 0);
-                            visitMap[vid].discountAmount  = Math.max(visitMap[vid].discountAmount,  t.discountAmount  || 0);
-                            visitMap[vid].discountPercent = Math.max(visitMap[vid].discountPercent, t.discountPercent || 0);
-                            if (t.discountRemark) visitMap[vid].discountRemark = t.discountRemark;
-                            
-                            // Add test to this visit with status
-                            visitMap[vid].tests.push({
-                              name: t.test?.name || "",
-                              sample: t.test?.sampleType || "N/A",
-                              b2cCharge: t.charge || 0,
-                              b2bCharge: t.charge || 0,
-                              isExisting: true,
-                              visitId: t.visitId,
-                              status: t.status || "Registered",
-                            });
+                        try {
+                          const response = await fetch(`${API_BASE_URL}/results/${testId}/auto-transition/barcode-printed`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ changedBy: 'search_booking' })
                           });
-
-                          const visits = Object.values(visitMap);
-                          visits.forEach((visit: any) => {
-                            const visitDate = visit.visitDate || p.createdAt;
-                            const paymentStatus = visit.balanceAmount > 0 ? "Due" : "Paid";
-                            
-                            mapped.push({
-                              bookingId: `${p.patientId}-${visit.visitId}`,
-                              name: `${p.title || ""} ${p.firstName || ""} ${p.lastName || ""}`.trim().toUpperCase(),
-                              patientId: p.patientId,
-                              date: visitDate
-                                ? new Date(visitDate).toLocaleDateString("en-GB")
-                                : new Date(p.createdAt).toLocaleDateString("en-GB"),
-                              tests: visit.tests,
-                              paymentStatus,
-                              rawDate: visitDate || p.createdAt,
-                              balanceAmount: visit.balanceAmount,
-                              paidAmount:    visit.paidAmount,
-                              totalAmount:   visit.totalAmount,
-                              visitId:       visit.visitId,
-                              discountAmount:  visit.discountAmount,
-                              discountPercent: visit.discountPercent,
-                              discountRemark:  visit.discountRemark,
-                              patientData: {
-                                patientId: p.patientId,
-                                title: p.title,
-                                firstName: p.firstName,
-                                lastName: p.lastName,
-                                age: p.age,
-                                gender: p.gender,
-                                mobile: p.mobile,
-                                email: p.email,
-                                referralDoctor: visit.referralDoctor,
-                                organizationId: visit.organizationId,
-                                organizationCode: ""
-                              }
-                            });
-                          });
-                        });
-                        
-                        // Update state with refreshed data
-                        setAllBookings(mapped);
-                        setBookings(mapped.filter(b => !deletedIds.has(b.bookingId)));
-                        
-                        // Update selected booking with new data
-                        const updatedSelected = mapped.find(b => b.bookingId === selectedBooking?.bookingId);
-                        if (updatedSelected) {
-                          setSelectedBooking(updatedSelected);
+                          const data = await response.json();
+                          if (data.success) {
+                            console.log(`✅ Test ${testId} successfully transitioned to Received`);
+                            successCount++;
+                          } else {
+                            console.error(`❌ Test ${testId} failed:`, data.message);
+                            errorCount++;
+                          }
+                        } catch (testError) {
+                          console.error(`❌ Test ${testId} API call error:`, testError);
+                          errorCount++;
                         }
-                        
-                        console.log('✅ Booking data refreshed with updated test statuses');
-                      } catch (refreshError) {
-                        console.error('⚠️ Failed to refresh booking data:', refreshError);
                       }
+                      
+                      console.log(`✅ Status update complete: ${successCount} succeeded, ${errorCount} failed`);
                     } catch (error) {
                       console.error('⚠️ Status transition failed:', error);
-                      // Don't block print if status update fails
                     }
                     
                     // Proceed with print
@@ -2784,10 +2699,41 @@ export default function BookingPage() {
                     win.document.close();
                     win.focus();
                     win.print();
+                    
+                    // Close modal immediately
                     setShowBarcodeModal(false);
                     
-                    // Show success message - status has been updated to Received
-                    alert('✅ Tests marked as Received and printed successfully!');
+                    // Show success and refresh data
+                    if (successCount > 0) {
+                      setTimeout(() => {
+                        alert(`✅ ${successCount} test(s) marked as Received and printed successfully!`);
+                        console.log('🔄 Refreshing booking data after print...');
+                        
+                        // Refresh bookings with fresh data from API
+                        Promise.all([getAllPatients(1, 1000), getOrganizations()])
+                          .then(([patientsRes, orgsRes]: any) => {
+                            const patients = Array.isArray(patientsRes) ? patientsRes : (patientsRes?.data ? patientsRes.data : []);
+                            const orgs = Array.isArray(orgsRes) ? orgsRes : (orgsRes?.data ? orgsRes.data : []);
+                            
+                            const updatedBookings = transformPatientsToBookings(patients, orgs);
+                            setAllBookings(updatedBookings);
+                            setBookings(updatedBookings.filter(b => !deletedIds.has(b.bookingId)));
+                            
+                            // Update selected booking if it still exists
+                            if (selectedBooking) {
+                              const updated = updatedBookings.find(b => b.bookingId === selectedBooking.bookingId);
+                              if (updated) {
+                                setSelectedBooking(updated);
+                              }
+                            }
+                            
+                            console.log('✅ Booking data refreshed with updated test statuses');
+                          })
+                          .catch(err => console.error('⚠️ Failed to refresh bookings:', err));
+                      }, 800);
+                    } else {
+                      alert('⚠️ No tests were successfully marked as Received. Check console for details.');
+                    }
                   }}
                   className="text-white bg-green-600 hover:bg-green-700 px-2 py-1 rounded text-xs font-semibold"
                 >

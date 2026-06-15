@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Header from "@/src/components/Header";
 import PageHeader from "@/src/components/BreadCrumb";
+import BarcodeModal from "@/app/components/BarcodeModal";
 import API_BASE_URL from "@/src/api/config";
 
 import {
@@ -330,6 +331,7 @@ export default function PatientRegistration() {
   useEffect(() => {
     if (selectedOrganization) {
       console.log('📡 Fetching charges for organization:', selectedOrganization);
+      console.log('🔒 Organization selected - Will show ONLY B2C charges and hide B2B');
       getTestCharges(undefined, selectedOrganization).then((charges: any) => {
         console.log('📥 Raw charges response type:', typeof charges, 'Array:', Array.isArray(charges));
         console.log('📥 Raw charges response:', charges);
@@ -368,7 +370,8 @@ export default function PatientRegistration() {
               return {
                 ...test,
                 b2cCharge: orgCharge.b2cCharge,
-                b2bCharge: orgCharge.b2bCharge
+                b2bCharge: orgCharge.b2bCharge,
+                isOrganizationCharge: true // Mark as organization charge for filtering
               };
             } else {
               console.log(`   ❓ Test "${test.name}" (ID: ${test.id}, key: "${key}"): No custom charge found in chargeMap keys: [${Object.keys(chargeMap).join(', ')}]`);
@@ -378,13 +381,45 @@ export default function PatientRegistration() {
           console.log('✅ Updated tests:', updatedTests.map(t => `${t.name}(B2C:${t.b2cCharge})`).join(', '));
           return updatedTests;
         });
+
+        // Also update departments with organization charges for left table display
+        setDepartments(prevDepts => {
+          return prevDepts.map(dept => ({
+            ...dept,
+            tests: dept.tests.map(test => {
+              const key = String(test.id);
+              const orgCharge = chargeMap[key];
+              if (orgCharge) {
+                console.log(`📝 Updated left table test: ${test.name} - B2C: ${test.b2cCharge} → ${orgCharge.b2cCharge}`);
+                return {
+                  ...test,
+                  b2cCharge: orgCharge.b2cCharge,
+                  b2bCharge: orgCharge.b2bCharge
+                };
+              }
+              return test;
+            })
+          }));
+        });
       }).catch((err) => {
         console.error('❌ Error fetching charges:', err);
       });
     } else {
       // Clear organization charges and keep original test charges
       setOrganizationCharges({});
-      console.log('🧹 Organization charges cleared');
+      console.log('🧹 Organization charges cleared - showing all B2C & B2B charges');
+      
+      // Remove organization charge marker when unselecting
+      setSelectedTests(prevTests => 
+        prevTests.map(test => ({
+          ...test,
+          isOrganizationCharge: false
+        }))
+      );
+
+      // Restore original charges in left table by reloading departments
+      console.log('🔄 Reloading departments with original charges...');
+      fetchDepartmentsData();
     }
   }, [selectedOrganization]);
 
@@ -605,7 +640,7 @@ export default function PatientRegistration() {
           return;
         }
         const dataToSave = {
-          firstName, lastName, title, dob, age, mobile, email, address, location,
+          firstName, lastName, title, dob, age, mobile, email, address, location, locationSearch,
           gender, remarks, visitType, reportMode,
           sampleBarcodeNo, refDoctor, isManualRefDoctor, manualRefDoctorName,
           selectedOrganization, selectedOrganizationCode, organizationSearch,
@@ -621,7 +656,7 @@ export default function PatientRegistration() {
 
     return () => clearTimeout(timeoutId);
   }, [
-    firstName, lastName, title, dob, age, mobile, email, address, location, gender, remarks,
+    firstName, lastName, title, dob, age, mobile, email, address, location, locationSearch, gender, remarks,
     visitType, reportMode, sampleBarcodeNo,
     refDoctor, isManualRefDoctor, manualRefDoctorName, selectedTests,
     selectedOrganization, organizationSearch,
@@ -655,6 +690,7 @@ export default function PatientRegistration() {
     setEmail("");
     setAddress("");
     setLocation("");
+    setLocationSearch("");  // ✨ FIX: Also clear location search
     setGender("");
     setRemarks("");
     setCreatedBy(loggedUser);
@@ -987,8 +1023,8 @@ export default function PatientRegistration() {
       
       alert(`Patient Information Saved ✅\nPatient ID: ${patientId}\n\nYou can now add tests and click "Register" to complete registration.`);
       
-      // Clear tests but KEEP patient info
-      setSelectedTests([]);
+      // ✅ KEEP selected tests displayed (don't clear them)
+      // setSelectedTests([]); // ❌ REMOVED - tests now persist after save
       
     } catch (error) {
       console.error("Error saving patient info:", error);
@@ -1116,8 +1152,9 @@ export default function PatientRegistration() {
         );
       }
       
-      // Clear tests but KEEP patient info
-      setSelectedTests([]);
+      // ✅ KEEP selected tests displayed (don't clear them)
+      // Users can add more tests or print barcode without losing their selection
+      // setSelectedTests([]); // ❌ REMOVED - tests now persist after save
       
       // Close registration modal if it was open
       setShowRegistrationModal(false);
@@ -1126,66 +1163,6 @@ export default function PatientRegistration() {
       console.error("Error saving registration:", error);
       alert(`Failed to register patient: ${error.message}`);
     }
-  };
-
-  // Generate Code128 barcode bars as SVG path data
-  const buildCode128Svg = (text: any) => {
-    // Code128B encoding table (char code 32-127)
-    const CODE128B = [
-      '11011001100','11001101100','11001100110','10010011000','10010001100',
-      '10001001100','10011001000','10011000100','10001100100','11001001000',
-      '11001000100','11000100100','10110011100','10011011100','10011001110',
-      '10111001100','10011101100','10011100110','11001110010','11001011100',
-      '11001001110','11011100100','11001110100','11101101110','11101001100',
-      '11100101100','11100100110','11101100100','11100110100','11100110010',
-      '11011011000','11011000110','11000110110','10100011000','10001011000',
-      '10001000110','10110001000','10001101000','10001100010','11010001000',
-      '11000101000','11000100010','10110111000','10110001110','10001101110',
-      '10111011000','10111000110','10001110110','11101110110','11010001110',
-      '11000101110','11011101000','11011100010','11011101110','11101011000',
-      '11101000110','11100010110','11101101000','11101100010','11100011010',
-      '11101111010','11001000010','11110001010','10100110000','10100001100',
-      '10010110000','10010000110','10000101100','10000100110','10110010000',
-      '10110000100','10011010000','10011000010','10000110100','10000110010',
-      '11000010010','11001010000','11110111010','11000010100','10001111010',
-      '10100111100','10010111100','10010011110','10111100100','10011110100',
-      '10011110010','11110100100','11110010100','11110010010','11011011110',
-      '11011110110','11110110110','10101111000','10100011110','10001011110',
-      '10111101000','10111100010','11110101000','11110100010','10111011110',
-      '10111101110','11101011110','11110101110','11010000100','11010010000',
-      '11010011100','1100011101011'
-    ];
-    const START_B = 104;
-    const STOP = 106;
-
-    const codes = [START_B];
-    let checksum = START_B;
-    for (let i = 0; i < text.length; i++) {
-      const c = text.charCodeAt(i) - 32;
-      codes.push(c);
-      checksum += c * (i + 1);
-    }
-    codes.push(checksum % 103);
-    codes.push(STOP);
-
-    const barWidth = 2;
-    let x = 0;
-    let bars = '';
-    const height = 60;
-
-    codes.forEach(code => {
-      const pattern = CODE128B[code];
-      if (!pattern) return;
-      for (let i = 0; i < pattern.length; i++) {
-        const w = parseInt(pattern[i]) * barWidth;
-        if (i % 2 === 0) {
-          bars += `<rect x="${x}" y="0" width="${w}" height="${height}" fill="black"/>`;
-        }
-        x += w;
-      }
-    });
-
-    return { svg: bars, width: x, height };
   };
 
   // Show barcode modal after registration
@@ -1245,7 +1222,14 @@ export default function PatientRegistration() {
       ageGender,
       organizationCode: organizationCode || '', // Store separately for display only
     });
-    setBarcodeLabels(labels);
+    
+    // Add organizationCode to each label for display on barcode
+    const labelsWithOrgCode = labels.map(label => ({
+      ...label,
+      organizationCode: organizationCode || '', // ✅ Add org code to barcode labels
+    }));
+    
+    setBarcodeLabels(labelsWithOrgCode);
     setShowBarcodeModal(true);
   };
 
@@ -1973,8 +1957,12 @@ export default function PatientRegistration() {
                 Test Name
               </div>
               <div className="col-span-2 text-center">Specimen Type</div>
+              {/* Show B2C Charges column always */}
               <div className="col-span-2 text-right">B2C Charges</div>
-              <div className="col-span-2 text-right">B2B Charges</div>
+              {/* Show B2B Charges column only when NO organization is selected */}
+              {!selectedOrganization && (
+                <div className="col-span-2 text-right">B2B Charges</div>
+              )}
               <div className="col-span-1"></div>
             </div>
           <div className="flex-1 overflow-auto text-xs" style={{ maxHeight: 'calc(75vh - 50px)' }}>
@@ -2017,8 +2005,12 @@ export default function PatientRegistration() {
                         </svg>
                         {t.sample}
                       </div>
+                      {/* Always show B2C Charges column */}
                       <div className="col-span-2 text-right">-</div>
-                      <div className="col-span-2 text-right">-</div>
+                      {/* Show B2B Charges column only when NO organization is selected */}
+                      {!selectedOrganization && (
+                        <div className="col-span-2 text-right">-</div>
+                      )}
                       <div className="col-span-1"></div>
                     </div>
                   ));
@@ -2060,8 +2052,12 @@ export default function PatientRegistration() {
                       </svg>
                       {t.sample}
                     </div>
+                    {/* Always show B2C Charges - from organization if selected, else default */}
                     <div className="col-span-2 text-right">₹{t.b2cCharge}</div>
-                    <div className="col-span-2 text-right">₹{t.b2bCharge}</div>
+                    {/* Show B2B Charges only when NO organization is selected */}
+                    {!selectedOrganization && (
+                      <div className="col-span-2 text-right">₹{t.b2bCharge}</div>
+                    )}
                     <div className="col-span-1"></div>
                   </div>
                 ));
@@ -2072,32 +2068,58 @@ export default function PatientRegistration() {
 
         {/* RIGHT */}
         <div className="md:col-span-4 col-span-12 bg-white rounded-xl shadow flex flex-col">
+          {/* Header Table - Fixed */}
           <table className="w-full text-xs">
             <colgroup>
               <col style={{ width: '35%' }} />
               <col style={{ width: '15%' }} />
-              <col style={{ width: '15%' }} />
-              <col style={{ width: '15%' }} />
-              <col style={{ width: '20%' }} />
+              {/* Dynamic colgroup based on B2B visibility */}
+              {!selectedOrganization ? (
+                <>
+                  <col style={{ width: '15%' }} />
+                  <col style={{ width: '15%' }} />
+                  <col style={{ width: '20%' }} />
+                </>
+              ) : (
+                <>
+                  <col style={{ width: '30%' }} />
+                  <col style={{ width: '20%' }} />
+                </>
+              )}
             </colgroup>
-            <thead className="bg-slate-900 text-white">
+            <thead className="bg-slate-900 text-white sticky top-0">
               <tr>
                 <th className="p-2 text-left">Test</th>
                 <th className="p-2 text-center">B2C Charges</th>
-                <th className="p-2 text-center">B2B Charges</th>
+                {/* Show B2B Charges column only when NO organization is selected */}
+                {!selectedOrganization && (
+                  <th className="p-2 text-center">B2B Charges</th>
+                )}
                 <th className="p-2 text-center">Sample</th>
                 <th className="p-2 text-center">Action</th>
               </tr>
             </thead>
           </table>
+
+          {/* Body Table - Scrollable */}
           <div className="flex-1 overflow-auto text-xs" style={{ maxHeight: 'calc(75vh - 160px)' }}>
             <table className="w-full text-xs">
               <colgroup>
                 <col style={{ width: '35%' }} />
                 <col style={{ width: '15%' }} />
-                <col style={{ width: '15%' }} />
-                <col style={{ width: '15%' }} />
-                <col style={{ width: '20%' }} />
+                {/* Dynamic colgroup based on B2B visibility */}
+                {!selectedOrganization ? (
+                  <>
+                    <col style={{ width: '15%' }} />
+                    <col style={{ width: '15%' }} />
+                    <col style={{ width: '20%' }} />
+                  </>
+                ) : (
+                  <>
+                    <col style={{ width: '30%' }} />
+                    <col style={{ width: '20%' }} />
+                  </>
+                )}
               </colgroup>
               <tbody>
                 {selectedTests.map((t) => (
@@ -2114,7 +2136,10 @@ export default function PatientRegistration() {
                       )}
                     </td>
                     <td className="p-2 text-center font-semibold">₹{t.b2cCharge}</td>
-                    <td className="p-2 text-center font-semibold">₹{t.b2bCharge}</td>
+                    {/* Show B2B Charges column only when NO organization is selected */}
+                    {!selectedOrganization && (
+                      <td className="p-2 text-center font-semibold">₹{t.b2bCharge}</td>
+                    )}
                     <td className="p-2 text-center">
                       <div className="flex items-center justify-center gap-1">
                         <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" style={{ transform: 'rotate(45deg)', flexShrink: 0 }}>
@@ -2614,166 +2639,85 @@ export default function PatientRegistration() {
       )}
 
       {/* Barcode Preview Modal */}
-      {showBarcodeModal && barcodePatientInfo && (
-        <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col">
-            {/* Header */}
-            <div className="flex items-center justify-between px-5 py-3 border-b bg-gray-800 rounded-t-lg">
-              <h2 className="text-sm font-semibold text-white flex items-center gap-2">
-                <Barcode size={16} /> Barcode Labels — {barcodePatientInfo.patientName} | {barcodePatientInfo.visitId}
-              </h2>
-              <div className="flex gap-2">
-                <button
-                  onClick={async () => {
-                    // Just print without status transition
-                    const printArea = document.getElementById('barcode-print-area');
-                    const win = window.open('', '_blank');
-                    win.document.write(`<!DOCTYPE html><html><head><title>Barcode Labels</title>
-                      <style>
-                        * { margin:0; padding:0; box-sizing:border-box; }
-                        body { font-family: Arial, sans-serif; background: white; }
-                        .labels-wrap { display: flex; flex-wrap: wrap; gap: 8mm; padding: 8mm; }
-                        .label { width: 80mm; border: 0.5px solid #999; page-break-inside: avoid; }
-                        @page { size: A4; margin: 8mm; }
-                      </style>
-                    </head><body>${printArea.innerHTML}</body></html>`);
-                    win.document.close();
-                    win.focus();
-                    win.print();
-                    setShowBarcodeModal(false);
-                  }}
-                  className="text-white bg-blue-600 hover:bg-blue-700 px-2 py-1 rounded text-xs font-semibold"
-                >
-                  Print Only
-                </button>
-
-                <button
-                  onClick={async () => {
-                    try {
-                      // Collect all test IDs from all barcode labels
-                      const allTestIds = new Set<number>();
-                      for (const label of barcodeLabels) {
-                        if (label.testIds && Array.isArray(label.testIds)) {
-                          label.testIds.forEach((id: number) => allTestIds.add(id));
-                        }
-                      }
-                      
-                      console.log('📝 Test IDs to update:', Array.from(allTestIds));
-                      
-                      // Call API for each test ID
-                      for (const testId of allTestIds) {
-                        console.log(`🔄 Transitioning test ${testId} to Received status...`);
-                        const response = await fetch(`${API_BASE_URL}/results/${testId}/auto-transition/barcode-printed`, {
-                          method: 'POST',
-                          headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify({ changedBy: 'registration' })
-                        });
-                        const data = await response.json();
-                        console.log(`✅ Test ${testId} response:`, data);
-                      }
-                      console.log('✅ All tests auto-transitioned to Received status');
-                    } catch (error) {
-                      console.error('⚠️ Status transition failed:', error);
-                      // Don't block print if status update fails
-                    }
-                    
-                    // Proceed with print
-                    const printArea = document.getElementById('barcode-print-area');
-                    const win = window.open('', '_blank');
-                    win.document.write(`<!DOCTYPE html><html><head><title>Barcode Labels</title>
-                      <style>
-                        * { margin:0; padding:0; box-sizing:border-box; }
-                        body { font-family: Arial, sans-serif; background: white; }
-                        .labels-wrap { display: flex; flex-wrap: wrap; gap: 8mm; padding: 8mm; }
-                        .label { width: 80mm; border: 0.5px solid #999; page-break-inside: avoid; }
-                        @page { size: A4; margin: 8mm; }
-                      </style>
-                    </head><body>${printArea.innerHTML}</body></html>`);
-                    win.document.close();
-                    win.focus();
-                    win.print();
-                    setShowBarcodeModal(false);
-                    
-                    // Show success message - status has been updated to Received
-                    alert('✅ Tests marked as Received and printed successfully!');
-                  }}
-                  className="text-white bg-green-600 hover:bg-green-700 px-2 py-1 rounded text-xs font-semibold"
-                >
-                  Print & Update
-                </button>
-
-                <button
-                  onClick={() => setShowBarcodeModal(false)}
-                  className="text-gray-300 hover:text-white text-xl font-bold leading-none px-1"
-                >×</button>
-              </div>
-            </div>
-
-            {/* Labels */}
-            <div className="overflow-y-auto flex-1 p-5 bg-gray-100">
-              <div id="barcode-print-area" className="flex flex-wrap gap-4 justify-start">
-                {barcodeLabels.map((label, idx) => {
-                  const { svg, width, height } = buildCode128Svg(label.barcodeValue);
-                  return (
-                    <div
-                      key={idx}
-                      className="bg-white border border-gray-300 shadow"
-                      style={{ width: '302px', fontFamily: 'Arial, sans-serif', position: 'relative' }}
-                    >
-                      {/* Organization Code - top right corner, small size */}
-                      {barcodePatientInfo.organizationCode && (
-                        <div className="absolute top-1 right-2 text-[8px] text-gray-600 font-semibold">
-                          {barcodePatientInfo.organizationCode}
-                        </div>
-                      )}
-
-                      {/* Barcode — centered, smaller size */}
-                      <div className="flex justify-center px-2 pt-3 pb-0">
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          width="85%"
-                          height="40"
-                          viewBox={`0 0 ${width} ${height}`}
-                          preserveAspectRatio="none"
-                          dangerouslySetInnerHTML={{ __html: svg }}
-                        />
-                      </div>
-
-                      {/* Barcode number centered - smaller text */}
-                      <div className="text-center font-bold text-xs tracking-widest py-0.5 px-2">
-                        {label.barcodeValue}
-                      </div>
-
-                      {/* Date time (left) + specimen type (right) */}
-                      <div className="flex justify-between items-center px-3 pb-0.5">
-                        <span className="text-[10px] text-gray-700">{label.dateStr} {label.timeStr}</span>
-                        <span className="text-[10px] text-gray-600 font-medium">({label.specimen})</span>
-                      </div>
-
-                      {/* Patient name (left) + gender initial / age (right) */}
-                      <div className="flex justify-between items-center px-3 pb-2">
-                        <span className="font-bold text-[10px] leading-tight truncate max-w-[170px]">
-                          {barcodePatientInfo.patientName}
-                        </span>
-                        <span className="text-[10px] font-semibold whitespace-nowrap ml-1">
-                          {barcodePatientInfo.ageGender}
-                        </span>
-                      </div>
-
-                      {/* Short test names */}
-                      {label.shortNamesStr && (
-                        <div className="px-3 pb-2 text-[9px] text-gray-500 truncate">
-                          {label.shortNamesStr}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Barcode Modal - Using Reusable Component */}
+      <BarcodeModal
+        isOpen={showBarcodeModal}
+        onClose={() => setShowBarcodeModal(false)}
+        onPrintOnly={async () => {
+          const printArea = document.getElementById('barcode-print-area');
+          const win = window.open('', '_blank');
+          win.document.write(`<!DOCTYPE html><html><head><title>Barcode Labels</title>
+            <style>
+              * { margin:0; padding:0; box-sizing:border-box; }
+              body { font-family: Arial, sans-serif; background: white; }
+              .labels-wrap { display: flex; flex-wrap: wrap; gap: 8mm; padding: 8mm; }
+              .label { width: 80mm; border: 0.5px solid #999; page-break-inside: avoid; }
+              @page { size: A4; margin: 8mm; }
+            </style>
+          </head><body>${printArea.innerHTML}</body></html>`);
+          win.document.close();
+          win.focus();
+          win.print();
+          setShowBarcodeModal(false);
+        }}
+        onPrintAndUpdate={async () => {
+          let successCount = 0;
+          
+          try {
+            const allTestIds = new Set<number>();
+            for (const label of barcodeLabels) {
+              if (label.testIds && Array.isArray(label.testIds)) {
+                label.testIds.forEach((id: number) => allTestIds.add(id));
+              }
+            }
+            
+            console.log('📝 Test IDs collected:', Array.from(allTestIds));
+            
+            for (const testId of allTestIds) {
+              console.log(`🔄 Transitioning test ${testId} to Received status...`);
+              try {
+                const response = await fetch(`${API_BASE_URL}/results/${testId}/auto-transition/barcode-printed`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ changedBy: 'registration' })
+                });
+                const data = await response.json();
+                if (data.success) {
+                  console.log(`✅ Test ${testId} transitioned to Received`);
+                  successCount++;
+                }
+              } catch (error) {
+                console.error(`❌ Test ${testId} error:`, error);
+              }
+            }
+          } catch (error) {
+            console.error('⚠️ Status transition failed:', error);
+          }
+          
+          // Print barcode
+          const printArea = document.getElementById('barcode-print-area');
+          const win = window.open('', '_blank');
+          win.document.write(`<!DOCTYPE html><html><head><title>Barcode Labels</title>
+            <style>
+              * { margin:0; padding:0; box-sizing:border-box; }
+              body { font-family: Arial, sans-serif; background: white; }
+              .labels-wrap { display: flex; flex-wrap: wrap; gap: 8mm; padding: 8mm; }
+              .label { width: 80mm; border: 0.5px solid #999; page-break-inside: avoid; }
+              @page { size: A4; margin: 8mm; }
+            </style>
+          </head><body>${printArea.innerHTML}</body></html>`);
+          win.document.close();
+          win.focus();
+          win.print();
+          setShowBarcodeModal(false);
+          
+          if (successCount > 0) {
+            alert(`✅ ${successCount} test(s) marked as Received and printed!`);
+          }
+        }}
+        barcodeLabels={barcodeLabels}
+        barcodePatientInfo={barcodePatientInfo}
+      />
     </div>
     </>
   );

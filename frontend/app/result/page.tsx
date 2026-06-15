@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import Header from "@/src/components/Header";
 import PageHeader from "@/src/components/BreadCrumb";
+import BarcodeModal from "@/app/components/BarcodeModal";
 import API_BASE_URL from "@/src/api/config";
 
 import { FaWhatsapp } from "react-icons/fa";
@@ -390,66 +391,6 @@ export default function Result() {
     return patient.patient_uid !== barcodeLockedPatientUid || patient.visit_id !== barcodeLockedVisitId;
   };
 
-  // Generate Code128 barcode bars as SVG path data
-  const buildCode128Svg = (text: any) => {
-    // Code128B encoding table (char code 32-127)
-    const CODE128B = [
-      '11011001100','11001101100','11001100110','10010011000','10010001100',
-      '10001001100','10011001000','10011000100','10001100100','11001001000',
-      '11001000100','11000100100','10110011100','10011011100','10011001110',
-      '10111001100','10011101100','10011100110','11001110010','11001011100',
-      '11001001110','11011100100','11001110100','11101101110','11101001100',
-      '11100101100','11100100110','11101100100','11100110100','11100110010',
-      '11011011000','11011000110','11000110110','10100011000','10001011000',
-      '10001000110','10110001000','10001101000','10001100010','11010001000',
-      '11000101000','11000100010','10110111000','10110001110','10001101110',
-      '10111011000','10111000110','10001110110','11101110110','11010001110',
-      '11000101110','11011101000','11011100010','11011101110','11101011000',
-      '11101000110','11100010110','11101101000','11101100010','11100011010',
-      '11101111010','11001000010','11110001010','10100110000','10100001100',
-      '10010110000','10010000110','10000101100','10000100110','10110010000',
-      '10110000100','10011010000','10011000010','10000110100','10000110010',
-      '11000010010','11001010000','11110111010','11000010100','10001111010',
-      '10100111100','10010111100','10010011110','10111100100','10011110100',
-      '10011110010','11110100100','11110010100','11110010010','11011011110',
-      '11011110110','11110110110','10101111000','10100011110','10001011110',
-      '10111101000','10111100010','11110101000','11110100010','10111011110',
-      '10111101110','11101011110','11110101110','11010000100','11010010000',
-      '11010011100','1100011101011'
-    ];
-    const START_B = 104;
-    const STOP = 106;
-
-    const codes = [START_B];
-    let checksum = START_B;
-    for (let i = 0; i < text.length; i++) {
-      const c = text.charCodeAt(i) - 32;
-      codes.push(c);
-      checksum += c * (i + 1);
-    }
-    codes.push(checksum % 103);
-    codes.push(STOP);
-
-    const barWidth = 2;
-    let x = 0;
-    let bars = '';
-    const height = 60;
-
-    codes.forEach(code => {
-      const pattern = CODE128B[code];
-      if (!pattern) return;
-      for (let i = 0; i < pattern.length; i++) {
-        const w = parseInt(pattern[i]) * barWidth;
-        if (i % 2 === 0) {
-          bars += `<rect x="${x}" y="0" width="${w}" height="${height}" fill="black"/>`;
-        }
-        x += w;
-      }
-    });
-
-    return { svg: bars, width: x, height };
-  };
-
   // Open barcode preview modal for selected barcode tests
   const handleBarcodePrint = () => {
     if (barcodeSelectedTests.size === 0) {
@@ -508,8 +449,16 @@ export default function Result() {
       gender: targetPatient.gender || '',
       // Pre-formatted age/gender string: "F/27 Yrs" or "M/45 Yrs"
       ageGender: genderInitial && age ? `${genderInitial}/${age} Yrs` : genderInitial || (age ? `${age} Yrs` : ''),
+      organizationCode: targetPatient.organizationCode || '', // ✅ Include organization code
     });
-    setBarcodeLabels(labels);
+    
+    // Add organizationCode to each label
+    const labelsWithOrgCode = labels.map(label => ({
+      ...label,
+      organizationCode: targetPatient.organizationCode || '', // ✅ Add org code to barcode labels
+    }));
+    
+    setBarcodeLabels(labelsWithOrgCode);
     setShowBarcodeModal(true);
   };
 
@@ -2704,170 +2653,101 @@ export default function Result() {
         </div>
       )}
 
-      {/* Barcode Preview Modal */}
-      {showBarcodeModal && barcodePatientInfo && (
-        <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col">
-            {/* Header */}
-            <div className="flex items-center justify-between px-5 py-3 border-b bg-gray-800 rounded-t-lg">
-              <h2 className="text-sm font-semibold text-white flex items-center gap-2">
-                <Barcode size={16} /> Barcode Labels — {barcodePatientInfo.patientName} | {barcodePatientInfo.visitId}
-              </h2>
-              <div className="flex gap-2">
-                <button
-                  onClick={async () => {
-                    // Just print without status transition
-                    const printArea = document.getElementById('barcode-print-area');
-                    const win = window.open('', '_blank');
-                    win.document.write(`<!DOCTYPE html><html><head><title>Barcode Labels</title>
-                      <style>
-                        * { margin:0; padding:0; box-sizing:border-box; }
-                        body { font-family: Arial, sans-serif; background: white; }
-                        .labels-wrap { display: flex; flex-wrap: wrap; gap: 8mm; padding: 8mm; }
-                        .label { width: 80mm; border: 0.5px solid #999; page-break-inside: avoid; }
-                        @page { size: A4; margin: 8mm; }
-                      </style>
-                    </head><body>${printArea.innerHTML}</body></html>`);
-                    win.document.close();
-                    win.focus();
-                    win.print();
-                    setShowBarcodeModal(false);
-                  }}
-                  className="text-white bg-blue-600 hover:bg-blue-700 px-2 py-1 rounded text-xs font-semibold"
-                >
-                  Print Only
-                </button>
-
-                <button
-                  onClick={async () => {
-                    try {
-                      // Collect all test IDs from all barcode labels
-                      const allTestIds = new Set<number>();
-                      for (const label of barcodeLabels) {
-                        if (label.testIds && Array.isArray(label.testIds)) {
-                          label.testIds.forEach((id: number) => allTestIds.add(id));
-                        }
-                      }
-                      
-                      console.log('📝 Test IDs to update:', Array.from(allTestIds));
-                      
-                      // Call API for each test ID
-                      for (const testId of allTestIds) {
-                        console.log(`🔄 Transitioning test ${testId} to Received status...`);
-                        const response = await fetch(`${API_BASE_URL}/results/${testId}/auto-transition/barcode-printed`, {
-                          method: 'POST',
-                          headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify({ changedBy: 'result_page' })
-                        });
-                        const data = await response.json();
-                        console.log(`✅ Test ${testId} response:`, data);
-                      }
-                      console.log('✅ All tests auto-transitioned to Received status');
-                    } catch (error) {
-                      console.error('⚠️ Status transition failed:', error);
-                      // Don't block print if status update fails
-                    }
-                    
-                    // Proceed with print
-                    const printArea = document.getElementById('barcode-print-area');
-                    const win = window.open('', '_blank');
-                    win.document.write(`<!DOCTYPE html><html><head><title>Barcode Labels</title>
-                      <style>
-                        * { margin:0; padding:0; box-sizing:border-box; }
-                        body { font-family: Arial, sans-serif; background: white; }
-                        .labels-wrap { display: flex; flex-wrap: wrap; gap: 8mm; padding: 8mm; }
-                        .label { width: 80mm; border: 0.5px solid #999; page-break-inside: avoid; }
-                        @page { size: A4; margin: 8mm; }
-                      </style>
-                    </head><body>${printArea.innerHTML}</body></html>`);
-                    win.document.close();
-                    win.focus();
-                    win.print();
-                    setShowBarcodeModal(false);
-                    
-                    // Refresh page after print to show updated status
-                    setTimeout(() => {
-                      fetchResults(); // Refresh data instead of full page reload
-                    }, 1000);
-                  }}
-                  className="text-white bg-green-600 hover:bg-green-700 px-2 py-1 rounded text-xs font-semibold"
-                >
-                  Print & Update
-                </button>
-
-                <button
-                  onClick={() => setShowBarcodeModal(false)}
-                  className="text-gray-300 hover:text-white text-xl font-bold leading-none px-1"
-                >×</button>
-              </div>
-            </div>
-
-            {/* Labels */}
-            <div className="overflow-y-auto flex-1 p-5 bg-gray-100">
-              <div id="barcode-print-area" className="flex flex-wrap gap-4 justify-start">
-                {barcodeLabels.map((label, idx) => {
-                  const { svg, width, height } = buildCode128Svg(label.barcodeValue);
-                  return (
-                    <div
-                      key={idx}
-                      className="bg-white border border-gray-300 shadow"
-                      style={{ width: '302px', fontFamily: 'Arial, sans-serif', position: 'relative' }}
-                    >
-                      {/* Organization Code - top right corner, small size */}
-                      {label.organizationCode && (
-                        <div className="absolute top-1 right-2 text-[8px] text-gray-600 font-semibold">
-                          {label.organizationCode}
-                        </div>
-                      )}
-
-                      {/* Barcode — centered, smaller size */}
-                      <div className="flex justify-center px-2 pt-3 pb-0">
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          width="85%"
-                          height="40"
-                          viewBox={`0 0 ${width} ${height}`}
-                          preserveAspectRatio="none"
-                          dangerouslySetInnerHTML={{ __html: svg }}
-                        />
-                      </div>
-
-                      {/* Barcode number centered - smaller text, this is what scanner reads = visitId */}
-                      <div className="text-center font-bold text-xs tracking-widest py-0.5 px-2">
-                        {label.barcodeValue}
-                      </div>
-
-                      {/* Date time (left) + specimen type (right) */}
-                      <div className="flex justify-between items-center px-3 pb-0.5">
-                        <span className="text-[10px] text-gray-700">{label.dateStr} {label.timeStr}</span>
-                        <span className="text-[10px] text-gray-600 font-medium">({label.specimen})</span>
-                      </div>
-
-                      {/* Patient name (left) + gender initial / age (right) */}
-                      <div className="flex justify-between items-center px-3 pb-2">
-                        <span className="font-bold text-[10px] leading-tight truncate max-w-[170px]">
-                          {barcodePatientInfo.patientName}
-                        </span>
-                        <span className="text-[10px] font-semibold whitespace-nowrap ml-1">
-                          {barcodePatientInfo.ageGender}
-                        </span>
-                      </div>
-
-                      {/* Short test names */}
-                      {label.shortNamesStr && (
-                        <div className="px-3 pb-2 text-[9px] text-gray-500 truncate">
-                          {label.shortNamesStr}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Barcode Modal - Using Reusable Component */}
+      <BarcodeModal
+        isOpen={showBarcodeModal}
+        onClose={() => {
+          setShowBarcodeModal(false);
+          setBarcodeSelectedTests(new Set());
+          setBarcodeLockedPatientUid(null);
+          setBarcodeLockedVisitId(null);
+        }}
+        onPrintOnly={async () => {
+          const printArea = document.getElementById('barcode-print-area');
+          const win = window.open('', '_blank');
+          win.document.write(`<!DOCTYPE html><html><head><title>Barcode Labels</title>
+            <style>
+              * { margin:0; padding:0; box-sizing:border-box; }
+              body { font-family: Arial, sans-serif; background: white; }
+              .labels-wrap { display: flex; flex-wrap: wrap; gap: 8mm; padding: 8mm; }
+              .label { width: 80mm; border: 0.5px solid #999; page-break-inside: avoid; }
+              @page { size: A4; margin: 8mm; }
+            </style>
+          </head><body>${printArea.innerHTML}</body></html>`);
+          win.document.close();
+          win.focus();
+          win.print();
+          setShowBarcodeModal(false);
+        }}
+        onPrintAndUpdate={async () => {
+          let successCount = 0;
+          
+          try {
+            const allTestIds = new Set<number>();
+            for (const label of barcodeLabels) {
+              if (label.testIds && Array.isArray(label.testIds)) {
+                label.testIds.forEach((id: number) => allTestIds.add(id));
+              }
+            }
+            
+            console.log('📝 Test IDs collected:', Array.from(allTestIds));
+            
+            for (const testId of allTestIds) {
+              console.log(`🔄 Transitioning test ${testId} to Received status...`);
+              try {
+                const response = await fetch(`${API_BASE_URL}/results/${testId}/auto-transition/barcode-printed`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ changedBy: 'result_page' })
+                });
+                const data = await response.json();
+                if (data.success) {
+                  console.log(`✅ Test ${testId} transitioned to Received`);
+                  successCount++;
+                } else {
+                  console.error(`❌ Test ${testId} failed:`, data.message);
+                }
+              } catch (error) {
+                console.error(`❌ Test ${testId} error:`, error);
+              }
+            }
+          } catch (error) {
+            console.error('⚠️ Status transition failed:', error);
+          }
+          
+          // Print barcode
+          const printArea = document.getElementById('barcode-print-area');
+          const win = window.open('', '_blank');
+          win.document.write(`<!DOCTYPE html><html><head><title>Barcode Labels</title>
+            <style>
+              * { margin:0; padding:0; box-sizing:border-box; }
+              body { font-family: Arial, sans-serif; background: white; }
+              .labels-wrap { display: flex; flex-wrap: wrap; gap: 8mm; padding: 8mm; }
+              .label { width: 80mm; border: 0.5px solid #999; page-break-inside: avoid; }
+              @page { size: A4; margin: 8mm; }
+            </style>
+          </head><body>${printArea.innerHTML}</body></html>`);
+          win.document.close();
+          win.focus();
+          win.print();
+          
+          setShowBarcodeModal(false);
+          setBarcodeSelectedTests(new Set());
+          setBarcodeLockedPatientUid(null);
+          setBarcodeLockedVisitId(null);
+          
+          if (successCount > 0) {
+            setTimeout(() => {
+              alert(`✅ ${successCount} test(s) marked as Received and printed!`);
+              fetchResults();
+            }, 800);
+          }
+        }}
+        barcodeLabels={barcodeLabels}
+        barcodePatientInfo={barcodePatientInfo}
+      />
     </>
   );
 }
+
 

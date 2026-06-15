@@ -165,6 +165,7 @@ export const getPatientTests = async (req, res) => {
           mobile: patientTest.patient.mobile,
           email: patientTest.patient.email,
           balance_amount: patientTest.balanceAmount || 0,
+          organizationCode: patientTest.organizationId || '', // ✅ Add organization code for barcode
           tests: []
         };
       }
