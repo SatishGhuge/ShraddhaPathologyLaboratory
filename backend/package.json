@@ -1,0 +1,41 @@
+{
+  "name": "shraddha-backend",
+  "version": "1.0.0",
+  "description": "Backend API for Shraddha Pathology Laboratory",
+  "main": "server.js",
+  "type": "module",
+  "scripts": {
+    "dev": "nodemon server.js",
+    "start": "node server.js",
+    "test": "node test-server.js",
+    "seed": "node scripts/seed.js",
+    "seed:all": "node scripts/seed-all.js",
+    "seed:complete": "node scripts/seed-complete.js",
+    "populate:allocations": "node scripts/populate-module-allocations.js",
+    "prisma:generate": "prisma generate",
+    "prisma:migrate": "prisma migrate dev",
+    "prisma:studio": "prisma studio"
+  },
+  "keywords": [
+    "express",
+    "prisma",
+    "diagnostics"
+  ],
+  "author": "Shraddha Pathology Laboratory",
+  "license": "ISC",
+  "dependencies": {
+    "@prisma/client": "^5.7.1",
+    "bcryptjs": "^2.4.3",
+    "cors": "^2.8.5",
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2",
+    "express-validator": "^7.0.1",
+    "jsonwebtoken": "^9.0.2",
+    "multer": "^2.1.1",
+    "nodemailer": "^6.9.7"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.2",
+    "prisma": "^5.7.1"
+  }
+}
