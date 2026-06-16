@@ -184,6 +184,7 @@ export default function AddUserForm() {
     mobile: "", email: "", address: ""
   });
   const [errors, setErrors] = useState<any>({});
+  const [selectedOrganization, setSelectedOrganization] = useState<any>(null);
 
   const inputClass = "w-full px-2 py-1 text-base border border-gray-300 rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-orange-500";
   const labelClass = "text-sm text-gray-700 font-medium mb-1 block";
@@ -217,6 +218,11 @@ export default function AddUserForm() {
               email: user.email || "",
               address: user.address || ""
             });
+            // Set selected organization when editing
+            if (user.organizationId && organizations.length > 0) {
+              const org = organizations.find(o => o.id === user.organizationId);
+              setSelectedOrganization(org || null);
+            }
             if (user.moduleAllocation) {
               try {
                 let allocationData = user.moduleAllocation;
@@ -245,12 +251,19 @@ export default function AddUserForm() {
         .catch((err) => setErrorMessage(err.message || "Failed to load user"))
         .finally(() => setLoading(false));
     }
-  }, [id, isEditMode]);
+  }, [id, isEditMode, organizations]);
 
   const handleChange = (e: any) => {
     const { name, value } = e.target;
     if (name === "name" && !/^[a-zA-Z\s]*$/.test(value)) return;
     if (name === "mobile" && !/^\d*$/.test(value)) return;
+    
+    // When organization changes, update selectedOrganization
+    if (name === "organizationId") {
+      const org = organizations.find(o => o.id === value);
+      setSelectedOrganization(org || null);
+    }
+    
     setFormData({ ...formData, [name]: value });
     setErrors({ ...errors, [name]: "" });
   };
@@ -268,7 +281,7 @@ export default function AddUserForm() {
 
   const validate = () => {
     const newErrors: any = {};
-    if (!formData.organizationId) newErrors.organizationId = "Organization is required";
+    // Organization is now optional (removed mandatory check)
     if (!formData.role) newErrors.role = "Role is required";
     if (!formData.username) newErrors.username = "Username is required";
     if (!formData.gender) newErrors.gender = "Gender is required";
@@ -339,7 +352,7 @@ export default function AddUserForm() {
 
           <div className="grid grid-cols-2 gap-4 mb-4">
             <div>
-              <label className={labelClass}>Organization *</label>
+              <label className={labelClass}>Organization</label>
               <select name="organizationId" value={formData.organizationId} onChange={handleChange} className={inputClass}>
                 <option value="">Please Select</option>
                 {Array.isArray(organizations) && organizations.map(org => (
@@ -359,6 +372,13 @@ export default function AddUserForm() {
               {errors.role && <p className="text-red-700 text-xs">{errors.role}</p>}
             </div>
           </div>
+
+          {selectedOrganization && (
+            <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded">
+              <label className={labelClass}>Organization Name</label>
+              <div className="text-sm font-semibold text-slate-800 px-2 py-1.5">{selectedOrganization.name}</div>
+            </div>
+          )}
 
           <div className="grid grid-cols-2 gap-3 mb-4">
             <div>

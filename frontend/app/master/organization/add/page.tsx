@@ -424,7 +424,7 @@ const AddOrganization = () => {
                 </div>
               </div>
 
-              <div className="md:col-span-2">
+              <div>
                 <label className="font-medium text-gray-700 text-sm">Email Address</label>
                 <div className="flex items-center border border-gray-300 rounded px-2 bg-white">
                   <Mail size={14} className="text-cyan-600" />
