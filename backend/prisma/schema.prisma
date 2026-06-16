@@ -9,14 +9,17 @@ datasource db {
 
 model Admin {
   id             Int             @id @default(autoincrement())
+  organizationId String?
   username       String          @unique
   email          String          @unique
   password       String
+  adminName      String?
   role           String          @default("ADMIN")
   isActive       Boolean         @default(true)
   createdAt      DateTime        @default(now())
   updatedAt      DateTime        @updatedAt
   passwordResets PasswordReset[]
+  organization   Organization?   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   @@map("admins")
 }
@@ -285,6 +288,8 @@ model Organization {
   moduleAllocation ModuleAllocation?
   patientTests     PatientTest[]
   testCharges      TestCharge[]
+  admins           Admin[]
+  users            User[]
 
   @@map("organizations")
 }
@@ -453,7 +458,7 @@ model Role {
 
 model User {
   id                   Int                    @id @default(autoincrement())
-  center               String
+  organizationId       String?
   name                 String
   username             String                 @unique
   role                 String
@@ -467,6 +472,7 @@ model User {
   updatedAt            DateTime               @updatedAt
   moduleAllocation     ModuleAllocation?
   user_password_resets user_password_resets[]
+  organization         Organization?          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   @@map("users")
 }

@@ -203,6 +203,7 @@ const AddOrganization = () => {
     mobile: "",
     email: "",
     date: "",
+    adminName: "",
     active: "Yes",
   });
 
@@ -225,6 +226,7 @@ const AddOrganization = () => {
                 mobile: organization.mobile || "",
                 email: organization.email || "",
                 date: organization.date ? new Date(organization.date).toISOString().split("T")[0] : "",
+                adminName: organization.adminName || "",
                 active: organization.isActive ? "Yes" : "No",
               });
               if (organization.moduleAllocation) {
@@ -306,6 +308,7 @@ const AddOrganization = () => {
         email: formData.email,
         date: formData.date || null,
         isActive: formData.active === "Yes",
+        adminName: formData.adminName,
         moduleAllocation: JSON.stringify(moduleAllocation),
       };
 
@@ -353,6 +356,16 @@ const AddOrganization = () => {
                 <div className="flex items-center border border-gray-300 rounded px-2 bg-white">
                   <Building2 size={14} className="text-cyan-600" />
                   <input type="text" name="name" value={formData.name} onChange={handleChange}
+                    disabled={isViewMode} required={!isViewMode}
+                    className="w-full px-2 py-1.5 outline-none text-sm disabled:bg-gray-50 bg-transparent" />
+                </div>
+              </div>
+
+              <div>
+                <label className="font-medium text-gray-700 text-sm">Admin Name</label>
+                <div className="flex items-center border border-gray-300 rounded px-2 bg-white">
+                  <User size={14} className="text-cyan-600" />
+                  <input type="text" name="adminName" value={formData.adminName} onChange={handleChange}
                     disabled={isViewMode} required={!isViewMode}
                     className="w-full px-2 py-1.5 outline-none text-sm disabled:bg-gray-50 bg-transparent" />
                 </div>

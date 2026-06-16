@@ -108,7 +108,7 @@ const UserList = () => {
                 filtered.map((u, index) => (
                   <tr key={u.id} className="hover:bg-gray-50 border-b border-gray-200">
                     <td className="border border-gray-300 px-3 py-1">{index + 1}</td>
-                    <td className="border border-gray-300 px-3 py-1">{u.center}</td>
+                    <td className="border border-gray-300 px-3 py-1">{u.organization?.name || "-"}</td>
                     <td className="border border-gray-300 px-3 py-1 font-medium">{u.name}</td>
                     <td className="border border-gray-300 px-3 py-1">{u.username}</td>
                     <td className="border border-gray-300 px-3 py-1">{u.role}</td>

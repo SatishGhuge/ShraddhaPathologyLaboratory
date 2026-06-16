@@ -8,7 +8,7 @@ import Header from "@/src/components/Header";
 import { getUserById, createUser, updateUser, getRoles, getOrganizations } from "@/src/api/master.js";
 
 // Module Accordion Component
-const ModuleAccordion = ({ title, icon: Icon, color, items, moduleAllocation, toggleModule }: any) => {
+const ModuleAccordion = ({ title, icon: Icon, color, items, moduleAllocation, previousModuleAllocation, toggleModule }: any) => {
   const [isOpen, setIsOpen] = useState(false);
   const enabledCount = items.filter((item: any) => {
     const keys = item.key.split('.');
@@ -179,7 +179,7 @@ export default function AddUserForm() {
   const [moduleAllocation, setModuleAllocation] = useState(defaultModuleAllocation);
 
   const [formData, setFormData] = useState({
-    center: "", role: "", username: "", gender: "",
+    organizationId: "", role: "", username: "", gender: "",
     name: "", password: "", confirmPassword: "",
     mobile: "", email: "", address: ""
   });
@@ -206,7 +206,7 @@ export default function AddUserForm() {
         .then((user) => {
           if (user) {
             setFormData({
-              center: user.center || "",
+              organizationId: user.organizationId || "",
               role: user.role || "",
               username: user.username || "",
               gender: user.gender || "",
@@ -219,11 +219,24 @@ export default function AddUserForm() {
             });
             if (user.moduleAllocation) {
               try {
-                const allocation = typeof user.moduleAllocation === 'string' 
-                  ? JSON.parse(user.moduleAllocation) 
-                  : user.moduleAllocation;
-                setModuleAllocation(allocation);
+                let allocationData = user.moduleAllocation;
+                console.log('📦 Raw moduleAllocation:', allocationData, 'Type:', typeof allocationData);
+                
+                // If it's an object with modules property, extract it
+                if (allocationData && typeof allocationData === 'object' && 'modules' in allocationData) {
+                  allocationData = allocationData.modules;
+                  console.log('✅ Extracted modules from object:', allocationData);
+                }
+                
+                // Parse if it's a string
+                const allocation = typeof allocationData === 'string' 
+                  ? JSON.parse(allocationData) 
+                  : allocationData;
+                console.log('✅ Final parsed allocation:', allocation);
+                
+                setModuleAllocation(allocation || defaultModuleAllocation);
               } catch (e) {
+                console.error('Error parsing module allocation:', e);
                 setModuleAllocation(defaultModuleAllocation);
               }
             }
@@ -255,7 +268,7 @@ export default function AddUserForm() {
 
   const validate = () => {
     const newErrors: any = {};
-    if (!formData.center) newErrors.center = "Organization is required";
+    if (!formData.organizationId) newErrors.organizationId = "Organization is required";
     if (!formData.role) newErrors.role = "Role is required";
     if (!formData.username) newErrors.username = "Username is required";
     if (!formData.gender) newErrors.gender = "Gender is required";
@@ -327,13 +340,13 @@ export default function AddUserForm() {
           <div className="grid grid-cols-2 gap-4 mb-4">
             <div>
               <label className={labelClass}>Organization *</label>
-              <select name="center" value={formData.center} onChange={handleChange} className={inputClass}>
+              <select name="organizationId" value={formData.organizationId} onChange={handleChange} className={inputClass}>
                 <option value="">Please Select</option>
                 {Array.isArray(organizations) && organizations.map(org => (
-                  <option key={org.id} value={org.name}>{org.name}</option>
+                  <option key={org.id} value={org.id}>{org.name}</option>
                 ))}
               </select>
-              {errors.center && <p className="text-red-700 text-xs">{errors.center}</p>}
+              {errors.organizationId && <p className="text-red-700 text-xs">{errors.organizationId}</p>}
             </div>
             <div>
               <label className={labelClass}>Role *</label>
