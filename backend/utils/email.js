@@ -172,6 +172,56 @@ export const sendPasswordChangedEmail = async (email, username, newPassword) => 
   }
 };
 
+// Send account update notification email
+export const sendAccountUpdateEmail = async (email, name, username, role) => {
+  try {
+    const transporter = createTransporter();
+    await transporter.sendMail({
+      from: `"Shraddha Pathology Laboratory" <${process.env.EMAIL_USER}>`,
+      to: email,
+      subject: 'Your Account Has Been Updated',
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <div style="background: linear-gradient(135deg, #f97316 0%, #fb923c 100%); padding: 20px; text-align: center;">
+            <h1 style="color: white; margin: 0;">Shraddha Pathology Laboratory</h1>
+            <p style="color: white; margin: 5px 0;">Empowering Life Transforming Health</p>
+          </div>
+          <div style="padding: 30px; background: #f9fafb;">
+            <p style="color: #374151; font-size: 16px;">Hello ${name},</p>
+            <p style="color: #374151; font-size: 16px;">
+              Your Shraddha Pathology Laboratory account has been updated with new information.
+            </p>
+            <div style="background: white; border: 2px solid #f97316; border-radius: 8px; padding: 20px; margin: 20px 0;">
+              <p style="margin: 10px 0; color: #6b7280; font-size: 12px; text-transform: uppercase; letter-spacing: 1px;"><strong>Updated Account Information</strong></p>
+              <p style="margin: 8px 0; color: #374151; font-size: 14px;"><strong>Name:</strong> ${name}</p>
+              <p style="margin: 8px 0; color: #374151; font-size: 14px;"><strong>Username:</strong> <span style="font-family: 'Courier New', monospace; color: #f97316; font-weight: bold;">${username}</span></p>
+              <p style="margin: 8px 0; color: #374151; font-size: 14px;"><strong>Role:</strong> ${role || 'Staff'}</p>
+            </div>
+            <div style="background: #fef3c7; border: 1px solid #f59e0b; border-radius: 6px; padding: 15px; margin: 20px 0;">
+              <p style="color: #92400e; font-size: 13px; margin: 0;">
+                <strong>📋 Update Notice:</strong><br>
+                • Your account details have been updated<br>
+                • If you did not authorize this update, please contact your administrator<br>
+                • Your password remains unchanged<br>
+                • Login with your existing credentials
+              </p>
+            </div>
+            <p style="color: #374151; font-size: 15px;">If you have any questions, please contact your administrator.</p>
+            <p style="color: #374151; font-size: 15px;">Thank you.</p>
+          </div>
+          <div style="background: #e5e7eb; padding: 15px; text-align: center;">
+            <p style="color: #6b7280; font-size: 12px; margin: 0;">Shraddha Pathology Laboratory | Plot No-38, Sector-1, New Panvel - 410 206</p>
+          </div>
+        </div>
+      `,
+    });
+    console.log(`✅ Account update notification email sent to ${email}`);
+  } catch (error) {
+    console.error('❌ Failed to send account update email:', error.message);
+    throw error;
+  }
+};
+
 // Send user credentials email (for staff users — AddUser form with auto-generated credentials)
 export const sendUserCredentialsEmail = async (email, name, username, password, role) => {
   try {

@@ -1,5 +1,5 @@
 import prisma from '../config/database.js';
-import { sendUserCredentialsEmail, sendFranchiseCredentialsEmail, sendCenterCredentialsEmail, sendStaffCredentialsEmail, sendOrganizationCredentialsEmail } from '../utils/email.js';
+import { sendUserCredentialsEmail, sendFranchiseCredentialsEmail, sendCenterCredentialsEmail, sendStaffCredentialsEmail, sendOrganizationCredentialsEmail, sendAccountUpdateEmail } from '../utils/email.js';
 import { getPaginationParams, buildPaginatedResponse } from '../utils/pagination.js';
 
 // Helper function to generate random password
@@ -4390,6 +4390,17 @@ export const updateUser = async (req, res) => {
         });
       } else {
         await prisma.moduleAllocation.deleteMany({ where: { userId: parseInt(id) } });
+      }
+    }
+
+    // Send email notification to user about account update
+    if (email) {
+      try {
+        await sendAccountUpdateEmail(email, name || existing.name, newUsername, role || existing.role);
+        console.log(`✅ Account update notification sent to ${email}`);
+      } catch (emailError) {
+        console.error('⚠️ Failed to send update notification email:', emailError);
+        // Don't fail the update if email fails, just log it
       }
     }
 
