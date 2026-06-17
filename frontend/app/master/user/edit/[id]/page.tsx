@@ -1,6 +1,6 @@
 "use client";
 
-import { Eye, EyeOff, ArrowLeft, ChevronDown, User, Settings, BarChart3, HelpCircle, ClipboardCheck, Lock } from "lucide-react";
+import { ArrowLeft, ChevronDown, User, Settings, BarChart3, HelpCircle, ClipboardCheck, Lock } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useRouter, useParams, usePathname } from "next/navigation";
 
@@ -8,7 +8,7 @@ import Header from "@/src/components/Header";
 import { getUserById, createUser, updateUser, getRoles, getOrganizations } from "@/src/api/master.js";
 
 // Module Accordion Component
-const ModuleAccordion = ({ title, icon: Icon, color, items, moduleAllocation, previousModuleAllocation, toggleModule }: any) => {
+const ModuleAccordion = ({ title, icon: Icon, color, items, moduleAllocation, toggleModule }: any) => {
   const [isOpen, setIsOpen] = useState(false);
   const enabledCount = items.filter((item: any) => {
     const keys = item.key.split('.');
@@ -169,7 +169,6 @@ export default function AddUserForm() {
   const isEditMode = pathname.includes("/edit/");
 
   const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
   const [loading, setLoading] = useState(false);
@@ -179,12 +178,11 @@ export default function AddUserForm() {
   const [moduleAllocation, setModuleAllocation] = useState(defaultModuleAllocation);
 
   const [formData, setFormData] = useState({
-    organizationId: "", role: "", username: "", gender: "",
-    name: "", password: "", confirmPassword: "",
+    organizationId: "", role: "", gender: "",
+    name: "",
     mobile: "", email: "", address: ""
   });
   const [errors, setErrors] = useState<any>({});
-  const [selectedOrganization, setSelectedOrganization] = useState<any>(null);
 
   const inputClass = "w-full px-2 py-1 text-base border border-gray-300 rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-orange-500";
   const labelClass = "text-sm text-gray-700 font-medium mb-1 block";
@@ -209,20 +207,13 @@ export default function AddUserForm() {
             setFormData({
               organizationId: user.organizationId || "",
               role: user.role || "",
-              username: user.username || "",
               gender: user.gender || "",
               name: user.name || "",
-              password: "",
-              confirmPassword: "",
               mobile: user.mobile || "",
               email: user.email || "",
               address: user.address || ""
             });
-            // Set selected organization when editing
-            if (user.organizationId && organizations.length > 0) {
-              const org = organizations.find(o => o.id === user.organizationId);
-              setSelectedOrganization(org || null);
-            }
+            // Organization is already set in formData
             if (user.moduleAllocation) {
               try {
                 let allocationData = user.moduleAllocation;
@@ -260,8 +251,7 @@ export default function AddUserForm() {
     
     // When organization changes, update selectedOrganization
     if (name === "organizationId") {
-      const org = organizations.find(o => o.id === value);
-      setSelectedOrganization(org || null);
+      // Just handle the change, no need to track selected organization
     }
     
     setFormData({ ...formData, [name]: value });
@@ -283,16 +273,8 @@ export default function AddUserForm() {
     const newErrors: any = {};
     // Organization is now optional (removed mandatory check)
     if (!formData.role) newErrors.role = "Role is required";
-    if (!formData.username) newErrors.username = "Username is required";
     if (!formData.gender) newErrors.gender = "Gender is required";
     if (!formData.name) newErrors.name = "Name is required";
-    if (!isEditMode && !formData.password) newErrors.password = "Password is required";
-    if (formData.password && !/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*(),.?":{}|<>]).{8,}$/.test(formData.password)) {
-      newErrors.password = "Password must have uppercase, lowercase, number and special character (min 8 chars)";
-    }
-    if (formData.password && formData.password !== formData.confirmPassword) {
-      newErrors.confirmPassword = "Passwords do not match";
-    }
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -306,8 +288,6 @@ export default function AddUserForm() {
         ...formData,
         moduleAllocation: JSON.stringify(moduleAllocation)
       };
-      delete payload.confirmPassword;
-      if (isEditMode && !payload.password) delete payload.password;
 
       console.log('📤 Submitting user payload:', payload);
 
@@ -320,7 +300,8 @@ export default function AddUserForm() {
       setTimeout(() => router.push("/master/userlist"), 1500);
     } catch (err: any) {
       console.error('❌ Error:', err);
-      setErrorMessage(err.message || "Failed to save user");
+      const errorMessage = err.detail || err.message || "Failed to save user";
+      setErrorMessage(errorMessage);
     } finally {
       setSaving(false);
     }
@@ -373,18 +354,11 @@ export default function AddUserForm() {
             </div>
           </div>
 
-          {selectedOrganization && (
-            <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded">
-              <label className={labelClass}>Organization Name</label>
-              <div className="text-sm font-semibold text-slate-800 px-2 py-1.5">{selectedOrganization.name}</div>
-            </div>
-          )}
-
           <div className="grid grid-cols-2 gap-3 mb-4">
             <div>
-              <label className={labelClass}>Username *</label>
-              <input name="username" value={formData.username} onChange={handleChange} className={inputClass} />
-              {errors.username && <p className="text-red-700 text-xs">{errors.username}</p>}
+              <label className={labelClass}>Name *</label>
+              <input name="name" value={formData.name} onChange={handleChange} className={inputClass} />
+              {errors.name && <p className="text-red-700 text-xs">{errors.name}</p>}
             </div>
             <div>
               <label className={labelClass}>Gender *</label>
@@ -395,44 +369,6 @@ export default function AddUserForm() {
                 <option>Other</option>
               </select>
               {errors.gender && <p className="text-red-700 text-xs">{errors.gender}</p>}
-            </div>
-          </div>
-
-          <div className="mb-4">
-            <label className={labelClass}>Name *</label>
-            <input name="name" value={formData.name} onChange={handleChange} className={inputClass} />
-            {errors.name && <p className="text-red-700 text-xs">{errors.name}</p>}
-          </div>
-
-          <div className="grid grid-cols-2 gap-3 mb-4">
-            <div className="relative">
-              <label className={labelClass}>Password {!isEditMode && "*"}</label>
-              <input
-                name="password"
-                type={showPassword ? "text" : "password"}
-                value={formData.password}
-                onChange={handleChange}
-                placeholder={isEditMode ? "Leave blank to keep current" : ""}
-                className={`${inputClass} pr-8`}
-              />
-              <span className="absolute right-2 top-7 cursor-pointer" onClick={() => setShowPassword(!showPassword)}>
-                {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-              </span>
-              {errors.password && <p className="text-red-700 text-xs">{errors.password}</p>}
-            </div>
-            <div className="relative">
-              <label className={labelClass}>Confirm Password</label>
-              <input
-                name="confirmPassword"
-                type={showConfirmPassword ? "text" : "password"}
-                value={formData.confirmPassword}
-                onChange={handleChange}
-                className={`${inputClass} pr-8`}
-              />
-              <span className="absolute right-2 top-7 cursor-pointer" onClick={() => setShowConfirmPassword(!showConfirmPassword)}>
-                {showConfirmPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-              </span>
-              {errors.confirmPassword && <p className="text-red-700 text-xs">{errors.confirmPassword}</p>}
             </div>
           </div>
 

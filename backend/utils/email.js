@@ -172,15 +172,14 @@ export const sendPasswordChangedEmail = async (email, username, newPassword) => 
   }
 };
 
-// Send user credentials email (for staff users — AddUser form)
-export const sendUserCredentialsEmail = async (email, name, username, password) => {
+// Send user credentials email (for staff users — AddUser form with auto-generated credentials)
+export const sendUserCredentialsEmail = async (email, name, username, password, role) => {
   try {
     const transporter = createTransporter();
-    const isUpdate = password === '(unchanged)';
     await transporter.sendMail({
       from: `"Shraddha Pathology Laboratory" <${process.env.EMAIL_USER}>`,
       to: email,
-      subject: isUpdate ? 'Your Staff Account Has Been Updated' : 'Your Staff Account Details',
+      subject: 'Your Shraddha Pathology Laboratory Account Has Been Created',
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
           <div style="background: linear-gradient(135deg, #f97316 0%, #fb923c 100%); padding: 20px; text-align: center;">
@@ -190,14 +189,25 @@ export const sendUserCredentialsEmail = async (email, name, username, password) 
           <div style="padding: 30px; background: #f9fafb;">
             <p style="color: #374151; font-size: 16px;">Hello ${name},</p>
             <p style="color: #374151; font-size: 16px;">
-              ${isUpdate ? 'Your staff account has been updated.' : 'Your staff account has been created.'}
+              Your staff account has been successfully created. Your login credentials are provided below.
             </p>
-            <div style="background: white; border: 1px solid #e5e7eb; border-radius: 8px; padding: 20px; margin: 20px 0;">
-              <p style="margin: 8px 0; color: #374151;"><strong>Username:</strong> ${username}</p>
-              ${!isUpdate ? `<p style="margin: 8px 0; color: #374151;"><strong>Password:</strong> ${password}</p>` : ''}
+            <div style="background: white; border: 2px solid #f97316; border-radius: 8px; padding: 20px; margin: 20px 0;">
+              <p style="margin: 10px 0; color: #6b7280; font-size: 12px; text-transform: uppercase; letter-spacing: 1px;"><strong>Login Credentials</strong></p>
+              <p style="margin: 8px 0; color: #374151; font-size: 14px;"><strong>Username:</strong> <span style="font-family: 'Courier New', monospace; color: #f97316; font-weight: bold;">${username}</span></p>
+              <p style="margin: 8px 0; color: #374151; font-size: 14px;"><strong>Password:</strong> <span style="font-family: 'Courier New', monospace; color: #f97316; font-weight: bold;">${password}</span></p>
+              <p style="margin: 8px 0; color: #374151; font-size: 14px;"><strong>Role:</strong> ${role || 'Staff'}</p>
             </div>
-            <p style="color: #374151; font-size: 16px;">Please login at the Shraddha Pathology Laboratory portal with the above credentials.</p>
-            <p style="color: #374151; font-size: 16px;">Thank you.</p>
+            <div style="background: #fef3c7; border: 1px solid #f59e0b; border-radius: 6px; padding: 15px; margin: 20px 0;">
+              <p style="color: #92400e; font-size: 13px; margin: 0;">
+                <strong>⚠️ Important:</strong><br>
+                • Please login with the credentials provided above<br>
+                • Keep your password secure and confidential<br>
+                • You can change your password after first login<br>
+                • Do not share your credentials with anyone
+              </p>
+            </div>
+            <p style="color: #374151; font-size: 15px;">Please login at the Shraddha Pathology Laboratory portal using the credentials above.</p>
+            <p style="color: #374151; font-size: 15px;">Thank you.</p>
           </div>
           <div style="background: #e5e7eb; padding: 15px; text-align: center;">
             <p style="color: #6b7280; font-size: 12px; margin: 0;">Shraddha Pathology Laboratory | Plot No-38, Sector-1, New Panvel - 410 206</p>
@@ -205,9 +215,10 @@ export const sendUserCredentialsEmail = async (email, name, username, password) 
         </div>
       `,
     });
-    console.log(`✅ Staff credentials email sent to ${email}`);
+    console.log(`✅ User credentials email sent to ${email}`);
   } catch (error) {
-    console.error('❌ Failed to send staff credentials email:', error.message);
+    console.error('❌ Failed to send user credentials email:', error.message);
+    throw error;
   }
 };
 
