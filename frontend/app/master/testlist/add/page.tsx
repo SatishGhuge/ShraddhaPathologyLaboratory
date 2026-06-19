@@ -5,6 +5,7 @@ import { useRouter, useParams, usePathname } from "next/navigation";
 
 import Header from "@/src/components/Header";
 import PageHeader from "@/src/components/BreadCrumb";
+import UnitModal from "@/src/components/UnitModal";
 import { CKEditor } from "@ckeditor/ckeditor5-react";
 import ClassicEditor from "@ckeditor/ckeditor5-build-classic";
 import { getTestById, createTest, updateTest, getDepartments, getUnits, getTests } from "@/src/api/master";
@@ -86,6 +87,18 @@ const AddTest = () => {
   const [paramSuggestions, setParamSuggestions] = useState({});
   const [paramSuggestionsOpen, setParamSuggestionsOpen] = useState({});
   const paramSearchTimers = {};
+
+  // Unit modal
+  const [showUnitModal, setShowUnitModal] = useState(false);
+
+  // Refresh units list when unit is added
+  const handleUnitAdded = async () => {
+    try {
+      setUnits(await getUnits());
+    } catch (err) {
+      console.error('Error refreshing units:', err);
+    }
+  };
 
   const handleParamNameSearch = (catIdx: any, paramIdx: any, value: any) => {
     const key = `${catIdx}-${paramIdx}`;
@@ -693,6 +706,9 @@ const AddTest = () => {
     } as any);
     setCategories(updatedCategories);
   };
+
+  // Open add unit modal
+  const openAddUnitModal = () => setShowUnitModal(true);
 
   const deleteParameter = (categoryIndex: any, parameterIndex: any) => {
     const updatedCategories = [...categories];
@@ -1686,21 +1702,33 @@ const AddTest = () => {
                               Delete Parameter
                             </button>
                           )}
-                          {/* Select Unit Dropdown */}
-                          <select 
-                            className="px-2 py-1.5 sm:py-1 border border-gray-300 rounded text-xs sm:text-sm w-32 bg-white focus:outline-none focus:ring-2 focus:ring-orange-500" 
-                            value={parameter.units || ""}
-                            onChange={(e) => handleParameterChange(categoryIndex, paramIndex, 'units', e.target.value)}
-                            disabled={isViewMode}
-                            title="Select unit - linked to Unit column in preview table"
-                          >
-                            <option value="">Select Unit 🔗</option>
-                            {(units || []).map((unit) => (
-                              <option key={unit.id} value={unit.symbol}>
-                                {unit.symbol}
-                              </option>
-                            ))}
-                          </select>
+                          {/* Select Unit Dropdown with Add Button */}
+                          <div className="flex gap-1 items-center">
+                            <select 
+                              className="px-2 py-1.5 sm:py-1 border border-gray-300 rounded text-xs sm:text-sm w-32 bg-white focus:outline-none focus:ring-2 focus:ring-orange-500" 
+                              value={parameter.units || ""}
+                              onChange={(e) => handleParameterChange(categoryIndex, paramIndex, 'units', e.target.value)}
+                              disabled={isViewMode}
+                              title="Select unit - linked to Unit column in preview table"
+                            >
+                              <option value="">Select Unit 🔗</option>
+                              {(units || []).map((unit) => (
+                                <option key={unit.id} value={unit.symbol}>
+                                  {unit.symbol}
+                                </option>
+                              ))}
+                            </select>
+                            {!isViewMode && (
+                              <button
+                                onClick={() => openAddUnitModal()}
+                                type="button"
+                                className="px-2 py-1.5 sm:py-1 bg-orange-500 hover:bg-orange-600 text-white rounded text-xs font-bold transition-colors"
+                                title="Add new unit"
+                              >
+                                +
+                              </button>
+                            )}
+                          </div>
                         </div>
                       </div>
                       {/* Row 1: Parameter Fields */}
@@ -2880,6 +2908,14 @@ const AddTest = () => {
             )}
           </div>
         </div>
+
+        {/* ================= UNIT MODAL COMPONENT ================= */}
+        <UnitModal
+          isOpen={showUnitModal}
+          onClose={() => setShowUnitModal(false)}
+          onUnitAdded={handleUnitAdded}
+          editingUnit={null}
+        />
       </div>
     </>
   );

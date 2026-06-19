@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Header from "@/src/components/Header";
 import PageHeader from "@/src/components/BreadCrumb";
 import BarcodeModal from "@/app/components/BarcodeModal";
+import ReferralDoctorModal from "@/src/components/ReferralDoctorModal";
 import API_BASE_URL from "@/src/api/config";
 
 import {
@@ -17,7 +18,7 @@ import {
   Barcode,
 } from "lucide-react";
 import { createPatient, searchPatient } from "@/src/api/patient";
-import { getDoctors, createDoctor, getSpecimenTypes, getOrganizations, getTestCharges } from "@/src/api/master";
+import { getDoctors, getSpecimenTypes, getOrganizations, getTestCharges } from "@/src/api/master";
 import { getCities, getSubSections, getDistricts, getVillages, formatLocation, parseLocation, searchLocations } from "@/src/data/maharashtraLocations";
 
 /* ------------------ INLINE DATE PICKER ------------------ */
@@ -298,7 +299,6 @@ export default function PatientRegistration() {
   
   const [showSimilarPatientsDropdown, setShowSimilarPatientsDropdown] = useState(false);
   const [newPackage, setNewPackage] = useState({ name: "", tests: [], b2cCharge: 0, b2bCharge: 0 });
-  const [newRef, setNewRef] = useState({ type: "Doctor", name: "", degree: "", compliment: "", mobile: "", email: "", address: "", allowSend: false });
 
   /* --- Referral Doctor Checkbox Logic --- */
   const [isManualRefDoctor, setIsManualRefDoctor] = useState(false);
@@ -521,40 +521,18 @@ export default function PatientRegistration() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const saveRef = async () => {
-    if (!newRef.name) return alert("Please enter name");
-    
+  // Handle doctor added from modal
+  const handleDoctorAdded = async (addedDoctor: any) => {
     try {
-      // Save to database
-      const doctorData = {
-        name: newRef.name,
-        type: newRef.type,
-        degree: newRef.degree || "",
-        compliment: parseFloat(newRef.compliment) || 0,
-        mobile: newRef.mobile || "",
-        email: newRef.email || "",
-        address: newRef.address || "",
-        allowSendReport: newRef.allowSend || false
-      };
-      
-      const result = await createDoctor(doctorData);
-      
       // Refresh the doctors list for the dropdown
       const doctors = await getDoctors();
       setDoctorsList(doctors);
       
       // Auto-select the newly added doctor in the dropdown
-      setRefDoctor(`Dr. ${newRef.name}`);
+      setRefDoctor(`Dr. ${addedDoctor.name}`);
       setIsManualRefDoctor(false);
-      
-      // Reset form and close modal
-      setNewRef({ type: "Doctor", name: "", degree: "", compliment: "", mobile: "", email: "", address: "", allowSend: false });
-      setShowRefModal(false);
-      
-      alert("Referral doctor added successfully and selected!");
     } catch (error) {
-      console.error("Error saving referral doctor:", error);
-      alert("Failed to save referral doctor: " + (error.message || "Unknown error"));
+      console.error("Error refreshing doctors list:", error);
     }
   };
 
@@ -1727,136 +1705,13 @@ export default function PatientRegistration() {
         </div>
       )}
 
-      {/* Referral Modal */}
-      {showRefModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-40 flex items-start justify-center z-50 p-6 overflow-y-auto">
-          <div className="bg-white rounded-lg w-full max-w-2xl p-6 my-8">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-semibold text-gray-700">Add Referral Doctor</h3>
-              <button 
-                onClick={() => {
-                  setShowRefModal(false);
-                  setNewRef({ type: "Doctor", name: "", degree: "", compliment: "", mobile: "", email: "", address: "", allowSend: false });
-                }} 
-                className="text-gray-500 hover:text-gray-700 text-2xl leading-none"
-              >&times;</button>
-            </div>
-            <div className="grid grid-cols-12 gap-3 text-sm">
-              <div className="col-span-4 flex items-center">Referral Type*</div>
-              <div className="col-span-8">
-                <label className="mr-4 inline-flex items-center cursor-pointer">
-                  <input type="radio" name="rtype" checked={newRef.type==='Doctor'} onChange={() => setNewRef({...newRef, type: 'Doctor'})} className="mr-2" /> 
-                  Doctor
-                </label>
-                <label className="inline-flex items-center cursor-pointer">
-                  <input type="radio" name="rtype" checked={newRef.type==='Hospital'} onChange={() => setNewRef({...newRef, type: 'Hospital'})} className="mr-2" /> 
-                  Hospital
-                </label>
-              </div>
-              <div className="col-span-4 flex items-center">Name*</div>
-              <div className="col-span-8">
-                <input 
-                  className={input} 
-                  value={newRef.name} 
-                  onChange={e => setNewRef({...newRef, name: e.target.value})} 
-                  placeholder="Enter doctor/hospital name" 
-                  required
-                />
-              </div>
-              <div className="col-span-4 flex items-center">Degree</div>
-              <div className="col-span-8">
-                <input 
-                  className={input} 
-                  value={newRef.degree} 
-                  onChange={e => setNewRef({...newRef, degree: e.target.value})} 
-                  placeholder="e.g., MBBS, MD"
-                />
-              </div>
-              <div className="col-span-4 flex items-center">Compliment %</div>
-              <div className="col-span-8">
-                <input 
-                  type="number"
-                  className={input} 
-                  value={newRef.compliment} 
-                  onChange={e => {
-                    const val = e.target.value;
-                    if (val === '' || (parseFloat(val) >= 0 && parseFloat(val) <= 100)) {
-                      setNewRef({...newRef, compliment: val});
-                    }
-                  }} 
-                  placeholder="0-100"
-                  min="0"
-                  max="100"
-                />
-              </div>
-              <div className="col-span-4 flex items-center">Mobile</div>
-              <div className="col-span-8">
-                <input 
-                  type="tel"
-                  className={input} 
-                  value={newRef.mobile} 
-                  onChange={e => {
-                    const val = e.target.value;
-                    if (/^\d{0,10}$/.test(val)) {
-                      setNewRef({...newRef, mobile: val});
-                    }
-                  }} 
-                  placeholder="10-digit mobile number"
-                  maxLength={10}
-                />
-              </div>
-              <div className="col-span-4 flex items-center">Email</div>
-              <div className="col-span-8">
-                <input 
-                  type="email"
-                  className={input} 
-                  value={newRef.email} 
-                  onChange={e => setNewRef({...newRef, email: e.target.value})} 
-                  placeholder="email@example.com"
-                />
-              </div>
-              <div className="col-span-4 flex items-start pt-2">Address</div>
-              <div className="col-span-8">
-                <textarea 
-                  className={input} 
-                  value={newRef.address} 
-                  onChange={e => setNewRef({...newRef, address: e.target.value})} 
-                  rows={3} 
-                  placeholder="Enter address"
-                />
-              </div>
-              <div className="col-span-12">
-                <label className="inline-flex items-center cursor-pointer">
-                  <input 
-                    type="checkbox" 
-                    className="mr-2 w-4 h-4 cursor-pointer" 
-                    checked={newRef.allowSend} 
-                    onChange={e => setNewRef({...newRef, allowSend: e.target.checked})} 
-                  />
-                  <span className="text-sm">Allow to send report on balance amount</span>
-                </label>
-              </div>
-            </div>
-            <div className="flex justify-end gap-2 mt-6">
-              <button 
-                onClick={() => {
-                  setShowRefModal(false);
-                  setNewRef({ type: "Doctor", name: "", degree: "", compliment: "", mobile: "", email: "", address: "", allowSend: false });
-                }} 
-                className="px-4 py-2 border border-gray-300 rounded hover:bg-gray-50 transition-colors"
-              >
-                Cancel
-              </button>
-              <button 
-                onClick={saveRef} 
-                className="bg-slate-900 hover:bg-orange-600 text-white px-6 py-2 rounded transition-colors font-semibold"
-              >
-                Save
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Referral Doctor Modal Component */}
+      <ReferralDoctorModal
+        isOpen={showRefModal}
+        onClose={() => setShowRefModal(false)}
+        onDoctorAdded={handleDoctorAdded}
+        editingDoctor={null}
+      />
 
       {/* MAIN 3-COLUMN */}
       <div className="grid grid-cols-1 md:grid-cols-12 gap-3 h-auto md:h-[75vh]">
