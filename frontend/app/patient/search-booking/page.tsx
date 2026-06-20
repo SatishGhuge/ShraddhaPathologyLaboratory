@@ -4,6 +4,8 @@ import { useRouter, useSearchParams } from "next/navigation";
 import React, { useState, useRef, useEffect } from "react";
 import Header from "@/src/components/Header";
 import PageHeader from "@/src/components/BreadCrumb";
+import BarcodeModal from "@/app/components/BarcodeModal";
+import BillReceipt from "@/app/components/BillReceipt";
 import API_BASE_URL from "@/src/api/config";
 
 import { 
@@ -18,6 +20,26 @@ import html2pdf from "html2pdf.js";
 import { jsPDF } from "jspdf";
 const LetterHead = "/LetterHead.jpeg";
 import { generateBillPDF, printBill } from "@/src/utils/billPdfGenerator.js";
+
+/* ─────────────────── Print Styles ─────────────────── */
+if (typeof window !== 'undefined') {
+  const style = document.createElement('style');
+  style.textContent = `
+    @media print {
+      [data-no-print],
+      .no-print {
+        display: none !important;
+        visibility: hidden !important;
+        height: 0 !important;
+        margin: 0 !important;
+        padding: 0 !important;
+      }
+    }
+  `;
+  if (document.head) {
+    document.head.appendChild(style);
+  }
+}
 
 /* ─────────────────── helpers ─────────────────── */
 const getSampleColor = (sample: any, specimenTypes: any) => {
@@ -318,6 +340,11 @@ export default function BookingPage() {
   const [showBarcodeModal, setShowBarcodeModal] = useState(false);
   const [barcodeLabels, setBarcodeLabels] = useState<any[]>([]);
   const [barcodePatientInfo, setBarcodePatientInfo] = useState<any>(null);
+  const [selectedBarcodeIndices, setSelectedBarcodeIndices] = useState<Set<number>>(new Set());
+  const [barcodeSelectedTests, setBarcodeSelectedTests] = useState<Set<number>>(new Set());
+  const [barcodeLockedPatientUid, setBarcodeLockedPatientUid] = useState<string | null>(null);
+  const [barcodeLockedVisitId, setBarcodeLockedVisitId] = useState<string | null>(null);
+  const [barcodesPrinting, setBarcodesPrinting] = useState(false);
   
   const [editingPatient,  setEditingPatient]  = useState<any>(null);
   const [formData,        setFormData]        = useState(INIT_FORM);
@@ -721,6 +748,19 @@ export default function BookingPage() {
     setBookings(filtered);
   }, [dateRange, appliedPatientName, appliedMobile, appliedDoctor, appliedOutstanding, allBookings, deletedIds]);
 
+  /* ===== BARCODE SELECTION HANDLER ===== */
+  const handleBarcodeToggle = (index: number) => {
+    setSelectedBarcodeIndices((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(index)) {
+        newSet.delete(index);
+      } else {
+        newSet.add(index);
+      }
+      return newSet;
+    });
+  };
+
   /* ===== SEARCH HANDLER ===== */
   const handleSearch = () => {
     setAppliedPatientName(patientNameSearch);
@@ -1014,6 +1054,12 @@ export default function BookingPage() {
       );
       setBookings(updated);
       setSelectedBooking(updated.find(b=>b.bookingId===selectedBooking.bookingId));
+      // Clear discount when test is removed
+      setBilling(prev => ({
+        ...prev,
+        discount: "0",
+        discountPercent: "0"
+      }));
     }
   };
 
@@ -1194,6 +1240,11 @@ export default function BookingPage() {
       // Organization code stored separately for display, not in barcode
       let organizationCode = booking.patientData?.organizationCode || '';
       
+      // Get barcode_status from the first test in this specimen group (they all have the same status)
+      const firstTestIdForSpecimen = specimenTestIds[specimen]?.[0];
+      const firstTest = booking.tests.find((t: any) => t.id === firstTestIdForSpecimen);
+      const barcodeStatus = firstTest?.barcode_status || 'Unprinted';
+      
       return {
         barcodeValue, // Just the visitId-based barcode
         organizationCode, // Store separately for display
@@ -1202,6 +1253,7 @@ export default function BookingPage() {
         dateStr,
         timeStr,
         testIds: specimenTestIds[specimen] || [], // Include test IDs for API calls
+        barcode_status: barcodeStatus, // Add barcode status from database
       };
     });
 
@@ -1218,7 +1270,188 @@ export default function BookingPage() {
       organizationCode: booking.patientData?.organizationCode || '', // Add organization code to patient info
     });
     setBarcodeLabels(labels);
+    setSelectedBarcodeIndices(new Set(labels.map((_, idx) => idx))); // Initialize all barcodes as selected
     setShowBarcodeModal(true);
+  };
+
+  // Print bill with header for booking
+  const handlePrintBillWithHeader = async () => {
+    setShowPrintDropdown(false);
+    if (!selectedBooking) return;
+
+    const billBooking = {
+      bookingId: selectedBooking.bookingId,
+      visitId: selectedBooking.visitId || selectedBooking.bookingId,
+      patientId: selectedBooking.patientId,
+      name: selectedBooking.name,
+      date: selectedBooking.date,
+      tests: selectedBooking.tests.map((t: any) => ({
+        name: t.name,
+        sample: t.sample,
+        charge: businessType === "B2C" ? (t.b2cCharge || t.charge || 0) : (t.b2bCharge || t.charge || 0),
+        b2cCharge: t.b2cCharge || t.charge || 0,
+        b2bCharge: t.b2bCharge || t.charge || 0
+      })),
+      paidAmount: selectedBooking.paidAmount || 0,
+      balanceAmount: selectedBooking.balanceAmount || 0,
+      patientData: {
+        title: selectedBooking.patientData?.title || 'MR',
+        firstName: selectedBooking.patientData?.firstName || '',
+        lastName: selectedBooking.patientData?.lastName || '',
+        age: selectedBooking.patientData?.age || '',
+        gender: selectedBooking.patientData?.gender || 'Male',
+        mobile: selectedBooking.patientData?.mobile || '',
+        referralDoctor: selectedBooking.patientData?.referralDoctor || '',
+        remark: selectedBooking.patientData?.remark || ''
+      }
+    };
+
+    const billingInfo = {
+      discount: String(selectedBooking.discountAmount || 0),
+      discountPercent: String(selectedBooking.discountPercent || 0),
+      remarks: selectedBooking.discountRemark || '',
+      paymentMode: billing.paymentMode || 'Cash'
+    };
+
+    const result = await printBill(billBooking, billingInfo, businessType, true);
+    if (!result.success) {
+      alert('Failed to print: ' + result.error);
+    }
+  };
+
+  // Print bill without header for booking
+  const handlePrintBillWithoutHeader = async () => {
+    setShowPrintDropdown(false);
+    if (!selectedBooking) return;
+
+    const billBooking = {
+      bookingId: selectedBooking.bookingId,
+      visitId: selectedBooking.visitId || selectedBooking.bookingId,
+      patientId: selectedBooking.patientId,
+      name: selectedBooking.name,
+      date: selectedBooking.date,
+      tests: selectedBooking.tests.map((t: any) => ({
+        name: t.name,
+        sample: t.sample,
+        charge: businessType === "B2C" ? (t.b2cCharge || t.charge || 0) : (t.b2bCharge || t.charge || 0),
+        b2cCharge: t.b2cCharge || t.charge || 0,
+        b2bCharge: t.b2bCharge || t.charge || 0
+      })),
+      paidAmount: selectedBooking.paidAmount || 0,
+      balanceAmount: selectedBooking.balanceAmount || 0,
+      patientData: {
+        title: selectedBooking.patientData?.title || 'MR',
+        firstName: selectedBooking.patientData?.firstName || '',
+        lastName: selectedBooking.patientData?.lastName || '',
+        age: selectedBooking.patientData?.age || '',
+        gender: selectedBooking.patientData?.gender || 'Male',
+        mobile: selectedBooking.patientData?.mobile || '',
+        referralDoctor: selectedBooking.patientData?.referralDoctor || '',
+        remark: selectedBooking.patientData?.remark || ''
+      }
+    };
+
+    const billingInfo = {
+      discount: String(selectedBooking.discountAmount || 0),
+      discountPercent: String(selectedBooking.discountPercent || 0),
+      remarks: selectedBooking.discountRemark || '',
+      paymentMode: billing.paymentMode || 'Cash'
+    };
+
+    const result = await printBill(billBooking, billingInfo, businessType, false);
+    if (!result.success) {
+      alert('Failed to print: ' + result.error);
+    }
+  };
+
+  // Download bill with header for booking
+  const handleDownloadBillWithHeader = async () => {
+    setShowDownloadDropdown(false);
+    if (!selectedBooking) return;
+
+    const billBooking = {
+      bookingId: selectedBooking.bookingId,
+      visitId: selectedBooking.visitId || selectedBooking.bookingId,
+      patientId: selectedBooking.patientId,
+      name: selectedBooking.name,
+      date: selectedBooking.date,
+      tests: selectedBooking.tests.map((t: any) => ({
+        name: t.name,
+        sample: t.sample,
+        charge: businessType === "B2C" ? (t.b2cCharge || t.charge || 0) : (t.b2bCharge || t.charge || 0),
+        b2cCharge: t.b2cCharge || t.charge || 0,
+        b2bCharge: t.b2bCharge || t.charge || 0
+      })),
+      paidAmount: selectedBooking.paidAmount || 0,
+      balanceAmount: selectedBooking.balanceAmount || 0,
+      patientData: {
+        title: selectedBooking.patientData?.title || 'MR',
+        firstName: selectedBooking.patientData?.firstName || '',
+        lastName: selectedBooking.patientData?.lastName || '',
+        age: selectedBooking.patientData?.age || '',
+        gender: selectedBooking.patientData?.gender || 'Male',
+        mobile: selectedBooking.patientData?.mobile || '',
+        referralDoctor: selectedBooking.patientData?.referralDoctor || '',
+        remark: selectedBooking.patientData?.remark || ''
+      }
+    };
+
+    const billingInfo = {
+      discount: String(selectedBooking.discountAmount || 0),
+      discountPercent: String(selectedBooking.discountPercent || 0),
+      remarks: selectedBooking.discountRemark || '',
+      paymentMode: billing.paymentMode || 'Cash'
+    };
+
+    const result = await generateBillPDF(billBooking, billingInfo, businessType, true);
+    if (!result.success) {
+      alert('Failed to download PDF: ' + result.error);
+    }
+  };
+
+  // Download bill without header for booking
+  const handleDownloadBillWithoutHeader = async () => {
+    setShowDownloadDropdown(false);
+    if (!selectedBooking) return;
+
+    const billBooking = {
+      bookingId: selectedBooking.bookingId,
+      visitId: selectedBooking.visitId || selectedBooking.bookingId,
+      patientId: selectedBooking.patientId,
+      name: selectedBooking.name,
+      date: selectedBooking.date,
+      tests: selectedBooking.tests.map((t: any) => ({
+        name: t.name,
+        sample: t.sample,
+        charge: businessType === "B2C" ? (t.b2cCharge || t.charge || 0) : (t.b2bCharge || t.charge || 0),
+        b2cCharge: t.b2cCharge || t.charge || 0,
+        b2bCharge: t.b2bCharge || t.charge || 0
+      })),
+      paidAmount: selectedBooking.paidAmount || 0,
+      balanceAmount: selectedBooking.balanceAmount || 0,
+      patientData: {
+        title: selectedBooking.patientData?.title || 'MR',
+        firstName: selectedBooking.patientData?.firstName || '',
+        lastName: selectedBooking.patientData?.lastName || '',
+        age: selectedBooking.patientData?.age || '',
+        gender: selectedBooking.patientData?.gender || 'Male',
+        mobile: selectedBooking.patientData?.mobile || '',
+        referralDoctor: selectedBooking.patientData?.referralDoctor || '',
+        remark: selectedBooking.patientData?.remark || ''
+      }
+    };
+
+    const billingInfo = {
+      discount: String(selectedBooking.discountAmount || 0),
+      discountPercent: String(selectedBooking.discountPercent || 0),
+      remarks: selectedBooking.discountRemark || '',
+      paymentMode: billing.paymentMode || 'Cash'
+    };
+
+    const result = await generateBillPDF(billBooking, billingInfo, businessType, false);
+    if (!result.success) {
+      alert('Failed to download PDF: ' + result.error);
+    }
   };
 
   return (
@@ -1528,9 +1761,9 @@ export default function BookingPage() {
                 <div className="bg-slate-900 text-white p-2 flex justify-between items-center">
                   <div>{selectedBooking.name} <span className="text-yellow-300">UID: {selectedBooking.visitId || selectedBooking.bookingId}</span></div>
                   <div className="flex gap-1">
-                    <button onClick={handleBill}    className="bg-orange-100 text-black px-3 py-1 rounded text-xs font-semibold">Bill</button>
-                    <button onClick={handleReceipt} className="bg-orange-100 text-black px-3 py-1 rounded text-xs font-semibold">Receipts</button>
-                    <button onClick={handleRefund}  className="bg-orange-100 text-black px-3 py-1 rounded text-xs font-semibold">Refund</button>
+                    <button onClick={() => setShowBillModal(true)}    className="bg-orange-100 text-black px-3 py-1 rounded text-xs font-semibold">Bill</button>
+                    <button onClick={() => alert('Receipt functionality to be implemented')} className="bg-orange-100 text-black px-3 py-1 rounded text-xs font-semibold">Receipts</button>
+                    <button onClick={() => setShowRefundModal(true)}  className="bg-orange-100 text-black px-3 py-1 rounded text-xs font-semibold">Refund</button>
                     <button onClick={()=>setSelectedBooking(null)} className="bg-red-500 p-1 rounded"><X size={16}/></button>
                   </div>
                 </div>
@@ -1651,8 +1884,7 @@ export default function BookingPage() {
                       </svg>
                       Specimen
                     </div>
-                    <div className="col-span-2 text-right">B2C</div>
-                    <div className="col-span-2 text-right">B2B</div>
+                    <div className="col-span-2 text-right">Charges</div>
                   </div>
                   <div className="overflow-y-auto flex-1" style={{maxHeight:"calc(100vh - 340px)"}}>
                     {testView==="packages" && !selectedPackage ? (
@@ -1703,7 +1935,6 @@ export default function BookingPage() {
                             <span>{t.sample}</span>
                           </div>
                           <div className="col-span-2 text-right text-gray-700">{isPackageView ? "" : `₹${t.b2cCharge}`}</div>
-                          <div className="col-span-2 text-right text-gray-500">{isPackageView ? "" : `₹${t.b2bCharge}`}</div>
                         </div>
                       );
                     }) : <div className="flex items-center justify-center h-full text-gray-400 text-xs">No tests found</div>}
@@ -1713,7 +1944,6 @@ export default function BookingPage() {
                       <div className="col-span-5 text-slate-900">Package Total</div>
                       <div className="col-span-3"></div>
                       <div className="col-span-2 text-right text-slate-900">₹{selectedPackage.b2cCharge}</div>
-                      <div className="col-span-2 text-right text-orange-500">₹{selectedPackage.b2bCharge}</div>
                     </div>
                   )}
                 </div>
@@ -1738,16 +1968,19 @@ export default function BookingPage() {
                                 <th className="p-2 text-left">Investigation(s)</th>
                                 <th className="p-2 text-center">Date</th>
                                 <th className="p-2 text-center">Amount</th>
+                                <th className="p-2 text-center" title="Barcode print status: Red=Unprinted, Blue=Printed">🔖</th>
                                 <th className="p-2 text-center">Action</th>
                               </tr>
                             </thead>
                             <tbody>
                               {allTests.length === 0 ? (
-                                <tr><td colSpan={5} className="p-3 text-center text-gray-400 text-xs">No investigations added</td></tr>
+                                <tr><td colSpan={6} className="p-3 text-center text-gray-400 text-xs">No investigations added</td></tr>
                               ) : allTests.map((t,i) => {
                                 const charge    = businessType==="B2C"?(t.b2cCharge||t.charge||0):(t.b2bCharge||t.charge||0);
                                 const isEditing = editingCharge?.testName===t.name;
                                 const isNewTest = !t.isExisting;
+                                // Barcode status: RED if Registered (unprinted), BLUE if not Registered (printed)
+                                const isBarcodePrinted = t.status && t.status !== "Registered";
                                 return (
                                   <tr key={i} className={`border-b hover:bg-gray-50 ${t.fromPackage||t.isPackage?"bg-orange-50":""}`}>
                                     <td className="p-2 text-center">
@@ -1776,6 +2009,16 @@ export default function BookingPage() {
                                         ) : <span className="font-semibold">₹{charge}</span>}
                                         <button onClick={()=>setEditingCharge({testName:t.name,value:charge})}
                                           className="text-primary-600 hover:text-primary-700 ml-1" title="Edit charge"><Pencil size={13}/></button>
+                                      </div>
+                                    </td>
+                                    <td className="p-2 text-center">
+                                      <div className="w-5 h-5 rounded border-2 flex items-center justify-center mx-auto" 
+                                        title={isBarcodePrinted ? "Printed (Received)" : "Unprinted (Registered)"}
+                                        style={isBarcodePrinted 
+                                          ? { borderColor: '#3b82f6', backgroundColor: '#eff6ff', color: '#1e40af' }
+                                          : { borderColor: '#ef4444', backgroundColor: '#fef2f2', color: '#dc2626' }
+                                        }>
+                                        {isBarcodePrinted ? '✓' : '○'}
                                       </div>
                                     </td>
                                     <td className="p-2 text-center">
@@ -2513,6 +2756,64 @@ export default function BookingPage() {
         );
       })()}
 
+      {/* ===== BILL MODAL ===== */}
+      {showBillModal && selectedBooking && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[100]">
+          <div className="bg-white rounded-lg shadow-2xl w-[95%] max-w-4xl max-h-[95vh] overflow-y-auto flex flex-col">
+            {/* Modal Header */}
+            <div className="sticky top-0 bg-gradient-to-r from-slate-900 to-slate-800 text-white p-4 flex justify-between items-center border-b border-slate-700">
+              <h2 className="text-xl font-bold">INVOICE - {selectedBooking.name}</h2>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => handlePrintBillWithHeader()}
+                  className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded text-sm font-semibold flex items-center gap-2 transition-colors"
+                  title="Print with letterhead"
+                >
+                  <Printer size={16} /> Print Header
+                </button>
+                <button
+                  onClick={() => handlePrintBillWithoutHeader()}
+                  className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded text-sm font-semibold flex items-center gap-2 transition-colors"
+                  title="Print without letterhead"
+                >
+                  <Printer size={16} /> Print
+                </button>
+                <button
+                  onClick={() => handleDownloadBillWithHeader()}
+                  className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded text-sm font-semibold flex items-center gap-2 transition-colors"
+                  title="Download PDF with letterhead"
+                >
+                  <Download size={16} /> PDF Header
+                </button>
+                <button
+                  onClick={() => handleDownloadBillWithoutHeader()}
+                  className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded text-sm font-semibold flex items-center gap-2 transition-colors"
+                  title="Download PDF without letterhead"
+                >
+                  <Download size={16} /> PDF
+                </button>
+                <button
+                  onClick={() => setShowBillModal(false)}
+                  className="bg-red-500 hover:bg-red-600 text-white px-3 py-2 rounded text-sm font-semibold transition-colors"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+            </div>
+
+            {/* Modal Body - Bill Receipt */}
+            <div className="flex-1 overflow-y-auto p-6 bg-gray-50">
+              <BillReceipt
+                booking={selectedBooking}
+                billing={billing}
+                businessType={businessType}
+                numberToWords={numberToWords}
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ===== REFUND MODAL ===== */}
       {showRefundModal && selectedBooking && (
         <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-[70]">
@@ -2606,213 +2907,128 @@ export default function BookingPage() {
       )}
 
       {/* Barcode Preview Modal */}
-      {showBarcodeModal && barcodePatientInfo && (
-        <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col">
-            {/* Header */}
-            <div className="flex items-center justify-between px-5 py-3 border-b bg-gray-800 rounded-t-lg">
-              <h2 className="text-sm font-semibold text-white flex items-center gap-2">
-                <Barcode size={16} /> Barcode Labels — {barcodePatientInfo.patientName} | {barcodePatientInfo.visitId}
-              </h2>
-              <div className="flex gap-2">
-                <button
-                  onClick={async () => {
-                    // Just print without status transition
-                    const printArea = document.getElementById('barcode-print-area');
-                    const win = window.open('', '_blank');
-                    win.document.write(`<!DOCTYPE html><html><head><title>Barcode Labels</title>
-                      <style>
-                        * { margin:0; padding:0; box-sizing:border-box; }
-                        body { font-family: Arial, sans-serif; background: white; }
-                        .labels-wrap { display: flex; flex-wrap: wrap; gap: 8mm; padding: 8mm; }
-                        .label { width: 80mm; border: 0.5px solid #999; page-break-inside: avoid; }
-                        @page { size: A4; margin: 8mm; }
-                      </style>
-                    </head><body>${printArea.innerHTML}</body></html>`);
-                    win.document.close();
-                    win.focus();
-                    win.print();
-                    setShowBarcodeModal(false);
-                  }}
-                  className="text-white bg-blue-600 hover:bg-blue-700 px-2 py-1 rounded text-xs font-semibold"
-                >
-                  Print Only
-                </button>
-
-                <button
-                  onClick={async () => {
-                    let successCount = 0;
-                    let errorCount = 0;
-                    
-                    try {
-                      // Collect all test IDs from all barcode labels
-                      const allTestIds = new Set<number>();
-                      for (const label of barcodeLabels) {
-                        if (label.testIds && Array.isArray(label.testIds)) {
-                          label.testIds.forEach((id: number) => allTestIds.add(id));
-                        }
-                      }
-                      
-                      console.log('📝 Test IDs collected from barcode labels:', Array.from(allTestIds));
-                      console.log('📝 Barcode Labels:', barcodeLabels);
-                      
-                      // Call API for each test ID
-                      for (const testId of allTestIds) {
-                        console.log(`🔄 Transitioning test ${testId} to Received status...`);
-                        try {
-                          const response = await fetch(`${API_BASE_URL}/results/${testId}/auto-transition/barcode-printed`, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ changedBy: 'search_booking' })
-                          });
-                          const data = await response.json();
-                          if (data.success) {
-                            console.log(`✅ Test ${testId} successfully transitioned to Received`);
-                            successCount++;
-                          } else {
-                            console.error(`❌ Test ${testId} failed:`, data.message);
-                            errorCount++;
-                          }
-                        } catch (testError) {
-                          console.error(`❌ Test ${testId} API call error:`, testError);
-                          errorCount++;
-                        }
-                      }
-                      
-                      console.log(`✅ Status update complete: ${successCount} succeeded, ${errorCount} failed`);
-                    } catch (error) {
-                      console.error('⚠️ Status transition failed:', error);
-                    }
-                    
-                    // Proceed with print
-                    const printArea = document.getElementById('barcode-print-area');
-                    const win = window.open('', '_blank');
-                    win.document.write(`<!DOCTYPE html><html><head><title>Barcode Labels</title>
-                      <style>
-                        * { margin:0; padding:0; box-sizing:border-box; }
-                        body { font-family: Arial, sans-serif; background: white; }
-                        .labels-wrap { display: flex; flex-wrap: wrap; gap: 8mm; padding: 8mm; }
-                        .label { width: 80mm; border: 0.5px solid #999; page-break-inside: avoid; }
-                        @page { size: A4; margin: 8mm; }
-                      </style>
-                    </head><body>${printArea.innerHTML}</body></html>`);
-                    win.document.close();
-                    win.focus();
-                    win.print();
-                    
-                    // Close modal immediately
-                    setShowBarcodeModal(false);
-                    
-                    // Show success and refresh data
-                    if (successCount > 0) {
-                      setTimeout(() => {
-                        alert(`✅ ${successCount} test(s) marked as Received and printed successfully!`);
-                        console.log('🔄 Refreshing booking data after print...');
-                        
-                        // Refresh bookings with fresh data from API
-                        Promise.all([getAllPatients(1, 1000), getOrganizations()])
-                          .then(([patientsRes, orgsRes]: any) => {
-                            const patients = Array.isArray(patientsRes) ? patientsRes : (patientsRes?.data ? patientsRes.data : []);
-                            const orgs = Array.isArray(orgsRes) ? orgsRes : (orgsRes?.data ? orgsRes.data : []);
-                            
-                            const updatedBookings = transformPatientsToBookings(patients, orgs);
-                            setAllBookings(updatedBookings);
-                            setBookings(updatedBookings.filter(b => !deletedIds.has(b.bookingId)));
-                            
-                            // Update selected booking if it still exists
-                            if (selectedBooking) {
-                              const updated = updatedBookings.find(b => b.bookingId === selectedBooking.bookingId);
-                              if (updated) {
-                                setSelectedBooking(updated);
-                              }
-                            }
-                            
-                            console.log('✅ Booking data refreshed with updated test statuses');
-                          })
-                          .catch(err => console.error('⚠️ Failed to refresh bookings:', err));
-                      }, 800);
-                    } else {
-                      alert('⚠️ No tests were successfully marked as Received. Check console for details.');
-                    }
-                  }}
-                  className="text-white bg-green-600 hover:bg-green-700 px-2 py-1 rounded text-xs font-semibold"
-                >
-                  Print & Update
-                </button>
-
-                <button
-                  onClick={() => setShowBarcodeModal(false)}
-                  className="text-gray-300 hover:text-white text-xl font-bold leading-none px-1"
-                >×</button>
-              </div>
-            </div>
-
-            {/* Labels */}
-            <div className="overflow-y-auto flex-1 p-5 bg-gray-100">
-              <div id="barcode-print-area" className="flex flex-wrap gap-4 justify-start">
-                {barcodeLabels.map((label, idx) => {
-                  const { svg, width, height } = buildCode128Svg(label.barcodeValue);
-                  return (
-                    <div
-                      key={idx}
-                      className="bg-white border border-gray-300 shadow"
-                      style={{ width: '302px', fontFamily: 'Arial, sans-serif', position: 'relative' }}
-                    >
-                      {/* Organization Code - top right corner, small size */}
-                      {label.organizationCode && (
-                        <div className="absolute top-1 right-2 text-[8px] text-gray-600 font-semibold">
-                          {label.organizationCode}
-                        </div>
-                      )}
-
-                      {/* Barcode — centered, smaller size */}
-                      <div className="flex justify-center px-2 pt-3 pb-0">
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          width="85%"
-                          height="40"
-                          viewBox={`0 0 ${width} ${height}`}
-                          preserveAspectRatio="none"
-                          dangerouslySetInnerHTML={{ __html: svg }}
-                        />
-                      </div>
-
-                      {/* Barcode number centered - smaller text */}
-                      <div className="text-center font-bold text-xs tracking-widest py-0.5 px-2">
-                        {label.barcodeValue}
-                      </div>
-
-                      {/* Date time (left) + specimen type (right) */}
-                      <div className="flex justify-between items-center px-3 pb-0.5">
-                        <span className="text-[10px] text-gray-700">{label.dateStr} {label.timeStr}</span>
-                        <span className="text-[10px] text-gray-600 font-medium">({label.specimen})</span>
-                      </div>
-
-                      {/* Patient name (left) + gender initial / age (right) */}
-                      <div className="flex justify-between items-center px-3 pb-2">
-                        <span className="font-bold text-[10px] leading-tight truncate max-w-[170px]">
-                          {barcodePatientInfo.patientName}
-                        </span>
-                        <span className="text-[10px] font-semibold whitespace-nowrap ml-1">
-                          {barcodePatientInfo.ageGender}
-                        </span>
-                      </div>
-
-                      {/* Short test names */}
-                      {label.shortNamesStr && (
-                        <div className="px-3 pb-2 text-[9px] text-gray-500 truncate">
-                          {label.shortNamesStr}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
+
+    {/* Barcode Modal */}
+    <BarcodeModal
+      isOpen={showBarcodeModal}
+      onClose={() => setShowBarcodeModal(false)}
+      onPrintOnly={async () => {
+        const printArea = document.getElementById('barcode-print-area');
+        const allLabels = printArea.querySelectorAll('[data-barcode-index]');
+        
+        // Print all barcodes
+        const allLabelsHtml = Array.from(allLabels)
+          .map((label) => (label as HTMLElement).outerHTML)
+          .join('');
+        
+        const win = window.open('', '_blank');
+        win.document.write(`<!DOCTYPE html><html><head><title>Barcode Labels</title>
+          <style>
+            * { margin:0; padding:0; box-sizing:border-box; }
+            body { font-family: Arial, sans-serif; background: white; }
+            .labels-wrap { display: flex; flex-wrap: wrap; gap: 8mm; padding: 8mm; }
+            .label { width: 80mm; border: 0.5px solid #999; page-break-inside: avoid; }
+            @page { size: A4; margin: 8mm; }
+          </style>
+        </head><body><div class="labels-wrap">${allLabelsHtml}</div></body></html>`);
+        win.document.close();
+        win.focus();
+        win.print();
+        setShowBarcodeModal(false);
+      }}
+      onPrintAndUpdate={async () => {
+        let successCount = 0;
+        
+        try {
+          // Only process selected barcodes - collect test IDs from selected barcode labels
+          const selectedTestIds = new Set<number>();
+          
+          for (const idx of selectedBarcodeIndices) {
+            if (idx < barcodeLabels.length) {
+              const label = barcodeLabels[idx];
+              if (label.testIds && Array.isArray(label.testIds)) {
+                label.testIds.forEach((id: number) => selectedTestIds.add(id));
+              }
+            }
+          }
+          
+          console.log('📝 Selected Test IDs:', Array.from(selectedTestIds));
+          console.log(`🖨️ Printing ${selectedBarcodeIndices.size}/${barcodeLabels.length} barcodes`);
+          
+          // Update status for selected tests
+          for (const testId of selectedTestIds) {
+            console.log(`🔄 Transitioning test ${testId} to Received status...`);
+            try {
+              const response = await fetch(`${API_BASE_URL}/results/${testId}/auto-transition/barcode-printed`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ changedBy: 'search_booking' })
+              });
+              const data = await response.json();
+              if (data.success) {
+                console.log(`✅ Test ${testId} transitioned to Received`);
+                successCount++;
+              } else {
+                console.error(`❌ Test ${testId} failed:`, data.message);
+              }
+            } catch (error) {
+              console.error(`❌ Test ${testId} error:`, error);
+            }
+          }
+        } catch (error) {
+          console.error('⚠️ Status transition failed:', error);
+        }
+        
+        // Print only the selected barcodes
+        const printArea = document.getElementById('barcode-print-area');
+        const allLabels = printArea.querySelectorAll('[data-barcode-index]');
+        
+        // Create a new container with only selected labels
+        const selectedLabelsHtml = Array.from(allLabels)
+          .map((label, idx) => {
+            if (selectedBarcodeIndices.has(idx)) {
+              return (label as HTMLElement).outerHTML;
+            }
+            return '';
+          })
+          .filter(html => html.length > 0)
+          .join('');
+        
+        const win = window.open('', '_blank');
+        win.document.write(`<!DOCTYPE html><html><head><title>Barcode Labels</title>
+          <style>
+            * { margin:0; padding:0; box-sizing:border-box; }
+            body { font-family: Arial, sans-serif; background: white; }
+            .labels-wrap { display: flex; flex-wrap: wrap; gap: 3mm; padding: 4mm; }
+            .label { width: 60mm; border: 0.5px solid #999; page-break-inside: avoid; }
+            @page { size: A4; margin: 4mm; }
+          </style>
+        </head><body><div class="labels-wrap">${selectedLabelsHtml}</div></body></html>`);
+        win.document.close();
+        win.focus();
+        win.print();
+        
+        setShowBarcodeModal(false);
+        setBarcodeSelectedTests(new Set());
+        setBarcodeLockedPatientUid(null);
+        setBarcodeLockedVisitId(null);
+        setSelectedBarcodeIndices(new Set());
+        
+        if (successCount > 0) {
+          setTimeout(() => {
+            alert(`✅ ${successCount} test(s) marked as Received and ${selectedBarcodeIndices.size} barcode(s) printed!`);
+            // Refresh the page to show updated barcode colors
+            window.location.reload();
+          }, 800);
+        }
+      }}
+      barcodeLabels={barcodeLabels}
+      barcodePatientInfo={barcodePatientInfo}
+      selectedBarcodes={selectedBarcodeIndices}
+      onBarcodeToggle={handleBarcodeToggle}
+      isPrinting={barcodesPrinting}
+    />
     </>
   );
 }

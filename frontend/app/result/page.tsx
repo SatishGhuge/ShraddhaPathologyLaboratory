@@ -269,6 +269,10 @@ export default function Result() {
   const [showBarcodeModal, setShowBarcodeModal] = useState(false);
   const [barcodeLabels, setBarcodeLabels] = useState<any[]>([]);
   const [barcodePatientInfo, setBarcodePatientInfo] = useState<any>(null);
+  
+  // State for tracking which barcodes are selected for printing (separate from test selection)
+  const [selectedBarcodeIndices, setSelectedBarcodeIndices] = useState<Set<number>>(new Set());
+  const [barcodesPrinting, setBarcodesPrinting] = useState(false);
 
   // Track sent/print icons per test_id — persisted in localStorage
   const [sentIcons, setSentIcons] = useState(() => {
@@ -459,7 +463,20 @@ export default function Result() {
     }));
     
     setBarcodeLabels(labelsWithOrgCode);
+    // Initialize all barcodes as selected by default
+    setSelectedBarcodeIndices(new Set(Array.from({ length: labelsWithOrgCode.length }, (_, i) => i)));
     setShowBarcodeModal(true);
+  };
+
+  // Toggle barcode selection for printing
+  const handleBarcodeToggle = (index: number) => {
+    const updated = new Set(selectedBarcodeIndices);
+    if (updated.has(index)) {
+      updated.delete(index);
+    } else {
+      updated.add(index);
+    }
+    setSelectedBarcodeIndices(updated);
   };
 
   // Handle navigate to result entry
@@ -1825,6 +1842,9 @@ export default function Result() {
                         <span className="text-[10px]">S.Taken</span>
                       </th>
                       <th className="px-0.5 sm:px-1 py-1.5 sm:py-2 text-center font-semibold text-xs whitespace-nowrap border border-gray-300">
+                        <span title="Barcode print status: Red=Unprinted, Blue=Printed" className="text-[10px]">🔖</span>
+                      </th>
+                      <th className="px-0.5 sm:px-1 py-1.5 sm:py-2 text-center font-semibold text-xs whitespace-nowrap border border-gray-300">
                         <div title="Print barcode labels for selected tests">
                           <Barcode
                             size={16}
@@ -1838,7 +1858,7 @@ export default function Result() {
                   <tbody className="bg-white">
                     {loading ? (
                       <tr>
-                        <td colSpan={12} className="text-center p-4 text-gray-500 text-sm border border-gray-300">
+                        <td colSpan={13} className="text-center p-4 text-gray-500 text-sm border border-gray-300">
                           <div className="flex items-center justify-center gap-2">
                             <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-cyan-600"></div>
                             Loading...
@@ -1847,7 +1867,7 @@ export default function Result() {
                       </tr>
                     ) : sortedAndFilteredResults.length === 0 ? (
                       <tr>
-                        <td colSpan={12} className="text-center p-3 sm:p-4 text-gray-500 text-xs sm:text-sm border border-gray-300">
+                        <td colSpan={13} className="text-center p-3 sm:p-4 text-gray-500 text-xs sm:text-sm border border-gray-300">
                           No records found for {selectedStatus} status
                         </td>
                       </tr>
@@ -2060,6 +2080,21 @@ export default function Result() {
                                     </div>
                                   ) : null
                                 )}
+                              </div>
+                            </td>
+                            <td className="px-0.5 sm:px-1 py-1 sm:py-1.5 text-center border border-gray-300">
+                              <div className="flex items-center justify-center">
+                                {/* Barcode print status indicator */}
+                                <div 
+                                  className={`w-5 h-5 rounded border-2 flex items-center justify-center ${
+                                    test.result_status === 'Registered' 
+                                      ? 'border-red-500 bg-red-50 text-red-600' 
+                                      : 'border-blue-500 bg-blue-50 text-blue-600'
+                                  }`}
+                                  title={test.result_status === 'Registered' ? 'Unprinted barcode' : 'Barcode printed'}
+                                >
+                                  {test.result_status === 'Registered' ? '○' : '✓'}
+                                </div>
                               </div>
                             </td>
                             <td className="px-0.5 sm:px-1 py-1 sm:py-1.5 text-center border border-gray-300">
@@ -2664,35 +2699,62 @@ export default function Result() {
         }}
         onPrintOnly={async () => {
           const printArea = document.getElementById('barcode-print-area');
+          const printContent = printArea.innerHTML;
           const win = window.open('', '_blank');
-          win.document.write(`<!DOCTYPE html><html><head><title>Barcode Labels</title>
-            <style>
-              * { margin:0; padding:0; box-sizing:border-box; }
-              body { font-family: Arial, sans-serif; background: white; }
-              .labels-wrap { display: flex; flex-wrap: wrap; gap: 8mm; padding: 8mm; }
-              .label { width: 80mm; border: 0.5px solid #999; page-break-inside: avoid; }
-              @page { size: A4; margin: 8mm; }
-            </style>
-          </head><body>${printArea.innerHTML}</body></html>`);
+          win.document.write(`<!DOCTYPE html>
+<html>
+<head>
+  <title>Barcode Labels - ${barcodePatientInfo?.patientName || 'Print'}</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: Arial, sans-serif; background: white; padding: 8mm; }
+    .barcode-container { display: flex; flex-wrap: wrap; gap: 6mm; justify-content: flex-start; }
+    .barcode-card {
+      width: 58mm;
+      border: 2px solid;
+      padding: 3px;
+      page-break-inside: avoid;
+      background: white;
+      display: flex;
+      flex-direction: column;
+      font-family: Arial, sans-serif;
+    }
+    @page { size: A4; margin: 8mm; }
+    @media print { body { padding: 0; } .barcode-container { gap: 4mm; } }
+  </style>
+</head>
+<body>
+  <div class="barcode-container">
+    ${printContent}
+  </div>
+</body>
+</html>`);
           win.document.close();
           win.focus();
-          win.print();
+          setTimeout(() => win.print(), 500);
           setShowBarcodeModal(false);
         }}
         onPrintAndUpdate={async () => {
           let successCount = 0;
           
           try {
-            const allTestIds = new Set<number>();
-            for (const label of barcodeLabels) {
-              if (label.testIds && Array.isArray(label.testIds)) {
-                label.testIds.forEach((id: number) => allTestIds.add(id));
+            // Only process selected barcodes - collect test IDs from selected barcode labels
+            const selectedTestIds = new Set<number>();
+            
+            for (const idx of selectedBarcodeIndices) {
+              if (idx < barcodeLabels.length) {
+                const label = barcodeLabels[idx];
+                if (label.testIds && Array.isArray(label.testIds)) {
+                  label.testIds.forEach((id: number) => selectedTestIds.add(id));
+                }
               }
             }
             
-            console.log('📝 Test IDs collected:', Array.from(allTestIds));
+            console.log('📝 Selected Test IDs:', Array.from(selectedTestIds));
+            console.log(`🖨️ Printing ${selectedBarcodeIndices.size}/${barcodeLabels.length} barcodes`);
             
-            for (const testId of allTestIds) {
+            // Update status for selected tests
+            for (const testId of selectedTestIds) {
               console.log(`🔄 Transitioning test ${testId} to Received status...`);
               try {
                 const response = await fetch(`${API_BASE_URL}/results/${testId}/auto-transition/barcode-printed`, {
@@ -2715,18 +2777,32 @@ export default function Result() {
             console.error('⚠️ Status transition failed:', error);
           }
           
-          // Print barcode
+          // Print only the selected barcodes
           const printArea = document.getElementById('barcode-print-area');
+          const allLabels = printArea.querySelectorAll('[data-barcode-index]');
+          
+          // Create a new container with only selected labels
+          const selectedLabelsHtml = Array.from(allLabels)
+            .map((label, idx) => {
+              if (selectedBarcodeIndices.has(idx)) {
+                return (label as HTMLElement).outerHTML;
+              }
+              return '';
+            })
+            .filter(html => html.length > 0)
+            .join('');
+          
           const win = window.open('', '_blank');
           win.document.write(`<!DOCTYPE html><html><head><title>Barcode Labels</title>
             <style>
               * { margin:0; padding:0; box-sizing:border-box; }
-              body { font-family: Arial, sans-serif; background: white; }
-              .labels-wrap { display: flex; flex-wrap: wrap; gap: 8mm; padding: 8mm; }
-              .label { width: 80mm; border: 0.5px solid #999; page-break-inside: avoid; }
+              body { font-family: Arial, sans-serif; background: white; padding: 8mm; }
+              .labels-wrap { display: flex; flex-wrap: wrap; gap: 6mm; justify-content: flex-start; }
+              .label { width: 58mm; border: 2px solid; padding: 3px; page-break-inside: avoid; }
               @page { size: A4; margin: 8mm; }
+              @media print { body { padding: 0; } .labels-wrap { gap: 4mm; } }
             </style>
-          </head><body>${printArea.innerHTML}</body></html>`);
+          </head><body><div class="labels-wrap">${selectedLabelsHtml}</div></body></html>`);
           win.document.close();
           win.focus();
           win.print();
@@ -2735,16 +2811,21 @@ export default function Result() {
           setBarcodeSelectedTests(new Set());
           setBarcodeLockedPatientUid(null);
           setBarcodeLockedVisitId(null);
+          setSelectedBarcodeIndices(new Set());
           
           if (successCount > 0) {
             setTimeout(() => {
-              alert(`✅ ${successCount} test(s) marked as Received and printed!`);
+              alert(`✅ ${successCount} test(s) marked as Received and ${selectedBarcodeIndices.size} barcode(s) printed!`);
+              // Refresh results to get updated barcode_status from database
               fetchResults();
             }, 800);
           }
         }}
         barcodeLabels={barcodeLabels}
         barcodePatientInfo={barcodePatientInfo}
+        selectedBarcodes={selectedBarcodeIndices}
+        onBarcodeToggle={handleBarcodeToggle}
+        isPrinting={barcodesPrinting}
       />
     </>
   );
