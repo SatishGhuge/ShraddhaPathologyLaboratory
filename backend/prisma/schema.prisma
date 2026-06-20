@@ -9,18 +9,19 @@ datasource db {
 
 model Admin {
   id             Int             @id @default(autoincrement())
-  organizationId String?
   username       String          @unique
   email          String          @unique
   password       String
-  adminName      String?
   role           String          @default("ADMIN")
   isActive       Boolean         @default(true)
   createdAt      DateTime        @default(now())
   updatedAt      DateTime        @updatedAt
+  organizationId String?
+  adminName      String?         @db.VarChar(255)
+  organization   Organization?   @relation(fields: [organizationId], references: [id], onDelete: Cascade, onUpdate: Restrict)
   passwordResets PasswordReset[]
-  organization   Organization?   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
+  @@index([organizationId])
   @@map("admins")
 }
 
@@ -38,28 +39,27 @@ model PasswordReset {
 }
 
 model Patient {
-  patientId         String        @id
-  title             String?
-  firstName         String?
-  lastName          String?
-  dob               DateTime?
-  age               Int?
-  gender            String?
-  mobile            String?
-  email             String?
-  createdBy         String?
-  createdAtLocation String?
-  address           String?       @db.Text
-  createdAt         DateTime?     @default(now())
-  updatedAt         DateTime      @updatedAt
-  location          String?
-  tests             PatientTest[]
+  patientId String        @id
+  title     String?
+  firstName String?
+  lastName  String?
+  dob       DateTime?
+  age       Int?
+  gender    String?
+  mobile    String?
+  email     String?
+  createdBy String?
+  address   String?       @db.Text
+  createdAt DateTime?     @default(now())
+  updatedAt DateTime      @updatedAt
+  location  String?       @db.VarChar(255)
+  tests     PatientTest[]
 
   @@index([mobile])
   @@index([email])
   @@index([firstName, lastName], map: "patients_name_idx")
   @@index([createdAt])
-  @@index([location])
+  @@index([location], map: "idx_patient_location")
   @@map("patients")
 }
 
@@ -71,7 +71,7 @@ model PatientTest {
   departmentId       Int
   sample             String
   charge             Float
-  status             String              @default("Registered")
+  status             String              @default("REGISTERED")
   barcode_status     String              @default("Unprinted")
   result             String?             @db.Text
   visitType          String?
@@ -98,8 +98,8 @@ model PatientTest {
   packageName        String?
   attachmentPath     String?
   organizationId     String?
-  lastStatusUpdateAt DateTime?
   lastUpdatedBy      String?
+  lastStatusUpdateAt DateTime?
   department         Department          @relation(fields: [departmentId], references: [id])
   organization       Organization?       @relation(fields: [organizationId], references: [id])
   patient            Patient             @relation(fields: [patientId], references: [patientId], onDelete: Cascade)
@@ -108,7 +108,6 @@ model PatientTest {
   statusHistory      TestStatusHistory[]
 
   @@index([departmentId], map: "patient_tests_departmentId_fkey")
-  @@index([patientId], map: "patient_tests_patientId_fkey")
   @@index([testId], map: "patient_tests_testId_fkey")
   @@index([organizationId], map: "patient_tests_organizationId_fkey")
   @@index([status])
@@ -126,9 +125,9 @@ model TestStatusHistory {
   newStatus      String
   changedBy      String?
   changedAt      DateTime    @default(now())
-  triggerType    String
-  remarks        String?     @db.Text
-  patientTest    PatientTest @relation(fields: [patientTestId], references: [id], onDelete: Cascade)
+  triggerType    String      @default("MANUAL")
+  remarks        String?     @db.LongText
+  patientTest    PatientTest @relation(fields: [patientTestId], references: [id], onDelete: Cascade, onUpdate: Restrict)
 
   @@index([patientTestId])
   @@index([changedAt])
@@ -183,6 +182,7 @@ model Test {
   isDeleted              Boolean          @default(false)
   createdAt              DateTime         @default(now())
   updatedAt              DateTime         @updatedAt
+  signatureId            Int?
   imageSize              String?          @default("800|600")
   linkedTestIds          String?          @db.Text
   testparameters         testparameters[]
@@ -193,6 +193,7 @@ model Test {
   ownedParameters        TestParameter[]  @relation("ParameterOwner")
   templates              TestTemplate[]
   department             Department       @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+  signatures             Signature?       @relation(fields: [signatureId], references: [id])
   testCategory           TestCategory?    @relation("PrimaryTestCategory", fields: [testCategoryId], references: [id])
   testParameter          TestParameter?   @relation("PrimaryTestParameter", fields: [testParameterId], references: [id])
 
@@ -202,6 +203,7 @@ model Test {
   @@index([testParameterId], map: "tests_testParameterId_fkey")
   @@index([isActive])
   @@index([name])
+  @@index([signatureId], map: "tests_signatureId_fkey")
   @@map("tests")
 }
 
@@ -277,22 +279,23 @@ model Doctor {
 
 model Organization {
   id               String            @id
-  name             String            @unique
+  name             String            @unique(map: "name")
   code             String?
   location         String?
-  address          String?           @db.Text
+  address          String?           @db.LongText
   mobile           String?
   email            String?
   date             DateTime?
   isActive         Boolean           @default(true)
   createdAt        DateTime          @default(now())
   updatedAt        DateTime          @updatedAt
+  admins           Admin[]
   moduleAllocation ModuleAllocation?
   patientTests     PatientTest[]
   testCharges      TestCharge[]
-  admins           Admin[]
   users            User[]
 
+  @@index([name], map: "idx_organization_name")
   @@map("organizations")
 }
 
@@ -459,23 +462,23 @@ model Role {
 }
 
 model User {
-  id                   Int                    @id @default(autoincrement())
-  organizationId       String?
-  name                 String
-  username             String                 @unique
-  role                 String
-  mobile               String?
-  gender               String?
-  email                String?
-  address              String?                @db.Text
-  password             String
-  isActive             Boolean                @default(true)
-  createdAt            DateTime               @default(now())
-  updatedAt            DateTime               @updatedAt
-  moduleAllocation     ModuleAllocation?
-  user_password_resets user_password_resets[]
-  organization         Organization?          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  id               Int               @id @default(autoincrement())
+  name             String
+  username         String            @unique
+  role             String
+  mobile           String?
+  gender           String?
+  email            String?
+  address          String?           @db.Text
+  password         String
+  isActive         Boolean           @default(true)
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  organizationId   String?
+  moduleAllocation ModuleAllocation?
+  organization     Organization?     @relation(fields: [organizationId], references: [id], onDelete: Cascade, onUpdate: Restrict)
 
+  @@index([organizationId])
   @@map("users")
 }
 
@@ -494,31 +497,20 @@ model Signature {
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
   imageSize      String?   @default("800|600")
+  tests          Test[]
 
   @@map("signatures")
 }
 
-model user_password_resets {
-  id        Int      @id @default(autoincrement())
-  userId    Int
-  code      String
-  expiresAt DateTime
-  used      Boolean  @default(false)
-  createdAt DateTime @default(now())
-  users     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId], map: "user_password_resets_userId_fkey")
-}
-
 model ModuleAllocation {
   id             Int           @id @default(autoincrement())
-  userId         Int?          @unique
-  organizationId String?       @unique
+  userId         Int?          @unique(map: "userId")
+  organizationId String?       @unique(map: "organizationId")
   modules        String?       @db.LongText
   createdAt      DateTime      @default(now())
-  updatedAt      DateTime      @updatedAt
-  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  user           User?         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  updatedAt      DateTime      @default(now()) @updatedAt
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade, onUpdate: Restrict)
+  user           User?         @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Restrict)
 
   @@index([userId], map: "module_allocation_userId_fkey")
   @@index([organizationId], map: "module_allocation_organizationId_fkey")

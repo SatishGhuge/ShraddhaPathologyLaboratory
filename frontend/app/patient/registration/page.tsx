@@ -318,7 +318,7 @@ export default function PatientRegistration() {
 
   /* ---- Visit Type ---- */
   const [visitType, setVisitType] = useState("");
-  const [reportMode, setReportMode] = useState("");
+  const [reportMode, setReportMode] = useState("WhatsApp");
   const [sampleBarcodeNo, setSampleBarcodeNo] = useState("");
 
   const [activeTab, setActiveTab] = useState("tests");
@@ -1996,6 +1996,7 @@ export default function PatientRegistration() {
           <div>
             <h2 className="text-sm font-semibold mb-3">Patient Identity</h2>
             <div className="grid grid-cols-1 sm:grid-cols-4 gap-2">
+              {/* ROW 1: Title, First Name, Last Name, DOB */}
               <InlineSelect
                 value={title}
                 onChange={handleTitleChange}
@@ -2027,6 +2028,8 @@ export default function PatientRegistration() {
                 required 
               />
               <InlineDatePicker value={dob} onChange={handleDobChange} placeholder="DOB" maxDate={new Date().toISOString().split("T")[0]} className="w-full" />
+
+              {/* ROW 2: Age, Gender, Mobile, Email */}
               <input 
                 className={input} 
                 placeholder="Age *" 
@@ -2089,9 +2092,67 @@ export default function PatientRegistration() {
               </div>
               
               <input className={input} placeholder="Email" value={email} onChange={(e) => handleEmailChange(e.target.value)} />
+
+              {/* ROW 3: Address, Location */}
+              <textarea className={input} placeholder="Address" value={address} onChange={(e) => setAddress(e.target.value)} rows={3}></textarea>
               
-              {/* Organization Dropdown */}
-              <div className="relative" ref={organizationDropdownRef}>
+              {/* Location Field - Searchable Input (Simple City-Village Format) */}
+              <div className="relative" ref={locationDropdownRef}>
+                <div className="relative">
+                  <input
+                    type="text"
+                    placeholder="Location"
+                    value={locationSearch}
+                    onChange={(e) => handleLocationSearchChange(e.target.value)}
+                    onFocus={() => {
+                      if (locationSearch.trim()) {
+                        setShowLocationDropdown(true);
+                      }
+                    }}
+                    className={`${input} w-full`}
+                  />
+                  {locationSearch && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setLocationSearch("");
+                        setLocation("");
+                        setLocationSuggestions([]);
+                        setShowLocationDropdown(false);
+                      }}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    >
+                      <X size={16} />
+                    </button>
+                  )}
+                </div>
+
+                {/* Location Suggestions Dropdown */}
+                {showLocationDropdown && locationSuggestions.length > 0 && (
+                  <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-50 max-h-64 overflow-y-auto">
+                    {locationSuggestions.map((suggestion, idx) => (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => handleLocationSelect(suggestion.display)}
+                        className="w-full text-left px-3 py-2 hover:bg-orange-50 border-b border-gray-100 last:border-b-0 transition-colors"
+                      >
+                        <div className="text-sm font-medium text-gray-800">{suggestion.display}</div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {/* No suggestions message */}
+                {showLocationDropdown && locationSearch.trim() && locationSuggestions.length === 0 && (
+                  <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-50 p-3 text-center text-gray-500 text-sm">
+                    No locations found matching "{locationSearch}"
+                  </div>
+                )}
+              </div>
+
+              {/* Organization - Wide field (spans 2 columns horizontally) */}
+              <div className="relative col-span-2" ref={organizationDropdownRef}>
                 <input
                   type="text"
                   placeholder="Organization"
@@ -2160,63 +2221,6 @@ export default function PatientRegistration() {
                   </div>
                 )}
               </div>
-
-              <textarea className={input} placeholder="Address" value={address} onChange={(e) => setAddress(e.target.value)} rows={3}></textarea>
-              
-              {/* Location Field - Searchable Input (Simple City-Village Format) */}
-              <div className="relative" ref={locationDropdownRef}>
-                <div className="relative">
-                  <input
-                    type="text"
-                    placeholder="Location"
-                    value={locationSearch}
-                    onChange={(e) => handleLocationSearchChange(e.target.value)}
-                    onFocus={() => {
-                      if (locationSearch.trim()) {
-                        setShowLocationDropdown(true);
-                      }
-                    }}
-                    className={`${input} w-full`}
-                  />
-                  {locationSearch && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setLocationSearch("");
-                        setLocation("");
-                        setLocationSuggestions([]);
-                        setShowLocationDropdown(false);
-                      }}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                    >
-                      <X size={16} />
-                    </button>
-                  )}
-                </div>
-
-                {/* Location Suggestions Dropdown */}
-                {showLocationDropdown && locationSuggestions.length > 0 && (
-                  <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-50 max-h-64 overflow-y-auto">
-                    {locationSuggestions.map((suggestion, idx) => (
-                      <button
-                        key={idx}
-                        type="button"
-                        onClick={() => handleLocationSelect(suggestion.display)}
-                        className="w-full text-left px-3 py-2 hover:bg-orange-50 border-b border-gray-100 last:border-b-0 transition-colors"
-                      >
-                        <div className="text-sm font-medium text-gray-800">{suggestion.display}</div>
-                      </button>
-                    ))}
-                  </div>
-                )}
-
-                {/* No suggestions message */}
-                {showLocationDropdown && locationSearch.trim() && locationSuggestions.length === 0 && (
-                  <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-50 p-3 text-center text-gray-500 text-sm">
-                    No locations found matching "{locationSearch}"
-                  </div>
-                )}
-              </div>
             </div>
           </div>
 
@@ -2232,7 +2236,7 @@ export default function PatientRegistration() {
                 <InlineSelect
                   value={reportMode}
                   onChange={setReportMode}
-                  options={["By Hand","SMS","WhatsApp","Email","Courier"]}
+                  options={["By Hand","WhatsApp","Email"]}
                   placeholder="Report Mode"
                 />
 
