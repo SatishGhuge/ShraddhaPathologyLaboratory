@@ -347,7 +347,10 @@ export default function PatientRegistration() {
 
   /* --- Referral Doctor Checkbox Logic --- */
   const [isManualRefDoctor, setIsManualRefDoctor] = useState(false);
-  const [manualRefDoctorName, setManualRefDoctorName] = useState("");  /* --- Departments and Packages from API --- */
+  const [manualRefDoctorName, setManualRefDoctorName] = useState("");
+  const [selectedDoctorDetails, setSelectedDoctorDetails] = useState<any>(null); // Store selected doctor's details
+  
+  /* --- Departments and Packages from API --- */
   const [departments, setDepartments] = useState<any[]>([]);
   const [doctorsList, setDoctorsList] = useState<any[]>([]);
   const [specimenTypes, setSpecimenTypes] = useState<any[]>([]);
@@ -587,6 +590,48 @@ export default function PatientRegistration() {
       setManualRefDoctorName("");
     }
   };
+
+  // Auto-fetch referral doctor details and populate patient email/phone when doctor is selected
+  useEffect(() => {
+    if (isManualRefDoctor || !refDoctor || !doctorsList.length) {
+      setSelectedDoctorDetails(null);
+      return;
+    }
+
+    // Extract doctor name from "Dr. Name" format
+    const doctorName = refDoctor.replace(/^Dr\.\s*/i, '').trim();
+    
+    // Find the selected doctor in the list
+    const selectedDoc = doctorsList.find(doc => 
+      doc.name.toLowerCase() === doctorName.toLowerCase() || 
+      `Dr. ${doc.name}`.toLowerCase() === refDoctor.toLowerCase()
+    );
+
+    if (selectedDoc) {
+      console.log('📞 Doctor selected:', {
+        name: selectedDoc.name,
+        email: selectedDoc.email,
+        mobile: selectedDoc.mobile,
+        degree: selectedDoc.degree
+      });
+      
+      setSelectedDoctorDetails(selectedDoc);
+
+      // Auto-populate patient email from doctor if patient email is empty
+      if (!email && selectedDoc.email) {
+        console.log('📧 Auto-filling patient email from doctor:', selectedDoc.email);
+        setEmail(selectedDoc.email);
+      }
+
+      // Auto-populate patient mobile from doctor if patient mobile is empty
+      if (!mobile && selectedDoc.mobile) {
+        console.log('📱 Auto-filling patient mobile from doctor:', selectedDoc.mobile);
+        setMobile(selectedDoc.mobile);
+      }
+    } else {
+      setSelectedDoctorDetails(null);
+    }
+  }, [refDoctor, isManualRefDoctor, doctorsList, email, mobile]);
 
   /* ============ LOCALSTORAGE PERSISTENCE ============ */
   const STORAGE_KEY = 'patientRegistrationDraft';
