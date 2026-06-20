@@ -30,7 +30,7 @@ router.get('/', getAllPatients);
 router.post('/',
   [
     body('firstName').trim().notEmpty().withMessage('First name is required'),
-    body('mobile').trim().notEmpty().withMessage('Mobile is required'),
+    body('mobile').optional().trim(),  // ✅ Mobile is now optional
     body('tests').isArray().withMessage('Tests must be an array')  // Allow empty array
   ],
   createPatient

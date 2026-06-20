@@ -1,5 +1,5 @@
-import React from 'react';
-import { Barcode, X } from 'lucide-react';
+import React, { useState } from 'react';
+import { Barcode, X, CheckCircle } from 'lucide-react';
 
 interface BarcodeLabel {
   barcodeValue: string;
@@ -9,6 +9,8 @@ interface BarcodeLabel {
   timeStr: string;
   testIds: number[];
   organizationCode?: string;
+  barcode_status?: string;
+  isSelected?: boolean;
 }
 
 interface BarcodePatientInfo {
@@ -28,6 +30,8 @@ interface BarcodeModalProps {
   barcodeLabels: BarcodeLabel[];
   barcodePatientInfo: BarcodePatientInfo;
   isPrinting?: boolean;
+  selectedBarcodes?: Set<number>;
+  onBarcodeToggle?: (index: number) => void;
 }
 
 // Generate Code128 barcode SVG
@@ -89,6 +93,102 @@ const buildCode128Svg = (text: any) => {
   return { svg: bars, width: x, height };
 };
 
+// Barcode card component - used in both modal and print preview
+const BarcodeCard = ({
+  label,
+  patientInfo,
+  isSelected,
+  index,
+  onClick,
+  isPrintMode = false,
+  barcode_status = 'Unprinted'
+}: {
+  label: any;
+  patientInfo: any;
+  isSelected: boolean;
+  index: number;
+  onClick?: () => void;
+  isPrintMode?: boolean;
+  barcode_status?: string;
+}) => {
+  const { svg, width, height } = buildCode128Svg(label.barcodeValue);
+  
+  // Determine colors based on barcode_status from database (persistent)
+  // For print mode: Use barcode_status from DB
+  // For modal: Show selection color if modal-selected, otherwise use DB status
+  const isPrinted = barcode_status === 'Printed';
+  const showAsSelected = !isPrintMode && isSelected;
+  
+  const borderColor = showAsSelected ? 'border-blue-600' : (isPrinted ? 'border-blue-600' : 'border-red-500');
+  const backgroundColor = showAsSelected ? 'bg-blue-100' : (isPrinted ? 'bg-blue-100' : 'bg-red-100');
+
+  return (
+    <div
+      data-barcode-index={index}
+      onClick={isPrintMode ? undefined : onClick}
+      className={`
+        relative transition-all border-2 ${borderColor} ${backgroundColor} shadow-sm
+        ${isPrintMode ? 'print:cursor-default print:bg-white print:border-gray-400' : 'cursor-pointer hover:shadow-md hover:border-blue-700'}
+      `}
+      style={{
+        width: '220px',
+        fontFamily: 'Arial, sans-serif',
+        pageBreakInside: isPrintMode ? 'avoid' : 'auto',
+        padding: '3px'
+      }}
+    >
+      {/* Organization Code - top right corner */}
+      {label.organizationCode && (
+        <div className="absolute top-1 right-1 text-[6px] text-gray-700 font-bold bg-white px-1 py-0.5 rounded border border-gray-400">
+          {label.organizationCode}
+        </div>
+      )}
+
+      {/* Barcode - centered, compact */}
+      <div className="flex justify-center py-0.5">
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          width="85%"
+          height="28"
+          viewBox={`0 0 ${width} ${height}`}
+          preserveAspectRatio="none"
+          dangerouslySetInnerHTML={{ __html: svg }}
+        />
+      </div>
+
+      {/* Barcode value (Visit ID) - centered, bold */}
+      <div className="text-center font-bold text-[8px] tracking-wider py-0.5 px-1">
+        {label.barcodeValue}
+      </div>
+
+      {/* Date time and specimen type - very compact */}
+      <div className="flex justify-between items-center px-1 py-0 text-[6px]">
+        <span className="text-gray-700 truncate">{label.dateStr}</span>
+        <span className="text-gray-600 font-medium flex-shrink-0">({label.specimen})</span>
+      </div>
+
+      {/* Age and Gender - below specimen type */}
+      <div className="px-1 py-0.5 text-[6px] text-gray-700 leading-tight">
+        {patientInfo.age && patientInfo.gender ? (
+          <span>{patientInfo.gender.charAt(0)}/{patientInfo.age}Y</span>
+        ) : (
+          <span>{patientInfo.age ? `${patientInfo.age}Y` : ''}{patientInfo.gender ? `${patientInfo.gender.charAt(0)}` : ''}</span>
+        )}
+      </div>
+
+      {/* Patient name - compact */}
+      <div className="px-1 py-0.5 text-[6px] font-bold leading-tight truncate text-gray-800">
+        {patientInfo.patientName}
+      </div>
+
+      {/* Test names - minimal height */}
+      <div className="px-1 py-0.5 text-[6px] text-gray-600 leading-tight border-t border-gray-400 max-h-[24px] overflow-hidden">
+        {label.shortNamesStr}
+      </div>
+    </div>
+  );
+};
+
 export const BarcodeModal: React.FC<BarcodeModalProps> = ({
   isOpen,
   onClose,
@@ -96,102 +196,74 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({
   onPrintAndUpdate,
   barcodeLabels,
   barcodePatientInfo,
-  isPrinting = false
+  isPrinting = false,
+  selectedBarcodes = new Set(),
+  onBarcodeToggle
 }) => {
   if (!isOpen || !barcodePatientInfo) return null;
 
+  const selectedCount = selectedBarcodes ? selectedBarcodes.size : 0;
+  const totalBarcodes = barcodeLabels?.length || 0;
+
   return (
     <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col">
+      <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] flex flex-col">
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-3 border-b bg-gray-800 rounded-t-lg">
+        <div className="flex items-center justify-between px-5 py-3 border-b bg-gray-800 rounded-t-lg print:hidden">
           <h2 className="text-sm font-semibold text-white flex items-center gap-2">
             <Barcode size={16} /> Barcode Labels — {barcodePatientInfo.patientName} | {barcodePatientInfo.visitId}
+            {selectedCount > 0 && (
+              <span className="ml-2 px-2 py-1 bg-blue-500 rounded text-xs">
+                {selectedCount}/{totalBarcodes} selected
+              </span>
+            )}
           </h2>
           <div className="flex gap-2">
             <button
               onClick={onPrintOnly}
               disabled={isPrinting}
-              className="text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 px-2 py-1 rounded text-xs font-semibold"
+              className="text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 px-3 py-1 rounded text-xs font-semibold transition"
             >
               Print Only
             </button>
 
             <button
               onClick={onPrintAndUpdate}
-              disabled={isPrinting}
-              className="text-white bg-green-600 hover:bg-green-700 disabled:opacity-50 px-2 py-1 rounded text-xs font-semibold"
+              disabled={isPrinting || selectedCount === 0}
+              title={selectedCount === 0 ? "Select at least one barcode" : "Print & update status to Received"}
+              className="text-white bg-green-600 hover:bg-green-700 disabled:opacity-50 px-3 py-1 rounded text-xs font-semibold transition"
             >
-              Print & Update
+              Print & Update ({selectedCount})
             </button>
 
             <button
               onClick={onClose}
-              className="text-gray-300 hover:text-white text-xl font-bold leading-none px-1"
+              className="text-gray-300 hover:text-white text-xl font-bold leading-none px-2"
             >
               ×
             </button>
           </div>
         </div>
 
-        {/* Labels */}
-        <div className="overflow-y-auto flex-1 p-5 bg-gray-100">
-          <div id="barcode-print-area" className="flex flex-wrap gap-4 justify-start">
-            {barcodeLabels.map((label, idx) => {
-              const { svg, width, height } = buildCode128Svg(label.barcodeValue);
-              return (
-                <div
-                  key={idx}
-                  className="bg-white border border-gray-300 shadow"
-                  style={{ width: '302px', fontFamily: 'Arial, sans-serif', position: 'relative' }}
-                >
-                  {/* Organization Code - top right corner */}
-                  {label.organizationCode && (
-                    <div className="absolute top-1 right-2 text-[8px] text-gray-600 font-semibold">
-                      {label.organizationCode}
-                    </div>
-                  )}
+        {/* Legend - REMOVED: No icons shown, just click to select */}
+        {/* Cards show BLUE when selected or when barcode_status='Printed' from database */}
+        {/* Cards show RED when unselected or unprinted */}
 
-                  {/* Barcode - centered */}
-                  <div className="flex justify-center px-2 pt-3 pb-0">
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      width="85%"
-                      height="40"
-                      viewBox={`0 0 ${width} ${height}`}
-                      preserveAspectRatio="none"
-                      dangerouslySetInnerHTML={{ __html: svg }}
-                    />
-                  </div>
-
-                  {/* Barcode value */}
-                  <div className="text-center font-bold text-xs tracking-widest py-0.5 px-2">
-                    {label.barcodeValue}
-                  </div>
-
-                  {/* Date time and specimen type */}
-                  <div className="flex justify-between items-center px-3 pb-0.5">
-                    <span className="text-[10px] text-gray-700">{label.dateStr} {label.timeStr}</span>
-                    <span className="text-[10px] text-gray-600 font-medium">({label.specimen})</span>
-                  </div>
-
-                  {/* Patient info */}
-                  <div className="flex justify-between items-center px-3 pb-2">
-                    <span className="font-bold text-[10px] leading-tight truncate max-w-[170px]">
-                      {barcodePatientInfo.patientName}
-                    </span>
-                    <span className="text-[10px] text-gray-700 font-semibold">
-                      {barcodePatientInfo.ageGender}
-                    </span>
-                  </div>
-
-                  {/* Test names */}
-                  <div className="px-3 pb-2 text-[9px] text-gray-600 leading-tight border-t pt-1">
-                    {label.shortNamesStr}
-                  </div>
-                </div>
-              );
-            })}
+        {/* Barcode Cards */}
+        <div className="overflow-y-auto flex-1 p-6 bg-gray-100 print:p-4 print:bg-white print:overflow-visible">
+          <div id="barcode-print-area" className="flex flex-wrap gap-4 justify-center print:justify-start print:gap-3">
+            {barcodeLabels.map((label, idx) => (
+              <BarcodeCard
+                key={idx}
+                label={label}
+                patientInfo={barcodePatientInfo}
+                isSelected={selectedBarcodes?.has(idx) || false}
+                index={idx}
+                onClick={() => onBarcodeToggle?.(idx)}
+                isPrintMode={false}
+                barcode_status={label.barcode_status || 'Unprinted'}
+              />
+            ))}
           </div>
         </div>
       </div>

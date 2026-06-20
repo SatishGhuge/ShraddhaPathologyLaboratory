@@ -11,7 +11,6 @@ export default function AddLabCharges() {
   const router = useRouter();
   const [tests, setTests] = useState<any[]>([]);
   const [charges, setCharges] = useState<any[]>([]);
-  const [b2bError, setB2bError] = useState("");
   const [filteredData, setFilteredData] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
 
@@ -20,7 +19,6 @@ export default function AddLabCharges() {
   const [searchGroup, setSearchGroup] = useState("");
   const [error, setError] = useState("");
   const [bulkCharge, setBulkCharge] = useState("");
-  const [bulkB2BCharge, setBulkB2BCharge] = useState("");
   const [showBulkModal, setShowBulkModal] = useState(false);
 
   // Fetch tests and charges on component mount
@@ -81,7 +79,6 @@ export default function AddLabCharges() {
         code: test.testCode || '',
         group: test.group || test.department?.name || '',
         charges: defaultCharge?.b2cCharge || 0,
-        b2b: defaultCharge?.b2bCharge || 0,
         chargeId: defaultCharge?.id || null
       };
     }).filter((item) =>
@@ -120,49 +117,35 @@ export default function AddLabCharges() {
 
   // Bulk apply charges
   const handleBulkApply = () => {
-    if (!bulkCharge && !bulkB2BCharge) {
-      alert("Please enter at least one bulk charge value!");
-      return;
-    }
-    if (bulkCharge && bulkB2BCharge && parseFloat(bulkB2BCharge) > parseFloat(bulkCharge)) {
-      setB2bError("B2B charge cannot be greater than B2C charge!");
+    if (!bulkCharge) {
+      alert("Please enter a bulk charge value!");
       return;
     }
 
     const updated = filteredData.map((item) => ({
       ...item,
-      charges: bulkCharge ? parseFloat(bulkCharge) : item.charges,
-      b2b: bulkB2BCharge ? parseFloat(bulkB2BCharge) : item.b2b
+      charges: bulkCharge ? parseFloat(bulkCharge) : item.charges
     }));
     
     setFilteredData(updated);
     setShowBulkModal(false);
     setBulkCharge("");
-    setBulkB2BCharge("");
     alert("Bulk charges applied! Click 'Save' to save to database.");
   };
 
   // Save charges to database
   const handleSave = async () => {
-    // Validate B2B <= B2C for all rows
-    const invalid = filteredData.find(item =>
-      item.charges > 0 && item.b2b > 0 && parseFloat(item.b2b) > parseFloat(item.charges)
-    );
-    if (invalid) {
-      setB2bError(`B2B charge cannot be greater than B2C charge for test: "${invalid.name}"`);
-      return;
-    }
     try {
       setLoading(true);
       setError("");
       
       // Prepare bulk update data for DEFAULT charges (no organizationId)
       const bulkCharges = filteredData
-        .filter(item => (item.charges && item.charges > 0) || (item.b2b && item.b2b > 0))
+        .filter(item => item.charges && item.charges > 0)
         .map(item => ({
           testId: item.id,
           b2cCharge: parseFloat(item.charges) || 0,
-          b2bCharge: parseFloat(item.b2b) || 0
+          b2bCharge: parseFloat(item.charges) || 0  // ✅ Set B2B = B2C
         }));
 
       if (bulkCharges.length === 0) {
@@ -216,8 +199,7 @@ export default function AddLabCharges() {
         'Test Name': item.name,
         'Test Code': item.code,
         'Group': item.group,
-        'Charges': item.charges,
-        'B2B': item.b2b
+        'Charges': item.charges
       }));
 
       // Create worksheet
@@ -229,8 +211,7 @@ export default function AddLabCharges() {
         { wch: 30 }, // Test Name
         { wch: 15 }, // Test Code
         { wch: 20 }, // Group
-        { wch: 12 }, // Charges
-        { wch: 12 }  // B2B
+        { wch: 12 }  // Charges
       ];
 
       // Create workbook
@@ -280,14 +261,13 @@ export default function AddLabCharges() {
         item.name,
         item.code,
         item.group,
-        item.charges,
-        item.b2b
+        item.charges
       ]);
 
       // Add table using autoTable
       autoTable(doc, {
         startY: 40,
-        head: [['Sr.No', 'Test Name', 'Test Code', 'Group', 'Charges', 'B2B']],
+        head: [['Sr.No', 'Test Name', 'Test Code', 'Group', 'Charges']],
         body: tableData,
         theme: 'grid',
         headStyles: {
@@ -301,11 +281,10 @@ export default function AddLabCharges() {
         },
         columnStyles: {
           0: { cellWidth: 15 },  // Sr.No
-          1: { cellWidth: 60 },  // Test Name
+          1: { cellWidth: 80 },  // Test Name
           2: { cellWidth: 30 },  // Test Code
           3: { cellWidth: 35 },  // Group
-          4: { cellWidth: 25 },  // Charges
-          5: { cellWidth: 20 }   // B2B
+          4: { cellWidth: 25 }   // Charges
         }
       });
 
@@ -429,8 +408,7 @@ export default function AddLabCharges() {
                           className="w-full px-2 py-1 text-sm text-black rounded bg-white focus:outline-none border border-gray-300"
                         />
                       </th>
-                      <th className="border border-gray-300 px-3 py-2 text-center font-semibold" style={{ width: '12%' }}>Charges</th>
-                      <th className="border border-gray-300 px-3 py-2 text-center font-semibold" style={{ width: '13%' }}>B2B</th>
+                      <th className="border border-gray-300 px-3 py-2 text-center font-semibold" style={{ width: '25%' }}>Charges</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -447,20 +425,11 @@ export default function AddLabCharges() {
                             className="w-full border border-gray-300 px-2 py-1 text-sm rounded bg-white focus:outline-none focus:ring-2 focus:ring-orange-500 text-center"
                           />
                         </td>
-                        <td className="border border-gray-300 px-2 py-1">
-                          <input
-                            type="number"
-                            value={item.b2b}
-                            onChange={(e) => handleChargeChange(item.id, 'b2b', e.target.value)}
-                            className={`w-full border px-2 py-1 text-sm rounded bg-white focus:outline-none focus:ring-2 focus:ring-orange-500 text-center ${parseFloat(item.b2b) > parseFloat(item.charges) && item.charges > 0 ? 'border-red-500 bg-red-50' : 'border-gray-300'}`}
-                            title={parseFloat(item.b2b) > parseFloat(item.charges) && item.charges > 0 ? 'B2B cannot exceed B2C' : ''}
-                          />
-                        </td>
                       </tr>
                     ))}
                     {filteredData.length === 0 && !loading && (
                       <tr>
-                        <td colSpan={5} className="text-center py-6 text-gray-500 border border-gray-300">
+                        <td colSpan={4} className="text-center py-6 text-gray-500 border border-gray-300">
                           No tests found matching your search criteria
                         </td>
                       </tr>
@@ -489,27 +458,14 @@ export default function AddLabCharges() {
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  B2C Charges (Apply to all tests)
+                  Charges (Apply to all tests)
                 </label>
                 <input
                   type="number"
                   value={bulkCharge}
                   onChange={(e) => setBulkCharge(e.target.value)}
                   className="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500"
-                  placeholder="Enter B2C charge"
-                />
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  B2B Charges (Apply to all tests)
-                </label>
-                <input
-                  type="number"
-                  value={bulkB2BCharge}
-                  onChange={(e) => setBulkB2BCharge(e.target.value)}
-                  className="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500"
-                  placeholder="Enter B2B charge"
+                  placeholder="Enter charge"
                 />
               </div>
               
@@ -532,17 +488,6 @@ export default function AddLabCharges() {
                 Apply to All
               </button>
             </div>
-          </div>
-        </div>
-      )}
-      {/* B2B Error Popup */}
-      {b2bError && (
-        <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-xl p-6 w-80 text-center">
-            <div className="text-red-500 text-4xl mb-3">⚠️</div>
-            <h3 className="text-base font-semibold text-gray-800 mb-2">Invalid Charge</h3>
-            <p className="text-sm text-gray-600 mb-4">{b2bError}</p>
-            <button onClick={() => setB2bError("")} className="bg-orange-500 text-white px-6 py-2 rounded hover:bg-orange-600 text-sm">OK</button>
           </div>
         </div>
       )}

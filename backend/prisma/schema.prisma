@@ -72,6 +72,7 @@ model PatientTest {
   sample             String
   charge             Float
   status             String              @default("Registered")
+  barcode_status     String              @default("Unprinted")
   result             String?             @db.Text
   visitType          String?
   reportMode         String?
@@ -111,6 +112,7 @@ model PatientTest {
   @@index([testId], map: "patient_tests_testId_fkey")
   @@index([organizationId], map: "patient_tests_organizationId_fkey")
   @@index([status])
+  @@index([barcode_status])
   @@index([visitDate])
   @@index([visitId])
   @@index([patientId, visitId])

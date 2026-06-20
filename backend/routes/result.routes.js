@@ -182,4 +182,129 @@ router.post('/:id/auto-transition/result-saved', async (req, res) => {
   }
 });
 
+// ===== BATCH BARCODE PRINTING WITH STATUS TRACKING =====
+
+// Batch print barcodes and update status to Received for selected tests
+router.post('/batch/barcode-print', async (req, res) => {
+  try {
+    const { testIds, changedBy = 'SYSTEM' } = req.body;
+
+    if (!testIds || !Array.isArray(testIds) || testIds.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'testIds array is required and must not be empty'
+      });
+    }
+
+    console.log(`📦 Processing batch barcode print for ${testIds.length} test(s)`);
+
+    const results = [];
+    const errors = [];
+
+    for (const testId of testIds) {
+      try {
+        const numTestId = parseInt(testId);
+        
+        // Get current test
+        const currentTest = await prisma.patientTest.findUnique({
+          where: { id: numTestId }
+        });
+
+        if (!currentTest) {
+          errors.push({ testId, error: 'Test not found' });
+          continue;
+        }
+
+        // Transition from Registered to Received
+        if (currentTest.status === 'Registered') {
+          const updated = await transitionToReceivedOnBarcodePrint(
+            numTestId,
+            changedBy
+          );
+          results.push({
+            testId: numTestId,
+            success: true,
+            previousStatus: currentTest.status,
+            newStatus: updated.status,
+            message: 'Status transitioned to Received'
+          });
+        } else {
+          results.push({
+            testId: numTestId,
+            success: true,
+            previousStatus: currentTest.status,
+            newStatus: currentTest.status,
+            message: `Already in ${currentTest.status} status`
+          });
+        }
+      } catch (error) {
+        console.error(`Error processing test ${testId}:`, error);
+        errors.push({ testId, error: error.message });
+      }
+    }
+
+    res.json({
+      success: true,
+      message: `Barcode print processed for ${results.length} test(s)`,
+      data: {
+        processed: results.length,
+        errors: errors.length,
+        results,
+        errors: errors.length > 0 ? errors : undefined
+      }
+    });
+  } catch (error) {
+    console.error('❌ Batch barcode print error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to process batch barcode print',
+      error: error.message
+    });
+  }
+});
+
+// Get barcode print status for tests (which barcodes have been printed)
+router.get('/batch/print-status', async (req, res) => {
+  try {
+    const { visitId } = req.query;
+
+    if (!visitId) {
+      return res.status(400).json({
+        success: false,
+        message: 'visitId is required'
+      });
+    }
+
+    // Get all tests for this visit
+    const tests = await prisma.patientTest.findMany({
+      where: { visitId: visitId },
+      select: {
+        id: true,
+        visitId: true,
+        status: true,
+        sample: true
+      }
+    });
+
+    res.json({
+      success: true,
+      data: {
+        visitId,
+        tests: tests.map(t => ({
+          testId: t.id,
+          status: t.status,
+          isPrinted: t.status !== 'Registered' // Barcode considered "printed" if status moved from Registered
+        }))
+      }
+    });
+  } catch (error) {
+    console.error('Barcode print status error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch barcode print status',
+      error: error.message
+    });
+  }
+});
+
 export default router;
