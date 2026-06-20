@@ -473,6 +473,9 @@ const Header = () => {
                   {(() => {
                     const user = JSON.parse(localStorage.getItem('admin') || '{}');
                     const isAdmin = user.userType === 'admin' || !user.userType;
+                    if (isAdmin && user.organization) {
+                      return user.organization.name;
+                    }
                     const displayName = user.name || user.username || 'User';
                     return isAdmin ? 'Shraddha Admin' : displayName;
                   })()}
@@ -492,6 +495,10 @@ const Header = () => {
                 {(() => {
                   const user = JSON.parse(localStorage.getItem('admin') || '{}');
                   const isAdmin = user.userType === 'admin' || !user.userType;
+                  if (isAdmin && user.organization) {
+                    const initials = user.organization.name.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2);
+                    return initials || 'ORG';
+                  }
                   if (isAdmin) return 'SA';
                   const name = user.name || user.username || 'U';
                   const initials = name.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2);
@@ -509,6 +516,8 @@ const Header = () => {
                     const username = user.username || '-';
                     const rawRole = user.role || (isAdmin ? 'Admin' : 'User');
                     const role = rawRole.toUpperCase().includes('ADMIN') || rawRole.toUpperCase().includes('SUPER') ? 'Admin' : rawRole;
+                    const orgName = user.organization?.name || null;
+                    const initials = orgName ? orgName.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2) : 'SA';
                     return (
                       <div className="space-y-3">
                         <div className="text-center">
@@ -516,11 +525,17 @@ const Header = () => {
                             WELCOME {isAdmin ? 'ADMIN' : role.toUpperCase()}
                           </h3>
                           <div className="w-12 h-12 bg-gradient-to-br from-primary-100 to-primary-200 rounded-full mx-auto flex items-center justify-center mb-2">
-                            <span className="text-xl font-bold text-primary-600">SA</span>
+                            <span className="text-xl font-bold text-primary-600">{initials}</span>
                           </div>
                         </div>
 
                         <div className="space-y-2 bg-gradient-to-br from-primary-50 to-primary-100 rounded-lg p-3 text-sm border border-primary-100">
+                          {orgName && (
+                            <div>
+                              <p className="text-xs text-gray-600">Organization:</p>
+                              <p className="font-semibold text-gray-800">{orgName}</p>
+                            </div>
+                          )}
                           <div>
                             <p className="text-xs text-gray-600">Name:</p>
                             <p className="font-semibold text-gray-800">{displayName}</p>

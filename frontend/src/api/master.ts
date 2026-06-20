@@ -8,6 +8,7 @@ interface ApiData {
 interface ApiResponse<T = any> {
   success: boolean;
   message?: string;
+  detail?: string;
   data?: T;
   pagination?: {
     page: number;
@@ -30,7 +31,12 @@ const apiCall = async <T = any>(endpoint: string, options: RequestInit & { heade
       ...options,
     });
     const data: ApiResponse<T> = await response.json();
-    if (!response.ok) throw new Error(data.message || 'API request failed');
+    if (!response.ok) {
+      const error = new Error(data.message || 'API request failed') as any;
+      error.detail = data.detail;
+      error.response = data;
+      throw error;
+    }
     return data;
   } catch (error) {
     console.error('API Error:', error);

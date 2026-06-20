@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Header from "@/src/components/Header";
 import PageHeader from "@/src/components/BreadCrumb";
 import BarcodeModal from "@/app/components/BarcodeModal";
+import ReferralDoctorModal from "@/src/components/ReferralDoctorModal";
 import API_BASE_URL from "@/src/api/config";
 import {RefreshCcw,Star,X,Calendar,UserPlus,ChevronDown,Printer,Download,} from "lucide-react";
 import { createPatient, searchPatient } from "@/src/api/patient";
@@ -317,7 +318,7 @@ export default function PatientRegistration() {
 
   /* ---- Visit Type ---- */
   const [visitType, setVisitType] = useState("");
-  const [reportMode, setReportMode] = useState("");
+  const [reportMode, setReportMode] = useState("WhatsApp");
   const [sampleBarcodeNo, setSampleBarcodeNo] = useState("");
 
   const [activeTab, setActiveTab] = useState("tests");
@@ -343,11 +344,13 @@ export default function PatientRegistration() {
   
   const [showSimilarPatientsDropdown, setShowSimilarPatientsDropdown] = useState(false);
   const [newPackage, setNewPackage] = useState({ name: "", tests: [], b2cCharge: 0, b2bCharge: 0 });
-  const [newRef, setNewRef] = useState({ type: "Doctor", name: "", degree: "", compliment: "", mobile: "", email: "", address: "", allowSend: false });
 
   /* --- Referral Doctor Checkbox Logic --- */
   const [isManualRefDoctor, setIsManualRefDoctor] = useState(false);
-  const [manualRefDoctorName, setManualRefDoctorName] = useState("");  /* --- Departments and Packages from API --- */
+  const [manualRefDoctorName, setManualRefDoctorName] = useState("");
+  const [selectedDoctorDetails, setSelectedDoctorDetails] = useState<any>(null); // Store selected doctor's details
+  
+  /* --- Departments and Packages from API --- */
   const [departments, setDepartments] = useState<any[]>([]);
   const [doctorsList, setDoctorsList] = useState<any[]>([]);
   const [specimenTypes, setSpecimenTypes] = useState<any[]>([]);
@@ -566,40 +569,18 @@ export default function PatientRegistration() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const saveRef = async () => {
-    if (!newRef.name) return alert("Please enter name");
-    
+  // Handle doctor added from modal
+  const handleDoctorAdded = async (addedDoctor: any) => {
     try {
-      // Save to database
-      const doctorData = {
-        name: newRef.name,
-        type: newRef.type,
-        degree: newRef.degree || "",
-        compliment: parseFloat(newRef.compliment) || 0,
-        mobile: newRef.mobile || "",
-        email: newRef.email || "",
-        address: newRef.address || "",
-        allowSendReport: newRef.allowSend || false
-      };
-      
-      const result = await createDoctor(doctorData);
-      
       // Refresh the doctors list for the dropdown
       const doctors = await getDoctors();
       setDoctorsList(doctors);
       
       // Auto-select the newly added doctor in the dropdown
-      setRefDoctor(`Dr. ${newRef.name}`);
+      setRefDoctor(`Dr. ${addedDoctor.name}`);
       setIsManualRefDoctor(false);
-      
-      // Reset form and close modal
-      setNewRef({ type: "Doctor", name: "", degree: "", compliment: "", mobile: "", email: "", address: "", allowSend: false });
-      setShowRefModal(false);
-      
-      alert("Referral doctor added successfully and selected!");
     } catch (error) {
-      console.error("Error saving referral doctor:", error);
-      alert("Failed to save referral doctor: " + (error.message || "Unknown error"));
+      console.error("Error refreshing doctors list:", error);
     }
   };
 
@@ -609,6 +590,48 @@ export default function PatientRegistration() {
       setManualRefDoctorName("");
     }
   };
+
+  // Auto-fetch referral doctor details and populate patient email/phone when doctor is selected
+  useEffect(() => {
+    if (isManualRefDoctor || !refDoctor || !doctorsList.length) {
+      setSelectedDoctorDetails(null);
+      return;
+    }
+
+    // Extract doctor name from "Dr. Name" format
+    const doctorName = refDoctor.replace(/^Dr\.\s*/i, '').trim();
+    
+    // Find the selected doctor in the list
+    const selectedDoc = doctorsList.find(doc => 
+      doc.name.toLowerCase() === doctorName.toLowerCase() || 
+      `Dr. ${doc.name}`.toLowerCase() === refDoctor.toLowerCase()
+    );
+
+    if (selectedDoc) {
+      console.log('📞 Doctor selected:', {
+        name: selectedDoc.name,
+        email: selectedDoc.email,
+        mobile: selectedDoc.mobile,
+        degree: selectedDoc.degree
+      });
+      
+      setSelectedDoctorDetails(selectedDoc);
+
+      // Auto-populate patient email from doctor if patient email is empty
+      if (!email && selectedDoc.email) {
+        console.log('📧 Auto-filling patient email from doctor:', selectedDoc.email);
+        setEmail(selectedDoc.email);
+      }
+
+      // Auto-populate patient mobile from doctor if patient mobile is empty
+      if (!mobile && selectedDoc.mobile) {
+        console.log('📱 Auto-filling patient mobile from doctor:', selectedDoc.mobile);
+        setMobile(selectedDoc.mobile);
+      }
+    } else {
+      setSelectedDoctorDetails(null);
+    }
+  }, [refDoctor, isManualRefDoctor, doctorsList, email, mobile]);
 
   /* ============ LOCALSTORAGE PERSISTENCE ============ */
   const STORAGE_KEY = 'patientRegistrationDraft';
@@ -1973,6 +1996,7 @@ export default function PatientRegistration() {
           <div>
             <h2 className="text-sm font-semibold mb-3">Patient Identity</h2>
             <div className="grid grid-cols-1 sm:grid-cols-4 gap-2">
+              {/* ROW 1: Title, First Name, Last Name, DOB */}
               <InlineSelect
                 value={title}
                 onChange={handleTitleChange}
@@ -2004,6 +2028,8 @@ export default function PatientRegistration() {
                 required 
               />
               <InlineDatePicker value={dob} onChange={handleDobChange} placeholder="DOB" maxDate={new Date().toISOString().split("T")[0]} className="w-full" />
+
+              {/* ROW 2: Age, Gender, Mobile, Email */}
               <input 
                 className={input} 
                 placeholder="Age *" 
@@ -2066,9 +2092,67 @@ export default function PatientRegistration() {
               </div>
               
               <input className={input} placeholder="Email" value={email} onChange={(e) => handleEmailChange(e.target.value)} />
+
+              {/* ROW 3: Address, Location */}
+              <textarea className={input} placeholder="Address" value={address} onChange={(e) => setAddress(e.target.value)} rows={3}></textarea>
               
-              {/* Organization Dropdown */}
-              <div className="relative" ref={organizationDropdownRef}>
+              {/* Location Field - Searchable Input (Simple City-Village Format) */}
+              <div className="relative" ref={locationDropdownRef}>
+                <div className="relative">
+                  <input
+                    type="text"
+                    placeholder="Location"
+                    value={locationSearch}
+                    onChange={(e) => handleLocationSearchChange(e.target.value)}
+                    onFocus={() => {
+                      if (locationSearch.trim()) {
+                        setShowLocationDropdown(true);
+                      }
+                    }}
+                    className={`${input} w-full`}
+                  />
+                  {locationSearch && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setLocationSearch("");
+                        setLocation("");
+                        setLocationSuggestions([]);
+                        setShowLocationDropdown(false);
+                      }}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    >
+                      <X size={16} />
+                    </button>
+                  )}
+                </div>
+
+                {/* Location Suggestions Dropdown */}
+                {showLocationDropdown && locationSuggestions.length > 0 && (
+                  <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-50 max-h-64 overflow-y-auto">
+                    {locationSuggestions.map((suggestion, idx) => (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => handleLocationSelect(suggestion.display)}
+                        className="w-full text-left px-3 py-2 hover:bg-orange-50 border-b border-gray-100 last:border-b-0 transition-colors"
+                      >
+                        <div className="text-sm font-medium text-gray-800">{suggestion.display}</div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {/* No suggestions message */}
+                {showLocationDropdown && locationSearch.trim() && locationSuggestions.length === 0 && (
+                  <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-50 p-3 text-center text-gray-500 text-sm">
+                    No locations found matching "{locationSearch}"
+                  </div>
+                )}
+              </div>
+
+              {/* Organization - Wide field (spans 2 columns horizontally) */}
+              <div className="relative col-span-2" ref={organizationDropdownRef}>
                 <input
                   type="text"
                   placeholder="Organization"
@@ -2137,63 +2221,6 @@ export default function PatientRegistration() {
                   </div>
                 )}
               </div>
-
-              <textarea className={input} placeholder="Address" value={address} onChange={(e) => setAddress(e.target.value)} rows={3}></textarea>
-              
-              {/* Location Field - Searchable Input (Simple City-Village Format) */}
-              <div className="relative" ref={locationDropdownRef}>
-                <div className="relative">
-                  <input
-                    type="text"
-                    placeholder="Location"
-                    value={locationSearch}
-                    onChange={(e) => handleLocationSearchChange(e.target.value)}
-                    onFocus={() => {
-                      if (locationSearch.trim()) {
-                        setShowLocationDropdown(true);
-                      }
-                    }}
-                    className={`${input} w-full`}
-                  />
-                  {locationSearch && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setLocationSearch("");
-                        setLocation("");
-                        setLocationSuggestions([]);
-                        setShowLocationDropdown(false);
-                      }}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                    >
-                      <X size={16} />
-                    </button>
-                  )}
-                </div>
-
-                {/* Location Suggestions Dropdown */}
-                {showLocationDropdown && locationSuggestions.length > 0 && (
-                  <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-50 max-h-64 overflow-y-auto">
-                    {locationSuggestions.map((suggestion, idx) => (
-                      <button
-                        key={idx}
-                        type="button"
-                        onClick={() => handleLocationSelect(suggestion.display)}
-                        className="w-full text-left px-3 py-2 hover:bg-orange-50 border-b border-gray-100 last:border-b-0 transition-colors"
-                      >
-                        <div className="text-sm font-medium text-gray-800">{suggestion.display}</div>
-                      </button>
-                    ))}
-                  </div>
-                )}
-
-                {/* No suggestions message */}
-                {showLocationDropdown && locationSearch.trim() && locationSuggestions.length === 0 && (
-                  <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-50 p-3 text-center text-gray-500 text-sm">
-                    No locations found matching "{locationSearch}"
-                  </div>
-                )}
-              </div>
             </div>
           </div>
 
@@ -2209,7 +2236,7 @@ export default function PatientRegistration() {
                 <InlineSelect
                   value={reportMode}
                   onChange={setReportMode}
-                  options={["By Hand","SMS","WhatsApp","Email","Courier"]}
+                  options={["By Hand","WhatsApp","Email"]}
                   placeholder="Report Mode"
                 />
 
@@ -2347,136 +2374,13 @@ export default function PatientRegistration() {
         </div>
       )}
 
-      {/* Referral Modal */}
-      {showRefModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-40 flex items-start justify-center z-50 p-6 overflow-y-auto">
-          <div className="bg-white rounded-lg w-full max-w-2xl p-6 my-8">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-semibold text-gray-700">Add Referral Doctor</h3>
-              <button 
-                onClick={() => {
-                  setShowRefModal(false);
-                  setNewRef({ type: "Doctor", name: "", degree: "", compliment: "", mobile: "", email: "", address: "", allowSend: false });
-                }} 
-                className="text-gray-500 hover:text-gray-700 text-2xl leading-none"
-              >&times;</button>
-            </div>
-            <div className="grid grid-cols-12 gap-3 text-sm">
-              <div className="col-span-4 flex items-center">Referral Type*</div>
-              <div className="col-span-8">
-                <label className="mr-4 inline-flex items-center cursor-pointer">
-                  <input type="radio" name="rtype" checked={newRef.type==='Doctor'} onChange={() => setNewRef({...newRef, type: 'Doctor'})} className="mr-2" /> 
-                  Doctor
-                </label>
-                <label className="inline-flex items-center cursor-pointer">
-                  <input type="radio" name="rtype" checked={newRef.type==='Hospital'} onChange={() => setNewRef({...newRef, type: 'Hospital'})} className="mr-2" /> 
-                  Hospital
-                </label>
-              </div>
-              <div className="col-span-4 flex items-center">Name*</div>
-              <div className="col-span-8">
-                <input 
-                  className={input} 
-                  value={newRef.name} 
-                  onChange={e => setNewRef({...newRef, name: e.target.value})} 
-                  placeholder="Enter doctor/hospital name" 
-                  required
-                />
-              </div>
-              <div className="col-span-4 flex items-center">Degree</div>
-              <div className="col-span-8">
-                <input 
-                  className={input} 
-                  value={newRef.degree} 
-                  onChange={e => setNewRef({...newRef, degree: e.target.value})} 
-                  placeholder="e.g., MBBS, MD"
-                />
-              </div>
-              <div className="col-span-4 flex items-center">Compliment %</div>
-              <div className="col-span-8">
-                <input 
-                  type="number"
-                  className={input} 
-                  value={newRef.compliment} 
-                  onChange={e => {
-                    const val = e.target.value;
-                    if (val === '' || (parseFloat(val) >= 0 && parseFloat(val) <= 100)) {
-                      setNewRef({...newRef, compliment: val});
-                    }
-                  }} 
-                  placeholder="0-100"
-                  min="0"
-                  max="100"
-                />
-              </div>
-              <div className="col-span-4 flex items-center">Mobile</div>
-              <div className="col-span-8">
-                <input 
-                  type="tel"
-                  className={input} 
-                  value={newRef.mobile} 
-                  onChange={e => {
-                    const val = e.target.value;
-                    if (/^\d{0,10}$/.test(val)) {
-                      setNewRef({...newRef, mobile: val});
-                    }
-                  }} 
-                  placeholder="10-digit mobile number"
-                  maxLength={10}
-                />
-              </div>
-              <div className="col-span-4 flex items-center">Email</div>
-              <div className="col-span-8">
-                <input 
-                  type="email"
-                  className={input} 
-                  value={newRef.email} 
-                  onChange={e => setNewRef({...newRef, email: e.target.value})} 
-                  placeholder="email@example.com"
-                />
-              </div>
-              <div className="col-span-4 flex items-start pt-2">Address</div>
-              <div className="col-span-8">
-                <textarea 
-                  className={input} 
-                  value={newRef.address} 
-                  onChange={e => setNewRef({...newRef, address: e.target.value})} 
-                  rows={3} 
-                  placeholder="Enter address"
-                />
-              </div>
-              <div className="col-span-12">
-                <label className="inline-flex items-center cursor-pointer">
-                  <input 
-                    type="checkbox" 
-                    className="mr-2 w-4 h-4 cursor-pointer" 
-                    checked={newRef.allowSend} 
-                    onChange={e => setNewRef({...newRef, allowSend: e.target.checked})} 
-                  />
-                  <span className="text-sm">Allow to send report on balance amount</span>
-                </label>
-              </div>
-            </div>
-            <div className="flex justify-end gap-2 mt-6">
-              <button 
-                onClick={() => {
-                  setShowRefModal(false);
-                  setNewRef({ type: "Doctor", name: "", degree: "", compliment: "", mobile: "", email: "", address: "", allowSend: false });
-                }} 
-                className="px-4 py-2 border border-gray-300 rounded hover:bg-gray-50 transition-colors"
-              >
-                Cancel
-              </button>
-              <button 
-                onClick={saveRef} 
-                className="bg-slate-900 hover:bg-orange-600 text-white px-6 py-2 rounded transition-colors font-semibold"
-              >
-                Save
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Referral Doctor Modal Component */}
+      <ReferralDoctorModal
+        isOpen={showRefModal}
+        onClose={() => setShowRefModal(false)}
+        onDoctorAdded={handleDoctorAdded}
+        editingDoctor={null}
+      />
 
       {/* MAIN 3-COLUMN */}
       <div className="grid grid-cols-1 md:grid-cols-12 gap-3 h-auto md:h-[75vh]">

@@ -1,6 +1,37 @@
 import prisma from '../config/database.js';
-import { sendUserCredentialsEmail, sendFranchiseCredentialsEmail, sendCenterCredentialsEmail, sendStaffCredentialsEmail, sendOrganizationCredentialsEmail } from '../utils/email.js';
+import { sendUserCredentialsEmail, sendFranchiseCredentialsEmail, sendCenterCredentialsEmail, sendStaffCredentialsEmail, sendOrganizationCredentialsEmail, sendAccountUpdateEmail } from '../utils/email.js';
 import { getPaginationParams, buildPaginatedResponse } from '../utils/pagination.js';
+
+// Helper function to generate random password
+function generateRandomPassword(length = 10) {
+  const uppercase = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+  const lowercase = 'abcdefghijklmnopqrstuvwxyz';
+  const numbers = '0123456789';
+  const special = '!@#$%^&*';
+  
+  const allChars = uppercase + lowercase + numbers + special;
+  let password = '';
+  
+  // Ensure at least one character from each category
+  password += uppercase[Math.floor(Math.random() * uppercase.length)];
+  password += lowercase[Math.floor(Math.random() * lowercase.length)];
+  password += numbers[Math.floor(Math.random() * numbers.length)];
+  password += special[Math.floor(Math.random() * special.length)];
+  
+  // Fill the rest randomly
+  for (let i = 4; i < length; i++) {
+    password += allChars[Math.floor(Math.random() * allChars.length)];
+  }
+  
+  // Shuffle the password
+  return password.split('').sort(() => Math.random() - 0.5).join('');
+}
+
+// Helper function to extract first name from full name
+function extractFirstName(fullName) {
+  if (!fullName) return 'User';
+  return fullName.trim().split(' ')[0];
+}
 
 // Helper function to process age ranges and auto-assign gender based on label
 function processAgeRangesWithGender(ageRanges, parameterName = '') {
@@ -1241,7 +1272,7 @@ export const getOrganizationById = async (req, res) => {
 // Create organization
 export const createOrganization = async (req, res) => {
   try {
-    const { name, code, location, address, mobile, email, date, isActive, testCharges, moduleAllocation } = req.body;
+    const { name, code, location, address, mobile, email, date, isActive, adminName, testCharges, moduleAllocation } = req.body;
     if (!name) return res.status(400).json({ success: false, message: 'Name is required' });
 
     const newId = await generateOrganizationId();
@@ -1249,7 +1280,7 @@ export const createOrganization = async (req, res) => {
     const username = newId;           // ORG-AAA
     const plainPassword = `${suffix}@123`;  // AAA@123
 
-    console.log('Creating organization:', { newId, name, email });
+    console.log('Creating organization:', { newId, name, email, adminName });
 
     // Check if organization already exists
     const existingOrg = await prisma.organization.findUnique({ where: { id: newId } });
@@ -1280,33 +1311,29 @@ export const createOrganization = async (req, res) => {
       });
     }
 
-    // Create user account for this organization
+    // Create admin account for this organization
     const bcrypt = await import('bcryptjs');
     const hashed = await bcrypt.default.hash(plainPassword, 10);
     
     try {
-      const upsertedUser = await prisma.user.upsert({
-        where: { username },
-        update: { password: hashed, email: email || null, name: name.trim(), center: name.trim(), role: 'Organization' },
-        create: { username, name: name.trim(), center: name.trim(), role: 'Organization', password: hashed, email: email || null, mobile: mobile || null, gender: null, address: address || null }
+      const admin = await prisma.admin.create({
+        data: {
+          username,
+          email: email || null,
+          password: hashed,
+          adminName: adminName || name.trim(),
+          organizationId: newId,
+          role: 'ADMIN',
+          isActive: true
+        }
       });
       
-      // Handle module allocation for the user
-      if (moduleAllocation) {
-        const modulesData = typeof moduleAllocation === 'string' ? moduleAllocation : JSON.stringify(moduleAllocation);
-        await prisma.moduleAllocation.upsert({
-          where: { userId: upsertedUser.id },
-          update: { modules: modulesData },
-          create: { userId: upsertedUser.id, modules: modulesData }
-        });
-      }
-      
-      console.log('User created for organization:', username);
-    } catch (userError) {
-      console.error('User creation error:', userError);
-      // Delete the organization if user creation fails
+      console.log('Admin created for organization:', { adminId: admin.id, adminName: admin.adminName, username: admin.username });
+    } catch (adminError) {
+      console.error('Admin creation error:', adminError);
+      // Delete the organization if admin creation fails
       await prisma.organization.delete({ where: { id: newId } });
-      throw userError;
+      throw adminError;
     }
 
     // Create test charges if provided, otherwise copy DEFAULT charges
@@ -4185,12 +4212,12 @@ export const getUsers = async (req, res) => {
       where: { isActive: true, NOT: { role: { in: ['Collection Center', 'Franchise', 'Organization'] } } }
     });
 
-    // Get paginated users with module allocation
+    // Get paginated users with module allocation and organization
     const users = await prisma.user.findMany({
       where: { isActive: true, NOT: { role: { in: ['Collection Center', 'Franchise', 'Organization'] } } },
       select: { 
         id: true, 
-        center: true, 
+        organizationId: true,
         name: true, 
         username: true, 
         role: true, 
@@ -4199,6 +4226,9 @@ export const getUsers = async (req, res) => {
         email: true, 
         address: true, 
         createdAt: true,
+        organization: {
+          select: { id: true, name: true }
+        },
         moduleAllocation: {
           select: { id: true, modules: true }
         }
@@ -4220,7 +4250,7 @@ export const getUserById = async (req, res) => {
       where: { id: parseInt(req.params.id) },
       select: { 
         id: true, 
-        center: true, 
+        organizationId: true,
         name: true, 
         username: true, 
         role: true, 
@@ -4228,6 +4258,9 @@ export const getUserById = async (req, res) => {
         gender: true, 
         email: true, 
         address: true,
+        organization: {
+          select: { id: true, name: true }
+        },
         moduleAllocation: {
           select: { id: true, modules: true }
         }
@@ -4242,15 +4275,35 @@ export const getUserById = async (req, res) => {
 
 export const createUser = async (req, res) => {
   try {
-    const { center, name, username, role, mobile, gender, email, address, password, moduleAllocation } = req.body;
-    if (!center || !name || !username || !role || !password) {
-      return res.status(400).json({ success: false, message: 'Center, Name, Username, Role and Password are required' });
+    const { organizationId, name, role, mobile, gender, email, address, moduleAllocation } = req.body;
+    
+    console.log('📥 Creating user with data:', { organizationId, name, role, gender, email });
+    
+    // Auto-generate username from first name
+    const username = extractFirstName(name);
+    
+    // Auto-generate password
+    const password = generateRandomPassword(10);
+    
+    if (!name || !role) {
+      return res.status(400).json({ success: false, message: 'Name and Role are required' });
     }
+
+    // Verify organization exists if provided
+    if (organizationId) {
+      const organization = await prisma.organization.findUnique({
+        where: { id: organizationId }
+      });
+      if (!organization) {
+        return res.status(404).json({ success: false, message: 'Organization not found' });
+      }
+    }
+
     const bcrypt = await import('bcryptjs');
     const hashed = await bcrypt.default.hash(password, 10);
     const user = await prisma.user.create({
       data: { 
-        center, 
+        organizationId: organizationId || null,
         name, 
         username: username.trim(), 
         role, 
@@ -4260,7 +4313,7 @@ export const createUser = async (req, res) => {
         address: address || null, 
         password: hashed
       },
-      select: { id: true, center: true, name: true, username: true, role: true, mobile: true, gender: true, email: true, address: true },
+      select: { id: true, organizationId: true, name: true, username: true, role: true, mobile: true, gender: true, email: true, address: true },
     });
 
     // Create module allocation if provided
@@ -4275,14 +4328,16 @@ export const createUser = async (req, res) => {
 
     // Send credentials email if email is provided (non-blocking — don't fail user creation if email fails)
     if (email) {
-      sendStaffCredentialsEmail(email, name, username.trim(), password, role).catch(e =>
+      console.log(`📧 Sending auto-generated credentials to ${email} - Username: ${username}, Password: ${password}`);
+      sendUserCredentialsEmail(email, name, username.trim(), password, role).catch(e =>
         console.error('Failed to send staff credentials email:', e.message)
       );
     }
 
     res.status(201).json({ success: true, message: 'User created successfully', data: user });
   } catch (error) {
-    console.error('Create user error:', error);
+    console.error('❌ Create user error:', error);
+    console.error('Error details:', { code: error.code, message: error.message, meta: error.meta });
     if (error.code === 'P2002') return res.status(400).json({ success: false, message: 'Username already exists' });
     res.status(500).json({ success: false, message: 'Failed to create user', detail: error.message });
   }
@@ -4291,29 +4346,38 @@ export const createUser = async (req, res) => {
 export const updateUser = async (req, res) => {
   try {
     const { id } = req.params;
-    const { center, name, username, role, mobile, gender, email, address, password, moduleAllocation } = req.body;
+    const { organizationId, name, role, mobile, gender, email, address, moduleAllocation } = req.body;
     const existing = await prisma.user.findUnique({ where: { id: parseInt(id) } });
     if (!existing) return res.status(404).json({ success: false, message: 'User not found' });
 
+    // Verify organization exists if organizationId is provided
+    if (organizationId) {
+      const organization = await prisma.organization.findUnique({
+        where: { id: organizationId }
+      });
+      if (!organization) {
+        return res.status(404).json({ success: false, message: 'Organization not found' });
+      }
+    }
+
+    // Auto-generate new username from updated name
+    const newUsername = name ? extractFirstName(name) : existing.username;
+
     const updateData = { 
-      center, 
-      name, 
-      username: username?.trim(), 
-      role, 
+      organizationId: organizationId || undefined,
+      name: name || undefined,
+      username: newUsername?.trim() || undefined,
+      role: role || undefined,
       mobile: mobile || null, 
       gender: gender || null, 
       email: email || null, 
       address: address || null
     };
-    if (password) {
-      const bcrypt = await import('bcryptjs');
-      updateData.password = await bcrypt.default.hash(password, 10);
-    }
 
     const user = await prisma.user.update({
       where: { id: parseInt(id) },
       data: updateData,
-      select: { id: true, center: true, name: true, username: true, role: true, mobile: true, gender: true, email: true, address: true },
+      select: { id: true, organizationId: true, name: true, username: true, role: true, mobile: true, gender: true, email: true, address: true },
     });
 
     // Update module allocation if provided
@@ -4329,11 +4393,15 @@ export const updateUser = async (req, res) => {
       }
     }
 
-    // Send updated credentials email (non-blocking)
-    const emailTo = email || existing.email;
-    if (emailTo) {
-      sendStaffCredentialsEmail(emailTo, name || existing.name, username?.trim() || existing.username, formData.password || '(unchanged)', role || existing.role)
-        .catch(e => console.error('Failed to send update email:', e.message));
+    // Send email notification to user about account update
+    if (email) {
+      try {
+        await sendAccountUpdateEmail(email, name || existing.name, newUsername, role || existing.role);
+        console.log(`✅ Account update notification sent to ${email}`);
+      } catch (emailError) {
+        console.error('⚠️ Failed to send update notification email:', emailError);
+        // Don't fail the update if email fails, just log it
+      }
     }
 
     res.json({ success: true, message: 'User updated successfully', data: user });
