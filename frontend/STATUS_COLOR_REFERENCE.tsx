@@ -34,14 +34,14 @@ export const STATUS_COLORS = {
     description: 'Sample received at lab'
   },
 
-  // Stage 3: Yellow/Amber - Results Entered
+  // Stage 3: Purple - Results Entered
   'Entered': {
-    bgColor: 'bg-yellow-100',
-    textColor: 'text-yellow-700',
-    borderColor: 'border-yellow-300',
-    tailwindColor: 'yellow',
-    hexColor: '#F59E0B',
-    lightHexColor: '#FFFBEB',
+    bgColor: 'bg-purple-100',
+    textColor: 'text-purple-700',
+    borderColor: 'border-purple-300',
+    tailwindColor: 'purple',
+    hexColor: '#A855F7',
+    lightHexColor: '#F3E8FF',
     icon: '✏️',
     description: 'Results entered in system'
   },
@@ -70,14 +70,14 @@ export const STATUS_COLORS = {
     description: 'Authorized by senior technician'
   },
 
-  // Stage 6: Cyan - Delivered
+  // Stage 6: Green - Delivered
   'Delivered': {
-    bgColor: 'bg-cyan-100',
-    textColor: 'text-cyan-700',
-    borderColor: 'border-cyan-300',
-    tailwindColor: 'cyan',
-    hexColor: '#06B6D4',
-    lightHexColor: '#ECFDFD',
+    bgColor: 'bg-green-100',
+    textColor: 'text-green-700',
+    borderColor: 'border-green-300',
+    tailwindColor: 'green',
+    hexColor: '#22C55E',
+    lightHexColor: '#F0FDF4',
     icon: '📤',
     description: 'Report delivered to patient'
   },

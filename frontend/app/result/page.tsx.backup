@@ -1443,13 +1443,13 @@ export default function Result() {
       case "Received":
         return "bg-orange-100 text-orange-800";
       case "Entered":
-        return "bg-purple-100 text-purple-800";
+        return "bg-green-100 text-green-800";
       case "Validation":
         return "bg-yellow-100 text-yellow-800";
       case "Authorized":
         return "bg-blue-100 text-blue-800";
       case "Delivered":
-        return "bg-green-100 text-green-800";
+        return "bg-purple-100 text-purple-800";
       case "Rectified":
         return "bg-red-100 text-red-800";
       default:
@@ -1635,10 +1635,10 @@ export default function Result() {
                 <div 
                   onClick={() => setSelectedStatus("Entered")}
                   className={`rounded-lg p-2 text-center cursor-pointer hover:shadow-md transition-shadow ${
-                    selectedStatus === "Entered" ? "bg-purple-200 ring-2 ring-purple-600" : "bg-purple-100"
+                    selectedStatus === "Entered" ? "bg-green-200 ring-2 ring-green-600" : "bg-green-100"
                   }`}
                 >
-                  <h3 className="text-purple-800 font-semibold text-xs sm:text-sm">
+                  <h3 className="text-green-800 font-semibold text-xs sm:text-sm">
                     Entered ({statistics.byStatus.Entered})
                   </h3>
                 </div>
@@ -1665,10 +1665,10 @@ export default function Result() {
                 <div 
                   onClick={() => setSelectedStatus("Delivered")}
                   className={`rounded-lg p-2 text-center cursor-pointer hover:shadow-md transition-shadow ${
-                    selectedStatus === "Delivered" ? "bg-green-200 ring-2 ring-green-600" : "bg-green-100"
+                    selectedStatus === "Delivered" ? "bg-purple-200 ring-2 ring-purple-600" : "bg-purple-100"
                   }`}
                 >
-                  <h3 className="text-green-800 font-semibold text-xs sm:text-sm">
+                  <h3 className="text-purple-800 font-semibold text-xs sm:text-sm">
                     Delivered ({statistics.byStatus.Delivered})
                   </h3>
                 </div>
@@ -1838,6 +1838,9 @@ export default function Result() {
                         <span className="text-[10px]">S.Taken</span>
                       </th>
                       <th className="px-0.5 sm:px-1 py-1.5 sm:py-2 text-center font-semibold text-xs whitespace-nowrap border border-gray-300">
+                        <span title="Barcode print status: Red=Unprinted, Blue=Printed" className="text-[10px]">🔖</span>
+                      </th>
+                      <th className="px-0.5 sm:px-1 py-1.5 sm:py-2 text-center font-semibold text-xs whitespace-nowrap border border-gray-300">
                         <div title="Print barcode labels for selected tests">
                           <Barcode
                             size={16}
@@ -1851,7 +1854,7 @@ export default function Result() {
                   <tbody className="bg-white">
                     {loading ? (
                       <tr>
-                        <td colSpan={10} className="text-center p-4 text-gray-500 text-sm border border-gray-300">
+                        <td colSpan={11} className="text-center p-4 text-gray-500 text-sm border border-gray-300">
                           <div className="flex items-center justify-center gap-2">
                             <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-cyan-600"></div>
                             Loading...
@@ -1860,7 +1863,7 @@ export default function Result() {
                       </tr>
                     ) : sortedAndFilteredResults.length === 0 ? (
                       <tr>
-                        <td colSpan={10} className="text-center p-3 sm:p-4 text-gray-500 text-xs sm:text-sm border border-gray-300">
+                        <td colSpan={11} className="text-center p-3 sm:p-4 text-gray-500 text-xs sm:text-sm border border-gray-300">
                           No records found for {selectedStatus} status
                         </td>
                       </tr>
@@ -1871,7 +1874,45 @@ export default function Result() {
                             key={`${patient.patient_uid}-${test.test_id}`} 
                             className={`hover:bg-opacity-80 text-gray-800 border-b border-gray-300 cursor-pointer transition-all ${getStatusBadgeColor(test.result_status)}`}
                           >
-                            {/* Column 1: Checkbox */}
+                            {/* Show patient info only on first test row, lab number on all rows */}
+                            {testIndex === 0 ? (
+                              <>
+                                <td className="px-1 sm:px-2 py-1 sm:py-1.5 text-xs font-medium border border-gray-300">
+                                  <span className="flex items-center gap-1">
+                                    <span className="truncate">{patient.patient_name}</span>
+                                    {patient.balance_amount > 0 && (
+                                      <span
+                                        className="relative group cursor-pointer"
+                                        onClick={() => {
+                                          localStorage.setItem('searchQuery', patient.patient_uid);
+                                          router.push('/patient/search-booking');
+                                        }}
+                                      >
+                                        <span className="text-red-500 text-[11px] font-bold leading-none select-none">₹</span>
+                                        {/* Tooltip */}
+                                        <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 hidden group-hover:flex flex-col items-center z-50 pointer-events-none">
+                                          <span className="bg-red-600 text-white text-[10px] font-semibold rounded px-2 py-1 whitespace-nowrap shadow-lg">
+                                            Balance: ₹{patient.balance_amount.toLocaleString('en-IN')}
+                                          </span>
+                                          <span className="w-2 h-2 bg-red-600 rotate-45 -mt-1" />
+                                        </span>
+                                      </span>
+                                    )}
+                                  </span>
+                                </td>
+                                <td className="px-1 sm:px-2 py-1 sm:py-1.5 text-xs border border-gray-300">{patient.corporate}</td>
+                                <td className="px-1 sm:px-2 py-1 sm:py-1.5 text-xs border border-gray-300">{patient.patient_uid}</td>
+                                <td className="px-1 sm:px-2 py-1 sm:py-1.5 text-xs font-semibold border border-gray-300">{patient.visit_id}</td>
+                              </>
+                            ) : (
+                              <>
+                                <td className="px-1 sm:px-2 py-1 sm:py-1.5 text-xs border border-gray-300"></td>
+                                <td className="px-1 sm:px-2 py-1 sm:py-1.5 text-xs border border-gray-300"></td>
+                                <td className="px-1 sm:px-2 py-1 sm:py-1.5 text-xs border border-gray-300"></td>
+                                <td className="px-1 sm:px-2 py-1 sm:py-1.5 text-xs font-semibold border border-gray-300">{patient.visit_id}</td>
+                              </>
+                            )}
+                            
                             <td className="px-1 sm:px-2 py-1 sm:py-1.5 text-center border border-gray-300">
                               <input 
                                 type="checkbox" 
@@ -1881,58 +1922,6 @@ export default function Result() {
                                 onChange={(e) => handleTestSelection(test.test_id, e.target.checked, patient, test)}
                               />
                             </td>
-
-                            {/* Column 2: Visit ID (show only on first test row) */}
-                            <td className="px-1 sm:px-2 py-1 sm:py-1.5 text-xs border border-gray-300">
-                              {testIndex === 0 ? patient.visit_id : ''}
-                            </td>
-
-                            {/* Column 3: Org ID with hover tooltip (show only on first test row) */}
-                            <td className="px-1 sm:px-2 py-1 sm:py-1.5 text-xs border border-gray-300 relative">
-                              {testIndex === 0 && (
-                                <div 
-                                  className="cursor-help relative group"
-                                  title={patient.organization_name || 'N/A'}
-                                >
-                                  <span>{patient.organizationCode || patient.patient_uid}</span>
-                                  {/* Tooltip */}
-                                  <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 hidden group-hover:flex flex-col items-center z-50 pointer-events-none">
-                                    <span className="bg-gray-800 text-white text-[10px] font-semibold rounded px-2 py-1 whitespace-nowrap shadow-lg">
-                                      {patient.organization_name || 'Organization'}
-                                    </span>
-                                    <span className="w-2 h-2 bg-gray-800 rotate-45 -mt-1" />
-                                  </span>
-                                </div>
-                              )}
-                            </td>
-
-                            {/* Column 4: Patient Name with balance icon (show only on first test row) */}
-                            <td className="px-1 sm:px-2 py-1 sm:py-1.5 text-xs font-medium border border-gray-300">
-                              {testIndex === 0 && (
-                                <span className="flex items-center gap-1">
-                                  <span className="truncate">{patient.patient_name}</span>
-                                  {patient.balance_amount > 0 && (
-                                    <span
-                                      className="relative group cursor-pointer"
-                                      onClick={() => {
-                                        localStorage.setItem('searchQuery', patient.patient_uid);
-                                        router.push('/patient/search-booking');
-                                      }}
-                                    >
-                                      <span className="text-red-500 text-[11px] font-bold leading-none select-none">₹</span>
-                                      {/* Tooltip */}
-                                      <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 hidden group-hover:flex flex-col items-center z-50 pointer-events-none">
-                                        <span className="bg-red-600 text-white text-[10px] font-semibold rounded px-2 py-1 whitespace-nowrap shadow-lg">
-                                          Balance: ₹{patient.balance_amount.toLocaleString('en-IN')}
-                                        </span>
-                                        <span className="w-2 h-2 bg-red-600 rotate-45 -mt-1" />
-                                      </span>
-                                    </span>
-                                  )}
-                                </span>
-                              )}
-                            </td>
-                            {/* Column 5: Services (with icons) */}
                             <td className="px-1 sm:px-2 py-1 sm:py-1.5 text-xs border border-gray-300" title={test.test_name}>
                               <div className="flex items-center gap-1">
                                 <span className="flex-1">{test.test_name}</span>
@@ -1990,13 +1979,6 @@ export default function Result() {
                                 )}
                               </div>
                             </td>
-
-                            {/* Column 6: Date (approved_date) */}
-                            <td className="px-1 sm:px-2 py-1 sm:py-1.5 text-xs whitespace-nowrap border border-gray-300">
-                              {test.approved_date}
-                            </td>
-
-                            {/* Column 7: Referral Doc */}
                             <td className="px-1 sm:px-2 py-1 sm:py-1.5 text-xs border border-gray-300">
                               <span className="inline-flex items-center gap-1">
                                 {test.ref_by === "SELF" ? (
@@ -2012,96 +1994,104 @@ export default function Result() {
                                 )}
                               </span>
                             </td>
-
-                            {/* Column 8: Patient History (display patient_history text only, show only on first test row) */}
-                            <td className="px-1 sm:px-2 py-1 sm:py-1.5 text-xs border border-gray-300 relative">
-                              {testIndex === 0 && (
-                                <div className="relative group cursor-help">
-                                  {patient.patient_history ? (
-                                    <>
-                                      <span className="truncate block max-w-xs" title={patient.patient_history}>
-                                        {patient.patient_history}
-                                      </span>
-                                      {/* Tooltip on hover */}
-                                      <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 hidden group-hover:flex flex-col items-center z-50 pointer-events-none">
-                                        <span className="bg-gray-800 text-white text-[10px] font-semibold rounded px-2 py-1 whitespace-normal max-w-xs shadow-lg">
-                                          {patient.patient_history}
-                                        </span>
-                                        <span className="w-2 h-2 bg-gray-800 rotate-45 -mt-1" />
-                                      </span>
-                                    </>
-                                  ) : (
-                                    <span className="text-gray-400 italic">—</span>
-                                  )}
-                                </div>
-                              )}
-                            </td>
-
-                            {/* Column 9: S.Taken (green tick mark + calendar & settings icons, all rows) */}
-                            <td className="px-0.5 sm:px-1 py-1 sm:py-1.5 text-center border border-gray-300">
-                              <div className="flex items-center justify-center gap-1">
-                                {test.sample_taken ? (
-                                  <span className="text-green-600 text-lg font-bold leading-none">✓</span>
-                                ) : null}
-                                {/* Calendar icon */}
-                                <div className="relative">
-                                  <Calendar 
-                                    size={14} 
-                                    className="text-gray-700 cursor-pointer hover:text-cyan-600 flex-shrink-0" 
-                                    onMouseEnter={() => setHoveredTest(`${patient.patient_uid}-${test.test_id}-calendar`)}
-                                    onMouseLeave={() => setHoveredTest(null)}
-                                    onClick={() => {
-                                      // Always show ALL tests for this patient visit, regardless of which row's calendar is clicked
-                                      handleCalendarClick(patient, test);
-                                    }}
-                                  />
-                                  {/* Tooltip for Calendar */}
-                                  {hoveredTest === `${patient.patient_uid}-${test.test_id}-calendar` && (
-                                    <div className="fixed z-50 w-72 sm:w-80 bg-white border-2 border-black rounded-lg shadow-lg p-3 text-xs pointer-events-none"
-                                         style={{
-                                           left: '50%',
-                                           top: '50%',
-                                           transform: 'translate(-50%, -50%)',
-                                           maxWidth: 'calc(100vw - 2rem)'
-                                         }}>
-                                      {testIndex === 0 ? (
-                                        <>
+                            <td className="px-1 sm:px-2 py-1 sm:py-1.5 text-xs whitespace-nowrap border border-gray-300">{test.approved_date}</td>
+                            <td className="px-0.5 sm:px-1 py-1 sm:py-1.5 border border-gray-300 relative">
+                              <div className="flex items-center justify-start gap-1">
+                                {/* Show patient-level buttons on first test row */}
+                                {testIndex === 0 ? (
+                                  <div className="flex items-center gap-1">
+                                    <div className="relative">
+                                      <Calendar 
+                                        size={14} 
+                                        className="text-gray-700 cursor-pointer hover:text-cyan-600 flex-shrink-0" 
+                                        onMouseEnter={() => setHoveredTest(`${patient.patient_uid}-patient-calendar`)}
+                                        onMouseLeave={() => setHoveredTest(null)}
+                                        onClick={() => handleCalendarClick(patient, patient.tests[0])}
+                                      />
+                                      {/* Responsive Tooltip */}
+                                      {hoveredTest === `${patient.patient_uid}-patient-calendar` && (
+                                        <div className="fixed z-50 w-72 sm:w-80 bg-white border-2 border-black rounded-lg shadow-lg p-3 text-xs pointer-events-none"
+                                             style={{
+                                               left: '50%',
+                                               top: '50%',
+                                               transform: 'translate(-50%, -50%)',
+                                               maxWidth: 'calc(100vw - 2rem)'
+                                             }}>
                                           <div className="font-semibold text-gray-800 mb-1">Patient: {patient.patient_name}</div>
                                           <div className="font-bold text-gray-900 mb-2">SHRADDHA PATHOLOGY LABORATORY</div>
                                           <div className="font-semibold text-gray-800 mb-1">Visit ID:</div>
                                           <div className="text-blue-600 font-medium mb-2">{patient.visit_id}</div>
                                           <div className="font-semibold text-gray-800 mb-1">Total Tests:</div>
                                           <div className="text-gray-900">{patient.tests.length}</div>
-                                        </>
-                                      ) : (
-                                        <>
-                                          <div className="font-semibold text-gray-800 mb-1">Test: {test.test_name}</div>
-                                          <div className="font-bold text-gray-900 mb-2">SHRADDHA PATHOLOGY LABORATORY</div>
-                                          <div className="font-semibold text-gray-800 mb-1">Sample Received:</div>
-                                          <div className="text-blue-600 font-medium mb-2">{test.approved_date}</div>
-                                          <div className="font-semibold text-gray-800 mb-1">Sample Type:</div>
-                                          <div className="text-gray-900">{test.specimen_type}</div>
-                                        </>
+                                        </div>
                                       )}
                                     </div>
-                                  )}
-                                </div>
-                                {/* Settings icon */}
-                                <Settings 
-                                  size={14} 
-                                  className="text-gray-700 cursor-pointer hover:text-cyan-600 flex-shrink-0" 
-                                  onClick={() => {
-                                    if (testIndex === 0) {
-                                      handleSettingsClick(patient, patient.tests[0]);
-                                    } else if (test.result_status === "Authorized" || test.result_status === "Entered") {
-                                      handleSettingsClick(patient, test);
-                                    }
-                                  }}
-                                />
+                                    <Settings 
+                                      size={14} 
+                                      className="text-gray-700 cursor-pointer hover:text-cyan-600 flex-shrink-0" 
+                                      onClick={() => handleSettingsClick(patient, patient.tests[0])}
+                                    />
+                                  </div>
+                                ) : (
+                                  /* Show individual test calendar/settings only for specific statuses */
+                                  (test.result_status === "Authorized" || test.result_status === "Entered") ? (
+                                    <div className="flex items-center gap-1">
+                                      <div className="relative">
+                                        <Calendar 
+                                          size={12} 
+                                          className="text-gray-500 crsor-pointer hover:text-cyan-600 flex-shrink-0" 
+                                          onMouseEnter={() => setHoveredTest(`${patient.patient_uid}-${test.test_id}`)}
+                                          onMouseLeave={() => setHoveredTest(null)}
+                                          onClick={() => handleCalendarClick(patient, test)}
+                                        />
+                                        {/* Responsive Tooltip */}
+                                        {hoveredTest === `${patient.patient_uid}-${test.test_id}` && (
+                                          <div className="fixed z-50 w-72 sm:w-80 bg-white border-2 border-black rounded-lg shadow-lg p-3 text-xs pointer-events-none"
+                                               style={{
+                                                 left: '50%',
+                                                 top: '50%',
+                                                 transform: 'translate(-50%, -50%)',
+                                                 maxWidth: 'calc(100vw - 2rem)'
+                                               }}>
+                                            <div className="font-semibold text-gray-800 mb-1">Test: {test.test_name}</div>
+                                            <div className="font-bold text-gray-900 mb-2">SHRADDHA PATHOLOGY LABORATORY</div>
+                                            <div className="font-semibold text-gray-800 mb-1">Sample Received:</div>
+                                            <div className="text-blue-600 font-medium mb-2">{test.approved_date}</div>
+                                            <div className="font-semibold text-gray-800 mb-1">Sample Type:</div>
+                                            <div className="text-gray-900">{test.specimen_type}</div>
+                                          </div>
+                                        )}
+                                      </div>
+                                      <Settings 
+                                        size={12} 
+                                        className="text-gray-500 cursor-pointer hover:text-cyan-600 flex-shrink-0" 
+                                        onClick={() => handleSettingsClick(patient, test)}
+                                      />
+                                    </div>
+                                  ) : (
+                                    /* Show only tick mark for S.Taken column without background */
+                                    test.sample_taken ? (
+                                      <span className="text-green-600 text-lg font-bold leading-none">✓</span>
+                                    ) : null
+                                  )
+                                )}
                               </div>
                             </td>
-
-                            {/* Column 10: Barcode checkbox */}
+                            <td className="px-0.5 sm:px-1 py-1 sm:py-1.5 text-center border border-gray-300">
+                              <div className="flex items-center justify-center">
+                                {/* Barcode print status indicator */}
+                                <div 
+                                  className={`w-5 h-5 rounded border-2 flex items-center justify-center ${
+                                    test.result_status === 'Registered' 
+                                      ? 'border-red-500 bg-red-50 text-red-600' 
+                                      : 'border-blue-500 bg-blue-50 text-blue-600'
+                                  }`}
+                                  title={test.result_status === 'Registered' ? 'Unprinted barcode' : 'Barcode printed'}
+                                >
+                                  {test.result_status === 'Registered' ? '○' : '✓'}
+                                </div>
+                              </div>
+                            </td>
                             <td className="px-0.5 sm:px-1 py-1 sm:py-1.5 text-center border border-gray-300">
                               <input
                                 type="checkbox"

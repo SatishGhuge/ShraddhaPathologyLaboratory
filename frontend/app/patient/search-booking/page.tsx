@@ -14,7 +14,7 @@ import {
   RefreshCcw, Plus, X, RefreshCw,
   ChevronLeft, ChevronRight, CalendarDays, AlertCircle, Barcode
 } from "lucide-react";
-import { getAllPatients, updatePayment, updatePatient } from "@/src/api/patient";
+import { getAllPatients, updatePayment, updatePatient, updatePatientTestDetails } from "@/src/api/patient";
 import { getDoctors, getTests, getPackages, getSpecimenTypes, getOrganizations } from "@/src/api/master";
 import html2pdf from "html2pdf.js";
 import { jsPDF } from "jspdf";
@@ -251,7 +251,7 @@ const INIT_FORM = {
   visitDate:"", location:"SHRADDHA", corporate:"WalkIn",
   reportMode:"By hand", mobile:"", title:"MR", firstName:"", lastName:"",
   age:"", ageUnit:"Year", gender:"Male", referralDoctor:"",
-  referralDoctorChecked:false, remark:"", email:"", address:""
+  referralDoctorChecked:false, patient_history:"", email:"", address:""
 };
 
 const INIT_BOOKING = [];
@@ -437,7 +437,7 @@ export default function BookingPage() {
             visitId:         vid,
             visitDate:       t.visitDate,
             referralDoctor:  t.referralDoctor || "",
-            remarks:         t.remarks || "",
+            patient_history: t.patient_history || "",
             organizationId:  t.organizationId || "",
             totalAmount:     0,
             paidAmount:      t.paidAmount    || 0,
@@ -947,6 +947,22 @@ export default function BookingPage() {
         address:   formData.address,
       });
       if (!res.success) { alert('Failed to update patient: ' + res.message); return; }
+
+      // Update patient_history for the visit if present
+      if (editingPatient.visitId && formData.patient_history !== undefined) {
+        try {
+          const historyRes = await updatePatientTestDetails(
+            editingPatient.patientId,
+            editingPatient.visitId,
+            formData.patient_history
+          );
+          if (!historyRes.success) {
+            console.warn('Failed to update patient history:', historyRes.message);
+          }
+        } catch (e) {
+          console.warn('Error updating patient history:', e);
+        }
+      }
     } catch (e) {
       alert('Failed to update patient: ' + e.message); return;
     }
@@ -2253,8 +2269,8 @@ export default function BookingPage() {
                 </div>
               </div>
               <div className={style.formGrid}>
-                <label className="col-span-3 font-semibold pt-2">Remark</label>
-                <input type="text" name="remark" value={formData.remark} onChange={handleInputChange} className="col-span-9 border border-gray-300 rounded px-3 py-2 bg-white"/>
+                <label className="col-span-3 font-semibold pt-2">Patient History</label>
+                <input type="text" name="patient_history" value={formData.patient_history} onChange={handleInputChange} className="col-span-9 border border-gray-300 rounded px-3 py-2 bg-white"/>
               </div>
               <div className={style.formGrid}>
                 <label className="col-span-3 font-semibold pt-2">Email</label>

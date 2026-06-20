@@ -166,6 +166,14 @@ export const updatePayment = async (patientId: string, visitId: string, paymentD
   return response;
 };
 
+// Update patient test visit details (patient_history, etc.)
+export const updatePatientTestDetails = async (patientId: string, visitId: string, patient_history: string): Promise<ApiResponse> => {
+  return apiCall(`/patients/${patientId}/visit-details`, {
+    method: 'PATCH',
+    body: JSON.stringify({ visitId, patient_history })
+  });
+};
+
 // Get patient statistics for dashboard with pagination
 export const getPatientStatistics = async (filters: Filters = {}, page: number = 1, limit: number = 20): Promise<any> => {
   const queryParams = new URLSearchParams();

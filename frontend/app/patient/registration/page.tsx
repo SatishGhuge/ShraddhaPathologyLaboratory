@@ -1401,7 +1401,7 @@ export default function PatientRegistration() {
         visitDate: date || new Date().toISOString().split('T')[0],
         visitTime: time || "00:00",
         sampleBarcodeNo: sampleBarcodeNo || null,
-        remarks: remarks || null,
+        patient_history: remarks || null,
         totalAmount: 0,
         discountPercent: 0,
         discountAmount: 0,
@@ -1476,7 +1476,7 @@ export default function PatientRegistration() {
         visitDate: date || new Date().toISOString().split('T')[0],  // Default to today
         visitTime: time || "00:00",  // Default time
         sampleBarcodeNo: sampleBarcodeNo || null,
-        remarks: remarks || null,
+        patient_history: remarks || null,
         // Billing Details
         totalAmount: totalAmt || 0,
         discountPercent: discPct || 0,
