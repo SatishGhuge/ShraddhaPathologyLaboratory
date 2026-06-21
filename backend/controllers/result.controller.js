@@ -60,25 +60,32 @@ export const getPatientTests = async (req, res) => {
 
     // Filter by searchQuery (Patient Name, ID, or Visit ID combined)
     if (searchQuery) {
+      const searchLower = searchQuery.toLowerCase();
       andConditions.push({
         OR: [
           {
             patient: {
               OR: [
-                { firstName: { contains: searchQuery, mode: 'insensitive' } },
-                { lastName:  { contains: searchQuery, mode: 'insensitive' } },
-                { patientId: { contains: searchQuery, mode: 'insensitive' } }
+                { firstName: { contains: searchQuery } },
+                { lastName: { contains: searchQuery } },
+                { patientId: { contains: searchQuery } }
               ]
             }
           },
-          { visitId: { contains: searchQuery, mode: 'insensitive' } }
+          { visitId: { contains: searchQuery } }
         ]
       });
     }
 
     // Filter by department
     if (department && department !== '') {
-      andConditions.push({ department: { name: { contains: department, mode: 'insensitive' } } });
+      andConditions.push({ 
+        department: { 
+          name: { 
+            contains: department.toLowerCase()
+          } 
+        } 
+      });
     }
 
     // Filter by organization
@@ -96,7 +103,13 @@ export const getPatientTests = async (req, res) => {
 
     // Filter by test name
     if (testName && testName !== '') {
-      andConditions.push({ test: { name: { contains: testName, mode: 'insensitive' } } });
+      andConditions.push({ 
+        test: { 
+          name: { 
+            contains: testName.toLowerCase()
+          } 
+        } 
+      });
     }
 
     const whereCondition = andConditions.length > 0 ? { AND: andConditions } : {};
@@ -109,7 +122,29 @@ export const getPatientTests = async (req, res) => {
     // Get paginated data
     const patientTests = await prisma.patientTest.findMany({
       where: whereCondition,
-      include: {
+      select: {
+        id: true,
+        patientId: true,
+        visitId: true,
+        visitDate: true,
+        visitTime: true,
+        status: true,
+        sampleTaken: true,
+        sampleReceived: true,
+        resultDate: true,
+        patient_history: true,
+        charge: true,
+        result: true,
+        businessType: true,
+        organizationId: true,
+        balanceAmount: true,
+        attachmentPath: true,
+        referralDoctor: true,
+        sample: true,
+        sampleBarcodeNo: true,
+        visitType: true,
+        reportMode: true,
+        packageName: true,
         patient: {
           select: {
             patientId: true,
@@ -126,6 +161,7 @@ export const getPatientTests = async (req, res) => {
           select: {
             id: true,
             name: true,
+            shortName: true,
             testCode: true,
             sampleType: true,
             attachFile: true,
@@ -133,6 +169,12 @@ export const getPatientTests = async (req, res) => {
           }
         },
         department: {
+          select: {
+            id: true,
+            name: true
+          }
+        },
+        organization: {
           select: {
             id: true,
             name: true
@@ -165,7 +207,9 @@ export const getPatientTests = async (req, res) => {
           mobile: patientTest.patient.mobile,
           email: patientTest.patient.email,
           balance_amount: patientTest.balanceAmount || 0,
-          organizationCode: patientTest.organizationId || '', // ✅ Add organization code for barcode
+          organizationCode: patientTest.organizationId || '', // ✅ Organization code
+          organization_name: patientTest.organization?.name || '', // ✅ Get organization name from relationship
+          patient_history: patientTest.patient_history || '', // ✅ Get patient history from first test in the group
           tests: []
         };
       }
@@ -198,7 +242,7 @@ export const getPatientTests = async (req, res) => {
         sample_taken: patientTest.sampleTaken ? patientTest.sampleTaken.toISOString() : null,
         sample_received: patientTest.sampleReceived ? patientTest.sampleReceived.toISOString() : null,
         result_date: patientTest.resultDate ? patientTest.resultDate.toISOString() : null,
-        remark: patientTest.remarks || '',
+        remark: patientTest.patient_history || '',
         charge: patientTest.charge,
         result: patientTest.result,
         department: patientTest.department.name,
@@ -685,7 +729,7 @@ export const updateTestStatus = async (req, res) => {
       where: { id: parseInt(id) },
       data: {
         status: properStatus,
-        remarks: remarks || undefined,
+        patient_history: remarks || undefined,
         updatedAt: new Date()
       },
       include: {
@@ -841,7 +885,7 @@ export const bulkUpdateTestStatus = async (req, res) => {
       },
       data: {
         status: properStatus,
-        remarks: remarks || undefined,
+        patient_history: remarks || undefined,
         updatedAt: new Date()
       }
     });

@@ -80,7 +80,7 @@ model PatientTest {
   visitDate          DateTime?
   visitTime          String?
   sampleBarcodeNo    String?
-  remarks            String?             @db.Text
+  patient_history    String?             @db.Text
   totalAmount        Float               @default(0)
   discountPercent    Float               @default(0)
   discountAmount     Float               @default(0)

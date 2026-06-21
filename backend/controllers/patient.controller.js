@@ -31,7 +31,7 @@ export const createPatient = async (req, res) => {
       createdBy, createdAtLocation, address, location,
       // Registration Details (will be saved with each test)
       visitType, reportMode, referralDoctor, visitDate, visitTime,
-      sampleTaken, sampleReceived, sampleBarcodeNo, remarks,
+      sampleTaken, sampleReceived, sampleBarcodeNo, patient_history,
       // Billing Details (will be saved with each test)
       totalAmount, discountPercent, discountAmount, discountRemark,
       paidAmount, balanceAmount, paymentMode, businessType,
@@ -109,7 +109,7 @@ export const createPatient = async (req, res) => {
           sampleTaken: sampleTaken ? new Date(sampleTaken) : null,
           sampleReceived: sampleReceived ? new Date(sampleReceived) : null,
           sampleBarcodeNo,
-          remarks,
+          patient_history,
           totalAmount: parseFloat(test.charge),
           discountPercent: discountPercent ? parseFloat(discountPercent) : 0,
           discountAmount: discountAmount ? parseFloat(discountAmount) / testCount : 0,
@@ -181,7 +181,7 @@ export const createPatient = async (req, res) => {
               sampleTaken: sampleTaken ? new Date(sampleTaken) : null,
               sampleReceived: sampleReceived ? new Date(sampleReceived) : null,
               sampleBarcodeNo,
-              remarks,
+              patient_history,
               totalAmount: parseFloat(test.charge),
               discountPercent: discountPercent ? parseFloat(discountPercent) : 0,
               discountAmount: discountAmount ? parseFloat(discountAmount) / testCount : 0,
@@ -368,6 +368,38 @@ export const searchPatient = async (req, res) => {
       message: 'Failed to search patient',
       error: error.message
     });
+  }
+};
+
+// Update patient test visit details (patient_history, etc.)
+export const updatePatientTestDetails = async (req, res) => {
+  try {
+    const { patientId } = req.params;
+    const { visitId, patient_history } = req.body;
+
+    if (!visitId) {
+      return res.status(400).json({ success: false, message: 'visitId is required' });
+    }
+
+    // Update all PatientTest records for this patient + visitId
+    const updated = await prisma.patientTest.updateMany({
+      where: {
+        patientId: patientId,
+        visitId: visitId
+      },
+      data: {
+        patient_history: patient_history || undefined
+      }
+    });
+
+    res.json({ 
+      success: true, 
+      message: 'Patient test details updated successfully',
+      updatedCount: updated.count
+    });
+  } catch (error) {
+    console.error('Update patient test details error:', error);
+    res.status(500).json({ success: false, message: 'Failed to update patient test details' });
   }
 };
 

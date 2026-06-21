@@ -6,6 +6,7 @@ import {
   getPatientById,
   searchPatient,
   updatePatient,
+  updatePatientTestDetails,
   updatePayment,
   getPatientStatistics,
   getPatientLocationStatistics,
@@ -41,6 +42,9 @@ router.get('/:id', getPatientById);
 
 // Update patient demographics
 router.put('/:patientId', updatePatient);
+
+// Update patient test visit details (patient_history, etc.)
+router.patch('/:patientId/visit-details', updatePatientTestDetails);
 
 // Update payment for a visit
 router.patch('/:patientId/payment', updatePayment);
