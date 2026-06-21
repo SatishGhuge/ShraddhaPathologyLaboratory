@@ -5,6 +5,7 @@ import { useRouter, useParams, usePathname } from "next/navigation";
 
 import Header from "@/src/components/Header";
 import PageHeader from "@/src/components/BreadCrumb";
+import UnitModal from "@/src/components/UnitModal";
 import { CKEditor } from "@ckeditor/ckeditor5-react";
 import ClassicEditor from "@ckeditor/ckeditor5-build-classic";
 import { getTestById, createTest, updateTest, getDepartments, getUnits, getTests } from "@/src/api/master.js";
@@ -77,6 +78,9 @@ const AddTest = () => {
   const [specimenTypes, setSpecimenTypes] = useState<any[]>([]);
   const [showSampleTypeDropdown, setShowSampleTypeDropdown] = useState(false);
   const [signatures, setSignatures] = useState<any[]>([]);
+  const [showUnitModal, setShowUnitModal] = useState(false);
+  const [editingUnit, setEditingUnit] = useState<any>(null);
+  const [successMsg, setSuccessMsg] = useState("");
 
   // Draft formula state: key = "catIdx-paramIdx", value = draft string being built
   const [formulaDrafts, setFormulaDrafts] = useState({});
@@ -85,6 +89,21 @@ const AddTest = () => {
   const [paramSuggestions, setParamSuggestions] = useState({});
   const [paramSuggestionsOpen, setParamSuggestionsOpen] = useState({});
   const paramSearchTimers = {};
+
+  // Unit modal callback handler
+  const handleUnitAdded = () => {
+    const fetchUnits = async () => {
+      try {
+        const unitsData = await getUnits();
+        setUnits(unitsData);
+      } catch (err) {
+        console.error('❌ Error fetching units:', err);
+      }
+    };
+    fetchUnits();
+    setSuccessMsg("Unit Added/Updated Successfully!");
+    setTimeout(() => setSuccessMsg(""), 2000);
+  };
 
   const handleParamNameSearch = (catIdx: any, paramIdx: any, value: any) => {
     const key = `${catIdx}-${paramIdx}`;
@@ -1663,6 +1682,16 @@ const AddTest = () => {
                               </option>
                             ))}
                           </select>
+                          {/* Add/Edit Unit Button */}
+                          {!isViewMode && (
+                            <button
+                              onClick={() => { setEditingUnit(null); setShowUnitModal(true); }}
+                              className="bg-orange-500 text-white px-2 py-1.5 sm:py-1 rounded text-xs hover:bg-orange-600 transition-colors flex items-center gap-1"
+                              title="Add new unit"
+                            >
+                              +
+                            </button>
+                          )}
                         </div>
                       </div>
                       {/* Row 1: Parameter Fields */}
@@ -2842,6 +2871,21 @@ const AddTest = () => {
             )}
           </div>
         </div>
+
+        {/* ================= UNIT MODAL ================= */}
+        <UnitModal
+          isOpen={showUnitModal}
+          onClose={() => setShowUnitModal(false)}
+          onUnitAdded={handleUnitAdded}
+          editingUnit={editingUnit}
+        />
+
+        {/* ================= SUCCESS MESSAGE ================= */}
+        {successMsg && (
+          <div className="fixed bottom-4 right-4 bg-green-500 text-white px-4 py-2 rounded shadow-lg">
+            {successMsg}
+          </div>
+        )}
       </div>
     </>
   );
