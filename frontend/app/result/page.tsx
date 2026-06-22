@@ -33,6 +33,8 @@ import {
   sendReport
 } from "@/src/api/result";
 import { getOrganizations } from "@/src/api/master";
+import ReadingValidationModal from "@/app/components/ReadingValidationModal";
+import AuthenticateModal from "@/app/components/AuthenticateModal";
 const LetterHead = "/LetterHead.jpeg";
 
 /* ── Per-test row with ALL date fields inside Edit Details modal ── */
@@ -303,6 +305,14 @@ export default function Result() {
   const [reportData, setReportData] = useState<any>(null);
   const [reportWithHeader, setReportWithHeader] = useState(true);
   const [defaultSignature, setDefaultSignature] = useState<any>(null);
+  
+  // State for Reading Validation Modal
+  const [showReadingValidationModal, setShowReadingValidationModal] = useState(false);
+  const [readingValidationData, setReadingValidationData] = useState<any>(null);
+  
+  // State for Authenticate Modal
+  const [showAuthenticateModal, setShowAuthenticateModal] = useState(false);
+  const [authenticateData, setAuthenticateData] = useState<any>(null);
   
   // Real data from API
   const [results, setResults] = useState<any[]>([]);
@@ -1262,6 +1272,68 @@ export default function Result() {
     // fetchStatistics is now called inside fetchResults
   }, [filters]);
 
+  // Handle test name click to open appropriate modal based on stage
+  const handleTestNameClick = async (test: any, patient: any) => {
+    try {
+      // Map status to proper format for stage check
+      const statusMap = {
+        'Provisional': 'Entered',
+        'Authenticated': 'Authorized',
+        'Validated': 'Validation'
+      };
+      
+      const testStatus = statusMap[test.result_status] || test.result_status;
+
+      // If test is in "Entered" stage - open Reading Validation Modal
+      if (testStatus === 'Entered') {
+        // Fetch full test data including parameters
+        const testData = await getPatientTestById(test.test_id);
+        
+        if (!testData || !testData.patientTest) {
+          alert('Error loading test data');
+          return;
+        }
+
+        // Set data for modal
+        setReadingValidationData({
+          patientTest: testData.patientTest,
+          parameters: testData.parameters,
+          groupedParameters: testData.groupedParameters
+        });
+        
+        setShowReadingValidationModal(true);
+      }
+      // If test is in "Validation" stage - open Authenticate Modal
+      else if (testStatus === 'Validation') {
+        // Fetch full test data including parameters
+        const testData = await getPatientTestById(test.test_id);
+        
+        if (!testData || !testData.patientTest) {
+          alert('Error loading test data');
+          return;
+        }
+
+        // Set data for modal
+        setAuthenticateData({
+          patientTest: testData.patientTest,
+          parameters: testData.parameters,
+          groupedParameters: testData.groupedParameters
+        });
+        
+        setShowAuthenticateModal(true);
+      }
+      // If test is in any other stage - show error message
+      else {
+        alert(`⚠️ Test cannot be edited or authenticated.\n\nCurrent Stage: ${testStatus}\n\nReadings can only be edited in "Entered" stage or authenticated in "Validation" stage.\n\nPlease complete earlier stages first.`);
+        return;
+      }
+
+    } catch (err: any) {
+      console.error('Error opening modal:', err);
+      alert('Error: ' + (err.message || 'Failed to open modal'));
+    }
+  };
+
   // Fetch organizations on component mount
   useEffect(() => {
     const fetchOrganizations = async () => {
@@ -1732,7 +1804,7 @@ export default function Result() {
                 >
                   <option value="">All Org</option>
                   {organizations.map(org => (
-                    <option key={org.id} value={org.id}>{org.name}</option>
+                    <option key={org.id} value={org.id}>{org.code || org.name}</option>
                   ))}
                 </select>
                 
@@ -1830,6 +1902,8 @@ export default function Result() {
                       <th className="px-1 sm:px-2 py-1.5 sm:py-2 text-left font-semibold text-xs whitespace-nowrap border border-gray-300">Visit ID</th>
                       <th className="px-1 sm:px-2 py-1.5 sm:py-2 text-left font-semibold text-xs whitespace-nowrap border border-gray-300">Org ID</th>
                       <th className="px-1 sm:px-2 py-1.5 sm:py-2 text-left font-semibold text-xs whitespace-nowrap border border-gray-300">Patient Name</th>
+                      <th className="px-1 sm:px-2 py-1.5 sm:py-2 text-left font-semibold text-xs whitespace-nowrap border border-gray-300">Age</th>
+                      <th className="px-1 sm:px-2 py-1.5 sm:py-2 text-left font-semibold text-xs whitespace-nowrap border border-gray-300">Gender</th>
                       <th className="px-1 sm:px-2 py-1.5 sm:py-2 text-left font-semibold text-xs whitespace-nowrap border border-gray-300">Services</th>
                       <th className="px-1 sm:px-2 py-1.5 sm:py-2 text-left font-semibold text-xs whitespace-nowrap border border-gray-300">Date</th>
                       <th className="px-1 sm:px-2 py-1.5 sm:py-2 text-left font-semibold text-xs whitespace-nowrap border border-gray-300">Referral Doc</th>
@@ -1932,10 +2006,31 @@ export default function Result() {
                                 </span>
                               )}
                             </td>
-                            {/* Column 5: Services (with icons) */}
+
+                            {/* Column 5: Age (show only on first test row) */}
+                            <td className="px-1 sm:px-2 py-1 sm:py-1.5 text-xs font-medium border border-gray-300 text-center">
+                              {testIndex === 0 && (
+                                <span className="font-semibold text-gray-900">{patient.age || '-'} Yrs</span>
+                              )}
+                            </td>
+
+                            {/* Column 6: Gender (show only on first test row) */}
+                            <td className="px-1 sm:px-2 py-1 sm:py-1.5 text-xs font-medium border border-gray-300 text-center">
+                              {testIndex === 0 && (
+                                <span className="font-semibold text-gray-900">{patient.gender || '-'}</span>
+                              )}
+                            </td>
+
+                            {/* Column 7: Services (with icons) */}
                             <td className="px-1 sm:px-2 py-1 sm:py-1.5 text-xs border border-gray-300" title={test.test_name}>
                               <div className="flex items-center gap-1">
-                                <span className="flex-1">{test.test_name}</span>
+                                <span 
+                                  className="flex-1 cursor-pointer hover:text-cyan-700 hover:font-semibold transition-colors"
+                                  onClick={() => handleTestNameClick(test, patient)}
+                                  title="Click to view/edit readings"
+                                >
+                                  {test.test_name}
+                                </span>
                                 {/* Sent/Print icons */}
                                 {sentIcons[test.test_id]?.has('email') && (
                                   <div title="Email sent">
@@ -2808,8 +2903,36 @@ export default function Result() {
         onBarcodeToggle={handleBarcodeToggle}
         isPrinting={barcodesPrinting}
       />
+
+      {/* Reading Validation Modal */}
+      {showReadingValidationModal && readingValidationData && (
+        <ReadingValidationModal
+          isOpen={showReadingValidationModal}
+          onClose={() => {
+            setShowReadingValidationModal(false);
+            setReadingValidationData(null);
+            fetchResults(); // Refresh results after validation
+          }}
+          patientData={readingValidationData.patientTest}
+          parameters={readingValidationData.parameters}
+          groupedParameters={readingValidationData.groupedParameters}
+        />
+      )}
+
+      {/* Authenticate Modal */}
+      {showAuthenticateModal && authenticateData && (
+        <AuthenticateModal
+          isOpen={showAuthenticateModal}
+          onClose={() => {
+            setShowAuthenticateModal(false);
+            setAuthenticateData(null);
+            fetchResults(); // Refresh results after authentication
+          }}
+          patientData={authenticateData.patientTest}
+          parameters={authenticateData.parameters}
+          groupedParameters={authenticateData.groupedParameters}
+        />
+      )}
     </>
   );
 }
-
-

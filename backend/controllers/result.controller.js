@@ -177,7 +177,8 @@ export const getPatientTests = async (req, res) => {
         organization: {
           select: {
             id: true,
-            name: true
+            name: true,
+            code: true
           }
         }
       },
@@ -207,7 +208,7 @@ export const getPatientTests = async (req, res) => {
           mobile: patientTest.patient.mobile,
           email: patientTest.patient.email,
           balance_amount: patientTest.balanceAmount || 0,
-          organizationCode: patientTest.organizationId || '', // ✅ Organization code
+          organizationCode: patientTest.organization?.code || patientTest.organizationId || '', // ✅ Get organization code from relationship
           organization_name: patientTest.organization?.name || '', // ✅ Get organization name from relationship
           patient_history: patientTest.patient_history || '', // ✅ Get patient history from first test in the group
           tests: []
@@ -729,7 +730,7 @@ export const updateTestStatus = async (req, res) => {
       where: { id: parseInt(id) },
       data: {
         status: properStatus,
-        patient_history: remarks || undefined,
+        // Don't update patient_history - keep existing history
         updatedAt: new Date()
       },
       include: {
@@ -885,7 +886,7 @@ export const bulkUpdateTestStatus = async (req, res) => {
       },
       data: {
         status: properStatus,
-        patient_history: remarks || undefined,
+        // Don't update patient_history - keep existing history
         updatedAt: new Date()
       }
     });
