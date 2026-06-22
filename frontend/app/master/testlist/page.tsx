@@ -223,7 +223,6 @@ const TestList = () => {
                   {[
                     "Id",
                     "Name",
-                    "Category",
                     "Short Name",
                     "Department",
                     "Sort Order",
@@ -243,7 +242,7 @@ const TestList = () => {
               <tbody>
                 {tests.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="text-center py-8 text-gray-500">
+                    <td colSpan={7} className="text-center py-8 text-gray-500">
                       No tests found.
                     </td>
                   </tr>
@@ -261,12 +260,6 @@ const TestList = () => {
 
                         <td className="border border-gray-300 px-3 py-1">
                           {test.name}
-                        </td>
-
-                        <td className="border border-gray-300 px-3 py-1 text-center">
-                          <span className="bg-orange-500 text-white px-2 rounded font-bold cursor-pointer">
-                            +
-                          </span>
                         </td>
 
                         <td className="border border-gray-300 px-3 py-1">

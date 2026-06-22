@@ -1,14 +1,15 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 
 import Header from "@/src/components/Header";
 import PageHeader from "@/src/components/BreadCrumb";
-import { DollarSign, RotateCcw, FileSpreadsheet, FileText } from "lucide-react";
+import { DollarSign, RotateCcw, FileSpreadsheet, FileText, Upload } from "lucide-react";
 
 export default function AddLabCharges() {
   const router = useRouter();
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [tests, setTests] = useState<any[]>([]);
   const [charges, setCharges] = useState<any[]>([]);
   const [filteredData, setFilteredData] = useState<any[]>([]);
@@ -20,6 +21,11 @@ export default function AddLabCharges() {
   const [error, setError] = useState("");
   const [bulkCharge, setBulkCharge] = useState("");
   const [showBulkModal, setShowBulkModal] = useState(false);
+  
+  // Import states
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [importedData, setImportedData] = useState<any[]>([]);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
   // Fetch tests and charges on component mount
   useEffect(() => {
@@ -76,14 +82,14 @@ export default function AddLabCharges() {
       return {
         id: test.id,
         name: test.name,
-        code: test.testCode || '',
+        shortName: test.shortName || test.testCode || '',
         group: test.group || test.department?.name || '',
         charges: defaultCharge?.b2cCharge || 0,
         chargeId: defaultCharge?.id || null
       };
     }).filter((item) =>
       item.name.toLowerCase().includes(searchName.toLowerCase()) &&
-      item.code.toLowerCase().includes(searchCode.toLowerCase()) &&
+      item.shortName.toLowerCase().includes(searchCode.toLowerCase()) &&
       item.group.toLowerCase().includes(searchGroup.toLowerCase())
     );
     
@@ -197,7 +203,7 @@ export default function AddLabCharges() {
       const exportData = filteredData.map((item, index) => ({
         'Sr.No': index + 1,
         'Test Name': item.name,
-        'Test Code': item.code,
+        'Short Name': item.shortName,
         'Group': item.group,
         'Charges': item.charges
       }));
@@ -259,7 +265,7 @@ export default function AddLabCharges() {
       const tableData = filteredData.map((item, index) => [
         index + 1,
         item.name,
-        item.code,
+        item.shortName,
         item.group,
         item.charges
       ]);
@@ -267,7 +273,7 @@ export default function AddLabCharges() {
       // Add table using autoTable
       autoTable(doc, {
         startY: 40,
-        head: [['Sr.No', 'Test Name', 'Test Code', 'Group', 'Charges']],
+        head: [['Sr.No', 'Test Name', 'Short Name', 'Group', 'Charges']],
         body: tableData,
         theme: 'grid',
         headStyles: {
@@ -298,6 +304,100 @@ export default function AddLabCharges() {
       console.error('Error exporting to PDF:', error);
       alert('Error exporting to PDF. Please try again.');
     }
+  };
+
+  // Handle Excel file selection
+  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      setSelectedFile(file);
+    }
+  };
+
+  // Parse Excel file and show data
+  const handleImportExcel = async () => {
+    if (!selectedFile) {
+      alert('Please select a file first');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const XLSX = await import('xlsx').catch(() => null);
+      
+      if (!XLSX) {
+        alert('Excel import feature requires the "xlsx" package to be installed.\n\nPlease run: npm install xlsx');
+        return;
+      }
+
+      // Read file
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const data = e.target?.result;
+          const workbook = XLSX.read(data, { type: 'binary' });
+          const sheetName = workbook.SheetNames[0];
+          const sheet = workbook.Sheets[sheetName];
+          const jsonData = XLSX.utils.sheet_to_json(sheet);
+
+          // Validate and prepare data
+          const validData = jsonData.map((row: any) => ({
+            testName: row['Test Name'] || row['testName'] || '',
+            testCode: row['Test Code'] || row['testCode'] || '',
+            group: row['Group'] || row['group'] || '',
+            charges: parseFloat(row['Charges'] || row['charges'] || 0)
+          })).filter(row => row.testName || row.testCode);
+
+          if (validData.length === 0) {
+            alert('No valid data found in Excel file. Please check the format.');
+            return;
+          }
+
+          setImportedData(validData);
+          setLoading(false);
+        } catch (err) {
+          console.error('Error parsing Excel:', err);
+          alert('Error parsing Excel file. Please check the format.');
+          setLoading(false);
+        }
+      };
+
+      reader.readAsBinaryString(selectedFile);
+    } catch (error) {
+      console.error('Error importing Excel:', error);
+      alert('Error importing Excel file.');
+      setLoading(false);
+    }
+  };
+
+  // Fill charges from imported data
+  const handleFillCharges = () => {
+    if (importedData.length === 0) {
+      alert('No imported data to fill');
+      return;
+    }
+
+    const updated = filteredData.map((item) => {
+      // Try to match by short name first, then by test name
+      const matchedRow = importedData.find((row) =>
+        (row.testCode && item.shortName === row.testCode) ||
+        (row.testName && item.name.toLowerCase().includes(row.testName.toLowerCase()))
+      );
+
+      return {
+        ...item,
+        charges: matchedRow ? matchedRow.charges : item.charges
+      };
+    });
+
+    setFilteredData(updated);
+    setShowImportModal(false);
+    setImportedData([]);
+    setSelectedFile(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+    // Silent completion - no alert shown
   };
 
   return (
@@ -348,6 +448,13 @@ export default function AddLabCharges() {
                     className="bg-purple-600 text-white px-4 py-1.5 text-sm rounded hover:bg-purple-700 transition-colors"
                   >
                     Bulk Apply
+                  </button>
+                  <button
+                    onClick={() => setShowImportModal(true)}
+                    className="flex gap-1 sm:gap-1.5 items-center bg-blue-600 hover:bg-blue-700 text-white px-2 sm:px-3 py-1.5 sm:py-2 rounded text-xs sm:text-sm transition-colors"
+                  >
+                    <Upload size={14} className="sm:w-4 sm:h-4" />
+                    <span>Import</span>
                   </button>
                   <button
                     onClick={handleExportExcel}
@@ -415,7 +522,7 @@ export default function AddLabCharges() {
                     {filteredData.map((item) => (
                       <tr key={item.id} className="hover:bg-gray-50 border-b border-gray-200">
                         <td className="border border-gray-300 px-3 py-2 font-medium">{item.name}</td>
-                        <td className="border border-gray-300 px-3 py-2">{item.code}</td>
+                        <td className="border border-gray-300 px-3 py-2">{item.shortName}</td>
                         <td className="border border-gray-300 px-3 py-2">{item.group}</td>
                         <td className="border border-gray-300 px-2 py-1">
                           <input
@@ -488,6 +595,133 @@ export default function AddLabCharges() {
                 Apply to All
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Import Modal */}
+      {showImportModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-4xl max-h-[80vh] overflow-y-auto">
+            <h3 className="text-lg font-semibold text-gray-800 mb-4">Import Charges from Excel</h3>
+            
+            {importedData.length === 0 ? (
+              // File Upload Section
+              <div className="space-y-4">
+                <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
+                  <Upload size={40} className="mx-auto text-blue-500 mb-2" />
+                  <p className="text-gray-700 font-medium mb-2">Upload Excel File</p>
+                  <p className="text-sm text-gray-600 mb-4">
+                    File should contain columns: Test Name, Test Code, Group, Charges
+                  </p>
+                  
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept=".xlsx,.xls,.csv"
+                    onChange={handleFileSelect}
+                    className="hidden"
+                  />
+                  
+                  <button
+                    onClick={() => fileInputRef.current?.click()}
+                    className="bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700 transition-colors mb-2"
+                  >
+                    Select File
+                  </button>
+                  
+                  {selectedFile && (
+                    <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded">
+                      <p className="text-sm text-blue-800">
+                        <strong>Selected:</strong> {selectedFile.name}
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex justify-end gap-3">
+                  <button
+                    onClick={() => {
+                      setShowImportModal(false);
+                      setSelectedFile(null);
+                      if (fileInputRef.current) {
+                        fileInputRef.current.value = '';
+                      }
+                    }}
+                    className="px-4 py-2 text-gray-600 border border-gray-300 rounded hover:bg-gray-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleImportExcel}
+                    disabled={!selectedFile || loading}
+                    className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
+                  >
+                    {loading ? 'Reading...' : 'Read File'}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              // Preview and Fill Section
+              <div className="space-y-4">
+                <div className="bg-green-50 border border-green-200 rounded p-4 mb-4">
+                  <p className="text-green-800 font-medium">
+                    ✅ Successfully loaded {importedData.length} records from Excel
+                  </p>
+                </div>
+
+                {/* Data Preview Table */}
+                <div className="overflow-x-auto max-h-[400px] overflow-y-auto">
+                  <table className="w-full border-collapse text-sm">
+                    <thead className="bg-gray-200 sticky top-0">
+                      <tr>
+                        <th className="border border-gray-300 px-3 py-2 text-left">Test Name</th>
+                        <th className="border border-gray-300 px-3 py-2 text-left">Test Code</th>
+                        <th className="border border-gray-300 px-3 py-2 text-left">Group</th>
+                        <th className="border border-gray-300 px-3 py-2 text-center">Charges</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {importedData.map((row, idx) => (
+                        <tr key={idx} className="hover:bg-gray-50">
+                          <td className="border border-gray-300 px-3 py-2">{row.testName}</td>
+                          <td className="border border-gray-300 px-3 py-2">{row.testCode}</td>
+                          <td className="border border-gray-300 px-3 py-2">{row.group}</td>
+                          <td className="border border-gray-300 px-3 py-2 text-center font-medium">{row.charges}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                <div className="flex justify-end gap-3">
+                  <button
+                    onClick={() => {
+                      setImportedData([]);
+                      setSelectedFile(null);
+                      if (fileInputRef.current) {
+                        fileInputRef.current.value = '';
+                      }
+                    }}
+                    className="px-4 py-2 text-gray-600 border border-gray-300 rounded hover:bg-gray-50"
+                  >
+                    Back
+                  </button>
+                  <button
+                    onClick={() => setShowImportModal(false)}
+                    className="px-4 py-2 text-gray-600 border border-gray-300 rounded hover:bg-gray-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleFillCharges}
+                    className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
+                  >
+                    Fill Charges
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
