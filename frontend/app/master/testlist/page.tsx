@@ -25,15 +25,20 @@ const TestList = () => {
     fetchTests(currentPage);
   }, [currentPage]);
 
+  // Reset to page 1 when search or filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search, showInactive]);
+
   const fetchTests = async (page: number = 1) => {
     try {
       setLoading(true);
       setError(null);
       const response = await getTests(page, ITEMS_PER_PAGE);
       
-      // Handle API response - getTests now returns an array directly
-      setTests(response);
-      setPagination(null);
+      // Handle API response - getTests now returns { data, pagination }
+      setTests(response.data || []);
+      setPagination(response.pagination || null);
     } catch (err) {
       console.error('Error fetching tests:', err);
       setError(err instanceof Error ? err.message : 'Failed to load tests. Please try again.');
@@ -77,7 +82,8 @@ const TestList = () => {
 
       if (result.success) {
         alert(`Test copied successfully!`);
-        fetchTests(); // Refresh the list
+        setCurrentPage(1); // Reset to page 1
+        fetchTests(1); // Fetch first page
       } else {
         throw new Error(result.message);
       }
@@ -98,7 +104,8 @@ const TestList = () => {
     try {
       await deleteTest(id);
       alert("Test deleted successfully!");
-      fetchTests(); // Refresh the list
+      setCurrentPage(1); // Reset to page 1
+      fetchTests(1); // Fetch first page
     } catch (err) {
       console.error('Error deleting test:', err);
       alert(`Failed to delete test: ${err.message}`);
@@ -119,7 +126,8 @@ const TestList = () => {
     try {
       await updateTest((Array.isArray(id) ? id[0] : id) as string, { isActive: !currentTest.isActive });
       alert(currentTest.isActive ? "Test inactivated successfully!" : "Test activated successfully!");
-      fetchTests(); // Refresh the list
+      setCurrentPage(1); // Reset to page 1
+      fetchTests(1); // Fetch first page
     } catch (err) {
       console.error('Error toggling test status:', err);
       alert(`Failed to update test: ${err.message}`);

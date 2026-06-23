@@ -11,6 +11,7 @@
     "seed": "node scripts/seed.js",
     "seed:all": "node scripts/seed-all.js",
     "seed:complete": "node scripts/seed-complete.js",
+    "seed:tests": "node prisma/seed-tests-charges.js",
     "populate:allocations": "node scripts/populate-module-allocations.js",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
