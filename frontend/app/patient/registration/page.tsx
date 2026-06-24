@@ -1450,7 +1450,12 @@ export default function PatientRegistration() {
       
     } catch (error) {
       console.error("Error saving patient info:", error);
-      alert(`Failed to save patient info: ${error.message}`);
+      console.error("Full error details:", {
+        message: error?.message,
+        status: error?.response?.status,
+        data: error?.response?.data
+      });
+      alert(`Failed to save patient info: ${error.message || 'Network error - check console'}`);
     }
   };
 
@@ -1582,7 +1587,12 @@ export default function PatientRegistration() {
       
     } catch (error) {
       console.error("Error saving registration:", error);
-      alert(`Failed to register patient: ${error.message}`);
+      console.error("Full error details:", {
+        message: error?.message,
+        status: error?.response?.status,
+        data: error?.response?.data
+      });
+      alert(`Failed to register patient: ${error.message || 'Network error - check backend server'}`);
     }
   };
 

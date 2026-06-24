@@ -129,7 +129,8 @@ export const createPatient = async (req, res) => {
           tests: {
             include: {
               test: true,
-              department: true
+              department: true,
+              organization: true
             }
           }
         }
@@ -246,7 +247,8 @@ export const getAllPatients = async (req, res) => {
         tests: {
           include: {
             test: true,
-            department: true
+            department: true,
+            organization: true
           }
         }
       },
@@ -279,7 +281,8 @@ export const getPatientById = async (req, res) => {
         tests: {
           include: {
             test: true,
-            department: true
+            department: true,
+            organization: true
           }
         }
       }
@@ -340,7 +343,8 @@ export const searchPatient = async (req, res) => {
         tests: {
           include: {
             test: true,
-            department: true
+            department: true,
+            organization: true
           },
           orderBy: { createdAt: 'desc' },
           take: 5 // Get last 5 tests per patient

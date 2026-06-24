@@ -3,9 +3,10 @@
 import { useState, useRef, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
 import { Search, RotateCcw, Printer, FileSpreadsheet, Users, ChevronDown, Calendar, ChevronLeft, ChevronRight } from "lucide-react";
+import * as XLSX from 'xlsx';
 import Header from "@/src/components/Header";
 import PageHeader from "@/src/components/BreadCrumb";
-import { getAllPatients, getCollectionCenters } from "@/src/api/patient";
+import { getAllPatients, getCollectionCenters, getOrganizations } from "@/src/api/patient";
 
 /* ── helpers ── */
 const toYMD = (iso: any) => {
@@ -68,12 +69,12 @@ function Cal({ month, year, onPrev, onNext, onDay, onHover, from, to, hover, pic
 }
 
 const COLS = [
-  {key:"center",label:"Center"},{key:"visitType",label:"Visit Type"},{key:"mobile",label:"Mobile"},
-  {key:"invoiceNo",label:"Invoice No"},{key:"visitId",label:"Visit ID"},{key:"refDoctor",label:"Ref.Dr"},
+  {key:"patientId",label:"Patient ID"},{key:"organization",label:"Organization"},{key:"mobile",label:"Mobile"},
+  {key:"visitIdInvoice",label:"Visit ID / Invoice No"},{key:"refDoctor",label:"Ref.Dr"},
   {key:"totalBill",label:"Total Bill"},{key:"received",label:"Received"},{key:"paymentMode",label:"Payment Mode"},
-  {key:"discount",label:"Discount"},{key:"refund",label:"Refund"},{key:"externalLab",label:"External Lab"},
+  {key:"discount",label:"Discount"},{key:"refund",label:"Refund"},
   {key:"dueNetAmount",label:"Due and Net Amount"},{key:"remark",label:"Remark"},{key:"user",label:"User"},
-  {key:"address",label:"Address"},{key:"sampleCollection",label:"Sample Collection"},
+  {key:"location",label:"Location"},{key:"sampleCollection",label:"Sample Collection"},
 ];
 
 export default function PatientList() {
@@ -82,7 +83,7 @@ export default function PatientList() {
   // Check for date parameter from URL (from dashboard navigation)
   const urlDate = searchParams.get('date');
   
-  const [f, setF] = useState({center:"",visitType:"",referralDoctor:"",nameUsername:"",patientName:"",onlyOutstandings:false,foc:false});
+  const [f, setF] = useState({visitType:"",referralDoctor:"",mobile:"",patientName:"",onlyOutstandings:false});
   const [dateFrom, setDateFrom] = useState(urlDate || fmtISO(today0()));
   const [dateTo, setDateTo]     = useState(urlDate || fmtISO(today0()));
   const [open, setOpen]         = useState(false);
@@ -106,19 +107,31 @@ export default function PatientList() {
   const [loading, setLoading] = useState(false);
   const [searched, setSearched] = useState(false);
   const [centers, setCenters] = useState<any[]>([]);
+  const [organizations, setOrganizations] = useState<any[]>([]);
   const [visitTypes, setVisitTypes] = useState<any[]>([]);
   const [refDoctors, setRefDoctors] = useState<any[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [pagination, setPagination] = useState<any>(null);
   const ITEMS_PER_PAGE = 20;
 
-  useEffect(()=>{ getCollectionCenters().then((res: any) => setCenters(Array.isArray(res) ? res : res?.data || [])).catch(()=>{}); },[]);
+  useEffect(()=>{ 
+    getCollectionCenters().then((res: any) => setCenters(Array.isArray(res) ? res : res?.data || [])).catch(()=>{});
+    getOrganizations().then((res: any) => setOrganizations(Array.isArray(res) ? res : res?.data || [])).catch(()=>{});
+  },[]);
 
   // Auto-fetch data on mount (use URL date if provided, otherwise today)
   useEffect(()=>{
     const initialDate = urlDate || fmtISO(today0());
     fetchData(initialDate, initialDate);
   },[]);
+  
+  // Refetch when filters change
+  useEffect(()=>{
+    if(searched){
+      fetchData(dateFrom, dateTo);
+    }
+  },[f.patientName, f.mobile, f.referralDoctor, f.visitType, f.onlyOutstandings]);
+  
   useEffect(()=>{
     const h = (e: any) =>{
       if(dpRef.current&&!dpRef.current.contains(e.target)) setOpen(false);
@@ -131,7 +144,7 @@ export default function PatientList() {
   const openPicker=()=>{ setTFrom(dateFrom); setTTo(dateTo); setCustom(false); setPicking(false); setHover(""); setOpen(true); };
   const pickPreset = (p: any) =>{ if(!p.fn){setCustom(true);setPreset("Custom Range");setTFrom("");setTTo("");setPicking(false);return;} const[a,b]=p.fn(); setTFrom(a);setTTo(b);setPreset(p.label);setCustom(false); };
   const clickDay = (day: any) =>{ if(!picking){setTFrom(day);setTTo("");setPicking(true);setHover("");}else{if(day<tFrom){setTTo(tFrom);setTFrom(day);}else setTTo(day);setPicking(false);} };
-  const apply=()=>{ setDateFrom(tFrom);setDateTo(tTo);setOpen(false);setPicking(false); };
+  const apply=()=>{ setDateFrom(tFrom);setDateTo(tTo);setOpen(false);setPicking(false);fetchData(tFrom,tTo); };
   const cancel=()=>{ setOpen(false);setCustom(false);setPicking(false);setTFrom(dateFrom);setTTo(dateTo); };
   const prevM=()=>{ if(cm===0){setCm(11);setCy(y=>y-1);}else setCm(m=>m-1); };
   const nextM=()=>{ if(cm===11){setCm(0);setCy(y=>y+1);}else setCm(m=>m+1); };
@@ -147,16 +160,17 @@ export default function PatientList() {
         if(!vm.has(t.visitId)){
           vm.set(t.visitId,{
             visitId:t.visitId, date:toGB(raw),
+            patientId:p.patientId||"-",
             patientName:[p.title,p.firstName,p.lastName].filter(Boolean).join(" "),
             ageGender:`${p.age||"-"} Yrs / ${p.gender||"-"}`,
             tests:[], totalBill:0, received:0, discount:0, dueNetAmount:0,
             paymentMode:t.paymentMode||"-", corporate:t.businessType||"-",
-            center:p.createdAtLocation||"-", mobile:p.mobile||"-",
+            mobile:p.mobile||"-",
             refDoctor:t.referralDoctor||"-", remark:t.remarks||"-",
-            user:p.createdBy||"-", address:p.address||"-",
-            visitType:t.visitType||"-",
+            user:p.createdBy||"-", location:p.location||"-",
+            organization:t.organization?.name||"-",
             sampleCollection:t.sampleTaken?toGB(t.sampleTaken):"-",
-            invoiceNo:t.visitId||"-", refund:"-", externalLab:"-",
+            visitIdInvoice:t.visitId||"-", refund:"-",
           });
         }
         const v=vm.get(t.visitId);
@@ -176,10 +190,9 @@ export default function PatientList() {
 
   const applyF = (rows: any) =>rows.filter(r=>{
     if(f.patientName&&!r.patientName.toLowerCase().includes(f.patientName.toLowerCase())) return false;
-    if(f.nameUsername&&!r.patientName.toLowerCase().includes(f.nameUsername.toLowerCase())&&!r.mobile.includes(f.nameUsername)) return false;
+    if(f.mobile&&!r.mobile.includes(f.mobile)) return false;
     if(f.referralDoctor&&!r.refDoctor.toLowerCase().includes(f.referralDoctor.toLowerCase())) return false;
-    if(f.visitType&&r.visitType!==f.visitType) return false;
-    if(f.center&&r.center!==f.center) return false;
+    if(f.visitType&&r.organization!==f.visitType) return false;
     if(f.onlyOutstandings&&parseFloat(r.dueNetAmount)<=0) return false;
     return true;
   });
@@ -195,9 +208,9 @@ export default function PatientList() {
         return d && d >= from && d <= toDate;
       }));
       const rows = buildRows(filtered, from, toDate);
-      const types = [...new Set(filtered.flatMap(p=>(p.tests||[]).map(t=>t.visitType).filter(Boolean)))].sort();
+      const orgs = [...new Set(filtered.flatMap(p=>(p.tests||[]).map(t=>t.organization?.id).filter(Boolean)))];
       const docs  = [...new Set(filtered.flatMap(p=>(p.tests||[]).map(t=>t.referralDoctor).filter(Boolean)))].sort();
-      setVisitTypes(types);
+      setVisitTypes([]);
       setRefDoctors(docs);
       const filteredRows = applyF(rows);
       setData(filteredRows);
@@ -227,12 +240,62 @@ export default function PatientList() {
 
   const handleReset=()=>{
     const todayStr = fmtISO(today0());
-    setF({center:"",visitType:"",referralDoctor:"",nameUsername:"",patientName:"",onlyOutstandings:false,foc:false});
+    setF({visitType:"",referralDoctor:"",mobile:"",patientName:"",onlyOutstandings:false});
     setDateFrom(todayStr); setDateTo(todayStr); setPreset("Today"); setCustom(false);
     setCurrentPage(1); setPagination(null);
     setSelCols(Object.fromEntries(COLS.map(c=>[c.key,true])));
     setColQ(""); setErrors({});
     fetchData(todayStr, todayStr);
+  };
+
+  const handleExportExcel = () => {
+    if (data.length === 0) {
+      alert("No data to export. Please search first.");
+      return;
+    }
+
+    // Prepare data with selected columns only
+    const exportData = data.map((row, index) => {
+      const rowData: any = { "Sr.No.": index + 1, "Date": row.date, "Patient Name": row.patientName, "Age/Gender": row.ageGender, "Test Performed": row.testPerformed };
+      vis.forEach(col => {
+        rowData[col.label] = row[col.key] ?? "-";
+      });
+      return rowData;
+    });
+
+    // Create workbook and worksheet
+    const ws = XLSX.utils.json_to_sheet(exportData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Patient List");
+
+    // Set column widths
+    const colWidths = [
+      { wch: 8 },  // Sr.No
+      { wch: 12 }, // Date
+      { wch: 20 }, // Patient Name
+      { wch: 15 }, // Age/Gender
+      { wch: 30 }, // Test Performed
+      ...vis.map(() => ({ wch: 18 }))
+    ];
+    ws['!cols'] = colWidths;
+
+    // Add header formatting (optional - basic styling)
+    const headerRow = ws['!ref']?.split(':')[0];
+    if (headerRow) {
+      const range = XLSX.utils.decode_range(ws['!ref'] || 'A1');
+      for (let col = 0; col <= range.e.c; col++) {
+        const cellAddress = XLSX.utils.encode_col(col) + '1';
+        if (ws[cellAddress]) {
+          ws[cellAddress].s = { font: { bold: true, color: { rgb: "FFFFFF" } }, fill: { fgColor: { rgb: "000000" } }, alignment: { horizontal: "center" } };
+        }
+      }
+    }
+
+    // Generate filename with date range
+    const fileName = `Patient_List_${dateFrom}_to_${dateTo}.xlsx`;
+
+    // Trigger download
+    XLSX.writeFile(wb, fileName);
   };
 
   const vis=COLS.filter(c=>selCols[c.key]);
@@ -245,7 +308,7 @@ export default function PatientList() {
         <PageHeader title="Patient List" icon={Users} path="Reports"/>
 
         <div className="bg-white p-2 sm:p-3 rounded shadow-md mb-3">
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 mb-2">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mb-2">
 
             {/* DATE PICKER */}
             <div className="relative" ref={dpRef}>
@@ -297,28 +360,30 @@ export default function PatientList() {
               )}
             </div>
 
-            <select value={f.center} onChange={e=>setF(p=>({...p,center:e.target.value}))}
-              className="border border-gray-300 p-1.5 rounded w-full text-sm focus:outline-none focus:ring-1 focus:ring-cyan-500">
-              <option value="">Select Center</option>
-              {centers.map(c=><option key={c.id} value={c.name}>{c.name}</option>)}
-            </select>
-
             <select value={f.visitType} onChange={e=>setF(p=>({...p,visitType:e.target.value}))}
               className="border border-gray-300 p-1.5 rounded w-full text-sm focus:outline-none focus:ring-1 focus:ring-cyan-500">
-              <option value="">Visit Type</option>
-              {visitTypes.map(v=><option key={v} value={v}>{v}</option>)}
+              <option value="">Organization</option>
+              {organizations.map(o=><option key={o.id} value={o.name}>{o.name}</option>)}
             </select>
 
             <input placeholder="Referral Doctor" value={f.referralDoctor} onChange={e=>setF(p=>({...p,referralDoctor:e.target.value}))}
               className="border border-gray-300 p-1.5 rounded w-full text-sm focus:outline-none focus:ring-1 focus:ring-cyan-500"/>
-            <input placeholder="Name / Mobile" value={f.nameUsername} onChange={e=>setF(p=>({...p,nameUsername:e.target.value}))}
-              className="border border-gray-300 p-1.5 rounded w-full text-sm focus:outline-none focus:ring-1 focus:ring-cyan-500"/>
           </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-2">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mb-2">
             <input placeholder="Patient Name" value={f.patientName} onChange={e=>setF(p=>({...p,patientName:e.target.value}))}
               className="border border-gray-300 p-1.5 rounded w-full text-sm focus:outline-none focus:ring-1 focus:ring-cyan-500"/>
 
+            <input placeholder="Mobile" value={f.mobile} onChange={e=>setF(p=>({...p,mobile:e.target.value}))}
+              className="border border-gray-300 p-1.5 rounded w-full text-sm focus:outline-none focus:ring-1 focus:ring-cyan-500"/>
+
+            <label className="flex items-center gap-2 text-sm border border-gray-300 p-1.5 rounded cursor-pointer">
+              <input type="checkbox" checked={f.onlyOutstandings} onChange={e=>setF(p=>({...p,onlyOutstandings:e.target.checked}))} className="w-4 h-4 accent-blue-600"/>
+              Only Outstandings
+            </label>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mb-2">
             <div className="relative" ref={colRef}>
               <button type="button" onClick={()=>setColOpen(o=>!o)}
                 className="border border-gray-300 p-1.5 rounded w-full text-sm text-left flex items-center justify-between bg-white focus:outline-none focus:ring-1 focus:ring-cyan-500">
@@ -350,15 +415,6 @@ export default function PatientList() {
                 </div>
               )}
             </div>
-
-            <label className="flex items-center gap-2 text-sm border border-gray-300 p-1.5 rounded cursor-pointer">
-              <input type="checkbox" checked={f.onlyOutstandings} onChange={e=>setF(p=>({...p,onlyOutstandings:e.target.checked}))} className="w-4 h-4 accent-blue-600"/>
-              Only Outstandings
-            </label>
-            <label className="flex items-center gap-2 text-sm border border-gray-300 p-1.5 rounded cursor-pointer">
-              <input type="checkbox" checked={f.foc} onChange={e=>setF(p=>({...p,foc:e.target.checked}))} className="w-4 h-4 accent-blue-600"/>
-              FOC
-            </label>
           </div>
 
           <div className="flex flex-wrap gap-1.5">
@@ -369,7 +425,7 @@ export default function PatientList() {
             <button onClick={()=>window.print()} className="flex gap-1.5 items-center bg-orange-600 hover:bg-orange-700 text-white px-3 py-1.5 rounded text-sm">
               <Printer size={14}/> Print
             </button>
-            <button className="flex gap-1.5 items-center bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 rounded text-sm">
+            <button onClick={handleExportExcel} className="flex gap-1.5 items-center bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 rounded text-sm">
               <FileSpreadsheet size={14}/> Excel
             </button>
             <button onClick={handleReset} className="flex gap-1.5 items-center bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded text-sm">
