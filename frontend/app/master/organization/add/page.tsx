@@ -517,7 +517,6 @@ const AddOrganization = () => {
                     items={[
                       { key: 'patient.registration', label: 'Registration' },
                       { key: 'patient.tests', label: 'Tests' },
-                      { key: 'patient.outsourcing', label: 'Outsourcing' },
                     ]}
                     moduleAllocation={moduleAllocation}
                     toggleModule={toggleModule}
