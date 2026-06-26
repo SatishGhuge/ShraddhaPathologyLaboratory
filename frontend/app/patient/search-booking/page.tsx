@@ -1156,6 +1156,36 @@ export default function BookingPage() {
     }
 
     try {
+      console.log('💾 Saving payment transaction...');
+      console.log('  visitId:', selectedBooking.visitId);
+      console.log('  patientId:', selectedBooking.patientId);
+      console.log('  paymentMode:', billing.paymentMode);
+      console.log('  paymentAmount:', payment);
+      console.log('  API URL:', `${API_BASE_URL}/patients/payment-transaction`);
+      
+      // First, save the payment transaction
+      const txResponse = await fetch(`${API_BASE_URL}/patients/payment-transaction`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          visitId: selectedBooking.visitId,
+          patientId: selectedBooking.patientId,
+          paymentMode: billing.paymentMode,
+          paymentAmount: payment,
+          remarks: billing.remarks || null
+        })
+      });
+      
+      const txData = await txResponse.json();
+      console.log('📥 Transaction Response:', txData);
+      
+      if(!txResponse.ok){
+        console.error('❌ Failed to save payment transaction:', txResponse.status, txData);
+      } else {
+        console.log('✅ Payment transaction saved successfully');
+      }
+
+      // Then update the main payment record
       const res = await updatePayment(selectedBooking.patientId, selectedBooking.visitId, {
         paymentAmount:   payment,
         paymentMode:     billing.paymentMode,
@@ -2081,7 +2111,11 @@ export default function BookingPage() {
                     <label className="text-xs font-semibold text-red-600 mb-1 block">Payment Mode</label>
                     <select value={billing.paymentMode} onChange={e=>setBilling({...billing,paymentMode:e.target.value})}
                       className={`${style.input} w-full bg-white`}>
-                      <option>Cash</option><option>Card</option><option>UPI</option><option>Cheque</option>
+                      <option>Cash</option>
+                      <option>Debit Card</option>
+                      <option>Credit Card</option>
+                      <option>UPI</option>
+                      <option>Other</option>
                     </select>
                   </div>
                   <div>

@@ -7,6 +7,7 @@ import * as XLSX from 'xlsx';
 import Header from "@/src/components/Header";
 import PageHeader from "@/src/components/BreadCrumb";
 import { getAllPatients, getCollectionCenters, getOrganizations } from "@/src/api/patient";
+import API_BASE_URL from "@/src/api/config";
 
 /* ── helpers ── */
 const toYMD = (iso: any) => {
@@ -83,7 +84,7 @@ export default function PatientList() {
   // Check for date parameter from URL (from dashboard navigation)
   const urlDate = searchParams.get('date');
   
-  const [f, setF] = useState({visitType:"",referralDoctor:"",mobile:"",patientName:"",onlyOutstandings:false});
+  const [f, setF] = useState({visitType:"",referralDoctor:"",mobile:"",patientName:"",paymentMode:"",onlyOutstandings:false});
   const [dateFrom, setDateFrom] = useState(urlDate || fmtISO(today0()));
   const [dateTo, setDateTo]     = useState(urlDate || fmtISO(today0()));
   const [open, setOpen]         = useState(false);
@@ -130,7 +131,7 @@ export default function PatientList() {
     if(searched){
       fetchData(dateFrom, dateTo);
     }
-  },[f.patientName, f.mobile, f.referralDoctor, f.visitType, f.onlyOutstandings]);
+  },[f.patientName, f.mobile, f.referralDoctor, f.visitType, f.paymentMode, f.onlyOutstandings]);
   
   useEffect(()=>{
     const h = (e: any) =>{
@@ -149,42 +150,148 @@ export default function PatientList() {
   const prevM=()=>{ if(cm===0){setCm(11);setCy(y=>y-1);}else setCm(m=>m-1); };
   const nextM=()=>{ if(cm===11){setCm(0);setCy(y=>y+1);}else setCm(m=>m+1); };
 
-  const buildRows = (patients: any, from: any, to: any) =>{
+  const buildRows = async (patients: any, from: any, to: any) =>{
     const rows=[];
+    
     for(const p of patients){
-      const vm=new Map();
+      // Group all tests by visitId first
+      const visitMap = new Map();
+      
       for(const t of p.tests||[]){
         const raw=t.visitDate||t.createdAt||p.createdAt;
         const d=toYMD(raw);
         if(from&&d&&(d<from||d>to)) continue;
-        if(!vm.has(t.visitId)){
-          vm.set(t.visitId,{
-            visitId:t.visitId, date:toGB(raw),
+
+        if(!visitMap.has(t.visitId)){
+          visitMap.set(t.visitId, {
+            visitId:t.visitId,
+            date:toGB(raw),
             patientId:p.patientId||"-",
             patientName:[p.title,p.firstName,p.lastName].filter(Boolean).join(" "),
             ageGender:`${p.age||"-"} Yrs / ${p.gender||"-"}`,
-            tests:[], totalBill:0, received:0, discount:0, dueNetAmount:0,
-            paymentMode:t.paymentMode||"-", corporate:t.businessType||"-",
+            tests:[],
+            totalBill:0,
+            received:0,
+            discount:0,
+            dueNetAmount:0,
+            corporate:t.businessType||"-",
             mobile:p.mobile||"-",
-            refDoctor:t.referralDoctor||"-", remark:t.remarks||"-",
-            user:p.createdBy||"-", location:p.location||"-",
+            refDoctor:t.referralDoctor||"-",
+            remark:t.remarks||"-",
+            user:p.createdBy||"-",
+            location:p.location||"-",
             organization:t.organization?.name||"-",
             sampleCollection:t.sampleTaken?toGB(t.sampleTaken):"-",
-            visitIdInvoice:t.visitId||"-", refund:"-",
+            visitIdInvoice:t.visitId||"-",
+            refund:"-",
           });
         }
-        const v=vm.get(t.visitId);
+        
+        const v = visitMap.get(t.visitId);
         v.tests.push(t.test?.name||"");
-        // totalAmount is per-test charge — sum it
         v.totalBill += t.totalAmount || 0;
-        // paidAmount/discountAmount/balanceAmount are stored as the full visit amount on every row — take max (first seen)
-        v.received    = Math.max(v.received,    t.paidAmount     || 0);
-        v.discount    = Math.max(v.discount,    t.discountAmount || 0);
-        v.dueNetAmount= Math.max(v.dueNetAmount, t.balanceAmount  || 0);
+        v.received = Math.max(v.received, t.paidAmount || 0);
+        v.discount = Math.max(v.discount, t.discountAmount || 0);
+        v.dueNetAmount = Math.max(v.dueNetAmount, t.balanceAmount || 0);
       }
-      for(const v of vm.values())
-        rows.push({...v,testPerformed:v.tests.join(", "),totalBill:Math.round(v.totalBill),received:Math.round(v.received),discount:Math.round(v.discount),dueNetAmount:Math.round(v.dueNetAmount)});
+      
+      // Now process each visit
+      for(const v of visitMap.values()){
+        try {
+          // Fetch payment transactions for this specific visit
+          const txResponse = await fetch(`${API_BASE_URL}/patients/payment-transactions/${v.visitId}`);
+          const txData = await txResponse.json();
+          const transactions = txData.success ? (txData.data || []) : [];
+
+          console.log(`📋 Visit ${v.visitId}: Found ${transactions.length} transactions`);
+
+          if(transactions && transactions.length > 0){
+            // Create ONE row per payment transaction (not per test)
+            for(const tx of transactions){
+              rows.push({
+                visitId:v.visitId,
+                date:v.date,
+                patientId:v.patientId,
+                patientName:v.patientName,
+                ageGender:v.ageGender,
+                tests:v.tests,
+                testPerformed:v.tests.join(", "),
+                totalBill:Math.round(v.totalBill),
+                received:Math.round(tx.paymentAmount),
+                paymentMode:tx.paymentMode,
+                discount:Math.round(v.discount),
+                dueNetAmount:Math.round(v.dueNetAmount),
+                corporate:v.corporate,
+                mobile:v.mobile,
+                refDoctor:v.refDoctor,
+                remark:tx.remarks||v.remark,
+                user:v.user,
+                location:v.location,
+                organization:v.organization,
+                sampleCollection:v.sampleCollection,
+                visitIdInvoice:v.visitIdInvoice,
+                refund:v.refund,
+              });
+            }
+          } else {
+            // No transactions found - show single row with all tests
+            console.log(`⚠️ No transactions for visit ${v.visitId}, showing single row`);
+            rows.push({
+              visitId:v.visitId,
+              date:v.date,
+              patientId:v.patientId,
+              patientName:v.patientName,
+              ageGender:v.ageGender,
+              tests:v.tests,
+              testPerformed:v.tests.join(", "),
+              totalBill:Math.round(v.totalBill),
+              received:Math.round(v.received),
+              paymentMode:v.paymentMode||"-",
+              discount:Math.round(v.discount),
+              dueNetAmount:Math.round(v.dueNetAmount),
+              corporate:v.corporate,
+              mobile:v.mobile,
+              refDoctor:v.refDoctor,
+              remark:v.remark,
+              user:v.user,
+              location:v.location,
+              organization:v.organization,
+              sampleCollection:v.sampleCollection,
+              visitIdInvoice:v.visitIdInvoice,
+              refund:v.refund,
+            });
+          }
+        } catch(err){
+          console.error('❌ Error fetching transactions for visit', v.visitId, err);
+          // Fallback: show single row
+          rows.push({
+            visitId:v.visitId,
+            date:v.date,
+            patientId:v.patientId,
+            patientName:v.patientName,
+            ageGender:v.ageGender,
+            tests:v.tests,
+            testPerformed:v.tests.join(", "),
+            totalBill:Math.round(v.totalBill),
+            received:Math.round(v.received),
+            paymentMode:v.paymentMode||"-",
+            discount:Math.round(v.discount),
+            dueNetAmount:Math.round(v.dueNetAmount),
+            corporate:v.corporate,
+            mobile:v.mobile,
+            refDoctor:v.refDoctor,
+            remark:v.remark,
+            user:v.user,
+            location:v.location,
+            organization:v.organization,
+            sampleCollection:v.sampleCollection,
+            visitIdInvoice:v.visitIdInvoice,
+            refund:v.refund,
+          });
+        }
+      }
     }
+    
     return rows;
   };
 
@@ -193,6 +300,7 @@ export default function PatientList() {
     if(f.mobile&&!r.mobile.includes(f.mobile)) return false;
     if(f.referralDoctor&&!r.refDoctor.toLowerCase().includes(f.referralDoctor.toLowerCase())) return false;
     if(f.visitType&&r.organization!==f.visitType) return false;
+    if(f.paymentMode&&!r.paymentMode.includes(f.paymentMode)) return false;
     if(f.onlyOutstandings&&parseFloat(r.dueNetAmount)<=0) return false;
     return true;
   });
@@ -207,7 +315,7 @@ export default function PatientList() {
         const d = toYMD(t.visitDate||t.createdAt||p.createdAt);
         return d && d >= from && d <= toDate;
       }));
-      const rows = buildRows(filtered, from, toDate);
+      const rows = await buildRows(filtered, from, toDate);
       const orgs = [...new Set(filtered.flatMap(p=>(p.tests||[]).map(t=>t.organization?.id).filter(Boolean)))];
       const docs  = [...new Set(filtered.flatMap(p=>(p.tests||[]).map(t=>t.referralDoctor).filter(Boolean)))].sort();
       setVisitTypes([]);
@@ -240,7 +348,7 @@ export default function PatientList() {
 
   const handleReset=()=>{
     const todayStr = fmtISO(today0());
-    setF({visitType:"",referralDoctor:"",mobile:"",patientName:"",onlyOutstandings:false});
+    setF({visitType:"",referralDoctor:"",mobile:"",patientName:"",paymentMode:"",onlyOutstandings:false});
     setDateFrom(todayStr); setDateTo(todayStr); setPreset("Today"); setCustom(false);
     setCurrentPage(1); setPagination(null);
     setSelCols(Object.fromEntries(COLS.map(c=>[c.key,true])));
@@ -370,12 +478,22 @@ export default function PatientList() {
               className="border border-gray-300 p-1.5 rounded w-full text-sm focus:outline-none focus:ring-1 focus:ring-cyan-500"/>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mb-2">
+          <div className="grid grid-cols-1 sm:grid-cols-4 gap-2 mb-2">
             <input placeholder="Patient Name" value={f.patientName} onChange={e=>setF(p=>({...p,patientName:e.target.value}))}
               className="border border-gray-300 p-1.5 rounded w-full text-sm focus:outline-none focus:ring-1 focus:ring-cyan-500"/>
 
             <input placeholder="Mobile" value={f.mobile} onChange={e=>setF(p=>({...p,mobile:e.target.value}))}
               className="border border-gray-300 p-1.5 rounded w-full text-sm focus:outline-none focus:ring-1 focus:ring-cyan-500"/>
+
+            <select value={f.paymentMode} onChange={e=>setF(p=>({...p,paymentMode:e.target.value}))}
+              className="border border-gray-300 p-1.5 rounded w-full text-sm focus:outline-none focus:ring-1 focus:ring-cyan-500">
+              <option value="">All Payment Modes</option>
+              <option>Cash</option>
+              <option>Debit Card</option>
+              <option>Credit Card</option>
+              <option>UPI</option>
+              <option>Other</option>
+            </select>
 
             <label className="flex items-center gap-2 text-sm border border-gray-300 p-1.5 rounded cursor-pointer">
               <input type="checkbox" checked={f.onlyOutstandings} onChange={e=>setF(p=>({...p,onlyOutstandings:e.target.checked}))} className="w-4 h-4 accent-blue-600"/>

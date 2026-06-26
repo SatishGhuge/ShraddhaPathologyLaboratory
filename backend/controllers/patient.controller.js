@@ -122,6 +122,20 @@ export const createPatient = async (req, res) => {
         })) || []
       });
 
+      // Create payment transaction if payment was made during registration
+      if(paymentMode && perTestPaid > 0){
+        await prisma.paymentTransaction.create({
+          data: {
+            visitId,
+            patientId: patient.patientId,
+            paymentMode,
+            paymentAmount: perTestPaid,
+            remarks: discountRemark || null
+          }
+        });
+        console.log(`✅ Payment transaction created: ${paymentMode} - ₹${perTestPaid}`);
+      }
+
       // Get updated patient with all tests
       patient = await prisma.patient.findUnique({
         where: { patientId: patient.patientId },
@@ -204,6 +218,20 @@ export const createPatient = async (req, res) => {
           }
         }
       });
+
+      // Create payment transaction if payment was made during registration
+      if(paymentMode && perTestPaid > 0){
+        await prisma.paymentTransaction.create({
+          data: {
+            visitId,
+            patientId: patient.patientId,
+            paymentMode,
+            paymentAmount: perTestPaid,
+            remarks: discountRemark || null
+          }
+        });
+        console.log(`✅ Payment transaction created: ${paymentMode} - ₹${perTestPaid}`);
+      }
     }
 
     res.status(201).json({
@@ -713,6 +741,120 @@ export const addTestToVisit = async (req, res) => {
       success: false,
       message: 'Failed to add test to visit',
       error: error.message
+    });
+  }
+};
+
+// Create payment transaction
+export const createPaymentTransaction = async (req, res) => {
+  try {
+    const { visitId, patientId, paymentMode, paymentAmount, remarks } = req.body;
+    
+    console.log('📨 createPaymentTransaction request received:');
+    console.log('  visitId:', visitId);
+    console.log('  patientId:', patientId);
+    console.log('  paymentMode:', paymentMode);
+    console.log('  paymentAmount:', paymentAmount);
+    console.log('  remarks:', remarks);
+    
+    // Validate required fields
+    if (!visitId || !patientId || !paymentMode || !paymentAmount) {
+      console.error('❌ Validation failed: Missing required fields');
+      return res.status(400).json({
+        success: false,
+        message: 'Missing required fields: visitId, patientId, paymentMode, paymentAmount'
+      });
+    }
+
+    const transaction = await prisma.paymentTransaction.create({
+      data: {
+        visitId,
+        patientId,
+        paymentMode,
+        paymentAmount: parseFloat(paymentAmount),
+        remarks: remarks || null
+      }
+    });
+    
+    console.log('✅ Payment transaction created:', transaction.id);
+
+    res.status(201).json({ 
+      success: true, 
+      message: 'Payment transaction created successfully',
+      data: transaction 
+    });
+  } catch (error) {
+    console.error('❌ Create payment transaction error:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Failed to create payment transaction',
+      error: error.message 
+    });
+  }
+};
+
+// Get payment transactions for a visit
+export const getPaymentTransactions = async (req, res) => {
+  try {
+    const { visitId } = req.params;
+    
+    if (!visitId) {
+      return res.status(400).json({
+        success: false,
+        message: 'visitId is required'
+      });
+    }
+
+    const transactions = await prisma.paymentTransaction.findMany({
+      where: { visitId },
+      orderBy: { createdAt: 'asc' }
+    });
+    
+    console.log(`✅ Found ${transactions.length} payment transactions for visit ${visitId}`);
+
+    res.json({ 
+      success: true, 
+      data: transactions 
+    });
+  } catch (error) {
+    console.error('Get payment transactions error:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Failed to fetch payment transactions',
+      error: error.message 
+    });
+  }
+};
+
+// Get all payment transactions for a patient
+export const getPatientPaymentTransactions = async (req, res) => {
+  try {
+    const { patientId } = req.params;
+    
+    if (!patientId) {
+      return res.status(400).json({
+        success: false,
+        message: 'patientId is required'
+      });
+    }
+
+    const transactions = await prisma.paymentTransaction.findMany({
+      where: { patientId },
+      orderBy: { createdAt: 'desc' }
+    });
+    
+    console.log(`✅ Found ${transactions.length} payment transactions for patient ${patientId}`);
+
+    res.json({ 
+      success: true, 
+      data: transactions 
+    });
+  } catch (error) {
+    console.error('Get patient payment transactions error:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Failed to fetch payment transactions',
+      error: error.message 
     });
   }
 };

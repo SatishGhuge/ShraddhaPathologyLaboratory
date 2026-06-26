@@ -2680,7 +2680,11 @@ export default function PatientRegistration() {
 
             <div className="grid grid-cols-3 gap-2 p-2 border-b bg-white items-center">
               <select className={input} value={paymentMode} onChange={(e) => setPaymentMode(e.target.value)}>
-                <option>Cash</option><option>UPI</option><option>Card</option><option>Net Banking</option>
+                <option>Cash</option>
+                <option>Debit Card</option>
+                <option>Credit Card</option>
+                <option>UPI</option>
+                <option>Other</option>
               </select>
               <input className={input} placeholder="Discount Remark" value={discountRemark} onChange={(e) => setDiscountRemark(e.target.value)} />
               <div className="text-right">
