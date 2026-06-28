@@ -72,7 +72,6 @@ model PatientTest {
   sample             String
   charge             Float
   status             String              @default("REGISTERED")
-  barcode_status     String              @default("Unprinted")
   result             String?             @db.Text
   visitType          String?
   reportMode         String?
@@ -100,6 +99,7 @@ model PatientTest {
   organizationId     String?
   lastUpdatedBy      String?
   lastStatusUpdateAt DateTime?
+  barcode_status     String              @default("Unprinted")
   department         Department          @relation(fields: [departmentId], references: [id])
   organization       Organization?       @relation(fields: [organizationId], references: [id])
   patient            Patient             @relation(fields: [patientId], references: [patientId], onDelete: Cascade)
@@ -518,14 +518,14 @@ model ModuleAllocation {
 }
 
 model PaymentTransaction {
-  id              Int       @id @default(autoincrement())
-  visitId         String
-  patientId       String
-  paymentMode     String
-  paymentAmount   Float
-  remarks         String?
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  id            Int      @id @default(autoincrement())
+  visitId       String
+  patientId     String
+  paymentMode   String
+  paymentAmount Float
+  remarks       String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
   @@index([visitId])
   @@index([patientId])
