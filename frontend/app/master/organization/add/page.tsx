@@ -389,7 +389,6 @@ const AddOrganization = () => {
         setToast({
           type: "success",
           message: `Organization added successfully!`,
-          credentials: (res as any)?.credentials || null,
         });
       }
     } catch (err: any) {
