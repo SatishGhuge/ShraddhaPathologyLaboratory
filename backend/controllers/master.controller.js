@@ -1078,10 +1078,33 @@ export const getDoctors = async (req, res) => {
   }
 };
 
+// Get doctor by ID
+export const getDoctorById = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const doctor = await prisma.doctor.findUnique({
+      where: { id: parseInt(id) }
+    });
+    if (!doctor) {
+      return res.status(404).json({ success: false, message: 'Doctor not found' });
+    }
+    res.json({
+      success: true,
+      data: doctor
+    });
+  } catch (error) {
+    console.error('Get doctor by ID error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch doctor'
+    });
+  }
+};
+
 // Create doctor
 export const createDoctor = async (req, res) => {
   try {
-    const { name, type, degree, compliment, mobile, email, address, allowBalance } = req.body;
+    const { name, type, degree, compliment, mobile, email, address, allowBalance, sendReportsViaWhatsApp, sendReportsViaMail } = req.body;
     if (!name || !name.trim()) {
       return res.status(400).json({ success: false, message: 'Name is required' });
     }
@@ -1095,6 +1118,8 @@ export const createDoctor = async (req, res) => {
         email: email || null,
         address: address || null,
         allowBalance: allowBalance || false,
+        sendReportsViaWhatsApp: sendReportsViaWhatsApp || false,
+        sendReportsViaMail: sendReportsViaMail || false,
         isActive: true,
       }
     });
@@ -1109,7 +1134,7 @@ export const createDoctor = async (req, res) => {
 export const updateDoctor = async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, type, degree, compliment, mobile, email, address, allowBalance } = req.body;
+    const { name, type, degree, compliment, mobile, email, address, allowBalance, sendReportsViaWhatsApp, sendReportsViaMail } = req.body;
     const existing = await prisma.doctor.findUnique({ where: { id: parseInt(id) } });
     if (!existing) return res.status(404).json({ success: false, message: 'Doctor not found' });
     const doctor = await prisma.doctor.update({
@@ -1123,6 +1148,8 @@ export const updateDoctor = async (req, res) => {
         email: email !== undefined ? email : existing.email,
         address: address !== undefined ? address : existing.address,
         allowBalance: allowBalance !== undefined ? allowBalance : existing.allowBalance,
+        sendReportsViaWhatsApp: sendReportsViaWhatsApp !== undefined ? sendReportsViaWhatsApp : existing.sendReportsViaWhatsApp,
+        sendReportsViaMail: sendReportsViaMail !== undefined ? sendReportsViaMail : existing.sendReportsViaMail,
       }
     });
 
@@ -1219,6 +1246,8 @@ export const getOrganizations = async (req, res) => {
         isActive: true,
         createdAt: true,
         updatedAt: true,
+        sendReportsViaWhatsApp: true,
+        sendReportsViaMail: true,
         moduleAllocation: {
           select: { id: true, modules: true }
         }
@@ -1249,6 +1278,8 @@ export const getOrganizationById = async (req, res) => {
         isActive: true,
         createdAt: true,
         updatedAt: true,
+        sendReportsViaWhatsApp: true,
+        sendReportsViaMail: true,
         moduleAllocation: {
           select: { modules: true }
         }
@@ -1272,7 +1303,7 @@ export const getOrganizationById = async (req, res) => {
 // Create organization
 export const createOrganization = async (req, res) => {
   try {
-    const { name, code, location, address, mobile, email, date, isActive, adminName, testCharges, moduleAllocation } = req.body;
+    const { name, code, location, address, mobile, email, date, isActive, adminName, testCharges, moduleAllocation, sendReportsViaWhatsApp, sendReportsViaMail } = req.body;
     if (!name) return res.status(400).json({ success: false, message: 'Name is required' });
 
     const newId = await generateOrganizationId();
@@ -1291,10 +1322,16 @@ export const createOrganization = async (req, res) => {
     const organization = await prisma.organization.create({
       data: {
         id: newId,
-        name: name.trim(), code: code || null, location: location || null,
-        address: address || null, mobile: mobile || null,
-        email: email || null, date: date ? new Date(date) : null,
-        isActive: isActive !== false
+        name: name.trim(), 
+        code: code || null, 
+        location: location || null,
+        address: address || null, 
+        mobile: mobile || null,
+        email: email || null, 
+        date: date ? new Date(date) : null,
+        isActive: isActive !== false,
+        sendReportsViaWhatsApp: sendReportsViaWhatsApp || false,
+        sendReportsViaMail: sendReportsViaMail || false,
       },
     });
 
@@ -1419,7 +1456,7 @@ export const createOrganization = async (req, res) => {
 export const updateOrganization = async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, code, location, address, mobile, email, date, isActive, moduleAllocation } = req.body;
+    const { name, code, location, address, mobile, email, date, isActive, moduleAllocation, sendReportsViaWhatsApp, sendReportsViaMail } = req.body;
     const existing = await prisma.organization.findUnique({ where: { id } });
     if (!existing) return res.status(404).json({ success: false, message: 'Organization not found' });
 
@@ -1433,7 +1470,9 @@ export const updateOrganization = async (req, res) => {
         mobile: mobile || null,
         email: email || null,
         date: date ? new Date(date) : null,
-        isActive: isActive !== undefined ? isActive : undefined
+        isActive: isActive !== undefined ? isActive : undefined,
+        sendReportsViaWhatsApp: sendReportsViaWhatsApp !== undefined ? sendReportsViaWhatsApp : undefined,
+        sendReportsViaMail: sendReportsViaMail !== undefined ? sendReportsViaMail : undefined,
       },
     });
 

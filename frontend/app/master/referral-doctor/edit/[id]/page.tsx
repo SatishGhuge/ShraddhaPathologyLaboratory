@@ -24,6 +24,8 @@ export default function AddReferralForm() {
     email: "",
     address: "",
     allowBalance: false,
+    sendReportsViaWhatsApp: false,
+    sendReportsViaMail: false,
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
@@ -44,6 +46,8 @@ export default function AddReferralForm() {
               email: doc.email || "",
               address: doc.address || "",
               allowBalance: doc.allowBalance || false,
+              sendReportsViaWhatsApp: doc.sendReportsViaWhatsApp || false,
+              sendReportsViaMail: doc.sendReportsViaMail || false,
             });
             setType(doc.type || "Doctor");
           }
@@ -110,6 +114,8 @@ export default function AddReferralForm() {
         email: formData.email || null,
         address: formData.address || null,
         allowBalance: formData.allowBalance,
+        sendReportsViaWhatsApp: formData.sendReportsViaWhatsApp,
+        sendReportsViaMail: formData.sendReportsViaMail,
       };
 
       if (isEditMode) {
@@ -255,6 +261,22 @@ export default function AddReferralForm() {
           <div className="flex items-center gap-2 pl-1">
             <input type="checkbox" name="allowBalance" checked={formData.allowBalance} onChange={handleChange} className="w-4 h-4 accent-cyan-600" />
             <span className="text-gray-700">Allow To Send Report on balance amount</span>
+          </div>
+
+          {/* Report Delivery Preferences */}
+          <div className="border-t border-cyan-300 pt-3 mt-3">
+            <p className="font-semibold text-gray-700 mb-2.5">📧 Report Delivery Preferences</p>
+            <div className="grid grid-cols-2 gap-3 pl-1">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" name="sendReportsViaWhatsApp" checked={formData.sendReportsViaWhatsApp} onChange={handleChange} className="w-4 h-4 accent-green-600" />
+                <span className="text-gray-700">Send via WhatsApp</span>
+              </label>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" name="sendReportsViaMail" checked={formData.sendReportsViaMail} onChange={handleChange} className="w-4 h-4 accent-cyan-600" />
+                <span className="text-gray-700">Send via Email</span>
+              </label>
+            </div>
+            <p className="text-xs text-gray-500 mt-2 ml-1">Select channels for report delivery</p>
           </div>
 
           {/* Buttons */}

@@ -240,6 +240,8 @@ const EditOrganization = () => {
   const [formData, setFormData] = useState({
     name: "", organizationType: "", address: "", code: "",
     location: "", mobile: "", email: "", date: "", active: "Yes",
+    sendReportsViaWhatsApp: false,
+    sendReportsViaMail: false,
   });
 
   const [toast, setToast] = useState<any>(null); // { type, message, credentials }
@@ -261,6 +263,8 @@ const EditOrganization = () => {
             email: organization.email || "",
             date: organization.date ? new Date(organization.date).toISOString().split("T")[0] : "",
             active: organization.isActive ? "Yes" : "No",
+            sendReportsViaWhatsApp: organization.sendReportsViaWhatsApp || false,
+            sendReportsViaMail: organization.sendReportsViaMail || false,
           });
           if (organization.moduleAllocation) {
             try {
@@ -279,7 +283,8 @@ const EditOrganization = () => {
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     if (isViewMode) return;
-    setFormData({ ...formData, [e.target.name]: e.target.value });
+    const { name, type, value, checked } = e.target as any;
+    setFormData({ ...formData, [name]: type === "checkbox" ? checked : value });
   };
 
   const toggleModule = (path: string) => {
@@ -355,6 +360,8 @@ const EditOrganization = () => {
         date: formData.date || null,
         isActive: formData.active === "Yes",
         moduleAllocation: JSON.stringify(moduleAllocation),
+        sendReportsViaWhatsApp: formData.sendReportsViaWhatsApp,
+        sendReportsViaMail: formData.sendReportsViaMail,
       };
 
       if (isEditMode) {
@@ -477,6 +484,23 @@ const EditOrganization = () => {
                 <textarea name="address" value={formData.address} onChange={handleChange}
                   disabled={isViewMode} rows={2} required={!isViewMode}
                   className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm disabled:bg-gray-50 bg-white" />
+              </div>
+            </div>
+
+            {/* Report Delivery Preferences Section */}
+            <div className="border-t border-gray-300 pt-4 mt-4 pb-4">
+              <p className="font-semibold text-gray-700 text-sm mb-3">📧 Report Delivery Preferences</p>
+              <div className="flex items-center gap-6 ml-1">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input type="checkbox" name="sendReportsViaWhatsApp" checked={formData.sendReportsViaWhatsApp} onChange={handleChange}
+                    disabled={isViewMode} className="w-4 h-4 accent-green-600" />
+                  <span className="text-sm text-gray-700">Send via WhatsApp</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input type="checkbox" name="sendReportsViaMail" checked={formData.sendReportsViaMail} onChange={handleChange}
+                    disabled={isViewMode} className="w-4 h-4 accent-cyan-600" />
+                  <span className="text-sm text-gray-700">Send via Email</span>
+                </label>
               </div>
             </div>
 

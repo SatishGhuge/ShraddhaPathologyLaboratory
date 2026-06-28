@@ -260,40 +260,44 @@ model TestCharge {
 }
 
 model Doctor {
-  id           Int      @id @default(autoincrement())
-  name         String
-  degree       String?
-  mobile       String?
-  specialty    String?
-  isActive     Boolean  @default(true)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-  address      String?  @db.Text
-  allowBalance Boolean  @default(false)
-  compliment   Float?
-  email        String?
-  type         String   @default("Doctor")
+  id                       Int      @id @default(autoincrement())
+  name                     String
+  degree                   String?
+  mobile                   String?
+  specialty                String?
+  isActive                 Boolean  @default(true)
+  createdAt                DateTime @default(now())
+  updatedAt                DateTime @updatedAt
+  address                  String?  @db.Text
+  allowBalance             Boolean  @default(false)
+  compliment               Float?
+  email                    String?
+  type                     String   @default("Doctor")
+  sendReportsViaWhatsApp   Boolean  @default(false)
+  sendReportsViaMail       Boolean  @default(false)
 
   @@map("doctors")
 }
 
 model Organization {
-  id               String            @id
-  name             String            @unique(map: "name")
-  code             String?
-  location         String?
-  address          String?           @db.LongText
-  mobile           String?
-  email            String?
-  date             DateTime?
-  isActive         Boolean           @default(true)
-  createdAt        DateTime          @default(now())
-  updatedAt        DateTime          @updatedAt
-  admins           Admin[]
-  moduleAllocation ModuleAllocation?
-  patientTests     PatientTest[]
-  testCharges      TestCharge[]
-  users            User[]
+  id                       String            @id
+  name                     String            @unique(map: "name")
+  code                     String?
+  location                 String?
+  address                  String?           @db.LongText
+  mobile                   String?
+  email                    String?
+  date                     DateTime?
+  isActive                 Boolean           @default(true)
+  createdAt                DateTime          @default(now())
+  updatedAt                DateTime          @updatedAt
+  sendReportsViaWhatsApp   Boolean           @default(false)
+  sendReportsViaMail       Boolean           @default(false)
+  admins                   Admin[]
+  moduleAllocation         ModuleAllocation?
+  patientTests             PatientTest[]
+  testCharges              TestCharge[]
+  users                    User[]
 
   @@index([name], map: "idx_organization_name")
   @@map("organizations")

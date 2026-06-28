@@ -25,6 +25,8 @@ export default function ReferralDoctorModal({
     email: "",
     address: "",
     allowBalance: false,
+    sendReportsViaWhatsApp: false,
+    sendReportsViaMail: false,
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
@@ -46,6 +48,8 @@ export default function ReferralDoctorModal({
           email: editingDoctor.email || "",
           address: editingDoctor.address || "",
           allowBalance: editingDoctor.allowBalance || false,
+          sendReportsViaWhatsApp: editingDoctor.sendReportsViaWhatsApp || false,
+          sendReportsViaMail: editingDoctor.sendReportsViaMail || false,
         });
       } else {
         setType("Doctor");
@@ -57,6 +61,8 @@ export default function ReferralDoctorModal({
           email: "",
           address: "",
           allowBalance: false,
+          sendReportsViaWhatsApp: false,
+          sendReportsViaMail: false,
         });
       }
       setErrors({});
@@ -116,6 +122,8 @@ export default function ReferralDoctorModal({
         email: formData.email || null,
         address: formData.address || null,
         allowBalance: formData.allowBalance,
+        sendReportsViaWhatsApp: formData.sendReportsViaWhatsApp,
+        sendReportsViaMail: formData.sendReportsViaMail,
       };
 
       if (editingDoctor?.id) {
@@ -167,6 +175,8 @@ export default function ReferralDoctorModal({
       email: "",
       address: "",
       allowBalance: false,
+      sendReportsViaWhatsApp: false,
+      sendReportsViaMail: false,
     });
     setErrors({});
     setErrorMsg("");
@@ -276,6 +286,21 @@ export default function ReferralDoctorModal({
           <div className="flex items-center gap-2">
             <input type="checkbox" name="allowBalance" checked={formData.allowBalance} onChange={handleChange} className="w-4 h-4 accent-orange-500" disabled={loading} />
             <span className="text-sm text-gray-700">Allow To Send Report on balance amount</span>
+          </div>
+
+          {/* Report Delivery Preferences */}
+          <div className="border-t border-gray-200 pt-3 mt-3">
+            <p className="text-xs font-semibold text-gray-600 mb-2">📧 Report Delivery Preferences</p>
+            <div className="flex items-center gap-4">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" name="sendReportsViaWhatsApp" checked={formData.sendReportsViaWhatsApp} onChange={handleChange} className="w-4 h-4 accent-green-600" disabled={loading} />
+                <span className="text-sm text-gray-700">WhatsApp</span>
+              </label>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" name="sendReportsViaMail" checked={formData.sendReportsViaMail} onChange={handleChange} className="w-4 h-4 accent-orange-500" disabled={loading} />
+                <span className="text-sm text-gray-700">Email</span>
+              </label>
+            </div>
           </div>
 
           {/* Submit Button */}
