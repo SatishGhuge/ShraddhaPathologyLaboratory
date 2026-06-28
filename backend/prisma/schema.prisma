@@ -16,12 +16,8 @@ model Admin {
   isActive       Boolean         @default(true)
   createdAt      DateTime        @default(now())
   updatedAt      DateTime        @updatedAt
-  organizationId String?
-  adminName      String?         @db.VarChar(255)
-  organization   Organization?   @relation(fields: [organizationId], references: [id], onDelete: Cascade, onUpdate: Restrict)
   passwordResets PasswordReset[]
 
-  @@index([organizationId])
   @@map("admins")
 }
 
@@ -39,27 +35,28 @@ model PasswordReset {
 }
 
 model Patient {
-  patientId String        @id
-  title     String?
-  firstName String?
-  lastName  String?
-  dob       DateTime?
-  age       Int?
-  gender    String?
-  mobile    String?
-  email     String?
-  createdBy String?
-  address   String?       @db.Text
-  createdAt DateTime?     @default(now())
-  updatedAt DateTime      @updatedAt
-  location  String?       @db.VarChar(255)
-  tests     PatientTest[]
+  patientId         String        @id
+  title             String?
+  firstName         String?
+  lastName          String?
+  dob               DateTime?
+  age               Int?
+  gender            String?
+  mobile            String?
+  email             String?
+  createdBy         String?
+  createdAtLocation String?
+  address           String?       @db.Text
+  createdAt         DateTime?     @default(now())
+  updatedAt         DateTime      @updatedAt
+  location          String?
+  tests             PatientTest[]
 
   @@index([mobile])
   @@index([email])
   @@index([firstName, lastName], map: "patients_name_idx")
   @@index([createdAt])
-  @@index([location], map: "idx_patient_location")
+  @@index([location])
   @@map("patients")
 }
 
@@ -71,8 +68,7 @@ model PatientTest {
   departmentId       Int
   sample             String
   charge             Float
-  status             String              @default("REGISTERED")
-  barcode_status     String              @default("Unprinted")
+  status             String              @default("Registered")
   result             String?             @db.Text
   visitType          String?
   reportMode         String?
@@ -100,6 +96,7 @@ model PatientTest {
   organizationId     String?
   lastUpdatedBy      String?
   lastStatusUpdateAt DateTime?
+  barcode_status     String              @default("Unprinted")
   department         Department          @relation(fields: [departmentId], references: [id])
   organization       Organization?       @relation(fields: [organizationId], references: [id])
   patient            Patient             @relation(fields: [patientId], references: [patientId], onDelete: Cascade)
@@ -115,6 +112,7 @@ model PatientTest {
   @@index([visitDate])
   @@index([visitId])
   @@index([patientId, visitId])
+  @@index([patientId], map: "patient_tests_patientId_fkey")
   @@map("patient_tests")
 }
 
@@ -125,9 +123,9 @@ model TestStatusHistory {
   newStatus      String
   changedBy      String?
   changedAt      DateTime    @default(now())
-  triggerType    String      @default("MANUAL")
-  remarks        String?     @db.LongText
-  patientTest    PatientTest @relation(fields: [patientTestId], references: [id], onDelete: Cascade, onUpdate: Restrict)
+  triggerType    String
+  remarks        String?     @db.Text
+  patientTest    PatientTest @relation(fields: [patientTestId], references: [id], onDelete: Cascade)
 
   @@index([patientTestId])
   @@index([changedAt])
@@ -182,7 +180,6 @@ model Test {
   isDeleted              Boolean          @default(false)
   createdAt              DateTime         @default(now())
   updatedAt              DateTime         @updatedAt
-  signatureId            Int?
   imageSize              String?          @default("800|600")
   linkedTestIds          String?          @db.Text
   testparameters         testparameters[]
@@ -193,7 +190,6 @@ model Test {
   ownedParameters        TestParameter[]  @relation("ParameterOwner")
   templates              TestTemplate[]
   department             Department       @relation(fields: [departmentId], references: [id], onDelete: Cascade)
-  signatures             Signature?       @relation(fields: [signatureId], references: [id])
   testCategory           TestCategory?    @relation("PrimaryTestCategory", fields: [testCategoryId], references: [id])
   testParameter          TestParameter?   @relation("PrimaryTestParameter", fields: [testParameterId], references: [id])
 
@@ -203,7 +199,6 @@ model Test {
   @@index([testParameterId], map: "tests_testParameterId_fkey")
   @@index([isActive])
   @@index([name])
-  @@index([signatureId], map: "tests_signatureId_fkey")
   @@map("tests")
 }
 
@@ -279,23 +274,20 @@ model Doctor {
 
 model Organization {
   id               String            @id
-  name             String            @unique(map: "name")
+  name             String            @unique
   code             String?
   location         String?
-  address          String?           @db.LongText
+  address          String?           @db.Text
   mobile           String?
   email            String?
   date             DateTime?
   isActive         Boolean           @default(true)
   createdAt        DateTime          @default(now())
   updatedAt        DateTime          @updatedAt
-  admins           Admin[]
   moduleAllocation ModuleAllocation?
   patientTests     PatientTest[]
   testCharges      TestCharge[]
-  users            User[]
 
-  @@index([name], map: "idx_organization_name")
   @@map("organizations")
 }
 
@@ -462,23 +454,22 @@ model Role {
 }
 
 model User {
-  id               Int               @id @default(autoincrement())
-  name             String
-  username         String            @unique
-  role             String
-  mobile           String?
-  gender           String?
-  email            String?
-  address          String?           @db.Text
-  password         String
-  isActive         Boolean           @default(true)
-  createdAt        DateTime          @default(now())
-  updatedAt        DateTime          @updatedAt
-  organizationId   String?
-  moduleAllocation ModuleAllocation?
-  organization     Organization?     @relation(fields: [organizationId], references: [id], onDelete: Cascade, onUpdate: Restrict)
+  id                   Int                    @id @default(autoincrement())
+  center               String
+  name                 String
+  username             String                 @unique
+  role                 String
+  mobile               String?
+  gender               String?
+  email                String?
+  address              String?                @db.Text
+  password             String
+  isActive             Boolean                @default(true)
+  createdAt            DateTime               @default(now())
+  updatedAt            DateTime               @updatedAt
+  moduleAllocation     ModuleAllocation?
+  user_password_resets user_password_resets[]
 
-  @@index([organizationId])
   @@map("users")
 }
 
@@ -497,22 +488,33 @@ model Signature {
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
   imageSize      String?   @default("800|600")
-  tests          Test[]
 
   @@map("signatures")
 }
 
 model ModuleAllocation {
   id             Int           @id @default(autoincrement())
-  userId         Int?          @unique(map: "userId")
-  organizationId String?       @unique(map: "organizationId")
+  userId         Int?          @unique
+  organizationId String?       @unique
   modules        String?       @db.LongText
   createdAt      DateTime      @default(now())
-  updatedAt      DateTime      @default(now()) @updatedAt
-  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade, onUpdate: Restrict)
-  user           User?         @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Restrict)
+  updatedAt      DateTime      @updatedAt
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user           User?         @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId], map: "module_allocation_userId_fkey")
   @@index([organizationId], map: "module_allocation_organizationId_fkey")
   @@map("module_allocations")
+}
+
+model user_password_resets {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  code      String
+  expiresAt DateTime
+  used      Boolean  @default(false)
+  createdAt DateTime @default(now())
+  users     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId], map: "user_password_resets_userId_fkey")
 }
