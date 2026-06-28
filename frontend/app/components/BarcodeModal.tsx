@@ -10,6 +10,7 @@ interface BarcodeLabel {
   testIds: number[];
   organizationCode?: string;
   barcode_status?: string;
+  sampleStatus?: string;
   isSelected?: boolean;
 }
 
@@ -101,7 +102,8 @@ const BarcodeCard = ({
   index,
   onClick,
   isPrintMode = false,
-  barcode_status = 'Unprinted'
+  barcode_status = 'Unprinted',
+  sampleStatus = 'Registered'
 }: {
   label: any;
   patientInfo: any;
@@ -110,25 +112,45 @@ const BarcodeCard = ({
   onClick?: () => void;
   isPrintMode?: boolean;
   barcode_status?: string;
+  sampleStatus?: string;
 }) => {
   const { svg, width, height } = buildCode128Svg(label.barcodeValue);
   
-  // Determine colors based on barcode_status from database (persistent)
-  // For print mode: Use barcode_status from DB
-  // For modal: Show selection color if modal-selected, otherwise use DB status
+  // Determine colors based on:
+  // 1. sampleStatus = 'Received' → BLUE (indicates sample received at lab)
+  // 2. barcode_status = 'Printed' → BLUE (indicates barcode was printed)
+  // 3. Not printed → RED (highlight unprinted barcodes)
+  // 4. Modal selection → BLUE (user actively selecting for print)
+  
+  const isReceived = sampleStatus === 'Received';
   const isPrinted = barcode_status === 'Printed';
   const showAsSelected = !isPrintMode && isSelected;
   
-  const borderColor = showAsSelected ? 'border-blue-600' : (isPrinted ? 'border-blue-600' : 'border-red-500');
-  const backgroundColor = showAsSelected ? 'bg-blue-100' : (isPrinted ? 'bg-blue-100' : 'bg-red-100');
+  // Priority: Selection > Received Status > Printed Status > Unprinted (Red)
+  const borderColor = showAsSelected 
+    ? 'border-blue-600' 
+    : isReceived 
+      ? 'border-blue-600' 
+      : isPrinted 
+        ? 'border-blue-600' 
+        : 'border-red-600';
+        
+  const backgroundColor = showAsSelected 
+    ? 'bg-blue-200' 
+    : isReceived 
+      ? 'bg-blue-200' 
+      : isPrinted 
+        ? 'bg-blue-200' 
+        : 'bg-red-300';
 
   return (
     <div
       data-barcode-index={index}
       onClick={isPrintMode ? undefined : onClick}
       className={`
-        relative transition-all border-2 ${borderColor} ${backgroundColor} shadow-sm
-        ${isPrintMode ? 'print:cursor-default print:bg-white print:border-gray-400' : 'cursor-pointer hover:shadow-md hover:border-blue-700'}
+        relative transition-all border-3 ${borderColor} ${backgroundColor} shadow-md rounded
+        ${isPrintMode ? 'print:cursor-default print:bg-white print:border-gray-300 print:border-2' : 'cursor-pointer hover:shadow-lg hover:border-opacity-75'}
+        ${isReceived ? 'ring-2 ring-blue-400' : isPrinted ? 'ring-2 ring-blue-400' : isPrintMode ? '' : 'hover:ring-2 hover:ring-red-400'}
       `}
       style={{
         width: '220px',
@@ -136,16 +158,17 @@ const BarcodeCard = ({
         pageBreakInside: isPrintMode ? 'avoid' : 'auto',
         padding: '3px'
       }}
+      title={isReceived ? 'Sample Status: Received ✓' : isPrinted ? 'Barcode: Printed ✓' : 'Barcode: Not Printed ⚠️'}
     >
       {/* Organization Code - top right corner */}
       {label.organizationCode && (
-        <div className="absolute top-1 right-1 text-[6px] text-gray-700 font-bold bg-white px-1 py-0.5 rounded border border-gray-400">
+        <div className="absolute top-1 right-1 text-[6px] text-gray-700 font-bold bg-white px-1 py-0.5 rounded border border-gray-400 print:text-[5px]">
           {label.organizationCode}
         </div>
       )}
 
       {/* Barcode - centered, compact */}
-      <div className="flex justify-center py-0.5">
+      <div className="flex justify-center py-0.5 print:py-0.5 print:my-1">
         <svg
           xmlns="http://www.w3.org/2000/svg"
           width="85%"
@@ -153,22 +176,23 @@ const BarcodeCard = ({
           viewBox={`0 0 ${width} ${height}`}
           preserveAspectRatio="none"
           dangerouslySetInnerHTML={{ __html: svg }}
+          style={{ pageBreakInside: 'avoid' }}
         />
       </div>
 
       {/* Barcode value (Visit ID) - centered, bold */}
-      <div className="text-center font-bold text-[8px] tracking-wider py-0.5 px-1">
+      <div className="text-center font-bold text-[8px] tracking-wider py-0.5 px-1 print:text-[7px] print:py-1">
         {label.barcodeValue}
       </div>
 
       {/* Date time and specimen type - very compact */}
-      <div className="flex justify-between items-center px-1 py-0 text-[6px]">
-        <span className="text-gray-700 truncate">{label.dateStr}</span>
-        <span className="text-gray-600 font-medium flex-shrink-0">({label.specimen})</span>
+      <div className="flex justify-between items-center px-1 py-0 text-[6px] print:text-[6px] print:py-0.5">
+        <span className="text-gray-700 truncate print:text-gray-900">{label.dateStr}</span>
+        <span className="text-gray-600 font-medium flex-shrink-0 print:text-gray-800">({label.specimen})</span>
       </div>
 
       {/* Age and Gender - below specimen type */}
-      <div className="px-1 py-0.5 text-[6px] text-gray-700 leading-tight">
+      <div className="px-1 py-0.5 text-[6px] text-gray-700 leading-tight print:text-[6px] print:text-gray-900">
         {patientInfo.age && patientInfo.gender ? (
           <span>{patientInfo.gender.charAt(0)}/{patientInfo.age}Y</span>
         ) : (
@@ -177,12 +201,12 @@ const BarcodeCard = ({
       </div>
 
       {/* Patient name - compact */}
-      <div className="px-1 py-0.5 text-[6px] font-bold leading-tight truncate text-gray-800">
+      <div className="px-1 py-0.5 text-[6px] font-bold leading-tight truncate text-gray-800 print:text-[6px] print:text-black">
         {patientInfo.patientName}
       </div>
 
       {/* Test names - minimal height */}
-      <div className="px-1 py-0.5 text-[6px] text-gray-600 leading-tight border-t border-gray-400 max-h-[24px] overflow-hidden">
+      <div className="px-1 py-0.5 text-[6px] text-gray-600 leading-tight border-t border-gray-400 max-h-[24px] overflow-hidden print:text-[6px] print:text-gray-800 print:border-gray-500 print:max-h-[30px]">
         {label.shortNamesStr}
       </div>
     </div>
@@ -246,8 +270,8 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({
         </div>
 
         {/* Legend - REMOVED: No icons shown, just click to select */}
-        {/* Cards show BLUE when selected or when barcode_status='Printed' from database */}
-        {/* Cards show RED when unselected or unprinted */}
+        {/* Cards show BLUE when selected, or when sample status='Received', or when barcode_status='Printed' */}
+        {/* Cards show RED when unselected, unprinted, and status != 'Received' */}
 
         {/* Barcode Cards */}
         <div className="overflow-y-auto flex-1 p-6 bg-gray-100 print:p-4 print:bg-white print:overflow-visible">
@@ -262,6 +286,7 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({
                 onClick={() => onBarcodeToggle?.(idx)}
                 isPrintMode={false}
                 barcode_status={label.barcode_status || 'Unprinted'}
+                sampleStatus={label.sampleStatus || 'Registered'}
               />
             ))}
           </div>

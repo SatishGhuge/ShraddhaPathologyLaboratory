@@ -129,6 +129,7 @@ export const getPatientTests = async (req, res) => {
         visitDate: true,
         visitTime: true,
         status: true,
+        barcode_status: true,
         sampleTaken: true,
         sampleReceived: true,
         resultDate: true,
@@ -226,6 +227,8 @@ export const getPatientTests = async (req, res) => {
         specimen_type: patientTest.test.sampleType || patientTest.sample,
         ref_by: patientTest.referralDoctor || 'SELF',
         result_status: normalizeStatus(patientTest.status),
+        status: patientTest.status,
+        barcode_status: patientTest.barcode_status || 'Unprinted',
         approved_date: patientTest.visitDate ? (() => {
           const d = patientTest.visitDate;
           const datePart = d.toLocaleDateString('en-GB'); // DD/MM/YYYY
@@ -306,7 +309,26 @@ export const getPatientTestById = async (req, res) => {
             speciality: true,
           }
         },
-        testResults: true
+        testResults: {
+          select: {
+            id: true,
+            testParameterId: true,
+            testCategoryId: true,
+            numericValue: true,
+            textValue: true,
+            selectedOption: true,
+            isAbnormal: true,
+            isOutOfRange: true,
+            isPanic: true,
+            lowValue: true,
+            highValue: true,
+            referenceRange: true,
+            enteredBy: true,
+            verifiedBy: true,
+            enteredAt: true,
+            verifiedAt: true
+          }
+        }
       }
     });
 
@@ -319,6 +341,8 @@ export const getPatientTestById = async (req, res) => {
     }
 
     console.log('Found patient test:', patientTest.id, 'for patient:', patientTest.patient.firstName);
+    console.log('Total testResults in database:', patientTest.testResults?.length || 0);
+    console.log('Test Results Details:', JSON.stringify(patientTest.testResults, null, 2));
 
     // Get test categories with their parameters - fetch all range-related fields
     const testCategories = await prisma.testCategory.findMany({
@@ -333,6 +357,7 @@ export const getPatientTestById = async (req, res) => {
             units: true,
             type: true,
             isDescriptive: true,
+            isMultipleOptions: true,
             isMandatory: true,
             parameterSortOrder: true,
             textContent: true,
@@ -370,6 +395,7 @@ export const getPatientTestById = async (req, res) => {
     // Process parameters from categories
     const allParameters = [];
     const groupedParameters = {};
+    let totalExistingResults = 0;
 
     testCategories.forEach(category => {
       if (category.testParameter) {
@@ -382,12 +408,27 @@ export const getPatientTestById = async (req, res) => {
                            category.categoryName : 
                            'NO_CATEGORY_HEADER'; // Special flag for no header
         
+        // Find existing result for this parameter
+        const existingResult = patientTest.testResults.find(r => r.testParameterId === category.testParameter.id);
+        if (existingResult) {
+          console.log(`  ✅ Found saved result for parameter ${category.testParameter.parameterName}:`, {
+            paramId: category.testParameter.id,
+            numericValue: existingResult.numericValue,
+            textValue: existingResult.textValue,
+            selectedOption: existingResult.selectedOption
+          });
+          totalExistingResults++;
+        } else {
+          console.log(`  ⭕ NO result found for parameter ${category.testParameter.parameterName} (ID: ${category.testParameter.id})`);
+        }
+        
         const parameter = {
           id: category.testParameter.id,
           parameterName: category.testParameter.parameterName,
           units: category.testParameter.units,
           type: category.testParameter.type,
           isDescriptive: category.testParameter.isDescriptive,
+          isMultipleOptions: category.testParameter.isMultipleOptions,
           isMandatory: category.testParameter.isMandatory,
           categoryName: categoryName,
           categoryId: category.id,
@@ -453,6 +494,7 @@ export const getPatientTestById = async (req, res) => {
           units: true,
           type: true,
           isDescriptive: true,
+          isMultipleOptions: true,
           isMandatory: true,
           parameterSortOrder: true,
           textContent: true,
@@ -484,12 +526,27 @@ export const getPatientTestById = async (req, res) => {
       });
 
       directParameters.forEach(param => {
+        // Find existing result for this parameter
+        const existingResult = patientTest.testResults.find(r => r.testParameterId === param.id);
+        if (existingResult) {
+          console.log(`  ✅ Found saved result for DIRECT parameter ${param.parameterName}:`, {
+            paramId: param.id,
+            numericValue: existingResult.numericValue,
+            textValue: existingResult.textValue,
+            selectedOption: existingResult.selectedOption
+          });
+          totalExistingResults++;
+        } else {
+          console.log(`  ⭕ NO result found for DIRECT parameter ${param.parameterName} (ID: ${param.id})`);
+        }
+        
         const parameter = {
           id: param.id,
           parameterName: param.parameterName,
           units: param.units,
           type: param.type,
           isDescriptive: param.isDescriptive,
+          isMultipleOptions: param.isMultipleOptions,
           isMandatory: param.isMandatory,
           categoryName: 'NO_CATEGORY_HEADER', // No header for direct parameters
           categoryId: null,
@@ -530,7 +587,7 @@ export const getPatientTestById = async (req, res) => {
           normalRange: getNormalRange(param, patientTest.patient),
           
           // Existing result if any
-          existingResult: patientTest.testResults.find(r => r.testParameterId === param.id)
+          existingResult: existingResult
         };
 
         allParameters.push(parameter);
@@ -545,6 +602,7 @@ export const getPatientTestById = async (req, res) => {
     }
 
     console.log(`Processed ${allParameters.length} parameters in ${Object.keys(groupedParameters).length} categories`);
+    console.log(`📤 RETURNING: ${totalExistingResults} parameters have existing saved results`);
 
     // Fetch signature matching the test's speciality
     let signature = null;
@@ -561,7 +619,8 @@ export const getPatientTestById = async (req, res) => {
         patientTest,
         parameters: allParameters,
         groupedParameters,
-        signature
+        signature,
+        debug: { totalExistingResults, totalParameters: allParameters.length }
       }
     });
 

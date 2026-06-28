@@ -36,9 +36,16 @@ const TestList = () => {
       setError(null);
       const response = await getTests(page, ITEMS_PER_PAGE);
       
-      // Handle API response - getTests now returns { data, pagination }
-      setTests(response.data || []);
-      setPagination(response.pagination || null);
+      // Handle API response - getTests now returns an array directly
+      // Sort tests alphabetically by name
+      const sortedTests = response.sort((a, b) => {
+        const nameA = (a.name || '').toLowerCase();
+        const nameB = (b.name || '').toLowerCase();
+        return nameA.localeCompare(nameB);
+      });
+      
+      setTests(sortedTests);
+      setPagination(null);
     } catch (err) {
       console.error('Error fetching tests:', err);
       setError(err instanceof Error ? err.message : 'Failed to load tests. Please try again.');
@@ -233,7 +240,6 @@ const TestList = () => {
                     "Name",
                     "Short Name",
                     "Department",
-                    "Sort Order",
                     "Active",
                     "Action",
                   ].map((head) => (
@@ -250,7 +256,7 @@ const TestList = () => {
               <tbody>
                 {tests.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="text-center py-8 text-gray-500">
+                    <td colSpan={6} className="text-center py-8 text-gray-500">
                       No tests found.
                     </td>
                   </tr>
@@ -276,15 +282,6 @@ const TestList = () => {
 
                         <td className="border border-gray-300 px-3 py-1">
                           {test.department?.name || '-'}
-                        </td>
-
-                        <td className="border border-gray-300 px-3 py-1">
-                          <input
-                            type="text"
-                            value={test.sortOrder || ''}
-                            readOnly
-                            className="border border-gray-300 w-12 sm:w-16 px-2 py-1 text-xs sm:text-sm rounded"
-                          />
                         </td>
 
                         {/* Active column */}

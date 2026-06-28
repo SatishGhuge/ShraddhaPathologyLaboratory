@@ -469,13 +469,14 @@ const PatientResult = () => {
                 <th className="border p-2 text-left">OBSERVED VALUE</th>
                 <th className="border p-2 text-left">UNITS</th>
                 <th className="border p-2 text-left">NORMAL RANGE</th>
+                <th className="border p-2 text-center">FORMULA</th>
               </tr>
             </thead>
             <tbody>
               {Object.entries(groupedParameters).map(([categoryName, categoryParams]: [string, any]) => (
                 <React.Fragment key={categoryName}>
                   {categoryName !== 'NO_CATEGORY_HEADER' && categoryParams[0]?.showCategoryHeader && (
-                    <tr className="bg-gray-200 font-semibold"><td colSpan={4} className="p-2">{categoryName.toUpperCase()}</td></tr>
+                    <tr className="bg-gray-200 font-semibold"><td colSpan={5} className="p-2">{categoryName.toUpperCase()}</td></tr>
                   )}
                   {(categoryParams as any[]).map((param) => {
                     const outOfRange = isValueOutOfRange(param, results[param.id]?.numericValue);
@@ -520,6 +521,16 @@ const PatientResult = () => {
                         </td>
                         <td className="border p-2">{param.units || ''}</td>
                         <td className="border p-2">{param.type === 'Text' || param.isDescriptive ? (param.normalRange || '') : getAgeAppropriateRange(param, patientData.patient.age, patientData.patient.gender, patientData.patient.dob)}</td>
+                        <td className="border p-2 text-center text-xs">
+                          {param.hasFormula && param.formula ? (
+                            <div className="bg-green-50 border border-green-300 rounded p-1">
+                              <div className="font-semibold text-green-700 text-xs mb-0.5">Formula:</div>
+                              <div className="text-green-900 font-mono text-xs break-words">{param.formula}</div>
+                            </div>
+                          ) : (
+                            <span className="text-gray-400">-</span>
+                          )}
+                        </td>
                       </tr>
                     );
                   })}

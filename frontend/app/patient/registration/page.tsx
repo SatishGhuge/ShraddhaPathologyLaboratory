@@ -341,6 +341,7 @@ export default function PatientRegistration() {
   const [showPrintDropdown, setShowPrintDropdown] = useState(false);
   const [showDownloadDropdown, setShowDownloadDropdown] = useState(false);
   const [billData, setBillData] = useState<any>(null);
+  const [lastRegisteredVisitId, setLastRegisteredVisitId] = useState<string | null>(null);
   
   const [showSimilarPatientsDropdown, setShowSimilarPatientsDropdown] = useState(false);
   const [newPackage, setNewPackage] = useState({ name: "", tests: [], b2cCharge: 0, b2bCharge: 0 });
@@ -1529,6 +1530,9 @@ export default function PatientRegistration() {
       const visitId = response?.data?.tests?.[0]?.visitId || 'N/A';
       const isExisting = response?.isExistingPatient || false;
       
+      // Store the actual visitId for use in bill modal
+      setLastRegisteredVisitId(visitId);
+      
       // Get PatientTest objects from response (these have the correct database ID)
       const patientTests = response?.data?.tests || [];
       console.log('📋 PatientTests from response:', patientTests);
@@ -1783,6 +1787,13 @@ export default function PatientRegistration() {
   /* ----------- BILL PRINT FUNCTIONS -----------*/
   const handlePrintBillWithHeader = async () => {
     setShowPrintDropdown(false);
+    
+    // Check if patient has been registered (visitId exists)
+    if (!lastRegisteredVisitId) {
+      alert('Please save the patient registration first before printing the bill');
+      return;
+    }
+    
     if (selectedTests.length === 0) {
       alert('Please add tests before printing bill');
       return;
@@ -1790,7 +1801,7 @@ export default function PatientRegistration() {
     
     const billBooking = {
       bookingId: `REG-${Date.now()}`,
-      visitId: `VIS-${Date.now()}`,
+      visitId: lastRegisteredVisitId,
       patientId: existingPatientId || `NEW-${Date.now()}`,
       name: `${title} ${firstName} ${lastName || ''}`.trim(),
       date: new Date(date).toLocaleDateString("en-GB"),
@@ -1829,6 +1840,12 @@ export default function PatientRegistration() {
 
   const handlePrintBillWithoutHeader = async () => {
     setShowPrintDropdown(false);
+    
+    // Check if patient has been registered (visitId exists)
+    if (!lastRegisteredVisitId) {
+      alert('Please save the patient registration first before printing the bill');
+      return;
+    }
     if (selectedTests.length === 0) {
       alert('Please add tests before printing bill');
       return;
@@ -1836,7 +1853,7 @@ export default function PatientRegistration() {
     
     const billBooking = {
       bookingId: `REG-${Date.now()}`,
-      visitId: `VIS-${Date.now()}`,
+      visitId: lastRegisteredVisitId,
       patientId: existingPatientId || `NEW-${Date.now()}`,
       name: `${title} ${firstName} ${lastName || ''}`.trim(),
       date: new Date(date).toLocaleDateString("en-GB"),
@@ -1875,6 +1892,13 @@ export default function PatientRegistration() {
 
   const handleDownloadBillWithHeader = async () => {
     setShowDownloadDropdown(false);
+    
+    // Check if patient has been registered (visitId exists)
+    if (!lastRegisteredVisitId) {
+      alert('Please save the patient registration first before downloading the bill');
+      return;
+    }
+    
     if (selectedTests.length === 0) {
       alert('Please add tests before downloading bill');
       return;
@@ -1882,7 +1906,7 @@ export default function PatientRegistration() {
     
     const billBooking = {
       bookingId: `REG-${Date.now()}`,
-      visitId: `VIS-${Date.now()}`,
+      visitId: lastRegisteredVisitId,
       patientId: existingPatientId || `NEW-${Date.now()}`,
       name: `${title} ${firstName} ${lastName || ''}`.trim(),
       date: new Date(date).toLocaleDateString("en-GB"),
@@ -1921,6 +1945,13 @@ export default function PatientRegistration() {
 
   const handleDownloadBillWithoutHeader = async () => {
     setShowDownloadDropdown(false);
+    
+    // Check if patient has been registered (visitId exists)
+    if (!lastRegisteredVisitId) {
+      alert('Please save the patient registration first before downloading the bill');
+      return;
+    }
+    
     if (selectedTests.length === 0) {
       alert('Please add tests before downloading bill');
       return;
@@ -1928,7 +1959,7 @@ export default function PatientRegistration() {
     
     const billBooking = {
       bookingId: `REG-${Date.now()}`,
-      visitId: `VIS-${Date.now()}`,
+      visitId: lastRegisteredVisitId,
       patientId: existingPatientId || `NEW-${Date.now()}`,
       name: `${title} ${firstName} ${lastName || ''}`.trim(),
       date: new Date(date).toLocaleDateString("en-GB"),
@@ -2111,7 +2142,7 @@ export default function PatientRegistration() {
                 <div className="relative">
                   <input
                     type="text"
-                    placeholder="Location"
+                    placeholder="Location *"
                     value={locationSearch}
                     onChange={(e) => handleLocationSearchChange(e.target.value)}
                     onFocus={() => {
@@ -2762,7 +2793,7 @@ export default function PatientRegistration() {
               <BillReceipt
                 booking={{
                   bookingId: `REG-${Date.now()}`,
-                  visitId: `VIS-${Date.now()}`,
+                  visitId: lastRegisteredVisitId || `VIS-${Date.now()}`,
                   patientId: existingPatientId || `NEW-${Date.now()}`,
                   name: `${title} ${firstName} ${lastName || ''}`.trim(),
                   date: new Date(date).toLocaleDateString("en-GB"),
