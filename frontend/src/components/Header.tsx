@@ -59,8 +59,7 @@ const allModules: NavModule[] = [
     icon: <FileBarChart2 size={20} />,
     items: [
       { label: "Dashboard", path: "/reports/report-dashboard" },
-      { label: "Daily Collection", path: "/reports/daily-collection" },
-      { label: "Monthly Collection Summary", path: "/reports/monthly-collection-summary" },
+      { label: "Collection Report", path: "/reports/collection" },
       { label: "Patient List", path: "/reports/patient-list" },
       { label: "Center wise cost Report", path: "/reports/center-wise-cost-report" },
       { label: "B2B Testwise Cost Report", path: "/reports/b2b-testwise-cost-report" },
@@ -193,8 +192,7 @@ const Header = () => {
               ...module,
               items: module.items.filter(item => {
                 if (item.path.includes("report-dashboard")) return accessible.reports.dashboard;
-                if (item.path.includes("daily-collection")) return accessible.reports.dailyCollection;
-                if (item.path.includes("monthly-collection")) return accessible.reports.monthlyCollectionSummary;
+                if (item.path.includes("/collection")) return accessible.reports.dailyCollection || accessible.reports.monthlyCollectionSummary;
                 if (item.path.includes("patient-list")) return accessible.reports.patientList;
                 if (item.path.includes("center-wise")) return accessible.reports.centerWiseCostReport;
                 if (item.path.includes("b2b-testwise")) return accessible.reports.b2bTestwiseCostReport;
