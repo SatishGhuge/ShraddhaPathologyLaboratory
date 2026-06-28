@@ -37,12 +37,20 @@ const apiCall = async <T = any>(endpoint: string, options: RequestInit & { heade
     const data: ApiResponse<T> = await response.json();
 
     if (!response.ok) {
-      throw new Error(data.message || 'API request failed');
+      const errorMsg = data.message || `API Error: ${response.status} ${response.statusText}`;
+      const error = new Error(errorMsg) as any;
+      error.response = { status: response.status, data };
+      throw error;
     }
 
     return data;
   } catch (error) {
-    console.error('API Error:', error);
+    console.error('API Error:', {
+      endpoint,
+      error: error?.message,
+      status: (error as any)?.response?.status,
+      data: (error as any)?.response?.data
+    });
     throw error;
   }
 };
@@ -144,6 +152,18 @@ export const getCorporates = async (page: number = 1, limit: number = 20): Promi
   params.append('limit', limit.toString());
   
   const response = await apiCall(`/master/corporates?${params.toString()}`, {
+    method: 'GET',
+  });
+  return response.data || [];
+};
+
+// Get all organizations
+export const getOrganizations = async (page: number = 1, limit: number = 20): Promise<any[]> => {
+  const params = new URLSearchParams();
+  params.append('page', page.toString());
+  params.append('limit', limit.toString());
+  
+  const response = await apiCall(`/master/organizations?${params.toString()}`, {
     method: 'GET',
   });
   return response.data || [];

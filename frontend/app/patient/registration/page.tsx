@@ -1450,7 +1450,12 @@ export default function PatientRegistration() {
       
     } catch (error) {
       console.error("Error saving patient info:", error);
-      alert(`Failed to save patient info: ${error.message}`);
+      console.error("Full error details:", {
+        message: error?.message,
+        status: error?.response?.status,
+        data: error?.response?.data
+      });
+      alert(`Failed to save patient info: ${error.message || 'Network error - check console'}`);
     }
   };
 
@@ -1582,7 +1587,12 @@ export default function PatientRegistration() {
       
     } catch (error) {
       console.error("Error saving registration:", error);
-      alert(`Failed to register patient: ${error.message}`);
+      console.error("Full error details:", {
+        message: error?.message,
+        status: error?.response?.status,
+        data: error?.response?.data
+      });
+      alert(`Failed to register patient: ${error.message || 'Network error - check backend server'}`);
     }
   };
 
@@ -2670,7 +2680,11 @@ export default function PatientRegistration() {
 
             <div className="grid grid-cols-3 gap-2 p-2 border-b bg-white items-center">
               <select className={input} value={paymentMode} onChange={(e) => setPaymentMode(e.target.value)}>
-                <option>Cash</option><option>UPI</option><option>Card</option><option>Net Banking</option>
+                <option>Cash</option>
+                <option>Debit Card</option>
+                <option>Credit Card</option>
+                <option>UPI</option>
+                <option>Other</option>
               </select>
               <input className={input} placeholder="Discount Remark" value={discountRemark} onChange={(e) => setDiscountRemark(e.target.value)} />
               <div className="text-right">

@@ -516,3 +516,19 @@ model ModuleAllocation {
   @@index([organizationId], map: "module_allocation_organizationId_fkey")
   @@map("module_allocations")
 }
+
+model PaymentTransaction {
+  id              Int       @id @default(autoincrement())
+  visitId         String
+  patientId       String
+  paymentMode     String
+  paymentAmount   Float
+  remarks         String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([visitId])
+  @@index([patientId])
+  @@index([paymentMode])
+  @@map("payment_transactions")
+}

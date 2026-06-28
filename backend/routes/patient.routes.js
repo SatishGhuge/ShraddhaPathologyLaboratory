@@ -10,12 +10,15 @@ import {
   updatePayment,
   getPatientStatistics,
   getPatientLocationStatistics,
-  addTestToVisit
+  addTestToVisit,
+  createPaymentTransaction,
+  getPaymentTransactions,
+  getPatientPaymentTransactions
 } from '../controllers/patient.controller.js';
 
 const router = express.Router();
 
-// Search patient by mobile or email — must be before /:id
+// Search patient by mobile or email — must be FIRST before /:id
 router.get('/search', searchPatient);
 
 // Get patient statistics for dashboard
@@ -23,6 +26,10 @@ router.get('/statistics', getPatientStatistics);
 
 // Get patient location-wise statistics
 router.get('/statistics/location', getPatientLocationStatistics);
+
+// Payment transaction routes — MUST be before /:id routes
+router.post('/payment-transaction', createPaymentTransaction);
+router.get('/payment-transactions/:visitId', getPaymentTransactions);
 
 // Get all patients
 router.get('/', getAllPatients);
@@ -51,5 +58,8 @@ router.patch('/:patientId/payment', updatePayment);
 
 // Add test to existing visit
 router.post('/:patientId/visits/:visitId/tests', addTestToVisit);
+
+// Get all payment transactions for a patient
+router.get('/:patientId/payment-transactions', getPatientPaymentTransactions);
 
 export default router;
