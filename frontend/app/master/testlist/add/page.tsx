@@ -38,14 +38,12 @@ const AddTest = () => {
   const [formData, setFormData] = useState({
     name: "",
     department: "",
-    speciality: "Regular",
     sortOrder: "",
     shortName: "",
     attachFile: "Yes",
     imageSize: "800|600",
     signatureId: "",
     costForLab: "",
-    testMethod: "",
     preparationTime: "",
     preparationType: "",
     isNABL: false,
@@ -183,6 +181,7 @@ const AddTest = () => {
       multiplyBy: "",
       decimal: "",
       sortOrder: "",
+      testMethod: "",
       isDescriptive: false,
       lowPanic: "",
       highPanic: "",
@@ -345,7 +344,6 @@ const AddTest = () => {
               imageSize: testData.imageSize || "800|600",
               signatureId: testData.signatureId?.toString() || "",
               costForLab: testData.costForLab?.toString() || "",
-              testMethod: testData.testMethod || "",
               preparationTime: testData.preparationTime || "",
               preparationType: testData.preparationType || "",
               isNABL: testData.isNABL || false,
@@ -392,6 +390,7 @@ const AddTest = () => {
                           machineCode: param.machineCode || "",
                           decimal: param.decimal !== undefined && param.decimal !== "" ? param.decimal : "",
                           sortOrder: param.sortOrder || "",
+                          testMethod: param.testMethod || "",
                           isDescriptive: param.isDescriptive || false,
                           lowPanic: param.lowPanic?.toString() || "",
                           highPanic: param.highPanic?.toString() || "",
@@ -674,6 +673,7 @@ const AddTest = () => {
       decimal: "",
       multiplyBy: "",
       sortOrder: "",
+      testMethod: "",
       isDescriptive: false,
       lowPanic: "",
       highPanic: "",
@@ -721,6 +721,7 @@ const AddTest = () => {
         machineCode: "",
         decimal: "",
         sortOrder: "",
+        testMethod: "",
         isDescriptive: false,
         lowPanic: "",
         highPanic: "",
@@ -874,9 +875,7 @@ const AddTest = () => {
         testCode: formData.testCode || null,
         departmentId: parseInt(formData.department),
         sampleType: formData.sampleType || null,
-        testMethod: formData.testMethod || null,
         machineName: formData.machineName || null,
-        speciality: formData.speciality || "Regular",
         group: formData.group || null,
         sortOrder: parseInt(formData.sortOrder) || null,
         reportHeader: formData.reportHeader || null,
@@ -923,6 +922,7 @@ const AddTest = () => {
           multiplyBy: param.multiplyBy || null,
           decimal: param.decimal ? parseInt(param.decimal) : null,
           sortOrder: param.sortOrder ? parseInt(param.sortOrder) : null,
+          testMethod: param.testMethod || null,
           isDescriptive: param.isDescriptive || false,
           lowPanic: param.lowPanic ? parseFloat(param.lowPanic) : null,
           highPanic: param.highPanic ? parseFloat(param.highPanic) : null,
@@ -1112,16 +1112,6 @@ const AddTest = () => {
                     disabled={isViewMode} 
                   />
 
-                  <Select
-                    label="Speciality"
-                    name="speciality"
-                    value={formData.speciality}
-                    onChange={handleChange}
-                    options={["Regular", "Pathology", "Cardiology", "Microbiology", "Biochemistry", "Culture & Sensitivity", "Haematology"]}
-                    disabled={isViewMode}
-                    required={false}
-                  />
-
                   <Input 
                     label="Sort Order" 
                     name="sortOrder"
@@ -1179,15 +1169,6 @@ const AddTest = () => {
                       disabled={isViewMode} 
                     required={false}/>
                   </div>
-
-                  <Input 
-                    label="Test Method" 
-                    name="testMethod"
-                    value={formData.testMethod}
-                    onChange={handleChange}
-                    disabled={isViewMode}
-                    required={false}
-                  />
 
                   <div className="flex flex-col sm:flex-row gap-3">
                     <Input 
@@ -1657,18 +1638,20 @@ const AddTest = () => {
                           disabled={isViewMode} 
                         />
                       </div>
+                      <div>
+                        <label className="block font-semibold text-gray-700 text-xs sm:text-sm mb-1">
+                          Category Test Method
+                        </label>
+                        <input 
+                          className="px-2 py-1.5 sm:py-1 border border-gray-300 rounded text-xs sm:text-sm w-full sm:w-40" 
+                          placeholder="Category test method..." 
+                          value={category.testMethod || ""}
+                          onChange={(e) => handleCategoryChange(categoryIndex, 'testMethod', e.target.value)}
+                          disabled={isViewMode} 
+                        />
+                      </div>
                     </div>
                   )}
-                  {/* Test Method in second row of first column */}
-                  <div className="mt-3">
-                    <input 
-                      className="px-2 py-1.5 sm:py-1 border border-gray-300 rounded text-xs sm:text-sm w-full sm:w-40" 
-                      placeholder="Test Method" 
-                      value={category.testMethod || ""}
-                      onChange={(e) => handleCategoryChange(categoryIndex, 'testMethod', e.target.value)}
-                      disabled={isViewMode} 
-                    />
-                  </div>
                 </div>
 
                 {/* COLUMN 2: Parameters */}
@@ -1880,6 +1863,16 @@ const AddTest = () => {
                             type="number"
                             value={parameter.sortOrder || ""}
                             onChange={(e) => handleParameterChange(categoryIndex, paramIndex, 'sortOrder', e.target.value)}
+                            disabled={isViewMode} 
+                          />
+                        )}
+
+                        {category.isCategory && (
+                          <input 
+                            className="px-2 py-1.5 sm:py-1 border border-gray-300 rounded text-xs sm:text-sm w-full sm:w-32" 
+                            placeholder="Parameter Test Method" 
+                            value={parameter.testMethod || ""}
+                            onChange={(e) => handleParameterChange(categoryIndex, paramIndex, 'testMethod', e.target.value)}
                             disabled={isViewMode} 
                           />
                         )}

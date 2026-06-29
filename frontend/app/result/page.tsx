@@ -261,6 +261,9 @@ export default function Result() {
   const [showSortDropdown, setShowSortDropdown] = useState(false);
   const [sortBy, setSortBy] = useState('date'); // 'date', 'uid', 'alphabetic'
 
+  // State for pagination
+  const [currentPage, setCurrentPage] = useState(1);
+  const RECORDS_PER_PAGE = 20;
 
   // State for barcode checkbox selection (separate from result selection)
   const [barcodeSelectedTests, setBarcodeSelectedTests] = useState(new Set());
@@ -430,28 +433,56 @@ export default function Result() {
     // Multiple tests with same specimen → one barcode, short names joined with " / "
     const specimenGroups = {};
     const specimenTestIds = {};
+    const specimenTestStatuses = {}; // Track ALL test statuses for each specimen group
+    const specimenBarcodeStatuses = {}; // Track ALL barcode statuses for each specimen group
+    
     selectedTestsList.forEach(t => {
       const key = t.specimen_type || 'Unknown';
       if (!specimenGroups[key]) {
         specimenGroups[key] = [];
         specimenTestIds[key] = [];
+        specimenTestStatuses[key] = []; // Store array of all test statuses
+        specimenBarcodeStatuses[key] = []; // Store array of all barcode statuses
       }
       specimenGroups[key].push(t.test_short_name || t.test_name);
-      specimenTestIds[key].push(t.test_id); // Store test IDs
+      specimenTestIds[key].push(t.test_id);
+      specimenTestStatuses[key].push(t.status || 'Registered'); // Store each test's status
+      specimenBarcodeStatuses[key].push(t.barcode_status || 'Unprinted'); // Store each barcode's status
     });
 
     // Build labels — barcode value = visitId for first specimen, visitId-2, visitId-3 ...
     const specimenEntries = Object.entries(specimenGroups);
-    const labels = specimenEntries.map(([specimen, shortNames], idx) => ({
-      // visitId for first, visitId-2 for second, etc.
-      barcodeValue: idx === 0 ? targetPatient.visit_id : `${targetPatient.visit_id}-${idx + 1}`,
-      specimen,
-      // Short names joined — truncated smartly for label space
-      shortNamesStr: (shortNames as any[]).join(' / '),
-      dateStr,
-      timeStr,
-      testIds: specimenTestIds[specimen] || [], // Include test IDs for API calls
-    }));
+    const labels = specimenEntries.map(([specimen, shortNames], idx) => {
+      const statuses = specimenTestStatuses[specimen] || [];
+      const barcodeStatuses = specimenBarcodeStatuses[specimen] || [];
+      
+      // Determine final status: if ANY test is "Received", use "Received"
+      // Otherwise, if ANY barcode is "Printed", use "Printed"
+      // Otherwise use "Registered" (no test received yet)
+      let finalSampleStatus = 'Registered';
+      let finalBarcodeStatus = 'Unprinted';
+      
+      // Check if any test has been received
+      if (statuses.includes('Received')) {
+        finalSampleStatus = 'Received';
+      }
+      
+      // Check if any barcode has been printed
+      if (barcodeStatuses.includes('Printed')) {
+        finalBarcodeStatus = 'Printed';
+      }
+      
+      return {
+        barcodeValue: idx === 0 ? targetPatient.visit_id : `${targetPatient.visit_id}-${idx + 1}`,
+        specimen,
+        shortNamesStr: (shortNames as any[]).join(' / '),
+        dateStr,
+        timeStr,
+        testIds: specimenTestIds[specimen] || [],
+        sampleStatus: finalSampleStatus,
+        barcode_status: finalBarcodeStatus,
+      };
+    });
 
     const genderInitial = targetPatient.gender ? targetPatient.gender.charAt(0).toUpperCase() : '';
     const age = targetPatient.age || '';
@@ -473,8 +504,8 @@ export default function Result() {
     }));
     
     setBarcodeLabels(labelsWithOrgCode);
-    // Initialize all barcodes as selected by default
-    setSelectedBarcodeIndices(new Set(Array.from({ length: labelsWithOrgCode.length }, (_, i) => i)));
+    // Initialize NO barcodes as selected (user must manually select them)
+    setSelectedBarcodeIndices(new Set());
     setShowBarcodeModal(true);
   };
 
@@ -1496,6 +1527,18 @@ export default function Result() {
     }
   });
 
+  // Calculate pagination
+  const totalRecords = sortedAndFilteredResults.length;
+  const totalPages = Math.ceil(totalRecords / RECORDS_PER_PAGE);
+  const startIndex = (currentPage - 1) * RECORDS_PER_PAGE;
+  const endIndex = startIndex + RECORDS_PER_PAGE;
+  const paginatedResults = sortedAndFilteredResults.slice(startIndex, endIndex);
+
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [filteredResults]);
+
   // Get status badge color based on status
   const getStatusBadgeColor = (status: any) => {
     const pascalStatus = status.charAt(0).toUpperCase() + status.slice(1).toLowerCase();
@@ -1932,14 +1975,14 @@ export default function Result() {
                           </div>
                         </td>
                       </tr>
-                    ) : sortedAndFilteredResults.length === 0 ? (
+                    ) : paginatedResults.length === 0 ? (
                       <tr>
                         <td colSpan={10} className="text-center p-3 sm:p-4 text-gray-500 text-xs sm:text-sm border border-gray-300">
                           No records found for {selectedStatus} status
                         </td>
                       </tr>
                     ) : (
-                      sortedAndFilteredResults.map((patient, patientIndex) => {
+                      paginatedResults.map((patient, patientIndex) => {
                         return patient.tests.map((test, testIndex) => (
                           <tr 
                             key={`${patient.patient_uid}-${test.test_id}`} 
@@ -1968,14 +2011,16 @@ export default function Result() {
                                   className="cursor-help relative group"
                                   title={patient.organization_name || 'N/A'}
                                 >
-                                  <span>{patient.organizationCode || patient.patient_uid}</span>
-                                  {/* Tooltip */}
-                                  <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 hidden group-hover:flex flex-col items-center z-50 pointer-events-none">
-                                    <span className="bg-gray-800 text-white text-[10px] font-semibold rounded px-2 py-1 whitespace-nowrap shadow-lg">
-                                      {patient.organization_name || 'Organization'}
+                                  <span>{patient.organizationCode ? patient.organizationCode : '-'}</span>
+                                  {/* Tooltip - only show if organization exists */}
+                                  {patient.organizationCode && (
+                                    <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 hidden group-hover:flex flex-col items-center z-50 pointer-events-none">
+                                      <span className="bg-gray-800 text-white text-[10px] font-semibold rounded px-2 py-1 whitespace-nowrap shadow-lg">
+                                        {patient.organization_name || 'Organization'}
+                                      </span>
+                                      <span className="w-2 h-2 bg-gray-800 rotate-45 -mt-1" />
                                     </span>
-                                    <span className="w-2 h-2 bg-gray-800 rotate-45 -mt-1" />
-                                  </span>
+                                  )}
                                 </div>
                               )}
                             </td>
@@ -2214,6 +2259,60 @@ export default function Result() {
                 </table>
               </div>
             </div>
+
+            {/* Pagination Controls */}
+            {totalRecords > 0 && (
+              <div className="bg-white rounded shadow-md p-3 flex items-center justify-between">
+                <div className="text-sm text-gray-700">
+                  Showing <span className="font-semibold">{startIndex + 1}</span> to <span className="font-semibold">{Math.min(endIndex, totalRecords)}</span> of <span className="font-semibold">{totalRecords}</span> records
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                    disabled={currentPage === 1}
+                    className="px-3 py-1.5 bg-cyan-600 hover:bg-cyan-700 disabled:bg-gray-400 text-white rounded text-sm font-medium transition-colors"
+                  >
+                    ← Previous
+                  </button>
+                  
+                  <div className="flex items-center gap-1">
+                    {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                      let pageNum;
+                      if (totalPages <= 5) {
+                        pageNum = i + 1;
+                      } else if (currentPage <= 3) {
+                        pageNum = i + 1;
+                      } else if (currentPage >= totalPages - 2) {
+                        pageNum = totalPages - 4 + i;
+                      } else {
+                        pageNum = currentPage - 2 + i;
+                      }
+                      return (
+                        <button
+                          key={pageNum}
+                          onClick={() => setCurrentPage(pageNum)}
+                          className={`px-2.5 py-1 rounded text-sm font-medium transition-colors ${
+                            currentPage === pageNum
+                              ? 'bg-cyan-600 text-white'
+                              : 'bg-gray-200 hover:bg-gray-300 text-gray-800'
+                          }`}
+                        >
+                          {pageNum}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  
+                  <button
+                    onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                    disabled={currentPage === totalPages}
+                    className="px-3 py-1.5 bg-cyan-600 hover:bg-cyan-700 disabled:bg-gray-400 text-white rounded text-sm font-medium transition-colors"
+                  >
+                    Next →
+                  </button>
+                </div>
+              </div>
+            )}
             
             {/* Bottom Action Buttons */}
             <div className="bg-white rounded shadow-md p-2 sm:p-3">
@@ -2783,32 +2882,72 @@ export default function Result() {
   <title>Barcode Labels - ${barcodePatientInfo?.patientName || 'Print'}</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { font-family: Arial, sans-serif; background: white; padding: 8mm; }
-    .barcode-container { display: flex; flex-wrap: wrap; gap: 6mm; justify-content: flex-start; }
+    html, body { width: 100%; height: 100%; }
+    body { 
+      font-family: 'Arial', sans-serif; 
+      background: white; 
+      padding: 5mm;
+      margin: 0;
+    }
+    .barcode-container { 
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 5mm;
+      padding: 0;
+      page-break-after: auto;
+    }
     .barcode-card {
-      width: 58mm;
-      border: 2px solid;
-      padding: 3px;
+      width: 70mm;
+      height: 80mm;
+      border: 2px solid #333;
+      padding: 4px;
       page-break-inside: avoid;
       background: white;
       display: flex;
       flex-direction: column;
-      font-family: Arial, sans-serif;
+      font-family: 'Arial', sans-serif;
+      font-size: 10px;
+      break-inside: avoid;
     }
-    @page { size: A4; margin: 8mm; }
-    @media print { body { padding: 0; } .barcode-container { gap: 4mm; } }
+    svg { 
+      max-width: 100%; 
+      height: auto; 
+      display: block;
+    }
+    @page { 
+      size: A4 portrait; 
+      margin: 5mm;
+      padding: 0;
+    }
+    @media print { 
+      body { 
+        padding: 5mm;
+        margin: 0;
+      }
+      .barcode-container { 
+        gap: 3mm;
+      }
+      .barcode-card {
+        border: 1px solid #000;
+        page-break-inside: avoid;
+        break-inside: avoid;
+      }
+    }
   </style>
 </head>
 <body>
   <div class="barcode-container">
     ${printContent}
   </div>
+  <script>
+    window.addEventListener('load', () => {
+      setTimeout(() => window.print(), 500);
+    });
+  </script>
 </body>
 </html>`);
           win.document.close();
           win.focus();
-          setTimeout(() => win.print(), 500);
-          setShowBarcodeModal(false);
         }}
         onPrintAndUpdate={async () => {
           let successCount = 0;

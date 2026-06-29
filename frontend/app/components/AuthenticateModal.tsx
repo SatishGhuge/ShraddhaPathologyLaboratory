@@ -8,6 +8,7 @@ interface Parameter {
   units: string;
   type: string;
   isDescriptive: boolean;
+  isMultipleOptions: boolean;
   isMandatory: boolean;
   categoryName: string;
   categoryId: number;
@@ -17,6 +18,7 @@ interface Parameter {
   displayRangeText: string;
   rangeText: string;
   normalRange: string;
+  textContent?: string;
   ageRanges?: any;
   maleLowValue?: number;
   maleHighValue?: number;
@@ -78,16 +80,32 @@ const AuthenticateModal = ({
   useEffect(() => {
     if (parameters && parameters.length > 0) {
       const initialResults = {};
+      let savedValuesCount = 0;
+      
       parameters.forEach(param => {
         if (param.existingResult) {
-          initialResults[param.id] = {
+          console.log(`✅ AUTH MODAL - FOUND SAVED VALUE - Param: ${param.parameterName} (ID: ${param.id})`, {
+            type: param.type,
+            existingResult: param.existingResult,
             numericValue: param.existingResult.numericValue,
             textValue: param.existingResult.textValue,
-            selectedOption: param.existingResult.selectedOption,
-            isAbnormal: param.existingResult.isAbnormal,
-            referenceRange: param.existingResult.referenceRange
+            selectedOption: param.existingResult.selectedOption
+          });
+          savedValuesCount++;
+          
+          const numericVal = param.existingResult.numericValue;
+          const textVal = param.existingResult.textValue;
+          const optionVal = param.existingResult.selectedOption;
+          
+          initialResults[param.id] = {
+            numericValue: (numericVal !== null && numericVal !== undefined) ? numericVal : null,
+            textValue: (textVal && typeof textVal === 'string' && textVal.trim() !== '') ? textVal : '',
+            selectedOption: (optionVal && typeof optionVal === 'string' && optionVal.trim() !== '') ? optionVal : '',
+            isAbnormal: param.existingResult.isAbnormal || false,
+            referenceRange: param.existingResult.referenceRange || param.normalRange
           };
         } else {
+          console.log(`⭕ AUTH MODAL - NO SAVED VALUE - Param: ${param.parameterName} (ID: ${param.id})`);
           initialResults[param.id] = {
             numericValue: null,
             textValue: '',
@@ -97,6 +115,7 @@ const AuthenticateModal = ({
           };
         }
       });
+      console.log(`📊 AUTH MODAL SUMMARY: Found ${savedValuesCount} saved values out of ${parameters.length} parameters`);
       setResults(initialResults);
     }
   }, [parameters]);
@@ -315,10 +334,9 @@ const AuthenticateModal = ({
               <thead className="bg-gradient-to-r from-blue-300 to-blue-200 text-blue-900">
                 <tr>
                   <th className="border p-2 text-left font-semibold">Parameter Name</th>
-                  <th className="border p-2 text-center w-24 font-semibold">Value</th>
+                  <th className="border p-2 text-center w-32 font-semibold">Value</th>
                   <th className="border p-2 text-center w-16 font-semibold">Units</th>
                   <th className="border p-2 text-center w-28 font-semibold">Biological Range</th>
-                  <th className="border p-2 text-center w-16 font-semibold">Abnormal</th>
                 </tr>
               </thead>
               <tbody>
@@ -359,21 +377,45 @@ const AuthenticateModal = ({
                                 className={`w-full text-center ${inputClass}`}
                               />
                             ) : param.isDescriptive ? (
-                              <textarea
-                                value={results[param.id]?.textValue || ''}
-                                onChange={(e) => {
-                                  const newResults = { ...results };
-                                  if (!newResults[param.id]) newResults[param.id] = {};
-                                  newResults[param.id].textValue = e.target.value;
-                                  setResults(newResults);
-                                }}
-                                className={`w-full p-2 rounded border ${
-                                  results[param.id]?.isAbnormal
-                                    ? 'border-red-500 bg-red-50'
-                                    : 'border-gray-300'
-                                }`}
-                                rows={2}
-                              />
+                              <div className="w-full">
+                                {/* Display saved readings as plain black text with minimal size - read-only */}
+                                <div className="flex flex-wrap gap-1.5 text-xs">
+                                  {(results[param.id]?.textValue || '').split(',').map((tag: string, idx: number) => {
+                                    const trimmedTag = tag.trim();
+                                    return trimmedTag ? (
+                                      <span
+                                        key={idx}
+                                        className="inline-block text-gray-900 font-medium px-1.5 py-0.5"
+                                      >
+                                        {trimmedTag}{idx < (results[param.id]?.textValue || '').split(',').filter((t: string) => t.trim()).length - 1 ? ',' : ''}
+                                      </span>
+                                    ) : null;
+                                  })}
+                                </div>
+                                {!results[param.id]?.textValue || results[param.id]?.textValue.trim() === '' ? (
+                                  <span className="text-gray-400 text-xs">No readings saved</span>
+                                ) : null}
+                              </div>
+                            ) : param.type === 'Text' || param.isMultipleOptions ? (
+                              // ✅ TEXT/DROPDOWN with predefined options - display as plain text (read-only in authenticate mode)
+                              <div className="w-full">
+                                <div className="flex flex-wrap items-center gap-0 text-xs">
+                                  {(results[param.id]?.textValue || '').split(',').map((option: string, idx: number) => {
+                                    const trimmedOption = option.trim();
+                                    return trimmedOption ? (
+                                      <span
+                                        key={idx}
+                                        className="inline-block text-gray-900 font-medium text-xs"
+                                      >
+                                        {trimmedOption}{idx < (results[param.id]?.textValue || '').split(',').filter((o: string) => o.trim()).length - 1 ? ', ' : ''}
+                                      </span>
+                                    ) : null;
+                                  })}
+                                </div>
+                                {!results[param.id]?.textValue || results[param.id]?.textValue.trim() === '' ? (
+                                  <span className="text-gray-400 text-xs">No selections</span>
+                                ) : null}
+                              </div>
                             ) : (
                               <input
                                 type="text"
@@ -393,20 +435,6 @@ const AuthenticateModal = ({
                           </td>
                           <td className="border p-2 text-center text-gray-600 text-xs">
                             {rangeStr}
-                          </td>
-                          <td className="border p-2 text-center">
-                            <input
-                              type="checkbox"
-                              checked={results[param.id]?.isAbnormal || false}
-                              onChange={() => {
-                                const newResults = { ...results };
-                                if (!newResults[param.id]) newResults[param.id] = {};
-                                newResults[param.id].isAbnormal = !newResults[param.id].isAbnormal;
-                                setResults(newResults);
-                              }}
-                              className="w-4 h-4 cursor-pointer accent-red-600"
-                              title="Mark as abnormal"
-                            />
                           </td>
                         </tr>
                       );
