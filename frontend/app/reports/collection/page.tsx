@@ -163,8 +163,6 @@ export default function CollectionReport() {
         const orgs = await getOrganizations();
         if (Array.isArray(orgs)) {
           setOrganizations(orgs);
-        } else if (orgs?.data && Array.isArray(orgs.data)) {
-          setOrganizations(orgs.data);
         }
         console.log('✅ Organizations loaded');
         

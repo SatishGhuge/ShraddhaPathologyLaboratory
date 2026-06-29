@@ -417,6 +417,7 @@ export const getTestById = async (req, res) => {
           rangeText: param.rangeText,
           textContent: param.textContent,
           isMultipleOptions: param.isMultipleOptions,
+          testMethod: param.testMethod || "",
           normalRanges: [
             {
               gender: 'Male',
@@ -659,6 +660,7 @@ export const createTest = async (req, res) => {
                 rangeText: param.rangeText || null,
                 textContent: param.textContent || null,
                 isMultipleOptions: param.isMultipleOptions || false,
+                testMethod: param.testMethod || null,
                 maleLowValue: param.normalRanges?.find(r => r.gender === 'Male')?.lowValue ? 
                   parseFloat(param.normalRanges.find(r => r.gender === 'Male').lowValue) : null,
                 maleHighValue: param.normalRanges?.find(r => r.gender === 'Male')?.highValue ? 
@@ -844,6 +846,7 @@ export const updateTest = async (req, res) => {
         if (category.parameters && category.parameters.length > 0) {
           for (const param of category.parameters) {
             console.log(`📋 Creating parameter:`, param.parameterName);
+            console.log(`🔍 Parameter testMethod value:`, param.testMethod);
             
             // Create TestParameter
             const testParameter = await prisma.testParameter.create({
@@ -869,6 +872,7 @@ export const updateTest = async (req, res) => {
                 rangeText: param.rangeText || null,
                 textContent: param.textContent || null,
                 isMultipleOptions: param.isMultipleOptions || false,
+                testMethod: param.testMethod || null,
                 maleLowValue: param.normalRanges?.find(r => r.gender === 'Male')?.lowValue ? 
                   parseFloat(param.normalRanges.find(r => r.gender === 'Male').lowValue) : null,
                 maleHighValue: param.normalRanges?.find(r => r.gender === 'Male')?.highValue ? 

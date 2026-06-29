@@ -36,16 +36,18 @@ const TestList = () => {
       setError(null);
       const response = await getTests(page, ITEMS_PER_PAGE);
       
-      // Handle API response - getTests now returns an array directly
+      // Handle API response - getTests returns { data: [], pagination: {} }
+      const testsArray = response.data || [];
+      
       // Sort tests alphabetically by name
-      const sortedTests = response.sort((a, b) => {
+      const sortedTests = testsArray.sort((a, b) => {
         const nameA = (a.name || '').toLowerCase();
         const nameB = (b.name || '').toLowerCase();
         return nameA.localeCompare(nameB);
       });
       
       setTests(sortedTests);
-      setPagination(null);
+      setPagination(response.pagination || null);
     } catch (err) {
       console.error('Error fetching tests:', err);
       setError(err instanceof Error ? err.message : 'Failed to load tests. Please try again.');
