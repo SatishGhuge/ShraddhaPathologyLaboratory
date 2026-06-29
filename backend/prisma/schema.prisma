@@ -16,8 +16,11 @@ model Admin {
   isActive       Boolean         @default(true)
   createdAt      DateTime        @default(now())
   updatedAt      DateTime        @updatedAt
+  organizationId String?
+  organization   Organization?   @relation(fields: [organizationId], references: [id])
   passwordResets PasswordReset[]
 
+  @@index([organizationId], map: "admins_organizationId_fkey")
   @@map("admins")
 }
 
@@ -255,44 +258,44 @@ model TestCharge {
 }
 
 model Doctor {
-  id                       Int      @id @default(autoincrement())
-  name                     String
-  degree                   String?
-  mobile                   String?
-  specialty                String?
-  isActive                 Boolean  @default(true)
-  createdAt                DateTime @default(now())
-  updatedAt                DateTime @updatedAt
-  address                  String?  @db.Text
-  allowBalance             Boolean  @default(false)
-  compliment               Float?
-  email                    String?
-  type                     String   @default("Doctor")
-  sendReportsViaWhatsApp   Boolean  @default(false)
-  sendReportsViaMail       Boolean  @default(false)
+  id                     Int      @id @default(autoincrement())
+  name                   String
+  degree                 String?
+  mobile                 String?
+  specialty              String?
+  isActive               Boolean  @default(true)
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+  address                String?  @db.Text
+  allowBalance           Boolean  @default(false)
+  compliment             Float?
+  email                  String?
+  type                   String   @default("Doctor")
+  sendReportsViaMail     Boolean  @default(false)
+  sendReportsViaWhatsApp Boolean  @default(false)
 
   @@map("doctors")
 }
 
 model Organization {
-  id                       String            @id
-  name                     String            @unique(map: "name")
-  code                     String?
-  location                 String?
-  address                  String?           @db.LongText
-  mobile                   String?
-  email                    String?
-  date                     DateTime?
-  isActive                 Boolean           @default(true)
-  createdAt                DateTime          @default(now())
-  updatedAt                DateTime          @updatedAt
-  sendReportsViaWhatsApp   Boolean           @default(false)
-  sendReportsViaMail       Boolean           @default(false)
-  admins                   Admin[]
-  moduleAllocation         ModuleAllocation?
-  patientTests             PatientTest[]
-  testCharges              TestCharge[]
-  users                    User[]
+  id                     String            @id
+  name                   String            @unique(map: "name")
+  code                   String?
+  location               String?
+  address                String?           @db.LongText
+  mobile                 String?
+  email                  String?
+  date                   DateTime?
+  isActive               Boolean           @default(true)
+  createdAt              DateTime          @default(now())
+  updatedAt              DateTime          @updatedAt
+  sendReportsViaMail     Boolean           @default(false)
+  sendReportsViaWhatsApp Boolean           @default(false)
+  admins                 Admin[]
+  moduleAllocation       ModuleAllocation?
+  patientTests           PatientTest[]
+  testCharges            TestCharge[]
+  users                  User[]
 
   @@map("organizations")
 }
@@ -473,9 +476,12 @@ model User {
   isActive             Boolean                @default(true)
   createdAt            DateTime               @default(now())
   updatedAt            DateTime               @updatedAt
+  organizationId       String?
   moduleAllocation     ModuleAllocation?
   user_password_resets user_password_resets[]
+  organization         Organization?          @relation(fields: [organizationId], references: [id])
 
+  @@index([organizationId], map: "users_organizationId_fkey")
   @@map("users")
 }
 
