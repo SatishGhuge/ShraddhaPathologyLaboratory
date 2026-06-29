@@ -1001,6 +1001,18 @@ export default function Result() {
         } catch (e) { console.warn('Could not fetch signature', e); }
       }
 
+      // Convert LetterHead to base64
+      let letterHeadBase64 = '';
+      try {
+        const imgRes = await fetch(LetterHead);
+        const blob = await imgRes.blob();
+        letterHeadBase64 = await new Promise<string>(resolve => {
+          const reader = new FileReader();
+          reader.onloadend = () => resolve(reader.result as string);
+          reader.readAsDataURL(blob);
+        });
+      } catch (e) { console.warn('Could not load letterhead', e); }
+
       // Build combined tests array
       const combinedTests = responses.map(r => ({
         name: r.patientTest.test.name,
@@ -1018,7 +1030,8 @@ export default function Result() {
         parameters: first.parameters,
         groupedParameters: first.groupedParameters,
         combinedTests,
-        signature
+        signature,
+        letterHeadBase64
       });
       setReportWithHeader(true);
       setShowReportModal(true);
@@ -2499,7 +2512,7 @@ export default function Result() {
                   style={{
                     backgroundColor: '#fff',
                     boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-                    padding: '20px',
+                    padding: '0',
                     marginBottom: '16px',
                     borderRadius: '4px',
                   }}
@@ -2513,6 +2526,7 @@ export default function Result() {
                     parameters={testData.parameters || reportData.parameters}
                     signature={reportData.signature}
                     withHeader={reportWithHeader}
+                    letterHeadBase64={reportData.letterHeadBase64}
                   />
                 </div>
               ))}
