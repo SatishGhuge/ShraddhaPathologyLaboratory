@@ -38,28 +38,27 @@ model PasswordReset {
 }
 
 model Patient {
-  patientId         String        @id
-  title             String?
-  firstName         String?
-  lastName          String?
-  dob               DateTime?
-  age               Int?
-  gender            String?
-  mobile            String?
-  email             String?
-  createdBy         String?
-  createdAtLocation String?
-  address           String?       @db.Text
-  createdAt         DateTime?     @default(now())
-  updatedAt         DateTime      @updatedAt
-  location          String?
-  tests             PatientTest[]
+  patientId   String        @id
+  title       String?
+  firstName   String?
+  lastName    String?
+  dob         DateTime?
+  age         Int?
+  gender      String?
+  mobile      String?
+  email       String?
+  createdBy   String?
+  address     String?       @db.Text
+  createdAt   DateTime?     @default(now())
+  updatedAt   DateTime      @updatedAt
+  location    String?       @db.VarChar(255)
+  tests       PatientTest[]
 
   @@index([mobile])
   @@index([email])
   @@index([firstName, lastName], map: "patients_name_idx")
   @@index([createdAt])
-  @@index([location])
+  @@index([location], map: "idx_patient_location")
   @@map("patients")
 }
 
@@ -482,7 +481,22 @@ model User {
   organization         Organization?          @relation(fields: [organizationId], references: [id])
 
   @@index([organizationId], map: "users_organizationId_fkey")
-  @@map("users")
+}
+
+model PaymentTransaction {
+  id            Int      @id @default(autoincrement())
+  visitId       String
+  patientId     String
+  paymentMode   String
+  paymentAmount Float
+  remarks       String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([visitId])
+  @@index([patientId])
+  @@index([paymentMode])
+  @@map("payment_transactions")
 }
 
 model Signature {
