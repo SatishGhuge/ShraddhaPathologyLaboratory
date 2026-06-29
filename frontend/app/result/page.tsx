@@ -35,6 +35,7 @@ import {
 import { getOrganizations } from "@/src/api/master";
 import ReadingValidationModal from "@/app/components/ReadingValidationModal";
 import AuthenticateModal from "@/app/components/AuthenticateModal";
+import ProfessionalResultReport from "@/src/components/ProfessionalResultReport";
 const LetterHead = "/LetterHead.jpeg";
 
 /* ── Per-test row with ALL date fields inside Edit Details modal ── */
@@ -971,7 +972,7 @@ export default function Result() {
     }
   };
 
-  // Print — loads report data, opens print preview in new tab with Print button
+  // Print — loads report data, opens modal with Professional Report Component
   const handlePrintPreview = async () => {
     if (selectedTests.size === 0) { alert('Please select a test to print'); return; }
     try {
@@ -1000,169 +1001,29 @@ export default function Result() {
         } catch (e) { console.warn('Could not fetch signature', e); }
       }
 
-      // Convert LetterHead to base64
-      let letterHeadBase64 = '';
-      try {
-        const imgRes = await fetch(LetterHead);
-        const blob = await imgRes.blob();
-        letterHeadBase64 = await new Promise<string>(resolve => {
-          const reader = new FileReader();
-          reader.onloadend = () => resolve(reader.result as string);
-          reader.readAsDataURL(blob);
-        });
-      } catch (e) { console.warn('Could not load letterhead', e); }
+      // Build combined tests array
+      const combinedTests = responses.map(r => ({
+        name: r.patientTest.test.name,
+        interpretation: r.patientTest.test.interpretation,
+        groupedParameters: r.groupedParameters,
+        parameters: r.parameters
+      }));
 
-      const patient = first.patientTest.patient;
-      const visitId = first.patientTest.visitId;
-      const visitDate = first.patientTest.visitDate
-        ? new Date(first.patientTest.visitDate).toLocaleDateString('en-GB') : '-';
-      const patientName = `${patient.title || ''} ${patient.firstName || ''} ${patient.lastName || ''}`.trim();
-
-      const buildPage = (r: any, withHeader: any) => {
-        const t = r.patientTest.test;
-        const gp = r.groupedParameters || {};
-
-        const paramRows = Object.entries(gp).map(([catName, catParams]: [string, any]) => {
-          let rows = '';
-          if (catName !== 'NO_CATEGORY_HEADER' && catParams[0]?.showCategoryHeader) {
-            rows += `<tr><td colSpan={4} style="padding:4px 6px;font-weight:bold;border-bottom:1px solid #ddd;background:#f5f5f5;">${catName.toUpperCase()}</td></tr>`;
-          }
-          (catParams as any[]).forEach(p => {
-            const er = p.existingResult;
-            const val = er
-              ? (er.numericValue !== null && er.numericValue !== undefined ? er.numericValue : (er.textValue || '-'))
-              : '-';
-            const flag = isParamOutOfRange(p, er);
-            const valDisplay = flag
-              ? `<strong style="color:#b91c1c;letter-spacing:0.3px;">${val} *</strong>`
-              : val;
-            rows += `<tr>
-              <td style="padding:3px 6px;width:38%;font-weight:${flag ? 'bold' : 'normal'};">${p.parameterName}</td>
-              <td style="padding:3px 6px 3px 20px;width:22%;font-size:11px;">${valDisplay}</td>
-              <td style="padding:3px 6px;width:12%;color:#555;">${p.units || ''}</td>
-              <td style="padding:3px 6px;width:28%;color:#555;">${er?.referenceRange || ''}</td>
-            </tr>`;
-          });
-          return rows;
-        }).join('');
-
-        const sigHtml = signature ? `
-          <div style="margin-top:auto;padding-top:6mm;display:flex;justify-content:flex-end;">
-            <div style="text-align:center;">
-              ${signature.signatureImage ? `<img src="${signature.signatureImage}" style="width:${signature.width||150}px;height:${signature.height||80}px;object-fit:contain;" />` : ''}
-              ${signature.signatureText ? `<div style="font-size:11px;font-weight:bold;">${signature.signatureText}</div>` : ''}
-              ${signature.doctorName ? `<div style="font-size:11px;font-weight:bold;">${signature.doctorName}</div>` : ''}
-              ${signature.specialty ? `<div style="font-size:10px;color:#444;">${signature.specialty}</div>` : ''}
-            </div>
-          </div>` : '';
-
-        return `
-          <div class="report-page">
-            ${withHeader && letterHeadBase64 ? `<img src="${letterHeadBase64}" style="position:absolute;top:0;left:0;width:100%;height:100%;object-fit:fill;z-index:0;" />` : ''}
-            <div style="position:relative;z-index:1;height:100%;display:flex;flex-direction:column;padding-top:${withHeader ? '38mm' : '12mm'};padding-bottom:${withHeader ? '36mm' : '12mm'};padding-left:14mm;padding-right:14mm;box-sizing:border-box;">
-              <div style="text-align:center;margin-bottom:6mm;border-bottom:1.5px solid #333;padding-bottom:3mm;">
-                <strong style="font-size:13px;letter-spacing:1px;">${t.name.toUpperCase()} REPORT</strong>
-              </div>
-              <table style="width:100%;border-collapse:collapse;margin-bottom:4mm;font-size:11px;">
-                <tr>
-                  <td style="padding:2px 4px;width:50%;"><strong>Patient:</strong> ${patientName}</td>
-                  <td style="padding:2px 4px;width:50%;"><strong>Age / Gender:</strong> ${patient.age || '-'} Yrs / ${patient.gender || '-'}</td>
-                </tr>
-                <tr>
-                  <td style="padding:2px 4px;"><strong>Lab No:</strong> ${visitId}</td>
-                  <td style="padding:2px 4px;"><strong>Date:</strong> ${visitDate}</td>
-                </tr>
-              </table>
-              <table style="width:100%;border-collapse:collapse;font-size:11px;">
-                <thead>
-                  <tr>
-                    <th style="border-bottom:1.5px solid #333;padding:4px 6px;text-align:left;width:38%;">Test Description</th>
-                    <th style="border-bottom:1.5px solid #333;padding:4px 6px 4px 20px;text-align:left;width:22%;">Result</th>
-                    <th style="border-bottom:1.5px solid #333;padding:4px 6px;text-align:left;width:12%;">Unit</th>
-                    <th style="border-bottom:1.5px solid #333;padding:4px 6px;text-align:left;width:28%;">Biological Reference Range</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr><td colSpan={4} style="padding:4px 6px;font-weight:bold;border-bottom:1px solid #ccc;">${t.name}</td></tr>
-                  ${paramRows}
-                </tbody>
-              </table>
-              ${t.interpretation ? `<div style="margin-top:4mm;border-top:1px solid #ccc;padding-top:3mm;font-size:11px;color:#444;">${t.interpretation}</div>` : ''}
-              ${sigHtml}
-            </div>
-          </div>`;
-      };
-
-      // Build both with-header and without-header versions
-      // Add attachment page if exists
-      const attachPath = responses.find(r => r.patientTest.attachmentPath)?.patientTest.attachmentPath
-        || (uploadedFiles[Array.from(selectedTests)[0] as string]?.serverPath);
-      let attachPageHtml = '';
-      if (attachPath) {
-        const baseUrl = process.env.NEXT_PUBLIC_API_URL.replace('/api','');
-        const src = attachPath.startsWith('http') ? attachPath : `${baseUrl}${attachPath}`;
-        const isPdf = attachPath.endsWith('.pdf');
-        attachPageHtml = `<div class="report-page" style="display:flex;align-items:center;justify-content:center;">
-          ${isPdf
-            ? `<iframe src="${src}" style="width:100%;height:100%;border:none;"></iframe>`
-            : `<img src="${src}" style="max-width:100%;max-height:100%;object-fit:contain;" />`}
-        </div>`;
-      }
-
-      const withHeaderHtml = responses.map(r => buildPage(r, true)).join('') + attachPageHtml;
-      const withoutHeaderHtml = responses.map(r => buildPage(r, false)).join('') + attachPageHtml;
-
-      const previewWindow = window.open('', '_blank', 'width=1000,height=800');
-      previewWindow.document.write(`<!DOCTYPE html><html><head><title>Print Preview — ${patientName}</title>
-        <style>
-          * { margin:0; padding:0; box-sizing:border-box; }
-          body { font-family:Arial,sans-serif; font-size:11px; background:#6b7280; }
-          .toolbar { position:fixed; top:0; left:0; right:0; z-index:100; background:#1f2937; color:white; padding:10px 20px; display:flex; align-items:center; gap:12px; box-shadow:0 2px 8px rgba(0,0,0,0.4); }
-          .toolbar h3 { font-size:14px; font-weight:600; flex:1; }
-          .toolbar button { padding:6px 16px; border:none; border-radius:4px; cursor:pointer; font-size:13px; font-weight:600; }
-          .btn-print { background:#2563eb; color:white; }
-          .btn-print:hover { background:#1d4ed8; }
-          .btn-toggle { background:#374151; color:#d1d5db; }
-          .btn-toggle.active { background:#0891b2; color:white; }
-          .pages { margin-top:60px; padding:20px; }
-          .report-page { width:210mm; height:297mm; position:relative; background:#fff; margin:16px auto; box-shadow:0 4px 20px rgba(0,0,0,0.3); overflow:hidden; page-break-after:always; }
-          .report-page:last-child { page-break-after:avoid; }
-          @media print {
-            .toolbar { display:none !important; }
-            body { background:white; }
-            .pages { margin-top:0; padding:0; }
-            .report-page { margin:0; box-shadow:none; }
-            @page { size:A4; margin:0; }
-          }
-        </style>
-      </head><body>
-        <div class="toolbar">
-          <h3>🖨️ Print Preview — ${patientName} | Lab No: ${visitId}</h3>
-          <button class="btn-toggle active" id="btnWith" onclick="showWith()">With Header</button>
-          <button class="btn-toggle" id="btnWithout" onclick="showWithout()">Without Header</button>
-          <button class="btn-print" onclick="window.print()">🖨️ Print</button>
-          <button class="btn-toggle" onclick="window.close()">✕ Close</button>
-        </div>
-        <div class="pages" id="pages">${withHeaderHtml}</div>
-        <script>
-          const withH = ${JSON.stringify(withHeaderHtml)};
-          const withoutH = ${JSON.stringify(withoutHeaderHtml)};
-          function showWith() {
-            document.getElementById('pages').innerHTML = withH;
-            document.getElementById('btnWith').classList.add('active');
-            document.getElementById('btnWithout').classList.remove('active');
-          }
-          function showWithout() {
-            document.getElementById('pages').innerHTML = withoutH;
-            document.getElementById('btnWithout').classList.add('active');
-            document.getElementById('btnWith').classList.remove('active');
-          }
-        <\/script>
-      </body></html>`);
-      previewWindow.document.close();
-      previewWindow.focus();
+      // Set report data and open modal
+      setReportData({
+        patient: first.patientTest.patient,
+        visitId: first.patientTest.visitId,
+        visitDate: first.patientTest.visitDate,
+        test: first.patientTest.test,
+        parameters: first.parameters,
+        groupedParameters: first.groupedParameters,
+        combinedTests,
+        signature
+      });
+      setReportWithHeader(true);
+      setShowReportModal(true);
       // Record print icon for selected tests
-      markSentIcons(Array.from(selectedTests), 'print');
+      markSentIcons(testIds, 'print');
     } catch (err) {
       console.error('Print preview error:', err);
       alert('Failed to load print preview: ' + err.message);
@@ -1171,32 +1032,9 @@ export default function Result() {
     }
   };
 
-  // Print — opens report in a new tab for viewing/printing
+  // Handle print from modal
   const handlePrint = () => {
-    const pages = document.querySelectorAll('.report-page');
-    if (!pages.length) return;
-    const pagesHtml = Array.from(pages).map(p => p.outerHTML).join('');
-    const printWindow = window.open('', '_blank', 'width=900,height=700');
-    printWindow.document.write(`<!DOCTYPE html><html><head><title>Report</title><style>
-      * { margin:0; padding:0; box-sizing:border-box; }
-      body { font-family:Arial,sans-serif; font-size:11px; background:#e5e7eb; }
-      @page { size: A4; margin: 0; }
-      .report-page {
-        width: 210mm; height: 297mm;
-        position: relative; overflow: hidden;
-        page-break-after: always;
-        background: #fff;
-        margin: 16px auto;
-        box-shadow: 0 2px 16px rgba(0,0,0,0.18);
-      }
-      .report-page:last-child { page-break-after: avoid; }
-      @media print {
-        body { background: white; }
-        .report-page { margin: 0; box-shadow: none; }
-      }
-    </style></head><body>${pagesHtml}</body></html>`);
-    printWindow.document.close();
-    printWindow.focus();
+    window.print();
   };
 
   // Open upload modal for a patient
@@ -2604,14 +2442,14 @@ export default function Result() {
         </div>
       )}
 
-      {/* Report Modal */}
+      {/* Report Modal - Using Professional Report Component */}
       {showReportModal && reportData && (
         <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[95vh] flex flex-col">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-5xl max-h-[95vh] flex flex-col">
 
             {/* Modal Toolbar - hidden on print */}
             <div className="flex items-center justify-between px-4 py-3 border-b no-print flex-shrink-0">
-              <h2 className="text-base font-semibold text-gray-900">{reportData.test?.name} — Report</h2>
+              <h2 className="text-base font-semibold text-gray-900">Professional Report - {reportData.test?.name}</h2>
               <div className="flex gap-2">
                 <button
                   onClick={handlePrint}
@@ -2629,7 +2467,7 @@ export default function Result() {
             </div>
 
             {/* Scrollable preview area */}
-            <div className="overflow-y-auto flex-1">
+            <div className="overflow-y-auto flex-1 bg-gray-100 p-6">
 
               {/* Print styles */}
               <style>{`
@@ -2638,157 +2476,44 @@ export default function Result() {
                   .report-page, .report-page * { visibility: visible !important; }
                   .report-page {
                     position: relative !important;
-                    width: 210mm !important;
-                    height: 297mm !important;
+                    width: 100% !important;
                     margin: 0 !important;
-                    padding: 0 !important;
+                    padding: 20px !important;
                     box-shadow: none !important;
                     page-break-after: always;
-                    overflow: hidden !important;
+                    overflow: visible !important;
+                    background: white !important;
                   }
                   .report-page:last-child { page-break-after: avoid; }
                   .no-print { display: none !important; }
-                  @page { size: A4; margin: 0; }
+                  @page { size: A4; margin: 10mm; }
                 }
               `}</style>
 
-              {/* Render each test as its own A4 page */}
-              {(reportData.combinedTests || [{ name: reportData.test?.name, groupedParameters: reportData.groupedParameters, interpretation: reportData.test?.interpretation }]).map((t, ti) => (
+              {/* Render Professional Report Component */}
+              {(reportData.combinedTests || [reportData]).map((testData, idx) => (
                 <div
-                  key={ti}
-                  id={ti === 0 ? 'report-print-page' : undefined}
+                  key={idx}
                   className="report-page"
+                  id={idx === 0 ? 'report-print-page' : undefined}
                   style={{
-                    width: '210mm',
-                    height: '297mm',
-                    margin: '16px auto',
-                    position: 'relative',
                     backgroundColor: '#fff',
-                    boxShadow: '0 2px 16px rgba(0,0,0,0.18)',
-                    fontFamily: 'Arial, sans-serif',
-                    fontSize: '11px',
-                    overflow: 'hidden',
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+                    padding: '20px',
+                    marginBottom: '16px',
+                    borderRadius: '4px',
                   }}
                 >
-                  {/* LetterHead background */}
-                  {reportWithHeader && (
-                    <img
-                      src={LetterHead}
-                      alt=""
-                      style={{
-                        position: 'absolute', top: 0, left: 0,
-                        width: '100%', height: '100%',
-                        objectFit: 'fill', zIndex: 0, pointerEvents: 'none',
-                      }}
-                    />
-                  )}
-
-                  {/* Page content */}
-                  <div
-                    style={{
-                      position: 'relative', zIndex: 1,
-                      height: '100%', display: 'flex', flexDirection: 'column',
-                      paddingTop: reportWithHeader ? '38mm' : '12mm',
-                      paddingBottom: reportWithHeader ? '36mm' : '12mm',
-                      paddingLeft: '14mm', paddingRight: '14mm',
-                      boxSizing: 'border-box',
-                    }}
-                  >
-                    {/* Report Title */}
-                    <div style={{ textAlign: 'center', marginBottom: '6mm', borderBottom: '1.5px solid #333', paddingBottom: '3mm' }}>
-                      <strong style={{ fontSize: '13px', letterSpacing: '1px' }}>{t.name?.toUpperCase()} REPORT</strong>
-                    </div>
-
-                    {/* Patient Info */}
-                    <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '4mm', fontSize: '11px' }}>
-                      <tbody>
-                        <tr>
-                          <td style={{ padding: '2px 4px', width: '50%' }}><strong>Patient:</strong> {reportData.patient?.title} {reportData.patient?.firstName} {reportData.patient?.lastName}</td>
-                          <td style={{ padding: '2px 4px', width: '50%' }}><strong>Age / Gender:</strong> {reportData.patient?.age} Yrs / {reportData.patient?.gender}</td>
-                        </tr>
-                        <tr>
-                          <td style={{ padding: '2px 4px' }}><strong>Lab No:</strong> {reportData.visitId}</td>
-                          <td style={{ padding: '2px 4px' }}><strong>Date:</strong> {reportData.visitDate ? new Date(reportData.visitDate).toLocaleDateString('en-GB') : '-'}</td>
-                        </tr>
-                      </tbody>
-                    </table>
-
-                    {/* Results Table */}
-                    <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '4mm', fontSize: '11px' }}>
-                      <thead>
-                        <tr>
-                          <th style={{ borderBottom: '1.5px solid #333', padding: '4px 6px', textAlign: 'left', width: '38%' }}>Test Description</th>
-                          <th style={{ borderBottom: '1.5px solid #333', padding: '4px 6px', textAlign: 'left', width: '22%', paddingLeft: '20px' }}>Result</th>
-                          <th style={{ borderBottom: '1.5px solid #333', padding: '4px 6px', textAlign: 'left', width: '12%' }}>Unit</th>
-                          <th style={{ borderBottom: '1.5px solid #333', padding: '4px 6px', textAlign: 'left', width: '28%' }}>Biological Reference Range</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        <tr>
-                          <td colSpan={4} style={{ padding: '4px 6px', fontWeight: 'bold', borderBottom: '1px solid #ccc' }}>{t.name}</td>
-                        </tr>
-                        {t.groupedParameters && Object.entries(t.groupedParameters).map(([categoryName, categoryParams]: [string, any]) => (
-                          <React.Fragment key={categoryName}>
-                            {categoryName !== 'NO_CATEGORY_HEADER' && categoryParams[0]?.showCategoryHeader && (
-                              <tr>
-                                <td colSpan={4} style={{ padding: '4px 6px', fontWeight: 'bold', borderBottom: '1px solid #ddd' }}>
-                                  {categoryName.toUpperCase()}
-                                </td>
-                              </tr>
-                            )}
-                            {(categoryParams as any[]).map((param) => (
-                              <tr key={param.id}>
-                                <td style={{ padding: '3px 6px', width: '38%', fontWeight: isParamOutOfRange(param, param.existingResult) ? 'bold' : 'normal' }}>{param.parameterName}</td>
-                                <td style={{ padding: '3px 6px 3px 20px', width: '22%', fontWeight: isParamOutOfRange(param, param.existingResult) ? '900' : 'normal', color: isParamOutOfRange(param, param.existingResult) ? '#b91c1c' : 'inherit', fontSize: '11px' }}>
-                                  {param.existingResult
-                                    ? (param.type === 'Numeric' ? (param.existingResult.numericValue ?? '-') : (param.existingResult.textValue || '-'))
-                                    : '-'}
-                                  {isParamOutOfRange(param, param.existingResult) && <span style={{ marginLeft: '4px' }}>*</span>}
-                                </td>
-                                <td style={{ padding: '3px 6px', width: '12%' }}>{param.units || ''}</td>
-                                <td style={{ padding: '3px 6px', width: '28%' }}>{param.normalRange || ''}</td>
-                              </tr>
-                            ))}
-                          </React.Fragment>
-                        ))}
-                      </tbody>
-                    </table>
-
-                    {/* Interpretation */}
-                    {t.interpretation && (
-                      <div style={{ marginTop: '4mm', borderTop: '1px solid #ccc', paddingTop: '3mm', fontSize: '11px', color: '#444' }}
-                        dangerouslySetInnerHTML={{ __html: t.interpretation }} />
-                    )}
-
-                    {/* Signature */}
-                    {reportData.signature && (
-                      <div style={{ marginTop: 'auto', paddingTop: '6mm', display: 'flex', justifyContent: 'flex-end' }}>
-                        <div style={{ textAlign: 'center' }}>
-                          {reportData.signature.signatureImage && (
-                            <img src={reportData.signature.signatureImage} alt="Signature"
-                              style={{ width: reportData.signature.width || 150, height: reportData.signature.height || 80, objectFit: 'contain', display: 'block', margin: '0 auto' }} />
-                          )}
-                          {reportData.signature.signatureText && (
-                            <div style={{ fontSize: '11px', fontWeight: 'bold', whiteSpace: 'pre-line', marginTop: '2px' }}>{reportData.signature.signatureText}</div>
-                          )}
-                          {reportData.signature.doctorName && (
-                            <div style={{ fontSize: '11px', fontWeight: 'bold' }}>{reportData.signature.doctorName}</div>
-                          )}
-                          {reportData.signature.specialty && (
-                            <div style={{ fontSize: '10px', color: '#444' }}>{reportData.signature.specialty}</div>
-                          )}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Footer - without header only */}
-                    {!reportWithHeader && (
-                      <div style={{ marginTop: reportData.signature ? '4mm' : 'auto', borderTop: '1px solid #ccc', paddingTop: '3mm', fontSize: '10px', color: '#666', display: 'flex', justifyContent: 'space-between' }}>
-                        <span>Report generated on: {new Date().toLocaleString('en-GB')}</span>
-                        <span>Shraddha Pathology Laboratory — Pathology Laboratory</span>
-                      </div>
-                    )}
-                  </div>
+                  <ProfessionalResultReport
+                    patient={reportData.patient}
+                    visitDate={reportData.visitDate}
+                    visitId={reportData.visitId}
+                    test={testData.test || testData}
+                    groupedParameters={testData.groupedParameters || reportData.groupedParameters}
+                    parameters={testData.parameters || reportData.parameters}
+                    signature={reportData.signature}
+                    withHeader={reportWithHeader}
+                  />
                 </div>
               ))}
             </div>
