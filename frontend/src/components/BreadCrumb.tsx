@@ -40,13 +40,6 @@ export default function PageHeader({ title, icon: Icon, path = "" }: { title: st
           );
         })}
       </div>
-
-      {/* Page Title */}
-      <div className="flex items-center gap-2">
-        <Icon size={22} className="text-blue-600" />
-        <h2 className="text-xl sm:text-2xl font-bold text-slate-800">{title}</h2>
-      </div>
-
     </div>
   );
 }

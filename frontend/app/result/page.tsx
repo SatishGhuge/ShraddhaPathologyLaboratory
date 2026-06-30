@@ -30,7 +30,9 @@ import {
   updateTestDates, 
   getTestStatistics,
   getPatientTestById,
-  sendReport
+  sendReport,
+  getPreviousTestResult,
+  getAllTestResults
 } from "@/src/api/result";
 import { getOrganizations } from "@/src/api/master";
 import ReadingValidationModal from "@/app/components/ReadingValidationModal";
@@ -260,11 +262,9 @@ export default function Result() {
 
   // State for sort dropdown
   const [showSortDropdown, setShowSortDropdown] = useState(false);
-  const [sortBy, setSortBy] = useState('date'); // 'date', 'uid', 'alphabetic'
-
-  // State for pagination
+  const [sortBy, setSortBy] = useState('date');
+  const [itemsPerPage, setItemsPerPage] = useState(25);
   const [currentPage, setCurrentPage] = useState(1);
-  const RECORDS_PER_PAGE = 20;
 
   // State for barcode checkbox selection (separate from result selection)
   const [barcodeSelectedTests, setBarcodeSelectedTests] = useState(new Set());
@@ -294,6 +294,22 @@ export default function Result() {
     } catch (e) {}
     return {};
   });
+
+  // Previous test results cache — stores previous results for each test
+  const [previousTestResults, setPreviousTestResults] = useState<any>({});
+
+  // All test results cache — stores all results for each patient/test combination
+  const [allTestResults, setAllTestResults] = useState<any>({});
+
+  // State for Previous Test Result Modal
+  const [showPreviousResultModal, setShowPreviousResultModal] = useState(false);
+  const [previousResultData, setPreviousResultData] = useState<any>(null);
+  const [previousResultLoading, setPreviousResultLoading] = useState(false);
+
+  // State for All Test Results Modal
+  const [showAllResultsModal, setShowAllResultsModal] = useState(false);
+  const [allResultsData, setAllResultsData] = useState<any>([]);
+  const [allResultsLoading, setAllResultsLoading] = useState(false);
   
   // State for Upload File Modal
   const [showUploadModal, setShowUploadModal] = useState(false);
@@ -333,14 +349,28 @@ export default function Result() {
     }
   });
   
-  // Filter states
-  const [filters, setFilters] = useState({
-    fromDate: new Date().toISOString().split('T')[0],
-    toDate: new Date().toISOString().split('T')[0],
-    searchQuery: '', // For Patient Name, ID, or Visit ID
-    department: '',
-    organization: '',
-    testName: ''
+  // Filter states — persisted in localStorage (survives browser refresh)
+  const [filters, setFilters] = useState(() => {
+    // Try to load filters from localStorage
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('resultPageFilters');
+      if (saved) {
+        try {
+          return JSON.parse(saved);
+        } catch (e) {
+          console.warn('Failed to parse saved filters:', e);
+        }
+      }
+    }
+    // Default filters if none saved
+    return {
+      fromDate: new Date().toISOString().split('T')[0],
+      toDate: new Date().toISOString().split('T')[0],
+      searchQuery: '', // For Patient Name, ID, or Visit ID
+      department: '',
+      organization: '',
+      testName: ''
+    };
   });
 
   // Organizations state
@@ -1154,6 +1184,13 @@ export default function Result() {
     // fetchStatistics is now called inside fetchResults
   }, [filters]);
 
+  // Save filters to localStorage whenever they change
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('resultPageFilters', JSON.stringify(filters));
+    }
+  }, [filters]);
+
   // Handle test name click to open appropriate modal based on stage
   const handleTestNameClick = async (test: any, patient: any) => {
     try {
@@ -1323,14 +1360,15 @@ export default function Result() {
 
   // Handle refresh — reset filters and reload data
   const handleRefresh = () => {
-    setFilters({
+    const defaultFilters = {
       fromDate: new Date().toISOString().split('T')[0],
       toDate: new Date().toISOString().split('T')[0],
       searchQuery: '',
       department: '',
       organization: '',
       testName: ''
-    });
+    };
+    setFilters(defaultFilters);
     setSelectedStatus('All');
     setSelectedTests(new Set());
     setLockedVisitId(null);
@@ -1339,8 +1377,52 @@ export default function Result() {
     setBarcodeSelectedTests(new Set());
     setBarcodeLockedPatientUid(null);
     setBarcodeLockedVisitId(null);
+    
+    // Clear filters from localStorage
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('resultPageFilters');
+    }
+    
     fetchResults();
     fetchStatistics();
+  };
+
+  // Handle fetch previous test result
+  const handleFetchPreviousResult = async (patient: any, test: any) => {
+    try {
+      setPreviousResultLoading(true);
+      const result = await getPreviousTestResult(patient.patient_uid, test.test_id.toString());
+      setPreviousResultData({
+        test: test,
+        patient: patient,
+        result: result
+      });
+      setShowPreviousResultModal(true);
+    } catch (error) {
+      console.error('Error fetching previous result:', error);
+      alert('Failed to fetch previous test result: ' + error.message);
+    } finally {
+      setPreviousResultLoading(false);
+    }
+  };
+
+  // Handle fetch all test results
+  const handleFetchAllResults = async (patient: any, test: any) => {
+    try {
+      setAllResultsLoading(true);
+      const results = await getAllTestResults(patient.patient_uid, test.test_id.toString(), 10);
+      setAllResultsData({
+        test: test,
+        patient: patient,
+        results: results
+      });
+      setShowAllResultsModal(true);
+    } catch (error) {
+      console.error('Error fetching all results:', error);
+      alert('Failed to fetch test result history: ' + error.message);
+    } finally {
+      setAllResultsLoading(false);
+    }
   };
 
   // Filter results based on selected status
@@ -1380,9 +1462,9 @@ export default function Result() {
 
   // Calculate pagination
   const totalRecords = sortedAndFilteredResults.length;
-  const totalPages = Math.ceil(totalRecords / RECORDS_PER_PAGE);
-  const startIndex = (currentPage - 1) * RECORDS_PER_PAGE;
-  const endIndex = startIndex + RECORDS_PER_PAGE;
+  const totalPages = Math.ceil(totalRecords / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
   const paginatedResults = sortedAndFilteredResults.slice(startIndex, endIndex);
 
   // Reset to page 1 when filters change
@@ -1553,7 +1635,7 @@ export default function Result() {
     <>
       <Header />
       <div className="p-2 sm:p-3 md:p-4 lg:p-6 bg-gray-50 min-h-screen mt-16">
-        <PageHeader title="Laboratory Dashboard" icon={FileText} path="Results" />
+        <PageHeader title="" path="Results" />
         
         {/* Error Message */}
         {error && (
@@ -1728,15 +1810,6 @@ export default function Result() {
                   <RefreshCcw size={14} />
                 </button>
                 
-
-                <button
-                  onClick={handlePrintPreview}
-                  disabled={loading || selectedTests.size === 0}
-                  className="h-8 px-3 bg-cyan-600 hover:bg-cyan-700 text-white rounded flex items-center gap-1.5 text-xs sm:text-sm disabled:opacity-50"
-                >
-                  <Printer size={14} />
-                </button>
-                
                 <button 
                   onClick={() => setShowSortDropdown(!showSortDropdown)}
                   className="h-8 px-3 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded text-xs sm:text-sm relative"
@@ -1782,10 +1855,34 @@ export default function Result() {
               </div>
             </div>
 
-
-
             {/* Result Table - Scrollable */}
             <div className="bg-white rounded shadow-md overflow-hidden">
+              {/* Top right selector for records per page */}
+              <div className="px-3 py-2 border-b border-gray-200 flex justify-end">
+                <div className="flex gap-1 text-sm">
+                  <button
+                    onClick={() => { setItemsPerPage(25); setCurrentPage(1); }}
+                    className={`px-2 py-1 transition-colors ${itemsPerPage === 25 ? 'text-cyan-600 font-semibold' : 'text-gray-700 hover:text-cyan-600'}`}
+                  >
+                    25
+                  </button>
+                  <span className="text-gray-400">/</span>
+                  <button
+                    onClick={() => { setItemsPerPage(50); setCurrentPage(1); }}
+                    className={`px-2 py-1 transition-colors ${itemsPerPage === 50 ? 'text-cyan-600 font-semibold' : 'text-gray-700 hover:text-cyan-600'}`}
+                  >
+                    50
+                  </button>
+                  <span className="text-gray-400">/</span>
+                  <button
+                    onClick={() => { setItemsPerPage(100); setCurrentPage(1); }}
+                    className={`px-2 py-1 transition-colors ${itemsPerPage === 100 ? 'text-cyan-600 font-semibold' : 'text-gray-700 hover:text-cyan-600'}`}
+                  >
+                    100
+                  </button>
+                </div>
+              </div>
+              
               <div className="overflow-x-auto">
                 <table className="w-full text-xs sm:text-sm border-collapse">
                   <thead className="bg-slate-900 text-white shadow-xl">
@@ -1799,12 +1896,17 @@ export default function Result() {
                       <th className="px-1 sm:px-2 py-1.5 sm:py-2 text-left font-semibold text-xs whitespace-nowrap border border-gray-300">Age</th>
                       <th className="px-1 sm:px-2 py-1.5 sm:py-2 text-left font-semibold text-xs whitespace-nowrap border border-gray-300">Gender</th>
                       <th className="px-1 sm:px-2 py-1.5 sm:py-2 text-left font-semibold text-xs whitespace-nowrap border border-gray-300">Services</th>
-                      <th className="px-1 sm:px-2 py-1.5 sm:py-2 text-left font-semibold text-xs whitespace-nowrap border border-gray-300">Date</th>
                       <th className="px-1 sm:px-2 py-1.5 sm:py-2 text-left font-semibold text-xs whitespace-nowrap border border-gray-300">Referral Doc</th>
-                      <th className="px-1 sm:px-2 py-1.5 sm:py-2 text-left font-semibold text-xs whitespace-nowrap border border-gray-300">Patient History</th>
+                      <th className="px-1 sm:px-2 py-1.5 sm:py-2 text-left font-semibold text-xs whitespace-nowrap border border-gray-300">
+                        Previous Test Result
+                      </th>
+                      <th className="px-1 sm:px-2 py-1.5 sm:py-2 text-left font-semibold text-xs whitespace-nowrap border border-gray-300">
+                        All Test Results
+                      </th>
                       <th className="px-0.5 sm:px-1 py-1.5 sm:py-2 text-center font-semibold text-xs whitespace-nowrap border border-gray-300">
                         <span className="text-[10px]">S.Taken</span>
                       </th>
+                      <th className="px-1 sm:px-2 py-1.5 sm:py-2 text-left font-semibold text-xs whitespace-nowrap border border-gray-300">Patient History</th>
                       <th className="px-0.5 sm:px-1 py-1.5 sm:py-2 text-center font-semibold text-xs whitespace-nowrap border border-gray-300">
                         <div title="Print barcode labels for selected tests">
                           <Barcode
@@ -1819,7 +1921,7 @@ export default function Result() {
                   <tbody className="bg-white">
                     {loading ? (
                       <tr>
-                        <td colSpan={10} className="text-center p-4 text-gray-500 text-sm border border-gray-300">
+                        <td colSpan={13} className="text-center p-4 text-gray-500 text-sm border border-gray-300">
                           <div className="flex items-center justify-center gap-2">
                             <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-cyan-600"></div>
                             Loading...
@@ -1828,7 +1930,7 @@ export default function Result() {
                       </tr>
                     ) : paginatedResults.length === 0 ? (
                       <tr>
-                        <td colSpan={10} className="text-center p-3 sm:p-4 text-gray-500 text-xs sm:text-sm border border-gray-300">
+                        <td colSpan={13} className="text-center p-3 sm:p-4 text-gray-500 text-xs sm:text-sm border border-gray-300">
                           No records found for {selectedStatus} status
                         </td>
                       </tr>
@@ -1981,13 +2083,7 @@ export default function Result() {
                                 )}
                               </div>
                             </td>
-
-                            {/* Column 6: Date (approved_date) */}
-                            <td className="px-1 sm:px-2 py-1 sm:py-1.5 text-xs whitespace-nowrap border border-gray-300">
-                              {test.approved_date}
-                            </td>
-
-                            {/* Column 7: Referral Doc */}
+                            {/* Column 8: Referral Doc */}
                             <td className="px-1 sm:px-2 py-1 sm:py-1.5 text-xs border border-gray-300">
                               <span className="inline-flex items-center gap-1">
                                 {test.ref_by === "SELF" ? (
@@ -2004,31 +2100,35 @@ export default function Result() {
                               </span>
                             </td>
 
-                            {/* Column 8: Patient History (display patient_history text only, show only on first test row) */}
-                            <td className="px-1 sm:px-2 py-1 sm:py-1.5 text-xs border border-gray-300 relative">
-                              {testIndex === 0 && (
-                                <div className="relative group cursor-help">
-                                  {patient.patient_history ? (
-                                    <>
-                                      <span className="truncate block max-w-xs" title={patient.patient_history}>
-                                        {patient.patient_history}
-                                      </span>
-                                      {/* Tooltip on hover */}
-                                      <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 hidden group-hover:flex flex-col items-center z-50 pointer-events-none">
-                                        <span className="bg-gray-800 text-white text-[10px] font-semibold rounded px-2 py-1 whitespace-normal max-w-xs shadow-lg">
-                                          {patient.patient_history}
-                                        </span>
-                                        <span className="w-2 h-2 bg-gray-800 rotate-45 -mt-1" />
-                                      </span>
-                                    </>
-                                  ) : (
-                                    <span className="text-gray-400 italic">—</span>
-                                  )}
-                                </div>
-                              )}
+                            {/* Column 9: Previous Test Result */}
+                            <td className="px-1 sm:px-2 py-1 sm:py-1.5 text-xs border border-gray-300">
+                              <div className="flex items-center gap-1">
+                                <button
+                                  onClick={() => handleFetchPreviousResult(patient, test)}
+                                  disabled={previousResultLoading}
+                                  className="text-cyan-600 hover:text-cyan-800 hover:underline font-medium text-xs disabled:opacity-50"
+                                  title="View previous test result"
+                                >
+                                  {previousResultLoading ? '...' : '📋 View'}
+                                </button>
+                              </div>
                             </td>
 
-                            {/* Column 9: S.Taken (green tick mark + calendar & settings icons, all rows) */}
+                            {/* Column 10: All Test Results */}
+                            <td className="px-1 sm:px-2 py-1 sm:py-1.5 text-xs border border-gray-300">
+                              <div className="flex items-center gap-1">
+                                <button
+                                  onClick={() => handleFetchAllResults(patient, test)}
+                                  disabled={allResultsLoading}
+                                  className="text-cyan-600 hover:text-cyan-800 hover:underline font-medium text-xs disabled:opacity-50"
+                                  title="View all test results"
+                                >
+                                  {allResultsLoading ? '...' : '📊 View'}
+                                </button>
+                              </div>
+                            </td>
+
+                            {/* Column 11: S.Taken (green tick mark + calendar & settings icons, all rows) */}
                             <td className="px-0.5 sm:px-1 py-1 sm:py-1.5 text-center border border-gray-300">
                               <div className="flex items-center justify-center gap-1">
                                 {test.sample_taken ? (
@@ -2092,7 +2192,31 @@ export default function Result() {
                               </div>
                             </td>
 
-                            {/* Column 10: Barcode checkbox */}
+                            {/* Column 12: Patient History (display patient_history text only, show only on first test row) */}
+                            <td className="px-1 sm:px-2 py-1 sm:py-1.5 text-xs border border-gray-300 relative">
+                              {testIndex === 0 && (
+                                <div className="relative group cursor-help">
+                                  {patient.patient_history ? (
+                                    <>
+                                      <span className="truncate block max-w-xs" title={patient.patient_history}>
+                                        {patient.patient_history}
+                                      </span>
+                                      {/* Tooltip on hover */}
+                                      <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 hidden group-hover:flex flex-col items-center z-50 pointer-events-none">
+                                        <span className="bg-gray-800 text-white text-[10px] font-semibold rounded px-2 py-1 whitespace-normal max-w-xs shadow-lg">
+                                          {patient.patient_history}
+                                        </span>
+                                        <span className="w-2 h-2 bg-gray-800 rotate-45 -mt-1" />
+                                      </span>
+                                    </>
+                                  ) : (
+                                    <span className="text-gray-400 italic">—</span>
+                                  )}
+                                </div>
+                              )}
+                            </td>
+
+                            {/* Column 13: Barcode checkbox */}
                             <td className="px-0.5 sm:px-1 py-1 sm:py-1.5 text-center border border-gray-300">
                               <input
                                 type="checkbox"
@@ -2113,10 +2237,12 @@ export default function Result() {
 
             {/* Pagination Controls */}
             {totalRecords > 0 && (
-              <div className="bg-white rounded shadow-md p-3 flex items-center justify-between">
-                <div className="text-sm text-gray-700">
+              <div className="bg-white rounded shadow-md p-3">
+                <div className="text-sm text-gray-700 mb-3">
                   Showing <span className="font-semibold">{startIndex + 1}</span> to <span className="font-semibold">{Math.min(endIndex, totalRecords)}</span> of <span className="font-semibold">{totalRecords}</span> records
                 </div>
+                
+                {/* Pagination buttons */}
                 <div className="flex gap-2">
                   <button
                     onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
@@ -2597,6 +2723,121 @@ export default function Result() {
               >
                 {uploading ? 'Uploading...' : 'Submit'}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Previous Test Result Modal */}
+      {showPreviousResultModal && previousResultData && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-96 overflow-y-auto">
+            <div className="flex items-center justify-between px-6 py-4 border-b sticky top-0 bg-white">
+              <h2 className="text-lg font-semibold text-gray-900">
+                Previous Test Result - {previousResultData.test.test_name}
+              </h2>
+              <button 
+                onClick={() => setShowPreviousResultModal(false)} 
+                className="text-gray-400 hover:text-gray-700 text-2xl font-bold leading-none"
+              >
+                ×
+              </button>
+            </div>
+            <div className="p-6">
+              {previousResultData.result ? (
+                <>
+                  <div className="mb-4 pb-4 border-b">
+                    <p className="text-sm text-gray-600">
+                      <strong>Patient:</strong> {previousResultData.patient.patient_name}
+                    </p>
+                    <p className="text-sm text-gray-600">
+                      <strong>Test Date:</strong> {new Date(previousResultData.result.visitDate).toLocaleDateString()}
+                    </p>
+                  </div>
+                  <div className="space-y-3">
+                    <p className="font-semibold text-gray-900">Results:</p>
+                    {previousResultData.result.testResults && previousResultData.result.testResults.length > 0 ? (
+                      <div className="space-y-2">
+                        {previousResultData.result.testResults.map((result, idx) => (
+                          <div key={idx} className="bg-gray-50 p-3 rounded border border-gray-200">
+                            <p className="font-medium text-gray-800">{result.parameterName}</p>
+                            <p className="text-sm text-gray-600">
+                              Value: <span className={result.isOutOfRange ? 'text-red-600 font-semibold' : ''}>{result.value}</span> {result.units}
+                            </p>
+                            {result.isAbnormal && (
+                              <p className="text-xs text-orange-600 font-semibold">⚠️ Abnormal</p>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-gray-500 italic">No results recorded for this test</p>
+                    )}
+                  </div>
+                </>
+              ) : (
+                <p className="text-gray-500 text-center py-6">No previous test result found</p>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* All Test Results Modal */}
+      {showAllResultsModal && allResultsData && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-3xl max-h-[80vh] overflow-y-auto">
+            <div className="flex items-center justify-between px-6 py-4 border-b sticky top-0 bg-white">
+              <h2 className="text-lg font-semibold text-gray-900">
+                Test Result History - {allResultsData.test.test_name}
+              </h2>
+              <button 
+                onClick={() => setShowAllResultsModal(false)} 
+                className="text-gray-400 hover:text-gray-700 text-2xl font-bold leading-none"
+              >
+                ×
+              </button>
+            </div>
+            <div className="p-6">
+              <p className="text-sm text-gray-600 mb-4">
+                <strong>Patient:</strong> {allResultsData.patient.patient_name} | 
+                <strong className="ml-2">Total Results:</strong> {allResultsData.results ? allResultsData.results.length : 0}
+              </p>
+              
+              {allResultsData.results && allResultsData.results.length > 0 ? (
+                <div className="space-y-4">
+                  {allResultsData.results.map((testResult, testIdx) => (
+                    <div key={testIdx} className="border border-gray-300 rounded-lg p-4 bg-gray-50">
+                      <div className="flex items-center justify-between mb-3 pb-2 border-b">
+                        <div>
+                          <p className="font-semibold text-gray-900">
+                            {new Date(testResult.visitDate).toLocaleDateString()} {new Date(testResult.visitDate).toLocaleTimeString()}
+                          </p>
+                          <p className="text-xs text-gray-600">Status: <span className="font-medium">{testResult.status}</span></p>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        {testResult.results && testResult.results.map((result, idx) => (
+                          <div key={idx} className="bg-white p-2 rounded border border-gray-200 text-xs">
+                            <p className="font-medium text-gray-800">{result.parameterName}</p>
+                            <p className="text-gray-600">
+                              <span className={result.isOutOfRange ? 'text-red-600 font-semibold' : ''}>
+                                {result.value}
+                              </span>
+                              {result.units && <span className="text-gray-500"> {result.units}</span>}
+                            </p>
+                            {result.referenceRange && (
+                              <p className="text-gray-500 text-[10px]">Ref: {result.referenceRange}</p>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-gray-500 text-center py-6">No test results found</p>
+              )}
             </div>
           </div>
         </div>
