@@ -1,8 +1,6 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from "react";
-import Header from "@/src/components/Header";
-import PageHeader from "@/src/components/BreadCrumb";
 
 import {
   Search,
@@ -148,15 +146,8 @@ export default function OutsourceTests() {
 
   return (
     <>
-    <Header/>
 
     <div className="w-full px-3 sm:px-6 mt-16">
-
-      <PageHeader 
-        title="Outsource for Test" 
-        icon={Send}
-        path="Patient"
-      />
 
 
       {/* Filter Card */}

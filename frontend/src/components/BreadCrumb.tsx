@@ -1,6 +1,7 @@
 "use client";
 
-import { Home, FileText, BarChart3, IndianRupee, FolderOpen, Settings, UserPlus, Search, Send, FileSignature } from "lucide-react";
+import { usePathname } from "next/navigation";
+import { Home, FileText, BarChart3, IndianRupee, FolderOpen, Settings, UserPlus, Search, Send, FileSignature, Database, ClipboardCheck } from "lucide-react";
 
 // Icon mapping for breadcrumb paths
 const iconMap = {
@@ -15,11 +16,75 @@ const iconMap = {
   "Outsourcing for Test": Send,
   "Configuration": Settings,
   "Signature": FileSignature,
+  "Tests": Database,
+  "Result": ClipboardCheck,
 };
 
-export default function PageHeader({ title, icon: Icon, path = "" }: { title: string; icon?: React.ComponentType<any>; path?: string }) {
-  // Split path by " / " to get breadcrumb items
-  const pathItems = path ? path.split(" / ").filter(item => item.trim()) : [];
+// URL to breadcrumb mapping - Comprehensive list of all pages
+const urlPathMap: { [key: string]: string } = {
+  // Master Module
+  "master/testlist": "Master / Tests",
+  "master/test-templets": "Master / Test Template",
+  "master/departmentlist": "Master / Department",
+  "master/packagelist": "Master / Packages",
+  "master/charges": "Master / Charges",
+  "master/corporate-wise-charges": "Master / Corporate Wise Charges",
+  "master/rolelist": "Master / Roles",
+  "master/userlist": "Master / Users",
+  "master/referral-doctor-list": "Master / Referral Doctors",
+  "master/referral-doctor": "Master / Referral Doctor",
+  "master/organization": "Master / Organization",
+  "master/specimen-type": "Master / Specimen Type",
+  "master/units": "Master / Units",
+  "master/microbiology-organism": "Master / Microbiology Organism",
+  "master/outsourcing": "Master / Outsourcing",
+  
+  // Patient Module
+  "patient/registration": "Patient / Registration",
+  "patient/search-booking": "Patient / Search for Booking",
+  
+  // Result Module
+  "result": "Result",
+  
+  // Reports Module
+  "reports/report-dashboard": "Reports / Dashboard",
+  "reports/collection": "Reports / Collection",
+  "reports/patient-list": "Reports / Patient List",
+  "reports/center-wise-cost-report": "Reports / Center Wise Cost Report",
+  "reports/b2b-testwise-cost-report": "Reports / B2B Testwise Cost Report",
+  "reports/discount-report": "Reports / Discount Report",
+  "reports/test-report": "Reports / Test Report",
+  
+  // Configuration Module
+  "config/signature": "Configuration / Signature",
+  
+  // Dashboard
+  "labdashboard": "Dashboard",
+  "dashboard/collectiondashboard": "Dashboard / Collection",
+  "dashboard/franchisedashboard": "Dashboard / Franchise",
+};
+
+export default function PageHeader({ title = "", icon: Icon, path = "" }: { title?: string; icon?: React.ComponentType<any>; path?: string }) {
+  const pathname = usePathname();
+  
+  // Generate breadcrumb path from URL if not provided
+  let pathItems: string[] = [];
+  
+  if (path) {
+    // Use provided path if available
+    pathItems = path.split(" / ").filter(item => item.trim());
+  } else {
+    // Generate from URL pathname
+    const urlPath = pathname.replace(/^\//, "").toLowerCase();
+    
+    // Find matching breadcrumb from map
+    for (const [url, breadcrumb] of Object.entries(urlPathMap)) {
+      if (urlPath.startsWith(url)) {
+        pathItems = breadcrumb.split(" / ").filter(item => item.trim());
+        break;
+      }
+    }
+  }
 
   return (
     <div className="mb-3 space-y-1">

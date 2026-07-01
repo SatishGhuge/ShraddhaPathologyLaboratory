@@ -1,8 +1,6 @@
 "use client";
 
 import { useState, useEffect, useRef } from 'react';
-import Header from "@/src/components/Header";
-import PageHeader from "@/src/components/BreadCrumb";
 import { FileText, RotateCwIcon, X, Check, Plus, Trash2, ChevronLeft, ChevronRight } from 'lucide-react';
 import { CKEditor } from '@ckeditor/ckeditor5-react';
 import ClassicEditor from '@ckeditor/ckeditor5-build-classic';
@@ -252,7 +250,6 @@ const TestTemplets = () => {
   if (showForm) {
     return (
       <>
-        <Header />
         <div className="p-3 sm:p-4 md:p-6 bg-gray-100 min-h-screen">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 bg-white p-3 rounded shadow-md gap-3 max-w-6xl mx-auto">
             <div className="flex items-center gap-3">
@@ -445,11 +442,8 @@ const TestTemplets = () => {
 
   return (
     <>
-      <Header />
       <div className="p-3 sm:p-4 md:p-6 bg-gray-100 min-h-screen">
         <div className="max-w-6xl mx-auto">
-          <PageHeader title="Test Templates" icon={FileText} path="Master" />
-
           <div className="flex flex-col sm:flex-row flex-wrap items-start sm:items-center justify-between gap-3 mb-4 bg-white p-4 rounded shadow-md">
             <div className="flex flex-col sm:flex-row gap-2 flex-1 w-full sm:w-auto">
               <input

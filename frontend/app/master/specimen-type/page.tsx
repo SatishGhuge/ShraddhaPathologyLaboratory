@@ -2,8 +2,6 @@
 
 import { useState, useEffect } from "react";
 import { ArrowLeft, TestTube, RotateCwIcon, ChevronLeft, ChevronRight } from "lucide-react";
-import Header from "@/src/components/Header";
-import PageHeader from "@/src/components/BreadCrumb";
 import { getSpecimenTypes, createSpecimenType, updateSpecimenType, deleteSpecimenType } from "@/src/api/master";
 
 // Common color name <-> hex map
@@ -190,16 +188,8 @@ export default function SampleTypes() {
 
   return (
     <>
-      <Header />
 
       <div className="min-h-screen bg-white p-6">
-
-        {/* Header */}
-        <PageHeader 
-          title="Specimen Type" 
-          icon={TestTube}
-          path="Master"
-        />
 
         {/* Success/Error Messages */}
         {successMsg && (

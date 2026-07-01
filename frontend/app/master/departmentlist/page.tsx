@@ -4,9 +4,6 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Eye, Edit, Trash2, Plus, Layers, RotateCcw } from "lucide-react";
 
-import Header from "@/src/components/Header";
-import PageHeader from "@/src/components/BreadCrumb";
-
 const DepartmentTable = () => {
   const [search, setSearch] = useState("");
   const [departments, setDepartments] = useState<any[]>([]);
@@ -139,16 +136,7 @@ const DepartmentTable = () => {
   };
 
   return ( 
-        <>
-      <Header />
-            <div className="p-4 sm:p-6 bg-white min-h-screen">
-
-      {/* Header */}
-      <PageHeader 
-        title="Department" 
-        icon={Layers}
-        path="Master"
-      />
+    <div className="p-4 sm:p-6 bg-white min-h-screen">
 
       {/* Top Bar - Search, Reset, Show Inactive, Add in Single Row */}
       <div className="flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-center justify-between gap-3 mb-4 bg-white p-4 rounded shadow-md">
@@ -355,7 +343,6 @@ const DepartmentTable = () => {
         )}
       </div>
     </div>
-    </>
   );
 };
 

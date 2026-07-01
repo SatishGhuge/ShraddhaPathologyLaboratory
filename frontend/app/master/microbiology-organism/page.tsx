@@ -2,8 +2,6 @@
 
 import { useState } from "react";
 import { Plus, Pencil, Trash2, ArrowLeft, Microscope, RotateCcw } from "lucide-react";
-import Header from "@/src/components/Header";
-import PageHeader from "@/src/components/BreadCrumb";
 
 const initialData = [
   { id: 1, name: "E. coli" },
@@ -87,16 +85,8 @@ export default function MicrobiologyOrganism() {
 
   return (
     <>
-      <Header />
 
       <div className="min-h-screen bg-white p-6">
-
-        {/* Header */}
-        <PageHeader 
-          title="Microbiology Organism" 
-          icon={Microscope}
-          path="Master"
-        />
 
         {/* Top Bar - Search, Reset, Add in Single Row */}
         <div className="flex flex-wrap items-center justify-between gap-3 mb-4 bg-white p-3 rounded shadow-md">

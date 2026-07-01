@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useContext } from "react";
 import { useRouter, usePathname } from "next/navigation";
+import { SidebarContext } from "@/app/layout-wrapper";
 import {
   User,
   Database,
@@ -13,6 +14,8 @@ import {
   ChevronLeft,
   Search,
   Bell,
+  Menu,
+  X,
 } from "lucide-react";
 import { getAccessibleModules } from "@/utils/modulePermissions";
 
@@ -96,6 +99,7 @@ const allModules: NavModule[] = [
 const Header = () => {
   const router = useRouter();
   const pathname = usePathname();
+  const { sidebarOpen, setSidebarOpen } = useContext(SidebarContext);
   const [activeModule, setActiveModule] = useState<string | null>(null);
   const [currentUser, setCurrentUser] = useState<any>({});
   const [searchQuery, setSearchQuery] = useState("");
@@ -115,7 +119,7 @@ const Header = () => {
     const user = JSON.parse(localStorage.getItem("admin") || "{}");
     setCurrentUser(user);
     console.log('🔍 Header - Initial user load:', user);
-    
+
     const timer = setInterval(() => setDateTime(new Date()), 1000);
     return () => clearInterval(timer);
   }, []);
@@ -127,7 +131,7 @@ const Header = () => {
       setCurrentUser(user);
       console.log('🔍 Header - Storage changed, user updated:', user);
     };
-    
+
     window.addEventListener('storage', handleStorageChange);
     return () => window.removeEventListener('storage', handleStorageChange);
   }, []);
@@ -137,125 +141,125 @@ const Header = () => {
     const filterModulesByAllocation = () => {
       const user = JSON.parse(localStorage.getItem("admin") || "{}");
       const moduleAllocation = user.moduleAllocation;
-      
+
       console.log('🔍 Header - User:', user);
       console.log('🔍 Header - moduleAllocation (raw):', moduleAllocation);
       console.log('🔍 Header - moduleAllocation type:', typeof moduleAllocation);
-      
+
       // Only filter if moduleAllocation exists and is not empty
       if (moduleAllocation && (typeof moduleAllocation === 'string' || typeof moduleAllocation === 'object')) {
-      try {
-        const accessible = getAccessibleModules(moduleAllocation);
-        console.log('🔍 Header - accessible (parsed):', accessible);
-        console.log('🔍 Header - accessible.masters:', accessible.masters);
-        console.log('🔍 Header - accessible.masters.hasAccess:', accessible.masters.hasAccess);
-        
-        const filteredModules = allModules.map(module => {
-          if (module.id === "patient") {
-            const filtered = {
-              ...module,
-              items: module.items.filter(item => {
-                if (item.path.includes("registration")) return accessible.patient.registration;
-                if (item.path.includes("search-booking")) return accessible.patient.tests;
-                return false;
-              })
-            };
-            console.log('🔍 Header - patient filtered:', filtered);
-            return filtered;
-          }
-          
-          if (module.id === "master") {
-            const filtered = {
-              ...module,
-              items: module.items.filter(item => {
-                if (item.path.includes("testlist")) return accessible.masters.testlist;
-                if (item.path.includes("units")) return accessible.masters.units;
-                if (item.path.includes("referral-doctor")) return accessible.masters.referralDoctorList;
-                if (item.path.includes("specimen-type")) return accessible.masters.specimenType;
-                if (item.path.includes("test-templets")) return accessible.masters.testTemplates;
-                if (item.path.includes("departmentlist")) return accessible.masters.departmentlist;
-                if (item.path.includes("packagelist")) return accessible.masters.packagelist;
-                if (item.path.includes("rolelist")) return accessible.masters.rolelist;
-                if (item.path.includes("userlist")) return accessible.masters.userlist;
-                if (item.path.includes("charges")) return accessible.masters.charges;
-                if (item.path.includes("organization")) return accessible.masters.organization;
-                return false;
-              })
-            };
-            console.log('🔍 Header - master filtered:', filtered);
-            console.log('🔍 Header - master items count:', filtered.items.length);
-            return filtered;
-          }
-          
-          if (module.id === "report") {
-            const filtered = {
-              ...module,
-              items: module.items.filter(item => {
-                if (item.path.includes("report-dashboard")) return accessible.reports.dashboard;
-                if (item.path.includes("/collection")) return accessible.reports.dailyCollection || accessible.reports.monthlyCollectionSummary;
-                if (item.path.includes("patient-list")) return accessible.reports.patientList;
-                if (item.path.includes("center-wise")) return accessible.reports.centerWiseCostReport;
-                if (item.path.includes("b2b-testwise")) return accessible.reports.b2bTestwiseCostReport;
-                if (item.path.includes("discount-report")) return accessible.reports.discountReport;
-                if (item.path.includes("test-report")) return accessible.reports.testReport;
-                return false;
-              })
-            };
-            console.log('🔍 Header - report filtered:', filtered);
-            return filtered;
-          }
-          
-          if (module.id === "configuration") {
-            const filtered = {
-              ...module,
-              items: module.items.filter(item => {
-                if (item.label === "Signature") return accessible.configuration.signature;
-                return false;
-              })
-            };
-            console.log('🔍 Header - configuration filtered:', filtered);
-            return filtered;
-          }
-          
-          if (module.id === "help") {
-            const filtered = {
-              ...module,
-              items: module.items.filter(item => {
-                if (item.label === "User Manual") return accessible.help.userManual;
-                if (item.label === "Download Ultraviewer") return accessible.help.ultraviewer;
-                if (item.label === "Download Anydesk") return accessible.help.anydesk;
-                return false;
-              })
-            };
-            console.log('🔍 Header - help filtered:', filtered);
-            return filtered;
-          }
-          
-          if (module.id === "result") {
-            return accessible.result ? module : { ...module, items: [] };
-          }
-          
-          return module;
-        }).filter(module => {
-          // Hide modules with no accessible items
-          const shouldHide = module.items.length === 0 && ["patient", "master", "report", "configuration", "help"].includes(module.id);
-          console.log(`🔍 Header - module ${module.id}: items=${module.items.length}, shouldHide=${shouldHide}`);
-          if (shouldHide) {
-            return false;
-          }
-          return true;
-        });
-        
-        console.log('🔍 Header - filteredModules:', filteredModules);
-        setModules(filteredModules);
-      } catch (error) {
-        console.error('🔍 Header - Error parsing moduleAllocation:', error);
+        try {
+          const accessible = getAccessibleModules(moduleAllocation);
+          console.log('🔍 Header - accessible (parsed):', accessible);
+          console.log('🔍 Header - accessible.masters:', accessible.masters);
+          console.log('🔍 Header - accessible.masters.hasAccess:', accessible.masters.hasAccess);
+
+          const filteredModules = allModules.map(module => {
+            if (module.id === "patient") {
+              const filtered = {
+                ...module,
+                items: module.items.filter(item => {
+                  if (item.path.includes("registration")) return accessible.patient.registration;
+                  if (item.path.includes("search-booking")) return accessible.patient.tests;
+                  return false;
+                })
+              };
+              console.log('🔍 Header - patient filtered:', filtered);
+              return filtered;
+            }
+
+            if (module.id === "master") {
+              const filtered = {
+                ...module,
+                items: module.items.filter(item => {
+                  if (item.path.includes("testlist")) return accessible.masters.testlist;
+                  if (item.path.includes("units")) return accessible.masters.units;
+                  if (item.path.includes("referral-doctor")) return accessible.masters.referralDoctorList;
+                  if (item.path.includes("specimen-type")) return accessible.masters.specimenType;
+                  if (item.path.includes("test-templets")) return accessible.masters.testTemplates;
+                  if (item.path.includes("departmentlist")) return accessible.masters.departmentlist;
+                  if (item.path.includes("packagelist")) return accessible.masters.packagelist;
+                  if (item.path.includes("rolelist")) return accessible.masters.rolelist;
+                  if (item.path.includes("userlist")) return accessible.masters.userlist;
+                  if (item.path.includes("charges")) return accessible.masters.charges;
+                  if (item.path.includes("organization")) return accessible.masters.organization;
+                  return false;
+                })
+              };
+              console.log('🔍 Header - master filtered:', filtered);
+              console.log('🔍 Header - master items count:', filtered.items.length);
+              return filtered;
+            }
+
+            if (module.id === "report") {
+              const filtered = {
+                ...module,
+                items: module.items.filter(item => {
+                  if (item.path.includes("report-dashboard")) return accessible.reports.dashboard;
+                  if (item.path.includes("/collection")) return accessible.reports.dailyCollection || accessible.reports.monthlyCollectionSummary;
+                  if (item.path.includes("patient-list")) return accessible.reports.patientList;
+                  if (item.path.includes("center-wise")) return accessible.reports.centerWiseCostReport;
+                  if (item.path.includes("b2b-testwise")) return accessible.reports.b2bTestwiseCostReport;
+                  if (item.path.includes("discount-report")) return accessible.reports.discountReport;
+                  if (item.path.includes("test-report")) return accessible.reports.testReport;
+                  return false;
+                })
+              };
+              console.log('🔍 Header - report filtered:', filtered);
+              return filtered;
+            }
+
+            if (module.id === "configuration") {
+              const filtered = {
+                ...module,
+                items: module.items.filter(item => {
+                  if (item.label === "Signature") return accessible.configuration.signature;
+                  return false;
+                })
+              };
+              console.log('🔍 Header - configuration filtered:', filtered);
+              return filtered;
+            }
+
+            if (module.id === "help") {
+              const filtered = {
+                ...module,
+                items: module.items.filter(item => {
+                  if (item.label === "User Manual") return accessible.help.userManual;
+                  if (item.label === "Download Ultraviewer") return accessible.help.ultraviewer;
+                  if (item.label === "Download Anydesk") return accessible.help.anydesk;
+                  return false;
+                })
+              };
+              console.log('🔍 Header - help filtered:', filtered);
+              return filtered;
+            }
+
+            if (module.id === "result") {
+              return accessible.result ? module : { ...module, items: [] };
+            }
+
+            return module;
+          }).filter(module => {
+            // Hide modules with no accessible items
+            const shouldHide = module.items.length === 0 && ["patient", "master", "report", "configuration", "help"].includes(module.id);
+            console.log(`🔍 Header - module ${module.id}: items=${module.items.length}, shouldHide=${shouldHide}`);
+            if (shouldHide) {
+              return false;
+            }
+            return true;
+          });
+
+          console.log('🔍 Header - filteredModules:', filteredModules);
+          setModules(filteredModules);
+        } catch (error) {
+          console.error('🔍 Header - Error parsing moduleAllocation:', error);
+          setModules(allModules);
+        }
+      } else {
+        console.log('🔍 Header - No moduleAllocation found, showing all modules');
         setModules(allModules);
       }
-    } else {
-      console.log('🔍 Header - No moduleAllocation found, showing all modules');
-      setModules(allModules);
-    }
     };
 
     // Filter modules immediately when component mounts or user changes
@@ -264,19 +268,22 @@ const Header = () => {
 
   // Determine active module based on current pathname
   useEffect(() => {
+    // Don't close sidebar on navigation - user can manually close if needed
+    // setSidebarOpen(false);  // REMOVED - sidebar should stay open
+
     const pathSegments = pathname.split('/').filter(Boolean);
     if (pathSegments.length > 0) {
       let moduleId = pathSegments[0];
-      
+
       // Handle path-to-module ID mapping (e.g., "reports" -> "report")
       const pathToModuleMap: { [key: string]: string } = {
         "reports": "report",
       };
-      
+
       if (pathToModuleMap[moduleId]) {
         moduleId = pathToModuleMap[moduleId];
       }
-      
+
       // Check if this is a valid module
       const validModule = modules.find(m => m.id === moduleId);
       if (validModule) {
@@ -358,21 +365,24 @@ const Header = () => {
 
   return (
     <>
-      {/* Top Header */}
-      <header className="fixed top-0 left-48 right-0 h-14 bg-white z-50 border-b border-gray-300">
+      {/* Top Header - Full Width */}
+      <header className="fixed top-0 left-0 right-0 h-14 bg-white z-50 border-b border-gray-300">
         <div className="flex items-center justify-between h-full px-6 gap-4">
-          
-          {/* Search Bar */}
-          <div className="flex-1 max-w-md">
-            <div className="relative">
-              <Search size={18} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-              <input
-                type="text"
-                placeholder="Search by Patient, Sample ID, Report..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-              />
+
+          {/* Logo + Brand (No Toggle Button) */}
+          <div className="flex items-center gap-2">
+            {/* Logo + Brand Name - Larger */}
+            <div
+              onClick={handleLogoClick}
+              className="flex items-center cursor-pointer hover:opacity-80 transition-opacity"
+            >
+              <img src={logo} alt="Logo" className="w-12 h-12 object-contain  flex-shrink-0" />
+              <div className="flex flex-col">
+                <span className="text-xl font-bold text-primary-500 leading-tight underline decoration-primary-500 underline-offset-4">
+                  SHRADDHA
+                </span>
+                <span className="text-sm text-gray-600 leading-tight">Pathology Lab</span>
+              </div>
             </div>
           </div>
 
@@ -486,7 +496,7 @@ const Header = () => {
                   })} {dateTime.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}
                 </p>
               </div>
-              <div 
+              <div
                 className="w-10 h-10 bg-gradient-to-br from-primary-400 to-primary-600 rounded-full flex items-center justify-center text-white font-bold cursor-pointer hover:shadow-lg transition-shadow"
                 onClick={() => setShowAdminPopup(!showAdminPopup)}
               >
@@ -572,21 +582,46 @@ const Header = () => {
         </div>
       </header>
 
-      {/* Sidebar */}
-      <aside className="w-48 bg-white flex flex-col overflow-hidden h-screen fixed left-0 top-0 z-40 border-r border-gray-300 transition-all duration-200">
-        
-        {/* Sidebar Header */}
-        <div 
-          onClick={handleLogoClick}
-          className="p-6 border-b border-gray-300 flex items-center gap-2 h-14 cursor-pointer hover:opacity-80 transition-opacity"
-        >
-          <img src={logo} alt="Logo" className="w-10 h-10 object-contain flex-shrink-0" />
-          <div className="flex flex-col">
-            <span className="text-sm font-bold text-primary-500 leading-tight">SHRADDHA</span>
-            <span className="text-xs text-gray-600 leading-tight">Pathology Lab</span>
+      {/* Left Edge Hover Arrow - Toggle Sidebar */}
+      <div
+        className="fixed left-0 top-14 h-96 w-1 hover:w-8 z-40 transition-all duration-300 group"
+        onMouseEnter={() => setSidebarOpen(true)}
+      >
+        {/* Arrow appears on hover */}
+        {!sidebarOpen && (
+          <div className="h-full bg-gradient-to-r from-primary-100 to-transparent flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+            <ChevronRight size={20} className="text-primary-600 absolute left-1" />
           </div>
+        )}
+      </div>
+
+      {/* Bottom-Left Corner Button - Only visible when sidebar is closed */}
+      {!sidebarOpen && (
+        <button
+          onClick={() => setSidebarOpen(true)}
+          className="fixed bottom-6 left-6 z-40 w-10 h-10 rounded-full bg-primary-500 hover:bg-primary-600 text-white flex items-center justify-center shadow-lg transition-all duration-300 hover:shadow-xl"
+          title="Open sidebar"
+        >
+          <ChevronRight size={20} />
+        </button>
+      )}
+
+      {/* Sidebar - Slides in from left */}
+      <aside className={`w-48 bg-white flex flex-col overflow-hidden h-screen fixed left-0 top-14 z-40 border-r border-gray-300 transition-all duration-300 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'
+        }`}>
+
+        {/* Sidebar Header with Close Button */}
+        <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200">
+          <h3 className="font-bold text-primary-600">Menu</h3>
+          <button
+            onClick={() => setSidebarOpen(false)}
+            className="p-1 hover:bg-gray-100 rounded-full transition-colors"
+            title="Close sidebar"
+          >
+            <ChevronLeft size={20} className="text-gray-600" />
+          </button>
         </div>
-        
+
         {/* Navigation Content */}
         <div className="flex-1 overflow-y-auto transition-all duration-200 animate-in fade-in">
           {!activeModule ? (
@@ -596,25 +631,22 @@ const Header = () => {
                 <button
                   key={module.id}
                   onClick={() => handleModuleClick(module.id)}
-                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 text-left font-medium text-sm group ${
-                    activeModule === module.id
+                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 text-left font-medium text-sm group ${activeModule === module.id
                       ? 'bg-primary-50 text-primary-600'
                       : 'hover:bg-primary-50 text-gray-700 hover:text-primary-600'
-                  }`}
+                    }`}
                 >
-                  <span className={`transition-colors ${
-                    activeModule === module.id 
-                      ? 'text-primary-600' 
+                  <span className={`transition-colors ${activeModule === module.id
+                      ? 'text-primary-600'
                       : 'text-primary-500 group-hover:text-primary-600'
-                  }`}>
+                    }`}>
                     {module.icon}
                   </span>
                   <span className="flex-1">{module.title}</span>
-                  <ChevronRight size={16} className={`transition-colors ${
-                    activeModule === module.id 
-                      ? 'text-primary-500' 
+                  <ChevronRight size={16} className={`transition-colors ${activeModule === module.id
+                      ? 'text-primary-500'
                       : 'text-gray-400 group-hover:text-primary-500'
-                  }`} />
+                    }`} />
                 </button>
               ))}
             </nav>
@@ -635,11 +667,10 @@ const Header = () => {
                   <button
                     key={`${selectedModule.id}-${index}`}
                     onClick={() => handleItemClick(item.path)}
-                    className={`w-full flex items-center gap-2 px-4 py-2 rounded-lg transition-colors text-left text-sm group ${
-                      isActive
+                    className={`w-full flex items-center gap-2 px-4 py-2 rounded-lg transition-colors text-left text-sm group ${isActive
                         ? 'bg-primary-50 text-primary-600 font-medium'
                         : 'text-gray-600 hover:bg-primary-50'
-                    }`}
+                      }`}
                   >
                     <span className={`transition-colors ${isActive ? 'text-primary-600' : 'text-primary-400 group-hover:text-primary-600'}`}>▸</span>
                     <span className="truncate">{item.label}</span>

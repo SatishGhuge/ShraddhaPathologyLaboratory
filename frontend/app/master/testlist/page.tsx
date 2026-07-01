@@ -3,8 +3,7 @@
 import { useRouter } from "next/navigation";
 import React, { useState, useEffect } from "react";
 
-import Header from "@/src/components/Header";
-import PageHeader from "@/src/components/BreadCrumb";
+
 import { FlaskConical, RotateCwIcon } from "lucide-react";
 import { getTests, deleteTest, updateTest } from "@/src/api/master";
 
@@ -152,16 +151,8 @@ const TestList = () => {
 
   return (
     <>
-      <Header />
 
       <div className="p-3 sm:p-4 md:p-6 bg-white min-h-screen">
-        {/* Page Header */}
-        <PageHeader 
-          title="Test List" 
-          icon={FlaskConical}
-          path="Master"
-        />
-
         {/* 🔹 Top Bar - Title, Search, Reset, Add in Single Row */}
         <div className="flex flex-col sm:flex-row flex-wrap items-start sm:items-center justify-between gap-3 mb-4 bg-white p-3 rounded shadow-md">
           <div className="flex flex-col sm:flex-row gap-2 flex-1 w-full sm:w-auto">
