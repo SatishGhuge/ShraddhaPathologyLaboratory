@@ -2,10 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-
-import { RotateCcw, FlaskConical } from "lucide-react";
-import Header from "@/src/components/Header";
-import PageHeader from "@/src/components/BreadCrumb";
+import { RotateCcw } from "lucide-react";
 
 const outsourcingData = [
   {
@@ -87,15 +84,8 @@ const OutsourcingList = () => {
 
   return (
     <>
-      <Header />
 
       <div className="p-6 bg-white min-h-screen">
-        {/* Page Header */}
-        <PageHeader 
-          title="Outsource Labs" 
-          icon={FlaskConical}
-          path="Master"
-        />
 
         {/* Top Bar - Search, Reset, Add in Single Row */}
         <div className="flex flex-wrap items-center justify-between gap-3 mb-4 bg-white p-3 rounded shadow-md">

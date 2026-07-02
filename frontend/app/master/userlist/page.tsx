@@ -4,8 +4,6 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 
 import { Users, RotateCcw, ChevronLeft, ChevronRight } from "lucide-react";
-import Header from "@/src/components/Header";
-import PageHeader from "@/src/components/BreadCrumb";
 import { getUsers, deleteUser } from "@/src/api/master";
 
 const UserList = () => {
@@ -54,9 +52,7 @@ const UserList = () => {
 
   return (
     <>
-      <Header />
       <div className="p-6 bg-white min-h-screen">
-        <PageHeader title="User List" icon={Users} path="Master" />
 
         <div className="flex flex-wrap items-center justify-between gap-3 mb-4 bg-white p-3 rounded shadow-md">
           <div className="flex gap-2 flex-1 flex-wrap">

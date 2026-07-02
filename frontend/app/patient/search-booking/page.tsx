@@ -2,8 +2,6 @@
 
 import { useRouter, useSearchParams } from "next/navigation";
 import React, { useState, useRef, useEffect } from "react";
-import Header from "@/src/components/Header";
-import PageHeader from "@/src/components/BreadCrumb";
 import BarcodeModal from "@/app/components/BarcodeModal";
 import BillReceipt from "@/app/components/BillReceipt";
 import API_BASE_URL from "@/src/api/config";
@@ -1508,10 +1506,7 @@ export default function BookingPage() {
       input[type=number] { -moz-appearance:textfield; }
     `}</style>
 
-    <Header/>
     <div className="w-full px-3 sm:px-6 mt-16">
-
-      <PageHeader title="Search for Booking" icon={Search} path="Patient" />
 
       {/* SEARCH BAR */}
       <div className="bg-white rounded shadow p-3 mb-4">

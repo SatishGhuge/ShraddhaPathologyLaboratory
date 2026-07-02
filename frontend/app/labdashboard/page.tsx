@@ -2,7 +2,6 @@
 
 import { useRouter } from "next/navigation";
 import React, { useEffect, useState } from "react";
-import Header from "@/src/components/Header";
 import { createAdmin } from "@/src/api/admin";
 import { getTestStatistics } from "@/src/api/result";
 import { getPatientStatistics } from "@/src/api/patient";
@@ -301,7 +300,6 @@ const Dashboard = () => {
 
   return (
     <>
-    <Header />
     <div className="fixed top-0 left-48 right-0 bottom-0 bg-gray-50 pt-14 overflow-hidden">
       <div className="p-3 h-full overflow-hidden flex flex-col">
 

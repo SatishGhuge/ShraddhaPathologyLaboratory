@@ -2,11 +2,9 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { getOrganizations, deleteOrganization } from "@/src/api/master";
 
 import { RotateCcw, Building2 } from "lucide-react";
-import Header from "@/src/components/Header";
-import PageHeader from "@/src/components/BreadCrumb";
-import { getOrganizations, deleteOrganization } from "@/src/api/master";
 
 const OrganizationList = () => {
   const router = useRouter();
@@ -64,15 +62,8 @@ const OrganizationList = () => {
 
   return (
     <>
-      <Header />
 
       <div className="p-6 bg-white min-h-screen">
-        {/* Page Header */}
-        <PageHeader 
-          title="Organization List" 
-          icon={Building2}
-          path="Master"
-        />
 
         {/* Top Bar - Search, Reset, Add in Single Row */}
         <div className="flex flex-wrap items-center justify-between gap-3 mb-4 bg-white p-3 rounded shadow-md">

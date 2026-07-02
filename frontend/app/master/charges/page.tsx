@@ -2,9 +2,6 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
-
-import Header from "@/src/components/Header";
-import PageHeader from "@/src/components/BreadCrumb";
 import { DollarSign, RotateCcw, FileSpreadsheet, FileText, Upload } from "lucide-react";
 
 export default function AddLabCharges() {
@@ -401,15 +398,8 @@ export default function AddLabCharges() {
 
   return (
     <>
-      <Header />
       
       <div className="p-6 bg-white min-h-screen">
-        {/* Page Header */}
-        <PageHeader 
-          title="Default Test Charges" 
-          icon={DollarSign}
-          path="Master"
-        />
         <p className="text-sm text-gray-600 mb-4">Set default charges for all tests. These charges will be applied to new organizations automatically.</p>
         {/* Main Content Card */}
         <div className="bg-white rounded shadow-md border border-gray-200">

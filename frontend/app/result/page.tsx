@@ -16,8 +16,6 @@ import {
   Upload,
   FileCheck,
 } from "lucide-react";
-import Header from "@/src/components/Header";
-import PageHeader from "@/src/components/BreadCrumb";
 import BarcodeModal from "@/app/components/BarcodeModal";
 import API_BASE_URL from "@/src/api/config";
 
@@ -1633,9 +1631,7 @@ export default function Result() {
 
   return (
     <>
-      <Header />
       <div className="p-2 sm:p-3 md:p-4 lg:p-6 bg-gray-50 min-h-screen mt-16">
-        <PageHeader title="" path="Results" />
         
         {/* Error Message */}
         {error && (

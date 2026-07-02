@@ -2,8 +2,6 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import Header from "@/src/components/Header";
-import PageHeader from "@/src/components/BreadCrumb";
 
 import { UserCheck, RotateCcw } from "lucide-react";
 import { getDoctors, deleteDoctor } from "@/src/api/master";
@@ -55,10 +53,7 @@ export default function ReferralListing() {
 
   return (
     <>
-    <Header />
     <div className="min-h-screen bg-white p-6">
-
-      <PageHeader title="Referral Doctor List" icon={UserCheck} path="Master" />
 
       {/* Top Bar */}
       <div className="flex flex-wrap items-center justify-between gap-3 mb-4 bg-white p-3 rounded shadow-md">

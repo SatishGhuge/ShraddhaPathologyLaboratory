@@ -4,8 +4,6 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 
 import { Search, RotateCcw, ShieldCheck, Trash2, ChevronLeft, ChevronRight } from "lucide-react";
-import Header from "@/src/components/Header";
-import PageHeader from "@/src/components/BreadCrumb";
 import { getRoles, deleteRole } from "@/src/api/master";
 
 const RoleList = () => {
@@ -53,9 +51,7 @@ const RoleList = () => {
 
   return (
     <>
-      <Header />
       <div className="p-6 min-h-screen bg-white">
-        <PageHeader title="Role List" icon={ShieldCheck} path="Master" />
 
         <div className="flex flex-wrap items-center justify-between gap-3 mb-4 bg-white p-3 rounded shadow-md">
           <div className="flex gap-2 flex-1">
