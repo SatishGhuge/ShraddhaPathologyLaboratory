@@ -13,6 +13,7 @@ import {
   ChevronLeft,
   Search,
   Bell,
+  Package,
 } from "lucide-react";
 import { getAccessibleModules } from "@/utils/modulePermissions";
 
@@ -84,6 +85,17 @@ const allModules: NavModule[] = [
       { label: "User Manual", path: "#" },
       { label: "Download Ultraviewer", path: "#" },
       { label: "Download Anydesk", path: "#" },
+    ],
+  },
+  {
+    id: "inventory",
+    title: "Inventory",
+    icon: <Package size={20} />,
+    items: [
+      { label: "Item Master",         path: "/inventory/item-master" },
+      { label: "Stock Transactions",  path: "/inventory/stock-transactions" },
+      { label: "Stock Transfers",     path: "/inventory/transfers" },
+      { label: "Expiry Tracker",      path: "/inventory/expiry-tracker" },
     ],
   },
   {
@@ -235,6 +247,11 @@ const Header = () => {
           
           if (module.id === "result") {
             return accessible.result ? module : { ...module, items: [] };
+          }
+          
+          // Inventory — always visible (no allocation filter yet)
+          if (module.id === "inventory") {
+            return module;
           }
           
           return module;
