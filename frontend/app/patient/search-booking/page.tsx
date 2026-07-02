@@ -463,6 +463,7 @@ export default function BookingPage() {
           isExisting: true,
           visitId: t.visitId,
           status: t.status || "Registered",
+          barcode_status: t.barcode_status || "Unprinted", // ✅ Include barcode status for highlighting
         });
       });
 
@@ -1265,15 +1266,23 @@ export default function BookingPage() {
     // Group by specimen type and collect test IDs (PatientTest IDs)
     const specimenGroups: any = {};
     const specimenTestIds: any = {};
+    const specimenStatuses: any = {};
+    const specimenBarcodeStatuses: any = {};
+    
     booking.tests.forEach((t: any) => {
       const key = t.sample || 'Unknown';
       if (!specimenGroups[key]) {
         specimenGroups[key] = [];
         specimenTestIds[key] = [];
+        specimenStatuses[key] = [];
+        specimenBarcodeStatuses[key] = [];
       }
       specimenGroups[key].push(t.name);
       // ✨ Store the patientTest ID (from the booking test object which comes from patientTest table)
       specimenTestIds[key].push(t.id);
+      // Store status and barcode_status for each test
+      specimenStatuses[key].push(t.status || 'Registered');
+      specimenBarcodeStatuses[key].push(t.barcode_status || 'Unprinted');
     });
 
     // Build labels - Use visitId for barcode ONLY (no organization code in barcode)
@@ -1284,10 +1293,21 @@ export default function BookingPage() {
       // Organization code stored separately for display, not in barcode
       let organizationCode = booking.patientData?.organizationCode || '';
       
-      // Get barcode_status from the first test in this specimen group (they all have the same status)
-      const firstTestIdForSpecimen = specimenTestIds[specimen]?.[0];
-      const firstTest = booking.tests.find((t: any) => t.id === firstTestIdForSpecimen);
-      const barcodeStatus = firstTest?.barcode_status || 'Unprinted';
+      // Get status and barcode_status from tests in this specimen group
+      const statuses = specimenStatuses[specimen] || [];
+      const barcodeStatuses = specimenBarcodeStatuses[specimen] || [];
+      
+      // Determine final status: if ANY test is "Received", use "Received"
+      let finalSampleStatus = 'Registered';
+      if (statuses.includes('Received')) {
+        finalSampleStatus = 'Received';
+      }
+      
+      // Get final barcode status: if ANY barcode has been printed, use "Printed"
+      let finalBarcodeStatus = 'Unprinted';
+      if (barcodeStatuses.includes('Printed')) {
+        finalBarcodeStatus = 'Printed';
+      }
       
       return {
         barcodeValue, // Just the visitId-based barcode
@@ -1297,7 +1317,8 @@ export default function BookingPage() {
         dateStr,
         timeStr,
         testIds: specimenTestIds[specimen] || [], // Include test IDs for API calls
-        barcode_status: barcodeStatus, // Add barcode status from database
+        barcode_status: finalBarcodeStatus, // Add barcode status from database
+        sampleStatus: finalSampleStatus, // ✅ ADD SAMPLE STATUS FOR BLUE HIGHLIGHTING
       };
     });
 

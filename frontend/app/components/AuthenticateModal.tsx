@@ -1,6 +1,79 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, Fragment } from 'react';
 import { X, AlertCircle } from 'lucide-react';
 import API_BASE_URL from '@/src/api/config';
+
+// Helper function to extract ALL available options from a parameter (from ALL database fields)
+const getAllOptionsFromParameter = (param: Parameter): string[] => {
+  const allOptions = new Set<string>();
+  
+  // 1. Add all options from textContent (primary source)
+  if (param.textContent) {
+    try {
+      let options: any[] = [];
+      try {
+        options = JSON.parse(param.textContent);
+      } catch {
+        options = param.textContent.split(',').map((o: string) => o.trim());
+      }
+      
+      options.forEach((option: any) => {
+        const optionValue = typeof option === 'object' ? option.value || option.name : option;
+        if (optionValue && optionValue.toString().trim()) {
+          allOptions.add(optionValue.toString().trim());
+        }
+      });
+    } catch (e) {
+      console.warn(`Error parsing textContent for parameter ${param.id}:`, e);
+    }
+  }
+  
+  // 2. Add gender-specific default values
+  if (param.maleDefaultValue?.trim()) allOptions.add(param.maleDefaultValue.trim());
+  if (param.femaleDefaultValue?.trim()) allOptions.add(param.femaleDefaultValue.trim());
+  if (param.childDefaultValue?.trim()) allOptions.add(param.childDefaultValue.trim());
+  
+  // 3. Add from displayRangeText
+  if (param.displayRangeText?.trim()) {
+    param.displayRangeText.split(',').forEach(opt => {
+      const trimmed = opt.trim();
+      if (trimmed) allOptions.add(trimmed);
+    });
+  }
+  
+  // 4. Add from rangeText
+  if (param.rangeText?.trim()) {
+    param.rangeText.split(',').forEach(opt => {
+      const trimmed = opt.trim();
+      if (trimmed) allOptions.add(trimmed);
+    });
+  }
+  
+  // 5. Add from rangeValues (JSON or comma-separated)
+  if (param.rangeValues?.trim()) {
+    try {
+      let rangeValues: any[] = [];
+      try {
+        rangeValues = JSON.parse(param.rangeValues);
+      } catch {
+        rangeValues = param.rangeValues.split(',').map((o: string) => o.trim());
+      }
+      
+      rangeValues.forEach((val: any) => {
+        const value = typeof val === 'object' ? val.value || val.name : val;
+        if (value && value.toString().trim()) {
+          allOptions.add(value.toString().trim());
+        }
+      });
+    } catch (e) {
+      console.warn(`Error parsing rangeValues for parameter ${param.id}:`, e);
+    }
+  }
+  
+  // 6. Return sorted array (remove empty strings)
+  return Array.from(allOptions)
+    .filter(opt => opt && opt.trim().length > 0)
+    .sort();
+};
 
 interface Parameter {
   id: number;
@@ -19,15 +92,19 @@ interface Parameter {
   rangeText: string;
   normalRange: string;
   textContent?: string;
+  rangeValues?: string;
   ageRanges?: any;
   maleLowValue?: number;
   maleHighValue?: number;
+  maleDefaultValue?: string;
   maleActive?: boolean;
   femaleLowValue?: number;
   femaleHighValue?: number;
+  femaleDefaultValue?: string;
   femaleActive?: boolean;
   childLowValue?: number;
   childHighValue?: number;
+  childDefaultValue?: string;
   childActive?: boolean;
   hasFormula?: boolean;
   formula?: string;
@@ -271,10 +348,11 @@ const AuthenticateModal = ({
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] overflow-y-auto">
         {/* Modal Header */}
-        <div className="flex items-center justify-between p-4 border-b sticky top-0 bg-white">
+        {/* Modal Header */}
+        <div className="flex items-center justify-between p-2 border-b sticky top-0 bg-white">
           <div>
-            <h2 className="text-lg font-bold text-gray-900">Authenticate Readings</h2>
-            <p className="text-sm text-gray-600 mt-1">
+            <h2 className="text-base font-bold text-gray-900">Authenticate Readings</h2>
+            <p className="text-xs text-gray-600">
               Test: <span className="font-semibold text-cyan-700">{patientData.test.name}</span>
             </p>
           </div>
@@ -287,8 +365,8 @@ const AuthenticateModal = ({
         </div>
 
         {/* Patient Info */}
-        <div className="bg-blue-50 border-b p-3">
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+        <div className="bg-blue-50 border-b p-2">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-1 text-xs">
             <div>
               <span className="font-semibold text-gray-700">Patient:</span>
               <span className="ml-2 text-gray-900">
@@ -323,25 +401,21 @@ const AuthenticateModal = ({
           </div>
         )}
 
-        {/* Readings Table (Read-only) */}
-        <div className="p-4">
-          <div className="bg-blue-50 border border-blue-200 rounded p-3 mb-4 text-sm text-blue-700">
-            📋 <span className="font-semibold">Review Mode:</span> You are reviewing verified readings before final authentication.
-          </div>
-          
+        {/* Readings Table */}
+        <div className="p-2">
           <div className="border rounded-lg overflow-x-auto">
-            <table className="w-full text-sm border-collapse">
-              <thead className="bg-gradient-to-r from-blue-300 to-blue-200 text-blue-900">
+            <table className="w-full text-xs border-collapse">
+              <thead className="bg-gradient-to-r from-purple-700 to-purple-600 text-white">
                 <tr>
-                  <th className="border p-2 text-left font-semibold">Parameter Name</th>
-                  <th className="border p-2 text-center w-32 font-semibold">Value</th>
-                  <th className="border p-2 text-center w-16 font-semibold">Units</th>
-                  <th className="border p-2 text-center w-28 font-semibold">Biological Range</th>
+                  <th className="border p-1.5 text-left">Parameter Name</th>
+                  <th className="border p-1.5 text-center w-60">Value</th>
+                  <th className="border p-1.5 text-center w-12">Units</th>
+                  <th className="border p-1.5 text-center w-32">Biological Range</th>
                 </tr>
               </thead>
               <tbody>
                 {Object.entries(groupedParameters || {}).map(([categoryName, categoryParams]: [string, any]) => (
-                  <React.Fragment key={categoryName}>
+                  <Fragment key={categoryName}>
                     {categoryName !== 'NO_CATEGORY_HEADER' && categoryParams[0]?.showCategoryHeader && (
                       <tr className="bg-gray-200 font-semibold">
                         <td colSpan={5} className="p-2">
@@ -353,29 +427,32 @@ const AuthenticateModal = ({
                       const outOfRange = isValueOutOfRange(param, results[param.id]?.numericValue);
                       const rangeStr = getAgeAppropriateRange(param);
                       const inputClass = outOfRange
-                        ? 'border-2 border-red-500 bg-red-50 px-2 py-1 rounded focus:outline-none focus:ring-2 focus:ring-red-500'
-                        : 'border border-gray-300 px-2 py-1 rounded focus:outline-none focus:ring-2 focus:ring-blue-500';
+                        ? 'border-2 border-red-500 bg-red-50 px-2 py-1 rounded focus:outline-none focus:ring-2 focus:ring-red-500 text-xs'
+                        : 'border border-gray-300 px-2 py-1 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-xs';
 
                       return (
-                        <tr key={param.id} className={outOfRange ? 'bg-red-50' : 'bg-white hover:bg-gray-50'}>
-                          <td className="border p-2">
-                            <span className="font-medium text-gray-900">{param.parameterName}</span>
+                        <tr key={param.id} className={outOfRange ? 'bg-red-50' : 'bg-white hover:bg-gray-50'} style={{height: '28px'}}>
+                          <td className="border p-1.5">
+                            <span className="font-medium text-gray-900 text-xs">{param.parameterName}</span>
                             {param.isMandatory && <span className="text-red-500 ml-1">*</span>}
                           </td>
-                          <td className="border p-2 text-center">
+                          <td className="border p-1.5 text-center">
                             {param.type === 'Numeric' ? (
-                              <input
-                                type="number"
-                                step="0.01"
-                                value={results[param.id]?.numericValue ?? ''}
-                                onChange={(e) => {
-                                  const newResults = { ...results };
-                                  if (!newResults[param.id]) newResults[param.id] = {};
-                                  newResults[param.id].numericValue = e.target.value === '' ? null : parseFloat(e.target.value);
-                                  setResults(newResults);
-                                }}
-                                className={`w-full text-center ${inputClass}`}
-                              />
+                              <div className="relative">
+                                <input
+                                  type="number"
+                                  step="0.01"
+                                  value={results[param.id]?.numericValue ?? ''}
+                                  onChange={(e) => {
+                                    const newResults = { ...results };
+                                    if (!newResults[param.id]) newResults[param.id] = {};
+                                    newResults[param.id].numericValue = e.target.value === '' ? null : parseFloat(e.target.value);
+                                    setResults(newResults);
+                                  }}
+                                  className="w-full text-center bg-transparent text-xs border-none focus:outline-none focus:ring-0 placeholder-gray-400"
+                                  placeholder="0"
+                                />
+                              </div>
                             ) : param.isDescriptive ? (
                               <div className="w-full">
                                 {/* Display saved readings as plain black text with minimal size - read-only */}
@@ -397,49 +474,96 @@ const AuthenticateModal = ({
                                 ) : null}
                               </div>
                             ) : param.type === 'Text' || param.isMultipleOptions ? (
-                              // ✅ TEXT/DROPDOWN with predefined options - display as plain text (read-only in authenticate mode)
-                              <div className="w-full">
+                              // TEXT/DROPDOWN - EDITABLE with all options from database
+                              <div className="w-full space-y-1">
+                                {/* Show previously selected values */}
                                 <div className="flex flex-wrap items-center gap-0 text-xs">
                                   {(results[param.id]?.textValue || '').split(',').map((option: string, idx: number) => {
                                     const trimmedOption = option.trim();
                                     return trimmedOption ? (
-                                      <span
+                                      <div
                                         key={idx}
-                                        className="inline-block text-gray-900 font-medium text-xs"
+                                        className="inline-flex items-center text-xs font-medium text-gray-900"
                                       >
-                                        {trimmedOption}{idx < (results[param.id]?.textValue || '').split(',').filter((o: string) => o.trim()).length - 1 ? ', ' : ''}
-                                      </span>
+                                        <span className="text-xs">{trimmedOption}</span>
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            const options = (results[param.id]?.textValue || '').split(',').map((o: string) => o.trim()).filter(Boolean);
+                                            const newOptions = options.filter((_: string, i: number) => i !== idx);
+                                            const newResults = { ...results };
+                                            newResults[param.id] = { ...newResults[param.id], textValue: newOptions.join(', ') };
+                                            setResults(newResults);
+                                          }}
+                                          className="text-gray-500 hover:text-gray-700 font-bold cursor-pointer ml-0.5"
+                                          title="Remove this selection"
+                                        >
+                                          ×
+                                        </button>
+                                        {idx < (results[param.id]?.textValue || '').split(',').filter((o: string) => o.trim()).length - 1 && (
+                                          <span className="mx-1 text-gray-400">,</span>
+                                        )}
+                                      </div>
                                     ) : null;
                                   })}
                                 </div>
-                                {!results[param.id]?.textValue || results[param.id]?.textValue.trim() === '' ? (
-                                  <span className="text-gray-400 text-xs">No selections</span>
-                                ) : null}
+
+                                {/* Dropdown to add/select options - editable */}
+                                <select
+                                  value=""
+                                  onChange={(e) => {
+                                    if (e.target.value) {
+                                      const existing = results[param.id]?.textValue || '';
+                                      const options = existing ? existing.split(',').map((o: string) => o.trim()).filter(Boolean) : [];
+                                      
+                                      // Avoid duplicates
+                                      if (!options.includes(e.target.value)) {
+                                        options.push(e.target.value);
+                                        const newResults = { ...results };
+                                        newResults[param.id] = { ...newResults[param.id], textValue: options.join(', ') };
+                                        setResults(newResults);
+                                      }
+                                      // Reset dropdown
+                                      e.target.value = '';
+                                    }
+                                  }}
+                                  className="w-full border border-gray-300 px-1.5 py-0.5 rounded text-xs focus:outline-none focus:ring-1 focus:ring-gray-400 bg-white text-gray-700 cursor-pointer"
+                                >
+                                  <option value="">➕ Add...</option>
+                                  {getAllOptionsFromParameter(param).map((optionValue: string) => (
+                                    <option key={optionValue} value={optionValue}>
+                                      {optionValue}
+                                    </option>
+                                  ))}
+                                </select>
                               </div>
                             ) : (
-                              <input
-                                type="text"
-                                value={results[param.id]?.selectedOption || ''}
-                                onChange={(e) => {
-                                  const newResults = { ...results };
-                                  if (!newResults[param.id]) newResults[param.id] = {};
-                                  newResults[param.id].selectedOption = e.target.value;
-                                  setResults(newResults);
-                                }}
-                                className={`w-full text-center ${inputClass}`}
-                              />
+                              <div className="relative">
+                                <input
+                                  type="text"
+                                  value={results[param.id]?.selectedOption || ''}
+                                  onChange={(e) => {
+                                    const newResults = { ...results };
+                                    if (!newResults[param.id]) newResults[param.id] = {};
+                                    newResults[param.id].selectedOption = e.target.value;
+                                    setResults(newResults);
+                                  }}
+                                  className="w-full text-center bg-transparent text-xs border-none focus:outline-none focus:ring-0 placeholder-gray-400"
+                                  placeholder="Enter"
+                                />
+                              </div>
                             )}
                           </td>
-                          <td className="border p-2 text-center text-gray-600 text-xs">
+                          <td className="border p-1.5 text-center text-gray-600 text-xs">
                             {param.units || '-'}
                           </td>
-                          <td className="border p-2 text-center text-gray-600 text-xs">
-                            {rangeStr}
+                          <td className="border p-1.5 text-center text-gray-600 text-xs max-w-xs truncate" title={rangeStr}>
+                            {rangeStr && rangeStr.length > 35 ? rangeStr.substring(0, 35) + '...' : rangeStr}
                           </td>
                         </tr>
                       );
                     })}
-                  </React.Fragment>
+                  </Fragment>
                 ))}
               </tbody>
             </table>
@@ -447,7 +571,7 @@ const AuthenticateModal = ({
         </div>
 
         {/* Modal Footer */}
-        <div className="flex items-center justify-end gap-3 p-4 border-t bg-gray-50 sticky bottom-0">
+        <div className="flex items-center justify-end gap-2 p-2 border-t bg-gray-50 sticky bottom-0">
           <button
             onClick={onClose}
             disabled={authenticating}

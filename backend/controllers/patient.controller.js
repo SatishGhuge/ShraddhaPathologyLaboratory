@@ -221,16 +221,25 @@ export const createPatient = async (req, res) => {
 
       // Create payment transaction if payment was made during registration
       if(paymentMode && perTestPaid > 0){
-        await prisma.paymentTransaction.create({
-          data: {
-            visitId,
-            patientId: patient.patientId,
-            paymentMode,
-            paymentAmount: perTestPaid,
-            remarks: discountRemark || null
+        try {
+          if(prisma.paymentTransaction && typeof prisma.paymentTransaction.create === 'function'){
+            await prisma.paymentTransaction.create({
+              data: {
+                visitId,
+                patientId: patient.patientId,
+                paymentMode,
+                paymentAmount: perTestPaid,
+                remarks: discountRemark || null
+              }
+            });
+            console.log(`✅ Payment transaction created: ${paymentMode} - ₹${perTestPaid}`);
+          } else {
+            console.warn('⚠️ PaymentTransaction model not available, skipping payment record');
           }
-        });
-        console.log(`✅ Payment transaction created: ${paymentMode} - ₹${perTestPaid}`);
+        } catch(paymentErr){
+          console.warn('⚠️ Failed to create payment transaction:', paymentErr.message);
+          // Don't block patient creation if payment transaction fails
+        }
       }
     }
 

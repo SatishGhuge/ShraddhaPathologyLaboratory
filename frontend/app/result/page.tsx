@@ -1631,7 +1631,7 @@ export default function Result() {
 
   return (
     <>
-      <div className="p-2 sm:p-3 md:p-4 lg:p-6 bg-gray-50 min-h-screen mt-16">
+      <div className="p-1 sm:p-2 md:p-2 lg:p-3 bg-white min-h-screen">
         
         {/* Error Message */}
         {error && (
@@ -1640,7 +1640,7 @@ export default function Result() {
           </div>
         )}
         
-        <div className="flex flex-col gap-2">
+        <div className="flex flex-col gap-0.5">
 
             {/* Status Cards with All button */}
             <div className="flex gap-2 items-center">
@@ -1648,8 +1648,8 @@ export default function Result() {
                 onClick={() => setSelectedStatus("All")}
                 className={`px-4 py-2 rounded-lg font-semibold text-xs sm:text-sm transition-all ${
                   selectedStatus === "All" 
-                    ? "bg-gray-700 text-white ring-2 ring-gray-900" 
-                    : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+                    ? "bg-slate-900 text-white ring-2 ring-slate-900" 
+                    : "bg-white text-gray-700 border border-gray-300 hover:bg-gray-50"
                 }`}
               >
                 All ({statistics.total})
@@ -1730,8 +1730,8 @@ export default function Result() {
             </div>
 
             {/* Top Filter Bar */}
-            <div className="bg-white rounded shadow-md p-2 sm:p-3">
-              <div className="flex flex-wrap items-center gap-1.5">
+            <div className="bg-white rounded shadow-md p-1.5 sm:p-2">
+              <div className="flex flex-wrap items-center gap-1">
                 <input 
                   type="date" 
                   value={filters.fromDate}
@@ -1848,62 +1848,65 @@ export default function Result() {
                     </div>
                   )}
                 </button>
-              </div>
-            </div>
 
-            {/* Result Table - Scrollable */}
-            <div className="bg-white rounded shadow-md overflow-hidden">
-              {/* Top right selector for records per page */}
-              <div className="px-3 py-2 border-b border-gray-200 flex justify-end">
-                <div className="flex gap-1 text-sm">
+                {/* ✅ Pagination selector moved to filter bar */}
+                <div className="ml-auto flex gap-0.5 text-sm items-center">
+                  <span className="text-xs text-gray-600">Show:</span>
                   <button
                     onClick={() => { setItemsPerPage(25); setCurrentPage(1); }}
-                    className={`px-2 py-1 transition-colors ${itemsPerPage === 25 ? 'text-cyan-600 font-semibold' : 'text-gray-700 hover:text-cyan-600'}`}
+                    className={`px-2 py-1 rounded transition-colors text-xs ${itemsPerPage === 25 ? 'text-cyan-600 font-semibold bg-cyan-100' : 'text-gray-700 hover:text-cyan-600 hover:bg-gray-100'}`}
                   >
                     25
                   </button>
                   <span className="text-gray-400">/</span>
                   <button
                     onClick={() => { setItemsPerPage(50); setCurrentPage(1); }}
-                    className={`px-2 py-1 transition-colors ${itemsPerPage === 50 ? 'text-cyan-600 font-semibold' : 'text-gray-700 hover:text-cyan-600'}`}
+                    className={`px-2 py-1 rounded transition-colors text-xs ${itemsPerPage === 50 ? 'text-cyan-600 font-semibold bg-cyan-100' : 'text-gray-700 hover:text-cyan-600 hover:bg-gray-100'}`}
                   >
                     50
                   </button>
                   <span className="text-gray-400">/</span>
                   <button
                     onClick={() => { setItemsPerPage(100); setCurrentPage(1); }}
-                    className={`px-2 py-1 transition-colors ${itemsPerPage === 100 ? 'text-cyan-600 font-semibold' : 'text-gray-700 hover:text-cyan-600'}`}
+                    className={`px-2 py-1 rounded transition-colors text-xs ${itemsPerPage === 100 ? 'text-cyan-600 font-semibold bg-cyan-100' : 'text-gray-700 hover:text-cyan-600 hover:bg-gray-100'}`}
                   >
                     100
                   </button>
                 </div>
               </div>
+            </div>
+
+            {/* Result Table - Scrollable */}
+            <div className="bg-white rounded shadow-md overflow-hidden">
               
               <div className="overflow-x-auto">
-                <table className="w-full text-xs sm:text-sm border-collapse">
+                <table className="w-full text-[11px] sm:text-xs border-collapse">
                   <thead className="bg-slate-900 text-white shadow-xl">
                     <tr>
-                      <th className="px-1 sm:px-2 py-1.5 sm:py-2 text-center font-semibold text-xs whitespace-nowrap border border-gray-300">
+                      <th className="px-1 sm:px-2 py-0.5 sm:py-1 text-center font-semibold text-[10px] whitespace-nowrap border border-gray-300">
                         <input type="checkbox" className="w-3 h-3 cursor-pointer accent-white" />
                       </th>
-                      <th className="px-1 sm:px-2 py-1.5 sm:py-2 text-left font-semibold text-xs whitespace-nowrap border border-gray-300">Visit ID</th>
-                      <th className="px-1 sm:px-2 py-1.5 sm:py-2 text-left font-semibold text-xs whitespace-nowrap border border-gray-300">Org ID</th>
-                      <th className="px-1 sm:px-2 py-1.5 sm:py-2 text-left font-semibold text-xs whitespace-nowrap border border-gray-300">Patient Name</th>
-                      <th className="px-1 sm:px-2 py-1.5 sm:py-2 text-left font-semibold text-xs whitespace-nowrap border border-gray-300">Age</th>
-                      <th className="px-1 sm:px-2 py-1.5 sm:py-2 text-left font-semibold text-xs whitespace-nowrap border border-gray-300">Gender</th>
-                      <th className="px-1 sm:px-2 py-1.5 sm:py-2 text-left font-semibold text-xs whitespace-nowrap border border-gray-300">Services</th>
-                      <th className="px-1 sm:px-2 py-1.5 sm:py-2 text-left font-semibold text-xs whitespace-nowrap border border-gray-300">Referral Doc</th>
-                      <th className="px-1 sm:px-2 py-1.5 sm:py-2 text-left font-semibold text-xs whitespace-nowrap border border-gray-300">
+                      <th className="px-1 sm:px-2 py-0.5 sm:py-1 text-left font-semibold text-[10px] whitespace-nowrap border border-gray-300">Visit ID</th>
+                      <th className="px-1 sm:px-2 py-0.5 sm:py-1 text-left font-semibold text-[10px] whitespace-nowrap border border-gray-300">Org ID</th>
+                      <th className="px-1 sm:px-2 py-0.5 sm:py-1 text-left font-semibold text-[10px] whitespace-nowrap border border-gray-300">Patient Name</th>
+                      <th className="px-1 sm:px-2 py-0.5 sm:py-1 text-left font-semibold text-[10px] whitespace-nowrap border border-gray-300">Age</th>
+                      <th className="px-1 sm:px-2 py-0.5 sm:py-1 text-left font-semibold text-[10px] whitespace-nowrap border border-gray-300">Gender</th>
+                      <th className="px-2 sm:px-3 py-0.5 sm:py-1 text-left font-semibold text-[10px] whitespace-nowrap border border-gray-300 min-w-[200px]">Services</th>
+                      <th className="px-1 sm:px-2 py-0.5 sm:py-1 text-left font-semibold text-[10px] whitespace-nowrap border border-gray-300">Ref. Interval</th>
+                      <th className="px-1 sm:px-2 py-0.5 sm:py-1 text-left font-semibold text-[10px] whitespace-nowrap border border-gray-300">Unit</th>
+                      <th className="px-1 sm:px-2 py-0.5 sm:py-1 text-left font-semibold text-[10px] whitespace-nowrap border border-gray-300">Result</th>
+                      <th className="px-1 sm:px-2 py-0.5 sm:py-1 text-left font-semibold text-[10px] whitespace-nowrap border border-gray-300">Referral Doc</th>
+                      <th className="px-1 sm:px-2 py-0.5 sm:py-1 text-left font-semibold text-[10px] whitespace-nowrap border border-gray-300">
                         Previous Test Result
                       </th>
-                      <th className="px-1 sm:px-2 py-1.5 sm:py-2 text-left font-semibold text-xs whitespace-nowrap border border-gray-300">
+                      <th className="px-1 sm:px-2 py-0.5 sm:py-1 text-left font-semibold text-[10px] whitespace-nowrap border border-gray-300">
                         All Test Results
                       </th>
-                      <th className="px-0.5 sm:px-1 py-1.5 sm:py-2 text-center font-semibold text-xs whitespace-nowrap border border-gray-300">
-                        <span className="text-[10px]">S.Taken</span>
+                      <th className="px-0.5 sm:px-1 py-0.5 sm:py-1 text-center font-semibold text-[10px] whitespace-nowrap border border-gray-300">
+                        <span className="text-[9px]">S.Taken</span>
                       </th>
-                      <th className="px-1 sm:px-2 py-1.5 sm:py-2 text-left font-semibold text-xs whitespace-nowrap border border-gray-300">Patient History</th>
-                      <th className="px-0.5 sm:px-1 py-1.5 sm:py-2 text-center font-semibold text-xs whitespace-nowrap border border-gray-300">
+                      <th className="px-1 sm:px-2 py-0.5 sm:py-1 text-left font-semibold text-[10px] whitespace-nowrap border border-gray-300">Patient History</th>
+                      <th className="px-0.5 sm:px-1 py-0.5 sm:py-1 text-center font-semibold text-[10px] whitespace-nowrap border border-gray-300">
                         <div title="Print barcode labels for selected tests">
                           <Barcode
                             size={16}
@@ -1917,7 +1920,7 @@ export default function Result() {
                   <tbody className="bg-white">
                     {loading ? (
                       <tr>
-                        <td colSpan={13} className="text-center p-4 text-gray-500 text-sm border border-gray-300">
+                        <td colSpan={16} className="text-center p-4 text-gray-500 text-sm border border-gray-300">
                           <div className="flex items-center justify-center gap-2">
                             <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-cyan-600"></div>
                             Loading...
@@ -1926,7 +1929,7 @@ export default function Result() {
                       </tr>
                     ) : paginatedResults.length === 0 ? (
                       <tr>
-                        <td colSpan={13} className="text-center p-3 sm:p-4 text-gray-500 text-xs sm:text-sm border border-gray-300">
+                        <td colSpan={16} className="text-center p-3 sm:p-4 text-gray-500 text-xs sm:text-sm border border-gray-300">
                           No records found for {selectedStatus} status
                         </td>
                       </tr>
@@ -1949,12 +1952,12 @@ export default function Result() {
                             </td>
 
                             {/* Column 2: Visit ID (show only on first test row) */}
-                            <td className="px-1 sm:px-2 py-1 sm:py-1.5 text-xs border border-gray-300">
+                            <td className="px-1 sm:px-2 py-0.5 sm:py-1 text-[11px] border border-gray-300">
                               {testIndex === 0 ? patient.visit_id : ''}
                             </td>
 
                             {/* Column 3: Org ID with hover tooltip (show only on first test row) */}
-                            <td className="px-1 sm:px-2 py-1 sm:py-1.5 text-xs border border-gray-300 relative">
+                            <td className="px-1 sm:px-2 py-0.5 sm:py-1 text-[11px] border border-gray-300 relative">
                               {testIndex === 0 && (
                                 <div 
                                   className="cursor-help relative group"
@@ -1975,7 +1978,7 @@ export default function Result() {
                             </td>
 
                             {/* Column 4: Patient Name with balance icon (show only on first test row) */}
-                            <td className="px-1 sm:px-2 py-1 sm:py-1.5 text-xs font-medium border border-gray-300">
+                            <td className="px-1 sm:px-2 py-0.5 sm:py-1 text-[11px] font-medium border border-gray-300">
                               {testIndex === 0 && (
                                 <span className="flex items-center gap-1">
                                   <span className="truncate">{patient.patient_name}</span>
@@ -2002,21 +2005,21 @@ export default function Result() {
                             </td>
 
                             {/* Column 5: Age (show only on first test row) */}
-                            <td className="px-1 sm:px-2 py-1 sm:py-1.5 text-xs font-medium border border-gray-300 text-center">
+                            <td className="px-1 sm:px-2 py-0.5 sm:py-1 text-[11px] font-medium border border-gray-300 text-center">
                               {testIndex === 0 && (
                                 <span className="font-semibold text-gray-900">{patient.age || '-'} Yrs</span>
                               )}
                             </td>
 
                             {/* Column 6: Gender (show only on first test row) */}
-                            <td className="px-1 sm:px-2 py-1 sm:py-1.5 text-xs font-medium border border-gray-300 text-center">
+                            <td className="px-1 sm:px-2 py-0.5 sm:py-1 text-[11px] font-medium border border-gray-300 text-center">
                               {testIndex === 0 && (
                                 <span className="font-semibold text-gray-900">{patient.gender || '-'}</span>
                               )}
                             </td>
 
                             {/* Column 7: Services (with icons) */}
-                            <td className="px-1 sm:px-2 py-1 sm:py-1.5 text-xs border border-gray-300" title={test.test_name}>
+                            <td className="px-2 sm:px-3 py-0.5 sm:py-1 text-[11px] border border-gray-300 min-w-[200px]" title={test.test_name}>
                               <div className="flex items-center gap-1">
                                 <span 
                                   className="flex-1 cursor-pointer hover:text-cyan-700 hover:font-semibold transition-colors"
@@ -2079,8 +2082,24 @@ export default function Result() {
                                 )}
                               </div>
                             </td>
-                            {/* Column 8: Referral Doc */}
-                            <td className="px-1 sm:px-2 py-1 sm:py-1.5 text-xs border border-gray-300">
+
+                            {/* Column 8: Ref. Interval */}
+                            <td className="px-1 sm:px-2 py-0.5 sm:py-1 text-[11px] border border-gray-300">
+                              <span className="text-gray-700">{test.ref_interval || '-'}</span>
+                            </td>
+
+                            {/* Column 9: Unit */}
+                            <td className="px-1 sm:px-2 py-0.5 sm:py-1 text-[11px] border border-gray-300">
+                              <span className="text-gray-700">{test.unit || '-'}</span>
+                            </td>
+
+                            {/* Column 10: Result */}
+                            <td className="px-1 sm:px-2 py-0.5 sm:py-1 text-[11px] border border-gray-300 max-w-[120px] truncate">
+                              <span className="text-gray-700">{test.result || '-'}</span>
+                            </td>
+
+                            {/* Column 11: Referral Doc */}
+                            <td className="px-1 sm:px-2 py-0.5 sm:py-1 text-[11px] border border-gray-300">
                               <span className="inline-flex items-center gap-1">
                                 {test.ref_by === "SELF" ? (
                                   <>
@@ -2096,8 +2115,8 @@ export default function Result() {
                               </span>
                             </td>
 
-                            {/* Column 9: Previous Test Result */}
-                            <td className="px-1 sm:px-2 py-1 sm:py-1.5 text-xs border border-gray-300">
+                            {/* Column 12: Previous Test Result */}
+                            <td className="px-1 sm:px-2 py-0.5 sm:py-1 text-[11px] border border-gray-300">
                               <div className="flex items-center gap-1">
                                 <button
                                   onClick={() => handleFetchPreviousResult(patient, test)}
@@ -2110,8 +2129,8 @@ export default function Result() {
                               </div>
                             </td>
 
-                            {/* Column 10: All Test Results */}
-                            <td className="px-1 sm:px-2 py-1 sm:py-1.5 text-xs border border-gray-300">
+                            {/* Column 13: All Test Results */}
+                            <td className="px-1 sm:px-2 py-0.5 sm:py-1 text-[11px] border border-gray-300">
                               <div className="flex items-center gap-1">
                                 <button
                                   onClick={() => handleFetchAllResults(patient, test)}
@@ -2124,8 +2143,8 @@ export default function Result() {
                               </div>
                             </td>
 
-                            {/* Column 11: S.Taken (green tick mark + calendar & settings icons, all rows) */}
-                            <td className="px-0.5 sm:px-1 py-1 sm:py-1.5 text-center border border-gray-300">
+                            {/* Column 14: S.Taken (green tick mark + calendar & settings icons, all rows) */}
+                            <td className="px-0.5 sm:px-1 py-0.5 sm:py-1 text-center border border-gray-300">
                               <div className="flex items-center justify-center gap-1">
                                 {test.sample_taken ? (
                                   <span className="text-green-600 text-lg font-bold leading-none">✓</span>
@@ -2188,8 +2207,8 @@ export default function Result() {
                               </div>
                             </td>
 
-                            {/* Column 12: Patient History (display patient_history text only, show only on first test row) */}
-                            <td className="px-1 sm:px-2 py-1 sm:py-1.5 text-xs border border-gray-300 relative">
+                            {/* Column 15: Patient History (display patient_history text only, show only on first test row) */}
+                            <td className="px-1 sm:px-2 py-0.5 sm:py-1 text-[11px] border border-gray-300 relative">
                               {testIndex === 0 && (
                                 <div className="relative group cursor-help">
                                   {patient.patient_history ? (
@@ -2212,8 +2231,8 @@ export default function Result() {
                               )}
                             </td>
 
-                            {/* Column 13: Barcode checkbox */}
-                            <td className="px-0.5 sm:px-1 py-1 sm:py-1.5 text-center border border-gray-300">
+                            {/* Column 16: Barcode checkbox */}
+                            <td className="px-0.5 sm:px-1 py-0.5 sm:py-1 text-center border border-gray-300">
                               <input
                                 type="checkbox"
                                 className="w-3 h-3 cursor-pointer accent-cyan-600 disabled:opacity-30 disabled:cursor-not-allowed"
