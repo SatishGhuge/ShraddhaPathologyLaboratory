@@ -62,8 +62,8 @@ export function LayoutWrapper({ children }: { children: ReactNode }) {
     <SidebarContext.Provider value={{ sidebarOpen, setSidebarOpen }}>
       <Header />
       <div className={`transition-all duration-300 ${!isPublicRoute ? `mt-14 ${sidebarOpen ? 'ml-48' : 'ml-0'} p-3 sm:p-4 md:p-6` : ""}`}>
-        {/* Auto-render breadcrumb for non-public routes */}
-        {!isPublicRoute && <PageHeader />}
+        {/* Auto-render breadcrumb for non-public routes, but NOT on dashboard */}
+        {!isPublicRoute && !pathname.includes('/labdashboard') && !pathname.includes('/dashboard') && <PageHeader />}
         {children}
       </div>
     </SidebarContext.Provider>
