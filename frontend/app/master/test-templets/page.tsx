@@ -95,11 +95,14 @@ const TestTemplets = () => {
       setLoading(true);
       setError(null);
       const data = await getTemplates(page, ITEMS_PER_PAGE);
-      setTemplates(data);
+      // Ensure data is an array - handle cases where API returns data.data or data.templates
+      const templatesArray = Array.isArray(data) ? data : (data?.data || data?.templates || []);
+      setTemplates(templatesArray);
       setPagination(null);
     } catch (err) {
       console.error('Error fetching templates:', err);
       setError('Failed to load templates. Please try again.');
+      setTemplates([]); // Set empty array on error to prevent filter error
     } finally {
       setLoading(false);
     }
@@ -241,7 +244,7 @@ const TestTemplets = () => {
     setSelectedTestParameters([]);
   };
 
-  const filteredTemplates = templates.filter(template =>
+  const filteredTemplates = (Array.isArray(templates) ? templates : []).filter(template =>
     template.templateName.toLowerCase().includes(search.toLowerCase()) ||
     template.test?.name.toLowerCase().includes(search.toLowerCase())
   );

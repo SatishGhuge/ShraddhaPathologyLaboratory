@@ -60,8 +60,7 @@ const allModules: NavModule[] = [
     icon: <FileBarChart2 size={20} />,
     items: [
       { label: "Dashboard", path: "/reports/report-dashboard" },
-      { label: "Daily Collection", path: "/reports/daily-collection" },
-      { label: "Monthly Collection Summary", path: "/reports/monthly-collection-summary" },
+      { label: "Collection Report", path: "/reports/collection" },
       { label: "Patient List", path: "/reports/patient-list" },
       { label: "Center wise cost Report", path: "/reports/center-wise-cost-report" },
       { label: "B2B Testwise Cost Report", path: "/reports/b2b-testwise-cost-report" },
@@ -205,8 +204,7 @@ const Header = () => {
               ...module,
               items: module.items.filter(item => {
                 if (item.path.includes("report-dashboard")) return accessible.reports.dashboard;
-                if (item.path.includes("daily-collection")) return accessible.reports.dailyCollection;
-                if (item.path.includes("monthly-collection")) return accessible.reports.monthlyCollectionSummary;
+                if (item.path.includes("/collection")) return accessible.reports.dailyCollection || accessible.reports.monthlyCollectionSummary;
                 if (item.path.includes("patient-list")) return accessible.reports.patientList;
                 if (item.path.includes("center-wise")) return accessible.reports.centerWiseCostReport;
                 if (item.path.includes("b2b-testwise")) return accessible.reports.b2bTestwiseCostReport;
@@ -490,6 +488,9 @@ const Header = () => {
                   {(() => {
                     const user = JSON.parse(localStorage.getItem('admin') || '{}');
                     const isAdmin = user.userType === 'admin' || !user.userType;
+                    if (isAdmin && user.organization) {
+                      return user.organization.name;
+                    }
                     const displayName = user.name || user.username || 'User';
                     return isAdmin ? 'Shraddha Admin' : displayName;
                   })()}
@@ -509,6 +510,10 @@ const Header = () => {
                 {(() => {
                   const user = JSON.parse(localStorage.getItem('admin') || '{}');
                   const isAdmin = user.userType === 'admin' || !user.userType;
+                  if (isAdmin && user.organization) {
+                    const initials = user.organization.name.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2);
+                    return initials || 'ORG';
+                  }
                   if (isAdmin) return 'SA';
                   const name = user.name || user.username || 'U';
                   const initials = name.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2);
@@ -526,6 +531,8 @@ const Header = () => {
                     const username = user.username || '-';
                     const rawRole = user.role || (isAdmin ? 'Admin' : 'User');
                     const role = rawRole.toUpperCase().includes('ADMIN') || rawRole.toUpperCase().includes('SUPER') ? 'Admin' : rawRole;
+                    const orgName = user.organization?.name || null;
+                    const initials = orgName ? orgName.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2) : 'SA';
                     return (
                       <div className="space-y-3">
                         <div className="text-center">
@@ -533,11 +540,17 @@ const Header = () => {
                             WELCOME {isAdmin ? 'ADMIN' : role.toUpperCase()}
                           </h3>
                           <div className="w-12 h-12 bg-gradient-to-br from-primary-100 to-primary-200 rounded-full mx-auto flex items-center justify-center mb-2">
-                            <span className="text-xl font-bold text-primary-600">SA</span>
+                            <span className="text-xl font-bold text-primary-600">{initials}</span>
                           </div>
                         </div>
 
                         <div className="space-y-2 bg-gradient-to-br from-primary-50 to-primary-100 rounded-lg p-3 text-sm border border-primary-100">
+                          {orgName && (
+                            <div>
+                              <p className="text-xs text-gray-600">Organization:</p>
+                              <p className="font-semibold text-gray-800">{orgName}</p>
+                            </div>
+                          )}
                           <div>
                             <p className="text-xs text-gray-600">Name:</p>
                             <p className="font-semibold text-gray-800">{displayName}</p>

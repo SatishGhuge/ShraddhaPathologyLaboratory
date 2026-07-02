@@ -10,31 +10,52 @@ import {
 import Header from "@/src/components/Header";
 import { updateOrganization, getOrganizationById, createOrganizationWithCredentials } from "@/src/api/master";
 
-// Module Accordion Component
-const ModuleAccordion = ({ title, icon: Icon, color, items, moduleAllocation, toggleModule }: any) => {
+// Module Accordion Component with Select All and Auto-close functionality
+const ModuleAccordion = ({ title, icon: Icon, items, moduleAllocation, toggleModule, onToggleAll, activeModule, onModuleChange }: any) => {
   const [isOpen, setIsOpen] = useState(false);
+  const isActive = title.toLowerCase() === activeModule;
+
+  // Close this accordion if another module opens
+  useEffect(() => {
+    if (!isActive && isOpen) {
+      setIsOpen(false);
+    }
+  }, [activeModule, isActive]);
+
   const enabledCount = items.filter((item: any) => {
     const keys = item.key.split('.');
     let current = moduleAllocation;
     for (const key of keys) {
-      current = current[key];
+      if (current && typeof current === 'object' && key in current) {
+        current = current[key];
+      } else {
+        return false;
+      }
     }
     return current;
   }).length;
 
-  const colorMap: any = {
-    blue: 'bg-blue-50 border-blue-200',
-    green: 'bg-green-50 border-green-200',
-    purple: 'bg-purple-50 border-purple-200',
-    orange: 'bg-orange-50 border-orange-200',
+  const allEnabled = enabledCount === items.length && items.length > 0;
+  const someEnabled = enabledCount > 0 && enabledCount < items.length;
+
+  const handleOpen = () => {
+    setIsOpen(!isOpen);
+    if (!isOpen) {
+      onModuleChange?.(title.toLowerCase());
+    }
+  };
+
+  const toggleSelectAll = () => {
+    const shouldEnable = !allEnabled;
+    onToggleAll(items, shouldEnable);
   };
 
   return (
-    <div className={`border rounded-lg ${colorMap[color] || 'bg-gray-50 border-gray-200'}`}>
+    <div className="border rounded-lg bg-white border-gray-200">
       <button
         type="button"
-        onClick={() => setIsOpen(!isOpen)}
-        className="w-full flex items-center justify-between p-4 hover:bg-white/50 transition-colors"
+        onClick={handleOpen}
+        className="w-full flex items-center justify-between p-4 hover:bg-gray-50 transition-colors border-b border-gray-200"
       >
         <div className="flex items-center gap-3">
           <Icon size={24} className="text-gray-700" />
@@ -47,53 +68,73 @@ const ModuleAccordion = ({ title, icon: Icon, color, items, moduleAllocation, to
       </button>
 
       {isOpen && (
-        <div className="border-t border-gray-200 p-4 space-y-2 bg-white/50">
-          {items.map((item: any) => {
-            const keys = item.key.split('.');
-            let current = moduleAllocation;
-            for (const key of keys) {
-              current = current[key];
-            }
-            const isEnabled = current;
+        <div className="p-4 space-y-3 bg-white">
+          {/* Select All Checkbox */}
+          <div className="flex items-center justify-between p-2 bg-gray-50 rounded border border-gray-200">
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                ref={(el) => {
+                  if (el) {
+                    (el as any).indeterminate = someEnabled;
+                  }
+                }}
+                checked={allEnabled}
+                onChange={toggleSelectAll}
+                className="w-4 h-4 accent-orange-500 cursor-pointer"
+              />
+              <span className="text-sm font-semibold text-gray-700">Select All</span>
+            </div>
+            <span className="text-xs text-gray-500">{enabledCount}/{items.length}</span>
+          </div>
 
-            return (
-              <div key={item.key} className="flex items-center justify-between p-2 hover:bg-gray-100 rounded">
-                <span className="text-sm text-gray-700">{item.label}</span>
-                <button
-                  type="button"
-                  onClick={() => toggleModule(item.key)}
-                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                    isEnabled ? 'bg-orange-500' : 'bg-gray-300'
-                  }`}
-                >
-                  <span
-                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                      isEnabled ? 'translate-x-6' : 'translate-x-1'
+          {/* Individual Items */}
+          <div className="space-y-2">
+            {items.map((item: any) => {
+              const keys = item.key.split('.');
+              let current = moduleAllocation;
+              for (const key of keys) {
+                if (current && typeof current === 'object' && key in current) {
+                  current = current[key];
+                } else {
+                  current = false;
+                  break;
+                }
+              }
+              const isEnabled = current;
+
+              return (
+                <div key={item.key} className="flex items-center justify-between p-2 hover:bg-gray-50 rounded">
+                  <span className="text-sm text-gray-700">{item.label}</span>
+                  <button
+                    type="button"
+                    onClick={() => toggleModule(item.key)}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                      isEnabled ? 'bg-orange-500' : 'bg-gray-300'
                     }`}
-                  />
-                </button>
-              </div>
-            );
-          })}
+                  >
+                    <span
+                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                        isEnabled ? 'translate-x-6' : 'translate-x-1'
+                      }`}
+                    />
+                  </button>
+                </div>
+              );
+            })}
+          </div>
         </div>
       )}
     </div>
   );
 };
 
-// Single Toggle Component for Configuration, Help, Result
-const SingleToggle = ({ title, icon: Icon, color, moduleKey, moduleAllocation, toggleModule }: any) => {
+// Single Toggle Component for Result
+const SingleToggle = ({ title, icon: Icon, moduleKey, moduleAllocation, toggleModule }: any) => {
   const isEnabled = moduleAllocation[moduleKey];
 
-  const colorMap: any = {
-    blue: 'bg-blue-50 border-blue-200',
-    green: 'bg-green-50 border-green-200',
-    purple: 'bg-purple-50 border-purple-200',
-    orange: 'bg-orange-50 border-orange-200',
-  };
-
   return (
-    <div className={`border rounded-lg ${colorMap[color] || 'bg-gray-50 border-gray-200'} p-4`}>
+    <div className="border rounded-lg bg-white border-gray-200 p-4">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <Icon size={24} className="text-gray-700" />
@@ -203,12 +244,16 @@ const AddOrganization = () => {
     mobile: "",
     email: "",
     date: "",
+    adminName: "",
     active: "Yes",
+    sendReportsViaWhatsApp: false,
+    sendReportsViaMail: false,
   });
 
   const [toast, setToast] = useState<any>(null);
   const [saving, setSaving] = useState(false);
   const [moduleAllocation, setModuleAllocation] = useState(defaultModuleAllocation);
+  const [activeModule, setActiveModule] = useState<string | null>(null);
 
   useEffect(() => {
     if (id && (isViewMode || isEditMode)) {
@@ -225,16 +270,31 @@ const AddOrganization = () => {
                 mobile: organization.mobile || "",
                 email: organization.email || "",
                 date: organization.date ? new Date(organization.date).toISOString().split("T")[0] : "",
+                adminName: organization.adminName || "",
                 active: organization.isActive ? "Yes" : "No",
+                sendReportsViaWhatsApp: organization.sendReportsViaWhatsApp || false,
+                sendReportsViaMail: organization.sendReportsViaMail || false,
               });
               if (organization.moduleAllocation) {
                 try {
-                  const allocationData = organization.moduleAllocation.modules || organization.moduleAllocation;
+                  let allocationData = organization.moduleAllocation;
+                  console.log('📦 Raw moduleAllocation:', allocationData, 'Type:', typeof allocationData);
+                  
+                  // If it's an object with modules property, extract it
+                  if (allocationData && typeof allocationData === 'object' && 'modules' in allocationData) {
+                    allocationData = allocationData.modules;
+                    console.log('✅ Extracted modules from object:', allocationData);
+                  }
+                  
+                  // Parse if it's a string
                   const allocation = typeof allocationData === 'string' 
                     ? JSON.parse(allocationData) 
                     : allocationData;
-                  setModuleAllocation(allocation);
+                  console.log('✅ Final parsed allocation:', allocation);
+                    
+                  setModuleAllocation(allocation || defaultModuleAllocation);
                 } catch (e) {
+                  console.error('Error parsing module allocation:', e);
                   setModuleAllocation(defaultModuleAllocation);
                 }
               }
@@ -249,7 +309,8 @@ const AddOrganization = () => {
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     if (isViewMode) return;
-    setFormData({ ...formData, [e.target.name]: e.target.value });
+    const { name, type, value, checked } = e.target as any;
+    setFormData({ ...formData, [name]: type === "checkbox" ? checked : value });
   };
 
   const toggleModule = (path: string) => {
@@ -260,6 +321,26 @@ const AddOrganization = () => {
       current = current[keys[i]];
     }
     current[keys[keys.length - 1]] = !current[keys[keys.length - 1]];
+    setModuleAllocation(newAllocation);
+  };
+
+  const toggleSelectAll = (items: any[], shouldEnable: boolean) => {
+    // Update all modules at once in a single state update
+    const newAllocation = JSON.parse(JSON.stringify(moduleAllocation));
+    
+    items.forEach((item: any) => {
+      const keys = item.key.split('.');
+      let current = newAllocation;
+      
+      // Navigate to parent
+      for (let i = 0; i < keys.length - 1; i++) {
+        current = current[keys[i]];
+      }
+      
+      // Set the value directly
+      current[keys[keys.length - 1]] = shouldEnable;
+    });
+    
     setModuleAllocation(newAllocation);
   };
 
@@ -294,7 +375,10 @@ const AddOrganization = () => {
         email: formData.email,
         date: formData.date || null,
         isActive: formData.active === "Yes",
+        adminName: formData.adminName,
         moduleAllocation: JSON.stringify(moduleAllocation),
+        sendReportsViaWhatsApp: formData.sendReportsViaWhatsApp,
+        sendReportsViaMail: formData.sendReportsViaMail,
       };
 
       if (isEditMode) {
@@ -305,7 +389,6 @@ const AddOrganization = () => {
         setToast({
           type: "success",
           message: `Organization added successfully!`,
-          credentials: (res as any)?.credentials || null,
         });
       }
     } catch (err: any) {
@@ -341,6 +424,16 @@ const AddOrganization = () => {
                 <div className="flex items-center border border-gray-300 rounded px-2 bg-white">
                   <Building2 size={14} className="text-cyan-600" />
                   <input type="text" name="name" value={formData.name} onChange={handleChange}
+                    disabled={isViewMode} required={!isViewMode}
+                    className="w-full px-2 py-1.5 outline-none text-sm disabled:bg-gray-50 bg-transparent" />
+                </div>
+              </div>
+
+              <div>
+                <label className="font-medium text-gray-700 text-sm">Admin Name</label>
+                <div className="flex items-center border border-gray-300 rounded px-2 bg-white">
+                  <User size={14} className="text-cyan-600" />
+                  <input type="text" name="adminName" value={formData.adminName} onChange={handleChange}
                     disabled={isViewMode} required={!isViewMode}
                     className="w-full px-2 py-1.5 outline-none text-sm disabled:bg-gray-50 bg-transparent" />
                 </div>
@@ -399,7 +492,7 @@ const AddOrganization = () => {
                 </div>
               </div>
 
-              <div className="md:col-span-2">
+              <div>
                 <label className="font-medium text-gray-700 text-sm">Email Address</label>
                 <div className="flex items-center border border-gray-300 rounded px-2 bg-white">
                   <Mail size={14} className="text-cyan-600" />
@@ -417,8 +510,25 @@ const AddOrganization = () => {
               </div>
             </div>
 
+            {/* Report Delivery Preferences Section */}
+            <div className="border-t border-gray-300 pt-4 mt-4 pb-4">
+              <p className="font-semibold text-gray-700 text-sm mb-3">📧 Report Delivery Preferences</p>
+              <div className="flex items-center gap-6 ml-1">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input type="checkbox" name="sendReportsViaWhatsApp" checked={formData.sendReportsViaWhatsApp} onChange={handleChange}
+                    disabled={isViewMode} className="w-4 h-4 accent-green-600" />
+                  <span className="text-sm text-gray-700">Send via WhatsApp</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input type="checkbox" name="sendReportsViaMail" checked={formData.sendReportsViaMail} onChange={handleChange}
+                    disabled={isViewMode} className="w-4 h-4 accent-cyan-600" />
+                  <span className="text-sm text-gray-700">Send via Email</span>
+                </label>
+              </div>
+            </div>
+
             {/* Module Allocation Section */}
-            {!isViewMode && (
+            {(isEditMode || !isViewMode) && (
               <div className="border-t border-gray-300 pt-4 mt-4">
                 <h3 className="text-lg font-semibold text-slate-900 mb-4">Module Allocation</h3>
                 
@@ -427,20 +537,21 @@ const AddOrganization = () => {
                   <ModuleAccordion
                     title="Patient"
                     icon={User}
-                    color="blue"
                     items={[
-                      { key: 'patient.registration', label: 'Patient Registration' },
-                      { key: 'patient.tests', label: 'Search for Test' },
+                      { key: 'patient.registration', label: 'Registration' },
+                      { key: 'patient.tests', label: 'Tests' },
                     ]}
                     moduleAllocation={moduleAllocation}
                     toggleModule={toggleModule}
+                    onToggleAll={toggleSelectAll}
+                    activeModule={activeModule}
+                    onModuleChange={(module: string) => setActiveModule(module === activeModule ? null : module)}
                   />
 
                   {/* Masters Module */}
                   <ModuleAccordion
                     title="Masters"
                     icon={Settings}
-                    color="green"
                     items={[
                       { key: 'masters.testlist', label: 'Tests' },
                       { key: 'masters.testTemplates', label: 'Test Template' },
@@ -456,13 +567,15 @@ const AddOrganization = () => {
                     ]}
                     moduleAllocation={moduleAllocation}
                     toggleModule={toggleModule}
+                    onToggleAll={toggleSelectAll}
+                    activeModule={activeModule}
+                    onModuleChange={(module: string) => setActiveModule(module === activeModule ? null : module)}
                   />
 
                   {/* Reports Module */}
                   <ModuleAccordion
                     title="Reports"
                     icon={BarChart3}
-                    color="purple"
                     items={[
                       { key: 'reports.dashboard', label: 'Dashboard' },
                       { key: 'reports.dailyCollection', label: 'Daily Collection' },
@@ -475,25 +588,29 @@ const AddOrganization = () => {
                     ]}
                     moduleAllocation={moduleAllocation}
                     toggleModule={toggleModule}
+                    onToggleAll={toggleSelectAll}
+                    activeModule={activeModule}
+                    onModuleChange={(module: string) => setActiveModule(module === activeModule ? null : module)}
                   />
 
                   {/* Configuration Module */}
                   <ModuleAccordion
                     title="Configuration"
                     icon={Lock}
-                    color="orange"
                     items={[
                       { key: 'configuration.signature', label: 'Signature' },
                     ]}
                     moduleAllocation={moduleAllocation}
                     toggleModule={toggleModule}
+                    onToggleAll={toggleSelectAll}
+                    activeModule={activeModule}
+                    onModuleChange={(module: string) => setActiveModule(module === activeModule ? null : module)}
                   />
 
                   {/* Help Module */}
                   <ModuleAccordion
                     title="Help"
                     icon={HelpCircle}
-                    color="blue"
                     items={[
                       { key: 'help.userManual', label: 'User Manual' },
                       { key: 'help.ultraviewer', label: 'Download Ultraviewer' },
@@ -501,13 +618,15 @@ const AddOrganization = () => {
                     ]}
                     moduleAllocation={moduleAllocation}
                     toggleModule={toggleModule}
+                    onToggleAll={toggleSelectAll}
+                    activeModule={activeModule}
+                    onModuleChange={(module: string) => setActiveModule(module === activeModule ? null : module)}
                   />
 
                   {/* Result Module */}
                   <SingleToggle
                     title="Result"
                     icon={ClipboardCheck}
-                    color="green"
                     moduleKey="result"
                     moduleAllocation={moduleAllocation}
                     toggleModule={toggleModule}
@@ -516,7 +635,7 @@ const AddOrganization = () => {
               </div>
             )}
 
-            {!isViewMode && (
+            {(isEditMode || !isViewMode) && (
               <div className="flex gap-3 mt-4">
                 <button type="submit" disabled={saving}
                   className="flex items-center gap-2 bg-orange-500 hover:bg-orange-600 disabled:opacity-60 text-white px-4 py-1.5 rounded text-sm transition-colors">

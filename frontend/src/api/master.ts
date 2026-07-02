@@ -8,6 +8,7 @@ interface ApiData {
 interface ApiResponse<T = any> {
   success: boolean;
   message?: string;
+  detail?: string;
   data?: T;
   pagination?: {
     page: number;
@@ -30,7 +31,12 @@ const apiCall = async <T = any>(endpoint: string, options: RequestInit & { heade
       ...options,
     });
     const data: ApiResponse<T> = await response.json();
-    if (!response.ok) throw new Error(data.message || 'API request failed');
+    if (!response.ok) {
+      const error = new Error(data.message || 'API request failed') as any;
+      error.detail = data.detail;
+      error.response = data;
+      throw error;
+    }
     return data;
   } catch (error) {
     console.error('API Error:', error);
@@ -47,12 +53,16 @@ const extractDataArray = (response: any): any[] => {
 };
 
 // ==================== TESTS ====================
-export const getTests = async (page: number = 1, limit: number = 20): Promise<any[]> => { 
+export const getTests = async (page: number = 1, limit: number = 20): Promise<any> => { 
   const params = new URLSearchParams();
   params.append('page', page.toString());
   params.append('limit', limit.toString());
   const r = await apiCall(`/master/tests?${params.toString()}`, { method: 'GET' }); 
-  return extractDataArray(r); 
+  // Return full response with pagination data
+  return {
+    data: r.data || [],
+    pagination: r.pagination || { page, limit, total: 0, totalPages: 0, hasMore: false }
+  };
 };
 export const getTestById = async (id: string): Promise<any | null> => { const r = await apiCall(`/master/tests/${id}`, { method: 'GET' }); return r.data || null; };
 export const createTest = async (d: ApiData): Promise<any> => { const r = await apiCall('/master/tests', { method: 'POST', body: JSON.stringify(d) }); return r.data || r; };

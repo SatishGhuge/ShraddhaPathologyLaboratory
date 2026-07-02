@@ -121,22 +121,39 @@ async function seedCharges(testIdMap) {
     const mappedTestId = testIdMap[c.testId];
     if (!mappedTestId) continue;
     try {
-      await prisma.testCharge.upsert({
+      // Try to find existing charge
+      const existing = await prisma.testCharge.findUnique({
         where: {
-          testId_franchiseId_corporateId_collectionCenterId: {
+          testId_organizationId: {
             testId: mappedTestId,
-            franchiseId: c.franchiseId ?? null,
-            corporateId: c.corporateId ?? null,
-            collectionCenterId: c.collectionCenterId ?? null,
+            organizationId: c.organizationId || null,
           },
         },
-        update: { b2cCharge: c.b2cCharge, b2bCharge: c.b2bCharge, isActive: c.isActive ?? true },
-        create: {
-          testId: mappedTestId, b2cCharge: c.b2cCharge, b2bCharge: c.b2bCharge,
-          franchiseId: c.franchiseId ?? null, corporateId: c.corporateId ?? null,
-          collectionCenterId: c.collectionCenterId ?? null, isActive: c.isActive ?? true,
-        },
-      });
+      }).catch(() => null);
+
+      if (existing) {
+        // Update existing
+        await prisma.testCharge.update({
+          where: {
+            testId_organizationId: {
+              testId: mappedTestId,
+              organizationId: c.organizationId || null,
+            },
+          },
+          data: { b2cCharge: c.b2cCharge, b2bCharge: c.b2bCharge, isActive: c.isActive ?? true },
+        });
+      } else {
+        // Create new
+        await prisma.testCharge.create({
+          data: {
+            testId: mappedTestId,
+            b2cCharge: c.b2cCharge,
+            b2bCharge: c.b2bCharge,
+            organizationId: c.organizationId || null,
+            isActive: c.isActive ?? true,
+          },
+        });
+      }
       count++;
     } catch (err) {
       console.log(`  ⚠️  Skipped charge for testId ${c.testId}: ${err.message}`);
@@ -194,7 +211,7 @@ async function seedUsers() {
       where: { username: 'staff' },
       update: {},
       create: {
-        username: 'staff', name: 'Staff User', center: 'Main Center',
+        username: 'staff', name: 'Staff User',
         role: 'Technician', password: defaultPassword, isActive: true,
       },
     });
@@ -205,9 +222,9 @@ async function seedUsers() {
     const hashed = await bcrypt.hash(u.password ?? 'User@123', 10);
     await prisma.user.upsert({
       where: { username: u.username },
-      update: { name: u.name, center: u.center, role: u.role, isActive: u.isActive ?? true },
+      update: { name: u.name, role: u.role, isActive: u.isActive ?? true },
       create: {
-        username: u.username, name: u.name, center: u.center, role: u.role,
+        username: u.username, name: u.name, role: u.role,
         mobile: u.mobile, gender: u.gender, email: u.email, address: u.address,
         password: hashed, isActive: u.isActive ?? true,
       },

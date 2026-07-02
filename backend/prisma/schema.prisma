@@ -16,8 +16,11 @@ model Admin {
   isActive       Boolean         @default(true)
   createdAt      DateTime        @default(now())
   updatedAt      DateTime        @updatedAt
+  organizationId String?
+  organization   Organization?   @relation(fields: [organizationId], references: [id])
   passwordResets PasswordReset[]
 
+  @@index([organizationId], map: "admins_organizationId_fkey")
   @@map("admins")
 }
 
@@ -35,28 +38,27 @@ model PasswordReset {
 }
 
 model Patient {
-  patientId         String        @id
-  title             String?
-  firstName         String?
-  lastName          String?
-  dob               DateTime?
-  age               Int?
-  gender            String?
-  mobile            String?
-  email             String?
-  createdBy         String?
-  createdAtLocation String?
-  address           String?       @db.Text
-  createdAt         DateTime?     @default(now())
-  updatedAt         DateTime      @updatedAt
-  location          String?
-  tests             PatientTest[]
+  patientId   String        @id
+  title       String?
+  firstName   String?
+  lastName    String?
+  dob         DateTime?
+  age         Int?
+  gender      String?
+  mobile      String?
+  email       String?
+  createdBy   String?
+  address     String?       @db.Text
+  createdAt   DateTime?     @default(now())
+  updatedAt   DateTime      @updatedAt
+  location    String?       @db.VarChar(255)
+  tests       PatientTest[]
 
   @@index([mobile])
   @@index([email])
   @@index([firstName, lastName], map: "patients_name_idx")
   @@index([createdAt])
-  @@index([location])
+  @@index([location], map: "idx_patient_location")
   @@map("patients")
 }
 
@@ -76,7 +78,7 @@ model PatientTest {
   visitDate          DateTime?
   visitTime          String?
   sampleBarcodeNo    String?
-  remarks            String?             @db.Text
+  patient_history    String?             @db.Text
   totalAmount        Float               @default(0)
   discountPercent    Float               @default(0)
   discountAmount     Float               @default(0)
@@ -94,8 +96,9 @@ model PatientTest {
   packageName        String?
   attachmentPath     String?
   organizationId     String?
-  lastStatusUpdateAt DateTime?
   lastUpdatedBy      String?
+  lastStatusUpdateAt DateTime?
+  barcode_status     String              @default("Unprinted")
   department         Department          @relation(fields: [departmentId], references: [id])
   organization       Organization?       @relation(fields: [organizationId], references: [id])
   patient            Patient             @relation(fields: [patientId], references: [patientId], onDelete: Cascade)
@@ -104,13 +107,14 @@ model PatientTest {
   statusHistory      TestStatusHistory[]
 
   @@index([departmentId], map: "patient_tests_departmentId_fkey")
-  @@index([patientId], map: "patient_tests_patientId_fkey")
   @@index([testId], map: "patient_tests_testId_fkey")
   @@index([organizationId], map: "patient_tests_organizationId_fkey")
   @@index([status])
+  @@index([barcode_status])
   @@index([visitDate])
   @@index([visitId])
   @@index([patientId, visitId])
+  @@index([patientId], map: "patient_tests_patientId_fkey")
   @@map("patient_tests")
 }
 
@@ -253,38 +257,44 @@ model TestCharge {
 }
 
 model Doctor {
-  id           Int      @id @default(autoincrement())
-  name         String
-  degree       String?
-  mobile       String?
-  specialty    String?
-  isActive     Boolean  @default(true)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-  address      String?  @db.Text
-  allowBalance Boolean  @default(false)
-  compliment   Float?
-  email        String?
-  type         String   @default("Doctor")
+  id                     Int      @id @default(autoincrement())
+  name                   String
+  degree                 String?
+  mobile                 String?
+  specialty              String?
+  isActive               Boolean  @default(true)
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+  address                String?  @db.Text
+  allowBalance           Boolean  @default(false)
+  compliment             Float?
+  email                  String?
+  type                   String   @default("Doctor")
+  sendReportsViaMail     Boolean  @default(false)
+  sendReportsViaWhatsApp Boolean  @default(false)
 
   @@map("doctors")
 }
 
 model Organization {
-  id               String            @id
-  name             String            @unique
-  code             String?
-  location         String?
-  address          String?           @db.Text
-  mobile           String?
-  email            String?
-  date             DateTime?
-  isActive         Boolean           @default(true)
-  createdAt        DateTime          @default(now())
-  updatedAt        DateTime          @updatedAt
-  moduleAllocation ModuleAllocation?
-  patientTests     PatientTest[]
-  testCharges      TestCharge[]
+  id                     String            @id
+  name                   String            @unique(map: "name")
+  code                   String?
+  location               String?
+  address                String?           @db.LongText
+  mobile                 String?
+  email                  String?
+  date                   DateTime?
+  isActive               Boolean           @default(true)
+  createdAt              DateTime          @default(now())
+  updatedAt              DateTime          @updatedAt
+  sendReportsViaMail     Boolean           @default(false)
+  sendReportsViaWhatsApp Boolean           @default(false)
+  admins                 Admin[]
+  moduleAllocation       ModuleAllocation?
+  patientTests           PatientTest[]
+  testCharges            TestCharge[]
+  users                  User[]
 
   @@map("organizations")
 }
@@ -326,6 +336,7 @@ model TestParameter {
   childActive        Boolean          @default(false)
   ageRanges          String?          @db.Text
   rangeValues        String?          @db.Text
+  testMethod         String?
   isActive           Boolean          @default(true)
   createdAt          DateTime         @default(now())
   updatedAt          DateTime         @updatedAt
@@ -465,10 +476,28 @@ model User {
   isActive             Boolean                @default(true)
   createdAt            DateTime               @default(now())
   updatedAt            DateTime               @updatedAt
+  organizationId       String?
   moduleAllocation     ModuleAllocation?
   user_password_resets user_password_resets[]
+  organization         Organization?          @relation(fields: [organizationId], references: [id])
 
-  @@map("users")
+  @@index([organizationId], map: "users_organizationId_fkey")
+}
+
+model PaymentTransaction {
+  id            Int      @id @default(autoincrement())
+  visitId       String
+  patientId     String
+  paymentMode   String
+  paymentAmount Float
+  remarks       String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([visitId])
+  @@index([patientId])
+  @@index([paymentMode])
+  @@map("payment_transactions")
 }
 
 model Signature {
@@ -490,18 +519,6 @@ model Signature {
   @@map("signatures")
 }
 
-model user_password_resets {
-  id        Int      @id @default(autoincrement())
-  userId    Int
-  code      String
-  expiresAt DateTime
-  used      Boolean  @default(false)
-  createdAt DateTime @default(now())
-  users     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId], map: "user_password_resets_userId_fkey")
-}
-
 model ModuleAllocation {
   id             Int           @id @default(autoincrement())
   userId         Int?          @unique
@@ -515,4 +532,16 @@ model ModuleAllocation {
   @@index([userId], map: "module_allocation_userId_fkey")
   @@index([organizationId], map: "module_allocation_organizationId_fkey")
   @@map("module_allocations")
+}
+
+model user_password_resets {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  code      String
+  expiresAt DateTime
+  used      Boolean  @default(false)
+  createdAt DateTime @default(now())
+  users     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId], map: "user_password_resets_userId_fkey")
 }

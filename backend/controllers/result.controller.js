@@ -7,6 +7,7 @@ import {
   transitionToEnteredOnResultSave,
   getStatusHistory,
   getStatusSummary,
+  normalizeStatus,
   WORKFLOW_STAGES,
   STAGE_METADATA
 } from '../utils/statusWorkflow.js';
@@ -59,25 +60,32 @@ export const getPatientTests = async (req, res) => {
 
     // Filter by searchQuery (Patient Name, ID, or Visit ID combined)
     if (searchQuery) {
+      const searchLower = searchQuery.toLowerCase();
       andConditions.push({
         OR: [
           {
             patient: {
               OR: [
-                { firstName: { contains: searchQuery, mode: 'insensitive' } },
-                { lastName:  { contains: searchQuery, mode: 'insensitive' } },
-                { patientId: { contains: searchQuery, mode: 'insensitive' } }
+                { firstName: { contains: searchQuery } },
+                { lastName: { contains: searchQuery } },
+                { patientId: { contains: searchQuery } }
               ]
             }
           },
-          { visitId: { contains: searchQuery, mode: 'insensitive' } }
+          { visitId: { contains: searchQuery } }
         ]
       });
     }
 
     // Filter by department
     if (department && department !== '') {
-      andConditions.push({ department: { name: { contains: department, mode: 'insensitive' } } });
+      andConditions.push({ 
+        department: { 
+          name: { 
+            contains: department.toLowerCase()
+          } 
+        } 
+      });
     }
 
     // Filter by organization
@@ -95,7 +103,13 @@ export const getPatientTests = async (req, res) => {
 
     // Filter by test name
     if (testName && testName !== '') {
-      andConditions.push({ test: { name: { contains: testName, mode: 'insensitive' } } });
+      andConditions.push({ 
+        test: { 
+          name: { 
+            contains: testName.toLowerCase()
+          } 
+        } 
+      });
     }
 
     const whereCondition = andConditions.length > 0 ? { AND: andConditions } : {};
@@ -108,7 +122,30 @@ export const getPatientTests = async (req, res) => {
     // Get paginated data
     const patientTests = await prisma.patientTest.findMany({
       where: whereCondition,
-      include: {
+      select: {
+        id: true,
+        patientId: true,
+        visitId: true,
+        visitDate: true,
+        visitTime: true,
+        status: true,
+        barcode_status: true,
+        sampleTaken: true,
+        sampleReceived: true,
+        resultDate: true,
+        patient_history: true,
+        charge: true,
+        result: true,
+        businessType: true,
+        organizationId: true,
+        balanceAmount: true,
+        attachmentPath: true,
+        referralDoctor: true,
+        sample: true,
+        sampleBarcodeNo: true,
+        visitType: true,
+        reportMode: true,
+        packageName: true,
         patient: {
           select: {
             patientId: true,
@@ -125,6 +162,7 @@ export const getPatientTests = async (req, res) => {
           select: {
             id: true,
             name: true,
+            shortName: true,
             testCode: true,
             sampleType: true,
             attachFile: true,
@@ -135,6 +173,13 @@ export const getPatientTests = async (req, res) => {
           select: {
             id: true,
             name: true
+          }
+        },
+        organization: {
+          select: {
+            id: true,
+            name: true,
+            code: true
           }
         }
       },
@@ -164,6 +209,9 @@ export const getPatientTests = async (req, res) => {
           mobile: patientTest.patient.mobile,
           email: patientTest.patient.email,
           balance_amount: patientTest.balanceAmount || 0,
+          organizationCode: patientTest.organization?.code || patientTest.organizationId || '', // ✅ Get organization code from relationship
+          organization_name: patientTest.organization?.name || '', // ✅ Get organization name from relationship
+          patient_history: patientTest.patient_history || '', // ✅ Get patient history from first test in the group
           tests: []
         };
       }
@@ -178,7 +226,9 @@ export const getPatientTests = async (req, res) => {
         attachment_path: patientTest.attachmentPath || null,
         specimen_type: patientTest.test.sampleType || patientTest.sample,
         ref_by: patientTest.referralDoctor || 'SELF',
-        result_status: patientTest.status,
+        result_status: normalizeStatus(patientTest.status),
+        status: patientTest.status,
+        barcode_status: patientTest.barcode_status || 'Unprinted',
         approved_date: patientTest.visitDate ? (() => {
           const d = patientTest.visitDate;
           const datePart = d.toLocaleDateString('en-GB'); // DD/MM/YYYY
@@ -196,7 +246,7 @@ export const getPatientTests = async (req, res) => {
         sample_taken: patientTest.sampleTaken ? patientTest.sampleTaken.toISOString() : null,
         sample_received: patientTest.sampleReceived ? patientTest.sampleReceived.toISOString() : null,
         result_date: patientTest.resultDate ? patientTest.resultDate.toISOString() : null,
-        remark: patientTest.remarks || '',
+        remark: patientTest.patient_history || '',
         charge: patientTest.charge,
         result: patientTest.result,
         department: patientTest.department.name,
@@ -259,7 +309,26 @@ export const getPatientTestById = async (req, res) => {
             speciality: true,
           }
         },
-        testResults: true
+        testResults: {
+          select: {
+            id: true,
+            testParameterId: true,
+            testCategoryId: true,
+            numericValue: true,
+            textValue: true,
+            selectedOption: true,
+            isAbnormal: true,
+            isOutOfRange: true,
+            isPanic: true,
+            lowValue: true,
+            highValue: true,
+            referenceRange: true,
+            enteredBy: true,
+            verifiedBy: true,
+            enteredAt: true,
+            verifiedAt: true
+          }
+        }
       }
     });
 
@@ -272,6 +341,8 @@ export const getPatientTestById = async (req, res) => {
     }
 
     console.log('Found patient test:', patientTest.id, 'for patient:', patientTest.patient.firstName);
+    console.log('Total testResults in database:', patientTest.testResults?.length || 0);
+    console.log('Test Results Details:', JSON.stringify(patientTest.testResults, null, 2));
 
     // Get test categories with their parameters - fetch all range-related fields
     const testCategories = await prisma.testCategory.findMany({
@@ -286,6 +357,7 @@ export const getPatientTestById = async (req, res) => {
             units: true,
             type: true,
             isDescriptive: true,
+            isMultipleOptions: true,
             isMandatory: true,
             parameterSortOrder: true,
             textContent: true,
@@ -323,6 +395,7 @@ export const getPatientTestById = async (req, res) => {
     // Process parameters from categories
     const allParameters = [];
     const groupedParameters = {};
+    let totalExistingResults = 0;
 
     testCategories.forEach(category => {
       if (category.testParameter) {
@@ -335,12 +408,27 @@ export const getPatientTestById = async (req, res) => {
                            category.categoryName : 
                            'NO_CATEGORY_HEADER'; // Special flag for no header
         
+        // Find existing result for this parameter
+        const existingResult = patientTest.testResults.find(r => r.testParameterId === category.testParameter.id);
+        if (existingResult) {
+          console.log(`  ✅ Found saved result for parameter ${category.testParameter.parameterName}:`, {
+            paramId: category.testParameter.id,
+            numericValue: existingResult.numericValue,
+            textValue: existingResult.textValue,
+            selectedOption: existingResult.selectedOption
+          });
+          totalExistingResults++;
+        } else {
+          console.log(`  ⭕ NO result found for parameter ${category.testParameter.parameterName} (ID: ${category.testParameter.id})`);
+        }
+        
         const parameter = {
           id: category.testParameter.id,
           parameterName: category.testParameter.parameterName,
           units: category.testParameter.units,
           type: category.testParameter.type,
           isDescriptive: category.testParameter.isDescriptive,
+          isMultipleOptions: category.testParameter.isMultipleOptions,
           isMandatory: category.testParameter.isMandatory,
           categoryName: categoryName,
           categoryId: category.id,
@@ -406,6 +494,7 @@ export const getPatientTestById = async (req, res) => {
           units: true,
           type: true,
           isDescriptive: true,
+          isMultipleOptions: true,
           isMandatory: true,
           parameterSortOrder: true,
           textContent: true,
@@ -437,12 +526,27 @@ export const getPatientTestById = async (req, res) => {
       });
 
       directParameters.forEach(param => {
+        // Find existing result for this parameter
+        const existingResult = patientTest.testResults.find(r => r.testParameterId === param.id);
+        if (existingResult) {
+          console.log(`  ✅ Found saved result for DIRECT parameter ${param.parameterName}:`, {
+            paramId: param.id,
+            numericValue: existingResult.numericValue,
+            textValue: existingResult.textValue,
+            selectedOption: existingResult.selectedOption
+          });
+          totalExistingResults++;
+        } else {
+          console.log(`  ⭕ NO result found for DIRECT parameter ${param.parameterName} (ID: ${param.id})`);
+        }
+        
         const parameter = {
           id: param.id,
           parameterName: param.parameterName,
           units: param.units,
           type: param.type,
           isDescriptive: param.isDescriptive,
+          isMultipleOptions: param.isMultipleOptions,
           isMandatory: param.isMandatory,
           categoryName: 'NO_CATEGORY_HEADER', // No header for direct parameters
           categoryId: null,
@@ -483,7 +587,7 @@ export const getPatientTestById = async (req, res) => {
           normalRange: getNormalRange(param, patientTest.patient),
           
           // Existing result if any
-          existingResult: patientTest.testResults.find(r => r.testParameterId === param.id)
+          existingResult: existingResult
         };
 
         allParameters.push(parameter);
@@ -498,6 +602,7 @@ export const getPatientTestById = async (req, res) => {
     }
 
     console.log(`Processed ${allParameters.length} parameters in ${Object.keys(groupedParameters).length} categories`);
+    console.log(`📤 RETURNING: ${totalExistingResults} parameters have existing saved results`);
 
     // Fetch signature matching the test's speciality
     let signature = null;
@@ -514,7 +619,8 @@ export const getPatientTestById = async (req, res) => {
         patientTest,
         parameters: allParameters,
         groupedParameters,
-        signature
+        signature,
+        debug: { totalExistingResults, totalParameters: allParameters.length }
       }
     });
 
@@ -647,9 +753,32 @@ export const updateTestStatus = async (req, res) => {
     const { id } = req.params;
     const { status, remarks } = req.body;
 
-    // Validate status
-    const validStatuses = ['REGISTERED', 'RECEIVED', 'PROVISIONAL', 'AUTHENTICATED', 'DELIVERED', 'RETEST', 'REVERT', 'HOLD', 'REJECTED'];
-    if (status && !validStatuses.includes(status.toUpperCase())) {
+    // Map old uppercase statuses to new format for backward compatibility
+    const statusMapping = {
+      'REGISTERED': 'Registered',
+      'RECEIVED': 'Received',
+      'PROVISIONAL': 'Entered',
+      'AUTHENTICATED': 'Authorized',
+      'VALIDATED': 'Validation',
+      'VALIDATION': 'Validation',
+      'DELIVERED': 'Delivered',
+      'RETEST': 'Rectified',
+      'RECTIFIED': 'Rectified',
+      'REVERT': 'Rectified',
+      'HOLD': 'Validation',
+      'REJECTED': 'Validation'
+    };
+
+    // Convert status to proper format
+    let properStatus = status;
+    if (status) {
+      const upperStatus = status.toUpperCase();
+      properStatus = statusMapping[upperStatus] || status;
+    }
+
+    // Validate status against allowed stages
+    const validStatuses = ['Registered', 'Received', 'Entered', 'Validation', 'Authorized', 'Delivered', 'Rectified'];
+    if (properStatus && !validStatuses.includes(properStatus)) {
       return res.status(400).json({
         success: false,
         message: 'Invalid status. Valid statuses are: ' + validStatuses.join(', ')
@@ -659,8 +788,8 @@ export const updateTestStatus = async (req, res) => {
     const updatedTest = await prisma.patientTest.update({
       where: { id: parseInt(id) },
       data: {
-        status: status?.toUpperCase(),
-        remarks: remarks || undefined,
+        status: properStatus,
+        // Don't update patient_history - keep existing history
         updatedAt: new Date()
       },
       include: {
@@ -699,11 +828,32 @@ export const updateTestResult = async (req, res) => {
     const { id } = req.params;
     const { result, status } = req.body;
 
+    // Map old uppercase statuses to new format for backward compatibility
+    const statusMapping = {
+      'REGISTERED': 'Registered',
+      'RECEIVED': 'Received',
+      'PROVISIONAL': 'Entered',
+      'AUTHENTICATED': 'Authorized',
+      'VALIDATED': 'Validation',
+      'VALIDATION': 'Validation',
+      'DELIVERED': 'Delivered',
+      'RETEST': 'Rectified',
+      'RECTIFIED': 'Rectified',
+      'REVERT': 'Rectified',
+      'HOLD': 'Validation',
+      'REJECTED': 'Validation'
+    };
+
     const updateData = {
       result: result || undefined,
-      status: status?.toUpperCase() || undefined,
       updatedAt: new Date()
     };
+
+    // Convert status to proper format if provided
+    if (status) {
+      const upperStatus = status.toUpperCase();
+      updateData.status = statusMapping[upperStatus] || status;
+    }
 
     // Automatically set resultDate when result is entered
     if (result && result.trim() !== '') {
@@ -755,9 +905,32 @@ export const bulkUpdateTestStatus = async (req, res) => {
       });
     }
 
-    // Validate status
-    const validStatuses = ['REGISTERED', 'RECEIVED', 'PROVISIONAL', 'AUTHENTICATED', 'DELIVERED', 'RETEST', 'REVERT', 'HOLD', 'REJECTED'];
-    if (status && !validStatuses.includes(status.toUpperCase())) {
+    // Map old uppercase statuses to new format for backward compatibility
+    const statusMapping = {
+      'REGISTERED': 'Registered',
+      'RECEIVED': 'Received',
+      'PROVISIONAL': 'Entered',
+      'AUTHENTICATED': 'Authorized',
+      'VALIDATED': 'Validation',
+      'VALIDATION': 'Validation',
+      'DELIVERED': 'Delivered',
+      'RETEST': 'Rectified',
+      'RECTIFIED': 'Rectified',
+      'REVERT': 'Rectified',
+      'HOLD': 'Validation',
+      'REJECTED': 'Validation'
+    };
+
+    // Convert status to proper format
+    let properStatus = status;
+    if (status) {
+      const upperStatus = status.toUpperCase();
+      properStatus = statusMapping[upperStatus] || status;
+    }
+
+    // Validate status against allowed stages
+    const validStatuses = ['Registered', 'Received', 'Entered', 'Validation', 'Authorized', 'Delivered', 'Rectified'];
+    if (properStatus && !validStatuses.includes(properStatus)) {
       return res.status(400).json({
         success: false,
         message: 'Invalid status. Valid statuses are: ' + validStatuses.join(', ')
@@ -771,8 +944,8 @@ export const bulkUpdateTestStatus = async (req, res) => {
         }
       },
       data: {
-        status: status?.toUpperCase(),
-        remarks: remarks || undefined,
+        status: properStatus,
+        // Don't update patient_history - keep existing history
         updatedAt: new Date()
       }
     });
@@ -835,9 +1008,23 @@ export const getTestStatistics = async (req, res) => {
       'REGISTERED': 'Registered',
       'RECEIVED': 'Received',
       'PROVISIONAL': 'Entered',
-      'AUTHENTICATED': 'Validation',
+      'AUTHENTICATED': 'Authorized',
+      'VALIDATED': 'Validation',
+      'VALIDATION': 'Validation',
       'DELIVERED': 'Delivered',
-      'RETEST': 'Rectified'
+      'RETEST': 'Rectified',
+      'RECTIFIED': 'Rectified',
+      'REVERT': 'Rectified',
+      'HOLD': 'Validation',
+      'REJECTED': 'Validation',
+      // Handle already mapped statuses (new format)
+      'Registered': 'Registered',
+      'Received': 'Received',
+      'Entered': 'Entered',
+      'Validation': 'Validation',
+      'Authorized': 'Authorized',
+      'Delivered': 'Delivered',
+      'Rectified': 'Rectified'
     };
 
     // Format response
@@ -1018,20 +1205,36 @@ export const saveTestResults = async (req, res) => {
       }
     }
 
-    // Update patient test status and result date
+    // Update patient test result date
     await prisma.patientTest.update({
       where: { id: parseInt(patientTestId) },
       data: {
-        status: 'PROVISIONAL',
         resultDate: new Date(),
         updatedAt: new Date()
+      }
+    });
+
+    // Auto-transition status from Received to Entered
+    const enteredByUser = enteredBy || 'SYSTEM';
+    await transitionToEnteredOnResultSave(parseInt(patientTestId), enteredByUser);
+
+    // Fetch the updated patient test with new status
+    const updatedPatientTest = await prisma.patientTest.findUnique({
+      where: { id: parseInt(patientTestId) },
+      include: {
+        patient: true,
+        test: true,
+        department: true
       }
     });
 
     res.json({
       success: true,
       message: 'Test results saved successfully',
-      data: savedResults
+      data: {
+        savedResults,
+        patientTest: updatedPatientTest
+      }
     });
 
   } catch (error) {
@@ -1239,5 +1442,155 @@ export const deleteAttachment = async (req, res) => {
     res.json({ success: true });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Failed to delete attachment' });
+  }
+};
+
+
+// Get previous test result for a patient and specific test
+export const getPreviousTestResult = async (req, res) => {
+  try {
+    const { patientId, testId } = req.params;
+
+    // Find the most recent previous test result (before today or before current visit)
+    const previousResult = await prisma.patientTest.findFirst({
+      where: {
+        patientId: parseInt(patientId),
+        testId: parseInt(testId),
+        visitDate: {
+          lt: new Date() // Get tests from before today
+        }
+      },
+      include: {
+        testResults: {
+          include: {
+            testParameter: {
+              select: {
+                id: true,
+                parameterName: true,
+                units: true
+              }
+            }
+          }
+        },
+        test: {
+          select: {
+            id: true,
+            name: true
+          }
+        }
+      },
+      orderBy: {
+        visitDate: 'desc'
+      },
+      take: 1
+    });
+
+    if (!previousResult) {
+      return res.json({
+        success: true,
+        data: null,
+        message: 'No previous test result found'
+      });
+    }
+
+    res.json({
+      success: true,
+      data: {
+        testId: previousResult.id,
+        testName: previousResult.test.name,
+        visitDate: previousResult.visitDate,
+        testResults: previousResult.testResults.map(tr => ({
+          parameterId: tr.testParameter.id,
+          parameterName: tr.testParameter.parameterName,
+          value: tr.numericValue || tr.textValue || tr.selectedOption,
+          units: tr.testParameter.units,
+          isAbnormal: tr.isAbnormal,
+          isOutOfRange: tr.isOutOfRange
+        }))
+      }
+    });
+
+  } catch (error) {
+    console.error('Get previous test result error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch previous test result'
+    });
+  }
+};
+
+// Get all test results history for a patient and specific test
+export const getAllTestResults = async (req, res) => {
+  try {
+    const { patientId, testId } = req.params;
+    const { limit = 10 } = req.query;
+
+    // Get all test results for this patient and test, ordered by date (most recent first)
+    const allResults = await prisma.patientTest.findMany({
+      where: {
+        patientId: parseInt(patientId),
+        testId: parseInt(testId)
+      },
+      include: {
+        testResults: {
+          include: {
+            testParameter: {
+              select: {
+                id: true,
+                parameterName: true,
+                units: true
+              }
+            }
+          }
+        },
+        test: {
+          select: {
+            id: true,
+            name: true
+          }
+        }
+      },
+      orderBy: {
+        visitDate: 'desc'
+      },
+      take: parseInt(limit)
+    });
+
+    if (allResults.length === 0) {
+      return res.json({
+        success: true,
+        data: [],
+        message: 'No test results found'
+      });
+    }
+
+    // Format results for display
+    const formattedResults = allResults.map(result => ({
+      testId: result.id,
+      visitDate: result.visitDate,
+      status: result.status,
+      results: result.testResults.map(tr => ({
+        parameterId: tr.testParameter.id,
+        parameterName: tr.testParameter.parameterName,
+        value: tr.numericValue || tr.textValue || tr.selectedOption,
+        units: tr.testParameter.units,
+        isAbnormal: tr.isAbnormal,
+        isOutOfRange: tr.isOutOfRange,
+        referenceRange: tr.referenceRange
+      }))
+    }));
+
+    res.json({
+      success: true,
+      data: formattedResults,
+      total: formattedResults.length
+    });
+
+  } catch (error) {
+    console.error('Get all test results error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch test result history'
+    });
   }
 };

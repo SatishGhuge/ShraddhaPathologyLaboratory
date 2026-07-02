@@ -5865,6 +5865,38 @@
       "createdAt": "2026-04-04T06:39:17.668Z"
     }
   ],
+  "testCharges": [
+    {
+      "id": 1,
+      "testId": 2,
+      "b2cCharge": 150,
+      "b2bCharge": 100,
+      "franchiseId": null,
+      "corporateId": null,
+      "collectionCenterId": null,
+      "isActive": true
+    },
+    {
+      "id": 2,
+      "testId": 3,
+      "b2cCharge": 120,
+      "b2bCharge": 80,
+      "franchiseId": null,
+      "corporateId": null,
+      "collectionCenterId": null,
+      "isActive": true
+    },
+    {
+      "id": 3,
+      "testId": 4,
+      "b2cCharge": 200,
+      "b2bCharge": 150,
+      "franchiseId": null,
+      "corporateId": null,
+      "collectionCenterId": null,
+      "isActive": true
+    }
+  ],
   "sampleTypes": [
     {
       "id": 1,

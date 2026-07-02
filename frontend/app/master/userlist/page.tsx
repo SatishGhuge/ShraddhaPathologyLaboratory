@@ -108,13 +108,17 @@ const UserList = () => {
                 filtered.map((u, index) => (
                   <tr key={u.id} className="hover:bg-gray-50 border-b border-gray-200">
                     <td className="border border-gray-300 px-3 py-1">{index + 1}</td>
-                    <td className="border border-gray-300 px-3 py-1">{u.center}</td>
+                    <td className="border border-gray-300 px-3 py-1">{u.organization?.name || "-"}</td>
                     <td className="border border-gray-300 px-3 py-1 font-medium">{u.name}</td>
                     <td className="border border-gray-300 px-3 py-1">{u.username}</td>
                     <td className="border border-gray-300 px-3 py-1">{u.role}</td>
                     <td className="border border-gray-300 px-3 py-1">{u.mobile || "-"}</td>
                     <td className="border border-gray-300 px-3 py-1">
                       <div className="flex gap-1">
+                        <button
+                          onClick={() => router.push(`/master/user/view/${u.id}`)}
+                          className="bg-green-600 text-white px-2 py-1 rounded text-xs hover:bg-green-700"
+                        >View</button>
                         <button
                           onClick={() => router.push(`/master/user/edit/${u.id}`)}
                           className="bg-blue-600 text-white px-2 py-1 rounded text-xs hover:bg-blue-700"

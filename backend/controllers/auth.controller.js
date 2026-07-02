@@ -38,8 +38,37 @@ export const login = async (req, res) => {
       const valid = await bcrypt.compare(password, admin.password);
       if (!valid) return res.status(401).json({ success: false, message: 'Invalid credentials' });
       const token = generateToken(admin.id);
+      
+      // Fetch module allocation and organization details for admin
+      let moduleAllocation = null;
+      let organizationDetails = null;
+      if (admin.organizationId) {
+        const orgModuleAllocation = await prisma.moduleAllocation.findUnique({
+          where: { organizationId: admin.organizationId },
+          select: { modules: true }
+        });
+        moduleAllocation = orgModuleAllocation?.modules || null;
+        
+        // Fetch organization name
+        const organization = await prisma.organization.findUnique({
+          where: { id: admin.organizationId },
+          select: { id: true, name: true }
+        });
+        organizationDetails = organization || null;
+      }
+      
       const { password: _, ...adminData } = admin;
-      return res.json({ success: true, message: 'Login successful', token, admin: { ...adminData, userType: 'admin' } });
+      return res.json({ 
+        success: true, 
+        message: 'Login successful', 
+        token, 
+        admin: { 
+          ...adminData, 
+          userType: 'admin',
+          moduleAllocation: moduleAllocation,
+          organization: organizationDetails
+        } 
+      });
     }
 
     // Check users table

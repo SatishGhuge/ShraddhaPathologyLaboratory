@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter, useParams } from "next/navigation";
-import { DollarSign, RotateCcw, FileSpreadsheet, FileText } from "lucide-react";
+import { DollarSign, RotateCcw, FileSpreadsheet, FileText, Upload } from "lucide-react";
 import Header from "@/src/components/Header";
 import PageHeader from "@/src/components/BreadCrumb";
 
@@ -10,11 +10,11 @@ export default function OrganizationCharges() {
   const router = useRouter();
   const params = useParams();
   const organizationId = params.organizationId as string;
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [tests, setTests] = useState<any[]>([]);
   const [charges, setCharges] = useState<any[]>([]);
   const [organization, setOrganization] = useState<any>(null);
-  const [b2bError, setB2bError] = useState("");
   const [filteredData, setFilteredData] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [defaultCharges, setDefaultCharges] = useState<any[]>([]); // Store default charges for comparison
@@ -24,13 +24,17 @@ export default function OrganizationCharges() {
   const [searchGroup, setSearchGroup] = useState("");
   const [error, setError] = useState("");
   const [bulkCharge, setBulkCharge] = useState("");
-  const [bulkB2BCharge, setBulkB2BCharge] = useState("");
   const [showBulkModal, setShowBulkModal] = useState(false);
   const [filterType, setFilterType] = useState("all"); // "all", "customized", "default"
   
+  // Import states
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [importedData, setImportedData] = useState<any[]>([]);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage] = useState(10);
+  const [itemsPerPage, setItemsPerPage] = useState(20);
 
   // Fetch organization, tests and charges on component mount
   useEffect(() => {
@@ -111,7 +115,7 @@ export default function OrganizationCharges() {
         return {
           id: test.id,
           name: test.name,
-          code: test.testCode || "",
+          shortName: test.shortName || test.testCode || "",
           group: test.group || test.department?.name || "",
           charges: testCharge?.b2cCharge || defaultCharge?.b2cCharge || 0,
           b2b: testCharge?.b2bCharge || defaultCharge?.b2bCharge || 0,
@@ -129,7 +133,7 @@ export default function OrganizationCharges() {
         // Apply search filters
         return (
           item.name.toLowerCase().includes(searchName.toLowerCase()) &&
-          item.code.toLowerCase().includes(searchCode.toLowerCase()) &&
+          item.shortName.toLowerCase().includes(searchCode.toLowerCase()) &&
           item.group.toLowerCase().includes(searchGroup.toLowerCase())
         );
       });
@@ -165,49 +169,35 @@ export default function OrganizationCharges() {
 
   // Bulk apply charges
   const handleBulkApply = () => {
-    if (!bulkCharge && !bulkB2BCharge) {
-      alert("Please enter at least one bulk charge value!");
-      return;
-    }
-    if (bulkCharge && bulkB2BCharge && parseFloat(bulkB2BCharge) > parseFloat(bulkCharge)) {
-      setB2bError("B2B charge cannot be greater than B2C charge!");
+    if (!bulkCharge) {
+      alert("Please enter charge value!");
       return;
     }
 
     const updated = filteredData.map((item) => ({
       ...item,
       charges: bulkCharge ? parseFloat(bulkCharge) : item.charges,
-      b2b: bulkB2BCharge ? parseFloat(bulkB2BCharge) : item.b2b,
     }));
 
     setFilteredData(updated);
     setShowBulkModal(false);
     setBulkCharge("");
-    setBulkB2BCharge("");
     alert("Bulk charges applied! Click 'Save' to save to database.");
   };
 
   // Save charges to database
   const handleSave = async () => {
-    // Validate B2B <= B2C for all rows
-    const invalid = filteredData.find(
-      (item) => item.charges > 0 && item.b2b > 0 && parseFloat(item.b2b) > parseFloat(item.charges)
-    );
-    if (invalid) {
-      setB2bError(`B2B charge cannot be greater than B2C charge for test: "${invalid.name}"`);
-      return;
-    }
     try {
       setLoading(true);
       setError("");
 
-      // Prepare bulk update data
+      // Prepare bulk update data - ONLY B2C charges (no B2B)
       const bulkCharges = filteredData
-        .filter((item) => (item.charges && item.charges > 0) || (item.b2b && item.b2b > 0))
+        .filter((item) => item.charges && item.charges > 0)
         .map((item) => ({
           testId: item.id,
           b2cCharge: parseFloat(item.charges) || 0,
-          b2bCharge: parseFloat(item.b2b) || 0,
+          b2bCharge: parseFloat(item.charges) || 0, // Set B2B = B2C for organization
         }));
 
       if (bulkCharges.length === 0) {
@@ -257,10 +247,9 @@ export default function OrganizationCharges() {
       const exportData = filteredData.map((item, index) => ({
         "Sr.No": index + 1,
         "Test Name": item.name,
-        "Test Code": item.code,
+        "Short Name": item.shortName,
         Group: item.group,
         Charges: item.charges,
-        B2B: item.b2b,
       }));
 
       const ws = XLSX.utils.json_to_sheet(exportData);
@@ -270,7 +259,6 @@ export default function OrganizationCharges() {
         { wch: 30 },
         { wch: 15 },
         { wch: 20 },
-        { wch: 12 },
         { wch: 12 },
       ];
 
@@ -312,15 +300,14 @@ export default function OrganizationCharges() {
       const tableData = filteredData.map((item, index) => [
         index + 1,
         item.name,
-        item.code,
+        item.shortName,
         item.group,
         item.charges,
-        item.b2b,
       ]);
 
       autoTable(doc, {
         startY: 40,
-        head: [["Sr.No", "Test Name", "Test Code", "Group", "Charges", "B2B"]],
+        head: [["Sr.No", "Test Name", "Short Name", "Group", "Charges"]],
         body: tableData,
         theme: "grid",
         headStyles: {
@@ -338,7 +325,6 @@ export default function OrganizationCharges() {
           2: { cellWidth: 30 },
           3: { cellWidth: 35 },
           4: { cellWidth: 25 },
-          5: { cellWidth: 20 },
         },
       });
 
@@ -350,6 +336,100 @@ export default function OrganizationCharges() {
       console.error("Error exporting to PDF:", error);
       alert("Error exporting to PDF. Please try again.");
     }
+  };
+
+  // Handle Excel file selection
+  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      setSelectedFile(file);
+    }
+  };
+
+  // Parse Excel file and show data
+  const handleImportExcel = async () => {
+    if (!selectedFile) {
+      alert('Please select a file first');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const XLSX = await import('xlsx').catch(() => null);
+      
+      if (!XLSX) {
+        alert('Excel import feature requires the "xlsx" package to be installed.\n\nPlease run: npm install xlsx');
+        return;
+      }
+
+      // Read file
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const data = e.target?.result;
+          const workbook = XLSX.read(data, { type: 'binary' });
+          const sheetName = workbook.SheetNames[0];
+          const sheet = workbook.Sheets[sheetName];
+          const jsonData = XLSX.utils.sheet_to_json(sheet);
+
+          // Validate and prepare data
+          const validData = jsonData.map((row: any) => ({
+            testName: row['Test Name'] || row['testName'] || '',
+            testCode: row['Test Code'] || row['testCode'] || '',
+            group: row['Group'] || row['group'] || '',
+            charges: parseFloat(row['Charges'] || row['charges'] || 0)
+          })).filter(row => row.testName || row.testCode);
+
+          if (validData.length === 0) {
+            alert('No valid data found in Excel file. Please check the format.');
+            return;
+          }
+
+          setImportedData(validData);
+          setLoading(false);
+        } catch (err) {
+          console.error('Error parsing Excel:', err);
+          alert('Error parsing Excel file. Please check the format.');
+          setLoading(false);
+        }
+      };
+
+      reader.readAsBinaryString(selectedFile);
+    } catch (error) {
+      console.error('Error importing Excel:', error);
+      alert('Error importing Excel file.');
+      setLoading(false);
+    }
+  };
+
+  // Fill charges from imported data
+  const handleFillCharges = () => {
+    if (importedData.length === 0) {
+      alert('No imported data to fill');
+      return;
+    }
+
+    const updated = filteredData.map((item) => {
+      // Try to match by short name first, then by name
+      const matchedRow = importedData.find((row) =>
+        (row.testCode && item.shortName === row.testCode) ||
+        (row.testName && item.name.toLowerCase().includes(row.testName.toLowerCase()))
+      );
+
+      return {
+        ...item,
+        charges: matchedRow ? matchedRow.charges : item.charges
+      };
+    });
+
+    setFilteredData(updated);
+    setShowImportModal(false);
+    setImportedData([]);
+    setSelectedFile(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+    // Silent completion - no alert shown
   };
 
   return (
@@ -426,6 +506,13 @@ export default function OrganizationCharges() {
                     Bulk Apply
                   </button>
                   <button
+                    onClick={() => setShowImportModal(true)}
+                    className="flex gap-1 sm:gap-1.5 items-center bg-blue-600 hover:bg-blue-700 text-white px-2 sm:px-3 py-1.5 sm:py-2 rounded text-xs sm:text-sm transition-colors"
+                  >
+                    <Upload size={14} className="sm:w-4 sm:h-4" />
+                    <span>Import</span>
+                  </button>
+                  <button
                     onClick={handleExportExcel}
                     className="flex gap-1 sm:gap-1.5 items-center bg-green-600 hover:bg-green-700 text-white px-2 sm:px-3 py-1.5 sm:py-2 rounded text-xs sm:text-sm transition-colors"
                   >
@@ -474,9 +561,9 @@ export default function OrganizationCharges() {
                         />
                       </th>
                       <th className="border border-gray-300 px-3 py-2 text-left font-semibold" style={{ width: "20%" }}>
-                        <div className="mb-1">TestCode</div>
+                        <div className="mb-1">Short Name</div>
                         <input
-                          placeholder="Search By TestCode"
+                          placeholder="Search By Short Name"
                           value={searchCode}
                           onChange={(e) => setSearchCode(e.target.value)}
                           className="w-full px-2 py-1 text-sm text-black rounded bg-white focus:outline-none border border-gray-300"
@@ -494,9 +581,6 @@ export default function OrganizationCharges() {
                       <th className="border border-gray-300 px-3 py-2 text-center font-semibold" style={{ width: "12%" }}>
                         Charges
                       </th>
-                      <th className="border border-gray-300 px-3 py-2 text-center font-semibold" style={{ width: "13%" }}>
-                        B2B
-                      </th>
                       <th className="border border-gray-300 px-3 py-2 text-center font-semibold" style={{ width: "10%" }}>
                         Status
                       </th>
@@ -506,7 +590,7 @@ export default function OrganizationCharges() {
                     {paginatedData.map((item) => (
                       <tr key={item.id} className={`hover:bg-gray-50 border-b border-gray-200 ${item.isCustomized ? 'bg-green-50' : 'bg-amber-50'}`}>
                         <td className="border border-gray-300 px-3 py-2 font-medium">{item.name}</td>
-                        <td className="border border-gray-300 px-3 py-2">{item.code}</td>
+                        <td className="border border-gray-300 px-3 py-2">{item.shortName}</td>
                         <td className="border border-gray-300 px-3 py-2">{item.group}</td>
                         <td className="border border-gray-300 px-2 py-1">
                           <input
@@ -514,23 +598,6 @@ export default function OrganizationCharges() {
                             value={item.charges}
                             onChange={(e) => handleChargeChange(item.id, "charges", e.target.value)}
                             className="w-full border border-gray-300 px-2 py-1 text-sm rounded bg-white focus:outline-none focus:ring-2 focus:ring-orange-500 text-center"
-                          />
-                        </td>
-                        <td className="border border-gray-300 px-2 py-1">
-                          <input
-                            type="number"
-                            value={item.b2b}
-                            onChange={(e) => handleChargeChange(item.id, "b2b", e.target.value)}
-                            className={`w-full border px-2 py-1 text-sm rounded bg-white focus:outline-none focus:ring-2 focus:ring-orange-500 text-center ${
-                              parseFloat(item.b2b) > parseFloat(item.charges) && item.charges > 0
-                                ? "border-red-500 bg-red-50"
-                                : "border-gray-300"
-                            }`}
-                            title={
-                              parseFloat(item.b2b) > parseFloat(item.charges) && item.charges > 0
-                                ? "B2B cannot exceed B2C"
-                                : ""
-                            }
                           />
                         </td>
                         <td className="border border-gray-300 px-2 py-1 text-center">
@@ -567,42 +634,64 @@ export default function OrganizationCharges() {
 
             {/* Pagination Controls */}
             {filteredData.length > 0 && (
-              <div className="px-4 py-3 bg-gray-50 border-t border-gray-300 flex items-center justify-between">
+              <div className="px-4 py-3 bg-gray-50 border-t border-gray-300 flex items-center justify-between flex-wrap gap-4">
                 <div className="text-sm text-gray-600">
                   Showing {startIndex + 1} to {Math.min(endIndex, filteredData.length)} of {filteredData.length} tests
                 </div>
-                <div className="flex gap-2 items-center">
-                  <button
-                    onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
-                    disabled={currentPage === 1}
-                    className="px-3 py-1.5 text-sm bg-gray-300 text-gray-700 rounded hover:bg-gray-400 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                  >
-                    ← Previous
-                  </button>
-                  
-                  <div className="flex gap-1">
-                    {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-                      <button
-                        key={page}
-                        onClick={() => setCurrentPage(page)}
-                        className={`px-2.5 py-1.5 text-sm rounded transition-colors ${
-                          currentPage === page
-                            ? "bg-orange-500 text-white font-semibold"
-                            : "bg-gray-200 text-gray-700 hover:bg-gray-300"
-                        }`}
-                      >
-                        {page}
-                      </button>
-                    ))}
+                
+                <div className="flex items-center gap-4">
+                  {/* Items per page selector */}
+                  <div className="flex items-center gap-2">
+                    <label className="text-sm font-medium text-gray-700">Items per page:</label>
+                    <select
+                      value={itemsPerPage}
+                      onChange={(e) => {
+                        setItemsPerPage(parseInt(e.target.value));
+                        setCurrentPage(1);
+                      }}
+                      className="border border-gray-300 rounded px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
+                    >
+                      <option value={10}>10</option>
+                      <option value={20}>20</option>
+                      <option value={50}>50</option>
+                      <option value={100}>100</option>
+                    </select>
                   </div>
 
-                  <button
-                    onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
-                    disabled={currentPage === totalPages}
-                    className="px-3 py-1.5 text-sm bg-gray-300 text-gray-700 rounded hover:bg-gray-400 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                  >
-                    Next →
-                  </button>
+                  {/* Pagination buttons */}
+                  <div className="flex gap-2 items-center">
+                    <button
+                      onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                      disabled={currentPage === 1}
+                      className="px-3 py-1.5 text-sm bg-gray-300 text-gray-700 rounded hover:bg-gray-400 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    >
+                      ← Previous
+                    </button>
+                    
+                    <div className="flex gap-1">
+                      {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                        <button
+                          key={page}
+                          onClick={() => setCurrentPage(page)}
+                          className={`px-2.5 py-1.5 text-sm rounded transition-colors ${
+                            currentPage === page
+                              ? "bg-orange-500 text-white font-semibold"
+                              : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+                          }`}
+                        >
+                          {page}
+                        </button>
+                      ))}
+                    </div>
+
+                    <button
+                      onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+                      disabled={currentPage === totalPages}
+                      className="px-3 py-1.5 text-sm bg-gray-300 text-gray-700 rounded hover:bg-gray-400 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    >
+                      Next →
+                    </button>
+                  </div>
                 </div>
               </div>
             )}
@@ -619,27 +708,14 @@ export default function OrganizationCharges() {
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  B2C Charges (Apply to all tests)
+                  Charges (Apply to all tests)
                 </label>
                 <input
                   type="number"
                   value={bulkCharge}
                   onChange={(e) => setBulkCharge(e.target.value)}
                   className="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500"
-                  placeholder="Enter B2C charge"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  B2B Charges (Apply to all tests)
-                </label>
-                <input
-                  type="number"
-                  value={bulkB2BCharge}
-                  onChange={(e) => setBulkB2BCharge(e.target.value)}
-                  className="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500"
-                  placeholder="Enter B2B charge"
+                  placeholder="Enter charge"
                 />
               </div>
 
@@ -665,19 +741,130 @@ export default function OrganizationCharges() {
           </div>
         </div>
       )}
-      {/* B2B Error Popup */}
-      {b2bError && (
-        <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-xl p-6 w-80 text-center">
-            <div className="text-red-500 text-4xl mb-3">⚠️</div>
-            <h3 className="text-base font-semibold text-gray-800 mb-2">Invalid Charge</h3>
-            <p className="text-sm text-gray-600 mb-4">{b2bError}</p>
-            <button
-              onClick={() => setB2bError("")}
-              className="bg-orange-500 text-white px-6 py-2 rounded hover:bg-orange-600 text-sm"
-            >
-              OK
-            </button>
+
+      {/* Import Modal */}
+      {showImportModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-4xl max-h-[80vh] overflow-y-auto">
+            <h3 className="text-lg font-semibold text-gray-800 mb-4">Import Charges from Excel</h3>
+            
+            {importedData.length === 0 ? (
+              // File Upload Section
+              <div className="space-y-4">
+                <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
+                  <Upload size={40} className="mx-auto text-blue-500 mb-2" />
+                  <p className="text-gray-700 font-medium mb-2">Upload Excel File</p>
+                  <p className="text-sm text-gray-600 mb-4">
+                    File should contain columns: Test Name, Test Code, Group, Charges
+                  </p>
+                  
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept=".xlsx,.xls,.csv"
+                    onChange={handleFileSelect}
+                    className="hidden"
+                  />
+                  
+                  <button
+                    onClick={() => fileInputRef.current?.click()}
+                    className="bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700 transition-colors mb-2"
+                  >
+                    Select File
+                  </button>
+                  
+                  {selectedFile && (
+                    <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded">
+                      <p className="text-sm text-blue-800">
+                        <strong>Selected:</strong> {selectedFile.name}
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex justify-end gap-3">
+                  <button
+                    onClick={() => {
+                      setShowImportModal(false);
+                      setSelectedFile(null);
+                      if (fileInputRef.current) {
+                        fileInputRef.current.value = '';
+                      }
+                    }}
+                    className="px-4 py-2 text-gray-600 border border-gray-300 rounded hover:bg-gray-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleImportExcel}
+                    disabled={!selectedFile || loading}
+                    className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
+                  >
+                    {loading ? 'Reading...' : 'Read File'}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              // Preview and Fill Section
+              <div className="space-y-4">
+                <div className="bg-green-50 border border-green-200 rounded p-4 mb-4">
+                  <p className="text-green-800 font-medium">
+                    ✅ Successfully loaded {importedData.length} records from Excel
+                  </p>
+                </div>
+
+                {/* Data Preview Table */}
+                <div className="overflow-x-auto max-h-[400px] overflow-y-auto">
+                  <table className="w-full border-collapse text-sm">
+                    <thead className="bg-gray-200 sticky top-0">
+                      <tr>
+                        <th className="border border-gray-300 px-3 py-2 text-left">Test Name</th>
+                        <th className="border border-gray-300 px-3 py-2 text-left">Test Code</th>
+                        <th className="border border-gray-300 px-3 py-2 text-left">Group</th>
+                        <th className="border border-gray-300 px-3 py-2 text-center">Charges</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {importedData.map((row, idx) => (
+                        <tr key={idx} className="hover:bg-gray-50">
+                          <td className="border border-gray-300 px-3 py-2">{row.testName}</td>
+                          <td className="border border-gray-300 px-3 py-2">{row.testCode}</td>
+                          <td className="border border-gray-300 px-3 py-2">{row.group}</td>
+                          <td className="border border-gray-300 px-3 py-2 text-center font-medium">{row.charges}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                <div className="flex justify-end gap-3">
+                  <button
+                    onClick={() => {
+                      setImportedData([]);
+                      setSelectedFile(null);
+                      if (fileInputRef.current) {
+                        fileInputRef.current.value = '';
+                      }
+                    }}
+                    className="px-4 py-2 text-gray-600 border border-gray-300 rounded hover:bg-gray-50"
+                  >
+                    Back
+                  </button>
+                  <button
+                    onClick={() => setShowImportModal(false)}
+                    className="px-4 py-2 text-gray-600 border border-gray-300 rounded hover:bg-gray-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleFillCharges}
+                    className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
+                  >
+                    Fill Charges
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}

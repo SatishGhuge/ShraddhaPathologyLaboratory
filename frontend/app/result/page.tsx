@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import Header from "@/src/components/Header";
 import PageHeader from "@/src/components/BreadCrumb";
+import BarcodeModal from "@/app/components/BarcodeModal";
 import API_BASE_URL from "@/src/api/config";
 
 import { FaWhatsapp } from "react-icons/fa";
@@ -29,9 +30,14 @@ import {
   updateTestDates, 
   getTestStatistics,
   getPatientTestById,
-  sendReport
+  sendReport,
+  getPreviousTestResult,
+  getAllTestResults
 } from "@/src/api/result";
 import { getOrganizations } from "@/src/api/master";
+import ReadingValidationModal from "@/app/components/ReadingValidationModal";
+import AuthenticateModal from "@/app/components/AuthenticateModal";
+import ProfessionalResultReport from "@/src/components/ProfessionalResultReport";
 const LetterHead = "/LetterHead.jpeg";
 
 /* ── Per-test row with ALL date fields inside Edit Details modal ── */
@@ -254,6 +260,12 @@ export default function Result() {
   // State for download dropdown
   const [showDownloadDropdown, setShowDownloadDropdown] = useState(false);
 
+  // State for sort dropdown
+  const [showSortDropdown, setShowSortDropdown] = useState(false);
+  const [sortBy, setSortBy] = useState('date');
+  const [itemsPerPage, setItemsPerPage] = useState(25);
+  const [currentPage, setCurrentPage] = useState(1);
+
   // State for barcode checkbox selection (separate from result selection)
   const [barcodeSelectedTests, setBarcodeSelectedTests] = useState(new Set());
   const [barcodeLockedPatientUid, setBarcodeLockedPatientUid] = useState<any>(null);
@@ -263,6 +275,10 @@ export default function Result() {
   const [showBarcodeModal, setShowBarcodeModal] = useState(false);
   const [barcodeLabels, setBarcodeLabels] = useState<any[]>([]);
   const [barcodePatientInfo, setBarcodePatientInfo] = useState<any>(null);
+  
+  // State for tracking which barcodes are selected for printing (separate from test selection)
+  const [selectedBarcodeIndices, setSelectedBarcodeIndices] = useState<Set<number>>(new Set());
+  const [barcodesPrinting, setBarcodesPrinting] = useState(false);
 
   // Track sent/print icons per test_id — persisted in localStorage
   const [sentIcons, setSentIcons] = useState(() => {
@@ -278,6 +294,22 @@ export default function Result() {
     } catch (e) {}
     return {};
   });
+
+  // Previous test results cache — stores previous results for each test
+  const [previousTestResults, setPreviousTestResults] = useState<any>({});
+
+  // All test results cache — stores all results for each patient/test combination
+  const [allTestResults, setAllTestResults] = useState<any>({});
+
+  // State for Previous Test Result Modal
+  const [showPreviousResultModal, setShowPreviousResultModal] = useState(false);
+  const [previousResultData, setPreviousResultData] = useState<any>(null);
+  const [previousResultLoading, setPreviousResultLoading] = useState(false);
+
+  // State for All Test Results Modal
+  const [showAllResultsModal, setShowAllResultsModal] = useState(false);
+  const [allResultsData, setAllResultsData] = useState<any>([]);
+  const [allResultsLoading, setAllResultsLoading] = useState(false);
   
   // State for Upload File Modal
   const [showUploadModal, setShowUploadModal] = useState(false);
@@ -294,6 +326,14 @@ export default function Result() {
   const [reportWithHeader, setReportWithHeader] = useState(true);
   const [defaultSignature, setDefaultSignature] = useState<any>(null);
   
+  // State for Reading Validation Modal
+  const [showReadingValidationModal, setShowReadingValidationModal] = useState(false);
+  const [readingValidationData, setReadingValidationData] = useState<any>(null);
+  
+  // State for Authenticate Modal
+  const [showAuthenticateModal, setShowAuthenticateModal] = useState(false);
+  const [authenticateData, setAuthenticateData] = useState<any>(null);
+  
   // Real data from API
   const [results, setResults] = useState<any[]>([]);
   const [statistics, setStatistics] = useState({
@@ -309,14 +349,28 @@ export default function Result() {
     }
   });
   
-  // Filter states
-  const [filters, setFilters] = useState({
-    fromDate: new Date().toISOString().split('T')[0],
-    toDate: new Date().toISOString().split('T')[0],
-    searchQuery: '', // For Patient Name, ID, or Visit ID
-    department: '',
-    organization: '',
-    testName: ''
+  // Filter states — persisted in localStorage (survives browser refresh)
+  const [filters, setFilters] = useState(() => {
+    // Try to load filters from localStorage
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('resultPageFilters');
+      if (saved) {
+        try {
+          return JSON.parse(saved);
+        } catch (e) {
+          console.warn('Failed to parse saved filters:', e);
+        }
+      }
+    }
+    // Default filters if none saved
+    return {
+      fromDate: new Date().toISOString().split('T')[0],
+      toDate: new Date().toISOString().split('T')[0],
+      searchQuery: '', // For Patient Name, ID, or Visit ID
+      department: '',
+      organization: '',
+      testName: ''
+    };
   });
 
   // Organizations state
@@ -385,66 +439,6 @@ export default function Result() {
     return patient.patient_uid !== barcodeLockedPatientUid || patient.visit_id !== barcodeLockedVisitId;
   };
 
-  // Generate Code128 barcode bars as SVG path data
-  const buildCode128Svg = (text: any) => {
-    // Code128B encoding table (char code 32-127)
-    const CODE128B = [
-      '11011001100','11001101100','11001100110','10010011000','10010001100',
-      '10001001100','10011001000','10011000100','10001100100','11001001000',
-      '11001000100','11000100100','10110011100','10011011100','10011001110',
-      '10111001100','10011101100','10011100110','11001110010','11001011100',
-      '11001001110','11011100100','11001110100','11101101110','11101001100',
-      '11100101100','11100100110','11101100100','11100110100','11100110010',
-      '11011011000','11011000110','11000110110','10100011000','10001011000',
-      '10001000110','10110001000','10001101000','10001100010','11010001000',
-      '11000101000','11000100010','10110111000','10110001110','10001101110',
-      '10111011000','10111000110','10001110110','11101110110','11010001110',
-      '11000101110','11011101000','11011100010','11011101110','11101011000',
-      '11101000110','11100010110','11101101000','11101100010','11100011010',
-      '11101111010','11001000010','11110001010','10100110000','10100001100',
-      '10010110000','10010000110','10000101100','10000100110','10110010000',
-      '10110000100','10011010000','10011000010','10000110100','10000110010',
-      '11000010010','11001010000','11110111010','11000010100','10001111010',
-      '10100111100','10010111100','10010011110','10111100100','10011110100',
-      '10011110010','11110100100','11110010100','11110010010','11011011110',
-      '11011110110','11110110110','10101111000','10100011110','10001011110',
-      '10111101000','10111100010','11110101000','11110100010','10111011110',
-      '10111101110','11101011110','11110101110','11010000100','11010010000',
-      '11010011100','1100011101011'
-    ];
-    const START_B = 104;
-    const STOP = 106;
-
-    const codes = [START_B];
-    let checksum = START_B;
-    for (let i = 0; i < text.length; i++) {
-      const c = text.charCodeAt(i) - 32;
-      codes.push(c);
-      checksum += c * (i + 1);
-    }
-    codes.push(checksum % 103);
-    codes.push(STOP);
-
-    const barWidth = 2;
-    let x = 0;
-    let bars = '';
-    const height = 60;
-
-    codes.forEach(code => {
-      const pattern = CODE128B[code];
-      if (!pattern) return;
-      for (let i = 0; i < pattern.length; i++) {
-        const w = parseInt(pattern[i]) * barWidth;
-        if (i % 2 === 0) {
-          bars += `<rect x="${x}" y="0" width="${w}" height="${height}" fill="black"/>`;
-        }
-        x += w;
-      }
-    });
-
-    return { svg: bars, width: x, height };
-  };
-
   // Open barcode preview modal for selected barcode tests
   const handleBarcodePrint = () => {
     if (barcodeSelectedTests.size === 0) {
@@ -453,7 +447,7 @@ export default function Result() {
     }
 
     let targetPatient = null;
-    for (const patient of filteredResults) {
+    for (const patient of sortedAndFilteredResults) {
       if (patient.patient_uid === barcodeLockedPatientUid && patient.visit_id === barcodeLockedVisitId) {
         targetPatient = patient;
         break;
@@ -469,23 +463,57 @@ export default function Result() {
     // Group by specimen type — one label per unique specimen
     // Multiple tests with same specimen → one barcode, short names joined with " / "
     const specimenGroups = {};
+    const specimenTestIds = {};
+    const specimenTestStatuses = {}; // Track ALL test statuses for each specimen group
+    const specimenBarcodeStatuses = {}; // Track ALL barcode statuses for each specimen group
+    
     selectedTestsList.forEach(t => {
       const key = t.specimen_type || 'Unknown';
-      if (!specimenGroups[key]) specimenGroups[key] = [];
+      if (!specimenGroups[key]) {
+        specimenGroups[key] = [];
+        specimenTestIds[key] = [];
+        specimenTestStatuses[key] = []; // Store array of all test statuses
+        specimenBarcodeStatuses[key] = []; // Store array of all barcode statuses
+      }
       specimenGroups[key].push(t.test_short_name || t.test_name);
+      specimenTestIds[key].push(t.test_id);
+      specimenTestStatuses[key].push(t.status || 'Registered'); // Store each test's status
+      specimenBarcodeStatuses[key].push(t.barcode_status || 'Unprinted'); // Store each barcode's status
     });
 
     // Build labels — barcode value = visitId for first specimen, visitId-2, visitId-3 ...
     const specimenEntries = Object.entries(specimenGroups);
-    const labels = specimenEntries.map(([specimen, shortNames], idx) => ({
-      // visitId for first, visitId-2 for second, etc.
-      barcodeValue: idx === 0 ? targetPatient.visit_id : `${targetPatient.visit_id}-${idx + 1}`,
-      specimen,
-      // Short names joined — truncated smartly for label space
-      shortNamesStr: (shortNames as any[]).join(' / '),
-      dateStr,
-      timeStr,
-    }));
+    const labels = specimenEntries.map(([specimen, shortNames], idx) => {
+      const statuses = specimenTestStatuses[specimen] || [];
+      const barcodeStatuses = specimenBarcodeStatuses[specimen] || [];
+      
+      // Determine final status: if ANY test is "Received", use "Received"
+      // Otherwise, if ANY barcode is "Printed", use "Printed"
+      // Otherwise use "Registered" (no test received yet)
+      let finalSampleStatus = 'Registered';
+      let finalBarcodeStatus = 'Unprinted';
+      
+      // Check if any test has been received
+      if (statuses.includes('Received')) {
+        finalSampleStatus = 'Received';
+      }
+      
+      // Check if any barcode has been printed
+      if (barcodeStatuses.includes('Printed')) {
+        finalBarcodeStatus = 'Printed';
+      }
+      
+      return {
+        barcodeValue: idx === 0 ? targetPatient.visit_id : `${targetPatient.visit_id}-${idx + 1}`,
+        specimen,
+        shortNamesStr: (shortNames as any[]).join(' / '),
+        dateStr,
+        timeStr,
+        testIds: specimenTestIds[specimen] || [],
+        sampleStatus: finalSampleStatus,
+        barcode_status: finalBarcodeStatus,
+      };
+    });
 
     const genderInitial = targetPatient.gender ? targetPatient.gender.charAt(0).toUpperCase() : '';
     const age = targetPatient.age || '';
@@ -497,9 +525,30 @@ export default function Result() {
       gender: targetPatient.gender || '',
       // Pre-formatted age/gender string: "F/27 Yrs" or "M/45 Yrs"
       ageGender: genderInitial && age ? `${genderInitial}/${age} Yrs` : genderInitial || (age ? `${age} Yrs` : ''),
+      organizationCode: targetPatient.organizationCode || '', // ✅ Include organization code
     });
-    setBarcodeLabels(labels);
+    
+    // Add organizationCode to each label
+    const labelsWithOrgCode = labels.map(label => ({
+      ...label,
+      organizationCode: targetPatient.organizationCode || '', // ✅ Add org code to barcode labels
+    }));
+    
+    setBarcodeLabels(labelsWithOrgCode);
+    // Initialize NO barcodes as selected (user must manually select them)
+    setSelectedBarcodeIndices(new Set());
     setShowBarcodeModal(true);
+  };
+
+  // Toggle barcode selection for printing
+  const handleBarcodeToggle = (index: number) => {
+    const updated = new Set(selectedBarcodeIndices);
+    if (updated.has(index)) {
+      updated.delete(index);
+    } else {
+      updated.add(index);
+    }
+    setSelectedBarcodeIndices(updated);
   };
 
   // Handle navigate to result entry
@@ -953,7 +1002,7 @@ export default function Result() {
     }
   };
 
-  // Print — loads report data, opens print preview in new tab with Print button
+  // Print — loads report data, opens modal with Professional Report Component
   const handlePrintPreview = async () => {
     if (selectedTests.size === 0) { alert('Please select a test to print'); return; }
     try {
@@ -994,157 +1043,30 @@ export default function Result() {
         });
       } catch (e) { console.warn('Could not load letterhead', e); }
 
-      const patient = first.patientTest.patient;
-      const visitId = first.patientTest.visitId;
-      const visitDate = first.patientTest.visitDate
-        ? new Date(first.patientTest.visitDate).toLocaleDateString('en-GB') : '-';
-      const patientName = `${patient.title || ''} ${patient.firstName || ''} ${patient.lastName || ''}`.trim();
+      // Build combined tests array
+      const combinedTests = responses.map(r => ({
+        name: r.patientTest.test.name,
+        interpretation: r.patientTest.test.interpretation,
+        groupedParameters: r.groupedParameters,
+        parameters: r.parameters
+      }));
 
-      const buildPage = (r: any, withHeader: any) => {
-        const t = r.patientTest.test;
-        const gp = r.groupedParameters || {};
-
-        const paramRows = Object.entries(gp).map(([catName, catParams]: [string, any]) => {
-          let rows = '';
-          if (catName !== 'NO_CATEGORY_HEADER' && catParams[0]?.showCategoryHeader) {
-            rows += `<tr><td colSpan={4} style="padding:4px 6px;font-weight:bold;border-bottom:1px solid #ddd;background:#f5f5f5;">${catName.toUpperCase()}</td></tr>`;
-          }
-          (catParams as any[]).forEach(p => {
-            const er = p.existingResult;
-            const val = er
-              ? (er.numericValue !== null && er.numericValue !== undefined ? er.numericValue : (er.textValue || '-'))
-              : '-';
-            const flag = isParamOutOfRange(p, er);
-            const valDisplay = flag
-              ? `<strong style="color:#b91c1c;letter-spacing:0.3px;">${val} *</strong>`
-              : val;
-            rows += `<tr>
-              <td style="padding:3px 6px;width:38%;font-weight:${flag ? 'bold' : 'normal'};">${p.parameterName}</td>
-              <td style="padding:3px 6px 3px 20px;width:22%;font-size:11px;">${valDisplay}</td>
-              <td style="padding:3px 6px;width:12%;color:#555;">${p.units || ''}</td>
-              <td style="padding:3px 6px;width:28%;color:#555;">${er?.referenceRange || ''}</td>
-            </tr>`;
-          });
-          return rows;
-        }).join('');
-
-        const sigHtml = signature ? `
-          <div style="margin-top:auto;padding-top:6mm;display:flex;justify-content:flex-end;">
-            <div style="text-align:center;">
-              ${signature.signatureImage ? `<img src="${signature.signatureImage}" style="width:${signature.width||150}px;height:${signature.height||80}px;object-fit:contain;" />` : ''}
-              ${signature.signatureText ? `<div style="font-size:11px;font-weight:bold;">${signature.signatureText}</div>` : ''}
-              ${signature.doctorName ? `<div style="font-size:11px;font-weight:bold;">${signature.doctorName}</div>` : ''}
-              ${signature.specialty ? `<div style="font-size:10px;color:#444;">${signature.specialty}</div>` : ''}
-            </div>
-          </div>` : '';
-
-        return `
-          <div class="report-page">
-            ${withHeader && letterHeadBase64 ? `<img src="${letterHeadBase64}" style="position:absolute;top:0;left:0;width:100%;height:100%;object-fit:fill;z-index:0;" />` : ''}
-            <div style="position:relative;z-index:1;height:100%;display:flex;flex-direction:column;padding-top:${withHeader ? '38mm' : '12mm'};padding-bottom:${withHeader ? '36mm' : '12mm'};padding-left:14mm;padding-right:14mm;box-sizing:border-box;">
-              <div style="text-align:center;margin-bottom:6mm;border-bottom:1.5px solid #333;padding-bottom:3mm;">
-                <strong style="font-size:13px;letter-spacing:1px;">${t.name.toUpperCase()} REPORT</strong>
-              </div>
-              <table style="width:100%;border-collapse:collapse;margin-bottom:4mm;font-size:11px;">
-                <tr>
-                  <td style="padding:2px 4px;width:50%;"><strong>Patient:</strong> ${patientName}</td>
-                  <td style="padding:2px 4px;width:50%;"><strong>Age / Gender:</strong> ${patient.age || '-'} Yrs / ${patient.gender || '-'}</td>
-                </tr>
-                <tr>
-                  <td style="padding:2px 4px;"><strong>Lab No:</strong> ${visitId}</td>
-                  <td style="padding:2px 4px;"><strong>Date:</strong> ${visitDate}</td>
-                </tr>
-              </table>
-              <table style="width:100%;border-collapse:collapse;font-size:11px;">
-                <thead>
-                  <tr>
-                    <th style="border-bottom:1.5px solid #333;padding:4px 6px;text-align:left;width:38%;">Test Description</th>
-                    <th style="border-bottom:1.5px solid #333;padding:4px 6px 4px 20px;text-align:left;width:22%;">Result</th>
-                    <th style="border-bottom:1.5px solid #333;padding:4px 6px;text-align:left;width:12%;">Unit</th>
-                    <th style="border-bottom:1.5px solid #333;padding:4px 6px;text-align:left;width:28%;">Biological Reference Range</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr><td colSpan={4} style="padding:4px 6px;font-weight:bold;border-bottom:1px solid #ccc;">${t.name}</td></tr>
-                  ${paramRows}
-                </tbody>
-              </table>
-              ${t.interpretation ? `<div style="margin-top:4mm;border-top:1px solid #ccc;padding-top:3mm;font-size:11px;color:#444;">${t.interpretation}</div>` : ''}
-              ${sigHtml}
-            </div>
-          </div>`;
-      };
-
-      // Build both with-header and without-header versions
-      // Add attachment page if exists
-      const attachPath = responses.find(r => r.patientTest.attachmentPath)?.patientTest.attachmentPath
-        || (uploadedFiles[Array.from(selectedTests)[0] as string]?.serverPath);
-      let attachPageHtml = '';
-      if (attachPath) {
-        const baseUrl = process.env.NEXT_PUBLIC_API_URL.replace('/api','');
-        const src = attachPath.startsWith('http') ? attachPath : `${baseUrl}${attachPath}`;
-        const isPdf = attachPath.endsWith('.pdf');
-        attachPageHtml = `<div class="report-page" style="display:flex;align-items:center;justify-content:center;">
-          ${isPdf
-            ? `<iframe src="${src}" style="width:100%;height:100%;border:none;"></iframe>`
-            : `<img src="${src}" style="max-width:100%;max-height:100%;object-fit:contain;" />`}
-        </div>`;
-      }
-
-      const withHeaderHtml = responses.map(r => buildPage(r, true)).join('') + attachPageHtml;
-      const withoutHeaderHtml = responses.map(r => buildPage(r, false)).join('') + attachPageHtml;
-
-      const previewWindow = window.open('', '_blank', 'width=1000,height=800');
-      previewWindow.document.write(`<!DOCTYPE html><html><head><title>Print Preview — ${patientName}</title>
-        <style>
-          * { margin:0; padding:0; box-sizing:border-box; }
-          body { font-family:Arial,sans-serif; font-size:11px; background:#6b7280; }
-          .toolbar { position:fixed; top:0; left:0; right:0; z-index:100; background:#1f2937; color:white; padding:10px 20px; display:flex; align-items:center; gap:12px; box-shadow:0 2px 8px rgba(0,0,0,0.4); }
-          .toolbar h3 { font-size:14px; font-weight:600; flex:1; }
-          .toolbar button { padding:6px 16px; border:none; border-radius:4px; cursor:pointer; font-size:13px; font-weight:600; }
-          .btn-print { background:#2563eb; color:white; }
-          .btn-print:hover { background:#1d4ed8; }
-          .btn-toggle { background:#374151; color:#d1d5db; }
-          .btn-toggle.active { background:#0891b2; color:white; }
-          .pages { margin-top:60px; padding:20px; }
-          .report-page { width:210mm; height:297mm; position:relative; background:#fff; margin:16px auto; box-shadow:0 4px 20px rgba(0,0,0,0.3); overflow:hidden; page-break-after:always; }
-          .report-page:last-child { page-break-after:avoid; }
-          @media print {
-            .toolbar { display:none !important; }
-            body { background:white; }
-            .pages { margin-top:0; padding:0; }
-            .report-page { margin:0; box-shadow:none; }
-            @page { size:A4; margin:0; }
-          }
-        </style>
-      </head><body>
-        <div class="toolbar">
-          <h3>🖨️ Print Preview — ${patientName} | Lab No: ${visitId}</h3>
-          <button class="btn-toggle active" id="btnWith" onclick="showWith()">With Header</button>
-          <button class="btn-toggle" id="btnWithout" onclick="showWithout()">Without Header</button>
-          <button class="btn-print" onclick="window.print()">🖨️ Print</button>
-          <button class="btn-toggle" onclick="window.close()">✕ Close</button>
-        </div>
-        <div class="pages" id="pages">${withHeaderHtml}</div>
-        <script>
-          const withH = ${JSON.stringify(withHeaderHtml)};
-          const withoutH = ${JSON.stringify(withoutHeaderHtml)};
-          function showWith() {
-            document.getElementById('pages').innerHTML = withH;
-            document.getElementById('btnWith').classList.add('active');
-            document.getElementById('btnWithout').classList.remove('active');
-          }
-          function showWithout() {
-            document.getElementById('pages').innerHTML = withoutH;
-            document.getElementById('btnWithout').classList.add('active');
-            document.getElementById('btnWith').classList.remove('active');
-          }
-        <\/script>
-      </body></html>`);
-      previewWindow.document.close();
-      previewWindow.focus();
+      // Set report data and open modal
+      setReportData({
+        patient: first.patientTest.patient,
+        visitId: first.patientTest.visitId,
+        visitDate: first.patientTest.visitDate,
+        test: first.patientTest.test,
+        parameters: first.parameters,
+        groupedParameters: first.groupedParameters,
+        combinedTests,
+        signature,
+        letterHeadBase64
+      });
+      setReportWithHeader(true);
+      setShowReportModal(true);
       // Record print icon for selected tests
-      markSentIcons(Array.from(selectedTests), 'print');
+      markSentIcons(testIds, 'print');
     } catch (err) {
       console.error('Print preview error:', err);
       alert('Failed to load print preview: ' + err.message);
@@ -1153,32 +1075,9 @@ export default function Result() {
     }
   };
 
-  // Print — opens report in a new tab for viewing/printing
+  // Handle print from modal
   const handlePrint = () => {
-    const pages = document.querySelectorAll('.report-page');
-    if (!pages.length) return;
-    const pagesHtml = Array.from(pages).map(p => p.outerHTML).join('');
-    const printWindow = window.open('', '_blank', 'width=900,height=700');
-    printWindow.document.write(`<!DOCTYPE html><html><head><title>Report</title><style>
-      * { margin:0; padding:0; box-sizing:border-box; }
-      body { font-family:Arial,sans-serif; font-size:11px; background:#e5e7eb; }
-      @page { size: A4; margin: 0; }
-      .report-page {
-        width: 210mm; height: 297mm;
-        position: relative; overflow: hidden;
-        page-break-after: always;
-        background: #fff;
-        margin: 16px auto;
-        box-shadow: 0 2px 16px rgba(0,0,0,0.18);
-      }
-      .report-page:last-child { page-break-after: avoid; }
-      @media print {
-        body { background: white; }
-        .report-page { margin: 0; box-shadow: none; }
-      }
-    </style></head><body>${pagesHtml}</body></html>`);
-    printWindow.document.close();
-    printWindow.focus();
+    window.print();
   };
 
   // Open upload modal for a patient
@@ -1282,8 +1181,77 @@ export default function Result() {
   // Load data on component mount and when filters change
   useEffect(() => {
     fetchResults();
-    fetchStatistics();
+    // fetchStatistics is now called inside fetchResults
   }, [filters]);
+
+  // Save filters to localStorage whenever they change
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('resultPageFilters', JSON.stringify(filters));
+    }
+  }, [filters]);
+
+  // Handle test name click to open appropriate modal based on stage
+  const handleTestNameClick = async (test: any, patient: any) => {
+    try {
+      // Map status to proper format for stage check
+      const statusMap = {
+        'Provisional': 'Entered',
+        'Authenticated': 'Authorized',
+        'Validated': 'Validation'
+      };
+      
+      const testStatus = statusMap[test.result_status] || test.result_status;
+
+      // If test is in "Entered" stage - open Reading Validation Modal
+      if (testStatus === 'Entered') {
+        // Fetch full test data including parameters
+        const testData = await getPatientTestById(test.test_id);
+        
+        if (!testData || !testData.patientTest) {
+          alert('Error loading test data');
+          return;
+        }
+
+        // Set data for modal
+        setReadingValidationData({
+          patientTest: testData.patientTest,
+          parameters: testData.parameters,
+          groupedParameters: testData.groupedParameters
+        });
+        
+        setShowReadingValidationModal(true);
+      }
+      // If test is in "Validation" stage - open Authenticate Modal
+      else if (testStatus === 'Validation') {
+        // Fetch full test data including parameters
+        const testData = await getPatientTestById(test.test_id);
+        
+        if (!testData || !testData.patientTest) {
+          alert('Error loading test data');
+          return;
+        }
+
+        // Set data for modal
+        setAuthenticateData({
+          patientTest: testData.patientTest,
+          parameters: testData.parameters,
+          groupedParameters: testData.groupedParameters
+        });
+        
+        setShowAuthenticateModal(true);
+      }
+      // If test is in any other stage - show error message
+      else {
+        alert(`⚠️ Test cannot be edited or authenticated.\n\nCurrent Stage: ${testStatus}\n\nReadings can only be edited in "Entered" stage or authenticated in "Validation" stage.\n\nPlease complete earlier stages first.`);
+        return;
+      }
+
+    } catch (err: any) {
+      console.error('Error opening modal:', err);
+      alert('Error: ' + (err.message || 'Failed to open modal'));
+    }
+  };
 
   // Fetch organizations on component mount
   useEffect(() => {
@@ -1320,6 +1288,13 @@ export default function Result() {
       
       const data = await getPatientTests(filters);
       setResults(data);
+      
+      // Calculate unique patient registration count
+      const uniquePatients = new Set(data.map(r => r.patient_uid)).size;
+      console.log(`📊 Unique patients registered today: ${uniquePatients}`);
+      
+      // Also fetch and update statistics with the new data
+      await fetchStatisticsWithData(data);
     } catch (err) {
       console.error('Error fetching results:', err);
       setError(err.message);
@@ -1328,14 +1303,43 @@ export default function Result() {
     }
   };
 
-  // Fetch statistics from API
-  const fetchStatistics = async () => {
+  // Fetch statistics from API with provided data
+  const fetchStatisticsWithData = async (data: any[]) => {
     try {
       const stats = await getTestStatistics({
         fromDate: filters.fromDate,
         toDate: filters.toDate
       });
-      setStatistics(stats);
+      
+      // Modify statistics: count unique patients for "Registered" count
+      // Instead of showing all tests with Registered status, show unique patients registered
+      const uniqueRegisteredPatients = new Set(
+        data
+          .filter(r => r.tests?.some(t => t.result_status === 'Registered'))
+          .map(r => r.patient_uid)
+      ).size;
+      
+      console.log(`👥 Unique patients with registered tests: ${uniqueRegisteredPatients}`);
+      console.log(`📊 Total tests with Registered status: ${data.flatMap(r => r.tests || []).filter(t => t.result_status === 'Registered').length}`);
+      
+      // Update stats to show unique patient count instead of test count
+      setStatistics({
+        ...stats,
+        byStatus: {
+          ...stats.byStatus,
+          Registered: uniqueRegisteredPatients  // Override with unique patient count
+        }
+      });
+    } catch (err) {
+      console.error('Error fetching statistics:', err);
+    }
+  };
+
+  // Fetch statistics from API (for manual calls)
+  const fetchStatistics = async () => {
+    try {
+      const data = await getPatientTests(filters);
+      await fetchStatisticsWithData(data);
     } catch (err) {
       console.error('Error fetching statistics:', err);
     }
@@ -1356,14 +1360,15 @@ export default function Result() {
 
   // Handle refresh — reset filters and reload data
   const handleRefresh = () => {
-    setFilters({
+    const defaultFilters = {
       fromDate: new Date().toISOString().split('T')[0],
       toDate: new Date().toISOString().split('T')[0],
       searchQuery: '',
       department: '',
       organization: '',
       testName: ''
-    });
+    };
+    setFilters(defaultFilters);
     setSelectedStatus('All');
     setSelectedTests(new Set());
     setLockedVisitId(null);
@@ -1372,8 +1377,52 @@ export default function Result() {
     setBarcodeSelectedTests(new Set());
     setBarcodeLockedPatientUid(null);
     setBarcodeLockedVisitId(null);
+    
+    // Clear filters from localStorage
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('resultPageFilters');
+    }
+    
     fetchResults();
     fetchStatistics();
+  };
+
+  // Handle fetch previous test result
+  const handleFetchPreviousResult = async (patient: any, test: any) => {
+    try {
+      setPreviousResultLoading(true);
+      const result = await getPreviousTestResult(patient.patient_uid, test.test_id.toString());
+      setPreviousResultData({
+        test: test,
+        patient: patient,
+        result: result
+      });
+      setShowPreviousResultModal(true);
+    } catch (error) {
+      console.error('Error fetching previous result:', error);
+      alert('Failed to fetch previous test result: ' + error.message);
+    } finally {
+      setPreviousResultLoading(false);
+    }
+  };
+
+  // Handle fetch all test results
+  const handleFetchAllResults = async (patient: any, test: any) => {
+    try {
+      setAllResultsLoading(true);
+      const results = await getAllTestResults(patient.patient_uid, test.test_id.toString(), 10);
+      setAllResultsData({
+        test: test,
+        patient: patient,
+        results: results
+      });
+      setShowAllResultsModal(true);
+    } catch (error) {
+      console.error('Error fetching all results:', error);
+      alert('Failed to fetch test result history: ' + error.message);
+    } finally {
+      setAllResultsLoading(false);
+    }
   };
 
   // Filter results based on selected status
@@ -1381,25 +1430,74 @@ export default function Result() {
     ? results 
     : results.map(patient => ({
         ...patient,
-        tests: patient.tests.filter(test => test.result_status.toUpperCase() === selectedStatus.toUpperCase())
+        tests: patient.tests.filter(test => {
+          // Map old status names to new ones
+          const statusMap = {
+            'Provisional': 'Entered',
+            'Authenticated': 'Authorized',
+            'Validated': 'Validation'
+          };
+          
+          const testStatus = statusMap[test.result_status] || test.result_status;
+          return testStatus.toUpperCase() === selectedStatus.toUpperCase();
+        })
       })).filter(patient => patient.tests.length > 0);
+
+  // Sort results based on sortBy selection
+  const sortedAndFilteredResults = [...filteredResults].sort((a, b) => {
+    switch (sortBy) {
+      case 'date':
+        // Sort by date (newest first)
+        return new Date(b.tests?.[0]?.order_date || 0).getTime() - new Date(a.tests?.[0]?.order_date || 0).getTime();
+      case 'uid':
+        // Sort by UID alphanumerically
+        return (a.patient_uid || '').localeCompare(b.patient_uid || '');
+      case 'alphabetic':
+        // Sort by patient name alphabetically
+        return (a.patient_name || '').localeCompare(b.patient_name || '');
+      default:
+        return 0;
+    }
+  });
+
+  // Calculate pagination
+  const totalRecords = sortedAndFilteredResults.length;
+  const totalPages = Math.ceil(totalRecords / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const paginatedResults = sortedAndFilteredResults.slice(startIndex, endIndex);
+
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [filteredResults]);
 
   // Get status badge color based on status
   const getStatusBadgeColor = (status: any) => {
     const pascalStatus = status.charAt(0).toUpperCase() + status.slice(1).toLowerCase();
-    switch (pascalStatus) {
+    
+    // Map old status names to new ones for display
+    const statusMap = {
+      'Provisional': 'Entered',
+      'Authenticated': 'Authorized',
+      'Validated': 'Validation'
+    };
+    
+    const displayStatus = statusMap[pascalStatus] || pascalStatus;
+    
+    switch (displayStatus) {
       case "Registered":
         return "bg-cyan-100 text-cyan-800";
       case "Received":
         return "bg-orange-100 text-orange-800";
       case "Entered":
-        return "bg-green-100 text-green-800";
+        return "bg-purple-100 text-purple-800";
       case "Validation":
         return "bg-yellow-100 text-yellow-800";
       case "Authorized":
         return "bg-blue-100 text-blue-800";
       case "Delivered":
-        return "bg-purple-100 text-purple-800";
+        return "bg-green-100 text-green-800";
       case "Rectified":
         return "bg-red-100 text-red-800";
       default:
@@ -1537,7 +1635,7 @@ export default function Result() {
     <>
       <Header />
       <div className="p-2 sm:p-3 md:p-4 lg:p-6 bg-gray-50 min-h-screen mt-16">
-        <PageHeader title="Laboratory Dashboard" icon={FileText} path="Results" />
+        <PageHeader title="" path="Results" />
         
         {/* Error Message */}
         {error && (
@@ -1585,10 +1683,10 @@ export default function Result() {
                 <div 
                   onClick={() => setSelectedStatus("Entered")}
                   className={`rounded-lg p-2 text-center cursor-pointer hover:shadow-md transition-shadow ${
-                    selectedStatus === "Entered" ? "bg-green-200 ring-2 ring-green-600" : "bg-green-100"
+                    selectedStatus === "Entered" ? "bg-purple-200 ring-2 ring-purple-600" : "bg-purple-100"
                   }`}
                 >
-                  <h3 className="text-green-800 font-semibold text-xs sm:text-sm">
+                  <h3 className="text-purple-800 font-semibold text-xs sm:text-sm">
                     Entered ({statistics.byStatus.Entered})
                   </h3>
                 </div>
@@ -1615,10 +1713,10 @@ export default function Result() {
                 <div 
                   onClick={() => setSelectedStatus("Delivered")}
                   className={`rounded-lg p-2 text-center cursor-pointer hover:shadow-md transition-shadow ${
-                    selectedStatus === "Delivered" ? "bg-purple-200 ring-2 ring-purple-600" : "bg-purple-100"
+                    selectedStatus === "Delivered" ? "bg-green-200 ring-2 ring-green-600" : "bg-green-100"
                   }`}
                 >
-                  <h3 className="text-purple-800 font-semibold text-xs sm:text-sm">
+                  <h3 className="text-green-800 font-semibold text-xs sm:text-sm">
                     Delivered ({statistics.byStatus.Delivered})
                   </h3>
                 </div>
@@ -1682,7 +1780,7 @@ export default function Result() {
                 >
                   <option value="">All Org</option>
                   {organizations.map(org => (
-                    <option key={org.id} value={org.id}>{org.name}</option>
+                    <option key={org.id} value={org.id}>{org.code || org.name}</option>
                   ))}
                 </select>
                 
@@ -1713,38 +1811,78 @@ export default function Result() {
                 </button>
                 
                 <button 
-                  onClick={() => {
-                    if (barcodeSelectedTests.size === 0) {
-                      alert('Please select tests using the barcode checkboxes first');
-                      return;
-                    }
-                    // Just open the barcode modal, without automatic print
-                    handleBarcodePrint();
-                  }}
-                  className="h-8 px-2 bg-green-600 hover:bg-green-700 text-white rounded flex items-center gap-1 text-xs"
-                  title="Print Barcode"
+                  onClick={() => setShowSortDropdown(!showSortDropdown)}
+                  className="h-8 px-3 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded text-xs sm:text-sm relative"
+                  title="Sort"
                 >
-                  <Printer size={14} />
-                </button>
-                
-                <button
-                  onClick={handlePrintPreview}
-                  disabled={loading || selectedTests.size === 0}
-                  className="h-8 px-3 bg-cyan-600 hover:bg-cyan-700 text-white rounded flex items-center gap-1.5 text-xs sm:text-sm disabled:opacity-50"
-                >
-                  <Printer size={14} />
-                </button>
-                
-                <button className="h-8 px-3 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded text-xs sm:text-sm">
                   ☰
+                  
+                  {showSortDropdown && (
+                    <div className="absolute top-full right-0 mt-1 bg-white border border-gray-300 rounded shadow-lg z-50 min-w-max">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSortBy('date');
+                          setShowSortDropdown(false);
+                        }}
+                        className={`block w-full text-left px-4 py-2 text-sm hover:bg-blue-100 ${sortBy === 'date' ? 'bg-blue-50 font-semibold' : ''}`}
+                      >
+                        ↓ Sort by Date
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSortBy('uid');
+                          setShowSortDropdown(false);
+                        }}
+                        className={`block w-full text-left px-4 py-2 text-sm hover:bg-blue-100 ${sortBy === 'uid' ? 'bg-blue-50 font-semibold' : ''}`}
+                      >
+                        ↓ Sort by UID
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSortBy('alphabetic');
+                          setShowSortDropdown(false);
+                        }}
+                        className={`block w-full text-left px-4 py-2 text-sm hover:bg-blue-100 ${sortBy === 'alphabetic' ? 'bg-blue-50 font-semibold' : ''}`}
+                      >
+                        ↓ Sort by Alphabetic (Name)
+                      </button>
+                    </div>
+                  )}
                 </button>
               </div>
             </div>
 
-
-
             {/* Result Table - Scrollable */}
             <div className="bg-white rounded shadow-md overflow-hidden">
+              {/* Top right selector for records per page */}
+              <div className="px-3 py-2 border-b border-gray-200 flex justify-end">
+                <div className="flex gap-1 text-sm">
+                  <button
+                    onClick={() => { setItemsPerPage(25); setCurrentPage(1); }}
+                    className={`px-2 py-1 transition-colors ${itemsPerPage === 25 ? 'text-cyan-600 font-semibold' : 'text-gray-700 hover:text-cyan-600'}`}
+                  >
+                    25
+                  </button>
+                  <span className="text-gray-400">/</span>
+                  <button
+                    onClick={() => { setItemsPerPage(50); setCurrentPage(1); }}
+                    className={`px-2 py-1 transition-colors ${itemsPerPage === 50 ? 'text-cyan-600 font-semibold' : 'text-gray-700 hover:text-cyan-600'}`}
+                  >
+                    50
+                  </button>
+                  <span className="text-gray-400">/</span>
+                  <button
+                    onClick={() => { setItemsPerPage(100); setCurrentPage(1); }}
+                    className={`px-2 py-1 transition-colors ${itemsPerPage === 100 ? 'text-cyan-600 font-semibold' : 'text-gray-700 hover:text-cyan-600'}`}
+                  >
+                    100
+                  </button>
+                </div>
+              </div>
+              
               <div className="overflow-x-auto">
                 <table className="w-full text-xs sm:text-sm border-collapse">
                   <thead className="bg-slate-900 text-white shadow-xl">
@@ -1752,20 +1890,23 @@ export default function Result() {
                       <th className="px-1 sm:px-2 py-1.5 sm:py-2 text-center font-semibold text-xs whitespace-nowrap border border-gray-300">
                         <input type="checkbox" className="w-3 h-3 cursor-pointer accent-white" />
                       </th>
-                      <th className="px-1 sm:px-2 py-1.5 sm:py-2 text-left font-semibold text-xs whitespace-nowrap border border-gray-300">No.</th>
-                      <th className="px-1 sm:px-2 py-1.5 sm:py-2 text-left font-semibold text-xs whitespace-nowrap border border-gray-300">Patient</th>
-                      <th className="px-1 sm:px-2 py-1.5 sm:py-2 text-left font-semibold text-xs whitespace-nowrap border border-gray-300">Corp.</th>
-                      <th className="px-1 sm:px-2 py-1.5 sm:py-2 text-left font-semibold text-xs whitespace-nowrap border border-gray-300">UID</th>
                       <th className="px-1 sm:px-2 py-1.5 sm:py-2 text-left font-semibold text-xs whitespace-nowrap border border-gray-300">Visit ID</th>
-                      <th className="px-1 sm:px-2 py-1.5 sm:py-2 text-center font-semibold text-xs whitespace-nowrap border border-gray-300">
-                        <input type="checkbox" className="w-3 h-3 cursor-pointer accent-white" />
-                      </th>
+                      <th className="px-1 sm:px-2 py-1.5 sm:py-2 text-left font-semibold text-xs whitespace-nowrap border border-gray-300">Org ID</th>
+                      <th className="px-1 sm:px-2 py-1.5 sm:py-2 text-left font-semibold text-xs whitespace-nowrap border border-gray-300">Patient Name</th>
+                      <th className="px-1 sm:px-2 py-1.5 sm:py-2 text-left font-semibold text-xs whitespace-nowrap border border-gray-300">Age</th>
+                      <th className="px-1 sm:px-2 py-1.5 sm:py-2 text-left font-semibold text-xs whitespace-nowrap border border-gray-300">Gender</th>
                       <th className="px-1 sm:px-2 py-1.5 sm:py-2 text-left font-semibold text-xs whitespace-nowrap border border-gray-300">Services</th>
-                      <th className="px-1 sm:px-2 py-1.5 sm:py-2 text-left font-semibold text-xs whitespace-nowrap border border-gray-300">Ref By</th>
-                      <th className="px-1 sm:px-2 py-1.5 sm:py-2 text-left font-semibold text-xs whitespace-nowrap border border-gray-300">Date</th>
+                      <th className="px-1 sm:px-2 py-1.5 sm:py-2 text-left font-semibold text-xs whitespace-nowrap border border-gray-300">Referral Doc</th>
+                      <th className="px-1 sm:px-2 py-1.5 sm:py-2 text-left font-semibold text-xs whitespace-nowrap border border-gray-300">
+                        Previous Test Result
+                      </th>
+                      <th className="px-1 sm:px-2 py-1.5 sm:py-2 text-left font-semibold text-xs whitespace-nowrap border border-gray-300">
+                        All Test Results
+                      </th>
                       <th className="px-0.5 sm:px-1 py-1.5 sm:py-2 text-center font-semibold text-xs whitespace-nowrap border border-gray-300">
                         <span className="text-[10px]">S.Taken</span>
                       </th>
+                      <th className="px-1 sm:px-2 py-1.5 sm:py-2 text-left font-semibold text-xs whitespace-nowrap border border-gray-300">Patient History</th>
                       <th className="px-0.5 sm:px-1 py-1.5 sm:py-2 text-center font-semibold text-xs whitespace-nowrap border border-gray-300">
                         <div title="Print barcode labels for selected tests">
                           <Barcode
@@ -1780,71 +1921,27 @@ export default function Result() {
                   <tbody className="bg-white">
                     {loading ? (
                       <tr>
-                        <td colSpan={12} className="text-center p-4 text-gray-500 text-sm border border-gray-300">
+                        <td colSpan={13} className="text-center p-4 text-gray-500 text-sm border border-gray-300">
                           <div className="flex items-center justify-center gap-2">
                             <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-cyan-600"></div>
                             Loading...
                           </div>
                         </td>
                       </tr>
-                    ) : filteredResults.length === 0 ? (
+                    ) : paginatedResults.length === 0 ? (
                       <tr>
-                        <td colSpan={12} className="text-center p-3 sm:p-4 text-gray-500 text-xs sm:text-sm border border-gray-300">
+                        <td colSpan={13} className="text-center p-3 sm:p-4 text-gray-500 text-xs sm:text-sm border border-gray-300">
                           No records found for {selectedStatus} status
                         </td>
                       </tr>
                     ) : (
-                      filteredResults.map((patient, patientIndex) => {
+                      paginatedResults.map((patient, patientIndex) => {
                         return patient.tests.map((test, testIndex) => (
                           <tr 
                             key={`${patient.patient_uid}-${test.test_id}`} 
                             className={`hover:bg-opacity-80 text-gray-800 border-b border-gray-300 cursor-pointer transition-all ${getStatusBadgeColor(test.result_status)}`}
                           >
-                            <td className="px-1 sm:px-2 py-1 sm:py-1.5 text-center border border-gray-300">
-                              <input type="checkbox" className="w-3 h-3 cursor-pointer accent-cyan-600" />
-                            </td>
-                            
-                            {/* Show patient info only on first test row, lab number on all rows */}
-                            {testIndex === 0 ? (
-                              <>
-                                <td className="px-1 sm:px-2 py-1 sm:py-1.5 text-xs border border-gray-300">{patientIndex + 1}</td>
-                                <td className="px-1 sm:px-2 py-1 sm:py-1.5 text-xs font-medium border border-gray-300">
-                                  <span className="flex items-center gap-1">
-                                    <span className="truncate">{patient.patient_name}</span>
-                                    {patient.balance_amount > 0 && (
-                                      <span
-                                        className="relative group cursor-pointer"
-                                        onClick={() => {
-                                          localStorage.setItem('searchQuery', patient.patient_uid);
-                                          router.push('/patient/search-booking');
-                                        }}
-                                      >
-                                        <span className="text-red-500 text-[11px] font-bold leading-none select-none">₹</span>
-                                        {/* Tooltip */}
-                                        <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 hidden group-hover:flex flex-col items-center z-50 pointer-events-none">
-                                          <span className="bg-red-600 text-white text-[10px] font-semibold rounded px-2 py-1 whitespace-nowrap shadow-lg">
-                                            Balance: ₹{patient.balance_amount.toLocaleString('en-IN')}
-                                          </span>
-                                          <span className="w-2 h-2 bg-red-600 rotate-45 -mt-1" />
-                                        </span>
-                                      </span>
-                                    )}
-                                  </span>
-                                </td>
-                                <td className="px-1 sm:px-2 py-1 sm:py-1.5 text-xs border border-gray-300">{patient.corporate}</td>
-                                <td className="px-1 sm:px-2 py-1 sm:py-1.5 text-xs border border-gray-300">{patient.patient_uid}</td>
-                                <td className="px-1 sm:px-2 py-1 sm:py-1.5 text-xs font-semibold border border-gray-300">{patient.visit_id}</td>
-                              </>
-                            ) : (
-                              <>
-                                <td className="px-1 sm:px-2 py-1 sm:py-1.5 text-xs border border-gray-300"></td>
-                                <td className="px-1 sm:px-2 py-1 sm:py-1.5 text-xs border border-gray-300"></td>
-                                <td className="px-1 sm:px-2 py-1 sm:py-1.5 text-xs border border-gray-300"></td>
-                                <td className="px-1 sm:px-2 py-1 sm:py-1.5 text-xs border border-gray-300"></td>
-                                <td className="px-1 sm:px-2 py-1 sm:py-1.5 text-xs font-semibold border border-gray-300">{patient.visit_id}</td>
-                              </>
-                            )}
-                            
+                            {/* Column 1: Checkbox */}
                             <td className="px-1 sm:px-2 py-1 sm:py-1.5 text-center border border-gray-300">
                               <input 
                                 type="checkbox" 
@@ -1854,9 +1951,84 @@ export default function Result() {
                                 onChange={(e) => handleTestSelection(test.test_id, e.target.checked, patient, test)}
                               />
                             </td>
+
+                            {/* Column 2: Visit ID (show only on first test row) */}
+                            <td className="px-1 sm:px-2 py-1 sm:py-1.5 text-xs border border-gray-300">
+                              {testIndex === 0 ? patient.visit_id : ''}
+                            </td>
+
+                            {/* Column 3: Org ID with hover tooltip (show only on first test row) */}
+                            <td className="px-1 sm:px-2 py-1 sm:py-1.5 text-xs border border-gray-300 relative">
+                              {testIndex === 0 && (
+                                <div 
+                                  className="cursor-help relative group"
+                                  title={patient.organization_name || 'N/A'}
+                                >
+                                  <span>{patient.organizationCode ? patient.organizationCode : '-'}</span>
+                                  {/* Tooltip - only show if organization exists */}
+                                  {patient.organizationCode && (
+                                    <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 hidden group-hover:flex flex-col items-center z-50 pointer-events-none">
+                                      <span className="bg-gray-800 text-white text-[10px] font-semibold rounded px-2 py-1 whitespace-nowrap shadow-lg">
+                                        {patient.organization_name || 'Organization'}
+                                      </span>
+                                      <span className="w-2 h-2 bg-gray-800 rotate-45 -mt-1" />
+                                    </span>
+                                  )}
+                                </div>
+                              )}
+                            </td>
+
+                            {/* Column 4: Patient Name with balance icon (show only on first test row) */}
+                            <td className="px-1 sm:px-2 py-1 sm:py-1.5 text-xs font-medium border border-gray-300">
+                              {testIndex === 0 && (
+                                <span className="flex items-center gap-1">
+                                  <span className="truncate">{patient.patient_name}</span>
+                                  {patient.balance_amount > 0 && (
+                                    <span
+                                      className="relative group cursor-pointer"
+                                      onClick={() => {
+                                        localStorage.setItem('searchQuery', patient.patient_uid);
+                                        router.push('/patient/search-booking');
+                                      }}
+                                    >
+                                      <span className="text-red-500 text-[11px] font-bold leading-none select-none">₹</span>
+                                      {/* Tooltip */}
+                                      <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 hidden group-hover:flex flex-col items-center z-50 pointer-events-none">
+                                        <span className="bg-red-600 text-white text-[10px] font-semibold rounded px-2 py-1 whitespace-nowrap shadow-lg">
+                                          Balance: ₹{patient.balance_amount.toLocaleString('en-IN')}
+                                        </span>
+                                        <span className="w-2 h-2 bg-red-600 rotate-45 -mt-1" />
+                                      </span>
+                                    </span>
+                                  )}
+                                </span>
+                              )}
+                            </td>
+
+                            {/* Column 5: Age (show only on first test row) */}
+                            <td className="px-1 sm:px-2 py-1 sm:py-1.5 text-xs font-medium border border-gray-300 text-center">
+                              {testIndex === 0 && (
+                                <span className="font-semibold text-gray-900">{patient.age || '-'} Yrs</span>
+                              )}
+                            </td>
+
+                            {/* Column 6: Gender (show only on first test row) */}
+                            <td className="px-1 sm:px-2 py-1 sm:py-1.5 text-xs font-medium border border-gray-300 text-center">
+                              {testIndex === 0 && (
+                                <span className="font-semibold text-gray-900">{patient.gender || '-'}</span>
+                              )}
+                            </td>
+
+                            {/* Column 7: Services (with icons) */}
                             <td className="px-1 sm:px-2 py-1 sm:py-1.5 text-xs border border-gray-300" title={test.test_name}>
                               <div className="flex items-center gap-1">
-                                <span className="flex-1">{test.test_name}</span>
+                                <span 
+                                  className="flex-1 cursor-pointer hover:text-cyan-700 hover:font-semibold transition-colors"
+                                  onClick={() => handleTestNameClick(test, patient)}
+                                  title="Click to view/edit readings"
+                                >
+                                  {test.test_name}
+                                </span>
                                 {/* Sent/Print icons */}
                                 {sentIcons[test.test_id]?.has('email') && (
                                   <div title="Email sent">
@@ -1911,6 +2083,7 @@ export default function Result() {
                                 )}
                               </div>
                             </td>
+                            {/* Column 8: Referral Doc */}
                             <td className="px-1 sm:px-2 py-1 sm:py-1.5 text-xs border border-gray-300">
                               <span className="inline-flex items-center gap-1">
                                 {test.ref_by === "SELF" ? (
@@ -1926,84 +2099,124 @@ export default function Result() {
                                 )}
                               </span>
                             </td>
-                            <td className="px-1 sm:px-2 py-1 sm:py-1.5 text-xs whitespace-nowrap border border-gray-300">{test.approved_date}</td>
-                            <td className="px-0.5 sm:px-1 py-1 sm:py-1.5 border border-gray-300 relative">
-                              <div className="flex items-center justify-start gap-1">
-                                {/* Show patient-level buttons on first test row */}
-                                {testIndex === 0 ? (
-                                  <div className="flex items-center gap-1">
-                                    <div className="relative">
-                                      <Calendar 
-                                        size={14} 
-                                        className="text-gray-700 cursor-pointer hover:text-cyan-600 flex-shrink-0" 
-                                        onMouseEnter={() => setHoveredTest(`${patient.patient_uid}-patient-calendar`)}
-                                        onMouseLeave={() => setHoveredTest(null)}
-                                        onClick={() => handleCalendarClick(patient, patient.tests[0])}
-                                      />
-                                      {/* Responsive Tooltip */}
-                                      {hoveredTest === `${patient.patient_uid}-patient-calendar` && (
-                                        <div className="fixed z-50 w-72 sm:w-80 bg-white border-2 border-black rounded-lg shadow-lg p-3 text-xs pointer-events-none"
-                                             style={{
-                                               left: '50%',
-                                               top: '50%',
-                                               transform: 'translate(-50%, -50%)',
-                                               maxWidth: 'calc(100vw - 2rem)'
-                                             }}>
+
+                            {/* Column 9: Previous Test Result */}
+                            <td className="px-1 sm:px-2 py-1 sm:py-1.5 text-xs border border-gray-300">
+                              <div className="flex items-center gap-1">
+                                <button
+                                  onClick={() => handleFetchPreviousResult(patient, test)}
+                                  disabled={previousResultLoading}
+                                  className="text-cyan-600 hover:text-cyan-800 hover:underline font-medium text-xs disabled:opacity-50"
+                                  title="View previous test result"
+                                >
+                                  {previousResultLoading ? '...' : '📋 View'}
+                                </button>
+                              </div>
+                            </td>
+
+                            {/* Column 10: All Test Results */}
+                            <td className="px-1 sm:px-2 py-1 sm:py-1.5 text-xs border border-gray-300">
+                              <div className="flex items-center gap-1">
+                                <button
+                                  onClick={() => handleFetchAllResults(patient, test)}
+                                  disabled={allResultsLoading}
+                                  className="text-cyan-600 hover:text-cyan-800 hover:underline font-medium text-xs disabled:opacity-50"
+                                  title="View all test results"
+                                >
+                                  {allResultsLoading ? '...' : '📊 View'}
+                                </button>
+                              </div>
+                            </td>
+
+                            {/* Column 11: S.Taken (green tick mark + calendar & settings icons, all rows) */}
+                            <td className="px-0.5 sm:px-1 py-1 sm:py-1.5 text-center border border-gray-300">
+                              <div className="flex items-center justify-center gap-1">
+                                {test.sample_taken ? (
+                                  <span className="text-green-600 text-lg font-bold leading-none">✓</span>
+                                ) : null}
+                                {/* Calendar icon */}
+                                <div className="relative">
+                                  <Calendar 
+                                    size={14} 
+                                    className="text-gray-700 cursor-pointer hover:text-cyan-600 flex-shrink-0" 
+                                    onMouseEnter={() => setHoveredTest(`${patient.patient_uid}-${test.test_id}-calendar`)}
+                                    onMouseLeave={() => setHoveredTest(null)}
+                                    onClick={() => {
+                                      // Always show ALL tests for this patient visit, regardless of which row's calendar is clicked
+                                      handleCalendarClick(patient, test);
+                                    }}
+                                  />
+                                  {/* Tooltip for Calendar */}
+                                  {hoveredTest === `${patient.patient_uid}-${test.test_id}-calendar` && (
+                                    <div className="fixed z-50 w-72 sm:w-80 bg-white border-2 border-black rounded-lg shadow-lg p-3 text-xs pointer-events-none"
+                                         style={{
+                                           left: '50%',
+                                           top: '50%',
+                                           transform: 'translate(-50%, -50%)',
+                                           maxWidth: 'calc(100vw - 2rem)'
+                                         }}>
+                                      {testIndex === 0 ? (
+                                        <>
                                           <div className="font-semibold text-gray-800 mb-1">Patient: {patient.patient_name}</div>
                                           <div className="font-bold text-gray-900 mb-2">SHRADDHA PATHOLOGY LABORATORY</div>
                                           <div className="font-semibold text-gray-800 mb-1">Visit ID:</div>
                                           <div className="text-blue-600 font-medium mb-2">{patient.visit_id}</div>
                                           <div className="font-semibold text-gray-800 mb-1">Total Tests:</div>
                                           <div className="text-gray-900">{patient.tests.length}</div>
-                                        </div>
+                                        </>
+                                      ) : (
+                                        <>
+                                          <div className="font-semibold text-gray-800 mb-1">Test: {test.test_name}</div>
+                                          <div className="font-bold text-gray-900 mb-2">SHRADDHA PATHOLOGY LABORATORY</div>
+                                          <div className="font-semibold text-gray-800 mb-1">Sample Received:</div>
+                                          <div className="text-blue-600 font-medium mb-2">{test.approved_date}</div>
+                                          <div className="font-semibold text-gray-800 mb-1">Sample Type:</div>
+                                          <div className="text-gray-900">{test.specimen_type}</div>
+                                        </>
                                       )}
                                     </div>
-                                    <Settings 
-                                      size={14} 
-                                      className="text-gray-700 cursor-pointer hover:text-cyan-600 flex-shrink-0" 
-                                      onClick={() => handleSettingsClick(patient, patient.tests[0])}
-                                    />
-                                  </div>
-                                ) : (
-                                  /* Show individual test calendar/settings only for specific statuses */
-                                  (test.result_status.toUpperCase() === "AUTHENTICATED" || test.result_status.toUpperCase() === "PROVISIONAL") ? (
-                                    <div className="flex items-center gap-1">
-                                      <div className="relative">
-                                        <Calendar 
-                                          size={12} 
-                                          className="text-gray-500 crsor-pointer hover:text-cyan-600 flex-shrink-0" 
-                                          onMouseEnter={() => setHoveredTest(`${patient.patient_uid}-${test.test_id}`)}
-                                          onMouseLeave={() => setHoveredTest(null)}
-                                          onClick={() => handleCalendarClick(patient, test)}
-                                        />
-                                        {/* Responsive Tooltip */}
-                                        {hoveredTest === `${patient.patient_uid}-${test.test_id}` && (
-                                          <div className="fixed z-50 w-72 sm:w-80 bg-white border-2 border-black rounded-lg shadow-lg p-3 text-xs pointer-events-none"
-                                               style={{
-                                                 left: '50%',
-                                                 top: '50%',
-                                                 transform: 'translate(-50%, -50%)',
-                                                 maxWidth: 'calc(100vw - 2rem)'
-                                               }}>
-                                            <div className="font-semibold text-gray-800 mb-1">Test: {test.test_name}</div>
-                                            <div className="font-bold text-gray-900 mb-2">SHRADDHA PATHOLOGY LABORATORY</div>
-                                            <div className="font-semibold text-gray-800 mb-1">Sample Received:</div>
-                                            <div className="text-blue-600 font-medium mb-2">{test.approved_date}</div>
-                                            <div className="font-semibold text-gray-800 mb-1">Sample Type:</div>
-                                            <div className="text-gray-900">{test.specimen_type}</div>
-                                          </div>
-                                        )}
-                                      </div>
-                                      <Settings 
-                                        size={12} 
-                                        className="text-gray-500 cursor-pointer hover:text-cyan-600 flex-shrink-0" 
-                                        onClick={() => handleSettingsClick(patient, test)}
-                                      />
-                                    </div>
-                                  ) : null
-                                )}
+                                  )}
+                                </div>
+                                {/* Settings icon */}
+                                <Settings 
+                                  size={14} 
+                                  className="text-gray-700 cursor-pointer hover:text-cyan-600 flex-shrink-0" 
+                                  onClick={() => {
+                                    if (testIndex === 0) {
+                                      handleSettingsClick(patient, patient.tests[0]);
+                                    } else if (test.result_status === "Authorized" || test.result_status === "Entered") {
+                                      handleSettingsClick(patient, test);
+                                    }
+                                  }}
+                                />
                               </div>
                             </td>
+
+                            {/* Column 12: Patient History (display patient_history text only, show only on first test row) */}
+                            <td className="px-1 sm:px-2 py-1 sm:py-1.5 text-xs border border-gray-300 relative">
+                              {testIndex === 0 && (
+                                <div className="relative group cursor-help">
+                                  {patient.patient_history ? (
+                                    <>
+                                      <span className="truncate block max-w-xs" title={patient.patient_history}>
+                                        {patient.patient_history}
+                                      </span>
+                                      {/* Tooltip on hover */}
+                                      <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 hidden group-hover:flex flex-col items-center z-50 pointer-events-none">
+                                        <span className="bg-gray-800 text-white text-[10px] font-semibold rounded px-2 py-1 whitespace-normal max-w-xs shadow-lg">
+                                          {patient.patient_history}
+                                        </span>
+                                        <span className="w-2 h-2 bg-gray-800 rotate-45 -mt-1" />
+                                      </span>
+                                    </>
+                                  ) : (
+                                    <span className="text-gray-400 italic">—</span>
+                                  )}
+                                </div>
+                              )}
+                            </td>
+
+                            {/* Column 13: Barcode checkbox */}
                             <td className="px-0.5 sm:px-1 py-1 sm:py-1.5 text-center border border-gray-300">
                               <input
                                 type="checkbox"
@@ -2021,6 +2234,62 @@ export default function Result() {
                 </table>
               </div>
             </div>
+
+            {/* Pagination Controls */}
+            {totalRecords > 0 && (
+              <div className="bg-white rounded shadow-md p-3">
+                <div className="text-sm text-gray-700 mb-3">
+                  Showing <span className="font-semibold">{startIndex + 1}</span> to <span className="font-semibold">{Math.min(endIndex, totalRecords)}</span> of <span className="font-semibold">{totalRecords}</span> records
+                </div>
+                
+                {/* Pagination buttons */}
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                    disabled={currentPage === 1}
+                    className="px-3 py-1.5 bg-cyan-600 hover:bg-cyan-700 disabled:bg-gray-400 text-white rounded text-sm font-medium transition-colors"
+                  >
+                    ← Previous
+                  </button>
+                  
+                  <div className="flex items-center gap-1">
+                    {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                      let pageNum;
+                      if (totalPages <= 5) {
+                        pageNum = i + 1;
+                      } else if (currentPage <= 3) {
+                        pageNum = i + 1;
+                      } else if (currentPage >= totalPages - 2) {
+                        pageNum = totalPages - 4 + i;
+                      } else {
+                        pageNum = currentPage - 2 + i;
+                      }
+                      return (
+                        <button
+                          key={pageNum}
+                          onClick={() => setCurrentPage(pageNum)}
+                          className={`px-2.5 py-1 rounded text-sm font-medium transition-colors ${
+                            currentPage === pageNum
+                              ? 'bg-cyan-600 text-white'
+                              : 'bg-gray-200 hover:bg-gray-300 text-gray-800'
+                          }`}
+                        >
+                          {pageNum}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  
+                  <button
+                    onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                    disabled={currentPage === totalPages}
+                    className="px-3 py-1.5 bg-cyan-600 hover:bg-cyan-700 disabled:bg-gray-400 text-white rounded text-sm font-medium transition-colors"
+                  >
+                    Next →
+                  </button>
+                </div>
+              </div>
+            )}
             
             {/* Bottom Action Buttons */}
             <div className="bg-white rounded shadow-md p-2 sm:p-3">
@@ -2088,28 +2357,6 @@ export default function Result() {
                       </div>
                     )}
                   </div>
-                  <button
-                    onClick={() => handleSendWhatsApp()}
-                    disabled={loading || selectedTests.size === 0}
-                    className="flex gap-1 sm:gap-1.5 items-center bg-cyan-600 hover:bg-cyan-700 text-white px-2 sm:px-3 py-1.5 sm:py-2 rounded text-xs sm:text-sm transition-colors disabled:opacity-50"
-                  >
-                    <span>Direct WA to Patient</span>
-                  </button>
-                  <button
-                    onClick={handleDirectWADoctor}
-                    disabled={loading || selectedTests.size === 0}
-                    className="flex gap-1 sm:gap-1.5 items-center bg-cyan-600 hover:bg-cyan-700 text-white px-2 sm:px-3 py-1.5 sm:py-2 rounded text-xs sm:text-sm transition-colors disabled:opacity-50"
-                  >
-                    <span>Direct WA to Doctor</span>
-                  </button>
-                </div>
-                
-                <div className="flex flex-wrap gap-2 items-center text-xs sm:text-sm">
-                  <span className="px-2 py-1 bg-cyan-100 text-cyan-800 rounded">Registered</span>
-                  <span className="px-2 py-1 bg-orange-100 text-orange-800 rounded">Received</span>
-                  <span className="px-2 py-1 bg-pink-100 text-pink-800 rounded">Provisional</span>
-                  <span className="px-2 py-1 bg-purple-100 text-purple-800 rounded">Authenticated</span>
-                  <span className="px-2 py-1 bg-green-100 text-green-800 rounded">Delivered</span>
                 </div>
               </div>
             </div>
@@ -2291,16 +2538,14 @@ export default function Result() {
                                 onChange={(e) => handleSettingsInputChange('testStatuses', test.test_id, e.target.value)}
                                 className="w-full px-3 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500"
                               >
-                                <option value="Please Select">Please Select</option>
-                                <option value="REGISTERED">Registered</option>
-                                <option value="RECEIVED">Received</option>
-                                <option value="PROVISIONAL">Provisional</option>
-                                <option value="AUTHENTICATED">Authenticated</option>
-                                <option value="DELIVERED">Delivered</option>
-                                <option value="RETEST">Retest</option>
-                                <option value="REVERT">Revert</option>
-                                <option value="HOLD">Hold</option>
-                                <option value="REJECTED">Rejected</option>
+                                <option value="">Please Select</option>
+                                <option value="Registered">Registered</option>
+                                <option value="Received">Received</option>
+                                <option value="Entered">Entered</option>
+                                <option value="Validation">Validation</option>
+                                <option value="Authorized">Authorized</option>
+                                <option value="Delivered">Delivered</option>
+                                <option value="Rectified">Rectified</option>
                               </select>
                             </td>
                             
@@ -2336,14 +2581,14 @@ export default function Result() {
         </div>
       )}
 
-      {/* Report Modal */}
+      {/* Report Modal - Using Professional Report Component */}
       {showReportModal && reportData && (
         <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[95vh] flex flex-col">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-5xl max-h-[95vh] flex flex-col">
 
             {/* Modal Toolbar - hidden on print */}
             <div className="flex items-center justify-between px-4 py-3 border-b no-print flex-shrink-0">
-              <h2 className="text-base font-semibold text-gray-900">{reportData.test?.name} — Report</h2>
+              <h2 className="text-base font-semibold text-gray-900">Professional Report - {reportData.test?.name}</h2>
               <div className="flex gap-2">
                 <button
                   onClick={handlePrint}
@@ -2361,7 +2606,7 @@ export default function Result() {
             </div>
 
             {/* Scrollable preview area */}
-            <div className="overflow-y-auto flex-1">
+            <div className="overflow-y-auto flex-1 bg-gray-100 p-6">
 
               {/* Print styles */}
               <style>{`
@@ -2370,157 +2615,45 @@ export default function Result() {
                   .report-page, .report-page * { visibility: visible !important; }
                   .report-page {
                     position: relative !important;
-                    width: 210mm !important;
-                    height: 297mm !important;
+                    width: 100% !important;
                     margin: 0 !important;
-                    padding: 0 !important;
+                    padding: 20px !important;
                     box-shadow: none !important;
                     page-break-after: always;
-                    overflow: hidden !important;
+                    overflow: visible !important;
+                    background: white !important;
                   }
                   .report-page:last-child { page-break-after: avoid; }
                   .no-print { display: none !important; }
-                  @page { size: A4; margin: 0; }
+                  @page { size: A4; margin: 10mm; }
                 }
               `}</style>
 
-              {/* Render each test as its own A4 page */}
-              {(reportData.combinedTests || [{ name: reportData.test?.name, groupedParameters: reportData.groupedParameters, interpretation: reportData.test?.interpretation }]).map((t, ti) => (
+              {/* Render Professional Report Component */}
+              {(reportData.combinedTests || [reportData]).map((testData, idx) => (
                 <div
-                  key={ti}
-                  id={ti === 0 ? 'report-print-page' : undefined}
+                  key={idx}
                   className="report-page"
+                  id={idx === 0 ? 'report-print-page' : undefined}
                   style={{
-                    width: '210mm',
-                    height: '297mm',
-                    margin: '16px auto',
-                    position: 'relative',
                     backgroundColor: '#fff',
-                    boxShadow: '0 2px 16px rgba(0,0,0,0.18)',
-                    fontFamily: 'Arial, sans-serif',
-                    fontSize: '11px',
-                    overflow: 'hidden',
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+                    padding: '0',
+                    marginBottom: '16px',
+                    borderRadius: '4px',
                   }}
                 >
-                  {/* LetterHead background */}
-                  {reportWithHeader && (
-                    <img
-                      src={LetterHead}
-                      alt=""
-                      style={{
-                        position: 'absolute', top: 0, left: 0,
-                        width: '100%', height: '100%',
-                        objectFit: 'fill', zIndex: 0, pointerEvents: 'none',
-                      }}
-                    />
-                  )}
-
-                  {/* Page content */}
-                  <div
-                    style={{
-                      position: 'relative', zIndex: 1,
-                      height: '100%', display: 'flex', flexDirection: 'column',
-                      paddingTop: reportWithHeader ? '38mm' : '12mm',
-                      paddingBottom: reportWithHeader ? '36mm' : '12mm',
-                      paddingLeft: '14mm', paddingRight: '14mm',
-                      boxSizing: 'border-box',
-                    }}
-                  >
-                    {/* Report Title */}
-                    <div style={{ textAlign: 'center', marginBottom: '6mm', borderBottom: '1.5px solid #333', paddingBottom: '3mm' }}>
-                      <strong style={{ fontSize: '13px', letterSpacing: '1px' }}>{t.name?.toUpperCase()} REPORT</strong>
-                    </div>
-
-                    {/* Patient Info */}
-                    <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '4mm', fontSize: '11px' }}>
-                      <tbody>
-                        <tr>
-                          <td style={{ padding: '2px 4px', width: '50%' }}><strong>Patient:</strong> {reportData.patient?.title} {reportData.patient?.firstName} {reportData.patient?.lastName}</td>
-                          <td style={{ padding: '2px 4px', width: '50%' }}><strong>Age / Gender:</strong> {reportData.patient?.age} Yrs / {reportData.patient?.gender}</td>
-                        </tr>
-                        <tr>
-                          <td style={{ padding: '2px 4px' }}><strong>Lab No:</strong> {reportData.visitId}</td>
-                          <td style={{ padding: '2px 4px' }}><strong>Date:</strong> {reportData.visitDate ? new Date(reportData.visitDate).toLocaleDateString('en-GB') : '-'}</td>
-                        </tr>
-                      </tbody>
-                    </table>
-
-                    {/* Results Table */}
-                    <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '4mm', fontSize: '11px' }}>
-                      <thead>
-                        <tr>
-                          <th style={{ borderBottom: '1.5px solid #333', padding: '4px 6px', textAlign: 'left', width: '38%' }}>Test Description</th>
-                          <th style={{ borderBottom: '1.5px solid #333', padding: '4px 6px', textAlign: 'left', width: '22%', paddingLeft: '20px' }}>Result</th>
-                          <th style={{ borderBottom: '1.5px solid #333', padding: '4px 6px', textAlign: 'left', width: '12%' }}>Unit</th>
-                          <th style={{ borderBottom: '1.5px solid #333', padding: '4px 6px', textAlign: 'left', width: '28%' }}>Biological Reference Range</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        <tr>
-                          <td colSpan={4} style={{ padding: '4px 6px', fontWeight: 'bold', borderBottom: '1px solid #ccc' }}>{t.name}</td>
-                        </tr>
-                        {t.groupedParameters && Object.entries(t.groupedParameters).map(([categoryName, categoryParams]: [string, any]) => (
-                          <React.Fragment key={categoryName}>
-                            {categoryName !== 'NO_CATEGORY_HEADER' && categoryParams[0]?.showCategoryHeader && (
-                              <tr>
-                                <td colSpan={4} style={{ padding: '4px 6px', fontWeight: 'bold', borderBottom: '1px solid #ddd' }}>
-                                  {categoryName.toUpperCase()}
-                                </td>
-                              </tr>
-                            )}
-                            {(categoryParams as any[]).map((param) => (
-                              <tr key={param.id}>
-                                <td style={{ padding: '3px 6px', width: '38%', fontWeight: isParamOutOfRange(param, param.existingResult) ? 'bold' : 'normal' }}>{param.parameterName}</td>
-                                <td style={{ padding: '3px 6px 3px 20px', width: '22%', fontWeight: isParamOutOfRange(param, param.existingResult) ? '900' : 'normal', color: isParamOutOfRange(param, param.existingResult) ? '#b91c1c' : 'inherit', fontSize: '11px' }}>
-                                  {param.existingResult
-                                    ? (param.type === 'Numeric' ? (param.existingResult.numericValue ?? '-') : (param.existingResult.textValue || '-'))
-                                    : '-'}
-                                  {isParamOutOfRange(param, param.existingResult) && <span style={{ marginLeft: '4px' }}>*</span>}
-                                </td>
-                                <td style={{ padding: '3px 6px', width: '12%' }}>{param.units || ''}</td>
-                                <td style={{ padding: '3px 6px', width: '28%' }}>{param.normalRange || ''}</td>
-                              </tr>
-                            ))}
-                          </React.Fragment>
-                        ))}
-                      </tbody>
-                    </table>
-
-                    {/* Interpretation */}
-                    {t.interpretation && (
-                      <div style={{ marginTop: '4mm', borderTop: '1px solid #ccc', paddingTop: '3mm', fontSize: '11px', color: '#444' }}
-                        dangerouslySetInnerHTML={{ __html: t.interpretation }} />
-                    )}
-
-                    {/* Signature */}
-                    {reportData.signature && (
-                      <div style={{ marginTop: 'auto', paddingTop: '6mm', display: 'flex', justifyContent: 'flex-end' }}>
-                        <div style={{ textAlign: 'center' }}>
-                          {reportData.signature.signatureImage && (
-                            <img src={reportData.signature.signatureImage} alt="Signature"
-                              style={{ width: reportData.signature.width || 150, height: reportData.signature.height || 80, objectFit: 'contain', display: 'block', margin: '0 auto' }} />
-                          )}
-                          {reportData.signature.signatureText && (
-                            <div style={{ fontSize: '11px', fontWeight: 'bold', whiteSpace: 'pre-line', marginTop: '2px' }}>{reportData.signature.signatureText}</div>
-                          )}
-                          {reportData.signature.doctorName && (
-                            <div style={{ fontSize: '11px', fontWeight: 'bold' }}>{reportData.signature.doctorName}</div>
-                          )}
-                          {reportData.signature.specialty && (
-                            <div style={{ fontSize: '10px', color: '#444' }}>{reportData.signature.specialty}</div>
-                          )}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Footer - without header only */}
-                    {!reportWithHeader && (
-                      <div style={{ marginTop: reportData.signature ? '4mm' : 'auto', borderTop: '1px solid #ccc', paddingTop: '3mm', fontSize: '10px', color: '#666', display: 'flex', justifyContent: 'space-between' }}>
-                        <span>Report generated on: {new Date().toLocaleString('en-GB')}</span>
-                        <span>Shraddha Pathology Laboratory — Pathology Laboratory</span>
-                      </div>
-                    )}
-                  </div>
+                  <ProfessionalResultReport
+                    patient={reportData.patient}
+                    visitDate={reportData.visitDate}
+                    visitId={reportData.visitId}
+                    test={testData.test || testData}
+                    groupedParameters={testData.groupedParameters || reportData.groupedParameters}
+                    parameters={testData.parameters || reportData.parameters}
+                    signature={reportData.signature}
+                    withHeader={reportWithHeader}
+                    letterHeadBase64={reportData.letterHeadBase64}
+                  />
                 </div>
               ))}
             </div>
@@ -2595,153 +2728,330 @@ export default function Result() {
         </div>
       )}
 
-      {/* Barcode Preview Modal */}
-      {showBarcodeModal && barcodePatientInfo && (
-        <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col">
-            {/* Header */}
-            <div className="flex items-center justify-between px-5 py-3 border-b bg-gray-800 rounded-t-lg">
-              <h2 className="text-sm font-semibold text-white flex items-center gap-2">
-                <Barcode size={16} /> Barcode Labels — {barcodePatientInfo.patientName} | {barcodePatientInfo.visitId}
+      {/* Previous Test Result Modal */}
+      {showPreviousResultModal && previousResultData && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-96 overflow-y-auto">
+            <div className="flex items-center justify-between px-6 py-4 border-b sticky top-0 bg-white">
+              <h2 className="text-lg font-semibold text-gray-900">
+                Previous Test Result - {previousResultData.test.test_name}
               </h2>
-              <div className="flex gap-2">
-                <button
-                  onClick={async () => {
-                    // Just print without status transition
-                    const printArea = document.getElementById('barcode-print-area');
-                    const win = window.open('', '_blank');
-                    win.document.write(`<!DOCTYPE html><html><head><title>Barcode Labels</title>
-                      <style>
-                        * { margin:0; padding:0; box-sizing:border-box; }
-                        body { font-family: Arial, sans-serif; background: white; }
-                        .labels-wrap { display: flex; flex-wrap: wrap; gap: 8mm; padding: 8mm; }
-                        .label { width: 80mm; border: 0.5px solid #999; page-break-inside: avoid; }
-                        @page { size: A4; margin: 8mm; }
-                      </style>
-                    </head><body>${printArea.innerHTML}</body></html>`);
-                    win.document.close();
-                    win.focus();
-                    win.print();
-                    setShowBarcodeModal(false);
-                  }}
-                  className="text-white bg-blue-600 hover:bg-blue-700 px-2 py-1 rounded text-xs font-semibold"
-                >
-                  Print Only
-                </button>
-
-                <button
-                  onClick={async () => {
-                    try {
-                      // Call API to transition tests to Received status when barcode is printed
-                      const testIds = Array.from(barcodeSelectedTests);
-                      for (const testId of testIds) {
-                        await fetch(`${API_BASE_URL}/results/${testId}/auto-transition/barcode-printed`, {
-                          method: 'POST',
-                          headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify({ changedBy: 'result_page' })
-                        });
-                      }
-                      console.log('✅ Tests auto-transitioned to Received status');
-                    } catch (error) {
-                      console.error('⚠️ Status transition failed:', error);
-                      // Don't block print if status update fails
-                    }
-                    
-                    // Proceed with print
-                    const printArea = document.getElementById('barcode-print-area');
-                    const win = window.open('', '_blank');
-                    win.document.write(`<!DOCTYPE html><html><head><title>Barcode Labels</title>
-                      <style>
-                        * { margin:0; padding:0; box-sizing:border-box; }
-                        body { font-family: Arial, sans-serif; background: white; }
-                        .labels-wrap { display: flex; flex-wrap: wrap; gap: 8mm; padding: 8mm; }
-                        .label { width: 80mm; border: 0.5px solid #999; page-break-inside: avoid; }
-                        @page { size: A4; margin: 8mm; }
-                      </style>
-                    </head><body>${printArea.innerHTML}</body></html>`);
-                    win.document.close();
-                    win.focus();
-                    win.print();
-                    setShowBarcodeModal(false);
-                  }}
-                  className="text-white bg-green-600 hover:bg-green-700 px-2 py-1 rounded text-xs font-semibold"
-                >
-                  Print & Transition
-                </button>
-
-                <button
-                  onClick={() => setShowBarcodeModal(false)}
-                  className="text-gray-300 hover:text-white text-xl font-bold leading-none px-1"
-                >×</button>
-              </div>
+              <button 
+                onClick={() => setShowPreviousResultModal(false)} 
+                className="text-gray-400 hover:text-gray-700 text-2xl font-bold leading-none"
+              >
+                ×
+              </button>
             </div>
-
-            {/* Labels */}
-            <div className="overflow-y-auto flex-1 p-5 bg-gray-100">
-              <div id="barcode-print-area" className="flex flex-wrap gap-4 justify-start">
-                {barcodeLabels.map((label, idx) => {
-                  const { svg, width, height } = buildCode128Svg(label.barcodeValue);
-                  return (
-                    <div
-                      key={idx}
-                      className="bg-white border border-gray-300 shadow"
-                      style={{ width: '302px', fontFamily: 'Arial, sans-serif', position: 'relative' }}
-                    >
-                      {/* Organization Code - top right corner, small size */}
-                      {label.organizationCode && (
-                        <div className="absolute top-1 right-2 text-[8px] text-gray-600 font-semibold">
-                          {label.organizationCode}
-                        </div>
-                      )}
-
-                      {/* Barcode — centered, smaller size */}
-                      <div className="flex justify-center px-2 pt-3 pb-0">
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          width="85%"
-                          height="40"
-                          viewBox={`0 0 ${width} ${height}`}
-                          preserveAspectRatio="none"
-                          dangerouslySetInnerHTML={{ __html: svg }}
-                        />
+            <div className="p-6">
+              {previousResultData.result ? (
+                <>
+                  <div className="mb-4 pb-4 border-b">
+                    <p className="text-sm text-gray-600">
+                      <strong>Patient:</strong> {previousResultData.patient.patient_name}
+                    </p>
+                    <p className="text-sm text-gray-600">
+                      <strong>Test Date:</strong> {new Date(previousResultData.result.visitDate).toLocaleDateString()}
+                    </p>
+                  </div>
+                  <div className="space-y-3">
+                    <p className="font-semibold text-gray-900">Results:</p>
+                    {previousResultData.result.testResults && previousResultData.result.testResults.length > 0 ? (
+                      <div className="space-y-2">
+                        {previousResultData.result.testResults.map((result, idx) => (
+                          <div key={idx} className="bg-gray-50 p-3 rounded border border-gray-200">
+                            <p className="font-medium text-gray-800">{result.parameterName}</p>
+                            <p className="text-sm text-gray-600">
+                              Value: <span className={result.isOutOfRange ? 'text-red-600 font-semibold' : ''}>{result.value}</span> {result.units}
+                            </p>
+                            {result.isAbnormal && (
+                              <p className="text-xs text-orange-600 font-semibold">⚠️ Abnormal</p>
+                            )}
+                          </div>
+                        ))}
                       </div>
-
-                      {/* Barcode number centered - smaller text, this is what scanner reads = visitId */}
-                      <div className="text-center font-bold text-xs tracking-widest py-0.5 px-2">
-                        {label.barcodeValue}
-                      </div>
-
-                      {/* Date time (left) + specimen type (right) */}
-                      <div className="flex justify-between items-center px-3 pb-0.5">
-                        <span className="text-[10px] text-gray-700">{label.dateStr} {label.timeStr}</span>
-                        <span className="text-[10px] text-gray-600 font-medium">({label.specimen})</span>
-                      </div>
-
-                      {/* Patient name (left) + gender initial / age (right) */}
-                      <div className="flex justify-between items-center px-3 pb-2">
-                        <span className="font-bold text-[10px] leading-tight truncate max-w-[170px]">
-                          {barcodePatientInfo.patientName}
-                        </span>
-                        <span className="text-[10px] font-semibold whitespace-nowrap ml-1">
-                          {barcodePatientInfo.ageGender}
-                        </span>
-                      </div>
-
-                      {/* Short test names */}
-                      {label.shortNamesStr && (
-                        <div className="px-3 pb-2 text-[9px] text-gray-500 truncate">
-                          {label.shortNamesStr}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
+                    ) : (
+                      <p className="text-gray-500 italic">No results recorded for this test</p>
+                    )}
+                  </div>
+                </>
+              ) : (
+                <p className="text-gray-500 text-center py-6">No previous test result found</p>
+              )}
             </div>
           </div>
         </div>
       )}
+
+      {/* All Test Results Modal */}
+      {showAllResultsModal && allResultsData && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-3xl max-h-[80vh] overflow-y-auto">
+            <div className="flex items-center justify-between px-6 py-4 border-b sticky top-0 bg-white">
+              <h2 className="text-lg font-semibold text-gray-900">
+                Test Result History - {allResultsData.test.test_name}
+              </h2>
+              <button 
+                onClick={() => setShowAllResultsModal(false)} 
+                className="text-gray-400 hover:text-gray-700 text-2xl font-bold leading-none"
+              >
+                ×
+              </button>
+            </div>
+            <div className="p-6">
+              <p className="text-sm text-gray-600 mb-4">
+                <strong>Patient:</strong> {allResultsData.patient.patient_name} | 
+                <strong className="ml-2">Total Results:</strong> {allResultsData.results ? allResultsData.results.length : 0}
+              </p>
+              
+              {allResultsData.results && allResultsData.results.length > 0 ? (
+                <div className="space-y-4">
+                  {allResultsData.results.map((testResult, testIdx) => (
+                    <div key={testIdx} className="border border-gray-300 rounded-lg p-4 bg-gray-50">
+                      <div className="flex items-center justify-between mb-3 pb-2 border-b">
+                        <div>
+                          <p className="font-semibold text-gray-900">
+                            {new Date(testResult.visitDate).toLocaleDateString()} {new Date(testResult.visitDate).toLocaleTimeString()}
+                          </p>
+                          <p className="text-xs text-gray-600">Status: <span className="font-medium">{testResult.status}</span></p>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        {testResult.results && testResult.results.map((result, idx) => (
+                          <div key={idx} className="bg-white p-2 rounded border border-gray-200 text-xs">
+                            <p className="font-medium text-gray-800">{result.parameterName}</p>
+                            <p className="text-gray-600">
+                              <span className={result.isOutOfRange ? 'text-red-600 font-semibold' : ''}>
+                                {result.value}
+                              </span>
+                              {result.units && <span className="text-gray-500"> {result.units}</span>}
+                            </p>
+                            {result.referenceRange && (
+                              <p className="text-gray-500 text-[10px]">Ref: {result.referenceRange}</p>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-gray-500 text-center py-6">No test results found</p>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Barcode Modal - Using Reusable Component */}
+      <BarcodeModal
+        isOpen={showBarcodeModal}
+        onClose={() => {
+          setShowBarcodeModal(false);
+          setBarcodeSelectedTests(new Set());
+          setBarcodeLockedPatientUid(null);
+          setBarcodeLockedVisitId(null);
+        }}
+        onPrintOnly={async () => {
+          const printArea = document.getElementById('barcode-print-area');
+          const printContent = printArea.innerHTML;
+          const win = window.open('', '_blank');
+          win.document.write(`<!DOCTYPE html>
+<html>
+<head>
+  <title>Barcode Labels - ${barcodePatientInfo?.patientName || 'Print'}</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { width: 100%; height: 100%; }
+    body { 
+      font-family: 'Arial', sans-serif; 
+      background: white; 
+      padding: 5mm;
+      margin: 0;
+    }
+    .barcode-container { 
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 5mm;
+      padding: 0;
+      page-break-after: auto;
+    }
+    .barcode-card {
+      width: 70mm;
+      height: 80mm;
+      border: 2px solid #333;
+      padding: 4px;
+      page-break-inside: avoid;
+      background: white;
+      display: flex;
+      flex-direction: column;
+      font-family: 'Arial', sans-serif;
+      font-size: 10px;
+      break-inside: avoid;
+    }
+    svg { 
+      max-width: 100%; 
+      height: auto; 
+      display: block;
+    }
+    @page { 
+      size: A4 portrait; 
+      margin: 5mm;
+      padding: 0;
+    }
+    @media print { 
+      body { 
+        padding: 5mm;
+        margin: 0;
+      }
+      .barcode-container { 
+        gap: 3mm;
+      }
+      .barcode-card {
+        border: 1px solid #000;
+        page-break-inside: avoid;
+        break-inside: avoid;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="barcode-container">
+    ${printContent}
+  </div>
+  <script>
+    window.addEventListener('load', () => {
+      setTimeout(() => window.print(), 500);
+    });
+  </script>
+</body>
+</html>`);
+          win.document.close();
+          win.focus();
+        }}
+        onPrintAndUpdate={async () => {
+          let successCount = 0;
+          
+          try {
+            // Only process selected barcodes - collect test IDs from selected barcode labels
+            const selectedTestIds = new Set<number>();
+            
+            for (const idx of selectedBarcodeIndices) {
+              if (idx < barcodeLabels.length) {
+                const label = barcodeLabels[idx];
+                if (label.testIds && Array.isArray(label.testIds)) {
+                  label.testIds.forEach((id: number) => selectedTestIds.add(id));
+                }
+              }
+            }
+            
+            console.log('📝 Selected Test IDs:', Array.from(selectedTestIds));
+            console.log(`🖨️ Printing ${selectedBarcodeIndices.size}/${barcodeLabels.length} barcodes`);
+            
+            // Update status for selected tests
+            for (const testId of selectedTestIds) {
+              console.log(`🔄 Transitioning test ${testId} to Received status...`);
+              try {
+                const response = await fetch(`${API_BASE_URL}/results/${testId}/auto-transition/barcode-printed`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ changedBy: 'result_page' })
+                });
+                const data = await response.json();
+                if (data.success) {
+                  console.log(`✅ Test ${testId} transitioned to Received`);
+                  successCount++;
+                } else {
+                  console.error(`❌ Test ${testId} failed:`, data.message);
+                }
+              } catch (error) {
+                console.error(`❌ Test ${testId} error:`, error);
+              }
+            }
+          } catch (error) {
+            console.error('⚠️ Status transition failed:', error);
+          }
+          
+          // Print only the selected barcodes
+          const printArea = document.getElementById('barcode-print-area');
+          const allLabels = printArea.querySelectorAll('[data-barcode-index]');
+          
+          // Create a new container with only selected labels
+          const selectedLabelsHtml = Array.from(allLabels)
+            .map((label, idx) => {
+              if (selectedBarcodeIndices.has(idx)) {
+                return (label as HTMLElement).outerHTML;
+              }
+              return '';
+            })
+            .filter(html => html.length > 0)
+            .join('');
+          
+          const win = window.open('', '_blank');
+          win.document.write(`<!DOCTYPE html><html><head><title>Barcode Labels</title>
+            <style>
+              * { margin:0; padding:0; box-sizing:border-box; }
+              body { font-family: Arial, sans-serif; background: white; padding: 8mm; }
+              .labels-wrap { display: flex; flex-wrap: wrap; gap: 6mm; justify-content: flex-start; }
+              .label { width: 58mm; border: 2px solid; padding: 3px; page-break-inside: avoid; }
+              @page { size: A4; margin: 8mm; }
+              @media print { body { padding: 0; } .labels-wrap { gap: 4mm; } }
+            </style>
+          </head><body><div class="labels-wrap">${selectedLabelsHtml}</div></body></html>`);
+          win.document.close();
+          win.focus();
+          win.print();
+          
+          setShowBarcodeModal(false);
+          setBarcodeSelectedTests(new Set());
+          setBarcodeLockedPatientUid(null);
+          setBarcodeLockedVisitId(null);
+          setSelectedBarcodeIndices(new Set());
+          
+          if (successCount > 0) {
+            setTimeout(() => {
+              alert(`✅ ${successCount} test(s) marked as Received and ${selectedBarcodeIndices.size} barcode(s) printed!`);
+              // Refresh results to get updated barcode_status from database
+              fetchResults();
+            }, 800);
+          }
+        }}
+        barcodeLabels={barcodeLabels}
+        barcodePatientInfo={barcodePatientInfo}
+        selectedBarcodes={selectedBarcodeIndices}
+        onBarcodeToggle={handleBarcodeToggle}
+        isPrinting={barcodesPrinting}
+      />
+
+      {/* Reading Validation Modal */}
+      {showReadingValidationModal && readingValidationData && (
+        <ReadingValidationModal
+          isOpen={showReadingValidationModal}
+          onClose={() => {
+            setShowReadingValidationModal(false);
+            setReadingValidationData(null);
+            fetchResults(); // Refresh results after validation
+          }}
+          patientData={readingValidationData.patientTest}
+          parameters={readingValidationData.parameters}
+          groupedParameters={readingValidationData.groupedParameters}
+        />
+      )}
+
+      {/* Authenticate Modal */}
+      {showAuthenticateModal && authenticateData && (
+        <AuthenticateModal
+          isOpen={showAuthenticateModal}
+          onClose={() => {
+            setShowAuthenticateModal(false);
+            setAuthenticateData(null);
+            fetchResults(); // Refresh results after authentication
+          }}
+          patientData={authenticateData.patientTest}
+          parameters={authenticateData.parameters}
+          groupedParameters={authenticateData.groupedParameters}
+        />
+      )}
     </>
   );
 }
-

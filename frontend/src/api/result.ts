@@ -181,3 +181,56 @@ export const sendReport = async (testIds: string[], channel: string): Promise<Ap
   if (!result.success) throw new Error(result.message || 'Failed to send report');
   return result;
 };
+
+// Update barcode print status (transitions status to Received when barcode printed)
+export const updateBarcodePrintStatus = async (testIds: string[], changedBy: string = 'SYSTEM'): Promise<ApiResponse> => {
+  // Call the endpoint for each test ID in parallel
+  const promises = testIds.map(id =>
+    fetch(`${API_BASE_URL}/results/${id}/auto-transition/barcode-printed`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ changedBy })
+    }).then(res => res.json())
+  );
+  
+  const results = await Promise.all(promises);
+  
+  // Check if all were successful
+  const allSuccess = results.every(r => r.success);
+  if (!allSuccess) {
+    throw new Error('Failed to update barcode status for some tests');
+  }
+  
+  return {
+    success: true,
+    message: `Updated barcode status for ${testIds.length} test(s)`,
+    data: results
+  };
+};
+
+// Get previous test result for a patient and test
+export const getPreviousTestResult = async (patientId: string, testId: string): Promise<any> => {
+  const response = await fetch(`${API_BASE_URL}/results/patient/${patientId}/test/${testId}/previous`);
+  const result: ApiResponse = await response.json();
+  
+  if (!result.success) {
+    throw new Error(result.message || 'Failed to fetch previous test result');
+  }
+  
+  return result.data;
+};
+
+// Get all test results for a patient and test
+export const getAllTestResults = async (patientId: string, testId: string, limit: number = 10): Promise<any> => {
+  const queryParams = new URLSearchParams();
+  queryParams.append('limit', limit.toString());
+  
+  const response = await fetch(`${API_BASE_URL}/results/patient/${patientId}/test/${testId}/history${queryParams.toString() ? `?${queryParams.toString()}` : ''}`);
+  const result: ApiResponse = await response.json();
+  
+  if (!result.success) {
+    throw new Error(result.message || 'Failed to fetch test result history');
+  }
+  
+  return result.data;
+};

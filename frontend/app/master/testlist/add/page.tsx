@@ -5,6 +5,7 @@ import { useRouter, useParams, usePathname } from "next/navigation";
 
 import Header from "@/src/components/Header";
 import PageHeader from "@/src/components/BreadCrumb";
+import UnitModal from "@/src/components/UnitModal";
 import { CKEditor } from "@ckeditor/ckeditor5-react";
 import ClassicEditor from "@ckeditor/ckeditor5-build-classic";
 import { getTestById, createTest, updateTest, getDepartments, getUnits, getTests } from "@/src/api/master";
@@ -37,14 +38,12 @@ const AddTest = () => {
   const [formData, setFormData] = useState({
     name: "",
     department: "",
-    speciality: "Regular",
     sortOrder: "",
     shortName: "",
     attachFile: "Yes",
     imageSize: "800|600",
     signatureId: "",
     costForLab: "",
-    testMethod: "",
     preparationTime: "",
     preparationType: "",
     isNABL: false,
@@ -86,6 +85,18 @@ const AddTest = () => {
   const [paramSuggestions, setParamSuggestions] = useState({});
   const [paramSuggestionsOpen, setParamSuggestionsOpen] = useState({});
   const paramSearchTimers = {};
+
+  // Unit modal
+  const [showUnitModal, setShowUnitModal] = useState(false);
+
+  // Refresh units list when unit is added
+  const handleUnitAdded = async () => {
+    try {
+      setUnits(await getUnits());
+    } catch (err) {
+      console.error('Error refreshing units:', err);
+    }
+  };
 
   const handleParamNameSearch = (catIdx: any, paramIdx: any, value: any) => {
     const key = `${catIdx}-${paramIdx}`;
@@ -170,6 +181,7 @@ const AddTest = () => {
       multiplyBy: "",
       decimal: "",
       sortOrder: "",
+      testMethod: "",
       isDescriptive: false,
       lowPanic: "",
       highPanic: "",
@@ -332,7 +344,6 @@ const AddTest = () => {
               imageSize: testData.imageSize || "800|600",
               signatureId: testData.signatureId?.toString() || "",
               costForLab: testData.costForLab?.toString() || "",
-              testMethod: testData.testMethod || "",
               preparationTime: testData.preparationTime || "",
               preparationType: testData.preparationType || "",
               isNABL: testData.isNABL || false,
@@ -379,6 +390,7 @@ const AddTest = () => {
                           machineCode: param.machineCode || "",
                           decimal: param.decimal !== undefined && param.decimal !== "" ? param.decimal : "",
                           sortOrder: param.sortOrder || "",
+                          testMethod: param.testMethod || "",
                           isDescriptive: param.isDescriptive || false,
                           lowPanic: param.lowPanic?.toString() || "",
                           highPanic: param.highPanic?.toString() || "",
@@ -661,6 +673,7 @@ const AddTest = () => {
       decimal: "",
       multiplyBy: "",
       sortOrder: "",
+      testMethod: "",
       isDescriptive: false,
       lowPanic: "",
       highPanic: "",
@@ -694,6 +707,9 @@ const AddTest = () => {
     setCategories(updatedCategories);
   };
 
+  // Open add unit modal
+  const openAddUnitModal = () => setShowUnitModal(true);
+
   const deleteParameter = (categoryIndex: any, parameterIndex: any) => {
     const updatedCategories = [...categories];
     updatedCategories[categoryIndex].parameters.splice(parameterIndex, 1);
@@ -705,6 +721,7 @@ const AddTest = () => {
         machineCode: "",
         decimal: "",
         sortOrder: "",
+        testMethod: "",
         isDescriptive: false,
         lowPanic: "",
         highPanic: "",
@@ -858,9 +875,7 @@ const AddTest = () => {
         testCode: formData.testCode || null,
         departmentId: parseInt(formData.department),
         sampleType: formData.sampleType || null,
-        testMethod: formData.testMethod || null,
         machineName: formData.machineName || null,
-        speciality: formData.speciality || "Regular",
         group: formData.group || null,
         sortOrder: parseInt(formData.sortOrder) || null,
         reportHeader: formData.reportHeader || null,
@@ -907,6 +922,7 @@ const AddTest = () => {
           multiplyBy: param.multiplyBy || null,
           decimal: param.decimal ? parseInt(param.decimal) : null,
           sortOrder: param.sortOrder ? parseInt(param.sortOrder) : null,
+          testMethod: param.testMethod || null,
           isDescriptive: param.isDescriptive || false,
           lowPanic: param.lowPanic ? parseFloat(param.lowPanic) : null,
           highPanic: param.highPanic ? parseFloat(param.highPanic) : null,
@@ -1096,16 +1112,6 @@ const AddTest = () => {
                     disabled={isViewMode} 
                   />
 
-                  <Select
-                    label="Speciality"
-                    name="speciality"
-                    value={formData.speciality}
-                    onChange={handleChange}
-                    options={["Regular", "Pathology", "Cardiology", "Microbiology", "Biochemistry", "Culture & Sensitivity", "Haematology"]}
-                    disabled={isViewMode}
-                    required={false}
-                  />
-
                   <Input 
                     label="Sort Order" 
                     name="sortOrder"
@@ -1163,15 +1169,6 @@ const AddTest = () => {
                       disabled={isViewMode} 
                     required={false}/>
                   </div>
-
-                  <Input 
-                    label="Test Method" 
-                    name="testMethod"
-                    value={formData.testMethod}
-                    onChange={handleChange}
-                    disabled={isViewMode}
-                    required={false}
-                  />
 
                   <div className="flex flex-col sm:flex-row gap-3">
                     <Input 
@@ -1641,18 +1638,20 @@ const AddTest = () => {
                           disabled={isViewMode} 
                         />
                       </div>
+                      <div>
+                        <label className="block font-semibold text-gray-700 text-xs sm:text-sm mb-1">
+                          Category Test Method
+                        </label>
+                        <input 
+                          className="px-2 py-1.5 sm:py-1 border border-gray-300 rounded text-xs sm:text-sm w-full sm:w-40" 
+                          placeholder="Category test method..." 
+                          value={category.testMethod || ""}
+                          onChange={(e) => handleCategoryChange(categoryIndex, 'testMethod', e.target.value)}
+                          disabled={isViewMode} 
+                        />
+                      </div>
                     </div>
                   )}
-                  {/* Test Method in second row of first column */}
-                  <div className="mt-3">
-                    <input 
-                      className="px-2 py-1.5 sm:py-1 border border-gray-300 rounded text-xs sm:text-sm w-full sm:w-40" 
-                      placeholder="Test Method" 
-                      value={category.testMethod || ""}
-                      onChange={(e) => handleCategoryChange(categoryIndex, 'testMethod', e.target.value)}
-                      disabled={isViewMode} 
-                    />
-                  </div>
                 </div>
 
                 {/* COLUMN 2: Parameters */}
@@ -1686,21 +1685,33 @@ const AddTest = () => {
                               Delete Parameter
                             </button>
                           )}
-                          {/* Select Unit Dropdown */}
-                          <select 
-                            className="px-2 py-1.5 sm:py-1 border border-gray-300 rounded text-xs sm:text-sm w-32 bg-white focus:outline-none focus:ring-2 focus:ring-orange-500" 
-                            value={parameter.units || ""}
-                            onChange={(e) => handleParameterChange(categoryIndex, paramIndex, 'units', e.target.value)}
-                            disabled={isViewMode}
-                            title="Select unit - linked to Unit column in preview table"
-                          >
-                            <option value="">Select Unit 🔗</option>
-                            {(units || []).map((unit) => (
-                              <option key={unit.id} value={unit.symbol}>
-                                {unit.symbol}
-                              </option>
-                            ))}
-                          </select>
+                          {/* Select Unit Dropdown with Add Button */}
+                          <div className="flex gap-1 items-center">
+                            <select 
+                              className="px-2 py-1.5 sm:py-1 border border-gray-300 rounded text-xs sm:text-sm w-32 bg-white focus:outline-none focus:ring-2 focus:ring-orange-500" 
+                              value={parameter.units || ""}
+                              onChange={(e) => handleParameterChange(categoryIndex, paramIndex, 'units', e.target.value)}
+                              disabled={isViewMode}
+                              title="Select unit - linked to Unit column in preview table"
+                            >
+                              <option value="">Select Unit 🔗</option>
+                              {(units || []).map((unit) => (
+                                <option key={unit.id} value={unit.symbol}>
+                                  {unit.symbol}
+                                </option>
+                              ))}
+                            </select>
+                            {!isViewMode && (
+                              <button
+                                onClick={() => openAddUnitModal()}
+                                type="button"
+                                className="px-2 py-1.5 sm:py-1 bg-orange-500 hover:bg-orange-600 text-white rounded text-xs font-bold transition-colors"
+                                title="Add new unit"
+                              >
+                                +
+                              </button>
+                            )}
+                          </div>
                         </div>
                       </div>
                       {/* Row 1: Parameter Fields */}
@@ -1852,6 +1863,16 @@ const AddTest = () => {
                             type="number"
                             value={parameter.sortOrder || ""}
                             onChange={(e) => handleParameterChange(categoryIndex, paramIndex, 'sortOrder', e.target.value)}
+                            disabled={isViewMode} 
+                          />
+                        )}
+
+                        {category.isCategory && (
+                          <input 
+                            className="px-2 py-1.5 sm:py-1 border border-gray-300 rounded text-xs sm:text-sm w-full sm:w-32" 
+                            placeholder="Parameter Test Method" 
+                            value={parameter.testMethod || ""}
+                            onChange={(e) => handleParameterChange(categoryIndex, paramIndex, 'testMethod', e.target.value)}
                             disabled={isViewMode} 
                           />
                         )}
@@ -2880,6 +2901,14 @@ const AddTest = () => {
             )}
           </div>
         </div>
+
+        {/* ================= UNIT MODAL COMPONENT ================= */}
+        <UnitModal
+          isOpen={showUnitModal}
+          onClose={() => setShowUnitModal(false)}
+          onUnitAdded={handleUnitAdded}
+          editingUnit={null}
+        />
       </div>
     </>
   );

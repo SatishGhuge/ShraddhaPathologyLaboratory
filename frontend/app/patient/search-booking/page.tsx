@@ -4,6 +4,8 @@ import { useRouter, useSearchParams } from "next/navigation";
 import React, { useState, useRef, useEffect } from "react";
 import Header from "@/src/components/Header";
 import PageHeader from "@/src/components/BreadCrumb";
+import BarcodeModal from "@/app/components/BarcodeModal";
+import BillReceipt from "@/app/components/BillReceipt";
 import API_BASE_URL from "@/src/api/config";
 
 import { 
@@ -12,12 +14,32 @@ import {
   RefreshCcw, Plus, X, RefreshCw,
   ChevronLeft, ChevronRight, CalendarDays, AlertCircle, Barcode
 } from "lucide-react";
-import { getAllPatients, updatePayment, updatePatient } from "@/src/api/patient";
+import { getAllPatients, updatePayment, updatePatient, updatePatientTestDetails } from "@/src/api/patient";
 import { getDoctors, getTests, getPackages, getSpecimenTypes, getOrganizations } from "@/src/api/master";
 import html2pdf from "html2pdf.js";
 import { jsPDF } from "jspdf";
 const LetterHead = "/LetterHead.jpeg";
 import { generateBillPDF, printBill } from "@/src/utils/billPdfGenerator.js";
+
+/* ─────────────────── Print Styles ─────────────────── */
+if (typeof window !== 'undefined') {
+  const style = document.createElement('style');
+  style.textContent = `
+    @media print {
+      [data-no-print],
+      .no-print {
+        display: none !important;
+        visibility: hidden !important;
+        height: 0 !important;
+        margin: 0 !important;
+        padding: 0 !important;
+      }
+    }
+  `;
+  if (document.head) {
+    document.head.appendChild(style);
+  }
+}
 
 /* ─────────────────── helpers ─────────────────── */
 const getSampleColor = (sample: any, specimenTypes: any) => {
@@ -229,7 +251,7 @@ const INIT_FORM = {
   visitDate:"", location:"SHRADDHA", corporate:"WalkIn",
   reportMode:"By hand", mobile:"", title:"MR", firstName:"", lastName:"",
   age:"", ageUnit:"Year", gender:"Male", referralDoctor:"",
-  referralDoctorChecked:false, remark:"", email:"", address:""
+  referralDoctorChecked:false, patient_history:"", email:"", address:""
 };
 
 const INIT_BOOKING = [];
@@ -318,6 +340,11 @@ export default function BookingPage() {
   const [showBarcodeModal, setShowBarcodeModal] = useState(false);
   const [barcodeLabels, setBarcodeLabels] = useState<any[]>([]);
   const [barcodePatientInfo, setBarcodePatientInfo] = useState<any>(null);
+  const [selectedBarcodeIndices, setSelectedBarcodeIndices] = useState<Set<number>>(new Set());
+  const [barcodeSelectedTests, setBarcodeSelectedTests] = useState<Set<number>>(new Set());
+  const [barcodeLockedPatientUid, setBarcodeLockedPatientUid] = useState<string | null>(null);
+  const [barcodeLockedVisitId, setBarcodeLockedVisitId] = useState<string | null>(null);
+  const [barcodesPrinting, setBarcodesPrinting] = useState(false);
   
   const [editingPatient,  setEditingPatient]  = useState<any>(null);
   const [formData,        setFormData]        = useState(INIT_FORM);
@@ -394,126 +421,130 @@ export default function BookingPage() {
     setDateRange({ start: sevenDaysAgo, end: today });
   }, []);
 
+  // Helper function to transform patients data to bookings format
+  const transformPatientsToBookings = (patients: any[], orgs: any[]) => {
+    const mapped = [];
+    
+    patients.forEach((p) => {
+      const patientTests = p.tests || [];
+
+      // Group tests by visitId
+      const visitMap: any = {};
+      patientTests.forEach((t: any) => {
+        const vid = t.visitId || "";
+        if (!visitMap[vid]) {
+          visitMap[vid] = {
+            visitId:         vid,
+            visitDate:       t.visitDate,
+            referralDoctor:  t.referralDoctor || "",
+            patient_history: t.patient_history || "",
+            organizationId:  t.organizationId || "",
+            totalAmount:     0,
+            paidAmount:      t.paidAmount    || 0,
+            balanceAmount:   t.balanceAmount || 0,
+            paymentMode:     t.paymentMode   || "Cash",
+            discountAmount:  t.discountAmount  || 0,
+            discountPercent: t.discountPercent || 0,
+            discountRemark:  t.discountRemark || "",
+            tests: []
+          };
+        }
+        visitMap[vid].totalAmount += t.totalAmount || 0;
+        visitMap[vid].paidAmount      = Math.max(visitMap[vid].paidAmount,      t.paidAmount      || 0);
+        visitMap[vid].balanceAmount   = Math.max(visitMap[vid].balanceAmount,   t.balanceAmount   || 0);
+        visitMap[vid].discountAmount  = Math.max(visitMap[vid].discountAmount,  t.discountAmount  || 0);
+        visitMap[vid].discountPercent = Math.max(visitMap[vid].discountPercent, t.discountPercent || 0);
+        if (t.discountRemark) visitMap[vid].discountRemark = t.discountRemark;
+        
+        visitMap[vid].tests.push({
+          id: t.id,  // ✅ IMPORTANT: Include the PatientTest ID
+          name: t.test?.name || "",
+          sample: t.test?.sampleType || "N/A",
+          b2cCharge: t.charge || 0,
+          b2bCharge: t.charge || 0,
+          isExisting: true,
+          visitId: t.visitId,
+          status: t.status || "Registered",
+        });
+      });
+
+      const visits = Object.values(visitMap);
+
+      visits.forEach((visit: any) => {
+        const visitDate = visit.visitDate || p.createdAt;
+        const paymentStatus = visit.balanceAmount > 0 ? "Due" : "Paid";
+        
+        mapped.push({
+          bookingId: `${p.patientId}-${visit.visitId}`,
+          name: `${p.title || ""} ${p.firstName || ""} ${p.lastName || ""}`.trim().toUpperCase(),
+          patientId: p.patientId,
+          date: visitDate
+            ? new Date(visitDate).toLocaleDateString("en-GB")
+            : new Date(p.createdAt).toLocaleDateString("en-GB"),
+          tests: visit.tests,
+          paymentStatus,
+          rawDate: visitDate || p.createdAt,
+          balanceAmount: visit.balanceAmount,
+          paidAmount:    visit.paidAmount,
+          totalAmount:   visit.totalAmount,
+          visitId:       visit.visitId,
+          discountAmount:  visit.discountAmount,
+          discountPercent: visit.discountPercent,
+          discountRemark:  visit.discountRemark,
+          patientData: {
+            ...INIT_FORM,
+            title: p.title || "MR",
+            firstName: p.firstName || "",
+            lastName: p.lastName || "",
+            mobile: p.mobile || "",
+            email: p.email || "",
+            age: String(p.age || ""),
+            gender: p.gender || "Male",
+            address: p.address || "",
+            remark: visit.remarks,
+            referralDoctor: visit.referralDoctor,
+            referralDoctorChecked: !!visit.referralDoctor,
+            visitDate: visitDate || "",
+            organizationId: visit.organizationId || "",
+            organizationCode: "",
+          },
+        });
+      });
+    });
+    
+    mapped.sort((a, b) => {
+      const dateA = new Date(a.rawDate);
+      const dateB = new Date(b.rawDate);
+      return dateA.getTime() - dateB.getTime();
+    });
+    
+    const updatedBookings = mapped.map(booking => {
+      if (booking.patientData?.organizationId && orgs.length > 0) {
+        const org = orgs.find((o: any) => o.id === booking.patientData.organizationId);
+        if (org && org.code) {
+          booking.patientData.organizationCode = org.code;
+        }
+      }
+      return booking;
+    });
+    
+    return updatedBookings;
+  };
+
   // Fetch real patients and doctors from API
   useEffect(() => {
-    Promise.all([getAllPatients(1, 1000), getDoctors(), getOrganizations()])  // Fetch up to 1000 patients and organizations
+    Promise.all([getAllPatients(1, 1000), getDoctors(), getOrganizations()])
       .then(([patientsRes, doctorsRes, orgsRes]: any) => {
         const patients = Array.isArray(patientsRes) ? patientsRes : (patientsRes?.data ? patientsRes.data : []);
         const doctors = Array.isArray(doctorsRes) ? doctorsRes : [];
         const orgs = Array.isArray(orgsRes) ? orgsRes : (orgsRes?.data ? orgsRes.data : []);
+        
         setOrganizations(orgs);
-        const mapped = [];
         
-        patients.forEach((p) => {
-          const patientTests = p.tests || [];
-
-          // Group tests by visitId
-          const visitMap = {};
-          patientTests.forEach(t => {
-            const vid = t.visitId || "";
-            if (!visitMap[vid]) {
-              visitMap[vid] = {
-                visitId:         vid,
-                visitDate:       t.visitDate,
-                referralDoctor:  t.referralDoctor || "",
-                remarks:         t.remarks || "",
-                organizationId:  t.organizationId || "", // Capture organization ID
-                totalAmount:     0,
-                paidAmount:      t.paidAmount    || 0,
-                balanceAmount:   t.balanceAmount || 0,
-                paymentMode:     t.paymentMode   || "Cash",
-                discountAmount:  t.discountAmount  || 0,
-                discountPercent: t.discountPercent || 0,
-                discountRemark:  t.discountRemark || "",
-                tests: []
-              };
-            }
-            // Sum totalAmount per visit
-            visitMap[vid].totalAmount += t.totalAmount || 0;
-            // Take max for visit-level amounts (stored on each test row)
-            visitMap[vid].paidAmount      = Math.max(visitMap[vid].paidAmount,      t.paidAmount      || 0);
-            visitMap[vid].balanceAmount   = Math.max(visitMap[vid].balanceAmount,   t.balanceAmount   || 0);
-            visitMap[vid].discountAmount  = Math.max(visitMap[vid].discountAmount,  t.discountAmount  || 0);
-            visitMap[vid].discountPercent = Math.max(visitMap[vid].discountPercent, t.discountPercent || 0);
-            if (t.discountRemark) visitMap[vid].discountRemark = t.discountRemark;
-            
-            // Add test to this visit
-            visitMap[vid].tests.push({
-              name: t.test?.name || "",
-              sample: t.test?.sampleType || "N/A",
-              b2cCharge: t.charge || 0,
-              b2bCharge: t.charge || 0,
-              isExisting: true,
-              visitId: t.visitId,
-            });
-          });
-
-          const visits = Object.values(visitMap);
-
-          // Create ONE booking row per VISIT
-          visits.forEach((visit: any) => {
-            const visitDate = visit.visitDate || p.createdAt;
-            const paymentStatus = visit.balanceAmount > 0 ? "Due" : "Paid";
-            
-            mapped.push({
-              bookingId: `${p.patientId}-${visit.visitId}`,
-              name: `${p.title || ""} ${p.firstName || ""} ${p.lastName || ""}`.trim().toUpperCase(),
-              patientId: p.patientId,
-              date: visitDate
-                ? new Date(visitDate).toLocaleDateString("en-GB")
-                : new Date(p.createdAt).toLocaleDateString("en-GB"),
-              tests: visit.tests,
-              paymentStatus,
-              rawDate: visitDate || p.createdAt,
-              balanceAmount: visit.balanceAmount,
-              paidAmount:    visit.paidAmount,
-              totalAmount:   visit.totalAmount,
-              visitId:       visit.visitId,
-              discountAmount:  visit.discountAmount,
-              discountPercent: visit.discountPercent,
-              discountRemark:  visit.discountRemark,
-              patientData: {
-                ...INIT_FORM,
-                title: p.title || "MR",
-                firstName: p.firstName || "",
-                lastName: p.lastName || "",
-                mobile: p.mobile || "",
-                email: p.email || "",
-                age: String(p.age || ""),
-                gender: p.gender || "Male",
-                address: p.address || "",
-                remark: visit.remarks,
-                referralDoctor: visit.referralDoctor,
-                referralDoctorChecked: !!visit.referralDoctor,
-                visitDate: visitDate || "",
-                organizationId: visit.organizationId || "",
-                organizationCode: "", // Will be populated after fetching org data
-              },
-            });
-          });
-        });
-        
-        // Sort bookings by visit date/time (oldest first = first registered appears at #1)
-        mapped.sort((a, b) => {
-          const dateA = new Date(a.rawDate);
-          const dateB = new Date(b.rawDate);
-          return dateA.getTime() - dateB.getTime(); // Ascending order: oldest first
-        });
-        
-        // Populate organizationCode from organizations list
-        const updatedBookings = mapped.map(booking => {
-          if (booking.patientData?.organizationId && orgs.length > 0) {
-            const org = orgs.find(o => o.id === booking.patientData.organizationId);
-            if (org && org.code) {
-              booking.patientData.organizationCode = org.code;
-            }
-          }
-          return booking;
-        });
-        
+        const updatedBookings = transformPatientsToBookings(patients, orgs);
         setAllBookings(updatedBookings);
         setBookings(updatedBookings.filter(b => !deletedIds.has(b.bookingId)));
-        setDoctorsList(doctors.map(d => ({
+        setDoctorsList(doctors.map((d: any) => ({
           id: d.id,
           name: `Dr. ${d.name}`,
           degree: d.degree || "",
@@ -717,6 +748,19 @@ export default function BookingPage() {
     setBookings(filtered);
   }, [dateRange, appliedPatientName, appliedMobile, appliedDoctor, appliedOutstanding, allBookings, deletedIds]);
 
+  /* ===== BARCODE SELECTION HANDLER ===== */
+  const handleBarcodeToggle = (index: number) => {
+    setSelectedBarcodeIndices((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(index)) {
+        newSet.delete(index);
+      } else {
+        newSet.add(index);
+      }
+      return newSet;
+    });
+  };
+
   /* ===== SEARCH HANDLER ===== */
   const handleSearch = () => {
     setAppliedPatientName(patientNameSearch);
@@ -903,6 +947,22 @@ export default function BookingPage() {
         address:   formData.address,
       });
       if (!res.success) { alert('Failed to update patient: ' + res.message); return; }
+
+      // Update patient_history for the visit if present
+      if (editingPatient.visitId && formData.patient_history !== undefined) {
+        try {
+          const historyRes = await updatePatientTestDetails(
+            editingPatient.patientId,
+            editingPatient.visitId,
+            formData.patient_history
+          );
+          if (!historyRes.success) {
+            console.warn('Failed to update patient history:', historyRes.message);
+          }
+        } catch (e) {
+          console.warn('Error updating patient history:', e);
+        }
+      }
     } catch (e) {
       alert('Failed to update patient: ' + e.message); return;
     }
@@ -925,6 +985,63 @@ export default function BookingPage() {
       setDeletedIds(prev => new Set([...prev, b.bookingId]));
       setBookings(bookings.filter(x=>x.bookingId!==b.bookingId));
       if (selectedBooking?.bookingId===b.bookingId) setSelectedBooking(null);
+    }
+  };
+
+  // Get booking row background color based on minimum test status
+  const getBookingRowColor = (booking: any) => {
+    // If selected, use orange
+    if (selectedBooking?.bookingId === booking.bookingId) {
+      return "bg-orange-50";
+    }
+
+    // Get minimum status from tests (lowest in workflow order)
+    const statusOrder = {
+      'Registered': 0,
+      'Received': 1,
+      'Entered': 2,
+      'Validation': 3,
+      'Authorized': 4,
+      'Delivered': 5,
+      'Rectified': 6
+    };
+
+    const tests = booking.tests || [];
+    if (tests.length === 0) {
+      return ""; // Default
+    }
+
+    // Find the minimum status (earliest in workflow)
+    let minStatus = tests[0]?.status || 'Registered';
+    let minOrder = statusOrder[minStatus] ?? 0;
+
+    for (const test of tests) {
+      const testStatus = test.status || 'Registered';
+      const order = statusOrder[testStatus] ?? 0;
+      if (order < minOrder) {
+        minOrder = order;
+        minStatus = testStatus;
+      }
+    }
+
+    // Map status to color
+    switch (minStatus) {
+      case 'Registered':
+        return "bg-cyan-50"; // Light cyan for gray status
+      case 'Received':
+        return "bg-orange-50"; // Light orange for Received
+      case 'Entered':
+        return "bg-green-50"; // Light green for Entered
+      case 'Validation':
+        return "bg-yellow-50"; // Light yellow for Validation
+      case 'Authorized':
+        return "bg-blue-50"; // Light blue for Authorized
+      case 'Delivered':
+        return "bg-purple-50"; // Light purple for Delivered
+      case 'Rectified':
+        return "bg-red-50"; // Light red for Rectified
+      default:
+        return "";
     }
   };
 
@@ -953,6 +1070,12 @@ export default function BookingPage() {
       );
       setBookings(updated);
       setSelectedBooking(updated.find(b=>b.bookingId===selectedBooking.bookingId));
+      // Clear discount when test is removed
+      setBilling(prev => ({
+        ...prev,
+        discount: "0",
+        discountPercent: "0"
+      }));
     }
   };
 
@@ -1033,6 +1156,36 @@ export default function BookingPage() {
     }
 
     try {
+      console.log('💾 Saving payment transaction...');
+      console.log('  visitId:', selectedBooking.visitId);
+      console.log('  patientId:', selectedBooking.patientId);
+      console.log('  paymentMode:', billing.paymentMode);
+      console.log('  paymentAmount:', payment);
+      console.log('  API URL:', `${API_BASE_URL}/patients/payment-transaction`);
+      
+      // First, save the payment transaction
+      const txResponse = await fetch(`${API_BASE_URL}/patients/payment-transaction`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          visitId: selectedBooking.visitId,
+          patientId: selectedBooking.patientId,
+          paymentMode: billing.paymentMode,
+          paymentAmount: payment,
+          remarks: billing.remarks || null
+        })
+      });
+      
+      const txData = await txResponse.json();
+      console.log('📥 Transaction Response:', txData);
+      
+      if(!txResponse.ok){
+        console.error('❌ Failed to save payment transaction:', txResponse.status, txData);
+      } else {
+        console.log('✅ Payment transaction saved successfully');
+      }
+
+      // Then update the main payment record
       const res = await updatePayment(selectedBooking.patientId, selectedBooking.visitId, {
         paymentAmount:   payment,
         paymentMode:     billing.paymentMode,
@@ -1111,12 +1264,18 @@ export default function BookingPage() {
     const dateStr = now.toLocaleDateString('en-GB');
     const timeStr = now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: true }).toUpperCase();
 
-    // Group by specimen type
+    // Group by specimen type and collect test IDs (PatientTest IDs)
     const specimenGroups: any = {};
+    const specimenTestIds: any = {};
     booking.tests.forEach((t: any) => {
       const key = t.sample || 'Unknown';
-      if (!specimenGroups[key]) specimenGroups[key] = [];
+      if (!specimenGroups[key]) {
+        specimenGroups[key] = [];
+        specimenTestIds[key] = [];
+      }
       specimenGroups[key].push(t.name);
+      // ✨ Store the patientTest ID (from the booking test object which comes from patientTest table)
+      specimenTestIds[key].push(t.id);
     });
 
     // Build labels - Use visitId for barcode ONLY (no organization code in barcode)
@@ -1127,13 +1286,20 @@ export default function BookingPage() {
       // Organization code stored separately for display, not in barcode
       let organizationCode = booking.patientData?.organizationCode || '';
       
+      // Get barcode_status from the first test in this specimen group (they all have the same status)
+      const firstTestIdForSpecimen = specimenTestIds[specimen]?.[0];
+      const firstTest = booking.tests.find((t: any) => t.id === firstTestIdForSpecimen);
+      const barcodeStatus = firstTest?.barcode_status || 'Unprinted';
+      
       return {
         barcodeValue, // Just the visitId-based barcode
         organizationCode, // Store separately for display
         specimen,
         shortNamesStr: (shortNames as any[]).join(' / '),
         dateStr,
-        timeStr
+        timeStr,
+        testIds: specimenTestIds[specimen] || [], // Include test IDs for API calls
+        barcode_status: barcodeStatus, // Add barcode status from database
       };
     });
 
@@ -1150,7 +1316,188 @@ export default function BookingPage() {
       organizationCode: booking.patientData?.organizationCode || '', // Add organization code to patient info
     });
     setBarcodeLabels(labels);
+    setSelectedBarcodeIndices(new Set(labels.map((_, idx) => idx))); // Initialize all barcodes as selected
     setShowBarcodeModal(true);
+  };
+
+  // Print bill with header for booking
+  const handlePrintBillWithHeader = async () => {
+    setShowPrintDropdown(false);
+    if (!selectedBooking) return;
+
+    const billBooking = {
+      bookingId: selectedBooking.bookingId,
+      visitId: selectedBooking.visitId || selectedBooking.bookingId,
+      patientId: selectedBooking.patientId,
+      name: selectedBooking.name,
+      date: selectedBooking.date,
+      tests: selectedBooking.tests.map((t: any) => ({
+        name: t.name,
+        sample: t.sample,
+        charge: businessType === "B2C" ? (t.b2cCharge || t.charge || 0) : (t.b2bCharge || t.charge || 0),
+        b2cCharge: t.b2cCharge || t.charge || 0,
+        b2bCharge: t.b2bCharge || t.charge || 0
+      })),
+      paidAmount: selectedBooking.paidAmount || 0,
+      balanceAmount: selectedBooking.balanceAmount || 0,
+      patientData: {
+        title: selectedBooking.patientData?.title || 'MR',
+        firstName: selectedBooking.patientData?.firstName || '',
+        lastName: selectedBooking.patientData?.lastName || '',
+        age: selectedBooking.patientData?.age || '',
+        gender: selectedBooking.patientData?.gender || 'Male',
+        mobile: selectedBooking.patientData?.mobile || '',
+        referralDoctor: selectedBooking.patientData?.referralDoctor || '',
+        remark: selectedBooking.patientData?.remark || ''
+      }
+    };
+
+    const billingInfo = {
+      discount: String(selectedBooking.discountAmount || 0),
+      discountPercent: String(selectedBooking.discountPercent || 0),
+      remarks: selectedBooking.discountRemark || '',
+      paymentMode: billing.paymentMode || 'Cash'
+    };
+
+    const result = await printBill(billBooking, billingInfo, businessType, true);
+    if (!result.success) {
+      alert('Failed to print: ' + result.error);
+    }
+  };
+
+  // Print bill without header for booking
+  const handlePrintBillWithoutHeader = async () => {
+    setShowPrintDropdown(false);
+    if (!selectedBooking) return;
+
+    const billBooking = {
+      bookingId: selectedBooking.bookingId,
+      visitId: selectedBooking.visitId || selectedBooking.bookingId,
+      patientId: selectedBooking.patientId,
+      name: selectedBooking.name,
+      date: selectedBooking.date,
+      tests: selectedBooking.tests.map((t: any) => ({
+        name: t.name,
+        sample: t.sample,
+        charge: businessType === "B2C" ? (t.b2cCharge || t.charge || 0) : (t.b2bCharge || t.charge || 0),
+        b2cCharge: t.b2cCharge || t.charge || 0,
+        b2bCharge: t.b2bCharge || t.charge || 0
+      })),
+      paidAmount: selectedBooking.paidAmount || 0,
+      balanceAmount: selectedBooking.balanceAmount || 0,
+      patientData: {
+        title: selectedBooking.patientData?.title || 'MR',
+        firstName: selectedBooking.patientData?.firstName || '',
+        lastName: selectedBooking.patientData?.lastName || '',
+        age: selectedBooking.patientData?.age || '',
+        gender: selectedBooking.patientData?.gender || 'Male',
+        mobile: selectedBooking.patientData?.mobile || '',
+        referralDoctor: selectedBooking.patientData?.referralDoctor || '',
+        remark: selectedBooking.patientData?.remark || ''
+      }
+    };
+
+    const billingInfo = {
+      discount: String(selectedBooking.discountAmount || 0),
+      discountPercent: String(selectedBooking.discountPercent || 0),
+      remarks: selectedBooking.discountRemark || '',
+      paymentMode: billing.paymentMode || 'Cash'
+    };
+
+    const result = await printBill(billBooking, billingInfo, businessType, false);
+    if (!result.success) {
+      alert('Failed to print: ' + result.error);
+    }
+  };
+
+  // Download bill with header for booking
+  const handleDownloadBillWithHeader = async () => {
+    setShowDownloadDropdown(false);
+    if (!selectedBooking) return;
+
+    const billBooking = {
+      bookingId: selectedBooking.bookingId,
+      visitId: selectedBooking.visitId || selectedBooking.bookingId,
+      patientId: selectedBooking.patientId,
+      name: selectedBooking.name,
+      date: selectedBooking.date,
+      tests: selectedBooking.tests.map((t: any) => ({
+        name: t.name,
+        sample: t.sample,
+        charge: businessType === "B2C" ? (t.b2cCharge || t.charge || 0) : (t.b2bCharge || t.charge || 0),
+        b2cCharge: t.b2cCharge || t.charge || 0,
+        b2bCharge: t.b2bCharge || t.charge || 0
+      })),
+      paidAmount: selectedBooking.paidAmount || 0,
+      balanceAmount: selectedBooking.balanceAmount || 0,
+      patientData: {
+        title: selectedBooking.patientData?.title || 'MR',
+        firstName: selectedBooking.patientData?.firstName || '',
+        lastName: selectedBooking.patientData?.lastName || '',
+        age: selectedBooking.patientData?.age || '',
+        gender: selectedBooking.patientData?.gender || 'Male',
+        mobile: selectedBooking.patientData?.mobile || '',
+        referralDoctor: selectedBooking.patientData?.referralDoctor || '',
+        remark: selectedBooking.patientData?.remark || ''
+      }
+    };
+
+    const billingInfo = {
+      discount: String(selectedBooking.discountAmount || 0),
+      discountPercent: String(selectedBooking.discountPercent || 0),
+      remarks: selectedBooking.discountRemark || '',
+      paymentMode: billing.paymentMode || 'Cash'
+    };
+
+    const result = await generateBillPDF(billBooking, billingInfo, businessType, true);
+    if (!result.success) {
+      alert('Failed to download PDF: ' + result.error);
+    }
+  };
+
+  // Download bill without header for booking
+  const handleDownloadBillWithoutHeader = async () => {
+    setShowDownloadDropdown(false);
+    if (!selectedBooking) return;
+
+    const billBooking = {
+      bookingId: selectedBooking.bookingId,
+      visitId: selectedBooking.visitId || selectedBooking.bookingId,
+      patientId: selectedBooking.patientId,
+      name: selectedBooking.name,
+      date: selectedBooking.date,
+      tests: selectedBooking.tests.map((t: any) => ({
+        name: t.name,
+        sample: t.sample,
+        charge: businessType === "B2C" ? (t.b2cCharge || t.charge || 0) : (t.b2bCharge || t.charge || 0),
+        b2cCharge: t.b2cCharge || t.charge || 0,
+        b2bCharge: t.b2bCharge || t.charge || 0
+      })),
+      paidAmount: selectedBooking.paidAmount || 0,
+      balanceAmount: selectedBooking.balanceAmount || 0,
+      patientData: {
+        title: selectedBooking.patientData?.title || 'MR',
+        firstName: selectedBooking.patientData?.firstName || '',
+        lastName: selectedBooking.patientData?.lastName || '',
+        age: selectedBooking.patientData?.age || '',
+        gender: selectedBooking.patientData?.gender || 'Male',
+        mobile: selectedBooking.patientData?.mobile || '',
+        referralDoctor: selectedBooking.patientData?.referralDoctor || '',
+        remark: selectedBooking.patientData?.remark || ''
+      }
+    };
+
+    const billingInfo = {
+      discount: String(selectedBooking.discountAmount || 0),
+      discountPercent: String(selectedBooking.discountPercent || 0),
+      remarks: selectedBooking.discountRemark || '',
+      paymentMode: billing.paymentMode || 'Cash'
+    };
+
+    const result = await generateBillPDF(billBooking, billingInfo, businessType, false);
+    if (!result.success) {
+      alert('Failed to download PDF: ' + result.error);
+    }
   };
 
   return (
@@ -1360,7 +1707,7 @@ export default function BookingPage() {
                   const paginatedBookings = filteredBookings.slice(startIndex, endIndex);
                   
                   return paginatedBookings.map((b,i) => (
-                    <tr key={i} className={`border-b hover:bg-gray-50 ${selectedBooking?.bookingId===b.bookingId ? "bg-orange-50" : ""}`}>
+                    <tr key={i} className={`border-b hover:bg-gray-50 ${getBookingRowColor(b)}`}>
                       <td className="p-2 text-center">{startIndex + i + 1}</td>
                       <td className="p-2">
                         <div className="flex items-center gap-1">
@@ -1460,9 +1807,9 @@ export default function BookingPage() {
                 <div className="bg-slate-900 text-white p-2 flex justify-between items-center">
                   <div>{selectedBooking.name} <span className="text-yellow-300">UID: {selectedBooking.visitId || selectedBooking.bookingId}</span></div>
                   <div className="flex gap-1">
-                    <button onClick={handleBill}    className="bg-orange-100 text-black px-3 py-1 rounded text-xs font-semibold">Bill</button>
-                    <button onClick={handleReceipt} className="bg-orange-100 text-black px-3 py-1 rounded text-xs font-semibold">Receipts</button>
-                    <button onClick={handleRefund}  className="bg-orange-100 text-black px-3 py-1 rounded text-xs font-semibold">Refund</button>
+                    <button onClick={() => setShowBillModal(true)}    className="bg-orange-100 text-black px-3 py-1 rounded text-xs font-semibold">Bill</button>
+                    <button onClick={() => alert('Receipt functionality to be implemented')} className="bg-orange-100 text-black px-3 py-1 rounded text-xs font-semibold">Receipts</button>
+                    <button onClick={() => setShowRefundModal(true)}  className="bg-orange-100 text-black px-3 py-1 rounded text-xs font-semibold">Refund</button>
                     <button onClick={()=>setSelectedBooking(null)} className="bg-red-500 p-1 rounded"><X size={16}/></button>
                   </div>
                 </div>
@@ -1583,8 +1930,7 @@ export default function BookingPage() {
                       </svg>
                       Specimen
                     </div>
-                    <div className="col-span-2 text-right">B2C</div>
-                    <div className="col-span-2 text-right">B2B</div>
+                    <div className="col-span-2 text-right">Charges</div>
                   </div>
                   <div className="overflow-y-auto flex-1" style={{maxHeight:"calc(100vh - 340px)"}}>
                     {testView==="packages" && !selectedPackage ? (
@@ -1635,7 +1981,6 @@ export default function BookingPage() {
                             <span>{t.sample}</span>
                           </div>
                           <div className="col-span-2 text-right text-gray-700">{isPackageView ? "" : `₹${t.b2cCharge}`}</div>
-                          <div className="col-span-2 text-right text-gray-500">{isPackageView ? "" : `₹${t.b2bCharge}`}</div>
                         </div>
                       );
                     }) : <div className="flex items-center justify-center h-full text-gray-400 text-xs">No tests found</div>}
@@ -1645,7 +1990,6 @@ export default function BookingPage() {
                       <div className="col-span-5 text-slate-900">Package Total</div>
                       <div className="col-span-3"></div>
                       <div className="col-span-2 text-right text-slate-900">₹{selectedPackage.b2cCharge}</div>
-                      <div className="col-span-2 text-right text-orange-500">₹{selectedPackage.b2bCharge}</div>
                     </div>
                   )}
                 </div>
@@ -1670,16 +2014,19 @@ export default function BookingPage() {
                                 <th className="p-2 text-left">Investigation(s)</th>
                                 <th className="p-2 text-center">Date</th>
                                 <th className="p-2 text-center">Amount</th>
+                                <th className="p-2 text-center" title="Barcode print status: Red=Unprinted, Blue=Printed">🔖</th>
                                 <th className="p-2 text-center">Action</th>
                               </tr>
                             </thead>
                             <tbody>
                               {allTests.length === 0 ? (
-                                <tr><td colSpan={5} className="p-3 text-center text-gray-400 text-xs">No investigations added</td></tr>
+                                <tr><td colSpan={6} className="p-3 text-center text-gray-400 text-xs">No investigations added</td></tr>
                               ) : allTests.map((t,i) => {
                                 const charge    = businessType==="B2C"?(t.b2cCharge||t.charge||0):(t.b2bCharge||t.charge||0);
                                 const isEditing = editingCharge?.testName===t.name;
                                 const isNewTest = !t.isExisting;
+                                // Barcode status: RED if Registered (unprinted), BLUE if not Registered (printed)
+                                const isBarcodePrinted = t.status && t.status !== "Registered";
                                 return (
                                   <tr key={i} className={`border-b hover:bg-gray-50 ${t.fromPackage||t.isPackage?"bg-orange-50":""}`}>
                                     <td className="p-2 text-center">
@@ -1708,6 +2055,16 @@ export default function BookingPage() {
                                         ) : <span className="font-semibold">₹{charge}</span>}
                                         <button onClick={()=>setEditingCharge({testName:t.name,value:charge})}
                                           className="text-primary-600 hover:text-primary-700 ml-1" title="Edit charge"><Pencil size={13}/></button>
+                                      </div>
+                                    </td>
+                                    <td className="p-2 text-center">
+                                      <div className="w-5 h-5 rounded border-2 flex items-center justify-center mx-auto" 
+                                        title={isBarcodePrinted ? "Printed (Received)" : "Unprinted (Registered)"}
+                                        style={isBarcodePrinted 
+                                          ? { borderColor: '#3b82f6', backgroundColor: '#eff6ff', color: '#1e40af' }
+                                          : { borderColor: '#ef4444', backgroundColor: '#fef2f2', color: '#dc2626' }
+                                        }>
+                                        {isBarcodePrinted ? '✓' : '○'}
                                       </div>
                                     </td>
                                     <td className="p-2 text-center">
@@ -1754,7 +2111,11 @@ export default function BookingPage() {
                     <label className="text-xs font-semibold text-red-600 mb-1 block">Payment Mode</label>
                     <select value={billing.paymentMode} onChange={e=>setBilling({...billing,paymentMode:e.target.value})}
                       className={`${style.input} w-full bg-white`}>
-                      <option>Cash</option><option>Card</option><option>UPI</option><option>Cheque</option>
+                      <option>Cash</option>
+                      <option>Debit Card</option>
+                      <option>Credit Card</option>
+                      <option>UPI</option>
+                      <option>Other</option>
                     </select>
                   </div>
                   <div>
@@ -1942,8 +2303,8 @@ export default function BookingPage() {
                 </div>
               </div>
               <div className={style.formGrid}>
-                <label className="col-span-3 font-semibold pt-2">Remark</label>
-                <input type="text" name="remark" value={formData.remark} onChange={handleInputChange} className="col-span-9 border border-gray-300 rounded px-3 py-2 bg-white"/>
+                <label className="col-span-3 font-semibold pt-2">Patient History</label>
+                <input type="text" name="patient_history" value={formData.patient_history} onChange={handleInputChange} className="col-span-9 border border-gray-300 rounded px-3 py-2 bg-white"/>
               </div>
               <div className={style.formGrid}>
                 <label className="col-span-3 font-semibold pt-2">Email</label>
@@ -2445,6 +2806,64 @@ export default function BookingPage() {
         );
       })()}
 
+      {/* ===== BILL MODAL ===== */}
+      {showBillModal && selectedBooking && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[100]">
+          <div className="bg-white rounded-lg shadow-2xl w-[95%] max-w-4xl max-h-[95vh] overflow-y-auto flex flex-col">
+            {/* Modal Header */}
+            <div className="sticky top-0 bg-gradient-to-r from-slate-900 to-slate-800 text-white p-4 flex justify-between items-center border-b border-slate-700">
+              <h2 className="text-xl font-bold">INVOICE - {selectedBooking.name}</h2>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => handlePrintBillWithHeader()}
+                  className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded text-sm font-semibold flex items-center gap-2 transition-colors"
+                  title="Print with letterhead"
+                >
+                  <Printer size={16} /> Print Header
+                </button>
+                <button
+                  onClick={() => handlePrintBillWithoutHeader()}
+                  className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded text-sm font-semibold flex items-center gap-2 transition-colors"
+                  title="Print without letterhead"
+                >
+                  <Printer size={16} /> Print
+                </button>
+                <button
+                  onClick={() => handleDownloadBillWithHeader()}
+                  className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded text-sm font-semibold flex items-center gap-2 transition-colors"
+                  title="Download PDF with letterhead"
+                >
+                  <Download size={16} /> PDF Header
+                </button>
+                <button
+                  onClick={() => handleDownloadBillWithoutHeader()}
+                  className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded text-sm font-semibold flex items-center gap-2 transition-colors"
+                  title="Download PDF without letterhead"
+                >
+                  <Download size={16} /> PDF
+                </button>
+                <button
+                  onClick={() => setShowBillModal(false)}
+                  className="bg-red-500 hover:bg-red-600 text-white px-3 py-2 rounded text-sm font-semibold transition-colors"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+            </div>
+
+            {/* Modal Body - Bill Receipt */}
+            <div className="flex-1 overflow-y-auto p-6 bg-gray-50">
+              <BillReceipt
+                booking={selectedBooking}
+                billing={billing}
+                businessType={businessType}
+                numberToWords={numberToWords}
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ===== REFUND MODAL ===== */}
       {showRefundModal && selectedBooking && (
         <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-[70]">
@@ -2538,126 +2957,128 @@ export default function BookingPage() {
       )}
 
       {/* Barcode Preview Modal */}
-      {showBarcodeModal && barcodePatientInfo && (
-        <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col">
-            {/* Header */}
-            <div className="flex items-center justify-between px-5 py-3 border-b bg-gray-800 rounded-t-lg">
-              <h2 className="text-sm font-semibold text-white flex items-center gap-2">
-                <Barcode size={16} /> Barcode Labels — {barcodePatientInfo.patientName} | {barcodePatientInfo.visitId}
-              </h2>
-              <div className="flex gap-2">
-                <button
-                  onClick={async () => {
-                    try {
-                      // Call API to transition test to Received status when barcode is printed
-                      if (barcodePatientInfo?.visitId) {
-                        await fetch(`${API_BASE_URL}/results/${barcodePatientInfo.visitId}/auto-transition/barcode-printed`, {
-                          method: 'POST',
-                          headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify({ changedBy: 'search_booking' })
-                        });
-                        console.log('✅ Test auto-transitioned to Received status');
-                      }
-                    } catch (error) {
-                      console.error('⚠️ Status transition failed:', error);
-                      // Don't block print if status update fails
-                    }
-                    
-                    // Proceed with print
-                    const printArea = document.getElementById('barcode-print-area');
-                    const win = window.open('', '_blank');
-                    win.document.write(`<!DOCTYPE html><html><head><title>Barcode Labels</title>
-                      <style>
-                        * { margin:0; padding:0; box-sizing:border-box; }
-                        body { font-family: Arial, sans-serif; background: white; }
-                        .labels-wrap { display: flex; flex-wrap: wrap; gap: 8mm; padding: 8mm; }
-                        .label { width: 80mm; border: 0.5px solid #999; page-break-inside: avoid; }
-                        @page { size: A4; margin: 8mm; }
-                      </style>
-                    </head><body>${printArea.innerHTML}</body></html>`);
-                    win.document.close();
-                    win.focus();
-                    win.print();
-                    win.close();
-                  }}
-                  className="bg-blue-600 text-white px-4 py-1.5 rounded text-xs font-semibold hover:bg-blue-700"
-                >
-                  🖨️ Print
-                </button>
-                <button
-                  onClick={() => setShowBarcodeModal(false)}
-                  className="text-gray-300 hover:text-white text-xl font-bold leading-none px-1"
-                >×</button>
-              </div>
-            </div>
-
-            {/* Labels */}
-            <div className="overflow-y-auto flex-1 p-5 bg-gray-100">
-              <div id="barcode-print-area" className="flex flex-wrap gap-4 justify-start">
-                {barcodeLabels.map((label, idx) => {
-                  const { svg, width, height } = buildCode128Svg(label.barcodeValue);
-                  return (
-                    <div
-                      key={idx}
-                      className="bg-white border border-gray-300 shadow"
-                      style={{ width: '302px', fontFamily: 'Arial, sans-serif', position: 'relative' }}
-                    >
-                      {/* Organization Code - top right corner, small size */}
-                      {label.organizationCode && (
-                        <div className="absolute top-1 right-2 text-[8px] text-gray-600 font-semibold">
-                          {label.organizationCode}
-                        </div>
-                      )}
-
-                      {/* Barcode — centered, smaller size */}
-                      <div className="flex justify-center px-2 pt-3 pb-0">
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          width="85%"
-                          height="40"
-                          viewBox={`0 0 ${width} ${height}`}
-                          preserveAspectRatio="none"
-                          dangerouslySetInnerHTML={{ __html: svg }}
-                        />
-                      </div>
-
-                      {/* Barcode number centered - smaller text */}
-                      <div className="text-center font-bold text-xs tracking-widest py-0.5 px-2">
-                        {label.barcodeValue}
-                      </div>
-
-                      {/* Date time (left) + specimen type (right) */}
-                      <div className="flex justify-between items-center px-3 pb-0.5">
-                        <span className="text-[10px] text-gray-700">{label.dateStr} {label.timeStr}</span>
-                        <span className="text-[10px] text-gray-600 font-medium">({label.specimen})</span>
-                      </div>
-
-                      {/* Patient name (left) + gender initial / age (right) */}
-                      <div className="flex justify-between items-center px-3 pb-2">
-                        <span className="font-bold text-[10px] leading-tight truncate max-w-[170px]">
-                          {barcodePatientInfo.patientName}
-                        </span>
-                        <span className="text-[10px] font-semibold whitespace-nowrap ml-1">
-                          {barcodePatientInfo.ageGender}
-                        </span>
-                      </div>
-
-                      {/* Short test names */}
-                      {label.shortNamesStr && (
-                        <div className="px-3 pb-2 text-[9px] text-gray-500 truncate">
-                          {label.shortNamesStr}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
+
+    {/* Barcode Modal */}
+    <BarcodeModal
+      isOpen={showBarcodeModal}
+      onClose={() => setShowBarcodeModal(false)}
+      onPrintOnly={async () => {
+        const printArea = document.getElementById('barcode-print-area');
+        const allLabels = printArea.querySelectorAll('[data-barcode-index]');
+        
+        // Print all barcodes
+        const allLabelsHtml = Array.from(allLabels)
+          .map((label) => (label as HTMLElement).outerHTML)
+          .join('');
+        
+        const win = window.open('', '_blank');
+        win.document.write(`<!DOCTYPE html><html><head><title>Barcode Labels</title>
+          <style>
+            * { margin:0; padding:0; box-sizing:border-box; }
+            body { font-family: Arial, sans-serif; background: white; }
+            .labels-wrap { display: flex; flex-wrap: wrap; gap: 8mm; padding: 8mm; }
+            .label { width: 80mm; border: 0.5px solid #999; page-break-inside: avoid; }
+            @page { size: A4; margin: 8mm; }
+          </style>
+        </head><body><div class="labels-wrap">${allLabelsHtml}</div></body></html>`);
+        win.document.close();
+        win.focus();
+        win.print();
+        setShowBarcodeModal(false);
+      }}
+      onPrintAndUpdate={async () => {
+        let successCount = 0;
+        
+        try {
+          // Only process selected barcodes - collect test IDs from selected barcode labels
+          const selectedTestIds = new Set<number>();
+          
+          for (const idx of selectedBarcodeIndices) {
+            if (idx < barcodeLabels.length) {
+              const label = barcodeLabels[idx];
+              if (label.testIds && Array.isArray(label.testIds)) {
+                label.testIds.forEach((id: number) => selectedTestIds.add(id));
+              }
+            }
+          }
+          
+          console.log('📝 Selected Test IDs:', Array.from(selectedTestIds));
+          console.log(`🖨️ Printing ${selectedBarcodeIndices.size}/${barcodeLabels.length} barcodes`);
+          
+          // Update status for selected tests
+          for (const testId of selectedTestIds) {
+            console.log(`🔄 Transitioning test ${testId} to Received status...`);
+            try {
+              const response = await fetch(`${API_BASE_URL}/results/${testId}/auto-transition/barcode-printed`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ changedBy: 'search_booking' })
+              });
+              const data = await response.json();
+              if (data.success) {
+                console.log(`✅ Test ${testId} transitioned to Received`);
+                successCount++;
+              } else {
+                console.error(`❌ Test ${testId} failed:`, data.message);
+              }
+            } catch (error) {
+              console.error(`❌ Test ${testId} error:`, error);
+            }
+          }
+        } catch (error) {
+          console.error('⚠️ Status transition failed:', error);
+        }
+        
+        // Print only the selected barcodes
+        const printArea = document.getElementById('barcode-print-area');
+        const allLabels = printArea.querySelectorAll('[data-barcode-index]');
+        
+        // Create a new container with only selected labels
+        const selectedLabelsHtml = Array.from(allLabels)
+          .map((label, idx) => {
+            if (selectedBarcodeIndices.has(idx)) {
+              return (label as HTMLElement).outerHTML;
+            }
+            return '';
+          })
+          .filter(html => html.length > 0)
+          .join('');
+        
+        const win = window.open('', '_blank');
+        win.document.write(`<!DOCTYPE html><html><head><title>Barcode Labels</title>
+          <style>
+            * { margin:0; padding:0; box-sizing:border-box; }
+            body { font-family: Arial, sans-serif; background: white; }
+            .labels-wrap { display: flex; flex-wrap: wrap; gap: 3mm; padding: 4mm; }
+            .label { width: 60mm; border: 0.5px solid #999; page-break-inside: avoid; }
+            @page { size: A4; margin: 4mm; }
+          </style>
+        </head><body><div class="labels-wrap">${selectedLabelsHtml}</div></body></html>`);
+        win.document.close();
+        win.focus();
+        win.print();
+        
+        setShowBarcodeModal(false);
+        setBarcodeSelectedTests(new Set());
+        setBarcodeLockedPatientUid(null);
+        setBarcodeLockedVisitId(null);
+        setSelectedBarcodeIndices(new Set());
+        
+        if (successCount > 0) {
+          setTimeout(() => {
+            alert(`✅ ${successCount} test(s) marked as Received and ${selectedBarcodeIndices.size} barcode(s) printed!`);
+            // Refresh the page to show updated barcode colors
+            window.location.reload();
+          }, 800);
+        }
+      }}
+      barcodeLabels={barcodeLabels}
+      barcodePatientInfo={barcodePatientInfo}
+      selectedBarcodes={selectedBarcodeIndices}
+      onBarcodeToggle={handleBarcodeToggle}
+      isPrinting={barcodesPrinting}
+    />
     </>
   );
 }

@@ -1,6 +1,34 @@
 import prisma from '../config/database.js';
 
 /**
+ * Normalize status value to proper format
+ * @param {string} status - Status value to normalize
+ * @returns {string} - Normalized status value
+ */
+export const normalizeStatus = (status) => {
+  if (!status) return status;
+  
+  const statusMap = {
+    'REGISTERED': 'Registered',
+    'RECEIVED': 'Received',
+    'PROVISIONAL': 'Entered',
+    'ENTERED': 'Entered',
+    'AUTHENTICATED': 'Authorized',
+    'AUTHORIZED': 'Authorized',
+    'VALIDATION': 'Validation',
+    'VALIDATED': 'Validation',
+    'DELIVERED': 'Delivered',
+    'RETEST': 'Rectified',
+    'RECTIFIED': 'Rectified',
+    'REVERT': 'Rectified',
+    'HOLD': 'Validation',
+    'REJECTED': 'Validation'
+  };
+  
+  return statusMap[status.toUpperCase()] || status;
+};
+
+/**
  * SAMPLE STATUS WORKFLOW DEFINITION
  * 
  * Stages:
@@ -165,6 +193,7 @@ export const updateTestStatus = async (
 /**
  * Automatically transition test from Registered to Received when barcode is printed
  * This is called from barcode print handlers
+ * Also sets barcode_status to 'Printed'
  */
 export const transitionToReceivedOnBarcodePrint = async (patientTestId, changedBy = 'SYSTEM') => {
   try {
@@ -176,9 +205,24 @@ export const transitionToReceivedOnBarcodePrint = async (patientTestId, changedB
       throw new Error(`Test not found: ${patientTestId}`);
     }
 
-    // Only transition if currently in Registered status
+    // Update barcode_status to 'Printed' and transition status to Received if needed
+    let updatedTest = test;
+    
+    // First, update barcode_status to 'Printed'
+    updatedTest = await prisma.patientTest.update({
+      where: { id: patientTestId },
+      data: {
+        barcode_status: 'Printed',
+        lastStatusUpdateAt: new Date(),
+        lastUpdatedBy: changedBy
+      }
+    });
+
+    console.log(`✅ Barcode status updated to 'Printed' for test ${patientTestId}`);
+
+    // Then, transition status from Registered to Received if needed
     if (test.status === 'Registered') {
-      return await updateTestStatus(
+      updatedTest = await updateTestStatus(
         patientTestId,
         'Received',
         'AUTO',
@@ -187,7 +231,7 @@ export const transitionToReceivedOnBarcodePrint = async (patientTestId, changedB
       );
     }
 
-    return test;
+    return updatedTest;
   } catch (error) {
     console.error('Error transitioning to Received:', error);
     throw error;

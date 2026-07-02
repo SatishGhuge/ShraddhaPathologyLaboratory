@@ -31,7 +31,7 @@ export const createPatient = async (req, res) => {
       createdBy, createdAtLocation, address, location,
       // Registration Details (will be saved with each test)
       visitType, reportMode, referralDoctor, visitDate, visitTime,
-      sampleTaken, sampleReceived, sampleBarcodeNo, remarks,
+      sampleTaken, sampleReceived, sampleBarcodeNo, patient_history,
       // Billing Details (will be saved with each test)
       totalAmount, discountPercent, discountAmount, discountRemark,
       paidAmount, balanceAmount, paymentMode, businessType,
@@ -109,7 +109,7 @@ export const createPatient = async (req, res) => {
           sampleTaken: sampleTaken ? new Date(sampleTaken) : null,
           sampleReceived: sampleReceived ? new Date(sampleReceived) : null,
           sampleBarcodeNo,
-          remarks,
+          patient_history,
           totalAmount: parseFloat(test.charge),
           discountPercent: discountPercent ? parseFloat(discountPercent) : 0,
           discountAmount: discountAmount ? parseFloat(discountAmount) / testCount : 0,
@@ -122,6 +122,20 @@ export const createPatient = async (req, res) => {
         })) || []
       });
 
+      // Create payment transaction if payment was made during registration
+      if(paymentMode && perTestPaid > 0){
+        await prisma.paymentTransaction.create({
+          data: {
+            visitId,
+            patientId: patient.patientId,
+            paymentMode,
+            paymentAmount: perTestPaid,
+            remarks: discountRemark || null
+          }
+        });
+        console.log(`✅ Payment transaction created: ${paymentMode} - ₹${perTestPaid}`);
+      }
+
       // Get updated patient with all tests
       patient = await prisma.patient.findUnique({
         where: { patientId: patient.patientId },
@@ -129,7 +143,8 @@ export const createPatient = async (req, res) => {
           tests: {
             include: {
               test: true,
-              department: true
+              department: true,
+              organization: true
             }
           }
         }
@@ -181,7 +196,7 @@ export const createPatient = async (req, res) => {
               sampleTaken: sampleTaken ? new Date(sampleTaken) : null,
               sampleReceived: sampleReceived ? new Date(sampleReceived) : null,
               sampleBarcodeNo,
-              remarks,
+              patient_history,
               totalAmount: parseFloat(test.charge),
               discountPercent: discountPercent ? parseFloat(discountPercent) : 0,
               discountAmount: discountAmount ? parseFloat(discountAmount) / testCount : 0,
@@ -203,6 +218,20 @@ export const createPatient = async (req, res) => {
           }
         }
       });
+
+      // Create payment transaction if payment was made during registration
+      if(paymentMode && perTestPaid > 0){
+        await prisma.paymentTransaction.create({
+          data: {
+            visitId,
+            patientId: patient.patientId,
+            paymentMode,
+            paymentAmount: perTestPaid,
+            remarks: discountRemark || null
+          }
+        });
+        console.log(`✅ Payment transaction created: ${paymentMode} - ₹${perTestPaid}`);
+      }
     }
 
     res.status(201).json({
@@ -246,7 +275,8 @@ export const getAllPatients = async (req, res) => {
         tests: {
           include: {
             test: true,
-            department: true
+            department: true,
+            organization: true
           }
         }
       },
@@ -279,7 +309,8 @@ export const getPatientById = async (req, res) => {
         tests: {
           include: {
             test: true,
-            department: true
+            department: true,
+            organization: true
           }
         }
       }
@@ -340,7 +371,8 @@ export const searchPatient = async (req, res) => {
         tests: {
           include: {
             test: true,
-            department: true
+            department: true,
+            organization: true
           },
           orderBy: { createdAt: 'desc' },
           take: 5 // Get last 5 tests per patient
@@ -368,6 +400,38 @@ export const searchPatient = async (req, res) => {
       message: 'Failed to search patient',
       error: error.message
     });
+  }
+};
+
+// Update patient test visit details (patient_history, etc.)
+export const updatePatientTestDetails = async (req, res) => {
+  try {
+    const { patientId } = req.params;
+    const { visitId, patient_history } = req.body;
+
+    if (!visitId) {
+      return res.status(400).json({ success: false, message: 'visitId is required' });
+    }
+
+    // Update all PatientTest records for this patient + visitId
+    const updated = await prisma.patientTest.updateMany({
+      where: {
+        patientId: patientId,
+        visitId: visitId
+      },
+      data: {
+        patient_history: patient_history || undefined
+      }
+    });
+
+    res.json({ 
+      success: true, 
+      message: 'Patient test details updated successfully',
+      updatedCount: updated.count
+    });
+  } catch (error) {
+    console.error('Update patient test details error:', error);
+    res.status(500).json({ success: false, message: 'Failed to update patient test details' });
   }
 };
 
@@ -630,7 +694,7 @@ export const addTestToVisit = async (req, res) => {
         organizationId: existingTest.organizationId || null,
         sample: sampleType || existingTest.sample,
         charge: parseFloat(charge) || 0,
-        status: 'REGISTERED',
+        status: 'Registered',
         visitType: existingTest.visitType,
         reportMode: existingTest.reportMode,
         referralDoctor: existingTest.referralDoctor,
@@ -677,6 +741,120 @@ export const addTestToVisit = async (req, res) => {
       success: false,
       message: 'Failed to add test to visit',
       error: error.message
+    });
+  }
+};
+
+// Create payment transaction
+export const createPaymentTransaction = async (req, res) => {
+  try {
+    const { visitId, patientId, paymentMode, paymentAmount, remarks } = req.body;
+    
+    console.log('📨 createPaymentTransaction request received:');
+    console.log('  visitId:', visitId);
+    console.log('  patientId:', patientId);
+    console.log('  paymentMode:', paymentMode);
+    console.log('  paymentAmount:', paymentAmount);
+    console.log('  remarks:', remarks);
+    
+    // Validate required fields
+    if (!visitId || !patientId || !paymentMode || !paymentAmount) {
+      console.error('❌ Validation failed: Missing required fields');
+      return res.status(400).json({
+        success: false,
+        message: 'Missing required fields: visitId, patientId, paymentMode, paymentAmount'
+      });
+    }
+
+    const transaction = await prisma.paymentTransaction.create({
+      data: {
+        visitId,
+        patientId,
+        paymentMode,
+        paymentAmount: parseFloat(paymentAmount),
+        remarks: remarks || null
+      }
+    });
+    
+    console.log('✅ Payment transaction created:', transaction.id);
+
+    res.status(201).json({ 
+      success: true, 
+      message: 'Payment transaction created successfully',
+      data: transaction 
+    });
+  } catch (error) {
+    console.error('❌ Create payment transaction error:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Failed to create payment transaction',
+      error: error.message 
+    });
+  }
+};
+
+// Get payment transactions for a visit
+export const getPaymentTransactions = async (req, res) => {
+  try {
+    const { visitId } = req.params;
+    
+    if (!visitId) {
+      return res.status(400).json({
+        success: false,
+        message: 'visitId is required'
+      });
+    }
+
+    const transactions = await prisma.paymentTransaction.findMany({
+      where: { visitId },
+      orderBy: { createdAt: 'asc' }
+    });
+    
+    console.log(`✅ Found ${transactions.length} payment transactions for visit ${visitId}`);
+
+    res.json({ 
+      success: true, 
+      data: transactions 
+    });
+  } catch (error) {
+    console.error('Get payment transactions error:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Failed to fetch payment transactions',
+      error: error.message 
+    });
+  }
+};
+
+// Get all payment transactions for a patient
+export const getPatientPaymentTransactions = async (req, res) => {
+  try {
+    const { patientId } = req.params;
+    
+    if (!patientId) {
+      return res.status(400).json({
+        success: false,
+        message: 'patientId is required'
+      });
+    }
+
+    const transactions = await prisma.paymentTransaction.findMany({
+      where: { patientId },
+      orderBy: { createdAt: 'desc' }
+    });
+    
+    console.log(`✅ Found ${transactions.length} payment transactions for patient ${patientId}`);
+
+    res.json({ 
+      success: true, 
+      data: transactions 
+    });
+  } catch (error) {
+    console.error('Get patient payment transactions error:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Failed to fetch payment transactions',
+      error: error.message 
     });
   }
 };

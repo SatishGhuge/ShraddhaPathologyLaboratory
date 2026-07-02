@@ -39,5 +39,5 @@ CREATE TABLE `test_status_history` (
     REFERENCES `patient_tests` (`id`) ON DELETE CASCADE
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
--- Add index for status column
-CREATE INDEX `patient_tests_status_idx` ON `patient_tests` (`status`);
+-- Add index for status column (if it doesn't already exist)
+CREATE INDEX IF NOT EXISTS `patient_tests_status_idx` ON `patient_tests` (`status`);
