@@ -131,6 +131,12 @@ export default function ReferralDoctorRevenueReport() {
 
   useEffect(() => {
     fetchDoctors();
+    // Don't call fetchTransactions here yet - wait for state to be ready
+  }, []);
+
+  // Fetch transactions after component mounts with initial dates
+  useEffect(() => {
+    console.log('📅 Initial load: Fetching transactions with dateFrom:', dateFrom, 'dateTo:', dateTo);
     fetchTransactions();
   }, []);
 
@@ -138,15 +144,18 @@ export default function ReferralDoctorRevenueReport() {
   useEffect(() => {
     // Trigger search if we have transactions loaded
     if (allTransactions.length > 0) {
-      console.log('🔔 FILTER CHANGED - Triggering search');
-      console.log('   dateFrom:', dateFrom);
-      console.log('   dateTo:', dateTo);
-      console.log('   selectedDoctor:', selectedDoctor);
-      console.log('   searchPatient:', searchPatient);
-      console.log('   paymentModeFilter:', paymentModeFilter);
+      console.log('🔄 Transactions loaded, applying filters');
       handleSearch();
     }
     // Removed dependencies from this hook to prevent infinite loops
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [allTransactions]);
+
+  // Handle filter changes
+  useEffect(() => {
+    if (allTransactions.length > 0) {
+      handleSearch();
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dateFrom, dateTo, selectedDoctor, searchPatient, paymentModeFilter, deletedRows]);
 
@@ -180,10 +189,13 @@ export default function ReferralDoctorRevenueReport() {
       // Use new backend endpoint that handles all joining and filtering
       const url = `${process.env.NEXT_PUBLIC_API_URL}/results/doctor-revenue?fromDate=${dateFrom}&toDate=${dateTo}`;
       console.log('🚀 Calling endpoint:', url);
+      console.log('   dateFrom:', dateFrom);
+      console.log('   dateTo:', dateTo);
       
       const response = await fetch(url);
       const result = await response.json();
       
+      console.log('📥 Backend response status:', response.status);
       console.log('📥 Backend response:', {
         success: result.success,
         count: result.data?.length,
@@ -191,6 +203,8 @@ export default function ReferralDoctorRevenueReport() {
       });
       
       if (result.success && result.data && Array.isArray(result.data)) {
+        console.log(`✅ API returned ${result.data.length} records`);
+        
         // Backend already provides formatted data with doctor charges linked
         const transactions = result.data.map((item: any) => ({
           id: `${item.id}-${item.patientId}`,
@@ -209,14 +223,18 @@ export default function ReferralDoctorRevenueReport() {
         }));
         
         console.log(`✅ Mapped ${transactions.length} transactions`);
+        console.log('   First transaction:', transactions[0]);
         setAllTransactions(transactions);
+        setFilteredData(transactions); // Also set filtered data immediately
       } else {
         console.warn('⚠️ No data returned or error in response:', result);
         setAllTransactions([]);
+        setFilteredData([]);
       }
     } catch (error) {
       console.error("❌ Failed to fetch transactions:", error);
       setAllTransactions([]);
+      setFilteredData([]);
     } finally {
       setLoading(false);
     }
@@ -649,10 +667,10 @@ export default function ReferralDoctorRevenueReport() {
                     
                     const visitSubtotal = {
                       billAmount: visitTests.reduce((sum, t) => sum + t.billAmount, 0),
-                      discountRuntime: visitTests[0]?.discountRuntime || 0,
-                      discountSpecial: visitTests[0]?.discountSpecial || 0,
-                      netAmount: visitTests[0]?.netAmount || 0,
-                      paymentStatus: visitTests[0]?.paymentStatus || "Unpaid",
+                      discountRuntime: visitTests.reduce((sum, t) => sum + (t.discountRuntime || 0), 0),  // SUM all discountR
+                      discountSpecial: visitTests.reduce((sum, t) => sum + (t.discountSpecial || 0), 0),  // SUM all discountS
+                      netAmount: visitTests.reduce((sum, t) => sum + (t.netAmount || 0), 0),  // SUM all netAmount
+                      paymentStatus: visitTests.some(t => t.paymentStatus === "Unpaid") ? "Unpaid" : "Paid",
                     };
                     
                     return (
