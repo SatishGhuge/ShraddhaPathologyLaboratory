@@ -13,7 +13,8 @@ import {
   addTestToVisit,
   createPaymentTransaction,
   getPaymentTransactions,
-  getPatientPaymentTransactions
+  getPatientPaymentTransactions,
+  getPatientTests
 } from '../controllers/patient.controller.js';
 
 const router = express.Router();

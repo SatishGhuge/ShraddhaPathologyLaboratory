@@ -188,7 +188,7 @@ export default function PatientList() {
         }
         
         const v = visitMap.get(t.visitId);
-        v.tests.push(t.test?.name||"");
+        v.tests.push(t.test?.shortName || t.test?.name || "");
         v.totalBill += t.totalAmount || 0;
         v.received = Math.max(v.received, t.paidAmount || 0);
         v.discount = Math.max(v.discount, t.discountAmount || 0);

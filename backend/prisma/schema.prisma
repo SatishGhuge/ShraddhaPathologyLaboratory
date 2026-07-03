@@ -189,6 +189,7 @@ model Test {
   patientTests           PatientTest[]
   categories             TestCategory[]
   charges                TestCharge[]
+  doctorCharges          DoctorTestCharge[]
   ownedParameters        TestParameter[]  @relation("ParameterOwner")
   templates              TestTemplate[]
   department             Department       @relation(fields: [departmentId], references: [id], onDelete: Cascade)
@@ -256,22 +257,43 @@ model TestCharge {
   @@map("test_charges")
 }
 
+model DoctorTestCharge {
+  id              Int       @id @default(autoincrement())
+  testId          Int
+  doctorId        Int
+  discountPercent Float?    @default(0)
+  discountR       Float?    @default(0)
+  discountS       Float?    @default(0)
+  effectiveFrom   DateTime  @default(now())
+  effectiveTo     DateTime?
+  isActive        Boolean   @default(true)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  doctor          Doctor    @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+  test            Test      @relation(fields: [testId], references: [id], onDelete: Cascade)
+
+  @@unique([testId, doctorId])
+  @@index([doctorId], map: "doctor_test_charges_doctorId_fkey")
+  @@map("doctor_test_charges")
+}
+
 model Doctor {
-  id                     Int      @id @default(autoincrement())
+  id                     Int                      @id @default(autoincrement())
   name                   String
   degree                 String?
   mobile                 String?
   specialty              String?
-  isActive               Boolean  @default(true)
-  createdAt              DateTime @default(now())
-  updatedAt              DateTime @updatedAt
-  address                String?  @db.Text
-  allowBalance           Boolean  @default(false)
+  isActive               Boolean                  @default(true)
+  createdAt              DateTime                 @default(now())
+  updatedAt              DateTime                 @updatedAt
+  address                String?                  @db.Text
+  allowBalance           Boolean                  @default(false)
   compliment             Float?
   email                  String?
-  type                   String   @default("Doctor")
-  sendReportsViaMail     Boolean  @default(false)
-  sendReportsViaWhatsApp Boolean  @default(false)
+  type                   String                   @default("Doctor")
+  sendReportsViaMail     Boolean                  @default(false)
+  sendReportsViaWhatsApp Boolean                  @default(false)
+  testCharges            DoctorTestCharge[]
 
   @@map("doctors")
 }
@@ -482,6 +504,7 @@ model User {
   organization         Organization?          @relation(fields: [organizationId], references: [id])
 
   @@index([organizationId], map: "users_organizationId_fkey")
+  @@map("users")
 }
 
 model PaymentTransaction {

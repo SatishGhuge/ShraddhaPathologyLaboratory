@@ -1721,6 +1721,98 @@ export const getAllTestCharges = async (req, res) => {
   }
 };
 
+// Get doctor test charges with comparison to defaults
+export const getDoctorTestCharges = async (req, res) => {
+  try {
+    const { doctorId } = req.params;
+
+    if (!doctorId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Doctor ID is required'
+      });
+    }
+
+    // Verify doctor exists
+    const doctor = await prisma.doctor.findUnique({
+      where: { id: parseInt(doctorId) }
+    });
+
+    if (!doctor) {
+      return res.status(404).json({
+        success: false,
+        message: 'Doctor not found'
+      });
+    }
+
+    // Get all tests with their default and doctor-specific charges
+    const tests = await prisma.test.findMany({
+      where: { isDeleted: false },
+      include: {
+        department: {
+          select: {
+            name: true
+          }
+        },
+        // Get default charges (organizationId = null)
+        charges: {
+          where: { organizationId: null },
+          include: {
+            organization: {
+              select: {
+                id: true,
+                name: true
+              }
+            }
+          }
+        },
+        // Get doctor-specific charges
+        doctorCharges: {
+          where: { doctorId: parseInt(doctorId) }
+        }
+      },
+      orderBy: [
+        { sortOrder: 'asc' },
+        { name: 'asc' }
+      ]
+    });
+
+    // Format response with discount data
+    const formattedTests = tests.map(test => ({
+      id: test.id,
+      name: test.name,
+      shortName: test.testCode,
+      group: test.department?.name || '',
+      // Default charges from test_charges table
+      defaultB2C: test.charges[0]?.b2cCharge || 0,
+      defaultB2B: test.charges[0]?.b2bCharge || 0,
+      // Doctor charges - discountR (default time) and discountS (customized)
+      discountR: test.doctorCharges[0]?.discountR || 0,
+      discountS: test.doctorCharges[0]?.discountS || 0,
+      // Doctor B2C (for backward compatibility) = Default B2C - discountS
+      doctorB2C: Math.max(0, (test.charges[0]?.b2cCharge || 0) - (test.doctorCharges[0]?.discountS || 0)),
+      // Is customized (doctor has different discounts than default)
+      isCustomized: test.doctorCharges.length > 0 && 
+        ((test.doctorCharges[0]?.discountR || 0) > 0 || (test.doctorCharges[0]?.discountS || 0) > 0)
+    }));
+
+    res.json({
+      success: true,
+      data: formattedTests,
+      doctor: {
+        id: doctor.id,
+        name: doctor.name
+      }
+    });
+  } catch (error) {
+    console.error('Get doctor test charges error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch doctor test charges'
+    });
+  }
+};
+
 // Create test charge for organization
 export const createTestCharge = async (req, res) => {
   try {
@@ -1951,9 +2043,9 @@ export const deleteTestCharge = async (req, res) => {
 // Bulk create/update test charges for an organization
 export const bulkCreateTestCharges = async (req, res) => {
   try {
-    const { organizationId, charges } = req.body;
+    const { organizationId, doctorId, charges } = req.body;
 
-    // organizationId is optional - if not provided, these are DEFAULT charges
+    // organizationId/doctorId is optional - if not provided, these are DEFAULT charges
     if (!Array.isArray(charges) || charges.length === 0) {
       return res.status(400).json({
         success: false,
@@ -1975,6 +2067,20 @@ export const bulkCreateTestCharges = async (req, res) => {
       }
     }
 
+    // If doctorId is provided, verify it exists
+    if (doctorId) {
+      const doctor = await prisma.doctor.findUnique({
+        where: { id: parseInt(doctorId) }
+      });
+
+      if (!doctor) {
+        return res.status(404).json({
+          success: false,
+          message: 'Doctor not found'
+        });
+      }
+    }
+
     const results = [];
     const errors = [];
     let created = 0;
@@ -1982,9 +2088,9 @@ export const bulkCreateTestCharges = async (req, res) => {
 
     for (const charge of charges) {
       try {
-        const { testId, b2cCharge, b2bCharge, discountPercent, specialPrice } = charge;
+        const { testId, b2cCharge, b2bCharge, discountR, discountS, discountPercent, specialPrice } = charge;
 
-        if (!testId || (!b2cCharge && !b2bCharge)) {
+        if (!testId || (!(b2cCharge || b2bCharge) && !(discountR || discountS))) {
           errors.push({ testId, error: 'Test ID and at least one charge required' });
           continue;
         }
@@ -1999,47 +2105,85 @@ export const bulkCreateTestCharges = async (req, res) => {
           continue;
         }
 
-        // For default charges (no organizationId), use null
-        const chargeOrgId = organizationId || null;
-
-        // Check if charge already exists
-        const existingCharge = await prisma.testCharge.findFirst({
-          where: {
-            testId: parseInt(testId),
-            organizationId: chargeOrgId
-          }
-        });
-
-        let result;
-        if (existingCharge) {
-          // Update existing charge
-          result = await prisma.testCharge.update({
-            where: { id: existingCharge.id },
-            data: {
-              b2cCharge: parseFloat(b2cCharge) || 0,
-              b2bCharge: parseFloat(b2bCharge) || 0,
-              discountPercent: discountPercent ? parseFloat(discountPercent) : 0,
-              specialPrice: specialPrice ? parseFloat(specialPrice) : null
-            }
-          });
-          updated++;
-        } else {
-          // Create new charge
-          result = await prisma.testCharge.create({
-            data: {
+        // Handle doctor charges
+        if (doctorId) {
+          const existingCharge = await prisma.doctorTestCharge.findFirst({
+            where: {
               testId: parseInt(testId),
-              organizationId: chargeOrgId,
-              b2cCharge: parseFloat(b2cCharge) || 0,
-              b2bCharge: parseFloat(b2bCharge) || 0,
-              discountPercent: discountPercent ? parseFloat(discountPercent) : 0,
-              specialPrice: specialPrice ? parseFloat(specialPrice) : null,
-              isActive: true
+              doctorId: parseInt(doctorId)
             }
           });
-          created++;
-        }
 
-        results.push(result);
+          let result;
+          if (existingCharge) {
+            // Update existing doctor charge
+            result = await prisma.doctorTestCharge.update({
+              where: { id: existingCharge.id },
+              data: {
+                discountR: charge.discountR !== undefined ? parseFloat(charge.discountR) : existingCharge.discountR,
+                discountS: charge.discountS !== undefined ? parseFloat(charge.discountS) : existingCharge.discountS,
+                discountPercent: discountPercent ? parseFloat(discountPercent) : 0
+              }
+            });
+            updated++;
+          } else {
+            // Create new doctor charge
+            result = await prisma.doctorTestCharge.create({
+              data: {
+                testId: parseInt(testId),
+                doctorId: parseInt(doctorId),
+                discountR: parseFloat(charge.discountR) || 0,
+                discountS: parseFloat(charge.discountS) || 0,
+                discountPercent: discountPercent ? parseFloat(discountPercent) : 0,
+                isActive: true
+              }
+            });
+            created++;
+          }
+          results.push(result);
+        } else {
+          // Handle organization/default charges
+          // For default charges (no organizationId), use null
+          const chargeOrgId = organizationId || null;
+
+          // Check if charge already exists
+          const existingCharge = await prisma.testCharge.findFirst({
+            where: {
+              testId: parseInt(testId),
+              organizationId: chargeOrgId
+            }
+          });
+
+          let result;
+          if (existingCharge) {
+            // Update existing charge
+            result = await prisma.testCharge.update({
+              where: { id: existingCharge.id },
+              data: {
+                b2cCharge: parseFloat(b2cCharge) || 0,
+                b2bCharge: parseFloat(b2bCharge) || 0,
+                discountPercent: discountPercent ? parseFloat(discountPercent) : 0,
+                specialPrice: specialPrice ? parseFloat(specialPrice) : null
+              }
+            });
+            updated++;
+          } else {
+            // Create new charge
+            result = await prisma.testCharge.create({
+              data: {
+                testId: parseInt(testId),
+                organizationId: chargeOrgId,
+                b2cCharge: parseFloat(b2cCharge) || 0,
+                b2bCharge: parseFloat(b2bCharge) || 0,
+                discountPercent: discountPercent ? parseFloat(discountPercent) : 0,
+                specialPrice: specialPrice ? parseFloat(specialPrice) : null,
+                isActive: true
+              }
+            });
+            created++;
+          }
+          results.push(result);
+        }
       } catch (error) {
         errors.push({ testId: charge.testId, error: error.message });
       }

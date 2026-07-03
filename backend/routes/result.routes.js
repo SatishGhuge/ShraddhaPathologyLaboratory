@@ -11,7 +11,8 @@ import {
   updateTestDates,
   sendReport,
   uploadAttachment,
-  deleteAttachment
+  deleteAttachment,
+  getDoctorReferralRevenue
 } from '../controllers/result.controller.js';
 import { upload } from '../utils/upload.js';
 import { 
@@ -24,6 +25,9 @@ import {
 } from '../utils/statusWorkflow.js';
 
 const router = express.Router();
+
+// Get doctor referral revenue - NEW ENDPOINT
+router.get('/doctor-revenue', getDoctorReferralRevenue);
 
 // Get all patient tests for results page
 router.get('/', getPatientTests);

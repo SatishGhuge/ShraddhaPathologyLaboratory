@@ -858,3 +858,37 @@ export const getPatientPaymentTransactions = async (req, res) => {
     });
   }
 };
+
+// Get all patient tests with referral doctor details - optimized for referral doctor revenue report
+export const getPatientTests = async (req, res) => {
+  try {
+    const { page, limit, skip } = getPaginationParams(req.query);
+
+    // Get total count of patient tests
+    const total = await prisma.patientTest.count();
+
+    // Fetch patient tests with patient, test, and department details
+    const patientTests = await prisma.patientTest.findMany({
+      include: {
+        patient: true,
+        test: true,
+        department: true,
+        organization: true
+      },
+      orderBy: {
+        visitDate: 'desc'
+      },
+      skip,
+      take: limit
+    });
+
+    res.json(buildPaginatedResponse(patientTests, total, page, limit));
+
+  } catch (error) {
+    console.error('Get patient tests error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch patient tests'
+    });
+  }
+};

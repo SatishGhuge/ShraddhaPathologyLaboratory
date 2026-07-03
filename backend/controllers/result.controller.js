@@ -1444,3 +1444,186 @@ export const deleteAttachment = async (req, res) => {
     res.status(500).json({ success: false, message: 'Failed to delete attachment' });
   }
 };
+
+
+// Get doctor referral revenue - Fetch patient tests with doctor charges
+export const getDoctorReferralRevenue = async (req, res) => {
+  try {
+    const { fromDate, toDate, doctorName } = req.query;
+    
+    console.log('📥 getDoctorReferralRevenue called with:');
+    console.log('   fromDate:', fromDate);
+    console.log('   toDate:', toDate);
+    console.log('   doctorName:', doctorName);
+
+    // Build where condition
+    const whereCondition = {
+      referralDoctor: {
+        not: null,
+        notIn: ['SELF', '']
+      }
+    };
+
+    // Add date range filter if provided
+    if (fromDate && toDate) {
+      const startDate = new Date(fromDate);
+      const endDate = new Date(toDate);
+      endDate.setHours(23, 59, 59, 999);
+
+      whereCondition.visitDate = {
+        gte: startDate,
+        lte: endDate
+      };
+      
+      console.log('   Date filter:', startDate, 'to', endDate);
+    }
+
+    // Filter by specific doctor if provided
+    if (doctorName) {
+      whereCondition.referralDoctor = doctorName;
+    }
+
+    console.log('   Where condition:', JSON.stringify(whereCondition, null, 2));
+
+    // Fetch patient tests with related data
+    const patientTests = await prisma.patientTest.findMany({
+      where: whereCondition,
+      include: {
+        patient: {
+          select: {
+            patientId: true,
+            firstName: true,
+            lastName: true
+          }
+        },
+        test: {
+          select: {
+            id: true,
+            name: true
+          }
+        },
+        organization: {
+          select: {
+            id: true,
+            name: true
+          }
+        }
+      },
+      orderBy: {
+        visitDate: 'desc'
+      }
+    });
+
+    console.log(`✅ Found ${patientTests.length} patient tests with referral doctors`);
+    
+    if (patientTests.length > 0) {
+      console.log('   First test:', {
+        id: patientTests[0].id,
+        referralDoctor: patientTests[0].referralDoctor,
+        testId: patientTests[0].testId,
+        visitDate: patientTests[0].visitDate
+      });
+    }
+
+    // Fetch all doctors once and create a normalized lookup map
+    const allDoctors = await prisma.doctor.findMany({
+      select: { id: true, name: true }
+    });
+    
+    console.log(`📋 Loaded ${allDoctors.length} doctors for matching`);
+    
+    // Create a map for fast normalized lookups
+    const doctorsByNormalizedName = {};
+    allDoctors.forEach(doctor => {
+      const normalized = doctor.name
+        .toLowerCase()
+        .trim()
+        .replace(/^dr\.\s+/, '')
+        .replace(/\s+/g, ' ');
+      
+      if (!doctorsByNormalizedName[normalized]) {
+        doctorsByNormalizedName[normalized] = doctor;
+      }
+    });
+
+    // For each patient test, fetch doctor charges
+    const revenue = await Promise.all(
+      patientTests.map(async (pt) => {
+        // Normalize the referral doctor name for matching
+        const normalizedRefDoctor = pt.referralDoctor
+          ?.toLowerCase()
+          .trim()
+          .replace(/^dr\.\s+/, '') // Remove "Dr. " prefix if present
+          .replace(/\s+/g, ' ') || '';
+        
+        console.log(`   Looking for doctor: "${pt.referralDoctor}" -> normalized: "${normalizedRefDoctor}"`);
+        
+        // Find matching doctor from our map
+        const matchedDoctor = doctorsByNormalizedName[normalizedRefDoctor];
+
+        if (!matchedDoctor) {
+          console.log(`      ⚠️  Doctor not found: ${pt.referralDoctor}`);
+          return null;
+        }
+
+        console.log(`      ✅ Found doctor: ${matchedDoctor.name} (ID: ${matchedDoctor.id})`);
+
+        // Fetch doctor charges for this test
+        const doctorCharge = await prisma.doctorTestCharge.findFirst({
+          where: {
+            testId: pt.testId,
+            doctorId: matchedDoctor.id
+          },
+          select: {
+            discountR: true,
+            discountS: true
+          }
+        });
+
+        if (!doctorCharge) {
+          console.log(`      ⚠️  No charge found for doctor ${matchedDoctor.name}, test ${pt.testId}`);
+        }
+
+        return {
+          id: pt.id,
+          visitId: pt.visitId,
+          patientId: pt.patient.patientId,
+          patientName: `${pt.patient.firstName || ''} ${pt.patient.lastName || ''}`.trim(),
+          testId: pt.testId,
+          testName: pt.test.name,
+          doctorId: matchedDoctor.id,
+          doctorName: pt.referralDoctor,
+          organization: pt.organization?.name || pt.organizationId || '-',
+          visitDate: pt.visitDate,
+          billAmount: parseFloat(pt.charge) || 0,
+          discountR: doctorCharge?.discountR || 0,  // Regular price
+          discountS: doctorCharge?.discountS || 0,  // Special price
+          netAmount: doctorCharge?.discountS || 0,  // Doctor gets special price
+          paymentMode: pt.paymentMode || '-',
+          paidAmount: parseFloat(pt.paidAmount) || 0,
+          balanceAmount: parseFloat(pt.balanceAmount) || 0,
+          paymentStatus: parseFloat(pt.balanceAmount) <= 0 ? 'Paid' : 'Unpaid'
+        };
+      })
+    );
+
+    // Filter out null values (doctors not found)
+    const validRevenue = revenue.filter(r => r !== null);
+
+    console.log(`📤 Returning ${validRevenue.length} valid revenue records`);
+
+    res.json({
+      success: true,
+      data: validRevenue,
+      count: validRevenue.length
+    });
+  } catch (error) {
+    console.error('❌ Get doctor referral revenue error:', error);
+    console.error('   Stack:', error.stack);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch doctor referral revenue',
+      error: error.message
+    });
+  }
+};

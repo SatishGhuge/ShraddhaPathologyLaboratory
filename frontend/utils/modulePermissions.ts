@@ -19,9 +19,9 @@ export const defaultModuleAllocation = {
   },
   reports: {
     dashboard: false,
-    dailyCollection: false,
-    monthlyCollectionSummary: false,
+    collectionReport: false,
     patientList: false,
+    referralDoctorRevenue: false,
     centerWiseCostReport: false,
     b2bTestwiseCostReport: false,
     discountReport: false,
@@ -93,9 +93,9 @@ export const getAccessibleModules = (moduleAllocation: any) => {
     reports: {
       hasAccess: Object.values(allocation.reports).some((v: any) => v === true),
       dashboard: allocation.reports.dashboard,
-      dailyCollection: allocation.reports.dailyCollection,
-      monthlyCollectionSummary: allocation.reports.monthlyCollectionSummary,
+      collectionReport: allocation.reports.collectionReport,
       patientList: allocation.reports.patientList,
+      referralDoctorRevenue: allocation.reports.referralDoctorRevenue,
       centerWiseCostReport: allocation.reports.centerWiseCostReport,
       b2bTestwiseCostReport: allocation.reports.b2bTestwiseCostReport,
       discountReport: allocation.reports.discountReport,

@@ -22,9 +22,9 @@ const defaultModuleAllocation = {
   },
   reports: {
     dashboard: false,
-    dailyCollection: false,
-    monthlyCollectionSummary: false,
+    collectionReport: false,
     patientList: false,
+    referralDoctorRevenue: false,
     centerWiseCostReport: false,
     b2bTestwiseCostReport: false,
     discountReport: false,

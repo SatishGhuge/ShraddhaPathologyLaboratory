@@ -116,6 +116,12 @@ export default function ReferralListing() {
                   <td className="border border-gray-300 px-3 py-2">
                     <div className="flex justify-center gap-1 flex-wrap">
                       <button
+                        onClick={() => router.push(`/master/referral-doctor/charges/${item.id}`)}
+                        className="bg-green-600 text-white px-2 py-1 rounded text-xs hover:bg-green-700 transition-colors"
+                      >
+                        Charges
+                      </button>
+                      <button
                         onClick={() => router.push(`/master/referral-doctor/edit/${item.id}`)}
                         className="bg-blue-600 text-white px-2 py-1 rounded text-xs hover:bg-blue-700 transition-colors"
                       >

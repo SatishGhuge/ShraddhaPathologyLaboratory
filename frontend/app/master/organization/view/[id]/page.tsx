@@ -404,9 +404,9 @@ const AddOrganization = () => {
                     color="purple"
                     items={[
                       { key: 'reports.dashboard', label: 'Dashboard' },
-                      { key: 'reports.dailyCollection', label: 'Daily Collection' },
-                      { key: 'reports.monthlyCollectionSummary', label: 'Monthly Summary' },
+                      { key: 'reports.collectionReport', label: 'Collection Report' },
                       { key: 'reports.patientList', label: 'Patient List' },
+                      { key: 'reports.referralDoctorRevenue', label: 'Referral Doctor Revenue' },
                       { key: 'reports.centerWiseCostReport', label: 'Center Cost' },
                       { key: 'reports.b2bTestwiseCostReport', label: 'B2B Cost' },
                       { key: 'reports.discountReport', label: 'Discount' },
