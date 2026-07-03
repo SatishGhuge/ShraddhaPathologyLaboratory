@@ -1568,7 +1568,7 @@ export const getDoctorReferralRevenue = async (req, res) => {
 
         console.log(`      ✅ Found doctor: ${matchedDoctor.name} (ID: ${matchedDoctor.id})`);
 
-        // Fetch doctor charges for this test
+        // Fetch doctor charges for this test (customized charges)
         const doctorCharge = await prisma.doctorTestCharge.findFirst({
           where: {
             testId: pt.testId,
@@ -1580,9 +1580,49 @@ export const getDoctorReferralRevenue = async (req, res) => {
           }
         });
 
+        // If no customized charge, fetch default test charge as fallback
+        let defaultCharge = null;
         if (!doctorCharge) {
-          console.log(`      ⚠️  No charge found for doctor ${matchedDoctor.name}, test ${pt.testId}`);
+          console.log(`      ℹ️  No customized charge found for doctor ${matchedDoctor.name}, test ${pt.testId}. Looking for default...`);
+          defaultCharge = await prisma.testCharge.findFirst({
+            where: {
+              testId: pt.testId,
+              organizationId: pt.organizationId  // Match the patient's organization
+            },
+            select: {
+              b2cCharge: true,
+              b2bCharge: true
+            }
+          });
+          
+          if (defaultCharge) {
+            console.log(`      ✅ Found default charge: B2C=${defaultCharge.b2cCharge}, B2B=${defaultCharge.b2bCharge}`);
+          } else {
+            console.log(`      ⚠️  No default charge found for test ${pt.testId}, organization ${pt.organizationId}`);
+          }
+        } else {
+          console.log(`      ✅ Found customized charge: discountR=${doctorCharge.discountR}, discountS=${doctorCharge.discountS}`);
         }
+
+        // Determine the actual charges to use
+        let discountR, discountS, netAmount;
+        
+        if (doctorCharge) {
+          // Use customized charges if they exist
+          discountR = doctorCharge.discountR || 0;
+          discountS = doctorCharge.discountS || 0;
+        } else if (defaultCharge) {
+          // Fall back to default charges
+          discountR = defaultCharge.b2cCharge || 0;  // Use B2C as default regular price
+          discountS = defaultCharge.b2bCharge || 0;  // Use B2B as special price (if customized)
+        } else {
+          // No charges found at all
+          discountR = 0;
+          discountS = 0;
+        }
+        
+        // Doctor gets the special price (discountS), or regular price if no special price
+        netAmount = discountS > 0 ? discountS : discountR;
 
         return {
           id: pt.id,
@@ -1596,9 +1636,9 @@ export const getDoctorReferralRevenue = async (req, res) => {
           organization: pt.organization?.name || pt.organizationId || '-',
           visitDate: pt.visitDate,
           billAmount: parseFloat(pt.charge) || 0,
-          discountR: doctorCharge?.discountR || 0,  // Regular price
-          discountS: doctorCharge?.discountS || 0,  // Special price
-          netAmount: doctorCharge?.discountS || 0,  // Doctor gets special price
+          discountR: discountR,  // Regular price (customized or default)
+          discountS: discountS,  // Special price (customized or default)
+          netAmount: netAmount,  // What doctor gets
           paymentMode: pt.paymentMode || '-',
           paidAmount: parseFloat(pt.paidAmount) || 0,
           balanceAmount: parseFloat(pt.balanceAmount) || 0,

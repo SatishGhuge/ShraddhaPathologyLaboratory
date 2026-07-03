@@ -126,8 +126,37 @@ export default function ReferralDoctorRevenueReport() {
   const [currentPage, setCurrentPage] = useState(1);
   const ITEMS_PER_PAGE = 40;
   
-  // Delete tracking (client-side only)
-  const [deletedRows, setDeletedRows] = useState<Set<string>>(new Set());
+  // Delete tracking (client-side only) - persisted in localStorage
+  const [inactiveVisits, setInactiveVisits] = useState<Set<string>>(new Set());
+  const [showInactiveModal, setShowInactiveModal] = useState(false);
+  const [isHydrated, setIsHydrated] = useState(false);
+
+  // Initialize inactiveVisits from localStorage on mount
+  useEffect(() => {
+    console.log('🔄 Loading inactive visits from localStorage...');
+    const stored = localStorage.getItem('referralDoctorInactiveVisits');
+    console.log('📦 Stored value:', stored);
+    if (stored) {
+      try {
+        const parsed = JSON.parse(stored);
+        console.log('✅ Loaded inactive visits:', parsed);
+        setInactiveVisits(new Set(parsed));
+      } catch (e) {
+        console.error('❌ Failed to parse stored inactive visits:', e);
+      }
+    } else {
+      console.log('ℹ️ No inactive visits stored');
+    }
+    setIsHydrated(true);
+  }, []);
+
+  // Save inactiveVisits to localStorage whenever it changes
+  useEffect(() => {
+    if (isHydrated) {
+      console.log('💾 Saving inactive visits to localStorage:', Array.from(inactiveVisits));
+      localStorage.setItem('referralDoctorInactiveVisits', JSON.stringify(Array.from(inactiveVisits)));
+    }
+  }, [inactiveVisits, isHydrated]);
 
   useEffect(() => {
     fetchDoctors();
@@ -157,7 +186,7 @@ export default function ReferralDoctorRevenueReport() {
       handleSearch();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dateFrom, dateTo, selectedDoctor, searchPatient, paymentModeFilter, deletedRows]);
+  }, [dateFrom, dateTo, selectedDoctor, searchPatient, paymentModeFilter, inactiveVisits]);
 
   // Close dropdowns on outside click
   useEffect(() => {
@@ -319,8 +348,8 @@ export default function ReferralDoctorRevenueReport() {
       });
     }
 
-    // Filter out deleted rows
-    filtered = filtered.filter((t) => !deletedRows.has(t.id));
+    // Filter out inactive visits
+    filtered = filtered.filter((t) => !inactiveVisits.has(t.visitId));
 
     setFilteredData(filtered);
   };
@@ -334,23 +363,18 @@ export default function ReferralDoctorRevenueReport() {
     setSearchPatient("");
     setCurrentPage(1);
     setSearched(false);
-    setDeletedRows(new Set());
-    setFilteredData([]);
     setPreset("Today");
+    // DO NOT touch: inactiveVisits, filteredData, table data
   };
 
-  const handleDeleteRow = (rowId: string) => {
-    const updated = new Set(deletedRows);
-    if (updated.has(rowId)) {
-      updated.delete(rowId);
+  const handleDeleteRow = (visitId: string) => {
+    const updated = new Set(inactiveVisits);
+    if (updated.has(visitId)) {
+      updated.delete(visitId);
     } else {
-      updated.add(rowId);
+      updated.add(visitId);
     }
-    setDeletedRows(updated);
-    
-    // Re-filter to reflect deletion
-    const newFiltered = filteredData.filter((t) => !updated.has(t.id));
-    setFilteredData(newFiltered);
+    setInactiveVisits(updated);
   };
 
   const handleExportExcel = () => {
@@ -416,8 +440,8 @@ export default function ReferralDoctorRevenueReport() {
         <PageHeader title="Referral Doctor Revenue Report" icon={DollarSign} path="Reports" />
 
         <div className="bg-white rounded shadow-md p-3 sm:p-4 border border-gray-200">
-          {/* Filters Row 1 - Date, Doctor, Payment Mode */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 mb-3">
+          {/* Filters Row - All 5 filters in one row */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2 mb-3">
             {/* DATE PICKER */}
             <div className="relative" ref={dpRef}>
               <button type="button" onClick={openPicker}
@@ -510,10 +534,8 @@ export default function ReferralDoctorRevenueReport() {
                 className="w-full border border-gray-300 rounded px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
               />
             </div>
-          </div>
 
-          {/* Filters Row 2 - Payment Mode and Column Selector */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mb-3">
+            {/* Payment Mode Select */}
             <select
               value={paymentModeFilter}
               onChange={(e) => setPaymentModeFilter(e.target.value)}
@@ -526,8 +548,6 @@ export default function ReferralDoctorRevenueReport() {
               <option value="UPI">UPI</option>
               <option value="Other">Other</option>
             </select>
-
-            <div></div> {/* Empty spacer */}
 
             {/* Column Selector */}
             <div className="relative" ref={colRef}>
@@ -606,6 +626,17 @@ export default function ReferralDoctorRevenueReport() {
             >
               <RotateCcw size={14} /> Reset
             </button>
+            <button
+              onClick={() => setShowInactiveModal(true)}
+              className={`flex gap-1.5 items-center px-3 py-1.5 rounded text-xs sm:text-sm font-semibold ${
+                inactiveVisits.size > 0 
+                  ? "bg-orange-600 hover:bg-orange-700 text-white" 
+                  : "bg-gray-300 hover:bg-gray-400 text-gray-600"
+              }`}
+              disabled={inactiveVisits.size === 0}
+            >
+              Inactive ({inactiveVisits.size})
+            </button>
           </div>
         </div>
 
@@ -615,22 +646,7 @@ export default function ReferralDoctorRevenueReport() {
             <thead className="bg-slate-900 text-white">
               <tr>
                 <th className="px-2 sm:px-3 py-1.5 sm:py-2 text-center font-semibold whitespace-nowrap border border-gray-300 w-12">
-                  <input
-                    type="checkbox"
-                    checked={deletedRows.size > 0 && deletedRows.size === filteredData.length}
-                    onChange={(e) => {
-                      if (e.target.checked) {
-                        const newDeleted = new Set(filteredData.map(t => t.id));
-                        setDeletedRows(newDeleted);
-                        setFilteredData([]);
-                      } else {
-                        setDeletedRows(new Set());
-                        handleSearch();
-                      }
-                    }}
-                    className="w-4 h-4 accent-white cursor-pointer"
-                    title="Check all to remove all visible records"
-                  />
+                  {/* Just a header, no check all */}
                 </th>
                 <th className="px-2 sm:px-3 py-1.5 sm:py-2 text-left font-semibold whitespace-nowrap border border-gray-300">Sr.No.</th>
                 <th className="px-2 sm:px-3 py-1.5 sm:py-2 text-left font-semibold whitespace-nowrap border border-gray-300">Patient Name</th>
@@ -685,13 +701,15 @@ export default function ReferralDoctorRevenueReport() {
                       <>
                         <tr key={row.id} className={i % 2 === 0 ? "bg-white hover:bg-gray-50" : "bg-gray-50 hover:bg-gray-100"}>
                           <td className="px-2 sm:px-3 py-1.5 sm:py-2 border border-gray-200 text-center w-12">
-                            <input
-                              type="checkbox"
-                              checked={deletedRows.has(row.id)}
-                              onChange={() => handleDeleteRow(row.id)}
-                              className="w-4 h-4 cursor-pointer accent-red-600"
-                              title="Check to remove from report"
-                            />
+                            {isFirstInVisit && (
+                              <input
+                                type="checkbox"
+                                checked={inactiveVisits.has(row.visitId)}
+                                onChange={() => handleDeleteRow(row.visitId)}
+                                className="w-4 h-4 cursor-pointer accent-red-600"
+                                title="Check to move to Inactive"
+                              />
+                            )}
                           </td>
                           <td className="px-2 sm:px-3 py-1.5 sm:py-2 border border-gray-200 whitespace-nowrap">{startIndex + i + 1}</td>
                           {/* Show patient name only for first test in each visit */}
@@ -758,6 +776,81 @@ export default function ReferralDoctorRevenueReport() {
             </tbody>
           </table>
         </div>
+
+        {/* Inactive Visits Modal */}
+        {showInactiveModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-2 sm:p-4">
+            <div className="bg-white rounded-lg shadow-2xl max-w-4xl w-full max-h-96 overflow-auto">
+              <div className="bg-orange-50 px-4 py-3 border-b border-gray-300 flex items-center justify-between sticky top-0">
+                <h3 className="text-base font-bold text-orange-800">Inactive Visits ({inactiveVisits.size})</h3>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setShowInactiveModal(false)}
+                    className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white text-xs rounded font-semibold"
+                    title="Back to report"
+                  >
+                    Back
+                  </button>
+                  <button
+                    onClick={() => setShowInactiveModal(false)}
+                    className="text-gray-500 hover:text-gray-700 text-xl font-bold"
+                  >
+                    ✕
+                  </button>
+                </div>
+              </div>
+              <table className="w-full text-xs sm:text-sm">
+                <thead className="bg-orange-100 sticky top-12">
+                  <tr>
+                    <th className="px-3 py-2 text-center font-semibold whitespace-nowrap border border-gray-300">Action</th>
+                    <th className="px-3 py-2 text-left font-semibold whitespace-nowrap border border-gray-300">Visit ID</th>
+                    <th className="px-3 py-2 text-left font-semibold whitespace-nowrap border border-gray-300">Patient Name</th>
+                    <th className="px-3 py-2 text-left font-semibold whitespace-nowrap border border-gray-300">Doctor</th>
+                    <th className="px-3 py-2 text-right font-semibold whitespace-nowrap border border-gray-300">Total Amount</th>
+                    <th className="px-3 py-2 text-center font-semibold whitespace-nowrap border border-gray-300">Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {Array.from(inactiveVisits).map((visitId) => {
+                    const visitData = allTransactions.find(t => t.visitId === visitId);
+                    const visitAllTests = allTransactions.filter(t => t.visitId === visitId);
+                    
+                    if (!visitData) return null;
+                    
+                    const totalAmount = visitAllTests.reduce((sum, t) => sum + t.netAmount, 0);
+                    const paymentStatus = visitAllTests.some(t => t.paymentStatus === "Unpaid") ? "Unpaid" : "Paid";
+                    
+                    return (
+                      <tr key={visitId} className="bg-white hover:bg-orange-50 border-b border-gray-200">
+                        <td className="px-3 py-2 border border-gray-300 text-center">
+                          <button
+                            onClick={() => {
+                              handleDeleteRow(visitId);
+                              console.log('✅ Activated visit:', visitId, '- Modal stays open');
+                            }}
+                            className="px-2 py-1 bg-green-600 hover:bg-green-700 text-white text-xs rounded font-semibold"
+                            title="Click to activate this visit (modal will stay open)"
+                          >
+                            Activate
+                          </button>
+                        </td>
+                        <td className="px-3 py-2 border border-gray-300 font-medium text-blue-700">{visitId}</td>
+                        <td className="px-3 py-2 border border-gray-300">{visitData.patientName}</td>
+                        <td className="px-3 py-2 border border-gray-300">Dr. {visitData.doctorName}</td>
+                        <td className="px-3 py-2 border border-gray-300 text-right font-semibold">₹{totalAmount.toFixed(2)}</td>
+                        <td className="px-3 py-2 border border-gray-300 text-center">
+                          <span className={`px-2 py-1 rounded text-xs font-bold ${paymentStatus === "Paid" ? "bg-green-200 text-green-800" : "bg-red-200 text-red-800"}`}>
+                            {paymentStatus}
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
 
         {/* Pagination */}
         {filteredData.length > 0 && (
