@@ -286,11 +286,22 @@ export default function ReferralDoctorRevenueReport() {
 
     // Filter by doctor (OPTIONAL - only if selected)
     if (selectedDoctor && selectedDoctor.trim() !== "") {
-      const doctorLower = selectedDoctor.toLowerCase().trim();
+      // Normalize both names for comparison
+      const normalizeDoctor = (name: string) => {
+        return name
+          .toLowerCase()
+          .trim()
+          .replace(/^dr\.\s+/, '')  // Remove "Dr. " prefix
+          .replace(/\s+/g, ' ');     // Normalize spaces
+      };
+      
+      const selectedDoctorNorm = normalizeDoctor(selectedDoctor);
       filtered = filtered.filter((t) => {
-        const dataDoctor = (t.doctorName || '').toLowerCase().trim();
-        return dataDoctor === doctorLower;
+        const dataDoctorNorm = normalizeDoctor(t.doctorName || '');
+        return dataDoctorNorm === selectedDoctorNorm;
       });
+      
+      console.log('🔍 Doctor filter applied:', selectedDoctor, '-> showing', filtered.length, 'records');
     }
 
     // Filter by patient name (OPTIONAL - only if typed)
@@ -468,9 +479,6 @@ export default function ReferralDoctorRevenueReport() {
                 onFocus={() => setDoctorOpen(true)}
                 className="w-full border border-gray-300 rounded px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
               />
-              {selectedDoctor && (
-                <div className="text-xs text-green-600 mt-1 font-semibold">✓ Selected: {selectedDoctor}</div>
-              )}
               {doctorOpen && doctorSearch && (
                 <div className="absolute z-50 top-full left-0 w-full mt-1 bg-white border border-gray-300 rounded shadow-lg max-h-48 overflow-y-auto">
                   {filteredDoctors.length > 0 ? (
@@ -716,13 +724,11 @@ export default function ReferralDoctorRevenueReport() {
                                 {c.key === "billAmount" ? `₹${visitSubtotal.billAmount.toFixed(2)}` :
                                  c.key === "discountRuntime" ? `₹${visitSubtotal.discountRuntime.toFixed(2)}` :
                                  c.key === "discountSpecial" ? `₹${visitSubtotal.discountSpecial.toFixed(2)}` :
-                                 c.key === "netAmount" ? `₹${visitSubtotal.netAmount.toFixed(2)}` : "-"}
+                                 c.key === "netAmount" ? `₹${visitSubtotal.netAmount.toFixed(2)}` :
+                                 c.key === "paymentMode" ? <span className={`px-2 py-1 rounded text-xs font-bold ${visitSubtotal.paymentStatus === "Paid" ? "bg-green-200 text-green-800" : "bg-red-200 text-red-800"}`}>{visitSubtotal.paymentStatus}</span>
+                                 : "-"}
                               </td>
                             ))}
-                            {/* Payment Status column - shown only in subtotal */}
-                            <td className="px-2 sm:px-3 py-1.5 sm:py-2 border border-gray-300 whitespace-nowrap text-right font-semibold bg-blue-100">
-                              <span className={`px-2 py-1 rounded text-xs font-bold ${visitSubtotal.paymentStatus === "Paid" ? "bg-green-200 text-green-800" : "bg-red-200 text-red-800"}`}>{visitSubtotal.paymentStatus}</span>
-                            </td>
                           </tr>
                         )}
                       </>
@@ -732,16 +738,17 @@ export default function ReferralDoctorRevenueReport() {
                   {selectedDoctor && totals && vis.some(c => ["billAmount", "discountRuntime", "discountSpecial", "netAmount"].includes(c.key)) && (
                     <tr className="bg-slate-100 border-t-2 border-gray-400 font-bold">
                       <td colSpan={1} className="px-2 sm:px-3 py-1.5 sm:py-2 border border-gray-300 text-center w-12"></td>
-                      <td colSpan={4} className="px-2 sm:px-3 py-1.5 sm:py-2 text-right border border-gray-300 flex items-center justify-end gap-2">
-                        <span>TOTAL</span>
-                        <span className={`px-2 py-0.5 rounded text-xs font-bold ${totals.paymentStatus === "Paid" ? "bg-green-200 text-green-800" : "bg-red-200 text-red-800"}`}>{totals.paymentStatus}</span>
+                      <td colSpan={4} className="px-2 sm:px-3 py-1.5 sm:py-2 text-right border border-gray-300">
+                        TOTAL
                       </td>
                       {vis.map(c => (
-                        <td key={c.key} className="px-2 sm:px-3 py-1.5 sm:py-2 border border-gray-300 whitespace-nowrap text-right">
+                        <td key={c.key} className="px-2 sm:px-3 py-1.5 sm:py-2 border border-gray-300 whitespace-nowrap text-right bg-slate-200">
                           {c.key === "billAmount" ? `₹${totals.billAmount.toFixed(2)}` :
                            c.key === "discountRuntime" ? `₹${totals.discountRuntime.toFixed(2)}` :
                            c.key === "discountSpecial" ? `₹${totals.discountSpecial.toFixed(2)}` :
-                           c.key === "netAmount" ? `₹${totals.netAmount.toFixed(2)}` : "-"}
+                           c.key === "netAmount" ? `₹${totals.netAmount.toFixed(2)}` :
+                           c.key === "paymentMode" ? <span className={`px-2 py-1 rounded text-xs font-bold ${totals.paymentStatus === "Paid" ? "bg-green-200 text-green-800" : "bg-red-200 text-red-800"}`}>{totals.paymentStatus}</span>
+                           : "-"}
                         </td>
                       ))}
                     </tr>
