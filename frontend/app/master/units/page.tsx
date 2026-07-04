@@ -2,8 +2,6 @@
 
 import { useState, useEffect } from "react";
 import { Ruler, RotateCcw, ChevronLeft, ChevronRight } from "lucide-react";
-import Header from "@/src/components/Header";
-import PageHeader from "@/src/components/BreadCrumb";
 import UnitModal from "@/src/components/UnitModal";
 import { getUnits, deleteUnit } from "@/src/api/master";
 
@@ -55,9 +53,7 @@ export default function ResultUnits() {
 
   return (
     <>
-      <Header />
       <div className="min-h-screen bg-white p-6">
-        <PageHeader title="Result Units" icon={Ruler} path="Master" />
 
         {/* Top Bar */}
         <div className="flex flex-wrap items-center justify-between gap-3 mb-4 bg-white p-3 rounded shadow-md">

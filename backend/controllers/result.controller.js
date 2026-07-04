@@ -1446,6 +1446,156 @@ export const deleteAttachment = async (req, res) => {
 };
 
 
+// Get previous test result for a patient and specific test
+export const getPreviousTestResult = async (req, res) => {
+  try {
+    const { patientId, testId } = req.params;
+
+    // Find the most recent previous test result (before today or before current visit)
+    const previousResult = await prisma.patientTest.findFirst({
+      where: {
+        patientId: parseInt(patientId),
+        testId: parseInt(testId),
+        visitDate: {
+          lt: new Date() // Get tests from before today
+        }
+      },
+      include: {
+        testResults: {
+          include: {
+            testParameter: {
+              select: {
+                id: true,
+                parameterName: true,
+                units: true
+              }
+            }
+          }
+        },
+        test: {
+          select: {
+            id: true,
+            name: true
+          }
+        }
+      },
+      orderBy: {
+        visitDate: 'desc'
+      },
+      take: 1
+    });
+
+    if (!previousResult) {
+      return res.json({
+        success: true,
+        data: null,
+        message: 'No previous test result found'
+      });
+    }
+
+    res.json({
+      success: true,
+      data: {
+        testId: previousResult.id,
+        testName: previousResult.test.name,
+        visitDate: previousResult.visitDate,
+        testResults: previousResult.testResults.map(tr => ({
+          parameterId: tr.testParameter.id,
+          parameterName: tr.testParameter.parameterName,
+          value: tr.numericValue || tr.textValue || tr.selectedOption,
+          units: tr.testParameter.units,
+          isAbnormal: tr.isAbnormal,
+          isOutOfRange: tr.isOutOfRange
+        }))
+      }
+    });
+
+  } catch (error) {
+    console.error('Get previous test result error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch previous test result'
+    });
+  }
+};
+
+// Get all test results history for a patient and specific test
+export const getAllTestResults = async (req, res) => {
+  try {
+    const { patientId, testId } = req.params;
+    const { limit = 10 } = req.query;
+
+    // Get all test results for this patient and test, ordered by date (most recent first)
+    const allResults = await prisma.patientTest.findMany({
+      where: {
+        patientId: parseInt(patientId),
+        testId: parseInt(testId)
+      },
+      include: {
+        testResults: {
+          include: {
+            testParameter: {
+              select: {
+                id: true,
+                parameterName: true,
+                units: true
+              }
+            }
+          }
+        },
+        test: {
+          select: {
+            id: true,
+            name: true
+          }
+        }
+      },
+      orderBy: {
+        visitDate: 'desc'
+      },
+      take: parseInt(limit)
+    });
+
+    if (allResults.length === 0) {
+      return res.json({
+        success: true,
+        data: [],
+        message: 'No test results found'
+      });
+    }
+
+    // Format results for display
+    const formattedResults = allResults.map(result => ({
+      testId: result.id,
+      visitDate: result.visitDate,
+      status: result.status,
+      results: result.testResults.map(tr => ({
+        parameterId: tr.testParameter.id,
+        parameterName: tr.testParameter.parameterName,
+        value: tr.numericValue || tr.textValue || tr.selectedOption,
+        units: tr.testParameter.units,
+        isAbnormal: tr.isAbnormal,
+        isOutOfRange: tr.isOutOfRange,
+        referenceRange: tr.referenceRange
+      }))
+    }));
+
+    res.json({
+      success: true,
+      data: formattedResults,
+      total: formattedResults.length
+    });
+
+  } catch (error) {
+    console.error('Get all test results error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch test result history'
+    });
+  }
+};
+
+
 // Get doctor referral revenue - Fetch patient tests with doctor charges
 export const getDoctorReferralRevenue = async (req, res) => {
   try {

@@ -1265,7 +1265,7 @@ const AddTest = () => {
                             className="flex-1 min-w-[120px] bg-transparent border-none outline-none text-xs text-gray-500 cursor-pointer"
                           >
                             <option value="">{selectedTestsToAdd.length === 0 ? '-- Select test to add --' : '+ Add more...'}</option>
-                            {tests
+                            {Array.isArray(tests) && tests
                               .filter(t => !selectedTestsToAdd.find(s => s.id === t.id))
                               .map(test => (
                                 <option key={test.id} value={test.id}>{test.name || test.shortName || `Test #${test.id}`}</option>

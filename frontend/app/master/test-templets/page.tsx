@@ -1,8 +1,6 @@
 "use client";
 
 import { useState, useEffect, useRef } from 'react';
-import Header from "@/src/components/Header";
-import PageHeader from "@/src/components/BreadCrumb";
 import { FileText, RotateCwIcon, X, Check, Plus, Trash2, ChevronLeft, ChevronRight } from 'lucide-react';
 import { CKEditor } from '@ckeditor/ckeditor5-react';
 import ClassicEditor from '@ckeditor/ckeditor5-build-classic';
@@ -111,18 +109,22 @@ const TestTemplets = () => {
   const fetchTests = async () => {
     try {
       const data = await getTests();
-      setTests(data);
+      // Ensure data is always an array
+      setTests(Array.isArray(data) ? data : ((data as any)?.data || []));
     } catch (err) {
       console.error('Error fetching tests:', err);
+      setTests([]); // Set empty array on error
     }
   };
 
   const fetchUnits = async () => {
     try {
       const data = await getUnits();
-      setUnits(data);
+      // Ensure data is always an array
+      setUnits(Array.isArray(data) ? data : ((data as any)?.data || []));
     } catch (err) {
       console.error('Error fetching units:', err);
+      setUnits([]); // Set empty array on error
     }
   };
 
@@ -252,7 +254,6 @@ const TestTemplets = () => {
   if (showForm) {
     return (
       <>
-        <Header />
         <div className="p-3 sm:p-4 md:p-6 bg-gray-100 min-h-screen">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 bg-white p-3 rounded shadow-md gap-3 max-w-6xl mx-auto">
             <div className="flex items-center gap-3">
@@ -306,7 +307,7 @@ const TestTemplets = () => {
                   className="w-full px-3 py-2 border border-gray-300 bg-white rounded text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 disabled:bg-gray-100 disabled:cursor-not-allowed disabled:text-gray-500"
                 >
                   <option value="">Please Select</option>
-                  {tests.map(test => (
+                  {Array.isArray(tests) && tests.map(test => (
                     <option key={test.id} value={test.id}>
                       {test.name}
                     </option>
@@ -445,11 +446,8 @@ const TestTemplets = () => {
 
   return (
     <>
-      <Header />
       <div className="p-3 sm:p-4 md:p-6 bg-gray-100 min-h-screen">
         <div className="max-w-6xl mx-auto">
-          <PageHeader title="Test Templates" icon={FileText} path="Master" />
-
           <div className="flex flex-col sm:flex-row flex-wrap items-start sm:items-center justify-between gap-3 mb-4 bg-white p-4 rounded shadow-md">
             <div className="flex flex-col sm:flex-row gap-2 flex-1 w-full sm:w-auto">
               <input
@@ -504,18 +502,16 @@ const TestTemplets = () => {
                 <table className="w-full text-xs sm:text-sm border-collapse">
                   <thead className="bg-slate-900 text-white sticky top-0">
                     <tr>
-                      <th className="border border-gray-300 px-4 py-3 text-left font-semibold">Template Name</th>
-                      <th className="border border-gray-300 px-4 py-3 text-left font-semibold">Test Name</th>
-                      <th className="border border-gray-300 px-4 py-3 text-left font-semibold">Parameters</th>
-                      <th className="border border-gray-300 px-4 py-3 text-left font-semibold">Created</th>
-                      <th className="border border-gray-300 px-4 py-3 text-center font-semibold">Action</th>
+                      <th className="border border-gray-300 px-4 py-2 text-left font-semibold">Template Name</th>
+                      <th className="border border-gray-300 px-4 py-2 text-left font-semibold">Test Name</th>
+                      <th className="border border-gray-300 px-4 py-2 text-center font-semibold">Action</th>
                     </tr>
                   </thead>
 
                   <tbody>
                     {filteredTemplates.length === 0 ? (
                       <tr>
-                        <td colSpan={5} className="text-center py-8 text-gray-500">
+                        <td colSpan={3} className="text-center py-8 text-gray-500">
                           {search ? 'No templates found matching your search.' : 'No templates found. Click "Add Template" to create one.'}
                         </td>
                       </tr>
@@ -525,42 +521,15 @@ const TestTemplets = () => {
                           key={template.id}
                           className={`hover:bg-blue-50 border-b border-gray-200 transition-colors ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}
                         >
-                          <td className="border border-gray-300 px-4 py-3 font-semibold text-gray-800">
+                          <td className="border border-gray-300 px-4 py-2 font-semibold text-gray-800">
                             {template.templateName}
                           </td>
 
-                          <td className="border border-gray-300 px-4 py-3 text-gray-700">
+                          <td className="border border-gray-300 px-4 py-2 text-gray-700">
                             {template.test?.name || '-'}
                           </td>
 
-                          <td className="border border-gray-300 px-4 py-3">
-                            <div className="text-xs space-y-1">
-                              {template.parameters && template.parameters.length > 0 ? (
-                                <div className="max-h-24 overflow-y-auto">
-                                  {template.parameters.map((param) => (
-                                    <div key={param.id} className="text-gray-600 py-1">
-                                      <span className="font-semibold text-gray-800">{param.name}:</span>
-                                      <div className="text-gray-500 ml-2 truncate">
-                                        {param.value ? (
-                                          param.value.length > 60 ? param.value.substring(0, 60) + '...' : param.value
-                                        ) : (
-                                          <span className="text-gray-400 italic">-</span>
-                                        )}
-                                      </div>
-                                    </div>
-                                  ))}
-                                </div>
-                              ) : (
-                                <span className="text-gray-400 italic">No parameters</span>
-                              )}
-                            </div>
-                          </td>
-
-                          <td className="border border-gray-300 px-4 py-3 text-gray-600">
-                            {template.createdAt ? new Date(template.createdAt).toLocaleDateString() : '-'}
-                          </td>
-
-                          <td className="border border-gray-300 px-4 py-3">
+                          <td className="border border-gray-300 px-4 py-2">
                             <div className="flex gap-2 justify-center flex-wrap">
                               <button
                                 onClick={() => handleEdit(template)}

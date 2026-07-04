@@ -12,6 +12,9 @@ import {
   sendReport,
   uploadAttachment,
   deleteAttachment,
+  getPreviousTestResult,
+  getAllTestResults
+  deleteAttachment,
   getDoctorReferralRevenue
 } from '../controllers/result.controller.js';
 import { upload } from '../utils/upload.js';
@@ -61,6 +64,14 @@ router.post('/:id/attachment', upload.single('file'), uploadAttachment);
 
 // Delete attachment
 router.delete('/:id/attachment', deleteAttachment);
+
+// ===== PREVIOUS AND ALL TEST RESULTS ENDPOINTS =====
+
+// Get previous test result for a patient and specific test
+router.get('/patient/:patientId/test/:testId/previous', getPreviousTestResult);
+
+// Get all test results history for a patient and specific test
+router.get('/patient/:patientId/test/:testId/history', getAllTestResults);
 
 // ===== NEW STATUS WORKFLOW ENDPOINTS =====
 

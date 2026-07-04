@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import Header from "@/src/components/Header";
 
 export default function CorporateWiseCharges() {
   const [selectedTest, setSelectedTest] = useState("");
@@ -219,7 +218,6 @@ export default function CorporateWiseCharges() {
 
   return (
     <>
-      <Header />
 
       <div className="p-4 bg-white min-h-screen flex justify-center">
         {/* WIDER WIDTH HERE */}

@@ -2,8 +2,6 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
-import Header from "@/src/components/Header";
-import PageHeader from "@/src/components/BreadCrumb";
 import BarcodeModal from "@/app/components/BarcodeModal";
 import ReferralDoctorModal from "@/src/components/ReferralDoctorModal";
 import API_BASE_URL from "@/src/api/config";
@@ -2024,10 +2022,7 @@ export default function PatientRegistration() {
       }
     `}</style>
 
-    {!hideHeader && <Header/>}
-
     <div className="w-full px-3 sm:px-6 mt-16 overflow-x-hidden">
-      <PageHeader title="Patient Registration" icon={UserPlus} path="Patient" />
 
       {/* TOP BAR */}
       <div className="bg-white rounded-xl shadow p-4 mb-3">

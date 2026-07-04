@@ -207,3 +207,30 @@ export const updateBarcodePrintStatus = async (testIds: string[], changedBy: str
     data: results
   };
 };
+
+// Get previous test result for a patient and test
+export const getPreviousTestResult = async (patientId: string, testId: string): Promise<any> => {
+  const response = await fetch(`${API_BASE_URL}/results/patient/${patientId}/test/${testId}/previous`);
+  const result: ApiResponse = await response.json();
+  
+  if (!result.success) {
+    throw new Error(result.message || 'Failed to fetch previous test result');
+  }
+  
+  return result.data;
+};
+
+// Get all test results for a patient and test
+export const getAllTestResults = async (patientId: string, testId: string, limit: number = 10): Promise<any> => {
+  const queryParams = new URLSearchParams();
+  queryParams.append('limit', limit.toString());
+  
+  const response = await fetch(`${API_BASE_URL}/results/patient/${patientId}/test/${testId}/history${queryParams.toString() ? `?${queryParams.toString()}` : ''}`);
+  const result: ApiResponse = await response.json();
+  
+  if (!result.success) {
+    throw new Error(result.message || 'Failed to fetch test result history');
+  }
+  
+  return result.data;
+};
