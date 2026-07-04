@@ -169,24 +169,27 @@ export default function ReferralDoctorRevenueReport() {
     fetchTransactions();
   }, []);
 
-  // Auto-filter when date range or filters change (AFTER allTransactions is populated)
+  // Auto-filter when transactions are fetched
   useEffect(() => {
-    // Trigger search if we have transactions loaded
     if (allTransactions.length > 0) {
-      console.log('🔄 Transactions loaded, applying filters');
+      console.log('🔄 Transactions loaded, applying all filters...');
       handleSearch();
     }
-    // Removed dependencies from this hook to prevent infinite loops
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [allTransactions]);
 
-  // Handle filter changes
+  // Re-filter when any filter parameter changes (except allTransactions which is handled above)
   useEffect(() => {
     if (allTransactions.length > 0) {
+      console.log('🔍 Filter changed, re-filtering...');
       handleSearch();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dateFrom, dateTo, selectedDoctor, searchPatient, paymentModeFilter, inactiveVisits]);
+
+  // Fetch new data when date range changes
+  useEffect(() => {
+    console.log('📅 Date range changed, fetching new data...');
+    fetchTransactions();
+  }, [dateFrom, dateTo]);
 
   // Close dropdowns on outside click
   useEffect(() => {
@@ -216,7 +219,7 @@ export default function ReferralDoctorRevenueReport() {
       setLoading(true);
       
       // Use new backend endpoint that handles all joining and filtering
-      const url = `${process.env.NEXT_PUBLIC_API_URL}/results/doctor-revenue?fromDate=${dateFrom}&toDate=${dateTo}`;
+      const url = `${process.env.NEXT_PUBLIC_API_URL}/doctor-revenue/doctor-revenue?fromDate=${dateFrom}&toDate=${dateTo}`;
       console.log('🚀 Calling endpoint:', url);
       console.log('   dateFrom:', dateFrom);
       console.log('   dateTo:', dateTo);
@@ -272,7 +275,14 @@ export default function ReferralDoctorRevenueReport() {
   const openPicker=()=>{ setTFrom(dateFrom); setTTo(dateTo); setCustom(false); setPicking(false); setHover(""); setOpen(true); };
   const pickPreset = (p: any) =>{ if(!p.fn){setCustom(true);setPreset("Custom Range");setTFrom("");setTTo("");setPicking(false);return;} const[a,b]=p.fn(); setTFrom(a);setTTo(b);setPreset(p.label);setCustom(false); };
   const clickDay = (day: any) =>{ if(!picking){setTFrom(day);setTTo("");setPicking(true);setHover("");}else{if(day<tFrom){setTTo(tFrom);setTFrom(day);}else setTTo(day);setPicking(false);} };
-  const apply=()=>{ setDateFrom(tFrom);setDateTo(tTo);setOpen(false);setPicking(false); };
+  const apply=()=>{ 
+    setDateFrom(tFrom);
+    setDateTo(tTo);
+    setOpen(false);
+    setPicking(false);
+    // Don't call fetchTransactions here - let useEffect handle it
+    console.log('📅 Date applied, will trigger fetch via effect');
+  };
   const cancel=()=>{ setOpen(false);setCustom(false);setPicking(false);setTFrom(dateFrom);setTTo(dateTo); };
   const prevM=()=>{ if(cm===0){setCm(11);setCy(y=>y-1);}else setCm(m=>m-1); };
   const nextM=()=>{ if(cm===11){setCm(0);setCy(y=>y+1);}else setCm(m=>m+1); };

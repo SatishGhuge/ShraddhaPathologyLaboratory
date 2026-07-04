@@ -7,6 +7,7 @@ import patientRoutes from './routes/patient.routes.js';
 import masterRoutes from './routes/master.routes.js';
 import resultRoutes from './routes/result.routes.js';
 import signatureRoutes from './routes/signature.routes.js';
+import doctorRevenueRoutes from './routes/doctor-revenue.routes.js';
 
 // Load environment variables
 dotenv.config();
@@ -38,6 +39,7 @@ app.use('/api/patients', patientRoutes);
 app.use('/api/master', masterRoutes);
 app.use('/api/results', resultRoutes);
 app.use('/api/signatures', signatureRoutes);
+app.use('/api/doctor-revenue', doctorRevenueRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {
