@@ -122,30 +122,7 @@ export const getPatientTests = async (req, res) => {
     // Get paginated data
     const patientTests = await prisma.patientTest.findMany({
       where: whereCondition,
-      select: {
-        id: true,
-        patientId: true,
-        visitId: true,
-        visitDate: true,
-        visitTime: true,
-        status: true,
-        barcode_status: true,
-        sampleTaken: true,
-        sampleReceived: true,
-        resultDate: true,
-        patient_history: true,
-        charge: true,
-        result: true,
-        businessType: true,
-        organizationId: true,
-        balanceAmount: true,
-        attachmentPath: true,
-        referralDoctor: true,
-        sample: true,
-        sampleBarcodeNo: true,
-        visitType: true,
-        reportMode: true,
-        packageName: true,
+      include: {
         patient: {
           select: {
             patientId: true,
@@ -159,14 +136,43 @@ export const getPatientTests = async (req, res) => {
           }
         },
         test: {
+          include: {
+            categories: {
+              include: {
+                testParameter: {
+                  select: {
+                    id: true,
+                    parameterName: true,
+                    units: true,
+                    testMethod: true,
+                    displayRangeText: true,
+                    rangeText: true,
+                    type: true,
+                    isDescriptive: true,
+                    ageRanges: true,
+                    rangeType: true,
+                    maleLowValue: true,
+                    maleHighValue: true,
+                    femaleHighValue: true,
+                    femaleLowValue: true,
+                    maleActive: true,
+                    femaleActive: true,
+                    childLowValue: true,
+                    childHighValue: true,
+                    childActive: true
+                  }
+                }
+              }
+            }
+          }
+        },
+        testResults: {
           select: {
             id: true,
-            name: true,
-            shortName: true,
-            testCode: true,
-            sampleType: true,
-            attachFile: true,
-            imageSize: true
+            testParameterId: true,
+            numericValue: true,
+            textValue: true,
+            referenceRange: true
           }
         },
         department: {
@@ -253,7 +259,27 @@ export const getPatientTests = async (req, res) => {
         sample_barcode: patientTest.sampleBarcodeNo,
         visit_type: patientTest.visitType,
         report_mode: patientTest.reportMode,
-        package_name: patientTest.packageName || null
+        package_name: patientTest.packageName || null,
+        // Count total parameters for this test
+        parameter_count: patientTest.test.categories?.length || 0,
+        // Add parameter_id for inline editing (only for single parameter tests)
+        parameter_id: patientTest.test.categories?.length === 1 ? (patientTest.test.categories?.[0]?.testParameter?.id || null) : null,
+        // Add method name for reports (only for single parameter tests)
+        method_name: patientTest.test.categories?.length === 1 ? (patientTest.test.categories?.[0]?.testParameter?.testMethod || '') : '',
+        // Add unit and ref_interval from first parameter (only for single parameter tests)
+        unit: patientTest.test.categories?.length === 1 ? (patientTest.test.categories?.[0]?.testParameter?.units || null) : null,
+        // For ref_interval, include full parameter data so frontend can calculate based on patient demographics
+        ref_interval_data: patientTest.test.categories?.length === 1 ? (patientTest.test.categories?.[0]?.testParameter || null) : null,
+        // For result, get the numeric or text value from the first test result if single parameter
+        result: patientTest.test.categories?.length === 1 && patientTest.testResults?.length > 0 
+          ? (patientTest.testResults[0]?.numericValue ?? patientTest.testResults[0]?.textValue ?? patientTest.result ?? '-')
+          : (patientTest.result || '-'),
+        // DEBUG: Log to verify parameter_id is being set
+        _debug_parameterInfo: patientTest.test.categories?.length === 1 ? {
+          parameterName: patientTest.test.categories?.[0]?.testParameter?.parameterName,
+          parameterId: patientTest.test.categories?.[0]?.testParameter?.id,
+          categoryCount: patientTest.test.categories?.length
+        } : null
       });
     });
 
@@ -310,23 +336,13 @@ export const getPatientTestById = async (req, res) => {
           }
         },
         testResults: {
-          select: {
-            id: true,
-            testParameterId: true,
-            testCategoryId: true,
-            numericValue: true,
-            textValue: true,
-            selectedOption: true,
-            isAbnormal: true,
-            isOutOfRange: true,
-            isPanic: true,
-            lowValue: true,
-            highValue: true,
-            referenceRange: true,
-            enteredBy: true,
-            verifiedBy: true,
-            enteredAt: true,
-            verifiedAt: true
+          include: {
+            testParameter: {
+              select: {
+                id: true,
+                parameterName: true
+              }
+            }
           }
         }
       }
@@ -343,18 +359,39 @@ export const getPatientTestById = async (req, res) => {
     console.log('Found patient test:', patientTest.id, 'for patient:', patientTest.patient.firstName);
     console.log('Total testResults in database:', patientTest.testResults?.length || 0);
     console.log('Test Results Details:', JSON.stringify(patientTest.testResults, null, 2));
+    
+    // Log which parameters exist in testResults
+    if (patientTest.testResults && patientTest.testResults.length > 0) {
+      console.log('✅ Found test results with values:');
+      patientTest.testResults.forEach(tr => {
+        console.log(`  - parameterId: ${tr.testParameterId}, numericValue: ${tr.numericValue}, textValue: ${tr.textValue}`);
+      });
+    } else {
+      console.log('⚠️  No test results found - array is empty or null');
+    }
 
     // Get test categories with their parameters - fetch all range-related fields
     const testCategories = await prisma.testCategory.findMany({
       where: { 
         testId: patientTest.test.id 
       },
-      include: {
+      select: {
+        id: true,
+        testId: true,
+        testParameterId: true,
+        categoryName: true,
+        isCategory: true,
+        testMethod: true,  // 🔴 IMPORTANT: Fetch testMethod from category
+        sortOrder: true,
+        createdAt: true,
+        updatedAt: true,
+        categoryId: true,
         testParameter: {
           select: {
             id: true,
             parameterName: true,
             units: true,
+            testMethod: true,
             type: true,
             isDescriptive: true,
             isMultipleOptions: true,
@@ -390,7 +427,14 @@ export const getPatientTestById = async (req, res) => {
       }
     });
 
-    console.log(`Found ${testCategories.length} categories for test`);
+    console.log(`\nℹ️  Test Categories found: ${testCategories.length}`);
+    testCategories.forEach(cat => {
+      console.log(`  - CategoryID ${cat.id}: ${cat.categoryName || '(no name)'}`);
+      console.log(`    testMethod: "${cat.testMethod}" (from category)`);
+      console.log(`    parameter: ${cat.testParameter?.parameterName}`);
+      console.log(`    parameter.testMethod: "${cat.testParameter?.testMethod}" (from parameter)`);
+      console.log(`    FINAL testMethod: "${cat.testMethod || cat.testParameter?.testMethod || '(none)'}"`);
+    });
 
     // Process parameters from categories
     const allParameters = [];
@@ -422,6 +466,35 @@ export const getPatientTestById = async (req, res) => {
           console.log(`  ⭕ NO result found for parameter ${category.testParameter.parameterName} (ID: ${category.testParameter.id})`);
         }
         
+        const foundResult = patientTest.testResults.find(r => 
+          // Match by category ID if available
+          r.testCategoryId === category.id || 
+          // Match by exact parameter ID
+          r.testParameterId === category.testParameter.id ||
+          // Fallback: match by parameter name (in case parameter was updated)
+          (r.testParameter && r.testParameter.parameterName === category.testParameter.parameterName)
+        );
+        
+        console.log(`  📌 Parameter: ${category.testParameter.parameterName} (ID: ${category.testParameter.id}, CategoryID: ${category.id})`);
+        console.log(`    Looking for result matching: categoryId=${category.id} OR paramId=${category.testParameter.id} OR paramName=${category.testParameter.parameterName}`);
+        if (patientTest.testResults.length > 0) {
+          console.log(`    Available results:`, patientTest.testResults.map(tr => ({
+            paramId: tr.testParameterId,
+            categoryId: tr.testCategoryId,
+            paramName: tr.testParameter?.parameterName,
+            value: tr.numericValue || tr.textValue
+          })));
+        }
+        console.log(`    Result found: ${!!foundResult}`);
+        if (foundResult) {
+          console.log(`    ✅ MATCHED! Result data:`, {
+            testResultId: foundResult.id,
+            parameterName: foundResult.testParameter?.parameterName,
+            numericValue: foundResult.numericValue,
+            textValue: foundResult.textValue
+          });
+        }
+
         const parameter = {
           id: category.testParameter.id,
           parameterName: category.testParameter.parameterName,
@@ -433,7 +506,19 @@ export const getPatientTestById = async (req, res) => {
           categoryName: categoryName,
           categoryId: category.id,
           sortOrder: category.testParameter.parameterSortOrder || 999,
-          showCategoryHeader: hasManualCategoryName, // Flag to show/hide header
+          showCategoryHeader: hasManualCategoryName,
+          
+          // 🔴 SEPARATE both methods
+          categoryTestMethod: category.testMethod || null,  // Method from category
+          parameterTestMethod: category.testParameter.testMethod || null,  // Method from parameter
+          testMethod: category.testMethod || category.testParameter.testMethod || '', // Fallback (for backward compatibility)
+          
+          // Log for debugging
+          _debug_testMethod: {
+            categoryTestMethod: category.testMethod,
+            parameterTestMethod: category.testParameter.testMethod,
+            finalValue: category.testMethod || category.testParameter.testMethod || ''
+          },
           
           // Range type and display text from database
           rangeType: category.testParameter.rangeType,
@@ -469,7 +554,7 @@ export const getPatientTestById = async (req, res) => {
           normalRange: getNormalRange(category.testParameter, patientTest.patient),
           
           // Existing result if any
-          existingResult: patientTest.testResults.find(r => r.testParameterId === category.testParameter.id)
+          existingResult: foundResult
         };
 
         allParameters.push(parameter);
@@ -492,6 +577,7 @@ export const getPatientTestById = async (req, res) => {
           id: true,
           parameterName: true,
           units: true,
+          testMethod: true,
           type: true,
           isDescriptive: true,
           isMultipleOptions: true,
@@ -552,6 +638,11 @@ export const getPatientTestById = async (req, res) => {
           categoryId: null,
           sortOrder: param.parameterSortOrder || 999,
           showCategoryHeader: false, // Don't show header for direct parameters
+          
+          // 🔴 For direct parameters: no category method, only parameter method
+          categoryTestMethod: null,  // No category for direct parameters
+          parameterTestMethod: param.testMethod || null,  // Method from parameter
+          testMethod: param.testMethod || '',  // Fallback (for backward compatibility)
           
           // Range type and display text from database
           rangeType: param.rangeType,
@@ -826,7 +917,12 @@ export const updateTestStatus = async (req, res) => {
 export const updateTestResult = async (req, res) => {
   try {
     const { id } = req.params;
-    const { result, status } = req.body;
+    const { result, status, parameterResults } = req.body;
+
+    console.log('🔵 updateTestResult called');
+    console.log('  📋 patientTestId:', id);
+    console.log('  📊 result:', result);
+    console.log('  📦 parameterResults:', JSON.stringify(parameterResults, null, 2));
 
     // Map old uppercase statuses to new format for backward compatibility
     const statusMapping = {
@@ -860,15 +956,74 @@ export const updateTestResult = async (req, res) => {
       updateData.resultDate = new Date();
     }
 
+    // Update PatientTest record
     const updatedTest = await prisma.patientTest.update({
       where: { id: parseInt(id) },
       data: updateData,
       include: {
         patient: true,
         test: true,
-        department: true
+        department: true,
+        testResults: true
       }
     });
+
+    console.log('  ✅ PatientTest updated');
+
+    // Handle parameterResults if provided (for inline editing of individual test parameter values)
+    if (parameterResults && Array.isArray(parameterResults) && parameterResults.length > 0) {
+      console.log('  🔄 Processing parameterResults...');
+      for (const paramResult of parameterResults) {
+        const { parameterId, numericValue, textValue } = paramResult;
+        
+        console.log(`  📝 Upserting TestResult:
+          patientTestId: ${id}
+          parameterId: ${parameterId}
+          numericValue: ${numericValue}
+          textValue: ${textValue}`);
+        
+        if (!parameterId) {
+          console.error(`  ❌ SKIPPED: parameterId is null or undefined!`);
+          continue;
+        }
+        
+        try {
+          // Upsert TestResult record - create if not exists, update if exists
+          const testResult = await prisma.testResult.upsert({
+            where: {
+              patientTestId_testParameterId: {
+                patientTestId: parseInt(id),
+                testParameterId: parseInt(parameterId)
+              }
+            },
+            update: {
+              numericValue: numericValue || undefined,
+              textValue: textValue || undefined,
+              verifiedAt: new Date()
+            },
+            create: {
+              patientTestId: parseInt(id),
+              testParameterId: parseInt(parameterId),
+              numericValue: numericValue || undefined,
+              textValue: textValue || undefined,
+              enteredAt: new Date(),
+              verifiedAt: new Date()
+            }
+          });
+
+          console.log(`  ✅ TestResult upserted for parameterId=${parameterId}:`, {
+            id: testResult.id,
+            numericValue: testResult.numericValue,
+            textValue: testResult.textValue
+          });
+        } catch (upsertError) {
+          console.error(`  ❌ Upsert error for parameterId=${parameterId}:`, upsertError.message);
+          throw upsertError;
+        }
+      }
+    } else {
+      console.log('  ⚠️  No parameterResults provided or empty array');
+    }
 
     res.json({
       success: true,
@@ -877,7 +1032,7 @@ export const updateTestResult = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Update test result error:', error);
+    console.error('❌ Update test result error:', error);
     
     if (error.code === 'P2025') {
       return res.status(404).json({
@@ -888,7 +1043,7 @@ export const updateTestResult = async (req, res) => {
 
     res.status(500).json({
       success: false,
-      message: 'Failed to update test result'
+      message: 'Failed to update test result: ' + error.message
     });
   }
 };

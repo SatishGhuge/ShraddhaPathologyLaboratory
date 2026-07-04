@@ -502,9 +502,9 @@ const TestTemplets = () => {
                 <table className="w-full text-xs sm:text-sm border-collapse">
                   <thead className="bg-slate-900 text-white sticky top-0">
                     <tr>
-                      <th className="border border-gray-300 px-4 py-2 text-left font-semibold">Template Name</th>
-                      <th className="border border-gray-300 px-4 py-2 text-left font-semibold">Test Name</th>
-                      <th className="border border-gray-300 px-4 py-2 text-center font-semibold">Action</th>
+                      <th className="border border-gray-300 px-2 py-0.5 text-left font-semibold text-xs">Template Name</th>
+                      <th className="border border-gray-300 px-2 py-0.5 text-left font-semibold text-xs">Test Name</th>
+                      <th className="border border-gray-300 px-2 py-0.5 text-center font-semibold text-xs">Action</th>
                     </tr>
                   </thead>
 
@@ -521,26 +521,26 @@ const TestTemplets = () => {
                           key={template.id}
                           className={`hover:bg-blue-50 border-b border-gray-200 transition-colors ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}
                         >
-                          <td className="border border-gray-300 px-4 py-2 font-semibold text-gray-800">
+                          <td className="border border-gray-300 px-2 py-0.5 font-semibold text-gray-800 text-xs">
                             {template.templateName}
                           </td>
 
-                          <td className="border border-gray-300 px-4 py-2 text-gray-700">
+                          <td className="border border-gray-300 px-2 py-0.5 text-gray-700 text-xs">
                             {template.test?.name || '-'}
                           </td>
 
-                          <td className="border border-gray-300 px-4 py-2">
-                            <div className="flex gap-2 justify-center flex-wrap">
+                          <td className="border border-gray-300 px-2 py-0.5">
+                            <div className="flex gap-1 justify-center flex-wrap">
                               <button
                                 onClick={() => handleEdit(template)}
-                                className="bg-blue-600 text-white px-3 py-1 rounded text-[10px] sm:text-xs hover:bg-blue-700 transition-colors font-medium"
+                                className="bg-blue-600 text-white px-2 py-0.5 rounded text-[9px] hover:bg-blue-700 transition-colors font-medium"
                               >
                                 Edit
                               </button>
 
                               <button
                                 onClick={() => handleDelete(template.id)}
-                                className="bg-red-500 text-white px-3 py-1 rounded text-[10px] sm:text-xs hover:bg-red-600 transition-colors font-medium"
+                                className="bg-red-500 text-white px-2 py-0.5 rounded text-[9px] hover:bg-red-600 transition-colors font-medium"
                               >
                                 Delete
                               </button>

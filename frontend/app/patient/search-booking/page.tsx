@@ -2022,7 +2022,7 @@ export default function BookingPage() {
                           <span>Investigation(s)</span>
                           <span className="text-yellow-300 text-xs">{allTests.length} test{allTests.length!==1?"s":""}</span>
                         </div>
-                        <div className="flex-1 overflow-y-auto">
+                        <div className="flex-1 overflow-y-auto overflow-x-auto">
                           <table className="w-full text-xs">
                             <thead className="bg-slate-900 text-white sticky top-0">
                               <tr>
@@ -2041,22 +2041,31 @@ export default function BookingPage() {
                                 const charge    = businessType==="B2C"?(t.b2cCharge||t.charge||0):(t.b2bCharge||t.charge||0);
                                 const isEditing = editingCharge?.testName===t.name;
                                 const isNewTest = !t.isExisting;
-                                // Barcode status: RED if Registered (unprinted), BLUE if not Registered (printed)
-                                const isBarcodePrinted = t.status && t.status !== "Registered";
+                                // Barcode status: RED if Unprinted, BLUE if Printed
+                                const barcodeStatus = t.barcode_status || "Unprinted";
+                                const isBarcodePrinted = barcodeStatus === "Printed";
+                                // Highlight entire row red if barcode not printed
+                                const rowBackgroundClass = !isBarcodePrinted ? "bg-red-50 hover:bg-red-100" : (t.fromPackage||t.isPackage ? "bg-orange-50 hover:bg-orange-100" : "hover:bg-gray-50");
                                 return (
-                                  <tr key={i} className={`border-b hover:bg-gray-50 ${t.fromPackage||t.isPackage?"bg-orange-50":""}`}>
+                                  <tr key={i} className={`border-b ${rowBackgroundClass} ${!isBarcodePrinted ? "border-red-300 border-l-4 border-l-red-600" : "border-gray-200"}`}>
                                     <td className="p-2 text-center">
                                       <div className="flex items-center justify-center gap-1">
                                         <span>{i+1}</span>
                                         {isNewTest && (
                                           <span className="text-blue-600 font-bold text-sm" title="Newly added test">N</span>
                                         )}
+                                        {!isBarcodePrinted && (
+                                          <span className="text-red-600 font-bold text-sm" title="Barcode not printed">⚠</span>
+                                        )}
                                       </div>
                                     </td>
                                     <td className="p-2">
-                                      <div className="flex items-center gap-1 flex-wrap">
+                                      <div className="flex items-center gap-2 flex-wrap">
                                         {(t.fromPackage||t.isPackage) && <span className="bg-orange-500 text-white text-xs px-1.5 py-0.5 rounded font-semibold shrink-0">PKG</span>}
                                         <span>{t.name}</span>
+                                        {barcodeStatus === "Unprinted" && (
+                                          <span className="bg-red-100 text-red-700 text-xs px-1.5 py-0.5 rounded font-semibold shrink-0" title="Barcode yet to get printed">⚠ Unprinted</span>
+                                        )}
                                       </div>
                                     </td>
                                     <td className="p-2 text-center">{selectedBooking.date}</td>
@@ -2075,7 +2084,7 @@ export default function BookingPage() {
                                     </td>
                                     <td className="p-2 text-center">
                                       <div className="w-5 h-5 rounded border-2 flex items-center justify-center mx-auto" 
-                                        title={isBarcodePrinted ? "Printed (Received)" : "Unprinted (Registered)"}
+                                        title={isBarcodePrinted ? "Printed" : "Unprinted"}
                                         style={isBarcodePrinted 
                                           ? { borderColor: '#3b82f6', backgroundColor: '#eff6ff', color: '#1e40af' }
                                           : { borderColor: '#ef4444', backgroundColor: '#fef2f2', color: '#dc2626' }
@@ -2605,7 +2614,7 @@ export default function BookingPage() {
                       setShowPrintDropdown(!showPrintDropdown);
                       setShowDownloadDropdown(false);
                     }}
-                    className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-1.5 rounded text-sm font-semibold flex items-center gap-2"
+                    className="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded text-sm font-semibold flex items-center gap-2"
                   >
                     <Printer size={16} />
                     Print
@@ -2613,7 +2622,7 @@ export default function BookingPage() {
                   </button>
                   
                   {showPrintDropdown && (
-                    <div className="absolute top-full left-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-10 min-w-[180px]">
+                    <div className="absolute bottom-full left-0 mb-1 bg-white border border-gray-200 rounded-lg shadow-lg z-10 min-w-[180px]">
                       <button
                         onClick={handlePrintWithHeader}
                         className="w-full text-left px-4 py-2 text-sm hover:bg-gray-50 rounded-t-lg border-b border-gray-100"
@@ -2637,7 +2646,7 @@ export default function BookingPage() {
                       setShowDownloadDropdown(!showDownloadDropdown);
                       setShowPrintDropdown(false);
                     }}
-                    className="bg-slate-900 hover:bg-orange-600 text-white px-4 py-1.5 rounded text-sm font-semibold flex items-center gap-2"
+                    className="bg-slate-900 hover:bg-orange-600 text-white px-5 py-2.5 rounded text-sm font-semibold flex items-center gap-2"
                   >
                     <Download size={16} />
                     Download PDF
@@ -2645,7 +2654,7 @@ export default function BookingPage() {
                   </button>
                   
                   {showDownloadDropdown && (
-                    <div className="absolute top-full left-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-10 min-w-[180px]">
+                    <div className="absolute bottom-full left-0 mb-1 bg-white border border-gray-200 rounded-lg shadow-lg z-10 min-w-[180px]">
                       <button
                         onClick={handleDownloadWithHeader}
                         className="w-full text-left px-4 py-2 text-sm hover:bg-gray-50 rounded-t-lg border-b border-gray-100"
@@ -2662,8 +2671,8 @@ export default function BookingPage() {
                   )}
                 </div>
 
-                <button className="bg-green-600 hover:bg-green-700 text-white px-4 py-1.5 rounded text-sm font-semibold">Whatsapp To Patient</button>
-                <button className="bg-teal-600 hover:bg-teal-700 text-white px-4 py-1.5 rounded text-sm font-semibold">Direct WA to Patient</button>
+                <button className="bg-green-600 hover:bg-green-700 text-white px-5 py-2.5 rounded text-sm font-semibold">Whatsapp To Patient</button>
+                <button className="bg-teal-600 hover:bg-teal-700 text-white px-5 py-2.5 rounded text-sm font-semibold">Direct WA to Patient</button>
                 <button 
                   onClick={() => {
                     setShowBillModal(false);

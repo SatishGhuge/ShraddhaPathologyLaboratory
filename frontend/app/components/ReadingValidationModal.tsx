@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, Fragment } from 'react';
+import { useState, useEffect, useCallback, Fragment, useRef } from 'react';
 import { X, AlertCircle } from 'lucide-react';
 import API_BASE_URL from '@/src/api/config';
 
@@ -153,6 +153,9 @@ const ReadingValidationModal = ({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [validating, setValidating] = useState(false);
+  const inputRefs = useRef<any>({});
+  const [focusedInputId, setFocusedInputId] = useState<number | null>(null);
+  const [flattenedParams, setFlattenedParams] = useState<Parameter[]>([]);
 
   // Initialize results from existing data
   useEffect(() => {
@@ -216,6 +219,33 @@ const ReadingValidationModal = ({
   useEffect(() => {
     console.log('🎯 RESULTS STATE UPDATED:', JSON.stringify(results, null, 2));
   }, [results]);
+
+  // Build flattened parameters list for keyboard navigation
+  useEffect(() => {
+    if (groupedParameters) {
+      const flattened: Parameter[] = [];
+      Object.entries(groupedParameters).forEach(([_, categoryParams]: [string, any]) => {
+        (categoryParams as Parameter[]).forEach(param => {
+          flattened.push(param);
+        });
+      });
+      setFlattenedParams(flattened);
+    }
+  }, [groupedParameters]);
+
+  // Auto-focus first input when modal opens
+  useEffect(() => {
+    if (isOpen && flattenedParams.length > 0) {
+      setTimeout(() => {
+        const firstParamId = flattenedParams[0].id;
+        if (inputRefs.current[firstParamId]) {
+          inputRefs.current[firstParamId].focus();
+          setFocusedInputId(firstParamId);
+          console.log('🎯 Auto-focused first input for parameter:', firstParamId);
+        }
+      }, 100);
+    }
+  }, [isOpen, flattenedParams]);
 
   // Calculate age in specific time unit
   const getAgeInUnit = (years: number, months: number, days: number, timeUnit: string) => {
@@ -467,6 +497,57 @@ const ReadingValidationModal = ({
     }
   };
 
+  // Handle keyboard navigation and shortcuts
+  const handleKeyDown = useCallback((e: KeyboardEvent) => {
+    if (!isOpen) return;
+
+    // Ctrl+S or Enter to save and validate
+    if ((e.ctrlKey && e.key === 's') || e.key === 'Enter') {
+      e.preventDefault();
+      handleValidate();
+      return;
+    }
+
+    // Escape to close modal
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      onClose();
+      return;
+    }
+
+    // Tab, Shift+Tab, ArrowDown, ArrowUp for navigation
+    if (['Tab', 'ArrowDown', 'ArrowUp'].includes(e.key)) {
+      const currentIndex = flattenedParams.findIndex(p => p.id === focusedInputId);
+      if (currentIndex === -1) return;
+
+      let nextIndex = currentIndex;
+
+      if (e.key === 'Tab' || e.key === 'ArrowDown') {
+        nextIndex = (currentIndex + 1) % flattenedParams.length;
+      } else if (e.key === 'ArrowUp' || (e.key === 'Tab' && e.shiftKey)) {
+        nextIndex = currentIndex - 1 < 0 ? flattenedParams.length - 1 : currentIndex - 1;
+      }
+
+      if (nextIndex !== currentIndex) {
+        e.preventDefault();
+        const nextParamId = flattenedParams[nextIndex].id;
+        if (inputRefs.current[nextParamId]) {
+          inputRefs.current[nextParamId].focus();
+          setFocusedInputId(nextParamId);
+          console.log('⌨️ Navigated to parameter:', nextParamId);
+        }
+      }
+    }
+  }, [isOpen, flattenedParams, focusedInputId, handleValidate, onClose]);
+
+  // Add keyboard listener
+  useEffect(() => {
+    if (isOpen) {
+      window.addEventListener('keydown', handleKeyDown);
+      return () => window.removeEventListener('keydown', handleKeyDown);
+    }
+  }, [isOpen, handleKeyDown]);
+
   if (!isOpen || !patientData) return null;
 
   return (
@@ -568,6 +649,7 @@ const ReadingValidationModal = ({
                             {param.type === 'Numeric' ? (
                               <div className="relative">
                                 <input
+                                  ref={(el) => { if (el) inputRefs.current[param.id] = el; }}
                                   type="number"
                                   step="0.01"
                                   value={results[param.id]?.numericValue ?? ''}
@@ -578,6 +660,7 @@ const ReadingValidationModal = ({
                                       e.target.value === '' ? null : parseFloat(e.target.value)
                                     )
                                   }
+                                  onFocus={() => setFocusedInputId(param.id)}
                                   className="w-full text-center bg-transparent text-xs border-none focus:outline-none focus:ring-0 placeholder-gray-400"
                                   placeholder="0"
                                 />
@@ -657,6 +740,7 @@ const ReadingValidationModal = ({
 
                                 {/* Dropdown with all options - simplified */}
                                 <select
+                                  ref={(el) => { if (el) inputRefs.current[param.id] = el; }}
                                   value=""
                                   onChange={(e) => {
                                     if (e.target.value) {
@@ -672,6 +756,7 @@ const ReadingValidationModal = ({
                                       e.target.value = '';
                                     }
                                   }}
+                                  onFocus={() => setFocusedInputId(param.id)}
                                   className="w-full border border-gray-300 px-1.5 py-0.5 rounded text-xs focus:outline-none focus:ring-1 focus:ring-gray-400 bg-white text-gray-700 cursor-pointer"
                                 >
                                   <option value="">➕ Add...</option>
@@ -685,11 +770,13 @@ const ReadingValidationModal = ({
                             ) : (
                               <div className="relative">
                                 <input
+                                  ref={(el) => { if (el) inputRefs.current[param.id] = el; }}
                                   type="text"
                                   value={results[param.id]?.selectedOption || ''}
                                   onChange={(e) =>
                                     handleResultChange(param.id, 'selectedOption', e.target.value)
                                   }
+                                  onFocus={() => setFocusedInputId(param.id)}
                                   className="w-full text-center bg-transparent text-xs border-none focus:outline-none focus:ring-0 placeholder-gray-400"
                                   placeholder="Enter"
                                 />
