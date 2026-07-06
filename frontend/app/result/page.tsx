@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter, useSearchParams } from "next/navigation";
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   RefreshCcw,
   Download,
@@ -25,7 +25,8 @@ import { jsPDF } from "jspdf";
 import { 
   getPatientTests, 
   updateTestStatus, 
-  updateTestDates, 
+  updateTestDates,
+  updateTestResult,
   getTestStatistics,
   getPatientTestById,
   sendReport,
@@ -251,6 +252,7 @@ export default function Result() {
   
   // State for selected tests
   const [selectedTests, setSelectedTests] = useState<Set<string>>(new Set());
+  const [selectAllChecked, setSelectAllChecked] = useState(false);
   const [lockedVisitId, setLockedVisitId] = useState<any>(null);
   const [lockedPatientUid, setLockedPatientUid] = useState<any>(null);
   const [lockedPackageName, setLockedPackageName] = useState<any>(null);
@@ -331,6 +333,17 @@ export default function Result() {
   // State for Authenticate Modal
   const [showAuthenticateModal, setShowAuthenticateModal] = useState(false);
   const [authenticateData, setAuthenticateData] = useState<any>(null);
+
+  // State for inline result editing
+  const [editingResultId, setEditingResultId] = useState<string | null>(null);
+  const [editingResultValue, setEditingResultValue] = useState<string>('');
+  const [inlineEditingTests, setInlineEditingTests] = useState<Set<string>>(new Set()); // Track which single-param tests to show inline editor for
+  
+  // Ref to track input elements for Tab navigation
+  const inlineInputRefs = useRef<any>({});
+
+  // State for sidebar visibility
+  const [showSidebar, setShowSidebar] = useState(true);
   
   // Real data from API
   const [results, setResults] = useState<any[]>([]);
@@ -410,6 +423,117 @@ export default function Result() {
     // Same visit — only allow if same package (or same individual)
     const thisKey = test.package_name || '__individual__';
     if (thisKey !== lockedPackageName) return true;
+    return false;
+  };
+
+  // Helper function to calculate biological reference range based on patient demographics
+  const getAgeAppropriateRange = (parameterData: any, patient: any) => {
+    if (!parameterData) return '-';
+    
+    const patientAge = patient.age || 0;
+    const patientGender = patient.gender?.toLowerCase();
+    const patientDob = null; // We don't have DOB in result page, only age
+    
+    let exactAgeInYears = patientAge;
+    
+    // Handle complex age ranges
+    if (parameterData.ageRanges) {
+      try {
+        const ageRanges = JSON.parse(parameterData.ageRanges);
+        for (const range of ageRanges) {
+          if (!range.enabled) continue;
+          const rangeGender = range.gender?.toLowerCase();
+          if (rangeGender && rangeGender !== patientGender) continue;
+          
+          let ageMatches = false;
+          if (range.label?.includes('Between') && range.from != null && range.to != null) {
+            ageMatches = exactAgeInYears >= range.from && exactAgeInYears <= range.to;
+          }
+          
+          if (ageMatches && range.ll != null && range.ul != null) {
+            return `${range.ll} - ${range.ul}`;
+          }
+        }
+      } catch (e) {
+        console.warn('Error parsing age ranges:', e);
+      }
+    }
+    
+    // Fallback to gender and age-based ranges
+    if (parameterData.rangeType === 'BySex' || parameterData.rangeType === 'ByGenderAndAge') {
+      if (exactAgeInYears < 18 && parameterData.childActive && parameterData.childLowValue != null && parameterData.childHighValue != null) {
+        return `${parameterData.childLowValue} - ${parameterData.childHighValue}`;
+      }
+      if (exactAgeInYears >= 18) {
+        if (patientGender === 'female' && parameterData.femaleActive && parameterData.femaleLowValue != null && parameterData.femaleHighValue != null) {
+          return `${parameterData.femaleLowValue} - ${parameterData.femaleHighValue}`;
+        }
+        if (patientGender === 'male' && parameterData.maleActive && parameterData.maleLowValue != null && parameterData.maleHighValue != null) {
+          return `${parameterData.maleLowValue} - ${parameterData.maleHighValue}`;
+        }
+      }
+    }
+    
+    // Final fallback to display range text
+    return parameterData.displayRangeText || parameterData.rangeText || '-';
+  };
+
+  // Helper function to extract numeric bounds from reference range and check if value is out of range
+  const isValueOutOfRange = (resultValue: any, parameterData: any, patient: any): boolean => {
+    if (!resultValue || !parameterData) return false;
+    
+    const numericValue = parseFloat(resultValue);
+    if (isNaN(numericValue)) return false;
+    
+    const patientAge = patient.age || 0;
+    const patientGender = patient.gender?.toLowerCase();
+    
+    // Check complex age ranges first
+    if (parameterData.ageRanges) {
+      try {
+        const ageRanges = JSON.parse(parameterData.ageRanges);
+        for (const range of ageRanges) {
+          if (!range.enabled) continue;
+          const rangeGender = range.gender?.toLowerCase();
+          if (rangeGender && rangeGender !== patientGender) continue;
+          
+          let ageMatches = false;
+          if (range.label?.includes('Between') && range.from != null && range.to != null) {
+            ageMatches = patientAge >= range.from && patientAge <= range.to;
+          }
+          
+          if (ageMatches && range.ll != null && range.ul != null) {
+            const ll = parseFloat(range.ll);
+            const ul = parseFloat(range.ul);
+            return numericValue < ll || numericValue > ul;
+          }
+        }
+      } catch (e) {
+        console.warn('Error parsing age ranges:', e);
+      }
+    }
+    
+    // Check gender and age-based ranges
+    if (parameterData.rangeType === 'BySex' || parameterData.rangeType === 'ByGenderAndAge') {
+      if (patientAge < 18 && parameterData.childActive && parameterData.childLowValue != null && parameterData.childHighValue != null) {
+        const ll = parseFloat(parameterData.childLowValue);
+        const ul = parseFloat(parameterData.childHighValue);
+        return numericValue < ll || numericValue > ul;
+      }
+      if (patientAge >= 18) {
+        if (patientGender === 'female' && parameterData.femaleActive && parameterData.femaleLowValue != null && parameterData.femaleHighValue != null) {
+          const ll = parseFloat(parameterData.femaleLowValue);
+          const ul = parseFloat(parameterData.femaleHighValue);
+          return numericValue < ll || numericValue > ul;
+        }
+        if (patientGender === 'male' && parameterData.maleActive && parameterData.maleLowValue != null && parameterData.maleHighValue != null) {
+          const ll = parseFloat(parameterData.maleLowValue);
+          const ul = parseFloat(parameterData.maleHighValue);
+          return numericValue < ll || numericValue > ul;
+        }
+      }
+    }
+    
     return false;
   };
 
@@ -556,9 +680,18 @@ export default function Result() {
       return;
     }
     
-    // Get the first selected test ID
-    const firstTestId = Array.from(selectedTests)[0];
-    router.push(`/result/patientresult/${firstTestId}`);
+    // Get all selected test IDs
+    const testIds = Array.from(selectedTests);
+    
+    // If multiple tests selected, pass as query parameter to the same route
+    if (testIds.length > 1) {
+      const testIdsParam = testIds.join(',');
+      router.push(`/result/patientresult/${testIds[0]}?testIds=${testIdsParam}`);
+    } else {
+      // Single test - use the original route
+      const firstTestId = testIds[0];
+      router.push(`/result/patientresult/${firstTestId}`);
+    }
   };
 
   // Helper: check if a value is out of range based on parameter ranges
@@ -576,6 +709,28 @@ export default function Result() {
       return val < low || val > high;
     }
     return false;
+  };
+
+  // Handle Select All checkbox in table header
+  const handleSelectAll = (checked: boolean) => {
+    setSelectAllChecked(checked);
+    
+    if (checked) {
+      // Select all visible tests from paginatedResults
+      const allTestIds = new Set<string>();
+      paginatedResults.forEach(patient => {
+        patient.tests.forEach((test: any) => {
+          // Only add if not disabled
+          if (!isCheckboxDisabled(patient, test)) {
+            allTestIds.add(test.test_id.toString());
+          }
+        });
+      });
+      setSelectedTests(allTestIds);
+    } else {
+      // Deselect all tests
+      setSelectedTests(new Set());
+    }
   };
 
   // Handle download with header option
@@ -751,7 +906,7 @@ export default function Result() {
         const paramRows2 = Object.entries(gp).map(([catName, catParams]: [string, any]) => {
           let rows = '';
           if (catName !== 'NO_CATEGORY_HEADER' && catParams[0]?.showCategoryHeader) {
-            rows += `<tr><td colSpan={4} style="padding:4px 6px;font-weight:bold;border-bottom:1px solid #ddd;background:#f5f5f5;">${catName.toUpperCase()}</td></tr>`;
+            rows += `<tr><td colSpan="4" style="padding:4px 6px;font-weight:bold;border-bottom:1px solid #ddd;background:#f5f5f5;">${catName.toUpperCase()}</td></tr>`;
           }
           (catParams as any[]).forEach(p => {
             const er = p.existingResult;
@@ -1137,45 +1292,6 @@ export default function Result() {
     }
   };
 
-  // Function to determine appropriate normal range based on age, gender, and time units
-  const getAgeAppropriateRange = (parameter, patientAge, patientGender, patientDob) => {
-    if (!parameter) return '';
-    
-    if (parameter.type === 'Text' || parameter.isDescriptive) {
-      return parameter.normalRange || '-';
-    }
-
-    if (!parameter.ageRanges || parameter.ageRanges.length === 0) {
-      return parameter.normalRange || '-';
-    }
-
-    const today = new Date();
-    const birthDate = new Date(patientDob);
-    
-    const ageInYears = today.getFullYear() - birthDate.getFullYear();
-    const ageInMonths = (today.getFullYear() - birthDate.getFullYear()) * 12 + (today.getMonth() - birthDate.getMonth());
-    const ageInDays = Math.floor((today.getTime() - birthDate.getTime()) / (1000 * 60 * 60 * 24));
-
-    for (const range of parameter.ageRanges) {
-      const patientAgeInUnit = getAgeInUnit(ageInYears, ageInMonths, ageInDays, range.timeUnit);
-      
-      const meetsAgeCondition = patientAgeInUnit >= range.minAge && patientAgeInUnit <= range.maxAge;
-      const meetsGenderCondition = !range.gender || range.gender.toLowerCase() === patientGender.toLowerCase();
-      
-      if (meetsAgeCondition && meetsGenderCondition) {
-        if (range.lowValue !== null && range.highValue !== null) {
-          return `${range.lowValue} - ${range.highValue}`;
-        } else if (range.lowValue !== null) {
-          return `> ${range.lowValue}`;
-        } else if (range.highValue !== null) {
-          return `< ${range.highValue}`;
-        }
-      }
-    }
-
-    return parameter.normalRange || '-';
-  };
-
   // Load data on component mount and when filters change
   useEffect(() => {
     fetchResults();
@@ -1189,7 +1305,25 @@ export default function Result() {
     }
   }, [filters]);
 
-  // Handle test name click to open appropriate modal based on stage
+  // Auto-focus first Result column input when page loads
+  useEffect(() => {
+    if (results && results.length > 0) {
+      setTimeout(() => {
+        // Find first test with single parameter in editable stage
+        const firstEditableTest = results.find(
+          test => test.parameter_count === 1 && 
+                  (test.result_status === 'Entered' || test.result_status === 'Validation')
+        );
+        
+        if (firstEditableTest && inlineInputRefs.current[firstEditableTest.test_id]) {
+          inlineInputRefs.current[firstEditableTest.test_id].focus();
+          console.log('🎯 Auto-focused first Result input for test:', firstEditableTest.test_id);
+        }
+      }, 100);
+    }
+  }, [results]);
+
+  // Handle test name click - open result entry page only for Received or Rectified stages
   const handleTestNameClick = async (test: any, patient: any) => {
     try {
       // Map status to proper format for stage check
@@ -1201,54 +1335,253 @@ export default function Result() {
       
       const testStatus = statusMap[test.result_status] || test.result_status;
 
-      // If test is in "Entered" stage - open Reading Validation Modal
-      if (testStatus === 'Entered') {
-        // Fetch full test data including parameters
-        const testData = await getPatientTestById(test.test_id);
-        
-        if (!testData || !testData.patientTest) {
-          alert('Error loading test data');
-          return;
-        }
-
-        // Set data for modal
-        setReadingValidationData({
-          patientTest: testData.patientTest,
-          parameters: testData.parameters,
-          groupedParameters: testData.groupedParameters
-        });
-        
-        setShowReadingValidationModal(true);
+      // Only allow opening result entry page for Received or Rectified stages
+      if (testStatus === 'Received' || testStatus === 'Rectified') {
+        router.push(`/result/patientresult/${test.test_id}`);
+      } else {
+        alert(`⚠️ Not Authorized\n\nCurrent Stage: ${testStatus}\n\nReadings can only be entered in "Received" stage or edited in "Rectified" stage.\n\nTo edit results in other stages, click on "Parameter" in the Result column.`);
+        return;
       }
-      // If test is in "Validation" stage - open Authenticate Modal
-      else if (testStatus === 'Validation') {
-        // Fetch full test data including parameters
-        const testData = await getPatientTestById(test.test_id);
-        
-        if (!testData || !testData.patientTest) {
-          alert('Error loading test data');
-          return;
-        }
 
-        // Set data for modal
+    } catch (err: any) {
+      console.error('Error opening result entry page:', err);
+      alert('Error: ' + (err.message || 'Failed to open result entry page'));
+    }
+  };
+
+  // Handle Parameter click - open appropriate modal based on current status
+  const handleParameterClick = async (test: any, patient: any) => {
+    try {
+      const testData = await getPatientTestById(test.test_id);
+      
+      if (!testData || !testData.patientTest) {
+        alert('Error loading test data');
+        return;
+      }
+
+      const status = test.result_status || test.status;
+      
+      console.log('🔍 Parameter click - Current status:', status);
+      
+      // Determine which modal to show based on current status
+      if (status === 'Validation') {
+        // Status is Validation → Show Authenticate modal (next stage is Authorized)
+        console.log('✅ Opening Authenticate modal for next stage');
         setAuthenticateData({
           patientTest: testData.patientTest,
           parameters: testData.parameters,
           groupedParameters: testData.groupedParameters
         });
-        
         setShowAuthenticateModal(true);
-      }
-      // If test is in any other stage - show error message
-      else {
-        alert(`⚠️ Test cannot be edited or authenticated.\n\nCurrent Stage: ${testStatus}\n\nReadings can only be edited in "Entered" stage or authenticated in "Validation" stage.\n\nPlease complete earlier stages first.`);
-        return;
+      } else if (status === 'Entered') {
+        // Status is Entered → Show Reading Validation modal
+        console.log('📋 Opening Reading Validation modal');
+        setReadingValidationData({
+          patientTest: testData.patientTest,
+          parameters: testData.parameters,
+          groupedParameters: testData.groupedParameters
+        });
+        setShowReadingValidationModal(true);
+      } else if (status === 'Authorized' || status === 'Delivered') {
+        // Status is Authorized or Delivered → Show view-only or completed message
+        console.log('✅ Test already authorized/delivered - show read-only');
+        alert('This test is already authorized. You can print or download the report.');
+      } else if (status === 'Registered') {
+        // Status is Registered → Allow entering results
+        console.log('📝 Opening result entry');
+        setReadingValidationData({
+          patientTest: testData.patientTest,
+          parameters: testData.parameters,
+          groupedParameters: testData.groupedParameters
+        });
+        setShowReadingValidationModal(true);
+      } else {
+        // Default - show validation modal
+        console.log('📋 Opening Reading Validation modal (default)');
+        setReadingValidationData({
+          patientTest: testData.patientTest,
+          parameters: testData.parameters,
+          groupedParameters: testData.groupedParameters
+        });
+        setShowReadingValidationModal(true);
       }
 
     } catch (err: any) {
       console.error('Error opening modal:', err);
       alert('Error: ' + (err.message || 'Failed to open modal'));
     }
+  };
+
+  // Handle result value click - enable inline editing for single parameter
+  const handleResultValueClick = (test: any) => {
+    // Only allow editing for single parameter tests
+    if (test.parameter_count === 1) {
+      setEditingResultId(`${test.test_id}`);
+      setEditingResultValue(test.result || '');
+    }
+  };
+
+  // Handle keyboard navigation and shortcuts for inline result editing
+  const handleInlineKeyDown = (e: any, test: any, results: any[], patient: any) => {
+    if (e.key === 'Enter' || (e.key === 's' && e.ctrlKey)) {
+      // Ctrl+S or Enter to save
+      e.preventDefault();
+      handleSaveResultValue(test, false);
+    } else if (e.key === 'Tab') {
+      // Tab or Shift+Tab to navigate to next/previous result field
+      e.preventDefault();
+      const currentEditingTests = results.filter(t => 
+        t.parameter_count === 1 && (t.result_status === 'Entered' || t.result_status === 'Validation')
+      );
+      const currentIndex = currentEditingTests.findIndex(t => t.test_id === test.test_id);
+      
+      if (!e.shiftKey && currentIndex < currentEditingTests.length - 1) {
+        // Tab: move to next
+        const nextTest = currentEditingTests[currentIndex + 1];
+        setEditingResultId(`${nextTest.test_id}`);
+        setEditingResultValue(nextTest.result || '');
+        setTimeout(() => {
+          inlineInputRefs.current[nextTest.test_id]?.focus();
+        }, 0);
+      } else if (e.shiftKey && currentIndex > 0) {
+        // Shift+Tab: move to previous
+        const prevTest = currentEditingTests[currentIndex - 1];
+        setEditingResultId(`${prevTest.test_id}`);
+        setEditingResultValue(prevTest.result || '');
+        setTimeout(() => {
+          inlineInputRefs.current[prevTest.test_id]?.focus();
+        }, 0);
+      }
+    } else if (e.key === 'ArrowDown') {
+      // Down arrow to move to next result field
+      e.preventDefault();
+      const currentEditingTests = results.filter(t => 
+        t.parameter_count === 1 && (t.result_status === 'Entered' || t.result_status === 'Validation')
+      );
+      const currentIndex = currentEditingTests.findIndex(t => t.test_id === test.test_id);
+      
+      if (currentIndex < currentEditingTests.length - 1) {
+        const nextTest = currentEditingTests[currentIndex + 1];
+        setEditingResultId(`${nextTest.test_id}`);
+        setEditingResultValue(nextTest.result || '');
+        setTimeout(() => {
+          inlineInputRefs.current[nextTest.test_id]?.focus();
+        }, 0);
+      }
+    } else if (e.key === 'ArrowUp') {
+      // Up arrow to move to previous result field
+      e.preventDefault();
+      const currentEditingTests = results.filter(t => 
+        t.parameter_count === 1 && (t.result_status === 'Entered' || t.result_status === 'Validation')
+      );
+      const currentIndex = currentEditingTests.findIndex(t => t.test_id === test.test_id);
+      
+      if (currentIndex > 0) {
+        const prevTest = currentEditingTests[currentIndex - 1];
+        setEditingResultId(`${prevTest.test_id}`);
+        setEditingResultValue(prevTest.result || '');
+        setTimeout(() => {
+          inlineInputRefs.current[prevTest.test_id]?.focus();
+        }, 0);
+      }
+    } else if (e.key === 'Escape') {
+      // Escape to cancel editing
+      e.preventDefault();
+      setEditingResultId(null);
+      setEditingResultValue('');
+    }
+  };
+
+  // Handle inline result save on Enter/Tab/Ctrl+S
+  const handleSaveResultValue = async (test: any, moveToNext: boolean = false) => {
+    try {
+      if (!editingResultValue.trim()) {
+        // Clear editing but don't save empty values
+        setEditingResultId(null);
+        setEditingResultValue('');
+        return;
+      }
+
+      console.log('💾 Saving result - Test object:', {
+        test_id: test.test_id,
+        parameter_id: test.parameter_id,
+        editingResultValue: editingResultValue,
+        isNumeric: !isNaN(parseFloat(editingResultValue))
+      });
+
+      const payloadData = {
+        result: editingResultValue,
+        parameterResults: [
+          {
+            parameterId: test.parameter_id,
+            numericValue: isNaN(parseFloat(editingResultValue)) ? null : parseFloat(editingResultValue),
+            textValue: isNaN(parseFloat(editingResultValue)) ? editingResultValue : null
+          }
+        ]
+      };
+
+      console.log('📤 Sending payload:', JSON.stringify(payloadData, null, 2));
+
+      // Update test result via API
+      const response = await updateTestResult(test.test_id.toString(), payloadData);
+      
+      console.log('✅ Backend response:', response);
+
+      // Update local state immediately for better UX - update the test result in the results array
+      setResults(prevResults => 
+        prevResults.map(patient => ({
+          ...patient,
+          tests: patient.tests.map(t => 
+            t.test_id === test.test_id 
+              ? { ...t, result: editingResultValue }
+              : t
+          )
+        }))
+      );
+
+      // Clear editing state
+      setEditingResultId(null);
+      setEditingResultValue('');
+
+      // Show success feedback
+      console.log('✨ Result saved successfully');
+      
+      // Refresh results from server (for pagination and other updates)
+      await fetchResults();
+      
+      // If moveToNext, find and focus the next single-param test in Entered stage
+      if (moveToNext) {
+        setTimeout(() => {
+          // Get current test index and find next Entered single-param test
+          const enteredSingleParamTests = paginatedResults
+            .flatMap(patient => patient.tests)
+            .filter(t => t.result_status === 'Entered' && t.parameter_count === 1);
+          
+          const currentIdx = enteredSingleParamTests.findIndex(t => t.test_id === test.test_id);
+          if (currentIdx !== -1 && currentIdx < enteredSingleParamTests.length - 1) {
+            const nextTest = enteredSingleParamTests[currentIdx + 1];
+            // Focus next input
+            const nextInput = inlineInputRefs.current[nextTest.test_id];
+            if (nextInput) {
+              nextInput.focus();
+              nextInput.select();
+              setEditingResultId(`${nextTest.test_id}`);
+              setEditingResultValue(nextTest.result || '');
+            }
+          }
+        }, 100);
+      }
+    } catch (err: any) {
+      console.error('❌ Error saving result:', err);
+      alert('Failed to save result: ' + (err.message || 'Unknown error'));
+      // Don't clear editing state on error, allow user to retry
+    }
+  };
+
+  // Handle cancel editing
+  const handleCancelEditResult = () => {
+    setEditingResultId(null);
+    setEditingResultValue('');
   };
 
   // Fetch organizations on component mount
@@ -1277,6 +1610,19 @@ export default function Result() {
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, [showDownloadDropdown]);
+
+  // Handle Ctrl+B to toggle sidebar
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.ctrlKey && e.key === 'b') {
+        e.preventDefault();
+        setShowSidebar(prev => !prev);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   // Fetch results from API
   const fetchResults = async () => {
@@ -1631,22 +1977,22 @@ export default function Result() {
 
   return (
     <>
-      <div className="p-1 sm:p-2 md:p-2 lg:p-3 bg-white min-h-screen">
+      <div className="h-screen flex flex-col bg-white overflow-hidden">
         
         {/* Error Message */}
         {error && (
-          <div className="mb-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded">
+          <div className="mb-2 p-2 bg-red-100 border border-red-400 text-red-700 rounded mx-2">
             {error}
           </div>
         )}
         
-        <div className="flex flex-col gap-0.5">
+        <div className="flex flex-col gap-0.5 flex-1 overflow-hidden">
 
             {/* Status Cards with All button */}
-            <div className="flex gap-2 items-center">
+            <div className="flex gap-1 items-center px-2 py-0.5">
               <button
                 onClick={() => setSelectedStatus("All")}
-                className={`px-4 py-2 rounded-lg font-semibold text-xs sm:text-sm transition-all ${
+                className={`px-3 py-1 rounded-lg font-semibold text-[11px] transition-all ${
                   selectedStatus === "All" 
                     ? "bg-slate-900 text-white ring-2 ring-slate-900" 
                     : "bg-white text-gray-700 border border-gray-300 hover:bg-gray-50"
@@ -1655,30 +2001,30 @@ export default function Result() {
                 All ({statistics.total})
               </button>
               
-              <div className="grid grid-cols-7 gap-2 flex-1">
+              <div className="grid grid-cols-7 gap-1 flex-1">
                 <div 
                   onClick={() => setSelectedStatus("Registered")}
-                  className={`rounded-lg p-2 text-center cursor-pointer hover:shadow-md transition-shadow ${
+                  className={`rounded-lg p-1 text-center cursor-pointer hover:shadow-md transition-shadow ${
                     selectedStatus === "Registered" ? "bg-cyan-200 ring-2 ring-cyan-600" : "bg-cyan-100"
                   }`}
                 >
-                  <h3 className="text-cyan-800 font-semibold text-xs sm:text-sm">
+                  <h3 className="text-cyan-800 font-semibold text-[11px]">
                     Registered ({statistics.byStatus.Registered})
                   </h3>
                 </div>
                 <div 
                   onClick={() => setSelectedStatus("Received")}
-                  className={`rounded-lg p-2 text-center cursor-pointer hover:shadow-md transition-shadow ${
+                  className={`rounded-lg p-1 text-center cursor-pointer hover:shadow-md transition-shadow ${
                     selectedStatus === "Received" ? "bg-orange-200 ring-2 ring-orange-600" : "bg-orange-100"
                   }`}
                 >
-                  <h3 className="text-orange-800 font-semibold text-xs sm:text-sm">
+                  <h3 className="text-orange-800 font-semibold text-[11px]">
                     Received ({statistics.byStatus.Received})
                   </h3>
                 </div>
                 <div 
                   onClick={() => setSelectedStatus("Entered")}
-                  className={`rounded-lg p-2 text-center cursor-pointer hover:shadow-md transition-shadow ${
+                  className={`rounded-lg p-1 text-center cursor-pointer hover:shadow-md transition-shadow ${
                     selectedStatus === "Entered" ? "bg-purple-200 ring-2 ring-purple-600" : "bg-purple-100"
                   }`}
                 >
@@ -1688,41 +2034,41 @@ export default function Result() {
                 </div>
                 <div 
                   onClick={() => setSelectedStatus("Validation")}
-                  className={`rounded-lg p-2 text-center cursor-pointer hover:shadow-md transition-shadow ${
+                  className={`rounded-lg p-1 text-center cursor-pointer hover:shadow-md transition-shadow ${
                     selectedStatus === "Validation" ? "bg-yellow-200 ring-2 ring-yellow-600" : "bg-yellow-100"
                   }`}
                 >
-                  <h3 className="text-yellow-800 font-semibold text-xs sm:text-sm">
+                  <h3 className="text-yellow-800 font-semibold text-[11px]">
                     Validation ({statistics.byStatus.Validation})
                   </h3>
                 </div>
                 <div 
                   onClick={() => setSelectedStatus("Authorized")}
-                  className={`rounded-lg p-2 text-center cursor-pointer hover:shadow-md transition-shadow ${
+                  className={`rounded-lg p-1 text-center cursor-pointer hover:shadow-md transition-shadow ${
                     selectedStatus === "Authorized" ? "bg-blue-200 ring-2 ring-blue-600" : "bg-blue-100"
                   }`}
                 >
-                  <h3 className="text-blue-800 font-semibold text-xs sm:text-sm">
+                  <h3 className="text-blue-800 font-semibold text-[11px]">
                     Authorized ({statistics.byStatus.Authorized})
                   </h3>
                 </div>
                 <div 
                   onClick={() => setSelectedStatus("Delivered")}
-                  className={`rounded-lg p-2 text-center cursor-pointer hover:shadow-md transition-shadow ${
+                  className={`rounded-lg p-1 text-center cursor-pointer hover:shadow-md transition-shadow ${
                     selectedStatus === "Delivered" ? "bg-green-200 ring-2 ring-green-600" : "bg-green-100"
                   }`}
                 >
-                  <h3 className="text-green-800 font-semibold text-xs sm:text-sm">
+                  <h3 className="text-green-800 font-semibold text-[11px]">
                     Delivered ({statistics.byStatus.Delivered})
                   </h3>
                 </div>
                 <div 
                   onClick={() => setSelectedStatus("Rectified")}
-                  className={`rounded-lg p-2 text-center cursor-pointer hover:shadow-md transition-shadow ${
+                  className={`rounded-lg p-1 text-center cursor-pointer hover:shadow-md transition-shadow ${
                     selectedStatus === "Rectified" ? "bg-red-200 ring-2 ring-red-600" : "bg-red-100"
                   }`}
                 >
-                  <h3 className="text-red-800 font-semibold text-xs sm:text-sm">
+                  <h3 className="text-red-800 font-semibold text-[11px]">
                     Rectified ({statistics.byStatus.Rectified})
                   </h3>
                 </div>
@@ -1730,7 +2076,7 @@ export default function Result() {
             </div>
 
             {/* Top Filter Bar */}
-            <div className="bg-white rounded shadow-md p-1.5 sm:p-2">
+            <div className="bg-white rounded shadow-md p-1 mx-2">
               <div className="flex flex-wrap items-center gap-1">
                 <input 
                   type="date" 
@@ -1876,15 +2222,21 @@ export default function Result() {
               </div>
             </div>
 
-            {/* Result Table - Scrollable */}
-            <div className="bg-white rounded shadow-md overflow-hidden">
+            {/* Result Table - Scrollable with dynamic height */}
+            <div className="bg-white rounded shadow-md overflow-hidden flex flex-col mx-2">
               
-              <div className="overflow-x-auto">
+              <div className="overflow-y-auto overflow-x-auto">
                 <table className="w-full text-[11px] sm:text-xs border-collapse">
                   <thead className="bg-slate-900 text-white shadow-xl">
                     <tr>
                       <th className="px-1 sm:px-2 py-0.5 sm:py-1 text-center font-semibold text-[10px] whitespace-nowrap border border-gray-300">
-                        <input type="checkbox" className="w-3 h-3 cursor-pointer accent-white" />
+                        <input 
+                          type="checkbox" 
+                          className="w-3 h-3 cursor-pointer accent-white" 
+                          checked={selectAllChecked}
+                          onChange={(e) => handleSelectAll(e.target.checked)}
+                          title="Select all visible tests"
+                        />
                       </th>
                       <th className="px-1 sm:px-2 py-0.5 sm:py-1 text-left font-semibold text-[10px] whitespace-nowrap border border-gray-300">Visit ID</th>
                       <th className="px-1 sm:px-2 py-0.5 sm:py-1 text-left font-semibold text-[10px] whitespace-nowrap border border-gray-300">Org ID</th>
@@ -1892,9 +2244,9 @@ export default function Result() {
                       <th className="px-1 sm:px-2 py-0.5 sm:py-1 text-left font-semibold text-[10px] whitespace-nowrap border border-gray-300">Age</th>
                       <th className="px-1 sm:px-2 py-0.5 sm:py-1 text-left font-semibold text-[10px] whitespace-nowrap border border-gray-300">Gender</th>
                       <th className="px-2 sm:px-3 py-0.5 sm:py-1 text-left font-semibold text-[10px] whitespace-nowrap border border-gray-300 min-w-[200px]">Services</th>
-                      <th className="px-1 sm:px-2 py-0.5 sm:py-1 text-left font-semibold text-[10px] whitespace-nowrap border border-gray-300">Ref. Interval</th>
-                      <th className="px-1 sm:px-2 py-0.5 sm:py-1 text-left font-semibold text-[10px] whitespace-nowrap border border-gray-300">Unit</th>
                       <th className="px-1 sm:px-2 py-0.5 sm:py-1 text-left font-semibold text-[10px] whitespace-nowrap border border-gray-300">Result</th>
+                      <th className="px-1 sm:px-2 py-0.5 sm:py-1 text-left font-semibold text-[10px] whitespace-nowrap border border-gray-300">Unit</th>
+                      <th className="px-1 sm:px-2 py-0.5 sm:py-1 text-left font-semibold text-[10px] whitespace-nowrap border border-gray-300">Ref. Interval</th>
                       <th className="px-1 sm:px-2 py-0.5 sm:py-1 text-left font-semibold text-[10px] whitespace-nowrap border border-gray-300">Referral Doc</th>
                       <th className="px-1 sm:px-2 py-0.5 sm:py-1 text-left font-semibold text-[10px] whitespace-nowrap border border-gray-300">
                         Previous Test Result
@@ -1920,7 +2272,7 @@ export default function Result() {
                   <tbody className="bg-white">
                     {loading ? (
                       <tr>
-                        <td colSpan={16} className="text-center p-4 text-gray-500 text-sm border border-gray-300">
+                        <td colSpan={16} className="text-center p-2 text-gray-500 text-sm border border-gray-300">
                           <div className="flex items-center justify-center gap-2">
                             <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-cyan-600"></div>
                             Loading...
@@ -1929,7 +2281,7 @@ export default function Result() {
                       </tr>
                     ) : paginatedResults.length === 0 ? (
                       <tr>
-                        <td colSpan={16} className="text-center p-3 sm:p-4 text-gray-500 text-xs sm:text-sm border border-gray-300">
+                        <td colSpan={16} className="text-center p-2 text-gray-500 text-xs sm:text-sm border border-gray-300">
                           No records found for {selectedStatus} status
                         </td>
                       </tr>
@@ -1939,9 +2291,10 @@ export default function Result() {
                           <tr 
                             key={`${patient.patient_uid}-${test.test_id}`} 
                             className={`hover:bg-opacity-80 text-gray-800 border-b border-gray-300 cursor-pointer transition-all ${getStatusBadgeColor(test.result_status)}`}
+                            style={{ height: 'auto', lineHeight: '1.2' }}
                           >
                             {/* Column 1: Checkbox */}
-                            <td className="px-1 sm:px-2 py-1 sm:py-1.5 text-center border border-gray-300">
+                            <td className="px-1 sm:px-2 py-0.5 text-center border border-gray-300">
                               <input 
                                 type="checkbox" 
                                 className="w-3 h-3 cursor-pointer accent-cyan-600 disabled:opacity-30 disabled:cursor-not-allowed"
@@ -1952,12 +2305,12 @@ export default function Result() {
                             </td>
 
                             {/* Column 2: Visit ID (show only on first test row) */}
-                            <td className="px-1 sm:px-2 py-0.5 sm:py-1 text-[11px] border border-gray-300">
+                            <td className="px-1 sm:px-2 py-0.25 text-[11px] border border-gray-300">
                               {testIndex === 0 ? patient.visit_id : ''}
                             </td>
 
                             {/* Column 3: Org ID with hover tooltip (show only on first test row) */}
-                            <td className="px-1 sm:px-2 py-0.5 sm:py-1 text-[11px] border border-gray-300 relative">
+                            <td className="px-1 sm:px-2 py-0.25 text-[11px] border border-gray-300 relative">
                               {testIndex === 0 && (
                                 <div 
                                   className="cursor-help relative group"
@@ -2024,7 +2377,7 @@ export default function Result() {
                                 <span 
                                   className="flex-1 cursor-pointer hover:text-cyan-700 hover:font-semibold transition-colors"
                                   onClick={() => handleTestNameClick(test, patient)}
-                                  title="Click to view/edit readings"
+                                  title="Click to enter/edit readings (Received or Rectified stage only)"
                                 >
                                   {test.test_name}
                                 </span>
@@ -2055,7 +2408,7 @@ export default function Result() {
                                   <div title="Upload file">
                                     <svg
                                       xmlns="http://www.w3.org/2000/svg"
-                                      width="24" height="24"
+                                      width="20" height="20"
                                       viewBox="0 0 24 24"
                                       fill="currentColor"
                                       className="text-gray-700 cursor-pointer hover:text-green-700 flex-shrink-0"
@@ -2083,19 +2436,92 @@ export default function Result() {
                               </div>
                             </td>
 
-                            {/* Column 8: Ref. Interval */}
-                            <td className="px-1 sm:px-2 py-0.5 sm:py-1 text-[11px] border border-gray-300">
-                              <span className="text-gray-700">{test.ref_interval || '-'}</span>
+                            {/* Column 8: Result */}
+                            <td className="px-1 sm:px-2 py-0.5 sm:py-1 text-[11px] border border-gray-300 max-w-[120px]">
+                              {test.parameter_count > 1 ? (
+                                <span 
+                                  className="text-black font-medium cursor-pointer hover:text-cyan-600 hover:underline focus:outline-none focus:ring-2 focus:ring-cyan-600 px-1 py-0.5 inline-block"
+                                  onClick={() => handleParameterClick(test, patient)}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter' || e.key === ' ') {
+                                      e.preventDefault();
+                                      handleParameterClick(test, patient);
+                                    }
+                                  }}
+                                  tabIndex={0}
+                                  role="button"
+                                  title="Press Enter or Space to edit parameters"
+                                >
+                                  Parameter
+                                </span>
+                              ) : test.parameter_count === 1 && (test.result_status === 'Entered' || test.result_status === 'Validation') ? (
+                                // Single parameter in Entered or Validation stage - show inline input with black text
+                                <input
+                                  ref={(el) => {
+                                    if (el) inlineInputRefs.current[test.test_id] = el;
+                                  }}
+                                  type="text"
+                                  value={editingResultId === `${test.test_id}` ? editingResultValue : (test.result || '')}
+                                  onChange={(e) => {
+                                    if (editingResultId === `${test.test_id}`) {
+                                      setEditingResultValue(e.target.value);
+                                    } else {
+                                      setEditingResultId(`${test.test_id}`);
+                                      setEditingResultValue(e.target.value);
+                                    }
+                                  }}
+                                  onKeyDown={(e) => handleInlineKeyDown(e, test, results, patient)}
+                                  onFocus={() => {
+                                    setEditingResultId(`${test.test_id}`);
+                                    setEditingResultValue(test.result || '');
+                                  }}
+                                  onBlur={() => {
+                                    // Keep value if user navigates away
+                                  }}
+                                  placeholder="Enter value"
+                                  autoFocus={editingResultId === `${test.test_id}`}
+                                  className={`w-24 px-1 py-0.5 border rounded text-[11px] text-black font-medium focus:outline-none focus:ring-1 ${
+                                    isValueOutOfRange(editingResultId === `${test.test_id}` ? editingResultValue : test.result, test.ref_interval_data, patient)
+                                      ? 'border-red-500 focus:ring-red-500 bg-white'
+                                      : 'border-cyan-600 focus:ring-cyan-600 bg-white'
+                                  }`}
+                                  title="Ctrl+S or Enter to save | Tab/Down to next | Shift+Tab/Up to previous | Escape to cancel"
+                                />
+                              ) : (
+                                <span 
+                                  className={`cursor-pointer focus:outline-none focus:ring-2 focus:ring-cyan-600 px-1 py-0.5 inline-block text-black font-medium hover:text-cyan-600 hover:underline`}
+                                  onClick={() => handleParameterClick(test, patient)}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter' || e.key === ' ') {
+                                      e.preventDefault();
+                                      handleParameterClick(test, patient);
+                                    }
+                                  }}
+                                  tabIndex={0}
+                                  role="button"
+                                  title={test.result_status === 'Validation' ? 'Press Enter to edit this value' : 'Read-only in this stage'}
+                                >
+                                  {test.result_status === 'Entered' || test.result_status === 'Validation' || test.result_status === 'Authorized' || test.result_status === 'Delivered' 
+                                    ? (test.result || '-') 
+                                    : '-'}
+                                </span>
+                              )}
                             </td>
 
                             {/* Column 9: Unit */}
                             <td className="px-1 sm:px-2 py-0.5 sm:py-1 text-[11px] border border-gray-300">
-                              <span className="text-gray-700">{test.unit || '-'}</span>
+                              <span className="text-gray-700">
+                                {test.parameter_count === 1 ? (test.unit || '-') : '-'}
+                              </span>
                             </td>
 
-                            {/* Column 10: Result */}
-                            <td className="px-1 sm:px-2 py-0.5 sm:py-1 text-[11px] border border-gray-300 max-w-[120px] truncate">
-                              <span className="text-gray-700">{test.result || '-'}</span>
+                            {/* Column 10: Ref. Interval */}
+                            <td className="px-1 sm:px-2 py-0.5 sm:py-1 text-[11px] border border-gray-300">
+                              <span className="text-gray-700">
+                                {test.parameter_count === 1 
+                                  ? getAgeAppropriateRange(test.ref_interval_data, patient)
+                                  : '-'}
+                              </span>
                             </td>
 
                             {/* Column 11: Referral Doc */}
@@ -2252,126 +2678,176 @@ export default function Result() {
 
             {/* Pagination Controls */}
             {totalRecords > 0 && (
-              <div className="bg-white rounded shadow-md p-3">
-                <div className="text-sm text-gray-700 mb-3">
-                  Showing <span className="font-semibold">{startIndex + 1}</span> to <span className="font-semibold">{Math.min(endIndex, totalRecords)}</span> of <span className="font-semibold">{totalRecords}</span> records
-                </div>
-                
-                {/* Pagination buttons */}
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                    disabled={currentPage === 1}
-                    className="px-3 py-1.5 bg-cyan-600 hover:bg-cyan-700 disabled:bg-gray-400 text-white rounded text-sm font-medium transition-colors"
-                  >
-                    ← Previous
-                  </button>
-                  
-                  <div className="flex items-center gap-1">
-                    {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                      let pageNum;
-                      if (totalPages <= 5) {
-                        pageNum = i + 1;
-                      } else if (currentPage <= 3) {
-                        pageNum = i + 1;
-                      } else if (currentPage >= totalPages - 2) {
-                        pageNum = totalPages - 4 + i;
-                      } else {
-                        pageNum = currentPage - 2 + i;
-                      }
-                      return (
-                        <button
-                          key={pageNum}
-                          onClick={() => setCurrentPage(pageNum)}
-                          className={`px-2.5 py-1 rounded text-sm font-medium transition-colors ${
-                            currentPage === pageNum
-                              ? 'bg-cyan-600 text-white'
-                              : 'bg-gray-200 hover:bg-gray-300 text-gray-800'
-                          }`}
-                        >
-                          {pageNum}
-                        </button>
-                      );
-                    })}
+              <div className="bg-white rounded shadow-md p-1 mx-2">
+                <div className="flex items-center gap-2">
+                  <div className="text-xs text-gray-700">
+                    Showing <span className="font-semibold">{startIndex + 1}</span> to <span className="font-semibold">{Math.min(endIndex, totalRecords)}</span> of <span className="font-semibold">{totalRecords}</span>
                   </div>
                   
-                  <button
-                    onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-                    disabled={currentPage === totalPages}
-                    className="px-3 py-1.5 bg-cyan-600 hover:bg-cyan-700 disabled:bg-gray-400 text-white rounded text-sm font-medium transition-colors"
-                  >
-                    Next →
-                  </button>
+                  {/* Pagination buttons - same row */}
+                  <div className="flex gap-0.5 items-center">
+                    <button
+                      onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                      disabled={currentPage === 1}
+                      className="px-1.5 py-0 bg-cyan-600 hover:bg-cyan-700 disabled:bg-gray-400 text-white rounded text-xs font-medium transition-colors"
+                    >
+                      ← Prev
+                    </button>
+                    
+                    <div className="flex items-center gap-0.5">
+                      {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                        let pageNum;
+                        if (totalPages <= 5) {
+                          pageNum = i + 1;
+                        } else if (currentPage <= 3) {
+                          pageNum = i + 1;
+                        } else if (currentPage >= totalPages - 2) {
+                          pageNum = totalPages - 4 + i;
+                        } else {
+                          pageNum = currentPage - 2 + i;
+                        }
+                        return (
+                          <button
+                            key={pageNum}
+                            onClick={() => setCurrentPage(pageNum)}
+                            className={`px-1 py-0 rounded text-xs font-medium transition-colors ${
+                              currentPage === pageNum
+                                ? 'bg-cyan-600 text-white'
+                                : 'bg-gray-200 hover:bg-gray-300 text-gray-800'
+                            }`}
+                          >
+                            {pageNum}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    
+                    <button
+                      onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                      disabled={currentPage === totalPages}
+                      className="px-1.5 py-0 bg-cyan-600 hover:bg-cyan-700 disabled:bg-gray-400 text-white rounded text-xs font-medium transition-colors"
+                    >
+                      Next →
+                    </button>
+                  </div>
                 </div>
               </div>
             )}
             
-            {/* Bottom Action Buttons */}
-            <div className="bg-white rounded shadow-md p-2 sm:p-3">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <div className="flex flex-wrap gap-1.5 sm:gap-2">
+            {/* Bottom Action Buttons - Fixed at bottom */}
+            <div className="bg-white rounded shadow-md p-0.5 mx-2 mb-2">
+              <div className="flex flex-wrap items-center gap-0.5">
+                <button 
+                  onClick={handleResultEntry}
+                  className="flex gap-0.5 items-center bg-gray-600 hover:bg-gray-700 text-white px-1.5 py-0.5 rounded text-[13px] transition-colors">
+                  <span>Result ({selectedTests.size})</span>
+                </button>
+                <button className="flex gap-0.5 items-center bg-gray-600 hover:bg-gray-700 text-white px-1.5 py-0.5 rounded text-[13px] transition-colors">
+                  <span>Save</span>
+                </button>
+                <button
+                  onClick={handlePrintPreview}
+                  disabled={loading || selectedTests.size === 0}
+                  className="flex gap-0.5 items-center bg-gray-600 hover:bg-gray-700 text-white px-1.5 py-0.5 rounded text-[13px] transition-colors disabled:opacity-50"
+                >
+                  <Printer size={11} />
+                  <span>Print</span>
+                </button>
+                <button
+                  onClick={handleSendEmail}
+                  disabled={loading || selectedTests.size === 0}
+                  className="flex gap-0.5 items-center bg-gray-600 hover:bg-gray-700 text-white px-1.5 py-0.5 rounded text-[13px] transition-colors disabled:opacity-50"
+                >
+                  <Mail size={11} />
+                  <span>Email</span>
+                </button>
+                <button
+                  onClick={() => handleSendWhatsApp()}
+                  disabled={loading || selectedTests.size === 0}
+                  className="flex gap-0.5 items-center bg-green-600 hover:bg-green-700 text-white px-1.5 py-0.5 rounded text-[13px] transition-colors disabled:opacity-50"
+                >
+                  <FaWhatsapp size={11} />
+                  <span>Whatsapp</span>
+                </button>
+
+                {/* Validate Button */}
+                <button
+                  onClick={async () => {
+                    const testsToValidate = Array.from(selectedTests);
+                    if (testsToValidate.length === 0) {
+                      alert('Please select tests to validate');
+                      return;
+                    }
+                    try {
+                      for (const testId of testsToValidate) {
+                        await updateTestStatus(testId.toString(), { status: 'Validation' });
+                      }
+                      alert(`${testsToValidate.length} test(s) moved to Validation stage`);
+                      fetchResults();
+                      setSelectedTests(new Set());
+                    } catch (err) {
+                      alert('Error validating tests: ' + err.message);
+                    }
+                  }}
+                  disabled={loading || selectedTests.size === 0}
+                  className="flex gap-0.5 items-center bg-yellow-500 hover:bg-yellow-600 text-white px-1.5 py-0.5 rounded text-[13px] transition-colors disabled:opacity-50"
+                >
+                  <span>Validate</span>
+                </button>
+
+                {/* Authorize Button */}
+                <button
+                  onClick={async () => {
+                    const testsToAuthorize = Array.from(selectedTests);
+                    if (testsToAuthorize.length === 0) {
+                      alert('Please select tests to authorize');
+                      return;
+                    }
+                    try {
+                      for (const testId of testsToAuthorize) {
+                        await updateTestStatus(testId.toString(), { status: 'Authorized' });
+                      }
+                      alert(`${testsToAuthorize.length} test(s) moved to Authorized stage`);
+                      fetchResults();
+                      setSelectedTests(new Set());
+                    } catch (err) {
+                      alert('Error authorizing tests: ' + err.message);
+                    }
+                  }}
+                  disabled={loading || selectedTests.size === 0}
+                  className="flex gap-0.5 items-center bg-green-600 hover:bg-green-700 text-white px-1.5 py-0.5 rounded text-[13px] transition-colors disabled:opacity-50"
+                >
+                  <span>Authorize</span>
+                </button>
+                
+                {/* Download Dropdown */}
+                <div className="relative download-dropdown">
                   <button 
-                    onClick={handleResultEntry}
-                    className="flex gap-1 sm:gap-1.5 items-center bg-gray-600 hover:bg-gray-700 text-white px-2 sm:px-3 py-1.5 sm:py-2 rounded text-xs sm:text-sm transition-colors">
-                    <span>Result ({selectedTests.size})</span>
-                  </button>
-                  <button className="flex gap-1 sm:gap-1.5 items-center bg-gray-600 hover:bg-gray-700 text-white px-2 sm:px-3 py-1.5 sm:py-2 rounded text-xs sm:text-sm transition-colors">
-                    <span>Save</span>
-                  </button>
-                  <button
-                    onClick={handlePrintPreview}
-                    disabled={loading || selectedTests.size === 0}
-                    className="flex gap-1 sm:gap-1.5 items-center bg-gray-600 hover:bg-gray-700 text-white px-2 sm:px-3 py-1.5 sm:py-2 rounded text-xs sm:text-sm transition-colors disabled:opacity-50"
+                    onClick={() => setShowDownloadDropdown(!showDownloadDropdown)}
+                    className="flex gap-0.5 items-center bg-gray-600 hover:bg-gray-700 text-white px-1.5 py-0.5 rounded text-[13px] transition-colors"
                   >
-                    <Printer size={14} className="sm:w-4 sm:h-4" />
-                    <span>Print</span>
-                  </button>
-                  <button
-                    onClick={handleSendEmail}
-                    disabled={loading || selectedTests.size === 0}
-                    className="flex gap-1 sm:gap-1.5 items-center bg-gray-600 hover:bg-gray-700 text-white px-2 sm:px-3 py-1.5 sm:py-2 rounded text-xs sm:text-sm transition-colors disabled:opacity-50"
-                  >
-                    <Mail size={14} className="sm:w-4 sm:h-4" />
-                    <span>Email</span>
-                  </button>
-                  <button
-                    onClick={() => handleSendWhatsApp()}
-                    disabled={loading || selectedTests.size === 0}
-                    className="flex gap-1 sm:gap-1.5 items-center bg-green-600 hover:bg-green-700 text-white px-2 sm:px-3 py-1.5 sm:py-2 rounded text-xs sm:text-sm transition-colors disabled:opacity-50"
-                  >
-                    <FaWhatsapp size={14} className="sm:w-4 sm:h-4" />
-                    <span>Whatsapp</span>
+                    <Download size={11} />
+                    <span>Download</span>
+                    <ChevronDown size={10} />
                   </button>
                   
-                  {/* Download Dropdown */}
-                  <div className="relative download-dropdown">
-                    <button 
-                      onClick={() => setShowDownloadDropdown(!showDownloadDropdown)}
-                      className="flex gap-1 sm:gap-1.5 items-center bg-gray-600 hover:bg-gray-700 text-white px-2 sm:px-3 py-1.5 sm:py-2 rounded text-xs sm:text-sm transition-colors"
-                    >
-                      <Download size={14} className="sm:w-4 sm:h-4" />
-                      <span>Download</span>
-                      <ChevronDown size={12} className="sm:w-3 sm:h-3" />
-                    </button>
-                    
-                    {showDownloadDropdown && (
-                      <div className="absolute top-full left-0 mt-1 bg-white border border-gray-300 rounded shadow-lg z-50 min-w-[140px]">
-                        <button
-                          onClick={() => handleDownloadPdf(true)}
-                          className="w-full text-left px-3 py-2 text-xs sm:text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2"
-                        >
-                          <img src={LetterHead} alt="Header" className="w-4 h-4 object-contain" />
-                          With Header
-                        </button>
-                        <button
-                          onClick={() => handleDownloadPdf(false)}
-                          className="w-full text-left px-3 py-2 text-xs sm:text-sm text-gray-700 hover:bg-gray-100"
-                        >
-                          Without Header
-                        </button>
-                      </div>
-                    )}
-                  </div>
+                  {showDownloadDropdown && (
+                    <div className="absolute bottom-full left-0 mb-1 bg-white border border-gray-300 rounded shadow-lg z-50 min-w-[140px]">
+                      <button
+                        onClick={() => handleDownloadPdf(true)}
+                        className="w-full text-left px-2 py-1 text-[11px] text-gray-700 hover:bg-gray-100 flex items-center gap-1.5"
+                      >
+                        <img src={LetterHead} alt="Header" className="w-3 h-3 object-contain" />
+                        With Header
+                      </button>
+                      <button
+                        onClick={() => handleDownloadPdf(false)}
+                        className="w-full text-left px-2 py-1 text-[11px] text-gray-700 hover:bg-gray-100"
+                      >
+                        Without Header
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>

@@ -1,7 +1,7 @@
 "use client";
 
 // Fixed API URL integration for backend communication
-import { useRouter, useParams } from "next/navigation";
+import { useRouter, useParams, useSearchParams } from "next/navigation";
 import React, { useState, useEffect, useCallback, useRef } from "react";
 
 import Header from "@/src/components/Header";
@@ -81,10 +81,15 @@ const SuggestionInput = ({ value, onChange, options, isAbnormal }) => {
 
 const PatientResult = () => {
   const params = useParams();
+  const searchParams = useSearchParams();
   const patientTestId = Array.isArray(params.patientTestId) ? params.patientTestId[0] : params.patientTestId;
+  const testIdsParam = searchParams.get('testIds'); // For multiple tests
+  
   const router = useRouter();
 
   const [loading, setLoading] = useState(true);
+  const [multipleTestIds, setMultipleTestIds] = useState<string[]>([]); // For multiple tests
+  const [allTestsData, setAllTestsData] = useState<any[]>([]); // For multiple tests
   const [patientData, setPatientData] = useState<any>(null);
   const [parameters, setParameters] = useState<any[]>([]);
   const [groupedParameters, setGroupedParameters] = useState<any>({});
@@ -94,7 +99,7 @@ const PatientResult = () => {
   const [showReportModal, setShowReportModal] = useState(false);
   const [reportWithHeader, setReportWithHeader] = useState(true);
   const [attachedFile, setAttachedFile] = useState<any>(null);
-  const [attachedFileUrl, setAttachedFileUrl] = useState<any>(null); // object URL for preview/print
+  const [attachedFileUrl, setAttachedFileUrl] = useState<any>(null);
   const [showComment, setShowComment] = useState(false);
   const [defaultSignature, setDefaultSignature] = useState<any>(null);
 
@@ -202,10 +207,26 @@ const PatientResult = () => {
     } catch { return null; }
   }, []);
 
+  // Detect if multiple tests or single test
   useEffect(() => {
-    if (patientTestId) fetchPatientTestData();
-  }, [patientTestId]);
+    if (testIdsParam) {
+      const ids = testIdsParam.split(',').filter(id => id.trim());
+      setMultipleTestIds(ids);
+    } else {
+      setMultipleTestIds([]);
+    }
+  }, [testIdsParam]);
 
+  // Load data based on single or multiple tests
+  useEffect(() => {
+    if (multipleTestIds.length > 0) {
+      fetchMultipleTestsData();
+    } else if (patientTestId) {
+      fetchPatientTestData();
+    }
+  }, [patientTestId, multipleTestIds]);
+
+  // Fetch single test data (existing logic)
   const fetchPatientTestData = async () => {
     try {
       setLoading(true);
@@ -230,26 +251,6 @@ const PatientResult = () => {
         });
         setResults(initialResults);
 
-        // Fetch signature by test's speciality, fallback to first active
-        if (!data.patientTest.test?.signature) {
-          try {
-            const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || '/api';
-            const testSpeciality = data.patientTest.test?.speciality || 'Regular';
-            const sigRes = await fetch(`${API_BASE_URL}/signatures/by-specialty/${encodeURIComponent(testSpeciality)}`);
-            const sigData = await sigRes.json();
-            if (sigData.success && sigData.data) {
-              setDefaultSignature(sigData.data);
-            } else {
-              const allRes = await fetch(`${API_BASE_URL}/signatures`);
-              const allData = await allRes.json();
-              if (allData.success && allData.data.length > 0) {
-                const active = allData.data.filter(s => s.isActive);
-                if (active.length > 0) setDefaultSignature(active[0]);
-              }
-            }
-          } catch (e) { console.warn('Could not fetch signature', e); }
-        }
-
         // Auto set to PROVISIONAL when page is opened (if still REGISTERED)
         if (data.patientTest.status === 'REGISTERED') {
           await updateTestStatus(data.patientTest.id, { status: 'PROVISIONAL' });
@@ -257,6 +258,61 @@ const PatientResult = () => {
       }
     } catch (error) {
       console.error('Error fetching patient test data:', error);
+      setError(error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Fetch multiple tests data
+  const fetchMultipleTestsData = async () => {
+    try {
+      setLoading(true);
+      const testDataArray = await Promise.all(
+        multipleTestIds.map(id => getPatientTestById(id))
+      );
+
+      const validTests = testDataArray.filter(td => td?.patientTest).map(td => td);
+      setAllTestsData(validTests);
+
+      // Use first test's patient data
+      if (validTests.length > 0) {
+        setPatientData(validTests[0].patientTest);
+      }
+
+      // Initialize results for all tests with all their parameters
+      const initialResults: any = {};
+      validTests.forEach((testData, idx) => {
+        const testId = multipleTestIds[testDataArray.indexOf(testData)];
+        if (testData.parameters) {
+          testData.parameters.forEach(param => {
+            const paramKey = `${testId}_${param.id}`;
+            if (param.existingResult) {
+              initialResults[paramKey] = {
+                numericValue: param.existingResult.numericValue,
+                textValue: param.existingResult.textValue,
+                selectedOption: param.existingResult.selectedOption,
+                isAbnormal: param.existingResult.isAbnormal,
+                referenceRange: param.existingResult.referenceRange
+              };
+            } else {
+              initialResults[paramKey] = { numericValue: null, textValue: param.textContent || '', selectedOption: '', isAbnormal: false, referenceRange: param.normalRange };
+            }
+          });
+        }
+      });
+      setResults(initialResults);
+
+      // Auto-transition all tests to PROVISIONAL
+      await Promise.all(
+        validTests.map(testData => {
+          if (testData.patientTest.status === 'REGISTERED') {
+            return updateTestStatus(testData.patientTest.id, { status: 'PROVISIONAL' });
+          }
+        })
+      );
+    } catch (error) {
+      console.error('Error fetching multiple tests data:', error);
       setError(error.message);
     } finally {
       setLoading(false);
@@ -278,6 +334,65 @@ const PatientResult = () => {
 
   const handleAbnormalChange = (parameterId: any) => {
     setResults(prev => ({ ...prev, [parameterId]: { ...prev[parameterId], isAbnormal: !prev[parameterId]?.isAbnormal } }));
+  };
+
+  // Save all tests at once (for multiple tests)
+  const handleSaveAllTests = async () => {
+    try {
+      setSaving(true);
+      
+      // Save results for each test
+      await Promise.all(
+        allTestsData.map(async (testData) => {
+          const testId = multipleTestIds[allTestsData.indexOf(testData)];
+          const resultsData = testData.parameters.map(param => {
+            const paramKey = `${testId}_${param.id}`;
+            return {
+              testParameterId: param.id,
+              testCategoryId: param.categoryId,
+              numericValue: results[paramKey]?.numericValue || null,
+              textValue: results[paramKey]?.textValue || null,
+              selectedOption: results[paramKey]?.selectedOption || null,
+              isAbnormal: results[paramKey]?.isAbnormal || false,
+              referenceRange: results[paramKey]?.referenceRange || param.normalRange
+            };
+          }).filter(r => {
+            const hasNumeric = r.numericValue !== null && r.numericValue !== undefined && r.numericValue !== '';
+            const hasText = r.textValue && typeof r.textValue === 'string' && r.textValue.trim() !== '';
+            const hasOption = r.selectedOption && typeof r.selectedOption === 'string' && r.selectedOption.trim() !== '';
+            return hasNumeric || hasText || hasOption;
+          });
+
+          const response = await fetch(`${API_BASE_URL}/results/${testData.patientTest.id}/results`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ results: resultsData, enteredBy: 'current_user' })
+          });
+          
+          const data = await response.json();
+          if (data.success) {
+            // Auto-transition to Entered status
+            try {
+              await fetch(`${API_BASE_URL}/results/${testData.patientTest.id}/auto-transition/result-saved`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ changedBy: 'result_entry' })
+              });
+            } catch (error) {
+              console.error('⚠️ Auto-transition failed:', error);
+            }
+          }
+        })
+      );
+
+      alert('All results saved successfully!');
+      router.push('/result');
+    } catch (error) {
+      console.error('Error saving results:', error);
+      alert('Error saving results');
+    } finally {
+      setSaving(false);
+    }
   };
 
   // Check if all non-formula parameters have values
@@ -457,90 +572,186 @@ const PatientResult = () => {
           <span><b>STATUS:</b> <span className="font-semibold text-blue-700">{patientData.status}</span></span>
         </div>
 
-        {/* Test Name */}
-        <div className="mt-2 bg-primary-600 text-white p-2 font-semibold">{patientData.test.name}</div>
+        {/* For Multiple Tests */}
+        {allTestsData.length > 0 ? (
+          <div className="space-y-8">
+            {allTestsData.map((testData, testIdx) => (
+              <div key={testIdx}>
+                {/* Test Name */}
+                <div className="mt-2 bg-primary-600 text-white p-2 font-semibold">
+                  {testIdx + 1}. {testData.patientTest.test.name}
+                </div>
 
-        {/* Results Table */}
-        <div className="mt-3 bg-white border">
-          <table className="w-full text-sm border-collapse">
-            <thead className="bg-secondary-700 text-white">
-              <tr>
-                <th className="border p-2 text-left">INVESTIGATION</th>
-                <th className="border p-2 text-left">OBSERVED VALUE</th>
-                <th className="border p-2 text-left">UNITS</th>
-                <th className="border p-2 text-left">NORMAL RANGE</th>
-                <th className="border p-2 text-center">FORMULA</th>
-              </tr>
-            </thead>
-            <tbody>
-              {Object.entries(groupedParameters).map(([categoryName, categoryParams]: [string, any]) => (
-                <React.Fragment key={categoryName}>
-                  {categoryName !== 'NO_CATEGORY_HEADER' && categoryParams[0]?.showCategoryHeader && (
-                    <tr className="bg-gray-200 font-semibold"><td colSpan={5} className="p-2">{categoryName.toUpperCase()}</td></tr>
-                  )}
-                  {(categoryParams as any[]).map((param) => {
-                    const outOfRange = isValueOutOfRange(param, results[param.id]?.numericValue);
-                    const isFormula = param.hasFormula && param.formula;
-                    const inputClass = outOfRange ? "border-2 border-red-500 bg-red-50 px-2 py-1 w-24 rounded" : "border border-gray-300 px-2 py-1 w-24 rounded";
-                    return (
-                      <tr key={param.id} className="bg-purple-100">
-                        <td className="border p-2">{param.parameterName}{param.isMandatory && <span className="text-red-500">*</span>}</td>
-                        <td className="border p-2">
-                          <div className="flex items-center gap-2">
-                            {!isFormula && <input type="checkbox" checked={results[param.id]?.isAbnormal || false} onChange={() => handleAbnormalChange(param.id)} title="Mark as abnormal" />}
-                            {isFormula ? (
-                              <div className="flex items-center gap-1">
-                                <input type="checkbox" checked={results[param.id]?.isAbnormal || false} onChange={() => handleAbnormalChange(param.id)} title="Mark as abnormal" />
-                                <input type="text" readOnly value={results[param.id]?.numericValue ?? ''} className={`${inputClass} bg-green-50 border-green-400 cursor-not-allowed`} title={`Auto-calculated: ${param.formula}`} />
-                                <span className="text-xs text-green-700 italic">auto</span>
-                              </div>
-                            ) : param.type === 'Numeric' ? (
-                              <input type="number" step="0.01" value={results[param.id]?.numericValue ?? ''} onChange={(e) => handleResultChange(param.id, 'numericValue', e.target.value === '' ? null : parseFloat(e.target.value), parameters)} className={inputClass} />
-                            ) : param.isDescriptive ? (
-                              <textarea value={results[param.id]?.textValue || ''} onChange={(e) => handleResultChange(param.id, 'textValue', e.target.value, parameters)} className={`border px-2 py-1 w-48 h-16 rounded ${results[param.id]?.isAbnormal ? "border-red-500 bg-red-50" : "border-gray-300"}`} />
-                            ) : (
-                              (() => {
-                                const rawRange = param.rangeText || param.displayRangeText || '';
-                                const options = rawRange
-                                  ? rawRange.split(/[,|]/).map(o => o.trim()).filter(Boolean)
-                                  : [];
-                                return options.length > 0 ? (
-                                  <SuggestionInput
-                                    value={results[param.id]?.textValue ?? (param.textContent || '')}
-                                    onChange={(val) => handleResultChange(param.id, 'textValue', val, parameters)}
-                                    options={options}
-                                    isAbnormal={results[param.id]?.isAbnormal}
-                                  />
-                                ) : (
-                                  <input type="text" value={results[param.id]?.textValue || ''} onChange={(e) => handleResultChange(param.id, 'textValue', e.target.value, parameters)} className={`border px-2 py-1 w-32 rounded ${results[param.id]?.isAbnormal ? "border-red-500 bg-red-50" : "border-gray-300"}`} />
-                                );
-                              })()
-                            )}
-                            {outOfRange && <span className="text-red-600 font-bold text-xs" title="Out of range">↑↓</span>}
-                          </div>
-                        </td>
-                        <td className="border p-2">{param.units || ''}</td>
-                        <td className="border p-2">{param.type === 'Text' || param.isDescriptive ? (param.normalRange || '') : getAgeAppropriateRange(param, patientData.patient.age, patientData.patient.gender, patientData.patient.dob)}</td>
-                        <td className="border p-2 text-center text-xs">
-                          {param.hasFormula && param.formula ? (
-                            <div className="bg-green-50 border border-green-300 rounded p-1">
-                              <div className="font-semibold text-green-700 text-xs mb-0.5">Formula:</div>
-                              <div className="text-green-900 font-mono text-xs break-words">{param.formula}</div>
-                            </div>
-                          ) : (
-                            <span className="text-gray-400">-</span>
-                          )}
-                        </td>
+                {/* Results Table */}
+                <div className="mt-3 bg-white border">
+                  <table className="w-full text-sm border-collapse">
+                    <thead className="bg-secondary-700 text-white">
+                      <tr>
+                        <th className="border p-2 text-left">INVESTIGATION</th>
+                        <th className="border p-2 text-left">OBSERVED VALUE</th>
+                        <th className="border p-2 text-left">UNITS</th>
+                        <th className="border p-2 text-left">NORMAL RANGE</th>
+                        <th className="border p-2 text-center">FORMULA</th>
                       </tr>
-                    );
-                  })}
-                </React.Fragment>
-              ))}
-            </tbody>
-          </table>
+                    </thead>
+                    <tbody>
+                      {Object.entries(testData.groupedParameters || {}).map(([categoryName, categoryParams]: [string, any]) => (
+                        <React.Fragment key={categoryName}>
+                          {categoryName !== 'NO_CATEGORY_HEADER' && categoryParams[0]?.showCategoryHeader && (
+                            <tr className="bg-gray-200 font-semibold"><td colSpan={5} className="p-2">{categoryName.toUpperCase()}</td></tr>
+                          )}
+                          {(categoryParams as any[]).map((param) => {
+                            const paramKey = `${multipleTestIds[testIdx]}_${param.id}`;
+                            const outOfRange = isValueOutOfRange(param, results[paramKey]?.numericValue);
+                            const isFormula = param.hasFormula && param.formula;
+                            const inputClass = outOfRange ? "border-2 border-red-500 bg-red-50 px-2 py-1 w-24 rounded" : "border border-gray-300 px-2 py-1 w-24 rounded";
+                            const rawRange = param.rangeText || param.displayRangeText || '';
+                            const options = rawRange
+                              ? rawRange.split(/[,|]/).map(o => o.trim()).filter(Boolean)
+                              : [];
+                            return (
+                              <tr key={param.id} className="bg-purple-100">
+                                <td className="border p-2">{param.parameterName}</td>
+                                <td className="border p-2">
+                                  {param.type === 'Numeric' ? (
+                                    <input
+                                      type="number"
+                                      value={results[paramKey]?.numericValue || ''}
+                                      onChange={(e) => handleResultChange(paramKey, 'numericValue', e.target.value, testData.parameters)}
+                                      disabled={isFormula}
+                                      className={inputClass}
+                                    />
+                                  ) : param.type === 'Text' ? (
+                                    options.length > 0 ? (
+                                      <SuggestionInput
+                                        value={results[paramKey]?.textValue || ''}
+                                        onChange={(val) => handleResultChange(paramKey, 'textValue', val, testData.parameters)}
+                                        options={options}
+                                        isAbnormal={results[paramKey]?.isAbnormal || false}
+                                      />
+                                    ) : (
+                                      <input
+                                        type="text"
+                                        value={results[paramKey]?.textValue || ''}
+                                        onChange={(e) => handleResultChange(paramKey, 'textValue', e.target.value, testData.parameters)}
+                                        className={`border px-2 py-1 w-32 rounded ${results[paramKey]?.isAbnormal ? "border-red-500 bg-red-50" : "border-gray-300"}`}
+                                      />
+                                    )
+                                  ) : (
+                                    <div className="text-xs italic text-gray-600">{param.type} Parameter</div>
+                                  )}
+                                </td>
+                                <td className="border p-2 text-xs">{param.units || '-'}</td>
+                                <td className="border p-2 text-xs">{getAgeAppropriateRange(param, patientData.patient?.age, patientData.patient?.gender, patientData.patient?.dob)}</td>
+                                <td className="border p-2 text-center">
+                                  <input
+                                    type="checkbox"
+                                    checked={results[paramKey]?.isAbnormal || false}
+                                    onChange={() => handleAbnormalChange(paramKey)}
+                                    className="cursor-pointer"
+                                    disabled={isFormula}
+                                  />
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </React.Fragment>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <>
+            {/* Test Name - Single Test */}
+            <div className="mt-2 bg-primary-600 text-white p-2 font-semibold">{patientData.test.name}</div>
 
-          {/* Attach File Section — shown when test has attachFile = Yes */}
-          {patientData.test.attachFile === 'Yes' && (
+            {/* Results Table - Single Test */}
+            <div className="mt-3 bg-white border">
+              <table className="w-full text-sm border-collapse">
+                <thead className="bg-secondary-700 text-white">
+                  <tr>
+                    <th className="border p-2 text-left">INVESTIGATION</th>
+                    <th className="border p-2 text-left">OBSERVED VALUE</th>
+                    <th className="border p-2 text-left">UNITS</th>
+                    <th className="border p-2 text-left">NORMAL RANGE</th>
+                    <th className="border p-2 text-center">FORMULA</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {Object.entries(groupedParameters).map(([categoryName, categoryParams]: [string, any]) => (
+                    <React.Fragment key={categoryName}>
+                      {categoryName !== 'NO_CATEGORY_HEADER' && categoryParams[0]?.showCategoryHeader && (
+                        <tr className="bg-gray-200 font-semibold"><td colSpan={5} className="p-2">{categoryName.toUpperCase()}</td></tr>
+                      )}
+                      {(categoryParams as any[]).map((param) => {
+                        const outOfRange = isValueOutOfRange(param, results[param.id]?.numericValue);
+                        const isFormula = param.hasFormula && param.formula;
+                        const inputClass = outOfRange ? "border-2 border-red-500 bg-red-50 px-2 py-1 w-24 rounded" : "border border-gray-300 px-2 py-1 w-24 rounded";
+                        return (
+                          <tr key={param.id} className="bg-purple-100">
+                            <td className="border p-2">{param.parameterName}{param.isMandatory && <span className="text-red-500">*</span>}</td>
+                            <td className="border p-2">
+                              <div className="flex items-center gap-2">
+                                {!isFormula && <input type="checkbox" checked={results[param.id]?.isAbnormal || false} onChange={() => handleAbnormalChange(param.id)} title="Mark as abnormal" />}
+                                {isFormula ? (
+                                  <div className="flex items-center gap-1">
+                                    <input type="checkbox" checked={results[param.id]?.isAbnormal || false} onChange={() => handleAbnormalChange(param.id)} title="Mark as abnormal" />
+                                    <input type="text" readOnly value={results[param.id]?.numericValue ?? ''} className={`${inputClass} bg-green-50 border-green-400 cursor-not-allowed`} title={`Auto-calculated: ${param.formula}`} />
+                                    <span className="text-xs text-green-700 italic">auto</span>
+                                  </div>
+                                ) : param.type === 'Numeric' ? (
+                                  <input type="number" step="0.01" value={results[param.id]?.numericValue ?? ''} onChange={(e) => handleResultChange(param.id, 'numericValue', e.target.value === '' ? null : parseFloat(e.target.value), parameters)} className={inputClass} />
+                                ) : param.isDescriptive ? (
+                                  <textarea value={results[param.id]?.textValue || ''} onChange={(e) => handleResultChange(param.id, 'textValue', e.target.value, parameters)} className={`border px-2 py-1 w-48 h-16 rounded ${results[param.id]?.isAbnormal ? "border-red-500 bg-red-50" : "border-gray-300"}`} />
+                                ) : (
+                                  (() => {
+                                    const rawRange = param.rangeText || param.displayRangeText || '';
+                                    const options = rawRange
+                                      ? rawRange.split(/[,|]/).map(o => o.trim()).filter(Boolean)
+                                      : [];
+                                    return options.length > 0 ? (
+                                      <SuggestionInput
+                                        value={results[param.id]?.textValue ?? (param.textContent || '')}
+                                        onChange={(val) => handleResultChange(param.id, 'textValue', val, parameters)}
+                                        options={options}
+                                        isAbnormal={results[param.id]?.isAbnormal}
+                                      />
+                                    ) : (
+                                      <input type="text" value={results[param.id]?.textValue || ''} onChange={(e) => handleResultChange(param.id, 'textValue', e.target.value, parameters)} className={`border px-2 py-1 w-32 rounded ${results[param.id]?.isAbnormal ? "border-red-500 bg-red-50" : "border-gray-300"}`} />
+                                    );
+                                  })()
+                                )}
+                                {outOfRange && <span className="text-red-600 font-bold text-xs" title="Out of range">↑↓</span>}
+                              </div>
+                            </td>
+                            <td className="border p-2">{param.units || ''}</td>
+                            <td className="border p-2">{param.type === 'Text' || param.isDescriptive ? (param.normalRange || '') : getAgeAppropriateRange(param, patientData.patient.age, patientData.patient.gender, patientData.patient.dob)}</td>
+                            <td className="border p-2 text-center text-xs">
+                              {param.hasFormula && param.formula ? (
+                                <div className="bg-green-50 border border-green-300 rounded p-1">
+                                  <div className="font-semibold text-green-700 text-xs mb-0.5">Formula:</div>
+                                  <div className="text-green-900 font-mono text-xs break-words">{param.formula}</div>
+                                </div>
+                              ) : (
+                                <span className="text-gray-400">-</span>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </React.Fragment>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
+        )}
+
+        {/* Attach File Section — shown when test has attachFile = Yes (only for single test) */}
+        {allTestsData.length === 0 && patientData.test.attachFile === 'Yes' && (
             <div className="border-t bg-purple-50 px-3 py-2">
               <div className="flex items-center gap-2 mb-2">
                 <input
@@ -583,15 +794,25 @@ const PatientResult = () => {
 
           {/* Action Buttons */}
           <div className="flex flex-wrap gap-2 p-3">
-            <button onClick={handleSave} disabled={saving} className="bg-blue-600 text-white px-3 py-1 rounded text-sm disabled:opacity-50">
-              {saving ? 'Saving...' : 'Save'}
-            </button>
-            <button onClick={() => router.back()} className="bg-gray-500 text-white px-3 py-1 rounded text-sm">Back</button>
-            <button onClick={() => handleSaveAndPrint(true)} disabled={saving} className="bg-primary-600 text-white px-3 py-1 rounded text-sm disabled:opacity-50">
-              Save & Print
-            </button>
+            {allTestsData.length > 0 ? (
+              <>
+                <button onClick={handleSaveAllTests} disabled={saving} className="bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded text-sm disabled:opacity-50">
+                  {saving ? 'Saving...' : `Save All Results (${allTestsData.length} tests)`}
+                </button>
+                <button onClick={() => router.back()} className="bg-gray-500 text-white px-3 py-1 rounded text-sm">Back</button>
+              </>
+            ) : (
+              <>
+                <button onClick={handleSave} disabled={saving} className="bg-blue-600 text-white px-3 py-1 rounded text-sm disabled:opacity-50">
+                  {saving ? 'Saving...' : 'Save'}
+                </button>
+                <button onClick={() => router.back()} className="bg-gray-500 text-white px-3 py-1 rounded text-sm">Back</button>
+                <button onClick={() => handleSaveAndPrint(true)} disabled={saving} className="bg-primary-600 text-white px-3 py-1 rounded text-sm disabled:opacity-50">
+                  Save & Print
+                </button>
+              </>
+            )}
           </div>
-        </div>
 
         {/* Report Modal */}
         {showReportModal && (

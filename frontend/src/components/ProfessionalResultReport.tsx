@@ -250,12 +250,26 @@ export default function ProfessionalResultReport({
                 const er = param.existingResult;
                 const val = er ? (er.numericValue !== null && er.numericValue !== undefined ? er.numericValue : er.textValue || "-") : "-";
                 const isAbnormal = er?.isAbnormal || (param.parameterType === "Numeric" && er?.isOutOfRange);
+                
+                // Get category method and parameter method separately
+                const categoryMethod = param.categoryTestMethod || null;
+                const parameterMethod = param.parameterTestMethod || null;
 
                 return (
                   <tr key={idx} className="table-row">
                     <td className="param-name">
+                      {/* Show Category Method if exists */}
+                      {categoryMethod && (
+                        <div className="param-method">Method: {categoryMethod}</div>
+                      )}
+                      
+                      {/* Show Parameter Name */}
                       <div>{param.parameterName}</div>
-                      <div className="param-method">METHOD: {param.machineCode || "N/A"}</div>
+                      
+                      {/* Show Parameter Method if exists */}
+                      {parameterMethod && (
+                        <div className="param-method">Method: {parameterMethod}</div>
+                      )}
                     </td>
                     <td className={`param-result ${isAbnormal ? "abnormal" : ""}`}>
                       {val}
