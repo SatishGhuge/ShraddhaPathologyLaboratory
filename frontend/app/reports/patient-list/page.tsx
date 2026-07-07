@@ -5,7 +5,6 @@ import { useSearchParams } from "next/navigation";
 import { Search, RotateCcw, Printer, FileSpreadsheet, Users, ChevronDown, Calendar, ChevronLeft, ChevronRight } from "lucide-react";
 import * as XLSX from 'xlsx';
 import Header from "@/src/components/Header";
-import PageHeader from "@/src/components/BreadCrumb";
 import { getAllPatients, getCollectionCenters, getOrganizations } from "@/src/api/patient";
 import API_BASE_URL from "@/src/api/config";
 
@@ -413,7 +412,6 @@ export default function PatientList() {
     <>
       <Header/>
       <div className="p-2 sm:p-3 md:p-4 bg-white min-h-screen">
-        <PageHeader title="Patient List" icon={Users} path="Reports"/>
 
         <div className="bg-white p-2 sm:p-3 rounded shadow-md mb-3">
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mb-2">

@@ -3,7 +3,6 @@
 import { useState, useEffect, useRef } from "react";
 import { Search, RotateCcw, Printer, FileSpreadsheet, DollarSign, ChevronDown, Calendar, ChevronLeft, ChevronRight } from "lucide-react";
 import Header from "@/src/components/Header";
-import PageHeader from "@/src/components/BreadCrumb";
 import { getAllPatients, getCollectionCenters } from "@/src/api/patient";
 
 /* ── Date helpers ── */
@@ -238,7 +237,6 @@ export default function DailyCollection() {
     <>
       <Header />
       <div className="p-2 sm:p-3 bg-white min-h-screen">
-        <PageHeader title="Daily Collection" icon={DollarSign} path="Reports / MIS Reports" />
 
         {/* FILTERS */}
         <div className="bg-white p-2 sm:p-3 rounded shadow-md mb-3">

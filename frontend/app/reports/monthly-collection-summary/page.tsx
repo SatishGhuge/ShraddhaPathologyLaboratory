@@ -3,7 +3,6 @@
 import { useState, useRef, useEffect } from "react";
 import { Search, RotateCcw, Printer, FileSpreadsheet, ChevronDown, Calendar, ChevronLeft, ChevronRight } from "lucide-react";
 import Header from "@/src/components/Header";
-import PageHeader from "@/src/components/BreadCrumb";
 import { getMonthlyCollectionSummary } from "@/src/api/admin";
 import { getCollectionCenters } from "@/src/api/patient";
 
@@ -168,7 +167,6 @@ export default function MonthlyCollectionSummary() {
     <>
       <Header />
       <div className="p-2 sm:p-3 md:p-4 lg:p-6 bg-white min-h-screen">
-        <PageHeader title="Monthly Collection Summary" icon={Calendar} path="Reports / Other Reports" />
 
         {/* FILTERS */}
         <div className="bg-white p-2 sm:p-3 rounded shadow-md mb-2 sm:mb-3">

@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { Search, RotateCcw, Printer, FileSpreadsheet, Wallet } from "lucide-react";
 import Header from "@/src/components/Header";
-import PageHeader from "@/src/components/BreadCrumb";
 
 export default function BulkSettlement() {
 
@@ -234,12 +233,6 @@ export default function BulkSettlement() {
     <>
       <Header />
       <div className="p-2 sm:p-3 md:p-4 lg:p-6 bg-cyan-50 min-h-screen">
-
-        <PageHeader 
-          title="Bulk Settlement List" 
-          icon={Wallet}
-          path="Reports"
-        />
 
         <div className="bg-white p-2 sm:p-3 md:p-4 rounded shadow-md mb-2 sm:mb-3">
 

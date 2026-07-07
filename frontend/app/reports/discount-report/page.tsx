@@ -3,7 +3,6 @@
 import { useState, useEffect } from "react";
 import { Search, RotateCcw, Printer, FileSpreadsheet, Percent, ChevronLeft, ChevronRight } from "lucide-react";
 import Header from "@/src/components/Header";
-import PageHeader from "@/src/components/BreadCrumb";
 import { getDiscountReport } from "@/src/api/admin";
 
 export default function DiscountReport() {
@@ -87,7 +86,6 @@ export default function DiscountReport() {
     <>
       <Header />
       <div className="p-3 bg-white min-h-screen">
-        <PageHeader title="Patient Discount List" icon={Percent} path="Reports / Other Reports" />
 
         {/* FILTERS */}
         <div className="bg-white p-3 rounded shadow-md mb-3">

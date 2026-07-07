@@ -8,7 +8,6 @@ import {
   UserCheck,
 } from "lucide-react";
 import Header from "@/src/components/Header";
-import PageHeader from "@/src/components/BreadCrumb";
 
 export default function UserLoginReport() {
   const [filters, setFilters] = useState({
@@ -195,13 +194,6 @@ export default function UserLoginReport() {
     <>
       <Header />
       <div className="p-2 sm:p-3 md:p-4 lg:p-6 bg-primary-50 min-h-screen">
-        {/* PAGE HEADING */}
-        <PageHeader 
-          title="User Login Report" 
-          icon={UserCheck}
-          path="Reports / Other Reports"
-        />
-
         {/* FILTER CARD */}
         <div className="bg-white p-2 sm:p-3 md:p-4 rounded shadow-md mb-2 sm:mb-3">
           {/* FILTER GRID */}

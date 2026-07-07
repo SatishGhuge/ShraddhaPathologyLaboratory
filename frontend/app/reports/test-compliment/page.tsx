@@ -3,7 +3,6 @@
 import { useState, useRef, useEffect } from "react";
 import { Search, RotateCcw, Printer, FileSpreadsheet, ChevronDown, Gift } from "lucide-react";
 import Header from "@/src/components/Header";
-import PageHeader from "@/src/components/BreadCrumb";
 
 export default function TestComplimentReport() {
 
@@ -228,13 +227,6 @@ export default function TestComplimentReport() {
     <>
       <Header />
       <div className="p-2 sm:p-3 md:p-4 lg:p-6 bg-white min-h-screen">
-
-        {/* PAGE HEADING */}
-        <PageHeader 
-          title="Test Wise Complement Report" 
-          icon={Gift}
-          path="Reports / MIS Reports"
-        />
 
         {/* FILTER CARD */}
         <div className="bg-white p-2 sm:p-3 md:p-4 rounded shadow-md mb-2 sm:mb-3">

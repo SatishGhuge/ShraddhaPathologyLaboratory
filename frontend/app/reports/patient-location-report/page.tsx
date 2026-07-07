@@ -2,7 +2,6 @@
 
 import React, { useState, useEffect } from "react";
 import Header from "@/src/components/Header";
-import PageHeader from "@/src/components/BreadCrumb";
 import { MapPin, Download, RefreshCw } from "lucide-react";
 import API_BASE_URL from "@/src/api/config";
 import * as XLSX from "xlsx";
@@ -138,7 +137,6 @@ export default function PatientLocationReport() {
   return (
     <>
       <Header />
-      <PageHeader title="Patient Location Report" icon={MapPin} path="Reports / Patient Location" />
 
       <div className="p-6 bg-gray-50 min-h-screen">
         {/* Filters */}

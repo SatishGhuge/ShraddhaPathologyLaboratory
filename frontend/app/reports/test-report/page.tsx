@@ -3,7 +3,6 @@
 import { useState, useEffect, useRef } from "react";
 import { RotateCcw, Printer, FileSpreadsheet, Search, ChevronDown, Calendar, ChevronLeft, ChevronRight, AlertCircle } from "lucide-react";
 import Header from "@/src/components/Header";
-import PageHeader from "@/src/components/BreadCrumb";
 import { getPatientTests } from "@/src/api/result";
 import { getOrganizations } from "@/src/api/patient";
 import * as XLSX from "xlsx";
@@ -599,7 +598,6 @@ export default function TestReport() {
     <>
       <Header />
       <div className="p-2 sm:p-3 bg-white min-h-screen">
-        <PageHeader title="Test Report" icon={Search} path="Reports / Test Reports" />
 
         {/* FILTERS */}
         <div className="bg-white p-2 sm:p-3 rounded shadow-md mb-3">

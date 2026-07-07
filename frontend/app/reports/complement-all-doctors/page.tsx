@@ -3,7 +3,6 @@
 import { useState, useRef, useEffect } from "react";
 import { Search, RotateCcw, Printer, FileSpreadsheet, ChevronDown, Users } from "lucide-react";
 import Header from "@/src/components/Header";
-import PageHeader from "@/src/components/BreadCrumb";
 
 export default function ComplementAllDoctorReport() {
 
@@ -237,13 +236,6 @@ export default function ComplementAllDoctorReport() {
     <>
       <Header />
       <div className="p-2 sm:p-3 md:p-4 lg:p-6 bg-cyan-50 min-h-screen">
-
-        {/* PAGE HEADING */}
-        <PageHeader 
-          title="Complement Report (All Doctors)" 
-          icon={Users}
-          path="Reports / MIS Reports"
-        />
 
         {/* FILTER CARD */}
         <div className="bg-white p-2 sm:p-3 md:p-4 rounded shadow-md mb-2 sm:mb-3">

@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { Search, RotateCcw, Printer, FileSpreadsheet, Receipt } from "lucide-react";
 import Header from "@/src/components/Header";
-import PageHeader from "@/src/components/BreadCrumb";
 
 export default function ReceiptReport() {
 
@@ -91,13 +90,6 @@ export default function ReceiptReport() {
     <>
       <Header />
       <div className="p-2 sm:p-3 md:p-4 lg:p-6 bg-white min-h-screen">
-
-        {/* PAGE HEADING */}
-        <PageHeader 
-          title="Payment Receipt Report" 
-          icon={Receipt}
-          path="Reports / MIS Reports"
-        />
 
         {/* FILTER CARD */}
         <div className="bg-white p-2 sm:p-3 md:p-4 rounded shadow-md mb-2 sm:mb-3">

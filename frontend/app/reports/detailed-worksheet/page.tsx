@@ -10,7 +10,6 @@ import {
   FileText,
 } from "lucide-react";
 import Header from "@/src/components/Header";
-import PageHeader from "@/src/components/BreadCrumb";
 
 export default function DetailedWorksheet() {
   const [filters, setFilters] = useState({
@@ -256,13 +255,6 @@ export default function DetailedWorksheet() {
     <>
       <Header />
       <div className="p-2 sm:p-3 md:p-4 lg:p-6 bg-white min-h-screen">
-        {/* PAGE HEADING */}
-        <PageHeader 
-          title="Detailed Worksheet" 
-          icon={FileText}
-          path="Reports / Other Reports"
-        />
-
         {/* FILTER CARD */}
         <div className="bg-white p-2 sm:p-3 md:p-4 rounded shadow-md mb-2 sm:mb-3">
           {/* FILTER ROW 1 */}

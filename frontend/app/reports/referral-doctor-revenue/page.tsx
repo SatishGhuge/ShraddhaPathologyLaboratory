@@ -3,7 +3,6 @@
 import { useState, useEffect, useRef } from "react";
 import { DollarSign, Download, Search, RotateCcw, ChevronDown, Printer, Calendar, ChevronLeft, ChevronRight } from "lucide-react";
 import Header from "@/src/components/Header";
-import PageHeader from "@/src/components/BreadCrumb";
 import * as XLSX from 'xlsx';
 
 /* ── date helpers ── */
@@ -452,7 +451,6 @@ export default function ReferralDoctorRevenueReport() {
     <>
       <Header />
       <div className="min-h-screen bg-gray-50 p-2 sm:p-3 md:p-4">
-        <PageHeader title="Referral Doctor Revenue Report" icon={DollarSign} path="Reports" />
 
         <div className="bg-white rounded shadow-md p-3 sm:p-4 border border-gray-200">
           {/* Filters Row - All 4 filters in one row */}

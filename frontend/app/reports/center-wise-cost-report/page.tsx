@@ -3,7 +3,6 @@
 import { useState, useRef, useEffect } from "react";
 import { Search, RotateCcw, Printer, FileText, FileSpreadsheet, BarChart3, ChevronDown, Calendar, ChevronLeft, ChevronRight } from "lucide-react";
 import Header from "@/src/components/Header";
-import PageHeader from "@/src/components/BreadCrumb";
 import { getAllPatients, getCollectionCenters } from "@/src/api/patient";
 import { getTests } from "@/src/api/master";
 
@@ -265,7 +264,6 @@ export default function CenterWiseCostReport() {
     <>
       <Header />
       <div className="p-2 sm:p-3 md:p-4 lg:p-6 bg-white min-h-screen">
-        <PageHeader title="Center Wise Cost Report" icon={BarChart3} path="Reports / Cost Related Reports"/>
 
         {/* FILTER CARD */}
         <div className="bg-white p-2 sm:p-3 md:p-4 rounded shadow-md mb-2 sm:mb-3">

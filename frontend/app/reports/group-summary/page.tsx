@@ -3,7 +3,6 @@
 import { useState, useEffect, useRef } from "react";
 import { Search, RotateCcw, FileSpreadsheet, Layers, Calendar, ChevronLeft, ChevronRight } from "lucide-react";
 import Header from "@/src/components/Header";
-import PageHeader from "@/src/components/BreadCrumb";
 import * as XLSX from "xlsx";
 import { getGroupSummaryReport } from "@/src/api/admin";
 
@@ -178,7 +177,6 @@ export default function GroupSummary() {
     <>
       <Header />
       <div className="p-2 sm:p-4 bg-cyan-50 min-h-screen">
-        <PageHeader title="Group Summary Report" icon={Layers} path="Reports" />
 
         <div className="bg-white p-3 rounded shadow-md mb-3">
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-2">

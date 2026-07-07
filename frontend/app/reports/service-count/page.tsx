@@ -3,7 +3,6 @@
 import { useState, useRef, useEffect } from "react";
 import { Search, RotateCcw, Printer, FileSpreadsheet, ChevronDown, Activity, Calendar, ChevronLeft, ChevronRight } from "lucide-react";
 import Header from "@/src/components/Header";
-import PageHeader from "@/src/components/BreadCrumb";
 import * as XLSX from "xlsx";
 import { getServiceCountReport } from "@/src/api/admin";
 
@@ -212,7 +211,6 @@ export default function ServiceCount() {
     <>
       <Header />
       <div className="p-2 sm:p-4 bg-white min-h-screen">
-        <PageHeader title="Service Count and Revenue" icon={Activity} path="Reports" />
 
         {/* FILTERS */}
         <div className="bg-white p-3 rounded shadow-md mb-3">

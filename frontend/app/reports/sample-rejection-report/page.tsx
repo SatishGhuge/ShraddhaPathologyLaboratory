@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { Search, RotateCcw, FileSpreadsheet, XCircle } from "lucide-react";
 import Header from "@/src/components/Header";
-import PageHeader from "@/src/components/BreadCrumb";
 
 export default function SampleRejectionReport() {
 
@@ -117,13 +116,6 @@ export default function SampleRejectionReport() {
     <>
       <Header />
       <div className="p-2 sm:p-3 md:p-4 lg:p-6 bg-white min-h-screen">
-
-        {/* PAGE HEADING */}
-        <PageHeader 
-          title="Sample Rejection Report" 
-          icon={XCircle}
-          path="Reports / Other Reports"
-        />
 
         {/* FILTER CARD */}
         <div className="bg-white p-2 sm:p-3 md:p-4 rounded shadow-md mb-2 sm:mb-3">
