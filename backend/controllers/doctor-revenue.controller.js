@@ -189,7 +189,8 @@ export const getDoctorReferralRevenue = async (req, res) => {
         test: {
           select: {
             id: true,
-            name: true
+            name: true,
+            shortName: true
           }
         },
         organization: {
@@ -374,6 +375,7 @@ export const getDoctorReferralRevenue = async (req, res) => {
           patientName: `${pt.patient.firstName || ''} ${pt.patient.lastName || ''}`.trim(),
           testId: pt.testId,
           testName: pt.test.name,
+          testShortName: pt.test.shortName || pt.test.name,
           doctorId: matchedDoctor.id,
           doctorName: pt.referralDoctor,
           organization: pt.organization?.name || pt.organizationId || '-',

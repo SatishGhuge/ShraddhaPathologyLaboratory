@@ -73,7 +73,6 @@ const COLS = [
   { key: "discountRuntime", label: "Discount (R)" },
   { key: "discountSpecial", label: "Discount (S)" },
   { key: "netAmount", label: "Net Amount" },
-  { key: "paymentMode", label: "Payment Mode" },
 ];
 
 export default function ReferralDoctorRevenueReport() {
@@ -112,7 +111,6 @@ export default function ReferralDoctorRevenueReport() {
   
   // Filters
   const [searchPatient, setSearchPatient] = useState("");
-  const [paymentModeFilter, setPaymentModeFilter] = useState("");
   
   // Column selector
   const [selCols, setSelCols] = useState<Record<string, boolean>>(
@@ -183,7 +181,7 @@ export default function ReferralDoctorRevenueReport() {
       console.log('🔍 Filter changed, re-filtering...');
       handleSearch();
     }
-  }, [dateFrom, dateTo, selectedDoctor, searchPatient, paymentModeFilter, inactiveVisits]);
+  }, [dateFrom, dateTo, selectedDoctor, searchPatient, inactiveVisits]);
 
   // Fetch new data when date range changes
   useEffect(() => {
@@ -242,6 +240,7 @@ export default function ReferralDoctorRevenueReport() {
           id: `${item.id}-${item.patientId}`,
           patientName: item.patientName,
           testName: item.testName,
+          testShortName: item.testShortName,
           organization: item.organization,
           visitId: item.visitId,
           doctorName: item.doctorName,
@@ -350,24 +349,26 @@ export default function ReferralDoctorRevenueReport() {
       );
     }
 
-    // Filter by payment mode (OPTIONAL - only if selected)
-    if (paymentModeFilter && paymentModeFilter.trim() !== "") {
-      filtered = filtered.filter((t) => {
-        const mode = (t.paymentMode || '').trim();
-        return mode === paymentModeFilter;
-      });
-    }
-
     // Filter out inactive visits
     filtered = filtered.filter((t) => !inactiveVisits.has(t.visitId));
 
     setFilteredData(filtered);
   };
 
+  // Handle proper print with formatted layout
+  const handlePrint = () => {
+    if (filteredData.length === 0) {
+      alert('Please generate report with filters first');
+      return;
+    }
+    
+    // Use standard print dialog (like test report)
+    window.print();
+  };
+
   const handleReset = () => {
     setDoctorSearch("");
     setSelectedDoctor("");
-    setPaymentModeFilter("");
     setDateFrom(fmtISO(today0()));
     setDateTo(fmtISO(today0()));
     setSearchPatient("");
@@ -381,6 +382,10 @@ export default function ReferralDoctorRevenueReport() {
     const updated = new Set(inactiveVisits);
     if (updated.has(visitId)) {
       updated.delete(visitId);
+      // If this was the last inactive visit, close the modal automatically
+      if (updated.size === 0) {
+        setShowInactiveModal(false);
+      }
     } else {
       updated.add(visitId);
     }
@@ -450,8 +455,8 @@ export default function ReferralDoctorRevenueReport() {
         <PageHeader title="Referral Doctor Revenue Report" icon={DollarSign} path="Reports" />
 
         <div className="bg-white rounded shadow-md p-3 sm:p-4 border border-gray-200">
-          {/* Filters Row - All 5 filters in one row */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2 mb-3">
+          {/* Filters Row - All 4 filters in one row */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 mb-3">
             {/* DATE PICKER */}
             <div className="relative" ref={dpRef}>
               <button type="button" onClick={openPicker}
@@ -545,20 +550,6 @@ export default function ReferralDoctorRevenueReport() {
               />
             </div>
 
-            {/* Payment Mode Select */}
-            <select
-              value={paymentModeFilter}
-              onChange={(e) => setPaymentModeFilter(e.target.value)}
-              className="border border-gray-300 rounded px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
-            >
-              <option value="">All Payment Modes</option>
-              <option value="Cash">Cash</option>
-              <option value="Debit Card">Debit Card</option>
-              <option value="Credit Card">Credit Card</option>
-              <option value="UPI">UPI</option>
-              <option value="Other">Other</option>
-            </select>
-
             {/* Column Selector */}
             <div className="relative" ref={colRef}>
               <button
@@ -619,7 +610,7 @@ export default function ReferralDoctorRevenueReport() {
           {/* Buttons */}
           <div className="flex flex-wrap gap-2 mb-3">
             <button
-              onClick={() => window.print()}
+              onClick={handlePrint}
               className="flex gap-1.5 items-center bg-orange-600 hover:bg-orange-700 text-white px-3 py-1.5 rounded text-xs sm:text-sm"
             >
               <Printer size={14} /> Print
@@ -652,18 +643,18 @@ export default function ReferralDoctorRevenueReport() {
 
         {/* Table */}
         <div className="bg-white rounded shadow-md border border-gray-200 overflow-x-auto mt-3">
-          <table className="w-full text-xs sm:text-sm">
+          <table className="w-full text-xs border-collapse">
             <thead className="bg-slate-900 text-white">
               <tr>
-                <th className="px-2 sm:px-3 py-1.5 sm:py-2 text-center font-semibold whitespace-nowrap border border-gray-300 w-12">
+                <th className="px-2 py-1.5 text-center font-semibold whitespace-nowrap border border-gray-300 w-12">
                   {/* Just a header, no check all */}
                 </th>
-                <th className="px-2 sm:px-3 py-1.5 sm:py-2 text-left font-semibold whitespace-nowrap border border-gray-300">Sr.No.</th>
-                <th className="px-2 sm:px-3 py-1.5 sm:py-2 text-left font-semibold whitespace-nowrap border border-gray-300">Patient Name</th>
-                <th className="px-2 sm:px-3 py-1.5 sm:py-2 text-left font-semibold whitespace-nowrap border border-gray-300">Test Performed</th>
-                <th className="px-2 sm:px-3 py-1.5 sm:py-2 text-left font-semibold whitespace-nowrap border border-gray-300">Ref Doctor</th>
+                <th className="px-2 py-1.5 text-left font-semibold whitespace-nowrap border border-gray-300">Sr.No.</th>
+                <th className="px-2 py-1.5 text-left font-semibold whitespace-nowrap border border-gray-300">Patient Name</th>
+                <th className="px-2 py-1.5 text-left font-semibold whitespace-nowrap border border-gray-300">Test Performed</th>
+                <th className="px-2 py-1.5 text-left font-semibold whitespace-nowrap border border-gray-300">Ref Doctor</th>
                 {vis.map(c => (
-                  <th key={c.key} className="px-2 sm:px-3 py-1.5 sm:py-2 text-left font-semibold whitespace-nowrap border border-gray-300">{c.label}</th>
+                  <th key={c.key} className="px-2 py-1.5 text-left font-semibold whitespace-nowrap border border-gray-300">{c.label}</th>
                 ))}
               </tr>
             </thead>
@@ -710,7 +701,7 @@ export default function ReferralDoctorRevenueReport() {
                     return (
                       <>
                         <tr key={row.id} className={i % 2 === 0 ? "bg-white hover:bg-gray-50" : "bg-gray-50 hover:bg-gray-100"}>
-                          <td className="px-2 sm:px-3 py-1.5 sm:py-2 border border-gray-200 text-center w-12">
+                          <td className="px-2 py-1.5 border border-gray-200 text-center w-12">
                             {isFirstInVisit && (
                               <input
                                 type="checkbox"
@@ -721,18 +712,20 @@ export default function ReferralDoctorRevenueReport() {
                               />
                             )}
                           </td>
-                          <td className="px-2 sm:px-3 py-1.5 sm:py-2 border border-gray-200 whitespace-nowrap">{startIndex + i + 1}</td>
+                          <td className="px-2 py-1.5 border border-gray-200 whitespace-nowrap">{startIndex + i + 1}</td>
                           {/* Show patient name only for first test in each visit */}
-                          <td className="px-2 sm:px-3 py-1.5 sm:py-2 border border-gray-200 font-medium">
+                          <td className="px-2 py-1.5 border border-gray-200 font-medium">
                             {isFirstInVisit ? row.patientName : "-"}
                           </td>
-                          <td className="px-2 sm:px-3 py-1.5 sm:py-2 border border-gray-200">{row.testName}</td>
+                          <td className="px-2 py-1.5 border border-gray-200 text-sm font-semibold" title={row.testName}>
+                            {row.testShortName || row.testName}
+                          </td>
                           {/* Show doctor name only for first test in each visit */}
-                          <td className="px-2 sm:px-3 py-1.5 sm:py-2 border border-gray-200 whitespace-nowrap">
+                          <td className="px-2 py-1.5 border border-gray-200 whitespace-nowrap">
                             {isFirstInVisit ? `Dr. ${row.doctorName}` : "-"}
                           </td>
                           {vis.map(c => (
-                            <td key={c.key} className="px-2 sm:px-3 py-1.5 sm:py-2 border border-gray-200 whitespace-nowrap text-right">
+                            <td key={c.key} className="px-2 py-1.5 border border-gray-200 whitespace-nowrap text-right">
                               {c.key === "date" ? new Date(row.date).toLocaleDateString("en-GB") : 
                                c.key === "billAmount" || c.key === "discountRuntime" || c.key === "discountSpecial" || c.key === "netAmount" 
                                ? `₹${Number(row[c.key]).toFixed(2)}`
@@ -743,12 +736,12 @@ export default function ReferralDoctorRevenueReport() {
                         {/* Visit Subtotal Row - Show after last test in each visit */}
                         {isLastInVisit && (
                           <tr className="bg-blue-50 border-t border-gray-300">
-                            <td colSpan={1} className="px-2 sm:px-3 py-1.5 sm:py-2 border border-gray-300"></td>
-                            <td colSpan={4} className="px-2 sm:px-3 py-1.5 sm:py-2 text-right border border-gray-300 font-semibold text-xs">
+                            <td colSpan={1} className="px-2 py-1.5 border border-gray-300"></td>
+                            <td colSpan={4} className="px-2 py-1.5 text-right border border-gray-300 font-semibold text-xs">
                               Visit {row.visitId} Subtotal:
                             </td>
                             {vis.map(c => (
-                              <td key={c.key} className="px-2 sm:px-3 py-1.5 sm:py-2 border border-gray-300 whitespace-nowrap text-right font-semibold bg-blue-100">
+                              <td key={c.key} className="px-2 py-1.5 border border-gray-300 whitespace-nowrap text-right font-semibold bg-blue-100">
                                 {c.key === "billAmount" ? `₹${visitSubtotal.billAmount.toFixed(2)}` :
                                  c.key === "discountRuntime" ? `₹${visitSubtotal.discountRuntime.toFixed(2)}` :
                                  c.key === "discountSpecial" ? `₹${visitSubtotal.discountSpecial.toFixed(2)}` :
@@ -765,12 +758,12 @@ export default function ReferralDoctorRevenueReport() {
                   {/* Total Row - Show only when doctor is selected */}
                   {selectedDoctor && totals && vis.some(c => ["billAmount", "discountRuntime", "discountSpecial", "netAmount"].includes(c.key)) && (
                     <tr className="bg-slate-100 border-t-2 border-gray-400 font-bold">
-                      <td colSpan={1} className="px-2 sm:px-3 py-1.5 sm:py-2 border border-gray-300 text-center w-12"></td>
-                      <td colSpan={4} className="px-2 sm:px-3 py-1.5 sm:py-2 text-right border border-gray-300">
+                      <td colSpan={1} className="px-2 py-1.5 border border-gray-300 text-center w-12"></td>
+                      <td colSpan={4} className="px-2 py-1.5 text-right border border-gray-300">
                         TOTAL
                       </td>
                       {vis.map(c => (
-                        <td key={c.key} className="px-2 sm:px-3 py-1.5 sm:py-2 border border-gray-300 whitespace-nowrap text-right bg-slate-200">
+                        <td key={c.key} className="px-2 py-1.5 border border-gray-300 whitespace-nowrap text-right bg-slate-200">
                           {c.key === "billAmount" ? `₹${totals.billAmount.toFixed(2)}` :
                            c.key === "discountRuntime" ? `₹${totals.discountRuntime.toFixed(2)}` :
                            c.key === "discountSpecial" ? `₹${totals.discountSpecial.toFixed(2)}` :
@@ -903,6 +896,106 @@ export default function ReferralDoctorRevenueReport() {
             <span className="text-red-600 font-semibold">Net Amount = Bill Amount - Discount</span>
           </div>
         )}
+
+        {/* PRINT ONLY SECTION */}
+        <div className="print-only">
+          <style>{`@media print{body *{visibility:hidden}.print-only,.print-only *{visibility:visible}.print-only{position:absolute;left:0;top:0;width:100%;padding:20px}@page{size:A4 landscape;margin:10mm}}@media screen{.print-only{display:none}}`}</style>
+          <div style={{textAlign:"center",marginBottom:"20px"}}>
+            <h1 style={{fontSize:"18px",fontWeight:"bold",margin:"0"}}>SHRADDHA PATHOLOGY LABORATORY</h1>
+            <p style={{margin:"4px 0",fontSize:"10px"}}>Plot No-38, Sector-1, D-Mart Road, New Panvel - 410 206</p>
+            <hr style={{margin:"8px 0",border:"1px solid #000"}}/>
+            <h2 style={{fontSize:"13px",fontWeight:"bold",color:"#0066cc",margin:"8px 0"}}>Referral Doctor Revenue Report</h2>
+            <p style={{margin:"4px 0",fontSize:"10px"}}>Doctor: {selectedDoctor || "All Doctors"} | Period: {dispRange(dateFrom,dateTo)} | Total Records: {filteredData.length}</p>
+            <hr style={{margin:"8px 0",border:"1px dashed #000"}}/>
+          </div>
+          <table style={{width:"100%",borderCollapse:"collapse",fontSize:"8px"}}>
+            <thead><tr style={{backgroundColor:"#1e293b",color:"white"}}>
+              <th style={{padding:"4px",border:"1px solid #000"}}>Sr.No.</th>
+              <th style={{padding:"4px",border:"1px solid #000"}}>Patient Name</th>
+              <th style={{padding:"4px",border:"1px solid #000"}}>Test Name</th>
+              <th style={{padding:"4px",border:"1px solid #000"}}>Visit ID</th>
+              <th style={{padding:"4px",border:"1px solid #000"}}>Date</th>
+              {vis.map(c => (
+                <th key={c.key} style={{padding:"4px",border:"1px solid #000"}}>{c.label}</th>
+              ))}
+            </tr></thead>
+            <tbody>{filteredData.map((row,i)=>{
+              const isFirstInVisit = filteredData.findIndex(r => r.visitId === row.visitId) === i;
+              let isLastInVisit = false;
+              for (let j = filteredData.length - 1; j >= 0; j--) {
+                if (filteredData[j].visitId === row.visitId) {
+                  isLastInVisit = j === i;
+                  break;
+                }
+              }
+              const visitTests = filteredData.filter(r => r.visitId === row.visitId);
+              const visitSubtotal = {
+                billAmount: visitTests.reduce((sum, t) => sum + t.billAmount, 0),
+                discountRuntime: visitTests.reduce((sum, t) => sum + (t.discountRuntime || 0), 0),
+                discountSpecial: visitTests.reduce((sum, t) => sum + (t.discountSpecial || 0), 0),
+                netAmount: visitTests.reduce((sum, t) => sum + (t.netAmount || 0), 0),
+              };
+              return (
+                <>
+                  <tr key={row.id}>
+                    <td style={{padding:"4px",border:"1px solid #000"}}>{i + 1}</td>
+                    <td style={{padding:"4px",border:"1px solid #000"}}>{isFirstInVisit ? row.patientName : "-"}</td>
+                    <td style={{padding:"4px",border:"1px solid #000"}}>{row.testShortName || row.testName}</td>
+                    <td style={{padding:"4px",border:"1px solid #000"}}>{isFirstInVisit ? row.visitId : "-"}</td>
+                    <td style={{padding:"4px",border:"1px solid #000"}}>{new Date(row.date).toLocaleDateString("en-GB")}</td>
+                    {vis.map(c => (
+                      <td key={c.key} style={{padding:"4px",border:"1px solid #000",textAlign:"right"}}>
+                        {c.key === "date" ? new Date(row.date).toLocaleDateString("en-GB") : 
+                         c.key === "billAmount" || c.key === "discountRuntime" || c.key === "discountSpecial" || c.key === "netAmount" 
+                         ? `₹${Number(row[c.key]).toFixed(2)}`
+                         : row[c.key] ?? "-"}
+                      </td>
+                    ))}
+                  </tr>
+                  {isLastInVisit && (
+                    <tr style={{backgroundColor:"#e0e7ff",fontWeight:"bold"}}>
+                      <td colSpan={5} style={{padding:"4px",border:"1px solid #000",textAlign:"right"}}>
+                        Visit {row.visitId} Subtotal:
+                      </td>
+                      {vis.map(c => (
+                        <td key={c.key} style={{padding:"4px",border:"1px solid #000",textAlign:"right",backgroundColor:"#dbeafe"}}>
+                          {c.key === "billAmount" ? `₹${visitSubtotal.billAmount.toFixed(2)}` :
+                           c.key === "discountRuntime" ? `₹${visitSubtotal.discountRuntime.toFixed(2)}` :
+                           c.key === "discountSpecial" ? `₹${visitSubtotal.discountSpecial.toFixed(2)}` :
+                           c.key === "netAmount" ? `₹${visitSubtotal.netAmount.toFixed(2)}` :
+                           "-"}
+                        </td>
+                      ))}
+                    </tr>
+                  )}
+                </>
+              );
+            })}</tbody>
+          </table>
+          {totals && (
+            <table style={{width:"100%",marginTop:"10px",borderCollapse:"collapse",fontSize:"8px"}}>
+              <tbody>
+                <tr style={{backgroundColor:"#f1f5f9",fontWeight:"bold"}}>
+                  <td colSpan={5} style={{padding:"4px",border:"1px solid #000",textAlign:"right"}}>
+                    GRAND TOTAL:
+                  </td>
+                  {vis.map(c => (
+                    <td key={c.key} style={{padding:"4px",border:"1px solid #000",textAlign:"right",backgroundColor:"#e2e8f0"}}>
+                      {c.key === "billAmount" ? `₹${totals.billAmount.toFixed(2)}` :
+                       c.key === "discountRuntime" ? `₹${totals.discountRuntime.toFixed(2)}` :
+                       c.key === "discountSpecial" ? `₹${totals.discountSpecial.toFixed(2)}` :
+                       c.key === "netAmount" ? `₹${totals.netAmount.toFixed(2)}` :
+                       "-"}
+                    </td>
+                  ))}
+                </tr>
+              </tbody>
+            </table>
+          )}
+          <div style={{marginTop:"20px",fontSize:"9px",textAlign:"center",borderTop:"1px solid #000",paddingTop:"10px"}}>
+            <p>This is a system-generated report. Printed on: {new Date().toLocaleString("en-GB")}</p>
+          </div>
+        </div>
       </div>
     </>
   );
