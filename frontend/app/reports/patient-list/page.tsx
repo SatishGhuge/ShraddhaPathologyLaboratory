@@ -414,7 +414,7 @@ export default function PatientList() {
       <div className="p-2 sm:p-3 md:p-4 bg-white min-h-screen">
 
         <div className="bg-white p-2 sm:p-3 rounded shadow-md mb-3">
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mb-2">
+          <div className="grid grid-cols-1 sm:grid-cols-4 gap-2 mb-2">
 
             {/* DATE PICKER */}
             <div className="relative" ref={dpRef}>
@@ -474,12 +474,12 @@ export default function PatientList() {
 
             <input placeholder="Referral Doctor" value={f.referralDoctor} onChange={e=>setF(p=>({...p,referralDoctor:e.target.value}))}
               className="border border-gray-300 p-1.5 rounded w-full text-sm focus:outline-none focus:ring-1 focus:ring-cyan-500"/>
+
+            <input placeholder="Patient Name" value={f.patientName} onChange={e=>setF(p=>({...p,patientName:e.target.value}))}
+              className="border border-gray-300 p-1.5 rounded w-full text-sm focus:outline-none focus:ring-1 focus:ring-cyan-500"/>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-4 gap-2 mb-2">
-            <input placeholder="Patient Name" value={f.patientName} onChange={e=>setF(p=>({...p,patientName:e.target.value}))}
-              className="border border-gray-300 p-1.5 rounded w-full text-sm focus:outline-none focus:ring-1 focus:ring-cyan-500"/>
-
             <input placeholder="Mobile" value={f.mobile} onChange={e=>setF(p=>({...p,mobile:e.target.value}))}
               className="border border-gray-300 p-1.5 rounded w-full text-sm focus:outline-none focus:ring-1 focus:ring-cyan-500"/>
 
@@ -497,13 +497,11 @@ export default function PatientList() {
               <input type="checkbox" checked={f.onlyOutstandings} onChange={e=>setF(p=>({...p,onlyOutstandings:e.target.checked}))} className="w-4 h-4 accent-blue-600"/>
               Only Outstandings
             </label>
-          </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mb-2">
             <div className="relative" ref={colRef}>
               <button type="button" onClick={()=>setColOpen(o=>!o)}
                 className="border border-gray-300 p-1.5 rounded w-full text-sm text-left flex items-center justify-between bg-white focus:outline-none focus:ring-1 focus:ring-cyan-500">
-                <span className="text-gray-600">Required Columns ({selCount})</span>
+                <span className="text-gray-600">Columns ({selCount})</span>
                 <ChevronDown size={14} className={`transition-transform ${colOpen?"rotate-180":""}`}/>
               </button>
               {colOpen&&(
@@ -552,33 +550,33 @@ export default function PatientList() {
 
         <div className="bg-white rounded shadow-md overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="w-full text-xs sm:text-sm border-collapse">
+            <table className="w-full text-xs border-collapse">
               <thead className="bg-slate-900 text-white">
                 <tr>
-                  <th className="px-2 sm:px-3 py-1.5 sm:py-2 text-left font-semibold text-xs sm:text-sm whitespace-nowrap border border-gray-300">Sr.No.</th>
-                  <th className="px-2 sm:px-3 py-1.5 sm:py-2 text-left font-semibold text-xs sm:text-sm whitespace-nowrap border border-gray-300">Date</th>
-                  <th className="px-2 sm:px-3 py-1.5 sm:py-2 text-left font-semibold text-xs sm:text-sm whitespace-nowrap border border-gray-300">Patient Name</th>
-                  <th className="px-2 sm:px-3 py-1.5 sm:py-2 text-left font-semibold text-xs sm:text-sm whitespace-nowrap border border-gray-300">Age / Gender</th>
-                  <th className="px-2 sm:px-3 py-1.5 sm:py-2 text-left font-semibold text-xs sm:text-sm whitespace-nowrap border border-gray-300">Test Performed</th>
-                  {vis.map(c=><th key={c.key} className="px-2 sm:px-3 py-1.5 sm:py-2 text-left font-semibold text-xs sm:text-sm whitespace-nowrap border border-gray-300">{c.label}</th>)}
+                  <th className="px-2 py-1.5 text-left font-semibold text-xs whitespace-nowrap border border-gray-300">Sr.No.</th>
+                  <th className="px-2 py-1.5 text-left font-semibold text-xs whitespace-nowrap border border-gray-300">Date</th>
+                  <th className="px-2 py-1.5 text-left font-semibold text-xs whitespace-nowrap border border-gray-300">Patient Name</th>
+                  <th className="px-2 py-1.5 text-left font-semibold text-xs whitespace-nowrap border border-gray-300">Age / Gender</th>
+                  <th className="px-2 py-1.5 text-left font-semibold text-xs whitespace-nowrap border border-gray-300">Test Performed</th>
+                  {vis.map(c=><th key={c.key} className="px-2 py-1.5 text-left font-semibold text-xs whitespace-nowrap border border-gray-300">{c.label}</th>)}
                 </tr>
               </thead>
               <tbody>
-                {loading?(<tr><td colSpan={5+vis.length} className="text-center p-3 sm:p-4 text-gray-500 text-xs sm:text-sm border border-gray-300">Loading...</td></tr>)
-                :errors.api?(<tr><td colSpan={5+vis.length} className="text-center p-3 sm:p-4 text-red-500 text-xs sm:text-sm border border-gray-300">{errors.api}</td></tr>)
-                :data.length===0?(<tr><td colSpan={5+vis.length} className="text-center p-3 sm:p-4 text-gray-500 text-xs sm:text-sm border border-gray-300">{searched?"No records found.":"Select filters and click Search."}</td></tr>)
+                {loading?(<tr><td colSpan={5+vis.length} className="text-center p-4 text-gray-500 text-xs border border-gray-300">Loading...</td></tr>)
+                :errors.api?(<tr><td colSpan={5+vis.length} className="text-center p-4 text-red-500 text-xs border border-gray-300">{errors.api}</td></tr>)
+                :data.length===0?(<tr><td colSpan={5+vis.length} className="text-center p-4 text-gray-500 text-xs border border-gray-300">{searched?"No records found.":"Select filters and click Search."}</td></tr>)
                 :(() => {
                   const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
                   const endIndex = startIndex + ITEMS_PER_PAGE;
                   const paginatedData = data.slice(startIndex, endIndex);
                   return paginatedData.map((row, i) => (
                     <tr key={`${row.visitId}-${i}`} className={i%2===0?"bg-white hover:bg-gray-50":"bg-gray-50 hover:bg-gray-100"}>
-                      <td className="px-2 sm:px-3 py-1.5 sm:py-2 border border-gray-200 text-xs sm:text-sm">{startIndex + i + 1}</td>
-                      <td className="px-2 sm:px-3 py-1.5 sm:py-2 border border-gray-200 whitespace-nowrap text-xs sm:text-sm">{row.date}</td>
-                      <td className="px-2 sm:px-3 py-1.5 sm:py-2 border border-gray-200 font-medium text-xs sm:text-sm">{row.patientName}</td>
-                      <td className="px-2 sm:px-3 py-1.5 sm:py-2 border border-gray-200 whitespace-nowrap text-xs sm:text-sm">{row.ageGender}</td>
-                      <td className="px-2 sm:px-3 py-1.5 sm:py-2 border border-gray-200 text-xs sm:text-sm">{row.testPerformed}</td>
-                      {vis.map(c=><td key={c.key} className="px-2 sm:px-3 py-1.5 sm:py-2 border border-gray-200 whitespace-nowrap text-xs sm:text-sm">{row[c.key]??"-"}</td>)}
+                      <td className="px-2 py-1.5 border border-gray-200 text-xs">{startIndex + i + 1}</td>
+                      <td className="px-2 py-1.5 border border-gray-200 whitespace-nowrap text-xs">{row.date}</td>
+                      <td className="px-2 py-1.5 border border-gray-200 font-medium text-xs">{row.patientName}</td>
+                      <td className="px-2 py-1.5 border border-gray-200 whitespace-nowrap text-xs">{row.ageGender}</td>
+                      <td className="px-2 py-1.5 border border-gray-200 text-xs">{row.testPerformed}</td>
+                      {vis.map(c=><td key={c.key} className="px-2 py-1.5 border border-gray-200 whitespace-nowrap text-xs">{row[c.key]??"-"}</td>)}
                     </tr>
                   ));
                 })()}
