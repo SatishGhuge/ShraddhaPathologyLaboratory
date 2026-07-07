@@ -3806,6 +3806,70 @@ export const getTemplates = async (req, res) => {
   }
 };
 
+// Get templates by test ID
+export const getTemplatesByTestId = async (req, res) => {
+  try {
+    const { testId } = req.params;
+
+    // Verify test exists
+    const test = await prisma.test.findUnique({
+      where: { id: parseInt(testId) }
+    });
+
+    if (!test) {
+      return res.status(404).json({
+        success: false,
+        message: 'Test not found'
+      });
+    }
+
+    // Get all templates for this test
+    const templates = await prisma.testTemplate.findMany({
+      where: { 
+        testId: parseInt(testId),
+        isActive: true
+      },
+      include: {
+        test: {
+          select: {
+            id: true,
+            name: true,
+            shortName: true
+          }
+        },
+        testCategory: {
+          select: {
+            id: true,
+            categoryName: true
+          }
+        }
+      },
+      orderBy: {
+        createdAt: 'desc'
+      }
+    });
+
+    // Parse JSON parameters for each template
+    const parsedTemplates = templates.map(template => ({
+      ...template,
+      parameters: template.parameters ? JSON.parse(template.parameters) : []
+    }));
+
+    res.json({
+      success: true,
+      data: parsedTemplates,
+      count: parsedTemplates.length
+    });
+  } catch (error) {
+    console.error('Error fetching templates by test ID:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch templates',
+      error: error.message
+    });
+  }
+};
+
 // Get template by ID
 export const getTemplateById = async (req, res) => {
   try {

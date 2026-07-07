@@ -38,21 +38,21 @@ model PasswordReset {
 }
 
 model Patient {
-  patientId   String        @id
-  title       String?
-  firstName   String?
-  lastName    String?
-  dob         DateTime?
-  age         Int?
-  gender      String?
-  mobile      String?
-  email       String?
-  createdBy   String?
-  address     String?       @db.Text
-  createdAt   DateTime?     @default(now())
-  updatedAt   DateTime      @updatedAt
-  location    String?       @db.VarChar(255)
-  tests       PatientTest[]
+  patientId String        @id
+  title     String?
+  firstName String?
+  lastName  String?
+  dob       DateTime?
+  age       Int?
+  gender    String?
+  mobile    String?
+  email     String?
+  createdBy String?
+  address   String?       @db.Text
+  createdAt DateTime?     @default(now())
+  updatedAt DateTime      @updatedAt
+  location  String?       @db.VarChar(255)
+  tests     PatientTest[]
 
   @@index([mobile])
   @@index([email])
@@ -150,51 +150,51 @@ model Department {
 }
 
 model Test {
-  id                     Int              @id @default(autoincrement())
+  id                     Int                @id @default(autoincrement())
   name                   String
   shortName              String?
-  testCode               String?          @unique
+  testCode               String?            @unique
   departmentId           Int
   testParameterId        Int?
   testCategoryId         Int?
   sampleType             String?
   testMethod             String?
   machineName            String?
-  speciality             String?          @default("Regular")
+  speciality             String?            @default("Regular")
   group                  String?
   sortOrder              Int?
   reportHeader           String?
   costForLab             Float?
   preparationTime        String?
   preparationType        String?
-  instructionPreparation String?          @db.Text
-  instructionPatient     String?          @db.Text
+  instructionPreparation String?            @db.Text
+  instructionPatient     String?            @db.Text
   interpretationLabel    String?
-  interpretation         String?          @db.Text
+  interpretation         String?            @db.Text
   outsourceLab           String?
-  attachFile             String?          @default("Yes")
-  profileTest            String?          @default("No")
-  isHeader               Boolean          @default(true)
-  showTestName           Boolean          @default(true)
-  isNABL                 Boolean          @default(false)
+  attachFile             String?            @default("Yes")
+  profileTest            String?            @default("No")
+  isHeader               Boolean            @default(true)
+  showTestName           Boolean            @default(true)
+  isNABL                 Boolean            @default(false)
   lineHeight             Float?
-  isActive               Boolean          @default(true)
-  isDeleted              Boolean          @default(false)
-  createdAt              DateTime         @default(now())
-  updatedAt              DateTime         @updatedAt
-  imageSize              String?          @default("800|600")
-  linkedTestIds          String?          @db.Text
+  isActive               Boolean            @default(true)
+  isDeleted              Boolean            @default(false)
+  createdAt              DateTime           @default(now())
+  updatedAt              DateTime           @updatedAt
+  imageSize              String?            @default("800|600")
+  linkedTestIds          String?            @db.Text
   testparameters         testparameters[]
+  doctorCharges          DoctorTestCharge[]
   packageTests           PackageTest[]
   patientTests           PatientTest[]
   categories             TestCategory[]
   charges                TestCharge[]
-  doctorCharges          DoctorTestCharge[]
-  ownedParameters        TestParameter[]  @relation("ParameterOwner")
+  ownedParameters        TestParameter[]    @relation("ParameterOwner")
   templates              TestTemplate[]
-  department             Department       @relation(fields: [departmentId], references: [id], onDelete: Cascade)
-  testCategory           TestCategory?    @relation("PrimaryTestCategory", fields: [testCategoryId], references: [id])
-  testParameter          TestParameter?   @relation("PrimaryTestParameter", fields: [testParameterId], references: [id])
+  department             Department         @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+  testCategory           TestCategory?      @relation("PrimaryTestCategory", fields: [testCategoryId], references: [id])
+  testParameter          TestParameter?     @relation("PrimaryTestParameter", fields: [testParameterId], references: [id])
 
   @@unique([name, departmentId])
   @@index([departmentId], map: "tests_departmentId_fkey")
@@ -278,21 +278,21 @@ model DoctorTestCharge {
 }
 
 model Doctor {
-  id                     Int                      @id @default(autoincrement())
+  id                     Int                @id @default(autoincrement())
   name                   String
   degree                 String?
   mobile                 String?
   specialty              String?
-  isActive               Boolean                  @default(true)
-  createdAt              DateTime                 @default(now())
-  updatedAt              DateTime                 @updatedAt
-  address                String?                  @db.Text
-  allowBalance           Boolean                  @default(false)
+  isActive               Boolean            @default(true)
+  createdAt              DateTime           @default(now())
+  updatedAt              DateTime           @updatedAt
+  address                String?            @db.Text
+  allowBalance           Boolean            @default(false)
   compliment             Float?
   email                  String?
-  type                   String                   @default("Doctor")
-  sendReportsViaMail     Boolean                  @default(false)
-  sendReportsViaWhatsApp Boolean                  @default(false)
+  type                   String             @default("Doctor")
+  sendReportsViaMail     Boolean            @default(false)
+  sendReportsViaWhatsApp Boolean            @default(false)
   testCharges            DoctorTestCharge[]
 
   @@map("doctors")
@@ -334,6 +334,7 @@ model TestParameter {
   highPanic          Float?
   isNABL             Boolean          @default(false)
   parameterCode      String?          @unique
+  testMethod         String?
   hasFormula         Boolean          @default(false)
   formula            String?          @db.Text
   type               String           @default("Numeric")
@@ -358,7 +359,6 @@ model TestParameter {
   childActive        Boolean          @default(false)
   ageRanges          String?          @db.Text
   rangeValues        String?          @db.Text
-  testMethod         String?
   isActive           Boolean          @default(true)
   createdAt          DateTime         @default(now())
   updatedAt          DateTime         @updatedAt
@@ -409,7 +409,7 @@ model TestTemplate {
   id             Int           @id @default(autoincrement())
   testId         Int
   testCategoryId Int?
-  templateName   String        @db.Text
+  templateName   String        @db.VarChar(255)
   parameters     String?       @db.Text
   isActive       Boolean       @default(true)
   createdAt      DateTime      @default(now())
@@ -417,6 +417,7 @@ model TestTemplate {
   testCategory   TestCategory? @relation(fields: [testCategoryId], references: [id])
   test           Test          @relation(fields: [testId], references: [id], onDelete: Cascade)
 
+  @@unique([testId, templateName])
   @@index([testCategoryId], map: "test_templates_testCategoryId_fkey")
   @@index([testId], map: "test_templates_testId_fkey")
   @@map("test_templates")
@@ -486,7 +487,6 @@ model Role {
 
 model User {
   id                   Int                    @id @default(autoincrement())
-  center               String
   name                 String
   username             String                 @unique
   role                 String
@@ -548,7 +548,7 @@ model ModuleAllocation {
   organizationId String?       @unique
   modules        String?       @db.LongText
   createdAt      DateTime      @default(now())
-  updatedAt      DateTime      @updatedAt
+  updatedAt      DateTime      @default(now()) @updatedAt
   organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   user           User?         @relation(fields: [userId], references: [id], onDelete: Cascade)
 

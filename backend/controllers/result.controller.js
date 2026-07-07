@@ -1752,3 +1752,143 @@ export const getAllTestResults = async (req, res) => {
 
 
 // Referral doctor revenue code moved to doctor-revenue.controller.js
+
+
+// Save test result with template decision logic
+// Handles 3 scenarios:
+// 1. Using template with NO changes → just save result
+// 2. Using template WITH changes → ask user via frontend
+// 3. No template / blank → just save result
+export const saveTestResultWithTemplate = async (req, res) => {
+  try {
+    const { patientTestId, result, parameterResults, templateDecision } = req.body;
+
+    console.log('📋 saveTestResultWithTemplate called:', {
+      patientTestId,
+      templateDecision,
+      parametersCount: parameterResults?.length
+    });
+
+    // First, save the result using existing updateTestResult logic
+    const updateData = {
+      result: result || undefined,
+      updatedAt: new Date()
+    };
+
+    if (result && result.trim() !== '') {
+      updateData.resultDate = new Date();
+    }
+
+    // Update PatientTest record with result
+    const updatedTest = await prisma.patientTest.update({
+      where: { id: parseInt(patientTestId) },
+      data: updateData,
+      include: {
+        patient: true,
+        test: true,
+        testResults: true
+      }
+    });
+
+    console.log('✅ PatientTest result updated');
+
+    // Handle parameterResults if provided
+    if (parameterResults && Array.isArray(parameterResults) && parameterResults.length > 0) {
+      for (const paramResult of parameterResults) {
+        const { parameterId, numericValue, textValue } = paramResult;
+        
+        if (!parameterId) {
+          console.warn('⚠️ Skipping - no parameterId provided');
+          continue;
+        }
+
+        // Upsert TestResult record
+        await prisma.testResult.upsert({
+          where: {
+            patientTestId_testParameterId: {
+              patientTestId: parseInt(patientTestId),
+              testParameterId: parseInt(parameterId)
+            }
+          },
+          update: {
+            numericValue: numericValue || undefined,
+            textValue: textValue || undefined,
+            verifiedAt: new Date()
+          },
+          create: {
+            patientTestId: parseInt(patientTestId),
+            testParameterId: parseInt(parameterId),
+            numericValue: numericValue || undefined,
+            textValue: textValue || undefined,
+            enteredAt: new Date(),
+            verifiedAt: new Date()
+          }
+        });
+
+        console.log(`✅ TestResult upserted for parameterId=${parameterId}`);
+      }
+    }
+
+    // Handle template decision
+    if (templateDecision) {
+      const { action, templateName, testId } = templateDecision;
+
+      if (action === 'save_as_new_template') {
+        // Create new template with the current result values
+        const newTemplate = await prisma.testTemplate.create({
+          data: {
+            testId: parseInt(testId),
+            templateName: templateName,
+            parameters: JSON.stringify(parameterResults || []),
+            isActive: true
+          },
+          include: {
+            test: true
+          }
+        });
+
+        console.log('✅ New template created:', newTemplate.id, newTemplate.templateName);
+
+        return res.json({
+          success: true,
+          message: 'Result saved and new template created successfully',
+          data: {
+            patientTest: updatedTest,
+            newTemplate: newTemplate
+          }
+        });
+      }
+    }
+
+    // Default: just return saved result
+    res.json({
+      success: true,
+      message: 'Test result saved successfully',
+      data: {
+        patientTest: updatedTest
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ Error in saveTestResultWithTemplate:', error);
+
+    if (error.code === 'P2025') {
+      return res.status(404).json({
+        success: false,
+        message: 'Patient test not found'
+      });
+    }
+
+    if (error.code === 'P2002') {
+      return res.status(409).json({
+        success: false,
+        message: 'Template with this name already exists for this test'
+      });
+    }
+
+    res.status(500).json({
+      success: false,
+      message: 'Failed to save result: ' + error.message
+    });
+  }
+};

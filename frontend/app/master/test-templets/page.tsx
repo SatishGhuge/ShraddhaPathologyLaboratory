@@ -502,9 +502,9 @@ const TestTemplets = () => {
                 <table className="w-full text-xs sm:text-sm border-collapse">
                   <thead className="bg-slate-900 text-white sticky top-0">
                     <tr>
-                      <th className="border border-gray-300 px-2 py-0.5 text-left font-semibold text-xs">Template Name</th>
-                      <th className="border border-gray-300 px-2 py-0.5 text-left font-semibold text-xs">Test Name</th>
-                      <th className="border border-gray-300 px-2 py-0.5 text-center font-semibold text-xs">Action</th>
+                      <th className="border border-gray-300 px-2 py-0.25 text-left font-semibold text-xs">Template Name</th>
+                      <th className="border border-gray-300 px-2 py-0.25 text-left font-semibold text-xs">Test Name</th>
+                      <th className="border border-gray-300 px-2 py-0.25 text-center font-semibold text-xs">Action</th>
                     </tr>
                   </thead>
 
@@ -521,15 +521,15 @@ const TestTemplets = () => {
                           key={template.id}
                           className={`hover:bg-blue-50 border-b border-gray-200 transition-colors ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}
                         >
-                          <td className="border border-gray-300 px-2 py-0.5 font-semibold text-gray-800 text-xs">
+                          <td className="border border-gray-300 px-2 py-0.25 font-semibold text-gray-800 text-xs">
                             {template.templateName}
                           </td>
 
-                          <td className="border border-gray-300 px-2 py-0.5 text-gray-700 text-xs">
+                          <td className="border border-gray-300 px-2 py-0.25 text-gray-700 text-xs">
                             {template.test?.name || '-'}
                           </td>
 
-                          <td className="border border-gray-300 px-2 py-0.5">
+                          <td className="border border-gray-300 px-2 py-0.25">
                             <div className="flex gap-1 justify-center flex-wrap">
                               <button
                                 onClick={() => handleEdit(template)}
