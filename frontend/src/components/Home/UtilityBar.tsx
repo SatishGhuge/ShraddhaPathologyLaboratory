@@ -60,7 +60,7 @@ export default function UtilityBar() {
             }}
           >
             {/* Duplicate text for seamless loop */}
-            {[1, 1].map((n) => (
+            {[0, 1].map((n) => (
               <span key={n} className="text-white/90 text-xs font-medium pr-16 flex-shrink-0">
                 {tickerText}
               </span>
