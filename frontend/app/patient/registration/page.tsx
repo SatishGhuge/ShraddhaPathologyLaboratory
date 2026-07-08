@@ -2298,10 +2298,15 @@ export default function PatientRegistration() {
                           const val = e.target.value;
                           if (val === "" || val === "D" || val === "Dr" || val === "Dr.") {
                             setManualRefDoctorName(val);
-                          } else if (!val.startsWith("Dr. ")) {
-                            setManualRefDoctorName("Dr. " + val.replace(/^Dr\.?\s*/i, ""));
                           } else {
-                            setManualRefDoctorName(val);
+                            // Remove all "Dr." prefixes (including duplicates like "Dr. Dr.")
+                            const normalized = val.replace(/\bDr\.?\s*/gi, '').trim();
+                            if (normalized) {
+                              // Add exactly one "Dr." prefix
+                              setManualRefDoctorName("Dr. " + normalized);
+                            } else {
+                              setManualRefDoctorName("");
+                            }
                           }
                         }}
                         autoFocus

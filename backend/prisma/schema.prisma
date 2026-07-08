@@ -264,6 +264,7 @@ model DoctorTestCharge {
   discountPercent Float?    @default(0)
   discountR       Float?    @default(0)
   discountS       Float?    @default(0)
+  isCustomized    Boolean   @default(false)
   effectiveFrom   DateTime  @default(now())
   effectiveTo     DateTime?
   isActive        Boolean   @default(true)
@@ -294,8 +295,29 @@ model Doctor {
   sendReportsViaMail     Boolean                  @default(false)
   sendReportsViaWhatsApp Boolean                  @default(false)
   testCharges            DoctorTestCharge[]
+  mergedTo               DoctorMerge[]           @relation("SourceDoctor")
+  mergedFrom             DoctorMerge[]           @relation("TargetDoctor")
 
   @@map("doctors")
+}
+
+model DoctorMerge {
+  id                Int       @id @default(autoincrement())
+  sourceDoctorId    Int
+  targetDoctorId    Int
+  sourceDoctorName  String
+  targetDoctorName  String
+  recordsUpdated    Int       @default(0)
+  chargesUpdated    Int       @default(0)
+  mergedAt          DateTime  @default(now())
+  mergedBy          String?
+  sourceDoctor      Doctor    @relation("SourceDoctor", fields: [sourceDoctorId], references: [id], onDelete: Cascade)
+  targetDoctor      Doctor    @relation("TargetDoctor", fields: [targetDoctorId], references: [id], onDelete: Cascade)
+
+  @@index([sourceDoctorId])
+  @@index([targetDoctorId])
+  @@index([mergedAt])
+  @@map("doctor_merges")
 }
 
 model Organization {

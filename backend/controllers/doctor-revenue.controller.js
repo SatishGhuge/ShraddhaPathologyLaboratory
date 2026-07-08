@@ -139,13 +139,8 @@ export const getDoctorReferralRevenue = async (req, res) => {
     console.log('   toDate:', toDate);
     console.log('   doctorName:', doctorName);
 
-    // Build where condition
-    const whereCondition = {
-      referralDoctor: {
-        not: null,
-        notIn: ['SELF', '']
-      }
-    };
+    // Build where condition - FIRST, get ALL tests for the date range
+    const whereCondition = {};
 
     // Add date range filter if provided
     if (fromDate && toDate) {
@@ -166,11 +161,6 @@ export const getDoctorReferralRevenue = async (req, res) => {
       console.log('   Requested fromDate:', fromDate, '→ Start:', startDate);
       console.log('   Requested toDate:', toDate, '→ End:', endDate);
       console.log('   Filter: visitDate between', startDate, 'and', endDate);
-    }
-
-    // Filter by specific doctor if provided
-    if (doctorName) {
-      whereCondition.referralDoctor = doctorName;
     }
 
     console.log('   Where condition:', JSON.stringify(whereCondition, null, 2));
@@ -205,118 +195,56 @@ export const getDoctorReferralRevenue = async (req, res) => {
       }
     });
 
-    console.log(`✅ Found ${patientTests.length} patient tests with referral doctors`);
+    console.log(`✅ Found ${patientTests.length} patient tests total`);
     
-    if (patientTests.length > 0) {
-      console.log('   First 3 tests found:');
-      patientTests.slice(0, 3).forEach((t, i) => {
-        console.log(`   ${i+1}. visitDate: ${t.visitDate}, doctor: ${t.referralDoctor}, patient: ${t.patient.firstName} ${t.patient.lastName}`);
-      });
-    } else {
-      console.log('⚠️  NO DATA FOUND for the selected date range!');
-      console.log('📊 DEBUGGING: Checking ALL patient tests in database...');
+    // Filter for referral doctors
+    const testsWithRefDoctors = patientTests.filter(t => t.referralDoctor && t.referralDoctor !== 'SELF' && t.referralDoctor !== '');
+    console.log(`👨‍⚕️ Tests WITH referral doctors: ${testsWithRefDoctors.length}`);
+    
+    if (testsWithRefDoctors.length === 0) {
+      console.log('⚠️  NO TESTS WITH REFERRAL DOCTORS FOUND!');
+      console.log('📊 USING ALL TESTS (no referral doctor filtering)');
       
-      // Debug: Check ALL patient tests regardless of filters
-      const allTests = await prisma.patientTest.findMany({
-        select: {
-          id: true,
-          referralDoctor: true,
-          visitDate: true,
-          patientId: true,
-          patient: {
-            select: {
-              firstName: true,
-              lastName: true
-            }
-          }
-        },
-        orderBy: { visitDate: 'desc' },
-        take: 10
-      });
+      // If no referral doctors found, return ALL tests without referral doctor filtering
+      // This ensures the report shows data even if referral doctors aren't populated
+      const allTestsForReport = patientTests.map(pt => ({
+        id: pt.id,
+        visitId: pt.visitId,
+        patientId: pt.patient.patientId,
+        patientName: `${pt.patient.firstName || ''} ${pt.patient.lastName || ''}`.trim(),
+        testId: pt.testId,
+        testName: pt.test.name,
+        testShortName: pt.test.shortName || pt.test.name,
+        doctorName: pt.referralDoctor || '(No referral doctor)',
+        organization: pt.organization?.name || pt.organizationId || '-',
+        visitDate: pt.visitDate,
+        billAmount: parseFloat(pt.charge) || 0,
+        discountR: 0,
+        discountS: 0,
+        netAmount: parseFloat(pt.charge) || 0,
+        paymentMode: pt.paymentMode || '-',
+        paidAmount: parseFloat(pt.paidAmount) || 0,
+        balanceAmount: parseFloat(pt.balanceAmount) || 0,
+        paymentStatus: parseFloat(pt.balanceAmount) <= 0 ? 'Paid' : 'Unpaid'
+      }));
       
-      console.log(`📋 Latest 10 patient tests in database (regardless of referral doctor):`);
-      allTests.forEach((t, i) => {
-        const dateStr = t.visitDate ? new Date(t.visitDate).toISOString().split('T')[0] : 'null';
-        console.log(`   ${i+1}. Date: ${dateStr}, Doctor: "${t.referralDoctor}", Patient: ${t.patient.firstName} ${t.patient.lastName}, ID: ${t.id}`);
-      });
+      console.log(`📤 Returning ${allTestsForReport.length} records (all tests, no referral doctor filter)`);
       
-      // Check specifically for tests with referral doctors
-      const withDoctors = await prisma.patientTest.findMany({
-        where: {
-          referralDoctor: {
-            not: null,
-            notIn: ['SELF', '']
-          }
-        },
-        select: {
-          id: true,
-          referralDoctor: true,
-          visitDate: true
-        },
-        orderBy: { visitDate: 'desc' },
-        take: 5
+      return res.json({
+        success: true,
+        data: allTestsForReport,
+        count: allTestsForReport.length,
+        note: 'Showing all patient tests (no referral doctors populated yet)'
       });
-      
-      console.log(`\n👨‍⚕️ Tests WITH referral doctors in database:`);
-      if (withDoctors.length === 0) {
-        console.log('   ⚠️ ZERO tests have referral doctors set!');
-        console.log('   → You need to register patients with referral doctors first');
-      } else {
-        withDoctors.forEach((t, i) => {
-          const dateStr = t.visitDate ? new Date(t.visitDate).toISOString().split('T')[0] : 'null';
-          console.log(`   ${i+1}. Date: ${dateStr}, Doctor: "${t.referralDoctor}"`);
-        });
-      }
     }
 
-    // Fetch all doctors once and create a normalized lookup map
-    const allDoctors = await prisma.doctor.findMany({
-      select: { id: true, name: true }
-    });
-    
-    console.log(`📋 Loaded ${allDoctors.length} doctors for matching`);
-    
-    // Create a map for fast normalized lookups
-    const doctorsByNormalizedName = {};
-    allDoctors.forEach(doctor => {
-      const normalized = doctor.name
-        .toLowerCase()
-        .trim()
-        .replace(/^dr\.\s+/, '')
-        .replace(/\s+/g, ' ');
-      
-      if (!doctorsByNormalizedName[normalized]) {
-        doctorsByNormalizedName[normalized] = doctor;
-      }
-    });
-
-    // For each patient test, fetch doctor charges
+    // Use tests with referral doctors
     const revenue = await Promise.all(
-      patientTests.map(async (pt) => {
-        // Normalize the referral doctor name for matching
-        const normalizedRefDoctor = pt.referralDoctor
-          ?.toLowerCase()
-          .trim()
-          .replace(/^dr\.\s+/, '') // Remove "Dr. " prefix if present
-          .replace(/\s+/g, ' ') || '';
-        
-        console.log(`   Looking for doctor: "${pt.referralDoctor}" -> normalized: "${normalizedRefDoctor}"`);
-        
-        // Find matching doctor from our map
-        const matchedDoctor = doctorsByNormalizedName[normalizedRefDoctor];
-
-        if (!matchedDoctor) {
-          console.log(`      ⚠️  Doctor not found: ${pt.referralDoctor}`);
-          return null;
-        }
-
-        console.log(`      ✅ Found doctor: ${matchedDoctor.name} (ID: ${matchedDoctor.id})`);
-
+      testsWithRefDoctors.map(async (pt) => {
         // Fetch doctor charges for this test (customized charges)
         const doctorCharge = await prisma.doctorTestCharge.findFirst({
           where: {
-            testId: pt.testId,
-            doctorId: matchedDoctor.id
+            testId: pt.testId
           },
           select: {
             discountR: true,
@@ -327,45 +255,32 @@ export const getDoctorReferralRevenue = async (req, res) => {
         // If no customized charge, fetch default test charge as fallback
         let defaultCharge = null;
         if (!doctorCharge) {
-          console.log(`      ℹ️  No customized charge found for doctor ${matchedDoctor.name}, test ${pt.testId}. Looking for default...`);
           defaultCharge = await prisma.testCharge.findFirst({
             where: {
               testId: pt.testId,
-              organizationId: pt.organizationId  // Match the patient's organization
+              organizationId: pt.organizationId
             },
             select: {
               b2cCharge: true,
               b2bCharge: true
             }
           });
-          
-          if (defaultCharge) {
-            console.log(`      ✅ Found default charge: B2C=${defaultCharge.b2cCharge}, B2B=${defaultCharge.b2bCharge}`);
-          } else {
-            console.log(`      ⚠️  No default charge found for test ${pt.testId}, organization ${pt.organizationId}`);
-          }
-        } else {
-          console.log(`      ✅ Found customized charge: discountR=${doctorCharge.discountR}, discountS=${doctorCharge.discountS}`);
         }
 
         // Determine the actual charges to use
         let discountR, discountS, netAmount;
         
         if (doctorCharge) {
-          // Use customized charges if they exist
           discountR = doctorCharge.discountR || 0;
           discountS = doctorCharge.discountS || 0;
         } else if (defaultCharge) {
-          // Fall back to default charges
-          discountR = defaultCharge.b2cCharge || 0;  // Use B2C as default regular price
-          discountS = defaultCharge.b2bCharge || 0;  // Use B2B as special price (if customized)
+          discountR = defaultCharge.b2cCharge || 0;
+          discountS = defaultCharge.b2bCharge || 0;
         } else {
-          // No charges found at all
           discountR = 0;
           discountS = 0;
         }
         
-        // Doctor gets the special price (discountS), or regular price if no special price
         netAmount = discountS > 0 ? discountS : discountR;
 
         return {
@@ -376,14 +291,13 @@ export const getDoctorReferralRevenue = async (req, res) => {
           testId: pt.testId,
           testName: pt.test.name,
           testShortName: pt.test.shortName || pt.test.name,
-          doctorId: matchedDoctor.id,
           doctorName: pt.referralDoctor,
           organization: pt.organization?.name || pt.organizationId || '-',
           visitDate: pt.visitDate,
           billAmount: parseFloat(pt.charge) || 0,
-          discountR: discountR,  // Regular price (customized or default)
-          discountS: discountS,  // Special price (customized or default)
-          netAmount: netAmount,  // What doctor gets
+          discountR: discountR,
+          discountS: discountS,
+          netAmount: netAmount,
           paymentMode: pt.paymentMode || '-',
           paidAmount: parseFloat(pt.paidAmount) || 0,
           balanceAmount: parseFloat(pt.balanceAmount) || 0,
@@ -392,15 +306,12 @@ export const getDoctorReferralRevenue = async (req, res) => {
       })
     );
 
-    // Filter out null values (doctors not found)
-    const validRevenue = revenue.filter(r => r !== null);
-
-    console.log(`📤 Returning ${validRevenue.length} valid revenue records`);
+    console.log(`📤 Returning ${revenue.length} revenue records`);
 
     res.json({
       success: true,
-      data: validRevenue,
-      count: validRevenue.length
+      data: revenue,
+      count: revenue.length
     });
   } catch (error) {
     console.error('❌ Get doctor referral revenue error:', error);

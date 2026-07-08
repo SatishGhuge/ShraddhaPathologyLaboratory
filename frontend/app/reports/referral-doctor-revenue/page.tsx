@@ -528,7 +528,7 @@ export default function ReferralDoctorRevenueReport() {
                         }}
                         className="px-3 py-2 text-xs sm:text-sm cursor-pointer hover:bg-blue-100 border-b border-gray-100 last:border-b-0"
                       >
-                        Dr. {doc.name}
+                        {doc.name}
                       </div>
                     ))
                   ) : (

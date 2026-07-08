@@ -183,8 +183,12 @@ export default function ChargesManager({
             testCharge.b2bCharge !== defaultCharge.b2bCharge;
         }
 
-        // Always show default test charge from test_charges table
-        const displayCharge = defaultCharge?.defaultB2C || 0;
+        // For doctor charges, if isCustomized, show discountS (special price), otherwise show defaultB2C
+        // For organization charges, always show the actual charge
+        let displayCharge = defaultCharge?.defaultB2C || 0;
+        if (entityType === "doctor" && isCustomized && testCharge?.discountS) {
+          displayCharge = testCharge.discountS;
+        }
 
         const item = {
           id: test.id,
@@ -286,50 +290,54 @@ export default function ChargesManager({
       setLoading(true);
       setError("");
 
-      // Build charges array - only include tests where charges actually changed
-      const bulkCharges = filteredData
-        .map((item) => {
-          const originalCharge = originalCharges[item.id];
-          const currentCharge = parseFloat(item.charges) || 0;
-          const hasChanged = currentCharge !== originalCharge;
+      // Debug: Log the filteredData before filtering
+      console.log("All filteredData before filtering:", filteredData);
 
-          return {
-            testId: item.id,
-            originalCharge,
-            currentCharge,
-            hasChanged,
-            item
-          };
+      // Build charges array - ONLY save customized charges (different from default)
+      const bulkCharges = filteredData
+        .filter((item) => {
+          // Only include customized charges - where charge differs from default
+          const currentCharge = parseFloat(item.charges) || 0;
+          const defaultCharge = item.defaultB2C || 0;
+          const isDifferent = Math.abs(currentCharge - defaultCharge) > 0.01;
+          
+          console.log(`Test: ${item.name}, Current: ${currentCharge}, Default: ${defaultCharge}, Different: ${isDifferent}`);
+          
+          return isDifferent;
         })
-        .filter((c) => c.hasChanged) // Only items that changed
-        .map((c) => {
+        .map((item) => {
+          const currentCharge = parseFloat(item.charges) || 0;
+
           if (entityType === "doctor") {
             // For doctor:
             // discountR = regular/default price (original from test_charges)
             // discountS = special/customized price (what admin set)
             
             return {
-              testId: c.item.id,
-              discountR: c.originalCharge,  // Regular price (from test_charges)
-              discountS: c.currentCharge    // Special price (customized by admin)
+              testId: item.id,
+              discountR: item.defaultB2C || 0,  // Regular price (from test_charges)
+              discountS: currentCharge           // Special price (customized by admin)
             };
           } else {
             // For organization: use the new charge value
             return {
-              testId: c.item.id,
-              b2cCharge: c.currentCharge,
-              b2bCharge: c.currentCharge
+              testId: item.id,
+              b2cCharge: currentCharge,
+              b2bCharge: currentCharge
             };
           }
         });
 
+      console.log("Filtered bulkCharges:", bulkCharges);
+
       if (bulkCharges.length === 0) {
-        alert("No charges were modified. Please edit test charges before saving.");
+        alert("⚠️ No customized charges to save.\n\nAll tests use default charges.");
         setLoading(false);
         return;
       }
 
       console.log("Sending bulk charges:", bulkCharges);
+      console.log(`Saving ${bulkCharges.length} customized test charges for ${entityType} ID: ${entityId}`);
 
       const token = localStorage.getItem("token");
       const response = await fetch(
@@ -349,15 +357,23 @@ export default function ChargesManager({
 
       const result = await response.json();
 
+      console.log("Save response:", result);
+
       if (result.success) {
-        alert(`✅ ${result.data.created + result.data.updated} charges saved!`);
-        fetchData();
+        const total = (result.data.created || 0) + (result.data.updated || 0);
+        alert(`✅ Successfully saved ${bulkCharges.length} customized charges!\n✓ Created: ${result.data.created || 0}\n✓ Updated: ${result.data.updated || 0}`);
+        
+        // Refresh data and show all tests (don't auto-filter to customized)
+        await fetchData();
+        setFilterType("all");  // Show all tests after save
       } else {
         setError(result.message || "Failed to save charges");
+        alert("❌ Error: " + (result.message || "Failed to save charges"));
       }
     } catch (error) {
       console.error("Error saving charges:", error);
-      setError("Failed to save charges");
+      setError("Failed to save charges: " + error.message);
+      alert("❌ Error: " + error.message);
     } finally {
       setLoading(false);
     }
@@ -532,13 +548,26 @@ export default function ChargesManager({
           (row.testName && item.name.toLowerCase().includes(row.testName.toLowerCase()))
       );
 
+      const newCharge = matchedRow ? matchedRow.charges : item.charges;
+      const defaultCharge = item.defaultB2C || 0;
+      
+      // Compare: if same as default, it's DEFAULT. If different, it's CUSTOMIZED
+      const isCustomized = Math.abs(newCharge - defaultCharge) > 0.01; // Allow small floating point difference
+
       return {
         ...item,
-        charges: matchedRow ? matchedRow.charges : item.charges,
+        charges: newCharge,
+        isCustomized: isCustomized, // Update isCustomized flag based on comparison
       };
     });
 
     setFilteredData(updated);
+    
+    // Show summary
+    const customizedCount = updated.filter(u => u.isCustomized).length;
+    const defaultCount = updated.length - customizedCount;
+    alert(`✅ Charges imported!\n• Customized: ${customizedCount}\n• Using Default: ${defaultCount}\n\nNow click Save to store customized charges.`);
+    
     setShowImportModal(false);
     setImportedData([]);
     setSelectedFile(null);

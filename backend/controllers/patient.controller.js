@@ -23,7 +23,7 @@ export const createPatient = async (req, res) => {
       businessType: req.body.businessType
     });
 
-    const { 
+    let { 
       // Existing patient ID (if this is an existing patient)
       existingPatientId,
       // Patient Identity
@@ -38,6 +38,20 @@ export const createPatient = async (req, res) => {
       // Tests
       tests 
     } = req.body;
+
+    // Normalize referralDoctor: remove all "Dr." prefixes and add exactly one
+    if (referralDoctor && referralDoctor.trim()) {
+      referralDoctor = referralDoctor
+        .replace(/\bDr\.?\s*/gi, '') // Remove all "Dr" or "Dr." variations
+        .trim();
+      
+      // Add exactly one "Dr." prefix if it has content
+      if (referralDoctor) {
+        referralDoctor = `Dr. ${referralDoctor}`;
+      } else {
+        referralDoctor = null;
+      }
+    }
 
     let patient;
     let isExistingPatient = false;

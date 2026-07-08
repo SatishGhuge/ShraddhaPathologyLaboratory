@@ -123,6 +123,23 @@ export const getDoctorById = async (id: string): Promise<any | null> => { const 
 export const createDoctor = async (d: ApiData): Promise<any> => { const r = await apiCall('/master/doctors', { method: 'POST', body: JSON.stringify(d) }); return r.data || r; };
 export const updateDoctor = async (id: string, d: ApiData): Promise<any> => { const r = await apiCall(`/master/doctors/${id}`, { method: 'PUT', body: JSON.stringify(d) }); return r.data || r; };
 export const deleteDoctor = async (id: string): Promise<ApiResponse> => { const r = await apiCall(`/master/doctors/${id}`, { method: 'DELETE' }); return r; };
+export const findDuplicateDoctors = async (threshold: number = 0.6): Promise<any> => {
+  const params = new URLSearchParams();
+  params.append('threshold', threshold.toString());
+  const r = await apiCall(`/master/doctors/find-duplicates?${params.toString()}`, { method: 'GET' });
+  return r.data || [];
+};
+export const getDoctorMergeHistory = async (doctorId: string): Promise<any> => {
+  const r = await apiCall(`/master/doctors/${doctorId}/merge-history`, { method: 'GET' });
+  return r.data || null;
+};
+export const mergeDoctors = async (sourceDoctorId: number, targetDoctorId: number): Promise<any> => {
+  const r = await apiCall('/master/doctors/merge', {
+    method: 'POST',
+    body: JSON.stringify({ sourceDoctorId, targetDoctorId })
+  });
+  return r.data || r;
+};
 
 // ==================== PACKAGES ====================
 export const getPackages = async (page: number = 1, limit: number = 20): Promise<any[]> => { 
