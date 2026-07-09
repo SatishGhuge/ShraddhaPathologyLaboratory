@@ -178,13 +178,11 @@ const Dashboard = () => {
       className="fixed top-14 bottom-0 right-0 bg-gray-50 overflow-y-auto flex flex-col gap-3 transition-all duration-300"
       style={{ left: sidebarW, padding:"16px" }}
     >
-      {/* Row 1: Stat Cards with colored top borders */}
+      {/* Row 1: Stat Cards */}
       <div className="grid grid-cols-5 gap-3 flex-shrink-0">
         {STAT_CONFIG.map(cfg => (
-          <div key={cfg.title} className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden transition-all hover:shadow-md cursor-pointer"
+          <div key={cfg.title} className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden transition-all hover:shadow-2xl hover:-translate-y-1.5 cursor-pointer"
             onClick={() => cfg.link && router.push(cfg.link)}>
-            {/* Colored top border */}
-            <div className="h-1" style={{ background: cfg.color }}></div>
             <div className="px-4 py-3 flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: cfg.bg }}>
                 <cfg.icon size={18} style={{ color: cfg.color }} />
@@ -206,7 +204,6 @@ const Dashboard = () => {
         <div className="flex flex-col gap-3 min-h-0">
           {/* Yesterday Summary Card */}
           <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden flex-shrink-0">
-            <div className="h-1 bg-blue-500"></div>
             <div className="p-3">
               <p className="text-[12px] font-bold text-gray-800 mb-4">Yesterday Summary</p>
               <div className="flex flex-col gap-3">
@@ -236,7 +233,6 @@ const Dashboard = () => {
 
           {/* Calendar Card */}
           <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden flex-1 min-h-0">
-            <div className="h-1 bg-orange-500"></div>
             <div className="p-4 flex flex-col h-full">
               <p className="text-[12px] font-bold text-gray-800 mb-2">📅 Calendar</p>
               <div className="flex-1 min-h-0"><MiniCalendar /></div>
@@ -250,7 +246,6 @@ const Dashboard = () => {
           <div className="grid grid-cols-2 gap-3 flex-shrink-0">
             {/* Locations Pie */}
             <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-              <div className="h-1 bg-orange-500"></div>
               <div className="p-3 h-52 flex flex-col">
                 <p className="text-[10px] font-bold text-gray-700 mb-2 flex-shrink-0">Top 5 Patient Capture Locations</p>
                 <div className="flex-1 min-h-0 w-full">
@@ -269,7 +264,6 @@ const Dashboard = () => {
 
             {/* Dept Pie */}
             <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-              <div className="h-1 bg-blue-500"></div>
               <div className="p-3 h-52 flex flex-col">
                 <p className="text-[10px] font-bold text-gray-700 mb-2 flex-shrink-0">Department wise Tests</p>
                 <div className="flex-1 min-h-0 w-full">
@@ -289,7 +283,6 @@ const Dashboard = () => {
 
           {/* Line Chart */}
           <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden flex-1 min-h-0">
-            <div className="h-1 bg-blue-500"></div>
             <div className="p-3 h-full flex flex-col">
               <p className="text-[10px] font-bold text-gray-700 mb-2 flex-shrink-0">Department-wise Tests</p>
               <div className="flex-1 min-h-0 w-full">
@@ -314,7 +307,6 @@ const Dashboard = () => {
         <div className="flex flex-col gap-3 min-h-0">
           {/* Quick Navigation */}
           <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden flex-shrink-0">
-            <div className="h-1 bg-green-500"></div>
             <div className="p-3 flex flex-col">
               <p className="text-[12px] font-extrabold text-gray-800 mb-3 flex items-center gap-1.5">
                 <Rocket size={13} className="text-[#C8651A]"/> Quick Navigation
@@ -333,7 +325,6 @@ const Dashboard = () => {
 
           {/* Monthly Review */}
           <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden flex-1 min-h-0">
-            <div className="h-1 bg-orange-500"></div>
             <div className="p-3 flex flex-col h-full">
               <p className="text-[10px] font-bold text-gray-700 mb-2 flex-shrink-0">Monthly Review</p>
               <div className="flex-1 min-h-0 w-full">

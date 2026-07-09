@@ -28,6 +28,20 @@ export default function ProfessionalResultReport({
   const patientName = `${patient.title || ""} ${patient.firstName || ""} ${patient.lastName || ""}`.trim();
   const visitDateStr = visitDate ? new Date(visitDate).toLocaleDateString("en-GB") : "-";
 
+  // Helper function to strip HTML tags
+  const stripHtmlTags = (str: string) => {
+    if (!str) return "-";
+    return str.replace(/<[^>]*>/g, "").trim();
+  };
+
+  // Check if ANY parameter has units or reference range
+  const hasAnyUnits = parameters && parameters.some((param: any) => param.units && stripHtmlTags(param.units) !== "-");
+  const hasAnyReferenceRange = parameters && parameters.some((param: any) => {
+    const er = param.existingResult;
+    const rangeText = stripHtmlTags(er?.referenceRange || param.rangeText || "-");
+    return rangeText !== "-";
+  });
+
   return (
     <div className="print-report" style={{ fontFamily: "'Arial', 'Nimbus Sans', sans-serif", lineHeight: "1.4", position: "relative" }}>
       <style>{`
@@ -240,8 +254,8 @@ export default function ProfessionalResultReport({
             <tr>
               <th style={{ width: "40%" }}>Test Description</th>
               <th style={{ width: "20%" }}>Result</th>
-              <th style={{ width: "15%" }}>Unit</th>
-              <th style={{ width: "25%" }}>Reference Range</th>
+              {hasAnyUnits && <th style={{ width: "15%" }}>Unit</th>}
+              {hasAnyReferenceRange && <th style={{ width: "25%" }}>Reference Range</th>}
             </tr>
           </thead>
           <tbody>
@@ -254,6 +268,11 @@ export default function ProfessionalResultReport({
                 // Get category method and parameter method separately
                 const categoryMethod = param.categoryTestMethod || null;
                 const parameterMethod = param.parameterTestMethod || null;
+
+                // Strip HTML tags from all values
+                const resultText = stripHtmlTags(String(val));
+                const unitText = stripHtmlTags(param.units);
+                const rangeText = stripHtmlTags(er?.referenceRange || param.rangeText || "-");
 
                 return (
                   <tr key={idx} className="table-row">
@@ -272,17 +291,17 @@ export default function ProfessionalResultReport({
                       )}
                     </td>
                     <td className={`param-result ${isAbnormal ? "abnormal" : ""}`}>
-                      {val}
+                      {resultText}
                       {isAbnormal ? " *" : ""}
                     </td>
-                    <td className="param-unit">{param.units || "-"}</td>
-                    <td className="param-range">{er?.referenceRange || param.rangeText || "-"}</td>
+                    {hasAnyUnits && <td className="param-unit">{unitText}</td>}
+                    {hasAnyReferenceRange && <td className="param-range">{rangeText}</td>}
                   </tr>
                 );
               })
             ) : (
               <tr className="table-row">
-                <td colSpan={4} style={{ textAlign: "center", color: "#999" }}>
+                <td colSpan={hasAnyUnits && hasAnyReferenceRange ? 4 : hasAnyUnits || hasAnyReferenceRange ? 3 : 2} style={{ textAlign: "center", color: "#999" }}>
                   No parameters available
                 </td>
               </tr>

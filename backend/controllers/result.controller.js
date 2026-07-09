@@ -1683,7 +1683,7 @@ export const getAllTestResults = async (req, res) => {
     // Get all test results for this patient and test, ordered by date (most recent first)
     const allResults = await prisma.patientTest.findMany({
       where: {
-        patientId: parseInt(patientId),
+        patientId: String(patientId), // patientId is a String, not Int
         testId: parseInt(testId)
       },
       include: {

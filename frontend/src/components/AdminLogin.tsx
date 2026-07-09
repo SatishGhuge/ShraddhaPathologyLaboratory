@@ -168,56 +168,50 @@ const AdminLogin = ({ onLogin }: { onLogin?: () => void }) => {
       {/* Floating lab icons — stay on left side matching the image */}
       <LeftIcons />
 
-      {/* ── LOGIN CARD — perfectly centered with float animation ── */}
+      {/* ── LOGIN CARD — Compact with curved corners ── */}
       <div className="relative z-10 w-full max-w-sm mx-4 anim-slide-right group">
 
-        {/* Ambient background glow */}
-        <div className="absolute w-48 h-48 bg-gradient-to-r from-cyan-300 to-blue-400 rounded-full blur-3xl opacity-10 animate-pulse -z-10 left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2" />
-        <div className="absolute w-48 h-48 bg-gradient-to-r from-purple-300 to-orange-500 rounded-full blur-7xl opacity-3 -z-10 left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2" style={{ animationDuration:"10s" }} />
-
-        {/* Glowing tilt border — removed, rounded square border handles it */}
-
-        {/* Card with float animation — rounded square + glass */}
+        {/* Card with float animation */}
         <div className="relative animate-float"
           style={{ filter:"drop-shadow(0 0 32px rgba(200,101,26,0.35))" }}>
 
-          {/* Rounded square glowing border */}
+          {/* Glowing border with curved corners */}
           <div className="absolute inset-0 -z-10 rounded-3xl"
             style={{
-              background:"linear-gradient(160deg,rgba(79,142,247,0.4),rgba(200,101,26,0.3),rgba(139,92,246,0.4))",
+              background:"linear-gradient(160deg,rgba(18, 58, 126, 0.4),rgba(200,101,26,0.3),rgba(43, 45, 138, 0.4))"
             }}
           />
 
-          {/* Glass card — rounded square */}
-          <div className="rounded-3xl"
+          {/* Glass card — Curved corners, relative positioning for button */}
+          <div className="relative rounded-3xl"
             style={{
               background:"rgba(8,18,32,0.15)",
               backdropFilter:"blur(8px)",
               WebkitBackdropFilter:"blur(8px)",
-              paddingTop:"32px",
-              paddingBottom:"32px",
-              paddingLeft:"32px",
-              paddingRight:"32px",
               border:"1px solid rgba(200,101,26,0.2)",
+              minHeight:"420px",
+              display:"flex",
+              flexDirection:"column",
+              padding:"32px"
             }}>
 
-          {/* Home link */}
-          <div className="pt-0">
-            <button onClick={() => router.push("/")}
-              className="flex items-center gap-1.5 text-gray-300 hover:text-white text-xs transition-colors">
-              <Home size={13} /> Home
-            </button>
-          </div>
+            {/* Home link */}
+            <div className="mb-4">
+              <button onClick={() => router.push("/")}
+                className="flex items-center gap-1.5 text-gray-300 hover:text-white text-xs transition-colors">
+                <Home size={13} /> Home
+              </button>
+            </div>
 
-          {/* Card header */}
-          <div className="flex flex-col items-center pt-4 pb-3 anim-fade-down" style={{ animationDelay:"0.15s" }}>
-            <p className="text-orange-500 text-2xl font-extrabold tracking-widest">SHRADDHA</p>
-            <p className="text-gray-200 text-xs">Pathology Laboratory</p>
-            <p className="text-orange-400 text-[11px] font-bold tracking-[0.25em] mt-1">{viewTitle}</p>
-          </div>
+            {/* Card header */}
+            <div className="mb-6 anim-fade-down" style={{ animationDelay:"0.15s" }}>
+              <p className="text-orange-500 text-2xl font-extrabold tracking-widest">SHRADDHA</p>
+              <p className="text-gray-200 text-xs">Pathology Laboratory</p>
+              <p className="text-orange-400 text-[11px] font-bold tracking-[0.25em] mt-1">{viewTitle}</p>
+            </div>
 
-          {/* ── Forms ── */}
-          <div className="pb-4">
+            {/* ── Forms — flex-1 to push button to bottom ── */}
+            <div className="flex-1">
 
             {/* LOGIN FORM */}
             {currentView === "login" && (
@@ -260,8 +254,8 @@ const AdminLogin = ({ onLogin }: { onLogin?: () => void }) => {
                   <button type="button" onClick={() => setCurrentView("forgotPassword")}
                     className="text-xs text-orange-400 hover:text-orange-300 underline">Forgot Password?</button>
                 </div>
-                {/* Login button */}
-                <div className="anim-fade-up" style={{ animationDelay:"0.50s" }}>
+                {/* Login button — positioned in bottom-right corner */}
+                <div className="anim-fade-up mt-6" style={{ animationDelay:"0.50s" }}>
                   <button type="submit" disabled={loading}
                     className="w-full py-3 rounded-lg text-white font-extrabold text-sm uppercase tracking-[0.2em] transition-all duration-200 disabled:opacity-50"
                     style={{ background:"#C8651A", boxShadow:"0 4px 18px rgba(200,101,26,0.45)" }}
@@ -363,16 +357,15 @@ const AdminLogin = ({ onLogin }: { onLogin?: () => void }) => {
                 </button>
               </form>
             )}
+            </div>
 
             {/* Card footer */}
-            <p className="text-center text-[10px] text-gray-600 mt-5 tracking-widest uppercase">
+            <p className="text-center text-[10px] text-gray-600 mt-4 tracking-widest uppercase">
               © 2026 Shraddha Diagnostic Center
             </p>
           </div>
         </div>
       </div>
-    </div>
-
     </div>
   );
 };

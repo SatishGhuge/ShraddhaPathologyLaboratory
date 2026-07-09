@@ -25,7 +25,8 @@ const DepartmentTable = () => {
       setLoading(true);
       setError("");
       
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/master/departments?page=${page}&limit=${ITEMS_PER_PAGE}`);
+      // Use /all endpoint to get both active and inactive departments
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/master/departments/all?page=${page}&limit=${ITEMS_PER_PAGE}`);
       const result = await response.json();
       
       if (result.success) {
@@ -49,6 +50,9 @@ const DepartmentTable = () => {
   };
 
   const filteredDepartments = departments.filter((dept) => {
+    // Exclude deleted items from all views
+    if (dept.isDeleted) return false;
+    
     // When "Show Inactive" is checked, show ONLY inactive departments
     if (showInactive && dept.isActive) return false;
     
@@ -63,18 +67,31 @@ const DepartmentTable = () => {
   });
 
   const handleDelete = async (id: string, name: string) => {
-    if (window.confirm(`Are you sure you want to delete the department "${name}"?`)) {
+    if (window.confirm(`Are you sure you want to permanently delete "${name}"?\n\nThis will remove it from all lists but keep it in the database.`)) {
       try {
         setLoading(true);
         
+        const currentDept = departments.find((d) => d.id === id);
+        const updateData = {
+          ...currentDept,
+          isDeleted: true
+        };
+        Object.keys(updateData).forEach(key => {
+          if (updateData[key] === undefined) delete updateData[key];
+        });
+        
         const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/master/departments/${id}`, {
-          method: 'DELETE'
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(updateData)
         });
         
         const result = await response.json();
         
         if (result.success) {
-          alert('Department deleted successfully!');
+          alert('Department deleted permanently!');
           fetchDepartments(); // Refresh the list
         } else {
           alert(`Error: ${result.message}`);
@@ -102,14 +119,22 @@ const DepartmentTable = () => {
     try {
       setLoading(true);
       
+      // Preserve all existing data, only toggle isActive
+      const updateData = {
+        ...currentDept,
+        isActive: !currentDept.isActive
+      };
+      // Remove undefined/null fields that might cause issues
+      Object.keys(updateData).forEach(key => {
+        if (updateData[key] === undefined) delete updateData[key];
+      });
+      
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/master/departments/${id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({
-          isActive: !currentDept.isActive
-        })
+        body: JSON.stringify(updateData)
       });
       
       const result = await response.json();
@@ -213,14 +238,14 @@ const DepartmentTable = () => {
             </tr>
           </thead>
           <tbody>
-            {departments.length === 0 ? (
+            {filteredDepartments.length === 0 ? (
               <tr>
                 <td colSpan={6} className="text-center py-8 text-gray-500 border border-gray-300">
                   No departments found.
                 </td>
               </tr>
             ) : (
-              departments.map((dept, index) => (
+              filteredDepartments.map((dept, index) => (
                 <tr 
                   key={dept.id} 
                   className={`hover:bg-gray-50 border-b border-gray-200 ${

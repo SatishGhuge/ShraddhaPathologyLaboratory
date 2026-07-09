@@ -207,14 +207,9 @@ const Header = () => {
               ...module,
               items: module.items.filter(item => {
                 if (item.path.includes("report-dashboard")) return accessible.reports.dashboard;
-<<<<<<< HEAD
                 if (item.path.includes("/collection")) return accessible.reports.collectionReport;
                 if (item.path.includes("patient-list")) return accessible.reports.patientList;
                 if (item.path.includes("referral-doctor-revenue")) return accessible.reports.referralDoctorRevenue;
-=======
-                if (item.path.includes("/collection")) return accessible.reports.dailyCollection || accessible.reports.monthlyCollectionSummary;
-                if (item.path.includes("patient-list")) return accessible.reports.patientList;
->>>>>>> e2377f3945c1305426c89031022f83f6cb138df1
                 if (item.path.includes("center-wise")) return accessible.reports.centerWiseCostReport;
                 if (item.path.includes("b2b-testwise")) return accessible.reports.b2bTestwiseCostReport;
                 if (item.path.includes("discount-report")) return accessible.reports.discountReport;
@@ -256,14 +251,11 @@ const Header = () => {
             return accessible.result ? module : { ...module, items: [] };
           }
           
-<<<<<<< HEAD
-=======
           // Inventory — always visible (no allocation filter yet)
           if (module.id === "inventory") {
             return module;
           }
           
->>>>>>> e2377f3945c1305426c89031022f83f6cb138df1
           return module;
         }).filter(module => {
           // Hide modules with no accessible items

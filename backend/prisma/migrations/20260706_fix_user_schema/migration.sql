@@ -1,4 +1,0 @@
--- Fix User model schema - remove incorrect 'center' field that doesn't exist in database
--- The User table never had a 'center' column, but Prisma schema had it
--- This migration documents the schema correction in Prisma without changing the database
--- No actual database changes needed - just schema synchronization
