@@ -210,13 +210,11 @@ const defaultModuleAllocation = {
   },
   reports: {
     dashboard: false,
-    dailyCollection: false,
-    monthlyCollectionSummary: false,
+    collectionReport: false,
     patientList: false,
-    centerWiseCostReport: false,
-    b2bTestwiseCostReport: false,
-    discountReport: false,
+    referralDoctorRevenue: false,
     testReport: false,
+    turnAroundTime: false,
   },
   configuration: {
     signature: false,
@@ -581,10 +579,8 @@ const AddOrganization = () => {
                       { key: 'reports.collectionReport', label: 'Collection Report' },
                       { key: 'reports.patientList', label: 'Patient List' },
                       { key: 'reports.referralDoctorRevenue', label: 'Referral Doctor Revenue' },
-                      { key: 'reports.centerWiseCostReport', label: 'Center Cost' },
-                      { key: 'reports.b2bTestwiseCostReport', label: 'B2B Cost' },
-                      { key: 'reports.discountReport', label: 'Discount' },
                       { key: 'reports.testReport', label: 'Test Report' },
+                      { key: 'reports.turnAroundTime', label: 'Turn Around Time' },
                     ]}
                     moduleAllocation={moduleAllocation}
                     toggleModule={toggleModule}
