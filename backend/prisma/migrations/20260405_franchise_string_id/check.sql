@@ -1,1 +1,0 @@
-DESCRIBE test_charges;
