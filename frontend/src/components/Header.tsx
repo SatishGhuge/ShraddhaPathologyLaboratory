@@ -64,10 +64,8 @@ const allModules: NavModule[] = [
       { label: "Collection Report", path: "/reports/collection" },
       { label: "Patient List", path: "/reports/patient-list" },
       { label: "Referral Doctor Revenue", path: "/reports/referral-doctor-revenue" },
-      { label: "Center wise cost Report", path: "/reports/center-wise-cost-report" },
-      { label: "B2B Testwise Cost Report", path: "/reports/b2b-testwise-cost-report" },
-      { label: "Discount Report", path: "/reports/discount-report" },
       { label: "Test Report", path: "/reports/test-report" },
+      { label: "Turn Around Time", path: "/reports/turn-around-time" },
     ],
   },
   {

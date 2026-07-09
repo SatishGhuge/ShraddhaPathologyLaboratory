@@ -1,7 +1,7 @@
 import express from 'express';
 import {
   getDepartments, getAllDepartments, getDepartmentById, createDepartment, updateDepartment, deleteDepartment,
-  getDoctors, getDoctorById, createDoctor, updateDoctor, deleteDoctor,
+  getDoctors, getDoctorById, createDoctor, updateDoctor, deleteDoctor, findDuplicateDoctors, getDoctorMergeHistory, mergeDoctors,
   getOrganizations, createOrganization, updateOrganization, deleteOrganization, getOrganizationById,
   getTests, getTestById, createTest, updateTest, deleteTest,
   getSeedDataSummary,
@@ -32,7 +32,10 @@ router.delete('/departments/:id', deleteDepartment);
 
 // Doctor routes
 router.get('/doctors', getDoctors);
+router.get('/doctors/find-duplicates', findDuplicateDoctors);
+router.post('/doctors/merge', mergeDoctors);
 router.get('/doctors/:id', getDoctorById);
+router.get('/doctors/:doctorId/merge-history', getDoctorMergeHistory);
 router.post('/doctors', createDoctor);
 router.put('/doctors/:id', updateDoctor);
 router.delete('/doctors/:id', deleteDoctor);

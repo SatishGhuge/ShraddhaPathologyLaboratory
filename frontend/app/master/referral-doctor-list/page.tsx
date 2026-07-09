@@ -3,8 +3,9 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 
-import { UserCheck, RotateCcw } from "lucide-react";
+import { UserCheck, RotateCcw, GitMerge } from "lucide-react";
 import { getDoctors, deleteDoctor } from "@/src/api/master";
+import DoctorMergeModal from "@/src/components/DoctorMergeModal";
 
 export default function ReferralListing() {
   const [search, setSearch] = useState("");
@@ -12,6 +13,9 @@ export default function ReferralListing() {
   const [loading, setLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
   const [pagination, setPagination] = useState<any>(null);
+  const [showMergeModal, setShowMergeModal] = useState(false);
+  const [selectedSourceDoctor, setSelectedSourceDoctor] = useState<any>(null);
+  const [selectedTargetDoctor, setSelectedTargetDoctor] = useState<any>(null);
   const ITEMS_PER_PAGE = 20;
   const router = useRouter();
 
@@ -49,6 +53,22 @@ export default function ReferralListing() {
   const handleSearch = () => {
     setCurrentPage(1);
     fetchDoctors(1);
+  };
+
+  const openMergeModal = (sourceDoctor: any) => {
+    setSelectedSourceDoctor(sourceDoctor);
+    setSelectedTargetDoctor(null);
+    setShowMergeModal(true);
+  };
+
+  const selectMergeTarget = (targetDoctor: any) => {
+    setSelectedTargetDoctor(targetDoctor);
+  };
+
+  const handleMergeSuccess = () => {
+    fetchDoctors(currentPage);
+    setSelectedSourceDoctor(null);
+    setSelectedTargetDoctor(null);
   };
 
   return (
@@ -117,6 +137,13 @@ export default function ReferralListing() {
                         Charges
                       </button>
                       <button
+                        onClick={() => openMergeModal(item)}
+                        className="bg-purple-600 text-white px-2 py-1 rounded text-xs hover:bg-purple-700 transition-colors flex items-center gap-1"
+                        title="Merge this doctor with another"
+                      >
+                        <GitMerge size={14} /> Merge
+                      </button>
+                      <button
                         onClick={() => router.push(`/master/referral-doctor/edit/${item.id}`)}
                         className="bg-blue-600 text-white px-2 py-1 rounded text-xs hover:bg-blue-700 transition-colors"
                       >
@@ -157,6 +184,59 @@ export default function ReferralListing() {
             Next
           </button>
         </div>
+      )}
+
+      {/* Merge Target Selection Modal */}
+      {showMergeModal && selectedSourceDoctor && !selectedTargetDoctor && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-sm">
+            <div className="bg-white border-b border-gray-200 px-4 py-2 flex items-center justify-between">
+              <h2 className="text-sm font-semibold">Select Target Doctor</h2>
+              <button
+                onClick={() => setShowMergeModal(false)}
+                className="text-gray-500 hover:text-gray-700"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="p-3 max-h-72 overflow-y-auto">
+              <p className="text-xs text-gray-600 mb-3">
+                Select to merge <strong>Dr. {selectedSourceDoctor.name}</strong> into:
+              </p>
+
+              <div className="space-y-1">
+                {data
+                  .filter(d => d.id !== selectedSourceDoctor.id && d.isActive)
+                  .map((doctor) => (
+                    <button
+                      key={doctor.id}
+                      onClick={() => selectMergeTarget(doctor)}
+                      className="w-full text-left p-2 border border-gray-200 rounded hover:bg-blue-50 hover:border-blue-300 transition-colors text-xs"
+                    >
+                      <p className="font-medium text-gray-900">Dr. {doctor.name}</p>
+                      {doctor.degree && <p className="text-gray-600">{doctor.degree}</p>}
+                    </button>
+                  ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Merge Confirmation Modal */}
+      {showMergeModal && selectedSourceDoctor && selectedTargetDoctor && (
+        <DoctorMergeModal
+          isOpen={true}
+          onClose={() => {
+            setShowMergeModal(false);
+            setSelectedSourceDoctor(null);
+            setSelectedTargetDoctor(null);
+          }}
+          sourceDoctor={selectedSourceDoctor}
+          targetDoctor={selectedTargetDoctor}
+          onMergeSuccess={handleMergeSuccess}
+        />
       )}
     </div>
     </>
