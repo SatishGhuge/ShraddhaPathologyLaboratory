@@ -100,6 +100,7 @@ export const getTemplates = async (page: number = 1, limit: number = 20): Promis
   return r; 
 };
 export const getTemplateById = async (id: string): Promise<any | null> => { const r = await apiCall(`/master/templates/${id}`, { method: 'GET' }); return r.data || null; };
+export const getTemplatesByTestId = async (testId: string | number): Promise<any[]> => { const r = await apiCall(`/master/templates/by-test/${testId}`, { method: 'GET' }); return r.data || []; };
 export const createTemplate = async (d: ApiData): Promise<any> => { const r = await apiCall('/master/templates', { method: 'POST', body: JSON.stringify(d) }); return r.data || r; };
 export const updateTemplate = async (id: string, d: ApiData): Promise<any> => { const r = await apiCall(`/master/templates/${id}`, { method: 'PUT', body: JSON.stringify(d) }); return r.data || r; };
 export const deleteTemplate = async (id: string): Promise<ApiResponse> => apiCall(`/master/templates/${id}`, { method: 'DELETE' });

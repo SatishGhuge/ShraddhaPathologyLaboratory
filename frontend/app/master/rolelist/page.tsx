@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 
-import { Search, RotateCcw, ShieldCheck, Trash2, ChevronLeft, ChevronRight } from "lucide-react";
+import { RotateCcw, X, ChevronLeft, ChevronRight } from "lucide-react";
 import { getRoles, deleteRole } from "@/src/api/master";
 
 const RoleList = () => {
@@ -15,6 +15,10 @@ const RoleList = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [pagination, setPagination] = useState<any>(null);
   const ITEMS_PER_PAGE = 20;
+  const [showModal, setShowModal] = useState(false);
+  const [roleName, setRoleName] = useState("");
+  const [editingRoleId, setEditingRoleId] = useState<any>(null);
+  const [saveLoading, setSaveLoading] = useState(false);
 
   const fetchRoles = async (page: number = 1) => {
     setLoading(true);
@@ -44,9 +48,92 @@ const RoleList = () => {
     }
   };
 
+  const handleAddNew = () => {
+    setRoleName("");
+    setEditingRoleId(null);
+    setShowModal(true);
+  };
+
+  const handleEdit = (role) => {
+    setRoleName(role.name);
+    setEditingRoleId(role.id);
+    setShowModal(true);
+  };
+
+  const handleToggleActive = async (role) => {
+    const message = role.isActive
+      ? `Do you want to Inactivate "${role.name}"?`
+      : `Do you want to Activate "${role.name}"?`;
+
+    if (!window.confirm(message)) return;
+
+    try {
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/master/roles/${role.id}`,
+        {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ isActive: !role.isActive })
+        }
+      );
+
+      const result = await response.json();
+      if (result.success) {
+        alert(role.isActive ? "Role inactivated successfully!" : "Role activated successfully!");
+        fetchRoles(1);
+      } else {
+        alert(result.message || "Failed to update role");
+      }
+    } catch (err) {
+      console.error('Error updating role:', err);
+      alert("Failed to update role");
+    }
+  };
+
+  const handleSaveRole = async () => {
+    if (!roleName.trim()) {
+      alert("Please enter role name");
+      return;
+    }
+
+    try {
+      setSaveLoading(true);
+      
+      const url = editingRoleId 
+        ? `${process.env.NEXT_PUBLIC_API_URL}/master/roles/${editingRoleId}`
+        : `${process.env.NEXT_PUBLIC_API_URL}/master/roles`;
+      
+      const response = await fetch(url, {
+        method: editingRoleId ? 'PUT' : 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          name: roleName
+        })
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        alert(editingRoleId ? "Role updated successfully!" : "Role added successfully!");
+        setShowModal(false);
+        setRoleName("");
+        setEditingRoleId(null);
+        fetchRoles(1);
+      } else {
+        alert(result.message || "Failed to save role");
+      }
+    } catch (err) {
+      console.error('Error saving role:', err);
+      alert("Failed to save role");
+    } finally {
+      setSaveLoading(false);
+    }
+  };
+
   const filtered = roles.filter(r =>
-    r.name.toLowerCase().includes(search.toLowerCase()) ||
-    r.codeName.toLowerCase().includes(search.toLowerCase())
+    r.name.toLowerCase().includes(search.toLowerCase())
   );
 
   return (
@@ -57,7 +144,7 @@ const RoleList = () => {
           <div className="flex gap-2 flex-1">
             <input
               type="text"
-              placeholder="Search by name or code"
+              placeholder="Search by name"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="border border-gray-300 bg-white rounded px-3 py-2 w-64 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
@@ -70,7 +157,7 @@ const RoleList = () => {
             </button>
           </div>
           <button
-            onClick={() => router.push("/master/rolelist/add")}
+            onClick={handleAddNew}
             className="bg-orange-500 text-white px-4 py-2 rounded text-sm hover:bg-orange-600"
           >
             + New Role
@@ -87,39 +174,39 @@ const RoleList = () => {
               <tr>
                 <th className="border border-gray-300 px-3 py-2 text-left">ID</th>
                 <th className="border border-gray-300 px-3 py-2 text-left">Name</th>
-                <th className="border border-gray-300 px-3 py-2 text-left">Code</th>
-                <th className="border border-gray-300 px-3 py-2 text-left">Landing</th>
-                <th className="border border-gray-300 px-3 py-2 text-left">Fin. Days</th>
-                <th className="border border-gray-300 px-3 py-2 text-left">Discount</th>
-                <th className="border border-gray-300 px-3 py-2 text-left">B2B</th>
+                <th className="border border-gray-300 px-3 py-2 text-center">Active</th>
                 <th className="border border-gray-300 px-3 py-2 text-left">Action</th>
               </tr>
             </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan={8} className="text-center py-6 text-gray-500">Loading...</td></tr>
+                <tr><td colSpan={4} className="text-center py-6 text-gray-500">Loading...</td></tr>
               ) : filtered.length === 0 ? (
-                <tr><td colSpan={8} className="text-center py-6 text-gray-500">No roles found</td></tr>
+                <tr><td colSpan={4} className="text-center py-6 text-gray-500">No roles found</td></tr>
               ) : (
                 filtered.map((role) => (
                   <tr key={role.id} className="hover:bg-gray-50 border-b border-gray-200">
-                    <td className="border border-gray-300 px-3 py-1">{role.id}</td>
-                    <td className="border border-gray-300 px-3 py-1 font-medium">{role.name}</td>
-                    <td className="border border-gray-300 px-3 py-1">{role.codeName}</td>
-                    <td className="border border-gray-300 px-3 py-1 capitalize">{role.roleLanding}</td>
-                    <td className="border border-gray-300 px-3 py-1">{role.viewFinancialDays}</td>
-                    <td className="border border-gray-300 px-3 py-1">{role.discountPermissible ? "Yes" : "No"}</td>
-                    <td className="border border-gray-300 px-3 py-1">{role.showB2B ? "Yes" : "No"}</td>
-                    <td className="border border-gray-300 px-3 py-1">
+                    <td className="border border-gray-300 px-3 py-2">{role.id}</td>
+                    <td className="border border-gray-300 px-3 py-2 font-medium">{role.name}</td>
+                    <td className="border border-gray-300 px-3 py-2 text-center">
+                      {role.isActive ? "Yes" : "No"}
+                    </td>
+                    <td className="border border-gray-300 px-3 py-2">
                       <div className="flex gap-1">
                         <button
-                          onClick={() => router.push(`/master/rolelist/view/${role.id}`)}
-                          className="bg-orange-500 text-white px-2 py-1 rounded text-xs hover:bg-orange-600"
-                        >View</button>
-                        <button
-                          onClick={() => router.push(`/master/rolelist/edit/${role.id}`)}
+                          onClick={() => handleEdit(role)}
                           className="bg-blue-600 text-white px-2 py-1 rounded text-xs hover:bg-blue-700"
                         >Edit</button>
+                        <button
+                          onClick={() => handleToggleActive(role)}
+                          className={`px-2 py-1 rounded text-xs text-white font-medium ${
+                            role.isActive
+                              ? "bg-green-600 hover:bg-green-700"
+                              : "bg-gray-600 hover:bg-gray-700"
+                          }`}
+                        >
+                          {role.isActive ? "Active" : "Inactive"}
+                        </button>
                         <button
                           onClick={() => handleDelete(role)}
                           className="bg-red-500 text-white px-2 py-1 rounded text-xs hover:bg-red-600"
@@ -178,6 +265,54 @@ const RoleList = () => {
           </div>
         )}
       </div>
+
+      {/* Add/Edit Role Modal */}
+      {showModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl p-6 w-96">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-semibold text-gray-800">
+                {editingRoleId ? "Edit Role" : "Add Role"}
+              </h3>
+              <button
+                onClick={() => setShowModal(false)}
+                className="text-gray-500 hover:text-gray-700"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="mb-4">
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
+                Role Name *
+              </label>
+              <input
+                type="text"
+                value={roleName}
+                onChange={(e) => setRoleName(e.target.value)}
+                placeholder="Enter role name"
+                className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
+              />
+            </div>
+
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => setShowModal(false)}
+                className="px-4 py-2 border border-gray-300 text-gray-700 rounded hover:bg-gray-100 text-sm"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSaveRole}
+                disabled={saveLoading}
+                className="px-4 py-2 bg-orange-500 text-white rounded hover:bg-orange-600 text-sm disabled:opacity-50"
+              >
+                {saveLoading ? "Saving..." : (editingRoleId ? "Update" : "Save")}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 };

@@ -11,7 +11,7 @@ import {
   searchParameters,
   getUnits, getUnitById, createUnit, updateUnit, deleteUnit,
   createTestParameter, createTestCategory, createTestCategoryWithParameter,
-  getTemplates, getTemplateById, createTemplate, updateTemplate, deleteTemplate,
+  getTemplates, getTemplateById, getTemplatesByTestId, createTemplate, updateTemplate, deleteTemplate,
   getSpecimenTypes, getSpecimenTypeById, createSpecimenType, updateSpecimenType, deleteSpecimenType,
   getRoles, getRoleById, createRole, updateRole, deleteRole,
   getUsers, getUserById, createUser, updateUser, deleteUser,
@@ -92,8 +92,9 @@ router.post('/test-parameters', createTestParameter);
 router.post('/test-categories', createTestCategory);
 router.post('/test-categories-with-parameter', createTestCategoryWithParameter);
 
-// Template routes
+// Template routes — specific before parameterized
 router.get('/templates', getTemplates);
+router.get('/templates/by-test/:testId', getTemplatesByTestId);
 router.get('/templates/:id', getTemplateById);
 router.post('/templates', createTemplate);
 router.put('/templates/:id', updateTemplate);

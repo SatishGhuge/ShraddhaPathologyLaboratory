@@ -108,10 +108,10 @@ export default function PageHeader({ title = "", icon: Icon, path = "" }: { titl
   }
 
   return (
-    <div className="mb-3 space-y-1">
+    <div className="mb-2">
 
       {/* Breadcrumb */}
-      <div className="flex items-center gap-2 text-sm text-slate-500">
+      <div className="flex items-center gap-1 text-sm text-slate-500">
         <Home size={16} />
         <span>Home</span>
 

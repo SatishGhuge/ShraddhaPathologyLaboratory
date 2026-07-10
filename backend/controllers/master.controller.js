@@ -4089,6 +4089,70 @@ export const getTemplates = async (req, res) => {
   }
 };
 
+// Get templates by test ID
+export const getTemplatesByTestId = async (req, res) => {
+  try {
+    const { testId } = req.params;
+
+    // Verify test exists
+    const test = await prisma.test.findUnique({
+      where: { id: parseInt(testId) }
+    });
+
+    if (!test) {
+      return res.status(404).json({
+        success: false,
+        message: 'Test not found'
+      });
+    }
+
+    // Get all templates for this test
+    const templates = await prisma.testTemplate.findMany({
+      where: { 
+        testId: parseInt(testId),
+        isActive: true
+      },
+      include: {
+        test: {
+          select: {
+            id: true,
+            name: true,
+            shortName: true
+          }
+        },
+        testCategory: {
+          select: {
+            id: true,
+            categoryName: true
+          }
+        }
+      },
+      orderBy: {
+        createdAt: 'desc'
+      }
+    });
+
+    // Parse JSON parameters for each template
+    const parsedTemplates = templates.map(template => ({
+      ...template,
+      parameters: template.parameters ? JSON.parse(template.parameters) : []
+    }));
+
+    res.json({
+      success: true,
+      data: parsedTemplates,
+      count: parsedTemplates.length
+    });
+  } catch (error) {
+    console.error('Error fetching templates by test ID:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch templates',
+      error: error.message
+    });
+  }
+};
+
 // Get template by ID
 export const getTemplateById = async (req, res) => {
   try {
@@ -4606,24 +4670,26 @@ export const getRoleById = async (req, res) => {
 
 export const createRole = async (req, res) => {
   try {
-    const { name, codeName, roleLanding, viewFinancialDays, discountPermissible, showB2B } = req.body;
-    if (!name || !codeName || !roleLanding) {
-      return res.status(400).json({ success: false, message: 'Name, Code Name and Role Landing are required' });
+    const { name } = req.body;
+    
+    if (!name) {
+      return res.status(400).json({ success: false, message: 'Role name is required' });
     }
+
+    // Auto-generate codeName from name (uppercase with underscores)
+    const codeName = name.trim().toUpperCase().replace(/\s+/g, '_');
+
     const role = await prisma.role.create({
       data: {
         name: name.trim(),
-        codeName: codeName.trim(),
-        roleLanding,
-        viewFinancialDays: viewFinancialDays ? parseInt(viewFinancialDays) : 30,
-        discountPermissible: discountPermissible || false,
-        showB2B: showB2B || false,
+        codeName: codeName,
+        isActive: true
       },
     });
     res.status(201).json({ success: true, message: 'Role created successfully', data: role });
   } catch (error) {
     if (error.code === 'P2002') {
-      return res.status(400).json({ success: false, message: 'Role name or code already exists' });
+      return res.status(400).json({ success: false, message: 'Role name already exists' });
     }
     res.status(500).json({ success: false, message: 'Failed to create role' });
   }
@@ -4632,25 +4698,31 @@ export const createRole = async (req, res) => {
 export const updateRole = async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, codeName, roleLanding, viewFinancialDays, discountPermissible, showB2B } = req.body;
+    const { name, isActive } = req.body;
+    
     const existing = await prisma.role.findUnique({ where: { id: parseInt(id) } });
     if (!existing) return res.status(404).json({ success: false, message: 'Role not found' });
 
+    const updateData = {};
+    if (name) {
+      updateData.name = name.trim();
+      updateData.codeName = name.trim().toUpperCase().replace(/\s+/g, '_');
+    }
+    if (isActive !== undefined) {
+      updateData.isActive = isActive;
+    }
+    if (Object.keys(updateData).length === 0) {
+      updateData.isDeleted = false; // Ensure we're not deleting
+    }
+
     const role = await prisma.role.update({
       where: { id: parseInt(id) },
-      data: {
-        name: name?.trim(),
-        codeName: codeName?.trim(),
-        roleLanding,
-        viewFinancialDays: viewFinancialDays ? parseInt(viewFinancialDays) : undefined,
-        discountPermissible,
-        showB2B,
-      },
+      data: updateData,
     });
     res.json({ success: true, message: 'Role updated successfully', data: role });
   } catch (error) {
     if (error.code === 'P2002') {
-      return res.status(400).json({ success: false, message: 'Role name or code already exists' });
+      return res.status(400).json({ success: false, message: 'Role name already exists' });
     }
     res.status(500).json({ success: false, message: 'Failed to update role' });
   }
