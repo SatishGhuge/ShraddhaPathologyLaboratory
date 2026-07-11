@@ -99,6 +99,7 @@ model PatientTest {
   lastUpdatedBy      String?
   lastStatusUpdateAt DateTime?
   barcode_status     String              @default("Unprinted")
+  comments           String?             @db.Text
   department         Department          @relation(fields: [departmentId], references: [id])
   organization       Organization?       @relation(fields: [organizationId], references: [id])
   patient            Patient             @relation(fields: [patientId], references: [patientId], onDelete: Cascade)
@@ -139,6 +140,7 @@ model Department {
   id           Int           @id @default(autoincrement())
   name         String        @unique
   code         String?
+  group        String?
   isActive     Boolean       @default(true)
   isDeleted    Boolean       @default(false)
   createdAt    DateTime      @default(now())
@@ -536,7 +538,6 @@ model PaymentTransaction {
 
 model Signature {
   id             Int       @id @default(autoincrement())
-  specialty      String
   doctorName     String?
   signatureText  String?   @db.Text
   signatureImage String?   @db.Text

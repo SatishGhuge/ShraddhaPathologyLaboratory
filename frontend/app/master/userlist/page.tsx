@@ -112,10 +112,6 @@ const UserList = () => {
                     <td className="border border-gray-300 px-3 py-1">
                       <div className="flex gap-1">
                         <button
-                          onClick={() => router.push(`/master/user/view/${u.id}`)}
-                          className="bg-green-600 text-white px-2 py-1 rounded text-xs hover:bg-green-700"
-                        >View</button>
-                        <button
                           onClick={() => router.push(`/master/user/edit/${u.id}`)}
                           className="bg-blue-600 text-white px-2 py-1 rounded text-xs hover:bg-blue-700"
                         >Edit</button>

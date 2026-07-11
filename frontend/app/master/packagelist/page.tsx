@@ -13,6 +13,7 @@ import {
   Eye,
   Edit
 } from "lucide-react";
+import { getAllPackages } from "@/src/api/master";
 
 const PackagesTable = () => {
   const router = useRouter();
@@ -36,14 +37,10 @@ const PackagesTable = () => {
       setError("");
       
       // Fetch ALL packages (both active and inactive)
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/master/packages/all?page=${page}&limit=${ITEMS_PER_PAGE}`);
-      const result = await response.json();
+      const result = await getAllPackages(page, ITEMS_PER_PAGE);
       
-      if (result.success) {
-        setPackages(result.data || []);
-        if (result.pagination) {
-          setPagination(result.pagination);
-        }
+      if (result && Array.isArray(result)) {
+        setPackages(result || []);
       } else {
         setError('Failed to load packages');
       }

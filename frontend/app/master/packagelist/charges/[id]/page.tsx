@@ -5,6 +5,7 @@ import { useRouter, useParams } from "next/navigation";
 
 import Header from "@/src/components/Header";
 import { ArrowLeft } from "lucide-react";
+import { getAllPackages } from "@/src/api/master";
 
 const AddPackageCharges = () => {
   const router = useRouter();
@@ -41,11 +42,10 @@ const AddPackageCharges = () => {
       setLoading(true);
       setError("");
       
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/master/packages/all`);
-      const result = await response.json();
+      const result = await getAllPackages(1, 100);
       
-      if (result.success) {
-        setPackages(result.data);
+      if (result && Array.isArray(result)) {
+        setPackages(result);
       } else {
         setError('Failed to load packages');
       }

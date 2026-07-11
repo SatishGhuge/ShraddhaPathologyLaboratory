@@ -13,7 +13,8 @@ import {
   uploadAttachment,
   deleteAttachment,
   getPreviousTestResult,
-  getAllTestResults
+  getAllTestResults,
+  updatePatientComments
 } from '../controllers/result.controller.js';
 import { upload } from '../utils/upload.js';
 import { 
@@ -53,6 +54,9 @@ router.post('/:patientTestId/results', saveTestResults);
 
 // Update test dates (calendar functionality)
 router.put('/:id/dates', updateTestDates);
+
+// Update patient comments/notes
+router.put('/:id/comments', updatePatientComments);
 
 // Upload attachment (image/PDF) for a patient test
 router.post('/:id/attachment', upload.single('file'), uploadAttachment);

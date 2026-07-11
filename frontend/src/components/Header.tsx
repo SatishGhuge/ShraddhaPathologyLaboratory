@@ -133,17 +133,45 @@ const Header = () => {
     return () => clearInterval(timer);
   }, []);
 
-  // Listen for storage changes (when user logs in from another tab or updates)
+  // Listen for storage changes and custom login event
   useEffect(() => {
-    const handleStorageChange = () => {
-      const user = JSON.parse(localStorage.getItem("admin") || "{}");
+    // Handle custom userLoggedIn event (same tab login)
+    const handleUserLoggedIn = (e: any) => {
+      const user = e.detail || JSON.parse(localStorage.getItem("admin") || "{}");
       setCurrentUser(user);
-      console.log('🔍 Header - Storage changed, user updated:', user);
+      console.log('🔍 Header - User logged in (custom event):', user);
     };
 
+    // Handle storage changes (other tabs/windows)
+    const handleStorageChange = (e?: StorageEvent) => {
+      if (e?.key === 'admin') {
+        const user = JSON.parse(localStorage.getItem("admin") || "{}");
+        setCurrentUser(user);
+        console.log('🔍 Header - Storage changed (other tab), user updated:', user);
+        
+        // If user logged out (empty object), navigate to login
+        if (!user.id) {
+          console.log('🔍 Header - User logged out, redirecting to login');
+          router.push('/login');
+        }
+      }
+    };
+
+    // Check immediately when component mounts (for initial sync)
+    const user = JSON.parse(localStorage.getItem("admin") || "{}");
+    setCurrentUser(user);
+
+    // Listen for custom login event (same tab)
+    window.addEventListener('userLoggedIn', handleUserLoggedIn);
+    
+    // Listen for storage changes from other tabs/windows
     window.addEventListener('storage', handleStorageChange);
-    return () => window.removeEventListener('storage', handleStorageChange);
-  }, []);
+    
+    return () => {
+      window.removeEventListener('userLoggedIn', handleUserLoggedIn);
+      window.removeEventListener('storage', handleStorageChange);
+    };
+  }, [router]);
 
   // Filter modules based on user module allocation
   useEffect(() => {
@@ -626,7 +654,7 @@ const Header = () => {
         }`}>
 
         {/* Sidebar Header with Close Button */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200">
+        <div className="flex items-center justify-between px-7 py-2 border-b border-gray-200">
           <h3 className="font-bold text-primary-600">Menu</h3>
           <button
             onClick={() => setSidebarOpen(false)}

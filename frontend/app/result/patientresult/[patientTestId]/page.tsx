@@ -5,8 +5,7 @@ import { useRouter, useParams, useSearchParams } from "next/navigation";
 import React, { useState, useEffect, useCallback, useRef } from "react";
 
 import Header from "@/src/components/Header";
-import { getPatientTestById } from "@/src/api/result.js";
-import { updateTestStatus } from "@/src/api/result.js";
+import { getPatientTestById, updateTestStatus, updatePatientComments } from "@/src/api/result.js";
 import API_BASE_URL from "@/src/api/config";
 import { useTestTemplates } from '@/src/hooks/useTestTemplates';
 import InlineTemplateSelector from '@/app/components/InlineTemplateSelector';
@@ -108,6 +107,7 @@ const PatientResult = () => {
   const [attachedFile, setAttachedFile] = useState<any>(null);
   const [attachedFileUrl, setAttachedFileUrl] = useState<any>(null);
   const [showComment, setShowComment] = useState(false);
+  const [comments, setComments] = useState('');
   const [defaultSignature, setDefaultSignature] = useState<any>(null);
 
   const calculateAge = (dob: any) => {
@@ -643,6 +643,17 @@ const PatientResult = () => {
       });
       const data = await response.json();
       if (data.success) {
+        // Save comments if provided
+        if (showComment && comments.trim()) {
+          try {
+            await updatePatientComments(patientData.id, comments);
+            console.log('✅ Comments saved successfully');
+          } catch (error) {
+            console.error('⚠️ Error saving comments:', error);
+            alert('Results saved, but failed to save comments');
+          }
+        }
+        
         // Auto-transition to Entered status when first result is saved
         try {
           const transitionResponse = await fetch(`${API_BASE_URL}/results/${patientData.id}/auto-transition/result-saved`, {
@@ -1029,8 +1040,22 @@ const PatientResult = () => {
                   onChange={(e) => setShowComment(e.target.checked)}
                   className="w-4 h-4"
                 />
-                <label htmlFor="show-comment" className="text-sm text-gray-700 cursor-pointer">Comment</label>
+                <label htmlFor="show-comment" className="text-sm text-gray-700 cursor-pointer">Add Comments/Notes</label>
               </div>
+              
+              {/* Comments Text Area - Show when checkbox is checked */}
+              {showComment && (
+                <div className="mb-3">
+                  <textarea
+                    value={comments}
+                    onChange={(e) => setComments(e.target.value)}
+                    placeholder="Enter comments or notes to be printed on the report..."
+                    className="w-full border border-gray-300 rounded px-3 py-2 text-sm font-normal"
+                    rows={4}
+                  />
+                </div>
+              )}
+              
               <div className="flex items-center gap-2">
                 <input
                   type="file"

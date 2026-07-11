@@ -91,13 +91,15 @@ export const getDepartments = async (req, res) => {
 
     const departments = await prisma.department.findMany({
       where: { isActive: true },
-      include: {
-        tests: {
-          where: { isActive: true }
-        },
-        packages: {
-          where: { isActive: true }
-        }
+      select: {
+        id: true,
+        name: true,
+        code: true,
+        group: true,
+        isActive: true,
+        isDeleted: true,
+        createdAt: true,
+        updatedAt: true
       },
       orderBy: { name: 'asc' },
       skip,
@@ -122,15 +124,17 @@ export const getAllDepartments = async (req, res) => {
     const total = await prisma.department.count();
 
     const departments = await prisma.department.findMany({
-      include: {
-        tests: {
-          where: { isActive: true }
-        },
-        packages: {
-          where: { isActive: true }
-        }
+      select: {
+        id: true,
+        name: true,
+        code: true,
+        group: true,
+        isActive: true,
+        isDeleted: true,
+        createdAt: true,
+        updatedAt: true
       },
-      orderBy: { sortOrder: 'asc' },
+      orderBy: { name: 'asc' },
       skip,
       take: limit
     });
@@ -185,7 +189,7 @@ export const getDepartmentById = async (req, res) => {
 // Create new department
 export const createDepartment = async (req, res) => {
   try {
-    const { name, code, sortOrder } = req.body;
+    const { name, code, group } = req.body;
 
     // Validate required fields
     if (!name || !code) {
@@ -211,7 +215,7 @@ export const createDepartment = async (req, res) => {
       data: {
         name,
         code,
-        sortOrder: sortOrder ? parseInt(sortOrder) : null,
+        group: group || null,
         isActive: true
       }
     });
@@ -242,7 +246,7 @@ export const createDepartment = async (req, res) => {
 export const updateDepartment = async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, code, sortOrder, isActive } = req.body;
+    const { name, code, group, isActive } = req.body;
 
     // Check if department exists
     const existingDepartment = await prisma.department.findUnique({
@@ -261,7 +265,7 @@ export const updateDepartment = async (req, res) => {
       data: {
         name: name || undefined,
         code: code || undefined,
-        sortOrder: sortOrder ? parseInt(sortOrder) : undefined,
+        group: group !== undefined ? group : undefined,
         isActive: isActive !== undefined ? isActive : undefined
       }
     });
@@ -355,14 +359,15 @@ export const getTestById = async (req, res) => {
         department: {
           select: {
             id: true,
-            name: true
+            name: true,
+            group: true
           }
         },
         categories: {
           include: {
             testParameter: true
           },
-          orderBy: { sortOrder: 'asc' }
+          orderBy: { categoryName: 'asc' }
         }
       }
     });
@@ -549,14 +554,10 @@ export const createTest = async (req, res) => {
       shortName,
       testCode,
       departmentId,
-      sampleType,
-      testMethod,
+      sampleTypeId,
       machineName,
-      speciality,
       group,
-      sortOrder,
       reportHeader,
-      costForLab,
       preparationTime,
       preparationType,
       instructionPreparation,
@@ -602,14 +603,10 @@ export const createTest = async (req, res) => {
         shortName,
         testCode,
         departmentId: parseInt(departmentId),
-        sampleType,
-        testMethod,
+        sampleTypeId: sampleTypeId ? parseInt(sampleTypeId) : null,
         machineName,
-        speciality: speciality || 'Regular',
         group,
-        sortOrder: sortOrder ? parseInt(sortOrder) : null,
         reportHeader,
-        costForLab: costForLab ? parseFloat(costForLab) : null,
         preparationTime,
         preparationType,
         instructionPreparation,
@@ -617,8 +614,8 @@ export const createTest = async (req, res) => {
         interpretationLabel,
         interpretation,
         outsourceLab,
-        attachFile: attachFile || 'Yes',
-        profileTest: profileTest || 'No',
+        attachFile: attachFile || false,
+        profileTest: profileTest || false,
         isHeader: isHeader !== undefined ? isHeader : true,
         showTestName: showTestName !== undefined ? showTestName : true,
         isNABL: isNABL || false,
@@ -655,7 +652,7 @@ export const createTest = async (req, res) => {
                 type: param.type || 'Numeric',
                 isMandatory: param.isMandatory || false,
                 rangeType: param.rangeType || 'BySex',
-                units: param.units || null,
+                unitId: param.unitId ? parseInt(param.unitId) : null,
                 displayRangeText: param.displayRangeText || null,
                 rangeText: param.rangeText || null,
                 textContent: param.textContent || null,
@@ -716,7 +713,7 @@ export const createTest = async (req, res) => {
           include: {
             testParameter: true
           },
-          orderBy: { sortOrder: 'asc' }
+          orderBy: { categoryName: 'asc' }
         }
       }
     });
@@ -759,14 +756,10 @@ export const updateTest = async (req, res) => {
       shortName,
       testCode,
       departmentId,
-      sampleType,
-      testMethod,
+      sampleTypeId,
       machineName,
-      speciality,
       group,
-      sortOrder,
       reportHeader,
-      costForLab,
       preparationTime,
       preparationType,
       instructionPreparation,
@@ -781,6 +774,7 @@ export const updateTest = async (req, res) => {
       isNABL,
       lineHeight,
       isActive,
+      isDeleted,
       categories
     } = req.body;
 
@@ -867,7 +861,7 @@ export const updateTest = async (req, res) => {
                 type: param.type || 'Numeric',
                 isMandatory: param.isMandatory || false,
                 rangeType: param.rangeType || 'BySex',
-                units: param.units || null,
+                unitId: param.unitId ? parseInt(param.unitId) : null,
                 displayRangeText: param.displayRangeText || null,
                 rangeText: param.rangeText || null,
                 textContent: param.textContent || null,
@@ -927,7 +921,7 @@ export const updateTest = async (req, res) => {
           include: {
             testParameter: true
           },
-          orderBy: { sortOrder: 'asc' }
+          orderBy: { categoryName: 'asc' }
         }
       }
     });
@@ -973,7 +967,8 @@ export const getTests = async (req, res) => {
         department: {
           select: {
             id: true,
-            name: true
+            name: true,
+            group: true
           }
         },
         categories: {
@@ -987,7 +982,7 @@ export const getTests = async (req, res) => {
               }
             }
           },
-          orderBy: { sortOrder: 'asc' }
+          orderBy: { categoryName: 'asc' }
         },
         charges: {
           where: { organizationId: null }, // Only get DEFAULT charges
@@ -1003,10 +998,7 @@ export const getTests = async (req, res) => {
           }
         }
       },
-      orderBy: [
-        { sortOrder: 'asc' },
-        { name: 'asc' }
-      ],
+      orderBy: { name: 'asc' },
       skip,
       take: limit
     });
@@ -1108,7 +1100,7 @@ export const getDoctorById = async (req, res) => {
 // Create doctor
 export const createDoctor = async (req, res) => {
   try {
-    const { name, type, degree, compliment, mobile, email, address, allowBalance, sendReportsViaWhatsApp, sendReportsViaMail } = req.body;
+    const { name, type, degree, mobile, email, address, allowBalance, sendReportsViaWhatsApp, sendReportsViaMail } = req.body;
     if (!name || !name.trim()) {
       return res.status(400).json({ success: false, message: 'Name is required' });
     }
@@ -1117,11 +1109,9 @@ export const createDoctor = async (req, res) => {
         name: name.trim(),
         type: type || 'Doctor',
         degree: degree || null,
-        compliment: compliment !== '' && compliment != null ? parseFloat(compliment) : null,
         mobile: mobile || null,
         email: email || null,
         address: address || null,
-        allowBalance: allowBalance || false,
         sendReportsViaWhatsApp: sendReportsViaWhatsApp || false,
         sendReportsViaMail: sendReportsViaMail || false,
         isActive: true,
@@ -1138,7 +1128,7 @@ export const createDoctor = async (req, res) => {
 export const updateDoctor = async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, type, degree, compliment, mobile, email, address, allowBalance, sendReportsViaWhatsApp, sendReportsViaMail } = req.body;
+    const { name, type, degree, mobile, email, address, allowBalance, sendReportsViaWhatsApp, sendReportsViaMail } = req.body;
     const existing = await prisma.doctor.findUnique({ where: { id: parseInt(id) } });
     if (!existing) return res.status(404).json({ success: false, message: 'Doctor not found' });
     const doctor = await prisma.doctor.update({
@@ -1147,11 +1137,9 @@ export const updateDoctor = async (req, res) => {
         name: name?.trim() || existing.name,
         type: type || existing.type,
         degree: degree !== undefined ? degree : existing.degree,
-        compliment: compliment !== '' && compliment != null ? parseFloat(compliment) : null,
         mobile: mobile !== undefined ? mobile : existing.mobile,
         email: email !== undefined ? email : existing.email,
         address: address !== undefined ? address : existing.address,
-        allowBalance: allowBalance !== undefined ? allowBalance : existing.allowBalance,
         sendReportsViaWhatsApp: sendReportsViaWhatsApp !== undefined ? sendReportsViaWhatsApp : existing.sendReportsViaWhatsApp,
         sendReportsViaMail: sendReportsViaMail !== undefined ? sendReportsViaMail : existing.sendReportsViaMail,
       }
@@ -1529,7 +1517,7 @@ export const getOrganizations = async (req, res) => {
         updatedAt: true,
         sendReportsViaWhatsApp: true,
         sendReportsViaMail: true,
-        moduleAllocation: {
+        moduleAllocations: {
           select: { id: true, modules: true }
         }
       },
@@ -1561,7 +1549,7 @@ export const getOrganizationById = async (req, res) => {
         updatedAt: true,
         sendReportsViaWhatsApp: true,
         sendReportsViaMail: true,
-        moduleAllocation: {
+        moduleAllocations: {
           select: { modules: true }
         }
       }
@@ -1569,10 +1557,30 @@ export const getOrganizationById = async (req, res) => {
     if (!organization) return res.status(404).json({ success: false, message: 'Organization not found' });
     
     // Transform response to match frontend expectations
+    // moduleAllocations is an array, but organization has only one allocation record (organizationId is unique)
     const response = {
       ...organization,
-      moduleAllocation: organization.moduleAllocation?.modules || null
+      moduleAllocation: organization.moduleAllocations?.[0]?.modules || null,
+      moduleAllocations: undefined  // Remove the array version
     };
+    
+    console.log('📦 getOrganizationById FULL response:', {
+      orgId: organization.id,
+      orgName: organization.name,
+      hasModuleAllocations: !!organization.moduleAllocations,
+      moduleAllocationsCount: organization.moduleAllocations?.length,
+      modulesValue: organization.moduleAllocations?.[0]?.modules ? 'EXISTS' : 'NULL',
+      finalModuleAllocation: response.moduleAllocation ? 'EXISTS (length: ' + response.moduleAllocation.length + ')' : 'NULL',
+      responseKeys: Object.keys(response),
+      sendingToFrontend: {
+        success: true,
+        data: {
+          id: response.id,
+          name: response.name,
+          moduleAllocation: response.moduleAllocation ? '...JSON STRING...' : null
+        }
+      }
+    });
     
     res.json({ success: true, data: response });
   } catch (error) {
@@ -1980,7 +1988,6 @@ export const getAllTestCharges = async (req, res) => {
         }
       },
       orderBy: [
-        { sortOrder: 'asc' },
         { name: 'asc' }
       ]
     });
@@ -2049,7 +2056,6 @@ export const getDoctorTestCharges = async (req, res) => {
         }
       },
       orderBy: [
-        { sortOrder: 'asc' },
         { name: 'asc' }
       ]
     });
@@ -2511,7 +2517,8 @@ export const getPackages = async (req, res) => {
         department: {
           select: {
             id: true,
-            name: true
+            name: true,
+            group: true
           }
         },
         packageTests: {
@@ -2521,7 +2528,7 @@ export const getPackages = async (req, res) => {
                 id: true,
                 name: true,
                 testCode: true,
-                sampleType: true
+                sampleTypeId: true
               }
             }
           }
@@ -2541,7 +2548,7 @@ export const getPackages = async (req, res) => {
           id: packageTest.test.id,
           name: packageTest.test.name,
           testCode: packageTest.test.testCode,
-          sampleType: packageTest.test.sampleType
+          sampleTypeId: packageTest.test.sampleTypeId
         }))
       };
     });
@@ -2568,7 +2575,8 @@ export const getAllPackages = async (req, res) => {
         department: {
           select: {
             id: true,
-            name: true
+            name: true,
+            group: true
           }
         },
         packageTests: {
@@ -2578,7 +2586,7 @@ export const getAllPackages = async (req, res) => {
                 id: true,
                 name: true,
                 testCode: true,
-                sampleType: true
+                sampleTypeId: true
               }
             }
           }
@@ -2598,7 +2606,7 @@ export const getAllPackages = async (req, res) => {
           id: packageTest.test.id,
           name: packageTest.test.name,
           testCode: packageTest.test.testCode,
-          sampleType: packageTest.test.sampleType
+          sampleTypeId: packageTest.test.sampleTypeId
         }))
       };
     });
@@ -2634,7 +2642,7 @@ export const getPackageById = async (req, res) => {
                 id: true,
                 name: true,
                 testCode: true,
-                sampleType: true
+                sampleTypeId: true
               }
             }
           }
@@ -2657,7 +2665,7 @@ export const getPackageById = async (req, res) => {
         id: packageTest.test.id,
         name: packageTest.test.name,
         testCode: packageTest.test.testCode,
-        sampleType: packageTest.test.sampleType
+        sampleTypeId: packageTest.test.sampleTypeId
       }))
     };
 
@@ -2714,9 +2722,7 @@ export const createPackage = async (req, res) => {
         name,
         code,
         departmentId: parseInt(departmentId),
-        center: center || "All Centers",
         b2cCharge: b2cCharge ? parseFloat(b2cCharge) : 0,
-        b2bCharge: b2bCharge ? parseFloat(b2bCharge) : 0,
         isActive: isActive !== undefined ? isActive : true
       }
     });
@@ -2751,7 +2757,7 @@ export const createPackage = async (req, res) => {
                 id: true,
                 name: true,
                 testCode: true,
-                sampleType: true
+                sampleTypeId: true
               }
             }
           }
@@ -2816,9 +2822,7 @@ export const updatePackage = async (req, res) => {
         name: name || undefined,
         code: code || undefined,
         departmentId: departmentId ? parseInt(departmentId) : undefined,
-        center: center || undefined,
         b2cCharge: b2cCharge !== undefined ? parseFloat(b2cCharge) : undefined,
-        b2bCharge: b2bCharge !== undefined ? parseFloat(b2bCharge) : undefined,
         isActive: isActive !== undefined ? isActive : undefined
       }
     });
@@ -2861,7 +2865,7 @@ export const updatePackage = async (req, res) => {
                 id: true,
                 name: true,
                 testCode: true,
-                sampleType: true
+                sampleTypeId: true
               }
             }
           }
@@ -2940,7 +2944,7 @@ export const getPackageTests = async (req, res) => {
             id: true,
             name: true,
             testCode: true,
-            sampleType: true,
+            sampleTypeId: true,
             department: {
               select: {
                 id: true,
@@ -3031,7 +3035,7 @@ export const addTestToPackage = async (req, res) => {
             id: true,
             name: true,
             testCode: true,
-            sampleType: true
+            sampleTypeId: true
           }
         },
         package: {
@@ -3690,7 +3694,7 @@ export const createTestParameter = async (req, res) => {
       type,
       isMandatory,
       rangeType,
-      units,
+      unitId,
       displayRangeText,
       rangeText,
       textContent,
@@ -3742,7 +3746,7 @@ export const createTestParameter = async (req, res) => {
         type: type || 'Numeric',
         isMandatory: isMandatory || false,
         rangeType: rangeType || 'BySex',
-        units: units || null,
+        unitId: unitId ? parseInt(unitId) : null,
         displayRangeText: displayRangeText || null,
         rangeText: rangeText || null,
         textContent: textContent || null,
@@ -3809,7 +3813,7 @@ export const createTestCategoryWithParameter = async (req, res) => {
       type,
       isMandatory,
       rangeType,
-      units,
+      unitId,
       displayRangeText,
       rangeText,
       textContent,
@@ -3876,7 +3880,7 @@ export const createTestCategoryWithParameter = async (req, res) => {
         type: type || 'Numeric',
         isMandatory: isMandatory || false,
         rangeType: rangeType || 'BySex',
-        units: units || null,
+        unitId: unitId ? parseInt(unitId) : null,
         displayRangeText: displayRangeText || null,
         rangeText: rangeText || null,
         textContent: textContent || null,

@@ -578,7 +578,7 @@ const TestTemplets = () => {
                   <tbody>
                     {filteredTemplates.length === 0 ? (
                       <tr>
-                        <td colSpan={4} className="text-center py-2 text-gray-500">
+                        <td colSpan={4} className="text-center py-1 text-gray-500 text-xs">
                           {search ? 'No templates found matching your search.' : 'No templates found. Click "Add Template" to create one.'}
                         </td>
                       </tr>
@@ -588,23 +588,23 @@ const TestTemplets = () => {
                           key={template.id}
                           className={`hover:bg-blue-50 border-b border-gray-200 transition-colors ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} ${!template.isActive ? 'bg-gray-100 opacity-60' : ''}`}
                         >
-                          <td className="border border-gray-300 px-3 py-0.5 font-semibold text-gray-800 text-xs">
+                          <td className="border border-gray-300 px-3 py-1 font-semibold text-gray-800 text-xs">
                             {template.templateName}
                           </td>
 
-                          <td className="border border-gray-300 px-3 py-0.5 text-gray-700 text-xs">
+                          <td className="border border-gray-300 px-3 py-1 text-gray-700 text-xs">
                             {template.test?.name || '-'}
                           </td>
 
-                          <td className="border border-gray-300 px-3 py-0.5 text-center font-semibold text-sm">
+                          <td className="border border-gray-300 px-3 py-1 text-center font-semibold text-xs">
                             {template.isActive ? "Yes" : "No"}
                           </td>
 
-                          <td className="border border-gray-300 px-3 py-0.5">
+                          <td className="border border-gray-300 px-3 py-1">
                             <div className="flex gap-1 justify-center flex-wrap">
                               <button
                                 onClick={() => handleEdit(template)}
-                                className="bg-blue-600 text-white px-2 py-0.5 rounded text-[9px] hover:bg-blue-700 transition-colors font-medium"
+                                className="bg-blue-600 text-white px-2 py-1 rounded text-[9px] hover:bg-blue-700 transition-colors font-medium whitespace-nowrap"
                               >
                                 Edit
                               </button>
@@ -612,7 +612,7 @@ const TestTemplets = () => {
                               <button
                                 onClick={() => handleToggleActive(template.id)}
                                 disabled={loading}
-                                className={`px-2 py-0.5 rounded text-[9px] text-white transition-colors disabled:opacity-50 font-medium ${
+                                className={`px-2 py-1 rounded text-[9px] text-white transition-colors disabled:opacity-50 font-medium whitespace-nowrap ${
                                   template.isActive
                                     ? "bg-green-600 hover:bg-green-700"
                                     : "bg-gray-900 hover:bg-gray-900"
@@ -624,7 +624,7 @@ const TestTemplets = () => {
 
                               <button
                                 onClick={() => handleDelete(template.id)}
-                                className="bg-red-500 text-white px-2 py-0.5 rounded text-[9px] hover:bg-red-600 transition-colors font-medium"
+                                className="bg-red-500 text-white px-2 py-1 rounded text-[9px] hover:bg-red-600 transition-colors font-medium whitespace-nowrap"
                               >
                                 Delete
                               </button>

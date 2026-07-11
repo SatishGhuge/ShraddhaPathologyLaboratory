@@ -92,6 +92,12 @@ const AdminLogin = ({ onLogin }: { onLogin?: () => void }) => {
       document.cookie = `token=${res.token}; path=/; max-age=86400; SameSite=Lax`;
       localStorage.setItem("token", res.token);
       localStorage.setItem("admin", JSON.stringify(res.admin));
+      
+      // Dispatch custom event to notify Header component of login
+      const loginEvent = new CustomEvent('userLoggedIn', { detail: res.admin });
+      window.dispatchEvent(loginEvent);
+      console.log('📢 Dispatched userLoggedIn event');
+      
       if (onLogin) onLogin();
       const role = res.admin?.role;
       router.replace(
