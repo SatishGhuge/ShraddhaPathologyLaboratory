@@ -102,10 +102,9 @@ model PatientTest {
   comments           String?             @db.Text
   department         Department          @relation(fields: [departmentId], references: [id])
   organization       Organization?       @relation(fields: [organizationId], references: [id])
-  packages           Package?            @relation(fields: [packageId], references: [id], onDelete: Cascade)
+  package            Package?            @relation(fields: [packageId], references: [id], onDelete: Cascade)
   patient            Patient             @relation(fields: [patientId], references: [patientId], onDelete: Cascade)
   test               Test                @relation(fields: [testId], references: [id])
-  package            Package?            @relation(fields: [packageId], references: [id], onDelete: Cascade)
   testResults        TestResult[]
   statusHistory      TestStatusHistory[]
 
@@ -186,12 +185,11 @@ model Test {
   updatedAt              DateTime            @updatedAt
   linkedTestIds          String?             @db.Text
   testparameters         testparameters[]
-  doctorCharges          DoctorTestCharge[]
+  doctorTestCharges      DoctorTestCharge[]
   packageTests           PackageTest[]
   patientTests           PatientTest[]
   categories             TestCategory[]
   charges                TestCharge[]
-  doctorTestCharges      DoctorTestCharge[]
   ownedParameters        TestParameter[]     @relation("ParameterOwner")
   templates              TestTemplate[]
   department             Department          @relation(fields: [departmentId], references: [id], onDelete: Cascade)
@@ -385,14 +383,13 @@ model TestParameter {
   testparameters     testparameters[]
   testCategories     TestCategory[]
   testOwner          Test?            @relation("ParameterOwner", fields: [testId], references: [id], onDelete: Cascade)
-  units              Unit?            @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  unit               Unit?            @relation(fields: [unitId], references: [id], onDelete: Cascade)
   testResults        TestResult[]
   primaryTests       Test[]           @relation("PrimaryTestParameter")
-  unit               Unit?            @relation(fields: [unitId], references: [id], onDelete: Cascade)
+
   @@index([testId], map: "test_parameters_testId_fkey")
   @@index([unitId], map: "test_parameters_unitId_fkey")
   @@index([parameterCode])
-  @@index([unitId], map: "test_parameters_unitId_fkey")
   @@map("test_parameters")
 }
 
