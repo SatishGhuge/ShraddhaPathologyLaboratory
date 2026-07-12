@@ -12,15 +12,16 @@ model Admin {
   username       String          @unique
   email          String          @unique
   password       String
+  adminName      String?
   role           String          @default("ADMIN")
+  organizationId String?
   isActive       Boolean         @default(true)
   createdAt      DateTime        @default(now())
   updatedAt      DateTime        @updatedAt
-  organizationId String?
-  organization   Organization?   @relation(fields: [organizationId], references: [id])
+  organization   Organization?   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   passwordResets PasswordReset[]
 
-  @@index([organizationId], map: "admins_organizationId_fkey")
+  @@index([organizationId])
   @@map("admins")
 }
 
@@ -38,27 +39,28 @@ model PasswordReset {
 }
 
 model Patient {
-  patientId   String        @id
-  title       String?
-  firstName   String?
-  lastName    String?
-  dob         DateTime?
-  age         Int?
-  gender      String?
-  mobile      String?
-  email       String?
-  createdBy   String?
-  address     String?       @db.Text
-  createdAt   DateTime?     @default(now())
-  updatedAt   DateTime      @updatedAt
-  location    String?       @db.VarChar(255)
-  tests       PatientTest[]
+  patientId         String        @id
+  title             String?
+  firstName         String?
+  lastName          String?
+  dob               DateTime?
+  age               Int?
+  gender            String?
+  mobile            String?
+  email             String?
+  createdBy         String?
+  createdAtLocation String?
+  address           String?       @db.Text
+  location          String?
+  createdAt         DateTime?     @default(now())
+  updatedAt         DateTime      @updatedAt
+  tests             PatientTest[]
 
   @@index([mobile])
   @@index([email])
   @@index([firstName, lastName], map: "patients_name_idx")
   @@index([createdAt])
-  @@index([location], map: "idx_patient_location")
+  @@index([location])
   @@map("patients")
 }
 
@@ -67,12 +69,11 @@ model PatientTest {
   patientId          String
   visitId            String
   testId             Int
+  packageId          Int?
   departmentId       Int
   sample             String
   charge             Float
   status             String              @default("Registered")
-  result             String?             @db.Text
-  visitType          String?
   reportMode         String?
   referralDoctor     String?
   visitDate          DateTime?
@@ -93,7 +94,6 @@ model PatientTest {
   sampleTaken        DateTime?
   resultDate         DateTime?
   isExcluded         Boolean             @default(false)
-  packageName        String?
   attachmentPath     String?
   organizationId     String?
   lastUpdatedBy      String?
@@ -101,6 +101,7 @@ model PatientTest {
   barcode_status     String              @default("Unprinted")
   department         Department          @relation(fields: [departmentId], references: [id])
   organization       Organization?       @relation(fields: [organizationId], references: [id])
+  packages           Package?            @relation(fields: [packageId], references: [id], onDelete: Cascade)
   patient            Patient             @relation(fields: [patientId], references: [patientId], onDelete: Cascade)
   test               Test                @relation(fields: [testId], references: [id])
   testResults        TestResult[]
@@ -115,6 +116,7 @@ model PatientTest {
   @@index([visitId])
   @@index([patientId, visitId])
   @@index([patientId], map: "patient_tests_patientId_fkey")
+  @@index([packageId], map: "patient_tests_packageId_fkey")
   @@map("patient_tests")
 }
 
@@ -138,8 +140,8 @@ model Department {
   id           Int           @id @default(autoincrement())
   name         String        @unique
   code         String?
-  sortOrder    Int?
   isActive     Boolean       @default(true)
+  isDeleted    Boolean       @default(false)
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
   packages     Package[]
@@ -150,51 +152,48 @@ model Department {
 }
 
 model Test {
-  id                     Int              @id @default(autoincrement())
+  id                     Int                @id @default(autoincrement())
   name                   String
   shortName              String?
-  testCode               String?          @unique
+  testCode               String?            @unique
   departmentId           Int
   testParameterId        Int?
   testCategoryId         Int?
-  sampleType             String?
-  testMethod             String?
+  sampleTypeId           Int?
   machineName            String?
-  speciality             String?          @default("Regular")
   group                  String?
-  sortOrder              Int?
   reportHeader           String?
-  costForLab             Float?
   preparationTime        String?
   preparationType        String?
-  instructionPreparation String?          @db.Text
-  instructionPatient     String?          @db.Text
+  instructionPreparation String?            @db.Text
+  instructionPatient     String?            @db.Text
   interpretationLabel    String?
-  interpretation         String?          @db.Text
+  interpretation         String?            @db.Text
   outsourceLab           String?
-  attachFile             String?          @default("Yes")
-  profileTest            String?          @default("No")
-  isHeader               Boolean          @default(true)
-  showTestName           Boolean          @default(true)
-  isNABL                 Boolean          @default(false)
-  lineHeight             Float?
-  isActive               Boolean          @default(true)
-  isDeleted              Boolean          @default(false)
-  createdAt              DateTime         @default(now())
-  updatedAt              DateTime         @updatedAt
-  imageSize              String?          @default("800|600")
-  linkedTestIds          String?          @db.Text
+  attachFile             Boolean?           @default(false)
+  imageSize              String?            @default("800|600")
+  profileTest            Boolean            @default(false)
+  isHeader               Boolean            @default(true)
+  showTestName           Boolean            @default(true)
+  isNABL                 Boolean            @default(false)
+  lineHeight             Float?             @default(1.4)
+  isActive               Boolean            @default(true)
+  isDeleted              Boolean            @default(false)
+  createdAt              DateTime           @default(now())
+  updatedAt              DateTime           @updatedAt
+  linkedTestIds          String?            @db.Text
   testparameters         testparameters[]
+  doctorCharges          DoctorTestCharge[]
   packageTests           PackageTest[]
   patientTests           PatientTest[]
   categories             TestCategory[]
-  charges                TestCharge[]
-  doctorCharges          DoctorTestCharge[]
-  ownedParameters        TestParameter[]  @relation("ParameterOwner")
+  charges                TestCharge?
+  ownedParameters        TestParameter[]    @relation("ParameterOwner")
   templates              TestTemplate[]
-  department             Department       @relation(fields: [departmentId], references: [id], onDelete: Cascade)
-  testCategory           TestCategory?    @relation("PrimaryTestCategory", fields: [testCategoryId], references: [id])
-  testParameter          TestParameter?   @relation("PrimaryTestParameter", fields: [testParameterId], references: [id])
+  department             Department         @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+  sample_types           sample_types?      @relation(fields: [sampleTypeId], references: [id])
+  testCategory           TestCategory?      @relation("PrimaryTestCategory", fields: [testCategoryId], references: [id])
+  testParameter          TestParameter?     @relation("PrimaryTestParameter", fields: [testParameterId], references: [id])
 
   @@unique([name, departmentId])
   @@index([departmentId], map: "tests_departmentId_fkey")
@@ -202,22 +201,23 @@ model Test {
   @@index([testParameterId], map: "tests_testParameterId_fkey")
   @@index([isActive])
   @@index([name])
+  @@index([sampleTypeId], map: "tests_sampleTypeId_fkey")
   @@map("tests")
 }
 
 model Package {
-  id           Int           @id @default(autoincrement())
-  name         String
-  code         String?
-  departmentId Int
-  center       String?       @default("All Centers")
-  b2cCharge    Float         @default(0)
-  b2bCharge    Float         @default(0)
-  isActive     Boolean       @default(true)
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
-  packageTests PackageTest[]
-  department   Department    @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+  id            Int           @id @default(autoincrement())
+  name          String
+  code          String?
+  departmentId  Int
+  b2cCharge     Float         @default(0)
+  isActive      Boolean       @default(true)
+  isDeleted     Boolean       @default(false)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  packageTests  PackageTest[]
+  department    Department    @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+  patient_tests PatientTest[]
 
   @@index([departmentId], map: "packages_departmentId_fkey")
   @@map("packages")
@@ -238,7 +238,7 @@ model PackageTest {
 
 model TestCharge {
   id              Int           @id @default(autoincrement())
-  testId          Int
+  testId          Int           @unique
   organizationId  String?
   b2cCharge       Float
   b2bCharge       Float
@@ -252,25 +252,24 @@ model TestCharge {
   organization    Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   test            Test          @relation(fields: [testId], references: [id], onDelete: Cascade)
 
-  @@unique([testId, organizationId])
   @@index([organizationId], map: "test_charges_organizationId_fkey")
   @@map("test_charges")
 }
 
 model DoctorTestCharge {
-  id              Int       @id @default(autoincrement())
-  testId          Int
-  doctorId        Int
-  discountPercent Float?    @default(0)
-  discountR       Float?    @default(0)
-  discountS       Float?    @default(0)
-  effectiveFrom   DateTime  @default(now())
-  effectiveTo     DateTime?
-  isActive        Boolean   @default(true)
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
-  doctor          Doctor    @relation(fields: [doctorId], references: [id], onDelete: Cascade)
-  test            Test      @relation(fields: [testId], references: [id], onDelete: Cascade)
+  id            Int       @id @default(autoincrement())
+  testId        Int
+  doctorId      Int
+  discountR     Float?    @default(0)
+  discountS     Float?    @default(0)
+  isCustomized  Boolean   @default(false)
+  effectiveFrom DateTime  @default(now())
+  effectiveTo   DateTime?
+  isActive      Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  doctor        Doctor    @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+  test          Test      @relation(fields: [testId], references: [id], onDelete: Cascade)
 
   @@unique([testId, doctorId])
   @@index([doctorId], map: "doctor_test_charges_doctorId_fkey")
@@ -278,32 +277,32 @@ model DoctorTestCharge {
 }
 
 model Doctor {
-  id                     Int                      @id @default(autoincrement())
-  name                   String
-  degree                 String?
-  mobile                 String?
-  specialty              String?
-  isActive               Boolean                  @default(true)
-  createdAt              DateTime                 @default(now())
-  updatedAt              DateTime                 @updatedAt
-  address                String?                  @db.Text
-  allowBalance           Boolean                  @default(false)
-  compliment             Float?
-  email                  String?
-  type                   String                   @default("Doctor")
-  sendReportsViaMail     Boolean                  @default(false)
-  sendReportsViaWhatsApp Boolean                  @default(false)
-  testCharges            DoctorTestCharge[]
+  id                                                  Int                @id @default(autoincrement())
+  name                                                String
+  degree                                              String?
+  mobile                                              String?
+  specialty                                           String?
+  isActive                                            Boolean            @default(true)
+  createdAt                                           DateTime           @default(now())
+  updatedAt                                           DateTime           @updatedAt
+  address                                             String?            @db.Text
+  email                                               String?
+  type                                                String             @default("Doctor")
+  sendReportsViaMail                                  Boolean            @default(false)
+  sendReportsViaWhatsApp                              Boolean            @default(false)
+  doctor_merges_doctor_merges_sourceDoctorIdTodoctors doctor_merges[]    @relation("doctor_merges_sourceDoctorIdTodoctors")
+  doctor_merges_doctor_merges_targetDoctorIdTodoctors doctor_merges[]    @relation("doctor_merges_targetDoctorIdTodoctors")
+  testCharges                                         DoctorTestCharge[]
 
   @@map("doctors")
 }
 
 model Organization {
   id                     String            @id
-  name                   String            @unique(map: "name")
+  name                   String            @unique
   code                   String?
   location               String?
-  address                String?           @db.LongText
+  address                String?           @db.Text
   mobile                 String?
   email                  String?
   date                   DateTime?
@@ -324,6 +323,7 @@ model Organization {
 model TestParameter {
   id                 Int              @id @default(autoincrement())
   testId             Int?
+  unitId             Int?
   parameterName      String
   machineCode        String?
   multiplyBy         String?
@@ -334,12 +334,12 @@ model TestParameter {
   highPanic          Float?
   isNABL             Boolean          @default(false)
   parameterCode      String?          @unique
+  testMethod         String?
   hasFormula         Boolean          @default(false)
   formula            String?          @db.Text
   type               String           @default("Numeric")
   isMandatory        Boolean          @default(false)
   rangeType          String           @default("BySex")
-  units              String?
   displayRangeText   String?          @db.Text
   rangeText          String?          @db.Text
   textContent        String?          @db.Text
@@ -358,18 +358,19 @@ model TestParameter {
   childActive        Boolean          @default(false)
   ageRanges          String?          @db.Text
   rangeValues        String?          @db.Text
-  testMethod         String?
   isActive           Boolean          @default(true)
   createdAt          DateTime         @default(now())
   updatedAt          DateTime         @updatedAt
   testparameters     testparameters[]
   testCategories     TestCategory[]
   testOwner          Test?            @relation("ParameterOwner", fields: [testId], references: [id], onDelete: Cascade)
+  units              Unit?            @relation(fields: [unitId], references: [id], onDelete: Cascade)
   testResults        TestResult[]
   primaryTests       Test[]           @relation("PrimaryTestParameter")
 
   @@index([testId], map: "test_parameters_testId_fkey")
   @@index([parameterCode])
+  @@index([unitId], map: "test_parameters_unitId_fkey")
   @@map("test_parameters")
 }
 
@@ -377,13 +378,13 @@ model TestCategory {
   id              Int            @id @default(autoincrement())
   testId          Int
   testParameterId Int
+  categoryId      String?
   categoryName    String?
   isCategory      Boolean        @default(false)
   testMethod      String?
   sortOrder       Int?
   createdAt       DateTime       @default(now())
   updatedAt       DateTime       @updatedAt
-  categoryId      String?
   test            Test           @relation(fields: [testId], references: [id], onDelete: Cascade)
   testParameter   TestParameter  @relation(fields: [testParameterId], references: [id], onDelete: Cascade)
   testResults     TestResult[]
@@ -396,11 +397,12 @@ model TestCategory {
 }
 
 model Unit {
-  id        Int      @id @default(autoincrement())
-  symbol    String   @unique
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id              Int             @id @default(autoincrement())
+  symbol          String          @unique
+  isActive        Boolean         @default(true)
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  test_parameters TestParameter[]
 
   @@map("units")
 }
@@ -409,14 +411,16 @@ model TestTemplate {
   id             Int           @id @default(autoincrement())
   testId         Int
   testCategoryId Int?
-  templateName   String        @db.Text
+  templateName   String        @db.VarChar(255)
   parameters     String?       @db.Text
   isActive       Boolean       @default(true)
+  isDeleted      Boolean       @default(false)
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
   testCategory   TestCategory? @relation(fields: [testCategoryId], references: [id])
   test           Test          @relation(fields: [testId], references: [id], onDelete: Cascade)
 
+  @@unique([testId, templateName])
   @@index([testCategoryId], map: "test_templates_testCategoryId_fkey")
   @@index([testId], map: "test_templates_testId_fkey")
   @@map("test_templates")
@@ -430,9 +434,6 @@ model TestResult {
   numericValue    Float?
   textValue       String?
   selectedOption  String?
-  isAbnormal      Boolean       @default(false)
-  isOutOfRange    Boolean       @default(false)
-  isPanic         Boolean       @default(false)
   lowValue        Float?
   highValue       Float?
   referenceRange  String?
@@ -463,30 +464,18 @@ model testparameters {
   @@map("_testparameters")
 }
 
-model sample_type {
-  id           Int    @id @default(autoincrement())
-  Sample_Type  String @unique(map: "Sample_Type_Sample_Type_key")
-  Sample_Color String
-}
-
 model Role {
-  id                  Int      @id @default(autoincrement())
-  name                String   @unique
-  codeName            String   @unique
-  roleLanding         String   @default("dashboard")
-  viewFinancialDays   Int      @default(30)
-  discountPermissible Boolean  @default(false)
-  showB2B             Boolean  @default(false)
-  isActive            Boolean  @default(true)
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
+  id        Int      @id @default(autoincrement())
+  name      String   @unique
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@map("roles")
 }
 
 model User {
   id                   Int                    @id @default(autoincrement())
-  center               String
   name                 String
   username             String                 @unique
   role                 String
@@ -501,7 +490,7 @@ model User {
   organizationId       String?
   moduleAllocation     ModuleAllocation?
   user_password_resets user_password_resets[]
-  organization         Organization?          @relation(fields: [organizationId], references: [id])
+  organization         Organization?          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   @@index([organizationId], map: "users_organizationId_fkey")
   @@map("users")
@@ -524,20 +513,17 @@ model PaymentTransaction {
 }
 
 model Signature {
-  id             Int       @id @default(autoincrement())
+  id             Int      @id @default(autoincrement())
   specialty      String
   doctorName     String?
-  signatureText  String?   @db.Text
-  signatureImage String?   @db.Text
-  activeFrom     DateTime?
-  expiredOn      DateTime?
-  width          Int?      @default(150)
-  height         Int?      @default(80)
-  sortOrder      Int?      @default(1)
-  isActive       Boolean   @default(true)
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
-  imageSize      String?   @default("800|600")
+  signatureText  String?  @db.Text
+  signatureImage String?  @db.Text
+  imageSize      String?  @default("800|600")
+  width          Int?     @default(150)
+  height         Int?     @default(80)
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
   @@map("signatures")
 }
@@ -548,7 +534,7 @@ model ModuleAllocation {
   organizationId String?       @unique
   modules        String?       @db.LongText
   createdAt      DateTime      @default(now())
-  updatedAt      DateTime      @updatedAt
+  updatedAt      DateTime      @default(now()) @updatedAt
   organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   user           User?         @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -567,4 +553,29 @@ model user_password_resets {
   users     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId], map: "user_password_resets_userId_fkey")
+}
+
+model doctor_merges {
+  id                                            Int      @id @default(autoincrement())
+  sourceDoctorId                                Int
+  targetDoctorId                                Int
+  sourceDoctorName                              String
+  targetDoctorName                              String
+  recordsUpdated                                Int      @default(0)
+  chargesUpdated                                Int      @default(0)
+  mergedAt                                      DateTime @default(now())
+  mergedBy                                      String?
+  doctors_doctor_merges_sourceDoctorIdTodoctors Doctor   @relation("doctor_merges_sourceDoctorIdTodoctors", fields: [sourceDoctorId], references: [id], onDelete: Cascade)
+  doctors_doctor_merges_targetDoctorIdTodoctors Doctor   @relation("doctor_merges_targetDoctorIdTodoctors", fields: [targetDoctorId], references: [id], onDelete: Cascade)
+
+  @@index([mergedAt])
+  @@index([sourceDoctorId])
+  @@index([targetDoctorId])
+}
+
+model sample_types {
+  id           Int    @id @default(autoincrement())
+  Sample_Type  String @unique(map: "Sample_Type_Sample_Type_key")
+  Sample_Color String
+  tests        Test[]
 }
