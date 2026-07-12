@@ -2,15 +2,13 @@
 
 import React, { useState, useEffect } from 'react';
 import Header from "@/src/components/Header";
-import PageHeader from "@/src/components/BreadCrumb";
 import { Search, Plus, Edit, Trash2, RotateCcw, FileSignature, X } from 'lucide-react';
 
 const API = process.env.NEXT_PUBLIC_API_URL || '/api';
 
 const empty = {
-  specialty: '', doctorName: '', signatureText: '', signatureImage: null as string | null,
-  signatureFile: null, activeFrom: '', expiredOn: '',
-  width: 150, height: 80, sortOrder: 1, isActive: true
+  doctorName: '', signatureText: '', signatureImage: null as string | null,
+  signatureFile: null, width: 150, height: 80, isActive: true
 };
 
 const SignatureList = () => {
@@ -34,16 +32,12 @@ const SignatureList = () => {
 
   const handleEdit = (sig: any) => {
     setFormData({
-      specialty: sig.specialty || '',
       doctorName: sig.doctorName || '',
       signatureText: sig.signatureText || '',
       signatureImage: sig.signatureImage || null,
       signatureFile: null,
-      activeFrom: sig.activeFrom ? sig.activeFrom.slice(0, 10) : '',
-      expiredOn: sig.expiredOn ? sig.expiredOn.slice(0, 10) : '',
       width: sig.width || 150,
       height: sig.height || 80,
-      sortOrder: sig.sortOrder || 1,
       isActive: sig.isActive
     });
     setImagePreview(sig.signatureImage || null);
@@ -91,17 +85,13 @@ const SignatureList = () => {
   };
 
   const handleSave = async () => {
-    if (!formData.specialty) { alert('Specialty is required'); return; }
+    if (!formData.doctorName) { alert('Doctor Name is required'); return; }
     const payload = {
-      specialty: formData.specialty,
       doctorName: formData.doctorName,
       signatureText: formData.signatureText,
       signatureImage: formData.signatureImage,
-      activeFrom: formData.activeFrom || null,
-      expiredOn: formData.expiredOn || null,
       width: formData.width,
       height: formData.height,
-      sortOrder: formData.sortOrder,
       isActive: formData.isActive
     };
     const url = isEditMode ? `${API}/signatures/${editingId}` : `${API}/signatures`;
@@ -121,15 +111,13 @@ const SignatureList = () => {
   };
 
   const filtered = signatures.filter(s =>
-    s.specialty?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     s.doctorName?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   return (
     <>
       <Header />
-      <div className="w-full px-3 sm:px-6 mt-4">
-        <PageHeader title="Signature List" icon={FileSignature} path="Configuration" />
+      <div className="w-full px-3 sm:px-6">
 
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 mb-4">
           <div className="px-4 py-3 bg-gray-50 border-b flex flex-wrap gap-2">
@@ -149,7 +137,7 @@ const SignatureList = () => {
             <table className="w-full min-w-max text-sm">
               <thead className="bg-gradient-to-r from-slate-800 via-primary-700 to-primary-600 text-white">
                 <tr>
-                  {['Specialty','Doctor','Signature Text','Active From','Expired On','W','H','Sort','Status','Action'].map(h => (
+                  {['Doctor','Signature Text','W','H','Status','Action'].map(h => (
                     <th key={h} className="px-3 py-2 text-left text-xs font-semibold whitespace-nowrap">{h}</th>
                   ))}
                 </tr>
@@ -157,17 +145,13 @@ const SignatureList = () => {
               <tbody className="divide-y divide-gray-200">
                 {filtered.map((sig, i) => (
                   <tr key={sig.id} className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                    <td className="px-3 py-2 text-xs">{sig.specialty}</td>
                     <td className="px-3 py-2 text-xs">{sig.doctorName}</td>
                     <td className="px-3 py-2 text-xs max-w-[180px]">
                       <div className="whitespace-pre-line line-clamp-2">{sig.signatureText}</div>
                       {sig.signatureImage && <img src={sig.signatureImage} alt="sig" style={{ width: sig.width || 100, height: sig.height || 50, objectFit: 'contain' }} className="mt-1" />}
                     </td>
-                    <td className="px-3 py-2 text-xs">{sig.activeFrom ? new Date(sig.activeFrom).toLocaleDateString('en-GB') : ''}</td>
-                    <td className="px-3 py-2 text-xs">{sig.expiredOn ? new Date(sig.expiredOn).toLocaleDateString('en-GB') : ''}</td>
                     <td className="px-3 py-2 text-xs">{sig.width}</td>
                     <td className="px-3 py-2 text-xs">{sig.height}</td>
-                    <td className="px-3 py-2 text-xs">{sig.sortOrder}</td>
                     <td className="px-3 py-2 text-xs">
                       <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${sig.isActive ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
                         {sig.isActive ? 'Active' : 'Inactive'}
@@ -198,7 +182,6 @@ const SignatureList = () => {
             </div>
             <div className="px-5 py-4 space-y-3 text-sm">
               {[
-                { label: 'Specialty *', name: 'specialty', type: 'select', options: ['Regular','Pathology','Cardiology','Microbiology','Biochemistry','Culture & Sensitivity','Haematology'] },
                 { label: 'Doctor Name', name: 'doctorName', type: 'text' },
               ].map((f: any) => (
                 <div key={f.name} className="grid grid-cols-3 gap-3 items-center">
@@ -239,11 +222,8 @@ const SignatureList = () => {
               </div>
 
               {[
-                { label: 'Active From', name: 'activeFrom', type: 'date' },
-                { label: 'Expired On', name: 'expiredOn', type: 'date' },
                 { label: 'Width (px)', name: 'width', type: 'number' },
                 { label: 'Height (px)', name: 'height', type: 'number' },
-                { label: 'Sort Order', name: 'sortOrder', type: 'number' },
               ].map(f => (
                 <div key={f.name} className="grid grid-cols-3 gap-3 items-center">
                   <label className="font-semibold text-gray-700">{f.label}</label>

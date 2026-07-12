@@ -1,7 +1,7 @@
 import express from 'express';
 import {
   getDepartments, getAllDepartments, getDepartmentById, createDepartment, updateDepartment, deleteDepartment,
-  getDoctors, getDoctorById, createDoctor, updateDoctor, deleteDoctor,
+  getDoctors, getDoctorById, createDoctor, updateDoctor, deleteDoctor, findDuplicateDoctors, getDoctorMergeHistory, mergeDoctors,
   getOrganizations, createOrganization, updateOrganization, deleteOrganization, getOrganizationById,
   getTests, getTestById, createTest, updateTest, deleteTest,
   getSeedDataSummary,
@@ -11,7 +11,7 @@ import {
   searchParameters,
   getUnits, getUnitById, createUnit, updateUnit, deleteUnit,
   createTestParameter, createTestCategory, createTestCategoryWithParameter,
-  getTemplates, getTemplateById, createTemplate, updateTemplate, deleteTemplate,
+  getTemplates, getTemplateById, getTemplatesByTestId, createTemplate, updateTemplate, deleteTemplate,
   getSpecimenTypes, getSpecimenTypeById, createSpecimenType, updateSpecimenType, deleteSpecimenType,
   getRoles, getRoleById, createRole, updateRole, deleteRole,
   getUsers, getUserById, createUser, updateUser, deleteUser,
@@ -32,7 +32,10 @@ router.delete('/departments/:id', deleteDepartment);
 
 // Doctor routes
 router.get('/doctors', getDoctors);
+router.get('/doctors/find-duplicates', findDuplicateDoctors);
+router.post('/doctors/merge', mergeDoctors);
 router.get('/doctors/:id', getDoctorById);
+router.get('/doctors/:doctorId/merge-history', getDoctorMergeHistory);
 router.post('/doctors', createDoctor);
 router.put('/doctors/:id', updateDoctor);
 router.delete('/doctors/:id', deleteDoctor);
@@ -89,8 +92,9 @@ router.post('/test-parameters', createTestParameter);
 router.post('/test-categories', createTestCategory);
 router.post('/test-categories-with-parameter', createTestCategoryWithParameter);
 
-// Template routes
+// Template routes — specific before parameterized
 router.get('/templates', getTemplates);
+router.get('/templates/by-test/:testId', getTemplatesByTestId);
 router.get('/templates/:id', getTemplateById);
 router.post('/templates', createTemplate);
 router.put('/templates/:id', updateTemplate);
@@ -102,6 +106,13 @@ router.get('/specimen-types/:id', getSpecimenTypeById);
 router.post('/specimen-types', createSpecimenType);
 router.put('/specimen-types/:id', updateSpecimenType);
 router.delete('/specimen-types/:id', deleteSpecimenType);
+
+// Sample type routes (alias for specimen types - same table)
+router.get('/sample-types', getSpecimenTypes);
+router.get('/sample-types/:id', getSpecimenTypeById);
+router.post('/sample-types', createSpecimenType);
+router.put('/sample-types/:id', updateSpecimenType);
+router.delete('/sample-types/:id', deleteSpecimenType);
 
 // Role routes
 router.get('/roles', getRoles);

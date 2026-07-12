@@ -25,7 +25,8 @@ const DepartmentTable = () => {
       setLoading(true);
       setError("");
       
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/master/departments?page=${page}&limit=${ITEMS_PER_PAGE}`);
+      // Use /all endpoint to get both active and inactive departments
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/master/departments/all?page=${page}&limit=${ITEMS_PER_PAGE}`);
       const result = await response.json();
       
       if (result.success) {
@@ -49,6 +50,9 @@ const DepartmentTable = () => {
   };
 
   const filteredDepartments = departments.filter((dept) => {
+    // Exclude deleted items from all views
+    if (dept.isDeleted) return false;
+    
     // When "Show Inactive" is checked, show ONLY inactive departments
     if (showInactive && dept.isActive) return false;
     
@@ -63,18 +67,31 @@ const DepartmentTable = () => {
   });
 
   const handleDelete = async (id: string, name: string) => {
-    if (window.confirm(`Are you sure you want to delete the department "${name}"?`)) {
+    if (window.confirm(`Are you sure you want to permanently delete "${name}"?\n\nThis will remove it from all lists but keep it in the database.`)) {
       try {
         setLoading(true);
         
+        const currentDept = departments.find((d) => d.id === id);
+        const updateData = {
+          ...currentDept,
+          isDeleted: true
+        };
+        Object.keys(updateData).forEach(key => {
+          if (updateData[key] === undefined) delete updateData[key];
+        });
+        
         const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/master/departments/${id}`, {
-          method: 'DELETE'
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(updateData)
         });
         
         const result = await response.json();
         
         if (result.success) {
-          alert('Department deleted successfully!');
+          alert('Department deleted permanently!');
           fetchDepartments(); // Refresh the list
         } else {
           alert(`Error: ${result.message}`);
@@ -102,14 +119,22 @@ const DepartmentTable = () => {
     try {
       setLoading(true);
       
+      // Preserve all existing data, only toggle isActive
+      const updateData = {
+        ...currentDept,
+        isActive: !currentDept.isActive
+      };
+      // Remove undefined/null fields that might cause issues
+      Object.keys(updateData).forEach(key => {
+        if (updateData[key] === undefined) delete updateData[key];
+      });
+      
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/master/departments/${id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({
-          isActive: !currentDept.isActive
-        })
+        body: JSON.stringify(updateData)
       });
       
       const result = await response.json();
@@ -207,20 +232,19 @@ const DepartmentTable = () => {
               <th className="border border-gray-300 px-3 py-1 text-left font-semibold">Id</th>
               <th className="border border-gray-300 px-3 py-1 text-left font-semibold">Name</th>
               <th className="border border-gray-300 px-3 py-1 text-left font-semibold">Code</th>
-              <th className="border border-gray-300 px-3 py-1 text-left font-semibold">Sort Order</th>
               <th className="border border-gray-300 px-3 py-1 text-left font-semibold">Active</th>
               <th className="border border-gray-300 px-3 py-1 text-left font-semibold">Action</th>
             </tr>
           </thead>
           <tbody>
-            {departments.length === 0 ? (
+            {filteredDepartments.length === 0 ? (
               <tr>
-                <td colSpan={6} className="text-center py-8 text-gray-500 border border-gray-300">
+                <td colSpan={5} className="text-center py-8 text-gray-500 border border-gray-300">
                   No departments found.
                 </td>
               </tr>
             ) : (
-              departments.map((dept, index) => (
+              filteredDepartments.map((dept, index) => (
                 <tr 
                   key={dept.id} 
                   className={`hover:bg-gray-50 border-b border-gray-200 ${
@@ -232,7 +256,6 @@ const DepartmentTable = () => {
                   </td>
                   <td className="border border-gray-300 px-3 py-1">{dept.name}</td>
                   <td className="border border-gray-300 px-3 py-1">{dept.code || '-'}</td>
-                  <td className="border border-gray-300 px-3 py-1">{dept.sortOrder || '-'}</td>
                   
                   {/* Active column - just display text */}
                   <td className="border border-gray-300 px-3 py-1 text-center font-semibold text-sm">

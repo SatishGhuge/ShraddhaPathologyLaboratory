@@ -5,9 +5,12 @@ import { useRouter, useParams, useSearchParams } from "next/navigation";
 import React, { useState, useEffect, useCallback, useRef } from "react";
 
 import Header from "@/src/components/Header";
-import { getPatientTestById } from "@/src/api/result.js";
-import { updateTestStatus } from "@/src/api/result.js";
+import { getPatientTestById, updateTestStatus, updatePatientComments } from "@/src/api/result.js";
 import API_BASE_URL from "@/src/api/config";
+import { useTestTemplates } from '@/src/hooks/useTestTemplates';
+import InlineTemplateSelector from '@/app/components/InlineTemplateSelector';
+import { CKEditor } from '@ckeditor/ckeditor5-react';
+import ClassicEditor from '@ckeditor/ckeditor5-build-classic';
 const LetterHead = "/LetterHead.jpeg";
 
 // Autocomplete text input with suggestion dropdown and multi-select tags
@@ -87,6 +90,9 @@ const PatientResult = () => {
   
   const router = useRouter();
 
+  // Initialize template hook
+  const { templateCache, fetchTemplatesForTests, getTemplates } = useTestTemplates();
+
   const [loading, setLoading] = useState(true);
   const [multipleTestIds, setMultipleTestIds] = useState<string[]>([]); // For multiple tests
   const [allTestsData, setAllTestsData] = useState<any[]>([]); // For multiple tests
@@ -101,6 +107,7 @@ const PatientResult = () => {
   const [attachedFile, setAttachedFile] = useState<any>(null);
   const [attachedFileUrl, setAttachedFileUrl] = useState<any>(null);
   const [showComment, setShowComment] = useState(false);
+  const [comments, setComments] = useState('');
   const [defaultSignature, setDefaultSignature] = useState<any>(null);
 
   const calculateAge = (dob: any) => {
@@ -188,6 +195,81 @@ const PatientResult = () => {
     return parseFloat(numericValue) < range.low || parseFloat(numericValue) > range.high;
   };
 
+  const getRangeIndicator = (param: any, numericValue: any) => {
+    if (param.type !== 'Numeric' || numericValue === null || numericValue === undefined || numericValue === '') return null;
+    const rangeStr = getAgeAppropriateRange(param, patientData?.patient?.age, patientData?.patient?.gender, patientData?.patient?.dob);
+    const range = parseRange(rangeStr);
+    if (!range) return null;
+    const value = parseFloat(numericValue);
+    if (value < range.low) return { icon: '↓', title: 'Below range', color: 'text-blue-600' };
+    if (value > range.high) return { icon: '↑', title: 'Above range', color: 'text-red-600' };
+    return null;
+  };
+
+  // Check if any parameter has units or reference range in report
+  const shouldShowUnitsColumn = (paramGrouped = groupedParameters) => {
+    try {
+      if (!paramGrouped || Object.keys(paramGrouped).length === 0) return false;
+      
+      const hasUnits = Object.values(paramGrouped).some((categoryParams: any) =>
+        (categoryParams as any[]).some(param => {
+          // Check if parameter has actual non-empty unit value
+          return param.units && param.units.trim() !== '' && param.units !== '-';
+        })
+      );
+      console.log('🔍 shouldShowUnitsColumn:', hasUnits, 'groupedParams:', Object.keys(paramGrouped));
+      return hasUnits;
+    } catch (e) {
+      console.error('Error in shouldShowUnitsColumn:', e);
+      return false;
+    }
+  };
+
+  const shouldShowReferenceRangeColumn = (paramGrouped = groupedParameters) => {
+    try {
+      if (!paramGrouped || Object.keys(paramGrouped).length === 0) return false;
+      
+      const hasRange = Object.values(paramGrouped).some((categoryParams: any) =>
+        (categoryParams as any[]).some(param => {
+          if (param.type === 'Text' || param.isDescriptive) return false; // Don't show for text/descriptive
+          const rangeStr = getAgeAppropriateRange(param, patientData?.patient?.age, patientData?.patient?.gender, patientData?.patient?.dob);
+          // Only return true if range has actual content
+          return rangeStr && rangeStr.trim() !== '' && rangeStr !== '-' && rangeStr !== param.normalRange?.trim?.();
+        })
+      );
+      console.log('🔍 shouldShowReferenceRangeColumn:', hasRange);
+      return hasRange;
+    } catch (e) {
+      console.error('Error in shouldShowReferenceRangeColumn:', e);
+      return false;
+    }
+  };
+
+  // Helper to check if text contains HTML
+  const hasHtmlTags = (text: string) => {
+    if (!text) return false;
+    const hasHtml = /<[^>]*>/.test(text);
+    if (hasHtml) console.log('✅ HTML detected in:', text.substring(0, 50));
+    return hasHtml;
+  };
+
+  // Helper to decode HTML entities
+  const decodeHtmlEntities = (text: string) => {
+    if (!text) return '';
+    const textArea = document.createElement('textarea');
+    textArea.innerHTML = text;
+    return textArea.value;
+  };
+
+  // Helper to sanitize and clean HTML display
+  const sanitizeHtml = (html: string) => {
+    if (!html) return '';
+    // Decode entities first
+    let decoded = decodeHtmlEntities(html);
+    // Remove script tags for safety
+    return decoded.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '');
+  };
+
   const evaluateFormula = useCallback((formula, allParams, currentResults) => {
     if (!formula) return null;
     try {
@@ -251,8 +333,8 @@ const PatientResult = () => {
         });
         setResults(initialResults);
 
-        // Auto set to PROVISIONAL when page is opened (if still REGISTERED)
-        if (data.patientTest.status === 'REGISTERED') {
+        // Auto set to next status when page is opened (if still RECEIVED)
+        if (data.patientTest.status === 'RECEIVED') {
           await updateTestStatus(data.patientTest.id, { status: 'PROVISIONAL' });
         }
       }
@@ -303,10 +385,10 @@ const PatientResult = () => {
       });
       setResults(initialResults);
 
-      // Auto-transition all tests to PROVISIONAL
+      // Auto-transition all tests to next status
       await Promise.all(
         validTests.map(testData => {
-          if (testData.patientTest.status === 'REGISTERED') {
+          if (testData.patientTest.status === 'RECEIVED') {
             return updateTestStatus(testData.patientTest.id, { status: 'PROVISIONAL' });
           }
         })
@@ -318,6 +400,51 @@ const PatientResult = () => {
       setLoading(false);
     }
   };
+
+  // Fetch templates for all tests when data loads
+  // Also auto-transition to VALIDATED if only 1 template exists
+  useEffect(() => {
+    if (allTestsData && allTestsData.length > 0) {
+      // Multiple tests - fetch templates for all
+      const testIds = allTestsData.map(td => td.patientTest.testId);
+      if (testIds.length > 0) {
+        fetchTemplatesForTests(testIds);
+        
+        // Check each test and auto-transition if only 1 template exists
+        testIds.forEach(testId => {
+          setTimeout(() => {
+            const templates = getTemplates(testId)?.templates || [];
+            if (templates.length === 1) {
+              console.log(`📋 Test ${testId} has only 1 template, auto-transitioning to VALIDATION stage (skipping ENTERED)...`);
+              // Auto-transition to VALIDATION (skip ENTERED) if only 1 template
+              const testData = allTestsData.find(td => td.patientTest.testId === testId);
+              if (testData?.patientTest?.status === 'RECEIVED') {
+                updateTestStatus(testData.patientTest.id, { status: 'VALIDATED' }).catch(err => 
+                  console.error('Error auto-transitioning to VALIDATION:', err)
+                );
+              }
+            }
+          }, 500);
+        });
+      }
+    } else if (patientData && patientData.testId) {
+      // Single test - fetch template
+      fetchTemplatesForTests([patientData.testId]);
+      
+      // Check and auto-transition if only 1 template exists
+      setTimeout(() => {
+        const templates = getTemplates(patientData.testId)?.templates || [];
+        if (templates.length === 1) {
+          console.log(`📋 Test ${patientData.testId} has only 1 template, auto-transitioning to VALIDATION stage (skipping ENTERED)...`);
+          if (patientData.status === 'RECEIVED') {
+            updateTestStatus(patientData.id, { status: 'VALIDATED' }).catch(err => 
+              console.error('Error auto-transitioning to VALIDATION:', err)
+            );
+          }
+        }
+      }, 500);
+    }
+  }, [patientData, allTestsData, fetchTemplatesForTests, getTemplates]);
 
   const handleResultChange = (parameterId, field, value, allParams) => {
     setResults(prev => {
@@ -336,7 +463,92 @@ const PatientResult = () => {
     setResults(prev => ({ ...prev, [parameterId]: { ...prev[parameterId], isAbnormal: !prev[parameterId]?.isAbnormal } }));
   };
 
-  // Save all tests at once (for multiple tests)
+  // Handle template selection - populate editor with template values
+  const handleTemplateSelect = (template: any, testId: number, isSingleTest: boolean = true) => {
+    try {
+      console.log('📋 Template selected:', template);
+      
+      if (!template?.parameters || !Array.isArray(template.parameters)) {
+        console.warn('⚠️ Template has no parameters');
+        alert('Template has no parameters to populate');
+        return;
+      }
+
+      // Create a mapping from parameter ID to template value
+      const templateValueMap = {};
+      template.parameters.forEach((param: any) => {
+        templateValueMap[param.id] = {
+          numericValue: param.value && !isNaN(parseFloat(param.value)) ? parseFloat(param.value) : null,
+          textValue: param.value && isNaN(parseFloat(param.value)) ? param.value : '',
+          isAbnormal: false,
+          referenceRange: param.unit || ''
+        };
+      });
+
+      // If single test: update results directly
+      if (isSingleTest && parameters.length > 0) {
+        setResults(prev => {
+          const updated = { ...prev };
+          parameters.forEach(param => {
+            if (templateValueMap[param.id]) {
+              updated[param.id] = templateValueMap[param.id];
+            }
+          });
+          return updated;
+        });
+        console.log('✅ Single test editor populated with template values');
+      } else if (!isSingleTest && allTestsData.length > 0) {
+        // For multiple tests: find the correct test and update its parameters
+        const testIdx = allTestsData.findIndex(td => td.patientTest.testId === testId);
+        if (testIdx === -1) {
+          console.warn('⚠️ Test not found in allTestsData');
+          return;
+        }
+
+        const testData = allTestsData[testIdx];
+        const testIdStr = multipleTestIds[testIdx];
+        
+        setResults(prev => {
+          const updated = { ...prev };
+          testData.parameters.forEach((param: any) => {
+            const paramKey = `${testIdStr}_${param.id}`;
+            if (templateValueMap[param.id]) {
+              updated[paramKey] = templateValueMap[param.id];
+            }
+          });
+          return updated;
+        });
+        console.log('✅ Multiple test editor populated with template values');
+      }
+
+      alert(`Template "${template.templateName}" values loaded into editor!`);
+    } catch (error) {
+      console.error('❌ Error loading template:', error);
+      alert('Failed to load template: ' + error.message);
+    }
+  };
+
+  // Save results - same as existing handleSave but reusable
+  const performSave = async (isMultipleTests: boolean = false) => {
+    try {
+      setSaving(true);
+      
+      if (isMultipleTests) {
+        await handleSaveAllTests();
+      } else {
+        await handleSave();
+      }
+      
+      return true;
+    } catch (error) {
+      console.error('Error saving:', error);
+      return false;
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // Save results - same as existing handleSave but reusable
   const handleSaveAllTests = async () => {
     try {
       setSaving(true);
@@ -431,6 +643,17 @@ const PatientResult = () => {
       });
       const data = await response.json();
       if (data.success) {
+        // Save comments if provided
+        if (showComment && comments.trim()) {
+          try {
+            await updatePatientComments(patientData.id, comments);
+            console.log('✅ Comments saved successfully');
+          } catch (error) {
+            console.error('⚠️ Error saving comments:', error);
+            alert('Results saved, but failed to save comments');
+          }
+        }
+        
         // Auto-transition to Entered status when first result is saved
         try {
           const transitionResponse = await fetch(`${API_BASE_URL}/results/${patientData.id}/auto-transition/result-saved`, {
@@ -578,8 +801,22 @@ const PatientResult = () => {
             {allTestsData.map((testData, testIdx) => (
               <div key={testIdx}>
                 {/* Test Name */}
-                <div className="mt-2 bg-primary-600 text-white p-2 font-semibold">
-                  {testIdx + 1}. {testData.patientTest.test.name}
+                <div className="mt-2 bg-primary-600 text-white p-2 font-semibold flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span>{testIdx + 1}. {testData.patientTest.test.name}</span>
+                    {/* Template dropdown - only show if templates exist */}
+                    {getTemplates(testData.patientTest.testId).templates && getTemplates(testData.patientTest.testId).templates.length > 0 && (
+                      <InlineTemplateSelector
+                        testId={testData.patientTest.testId}
+                        testName={testData.patientTest.test.name}
+                        templates={getTemplates(testData.patientTest.testId).templates}
+                        isLoadingTemplates={getTemplates(testData.patientTest.testId).loading}
+                        onTemplateSelect={(template) => {
+                          handleTemplateSelect(template, testData.patientTest.testId, false);
+                        }}
+                      />
+                    )}
+                  </div>
                 </div>
 
                 {/* Results Table */}
@@ -591,14 +828,13 @@ const PatientResult = () => {
                         <th className="border p-2 text-left">OBSERVED VALUE</th>
                         <th className="border p-2 text-left">UNITS</th>
                         <th className="border p-2 text-left">NORMAL RANGE</th>
-                        <th className="border p-2 text-center">FORMULA</th>
                       </tr>
                     </thead>
                     <tbody>
                       {Object.entries(testData.groupedParameters || {}).map(([categoryName, categoryParams]: [string, any]) => (
                         <React.Fragment key={categoryName}>
                           {categoryName !== 'NO_CATEGORY_HEADER' && categoryParams[0]?.showCategoryHeader && (
-                            <tr className="bg-gray-200 font-semibold"><td colSpan={5} className="p-2">{categoryName.toUpperCase()}</td></tr>
+                            <tr className="bg-gray-200 font-semibold"><td colSpan={4} className="p-2">{categoryName.toUpperCase()}</td></tr>
                           )}
                           {(categoryParams as any[]).map((param) => {
                             const paramKey = `${multipleTestIds[testIdx]}_${param.id}`;
@@ -613,45 +849,63 @@ const PatientResult = () => {
                               <tr key={param.id} className="bg-purple-100">
                                 <td className="border p-2">{param.parameterName}</td>
                                 <td className="border p-2">
-                                  {param.type === 'Numeric' ? (
-                                    <input
-                                      type="number"
-                                      value={results[paramKey]?.numericValue || ''}
-                                      onChange={(e) => handleResultChange(paramKey, 'numericValue', e.target.value, testData.parameters)}
-                                      disabled={isFormula}
-                                      className={inputClass}
-                                    />
-                                  ) : param.type === 'Text' ? (
-                                    options.length > 0 ? (
-                                      <SuggestionInput
-                                        value={results[paramKey]?.textValue || ''}
-                                        onChange={(val) => handleResultChange(paramKey, 'textValue', val, testData.parameters)}
-                                        options={options}
-                                        isAbnormal={results[paramKey]?.isAbnormal || false}
-                                      />
-                                    ) : (
+                                  <div className="flex items-center gap-2">
+                                    {param.type === 'Numeric' ? (
                                       <input
-                                        type="text"
-                                        value={results[paramKey]?.textValue || ''}
-                                        onChange={(e) => handleResultChange(paramKey, 'textValue', e.target.value, testData.parameters)}
-                                        className={`border px-2 py-1 w-32 rounded ${results[paramKey]?.isAbnormal ? "border-red-500 bg-red-50" : "border-gray-300"}`}
+                                        type="number"
+                                        value={results[paramKey]?.numericValue || ''}
+                                        onChange={(e) => handleResultChange(paramKey, 'numericValue', e.target.value, testData.parameters)}
+                                        disabled={isFormula}
+                                        className={inputClass}
                                       />
-                                    )
-                                  ) : (
-                                    <div className="text-xs italic text-gray-600">{param.type} Parameter</div>
-                                  )}
+                                    ) : param.isDescriptive ? (
+                                      <div className="border border-gray-300 rounded min-h-[150px]">
+                                        <CKEditor
+                                          editor={ClassicEditor as any}
+                                          data={results[paramKey]?.textValue || ''}
+                                          onChange={(_, editor) => {
+                                            const data = editor.getData();
+                                            handleResultChange(paramKey, 'textValue', data, testData.parameters);
+                                          }}
+                                          config={{
+                                            toolbar: [
+                                              'heading', '|',
+                                              'bold', 'italic', 'underline', '|',
+                                              'fontSize', 'fontColor', '|',
+                                              'bulletedList', 'numberedList', '|',
+                                              'link', 'blockQuote', '|',
+                                              'undo', 'redo'
+                                            ]
+                                          }}
+                                        />
+                                      </div>
+                                    ) : param.type === 'Text' ? (
+                                      options.length > 0 ? (
+                                        <SuggestionInput
+                                          value={results[paramKey]?.textValue || ''}
+                                          onChange={(val) => handleResultChange(paramKey, 'textValue', val, testData.parameters)}
+                                          options={options}
+                                          isAbnormal={results[paramKey]?.isAbnormal || false}
+                                        />
+                                      ) : (
+                                        <input
+                                          type="text"
+                                          value={results[paramKey]?.textValue || ''}
+                                          onChange={(e) => handleResultChange(paramKey, 'textValue', e.target.value, testData.parameters)}
+                                          className={`border px-2 py-1 w-32 rounded ${results[paramKey]?.isAbnormal ? "border-red-500 bg-red-50" : "border-gray-300"}`}
+                                        />
+                                      )
+                                    ) : (
+                                      <div className="text-xs italic text-gray-600">{param.type} Parameter</div>
+                                    )}
+                                    {(() => {
+                                      const indicator = getRangeIndicator(param, results[paramKey]?.numericValue);
+                                      return indicator ? <span className={`font-bold text-xs ${indicator.color}`} title={indicator.title}>{indicator.icon}</span> : null;
+                                    })()}
+                                  </div>
                                 </td>
                                 <td className="border p-2 text-xs">{param.units || '-'}</td>
                                 <td className="border p-2 text-xs">{getAgeAppropriateRange(param, patientData.patient?.age, patientData.patient?.gender, patientData.patient?.dob)}</td>
-                                <td className="border p-2 text-center">
-                                  <input
-                                    type="checkbox"
-                                    checked={results[paramKey]?.isAbnormal || false}
-                                    onChange={() => handleAbnormalChange(paramKey)}
-                                    className="cursor-pointer"
-                                    disabled={isFormula}
-                                  />
-                                </td>
                               </tr>
                             );
                           })}
@@ -666,7 +920,23 @@ const PatientResult = () => {
         ) : (
           <>
             {/* Test Name - Single Test */}
-            <div className="mt-2 bg-primary-600 text-white p-2 font-semibold">{patientData.test.name}</div>
+            <div className="mt-2 bg-primary-600 text-white p-2 font-semibold flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span>{patientData.test.name}</span>
+                {/* Template dropdown - only show if templates exist */}
+                {getTemplates(patientData.testId).templates && getTemplates(patientData.testId).templates.length > 0 && (
+                  <InlineTemplateSelector
+                    testId={patientData.testId}
+                    testName={patientData.test.name}
+                    templates={getTemplates(patientData.testId).templates}
+                    isLoadingTemplates={getTemplates(patientData.testId).loading}
+                    onTemplateSelect={(template) => {
+                      handleTemplateSelect(template, patientData.testId, true);
+                    }}
+                  />
+                )}
+              </div>
+            </div>
 
             {/* Results Table - Single Test */}
             <div className="mt-3 bg-white border">
@@ -677,14 +947,13 @@ const PatientResult = () => {
                     <th className="border p-2 text-left">OBSERVED VALUE</th>
                     <th className="border p-2 text-left">UNITS</th>
                     <th className="border p-2 text-left">NORMAL RANGE</th>
-                    <th className="border p-2 text-center">FORMULA</th>
                   </tr>
                 </thead>
                 <tbody>
                   {Object.entries(groupedParameters).map(([categoryName, categoryParams]: [string, any]) => (
                     <React.Fragment key={categoryName}>
                       {categoryName !== 'NO_CATEGORY_HEADER' && categoryParams[0]?.showCategoryHeader && (
-                        <tr className="bg-gray-200 font-semibold"><td colSpan={5} className="p-2">{categoryName.toUpperCase()}</td></tr>
+                        <tr className="bg-gray-200 font-semibold"><td colSpan={4} className="p-2">{categoryName.toUpperCase()}</td></tr>
                       )}
                       {(categoryParams as any[]).map((param) => {
                         const outOfRange = isValueOutOfRange(param, results[param.id]?.numericValue);
@@ -695,17 +964,34 @@ const PatientResult = () => {
                             <td className="border p-2">{param.parameterName}{param.isMandatory && <span className="text-red-500">*</span>}</td>
                             <td className="border p-2">
                               <div className="flex items-center gap-2">
-                                {!isFormula && <input type="checkbox" checked={results[param.id]?.isAbnormal || false} onChange={() => handleAbnormalChange(param.id)} title="Mark as abnormal" />}
                                 {isFormula ? (
                                   <div className="flex items-center gap-1">
-                                    <input type="checkbox" checked={results[param.id]?.isAbnormal || false} onChange={() => handleAbnormalChange(param.id)} title="Mark as abnormal" />
                                     <input type="text" readOnly value={results[param.id]?.numericValue ?? ''} className={`${inputClass} bg-green-50 border-green-400 cursor-not-allowed`} title={`Auto-calculated: ${param.formula}`} />
                                     <span className="text-xs text-green-700 italic">auto</span>
                                   </div>
                                 ) : param.type === 'Numeric' ? (
                                   <input type="number" step="0.01" value={results[param.id]?.numericValue ?? ''} onChange={(e) => handleResultChange(param.id, 'numericValue', e.target.value === '' ? null : parseFloat(e.target.value), parameters)} className={inputClass} />
                                 ) : param.isDescriptive ? (
-                                  <textarea value={results[param.id]?.textValue || ''} onChange={(e) => handleResultChange(param.id, 'textValue', e.target.value, parameters)} className={`border px-2 py-1 w-48 h-16 rounded ${results[param.id]?.isAbnormal ? "border-red-500 bg-red-50" : "border-gray-300"}`} />
+                                  <div className="border border-gray-300 rounded min-h-[150px]">
+                                    <CKEditor
+                                      editor={ClassicEditor as any}
+                                      data={results[param.id]?.textValue || ''}
+                                      onChange={(_, editor) => {
+                                        const data = editor.getData();
+                                        handleResultChange(param.id, 'textValue', data, parameters);
+                                      }}
+                                      config={{
+                                        toolbar: [
+                                          'heading', '|',
+                                          'bold', 'italic', 'underline', '|',
+                                          'fontSize', 'fontColor', '|',
+                                          'bulletedList', 'numberedList', '|',
+                                          'link', 'blockQuote', '|',
+                                          'undo', 'redo'
+                                        ]
+                                      }}
+                                    />
+                                  </div>
                                 ) : (
                                   (() => {
                                     const rawRange = param.rangeText || param.displayRangeText || '';
@@ -724,21 +1010,14 @@ const PatientResult = () => {
                                     );
                                   })()
                                 )}
-                                {outOfRange && <span className="text-red-600 font-bold text-xs" title="Out of range">↑↓</span>}
+                                {(() => {
+                                  const indicator = getRangeIndicator(param, results[param.id]?.numericValue);
+                                  return indicator ? <span className={`font-bold text-xs ${indicator.color}`} title={indicator.title}>{indicator.icon}</span> : null;
+                                })()}
                               </div>
                             </td>
                             <td className="border p-2">{param.units || ''}</td>
                             <td className="border p-2">{param.type === 'Text' || param.isDescriptive ? (param.normalRange || '') : getAgeAppropriateRange(param, patientData.patient.age, patientData.patient.gender, patientData.patient.dob)}</td>
-                            <td className="border p-2 text-center text-xs">
-                              {param.hasFormula && param.formula ? (
-                                <div className="bg-green-50 border border-green-300 rounded p-1">
-                                  <div className="font-semibold text-green-700 text-xs mb-0.5">Formula:</div>
-                                  <div className="text-green-900 font-mono text-xs break-words">{param.formula}</div>
-                                </div>
-                              ) : (
-                                <span className="text-gray-400">-</span>
-                              )}
-                            </td>
                           </tr>
                         );
                       })}
@@ -761,8 +1040,22 @@ const PatientResult = () => {
                   onChange={(e) => setShowComment(e.target.checked)}
                   className="w-4 h-4"
                 />
-                <label htmlFor="show-comment" className="text-sm text-gray-700 cursor-pointer">Comment</label>
+                <label htmlFor="show-comment" className="text-sm text-gray-700 cursor-pointer">Add Comments/Notes</label>
               </div>
+              
+              {/* Comments Text Area - Show when checkbox is checked */}
+              {showComment && (
+                <div className="mb-3">
+                  <textarea
+                    value={comments}
+                    onChange={(e) => setComments(e.target.value)}
+                    placeholder="Enter comments or notes to be printed on the report..."
+                    className="w-full border border-gray-300 rounded px-3 py-2 text-sm font-normal"
+                    rows={4}
+                  />
+                </div>
+              )}
+              
               <div className="flex items-center gap-2">
                 <input
                   type="file"
@@ -843,6 +1136,16 @@ const PatientResult = () => {
                     .no-print { display: none !important; }
                     @page { size: A4; margin: 0; }
                   }
+                  #pr-report-page b, #pr-report-page strong { font-weight: bold !important; display: inline !important; }
+                  #pr-report-page i, #pr-report-page em { font-style: italic !important; display: inline !important; }
+                  #pr-report-page u { text-decoration: underline !important; display: inline !important; }
+                  #pr-report-page p { margin: 2px 0 !important; line-height: 1.4 !important; display: block !important; white-space: normal !important; }
+                  #pr-report-page ul, #pr-report-page ol { margin: 2px 0 !important; padding-left: 20px !important; display: block !important; }
+                  #pr-report-page li { margin: 2px 0 !important; display: list-item !important; }
+                  #pr-report-page a { color: #0066cc !important; text-decoration: underline !important; display: inline !important; }
+                  #pr-report-page td > div { white-space: normal !important; word-wrap: break-word !important; word-break: break-word !important; overflow-wrap: break-word !important; }
+                  #pr-report-page td > div * { white-space: normal !important; }
+                  #pr-report-page h1, #pr-report-page h2, #pr-report-page h3, #pr-report-page h4, #pr-report-page h5, #pr-report-page h6 { margin: 4px 0 !important; font-weight: bold !important; display: block !important; }
                 `}</style>
 
                 <div id="pr-report-page" style={{ width: '210mm', height: '297mm', margin: '16px auto', position: 'relative', backgroundColor: '#fff', boxShadow: '0 2px 16px rgba(0,0,0,0.18)', fontFamily: 'Arial, sans-serif', fontSize: '11px', overflow: 'hidden' }}>
@@ -874,33 +1177,46 @@ const PatientResult = () => {
                     <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '4mm', fontSize: '11px' }}>
                       <thead>
                         <tr>
-                          <th style={{ borderBottom: '1.5px solid #333', padding: '4px 6px', textAlign: 'left', width: '38%' }}>Test Description</th>
-                          <th style={{ borderBottom: '1.5px solid #333', padding: '4px 6px 4px 20px', textAlign: 'left', width: '22%' }}>Result</th>
-                          <th style={{ borderBottom: '1.5px solid #333', padding: '4px 6px', textAlign: 'left', width: '12%' }}>Unit</th>
-                          <th style={{ borderBottom: '1.5px solid #333', padding: '4px 6px', textAlign: 'left', width: '28%' }}>Biological Reference Range</th>
+                          <th style={{ borderBottom: '1.5px solid #333', padding: '4px 6px', textAlign: 'left', width: shouldShowUnitsColumn() || shouldShowReferenceRangeColumn() ? '30%' : '50%' }}>Test Description</th>
+                          <th style={{ borderBottom: '1.5px solid #333', padding: '4px 6px 4px 20px', textAlign: 'left', width: shouldShowUnitsColumn() || shouldShowReferenceRangeColumn() ? '28%' : '50%' }}>Result</th>
+                          {shouldShowUnitsColumn() && (
+                            <th style={{ borderBottom: '1.5px solid #333', padding: '4px 6px', textAlign: 'left', width: '12%' }}>Unit</th>
+                          )}
+                          {shouldShowReferenceRangeColumn() && (
+                            <th style={{ borderBottom: '1.5px solid #333', padding: '4px 6px', textAlign: 'left', width: '30%' }}>Biological Reference Range</th>
+                          )}
                         </tr>
                       </thead>
                       <tbody>
                         <tr>
-                          <td colSpan={4} style={{ padding: '4px 6px', fontWeight: 'bold', borderBottom: '1px solid #ccc' }}>{patientData.test.name}</td>
+                          <td colSpan={shouldShowUnitsColumn() || shouldShowReferenceRangeColumn() ? (shouldShowUnitsColumn() && shouldShowReferenceRangeColumn() ? 4 : 3) : 2} style={{ padding: '4px 6px', fontWeight: 'bold', borderBottom: '1px solid #ccc' }}>{patientData.test.name}</td>
                         </tr>
                         {Object.entries(groupedParameters).map(([categoryName, categoryParams]: [string, any]) => (
                           <React.Fragment key={categoryName}>
                             {categoryName !== 'NO_CATEGORY_HEADER' && categoryParams[0]?.showCategoryHeader && (
-                              <tr><td colSpan={4} style={{ padding: '4px 6px', fontWeight: 'bold', borderBottom: '1px solid #ddd' }}>{categoryName.toUpperCase()}</td></tr>
+                              <tr><td colSpan={shouldShowUnitsColumn() || shouldShowReferenceRangeColumn() ? (shouldShowUnitsColumn() && shouldShowReferenceRangeColumn() ? 4 : 3) : 2} style={{ padding: '4px 6px', fontWeight: 'bold', borderBottom: '1px solid #ddd' }}>{categoryName.toUpperCase()}</td></tr>
                             )}
                             {(categoryParams as any[]).map((param) => {
                               const numVal = results[param.id]?.numericValue;
                               const isAbn = results[param.id]?.isAbnormal === true || results[param.id]?.isAbnormal === 1 || isValueOutOfRange(param, numVal);
                               const displayValue = param.type === 'Numeric' ? (numVal !== null && numVal !== undefined ? numVal : '-') : (results[param.id]?.textValue || '-');
+                              const rangeStr = shouldShowReferenceRangeColumn() ? getAgeAppropriateRange(param, patientData.patient.age, patientData.patient.gender, patientData.patient.dob) : '';
                               return (
                                 <tr key={param.id}>
-                                  <td style={{ padding: '3px 6px', width: '38%', fontWeight: isAbn ? 'bold' : 'normal' }}>{param.parameterName}</td>
-                                  <td style={{ padding: '3px 6px 3px 20px', width: '22%', fontWeight: isAbn ? '900' : 'normal', color: isAbn ? '#b91c1c' : 'inherit', fontSize: '11px' }}>
-                                    {displayValue}{isAbn && ' *'}
+                                  <td style={{ padding: '3px 6px', width: shouldShowUnitsColumn() || shouldShowReferenceRangeColumn() ? '30%' : '50%', fontWeight: isAbn ? 'bold' : 'normal' }}>{param.parameterName}</td>
+                                  <td style={{ padding: '3px 6px 3px 20px', width: shouldShowUnitsColumn() || shouldShowReferenceRangeColumn() ? '28%' : '50%', fontWeight: isAbn ? '900' : 'normal', color: isAbn ? '#b91c1c' : 'inherit', fontSize: '11px', whiteSpace: 'normal', wordWrap: 'break-word' }}>
+                                    {param.isDescriptive && hasHtmlTags(displayValue) ? (
+                                      <div dangerouslySetInnerHTML={{ __html: sanitizeHtml(displayValue) }} style={{ margin: 0, whiteSpace: 'normal' }} />
+                                    ) : (
+                                      <>{displayValue}{isAbn && ' *'}</>
+                                    )}
                                   </td>
-                                  <td style={{ padding: '3px 6px', width: '12%' }}>{param.units || ''}</td>
-                                  <td style={{ padding: '3px 6px', width: '28%' }}>{param.type === 'Text' || param.isDescriptive ? (param.normalRange || '-') : getAgeAppropriateRange(param, patientData.patient.age, patientData.patient.gender, patientData.patient.dob)}</td>
+                                  {shouldShowUnitsColumn() && (
+                                    <td style={{ padding: '3px 6px', width: '12%' }}>{param.units || ''}</td>
+                                  )}
+                                  {shouldShowReferenceRangeColumn() && (
+                                    <td style={{ padding: '3px 6px', width: '30%' }}>{rangeStr || '-'}</td>
+                                  )}
                                 </tr>
                               );
                             })}

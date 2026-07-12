@@ -106,12 +106,20 @@ const TestList = () => {
     const testToDelete = tests.find((t) => t.id === id);
     if (!testToDelete) return;
 
-    const confirm = window.confirm(`Are you sure you want to delete "${testToDelete.name}"?\n\nThis action cannot be undone.`);
+    const confirm = window.confirm(`Are you sure you want to permanently delete "${testToDelete.name}"?\n\nThis will remove it from all lists but keep it in the database.`);
     if (!confirm) return;
 
     try {
-      await deleteTest(id);
-      alert("Test deleted successfully!");
+      const updateData = {
+        ...testToDelete,
+        isDeleted: true
+      };
+      Object.keys(updateData).forEach(key => {
+        if (updateData[key] === undefined) delete updateData[key];
+      });
+      
+      await updateTest(id, updateData);
+      alert("Test deleted permanently!");
       setCurrentPage(1); // Reset to page 1
       fetchTests(1); // Fetch first page
     } catch (err) {
@@ -132,7 +140,17 @@ const TestList = () => {
     if (!confirm) return;
 
     try {
-      await updateTest((Array.isArray(id) ? id[0] : id) as string, { isActive: !currentTest.isActive });
+      // Preserve all existing data, only toggle isActive
+      const updateData = {
+        ...currentTest,
+        isActive: !currentTest.isActive
+      };
+      // Remove undefined/null fields that might cause issues
+      Object.keys(updateData).forEach(key => {
+        if (updateData[key] === undefined) delete updateData[key];
+      });
+      
+      await updateTest((Array.isArray(id) ? id[0] : id) as string, updateData);
       alert(currentTest.isActive ? "Test inactivated successfully!" : "Test activated successfully!");
       setCurrentPage(1); // Reset to page 1
       fetchTests(1); // Fetch first page
@@ -148,6 +166,25 @@ const TestList = () => {
     setCurrentPage(1);
     fetchTests(1);
   };
+
+  // 🔹 Filter tests - exclude deleted, then by active/inactive and search
+  const filteredTests = (Array.isArray(tests) ? tests : []).filter(test => {
+    // Exclude deleted items from all views
+    if (test.isDeleted) return false;
+    
+    // When "Show Inactive" is checked, show ONLY inactive tests
+    if (showInactive && test.isActive) return false;
+    
+    // When "Show Inactive" is unchecked, show ONLY active tests
+    if (!showInactive && !test.isActive) return false;
+    
+    // Filter by search
+    return (
+      test.name.toLowerCase().includes(search.toLowerCase()) ||
+      test.shortName?.toLowerCase().includes(search.toLowerCase()) ||
+      test.department?.name.toLowerCase().includes(search.toLowerCase())
+    );
+  });
 
   return (
     <>
@@ -254,7 +291,7 @@ const TestList = () => {
                     </td>
                   </tr>
                 ) : (
-                  tests.map((test, index) => (
+                  filteredTests.map((test, index) => (
                       <tr 
                         key={test.id} 
                         className={`hover:bg-gray-50 border-b border-gray-200 ${

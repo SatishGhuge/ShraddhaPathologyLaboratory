@@ -10,6 +10,7 @@ node_modules/
 package-lock.json
 */package-lock.json
 backend/package-lock.json
+backend/prisma/migrations
 frontend/package-lock.json
 package.json
 

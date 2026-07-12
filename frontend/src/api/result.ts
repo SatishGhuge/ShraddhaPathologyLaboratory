@@ -234,3 +234,22 @@ export const getAllTestResults = async (patientId: string, testId: string, limit
   
   return result.data;
 };
+
+// Update patient comments/notes
+export const updatePatientComments = async (testId: string, comments: string): Promise<any> => {
+  const response = await fetch(`${API_BASE_URL}/results/${testId}/comments`, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ comments })
+  });
+  
+  const result: ApiResponse = await response.json();
+  
+  if (!result.success) {
+    throw new Error(result.message || 'Failed to update patient comments');
+  }
+  
+  return result.data;
+};

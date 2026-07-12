@@ -23,11 +23,11 @@ const AddPackage = () => {
   const [error, setError] = useState("");
   
   const [formData, setFormData] = useState({
-    center: "All Centers",
-    packageName: "",
-    packageCode: "",
+    name: "",
+    code: "",
     departmentId: "",
     labTests: "",
+    b2cCharge: "",
   });
   
   const [testList, setTestList] = useState<any[]>([]);
@@ -86,9 +86,8 @@ const AddPackage = () => {
       if (result.success) {
         const pkg = result.data;
         setFormData({
-          center: pkg.center || "All Centers",
-          packageName: pkg.name || "",
-          packageCode: pkg.code || "",
+          name: pkg.name || "",
+          code: pkg.code || "",
           departmentId: pkg.departmentId?.toString() || "",
           labTests: "",
         });
@@ -157,11 +156,11 @@ const AddPackage = () => {
     // Validation: Check if required fields are empty
     const emptyFields = [];
     
-    if (!formData.packageName.trim()) {
+    if (!formData.name.trim()) {
       emptyFields.push("Package Name");
     }
     
-    if (!formData.packageCode.trim()) {
+    if (!formData.code.trim()) {
       emptyFields.push("Package Code");
     }
 
@@ -180,13 +179,11 @@ const AddPackage = () => {
       setError("");
       
       const packageData = {
-        name: formData.packageName,
-        code: formData.packageCode,
+        name: formData.name,
+        code: formData.code,
         departmentId: parseInt(formData.departmentId),
-        center: formData.center,
         testIds: testList.map(test => test.id),
-        b2cCharge: 0, // Default values
-        b2bCharge: 0
+        b2cCharge: formData.b2cCharge ? parseFloat(formData.b2cCharge) : 0
       };
       
       let response;
@@ -294,26 +291,6 @@ const AddPackage = () => {
           {/* Form */}
           <form onSubmit={handleSubmit} className="p-3 sm:p-4 space-y-3 sm:space-y-4">
             <div className="max-w-2xl space-y-3 sm:space-y-4">
-              {/* Center */}
-              <div className="grid grid-cols-1 md:grid-cols-3 items-start md:items-center gap-2 sm:gap-3">
-                <label className="text-xs sm:text-sm font-medium flex items-center gap-1.5 text-gray-700">
-                  <Building2 size={14} className="text-cyan-600" />
-                  Center
-                </label>
-
-                <select
-                  name="center"
-                  value={formData.center}
-                  onChange={handleChange}
-                  disabled={isViewMode}
-                  className="md:col-span-2 border border-gray-300 rounded-md px-2 py-1.5 sm:py-1 text-xs sm:text-sm bg-white focus:ring-2 focus:ring-orange-500 outline-none disabled:bg-gray-100 disabled:cursor-not-allowed"
-                >
-                  <option>All Centers</option>
-                  <option>SHRADDHA PATHOLOGY LABORATORY</option>
-                  <option>City Lab</option>
-                </select>
-              </div>
-
               {/* Department */}
               <div className="grid grid-cols-1 md:grid-cols-3 items-start md:items-center gap-2 sm:gap-3">
                 <label className="text-xs sm:text-sm font-medium flex items-center gap-1.5 text-gray-700">
@@ -346,8 +323,8 @@ const AddPackage = () => {
 
                 <input
                   type="text"
-                  name="packageName"
-                  value={formData.packageName}
+                  name="name"
+                  value={formData.name}
                   onChange={handleChange}
                   disabled={isViewMode}
                   className="md:col-span-2 border border-gray-300 rounded-md px-2 py-1.5 sm:py-1 text-xs sm:text-sm bg-white focus:ring-2 focus:ring-orange-500 outline-none disabled:bg-gray-100 disabled:cursor-not-allowed"
@@ -363,8 +340,8 @@ const AddPackage = () => {
 
                 <input
                   type="text"
-                  name="packageCode"
-                  value={formData.packageCode}
+                  name="code"
+                  value={formData.code}
                   onChange={handleChange}
                   disabled={isViewMode}
                   className="md:col-span-2 border border-gray-300 rounded-md px-2 py-1.5 sm:py-1 text-xs sm:text-sm bg-white focus:ring-2 focus:ring-orange-500 outline-none disabled:bg-gray-100 disabled:cursor-not-allowed"

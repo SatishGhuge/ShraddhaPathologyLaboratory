@@ -2301,6 +2301,8 @@ export default function Result() {
                                 checked={selectedTests.has(test.test_id)}
                                 disabled={isCheckboxDisabled(patient, test)}
                                 onChange={(e) => handleTestSelection(test.test_id, e.target.checked, patient, test)}
+                                tabIndex={0}
+                                title="Select test (Tab to focus)"
                               />
                             </td>
 
@@ -3289,27 +3291,27 @@ export default function Result() {
                 ×
               </button>
             </div>
-            <div className="p-6">
-              <p className="text-sm text-gray-600 mb-4">
+            <div className="p-4">
+              <p className="text-xs text-gray-600 mb-2">
                 <strong>Patient:</strong> {allResultsData.patient.patient_name} | 
                 <strong className="ml-2">Total Results:</strong> {allResultsData.results ? allResultsData.results.length : 0}
               </p>
               
               {allResultsData.results && allResultsData.results.length > 0 ? (
-                <div className="space-y-4">
+                <div className="space-y-2">
                   {allResultsData.results.map((testResult, testIdx) => (
-                    <div key={testIdx} className="border border-gray-300 rounded-lg p-4 bg-gray-50">
-                      <div className="flex items-center justify-between mb-3 pb-2 border-b">
+                    <div key={testIdx} className="border border-gray-300 rounded-lg p-2 bg-gray-50">
+                      <div className="flex items-center justify-between mb-2 pb-1 border-b">
                         <div>
-                          <p className="font-semibold text-gray-900">
+                          <p className="font-semibold text-gray-900 text-xs">
                             {new Date(testResult.visitDate).toLocaleDateString()} {new Date(testResult.visitDate).toLocaleTimeString()}
                           </p>
-                          <p className="text-xs text-gray-600">Status: <span className="font-medium">{testResult.status}</span></p>
+                          <p className="text-[10px] text-gray-600">Status: <span className="font-medium">{testResult.status}</span></p>
                         </div>
                       </div>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-1">
                         {testResult.results && testResult.results.map((result, idx) => (
-                          <div key={idx} className="bg-white p-2 rounded border border-gray-200 text-xs">
+                          <div key={idx} className="bg-white p-1 rounded border border-gray-200 text-[10px]">
                             <p className="font-medium text-gray-800">{result.parameterName}</p>
                             <p className="text-gray-600">
                               <span className={result.isOutOfRange ? 'text-red-600 font-semibold' : ''}>
@@ -3318,7 +3320,7 @@ export default function Result() {
                               {result.units && <span className="text-gray-500"> {result.units}</span>}
                             </p>
                             {result.referenceRange && (
-                              <p className="text-gray-500 text-[10px]">Ref: {result.referenceRange}</p>
+                              <p className="text-gray-500 text-[9px]">Ref: {result.referenceRange}</p>
                             )}
                           </div>
                         ))}
@@ -3327,7 +3329,7 @@ export default function Result() {
                   ))}
                 </div>
               ) : (
-                <p className="text-gray-500 text-center py-6">No test results found</p>
+                <p className="text-gray-500 text-center py-3">No test results found</p>
               )}
             </div>
           </div>

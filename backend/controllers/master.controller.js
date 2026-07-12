@@ -91,13 +91,15 @@ export const getDepartments = async (req, res) => {
 
     const departments = await prisma.department.findMany({
       where: { isActive: true },
-      include: {
-        tests: {
-          where: { isActive: true }
-        },
-        packages: {
-          where: { isActive: true }
-        }
+      select: {
+        id: true,
+        name: true,
+        code: true,
+        group: true,
+        isActive: true,
+        isDeleted: true,
+        createdAt: true,
+        updatedAt: true
       },
       orderBy: { name: 'asc' },
       skip,
@@ -122,15 +124,17 @@ export const getAllDepartments = async (req, res) => {
     const total = await prisma.department.count();
 
     const departments = await prisma.department.findMany({
-      include: {
-        tests: {
-          where: { isActive: true }
-        },
-        packages: {
-          where: { isActive: true }
-        }
+      select: {
+        id: true,
+        name: true,
+        code: true,
+        group: true,
+        isActive: true,
+        isDeleted: true,
+        createdAt: true,
+        updatedAt: true
       },
-      orderBy: { sortOrder: 'asc' },
+      orderBy: { name: 'asc' },
       skip,
       take: limit
     });
@@ -185,7 +189,7 @@ export const getDepartmentById = async (req, res) => {
 // Create new department
 export const createDepartment = async (req, res) => {
   try {
-    const { name, code, sortOrder } = req.body;
+    const { name, code, group } = req.body;
 
     // Validate required fields
     if (!name || !code) {
@@ -211,7 +215,7 @@ export const createDepartment = async (req, res) => {
       data: {
         name,
         code,
-        sortOrder: sortOrder ? parseInt(sortOrder) : null,
+        group: group || null,
         isActive: true
       }
     });
@@ -242,7 +246,7 @@ export const createDepartment = async (req, res) => {
 export const updateDepartment = async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, code, sortOrder, isActive } = req.body;
+    const { name, code, group, isActive } = req.body;
 
     // Check if department exists
     const existingDepartment = await prisma.department.findUnique({
@@ -261,7 +265,7 @@ export const updateDepartment = async (req, res) => {
       data: {
         name: name || undefined,
         code: code || undefined,
-        sortOrder: sortOrder ? parseInt(sortOrder) : undefined,
+        group: group !== undefined ? group : undefined,
         isActive: isActive !== undefined ? isActive : undefined
       }
     });
@@ -355,14 +359,15 @@ export const getTestById = async (req, res) => {
         department: {
           select: {
             id: true,
-            name: true
+            name: true,
+            group: true
           }
         },
         categories: {
           include: {
             testParameter: true
           },
-          orderBy: { sortOrder: 'asc' }
+          orderBy: { categoryName: 'asc' }
         }
       }
     });
@@ -549,14 +554,10 @@ export const createTest = async (req, res) => {
       shortName,
       testCode,
       departmentId,
-      sampleType,
-      testMethod,
+      sampleTypeId,
       machineName,
-      speciality,
       group,
-      sortOrder,
       reportHeader,
-      costForLab,
       preparationTime,
       preparationType,
       instructionPreparation,
@@ -602,14 +603,10 @@ export const createTest = async (req, res) => {
         shortName,
         testCode,
         departmentId: parseInt(departmentId),
-        sampleType,
-        testMethod,
+        sampleTypeId: sampleTypeId ? parseInt(sampleTypeId) : null,
         machineName,
-        speciality: speciality || 'Regular',
         group,
-        sortOrder: sortOrder ? parseInt(sortOrder) : null,
         reportHeader,
-        costForLab: costForLab ? parseFloat(costForLab) : null,
         preparationTime,
         preparationType,
         instructionPreparation,
@@ -617,8 +614,8 @@ export const createTest = async (req, res) => {
         interpretationLabel,
         interpretation,
         outsourceLab,
-        attachFile: attachFile || 'Yes',
-        profileTest: profileTest || 'No',
+        attachFile: attachFile || false,
+        profileTest: profileTest || false,
         isHeader: isHeader !== undefined ? isHeader : true,
         showTestName: showTestName !== undefined ? showTestName : true,
         isNABL: isNABL || false,
@@ -655,7 +652,7 @@ export const createTest = async (req, res) => {
                 type: param.type || 'Numeric',
                 isMandatory: param.isMandatory || false,
                 rangeType: param.rangeType || 'BySex',
-                units: param.units || null,
+                unitId: param.unitId ? parseInt(param.unitId) : null,
                 displayRangeText: param.displayRangeText || null,
                 rangeText: param.rangeText || null,
                 textContent: param.textContent || null,
@@ -716,7 +713,7 @@ export const createTest = async (req, res) => {
           include: {
             testParameter: true
           },
-          orderBy: { sortOrder: 'asc' }
+          orderBy: { categoryName: 'asc' }
         }
       }
     });
@@ -759,14 +756,10 @@ export const updateTest = async (req, res) => {
       shortName,
       testCode,
       departmentId,
-      sampleType,
-      testMethod,
+      sampleTypeId,
       machineName,
-      speciality,
       group,
-      sortOrder,
       reportHeader,
-      costForLab,
       preparationTime,
       preparationType,
       instructionPreparation,
@@ -781,6 +774,7 @@ export const updateTest = async (req, res) => {
       isNABL,
       lineHeight,
       isActive,
+      isDeleted,
       categories
     } = req.body;
 
@@ -867,7 +861,7 @@ export const updateTest = async (req, res) => {
                 type: param.type || 'Numeric',
                 isMandatory: param.isMandatory || false,
                 rangeType: param.rangeType || 'BySex',
-                units: param.units || null,
+                unitId: param.unitId ? parseInt(param.unitId) : null,
                 displayRangeText: param.displayRangeText || null,
                 rangeText: param.rangeText || null,
                 textContent: param.textContent || null,
@@ -927,7 +921,7 @@ export const updateTest = async (req, res) => {
           include: {
             testParameter: true
           },
-          orderBy: { sortOrder: 'asc' }
+          orderBy: { categoryName: 'asc' }
         }
       }
     });
@@ -973,7 +967,8 @@ export const getTests = async (req, res) => {
         department: {
           select: {
             id: true,
-            name: true
+            name: true,
+            group: true
           }
         },
         categories: {
@@ -987,7 +982,7 @@ export const getTests = async (req, res) => {
               }
             }
           },
-          orderBy: { sortOrder: 'asc' }
+          orderBy: { categoryName: 'asc' }
         },
         charges: {
           where: { organizationId: null }, // Only get DEFAULT charges
@@ -1003,10 +998,7 @@ export const getTests = async (req, res) => {
           }
         }
       },
-      orderBy: [
-        { sortOrder: 'asc' },
-        { name: 'asc' }
-      ],
+      orderBy: { name: 'asc' },
       skip,
       take: limit
     });
@@ -1108,7 +1100,7 @@ export const getDoctorById = async (req, res) => {
 // Create doctor
 export const createDoctor = async (req, res) => {
   try {
-    const { name, type, degree, compliment, mobile, email, address, allowBalance, sendReportsViaWhatsApp, sendReportsViaMail } = req.body;
+    const { name, type, degree, mobile, email, address, allowBalance, sendReportsViaWhatsApp, sendReportsViaMail } = req.body;
     if (!name || !name.trim()) {
       return res.status(400).json({ success: false, message: 'Name is required' });
     }
@@ -1117,11 +1109,9 @@ export const createDoctor = async (req, res) => {
         name: name.trim(),
         type: type || 'Doctor',
         degree: degree || null,
-        compliment: compliment !== '' && compliment != null ? parseFloat(compliment) : null,
         mobile: mobile || null,
         email: email || null,
         address: address || null,
-        allowBalance: allowBalance || false,
         sendReportsViaWhatsApp: sendReportsViaWhatsApp || false,
         sendReportsViaMail: sendReportsViaMail || false,
         isActive: true,
@@ -1138,7 +1128,7 @@ export const createDoctor = async (req, res) => {
 export const updateDoctor = async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, type, degree, compliment, mobile, email, address, allowBalance, sendReportsViaWhatsApp, sendReportsViaMail } = req.body;
+    const { name, type, degree, mobile, email, address, allowBalance, sendReportsViaWhatsApp, sendReportsViaMail } = req.body;
     const existing = await prisma.doctor.findUnique({ where: { id: parseInt(id) } });
     if (!existing) return res.status(404).json({ success: false, message: 'Doctor not found' });
     const doctor = await prisma.doctor.update({
@@ -1147,11 +1137,9 @@ export const updateDoctor = async (req, res) => {
         name: name?.trim() || existing.name,
         type: type || existing.type,
         degree: degree !== undefined ? degree : existing.degree,
-        compliment: compliment !== '' && compliment != null ? parseFloat(compliment) : null,
         mobile: mobile !== undefined ? mobile : existing.mobile,
         email: email !== undefined ? email : existing.email,
         address: address !== undefined ? address : existing.address,
-        allowBalance: allowBalance !== undefined ? allowBalance : existing.allowBalance,
         sendReportsViaWhatsApp: sendReportsViaWhatsApp !== undefined ? sendReportsViaWhatsApp : existing.sendReportsViaWhatsApp,
         sendReportsViaMail: sendReportsViaMail !== undefined ? sendReportsViaMail : existing.sendReportsViaMail,
       }
@@ -1184,6 +1172,283 @@ export const deleteDoctor = async (req, res) => {
   } catch (error) {
     console.error('Delete doctor error:', error);
     res.status(500).json({ success: false, message: 'Failed to delete doctor' });
+  }
+};
+
+// Find duplicate doctors (same or similar names)
+export const findDuplicateDoctors = async (req, res) => {
+  try {
+    const { threshold = 0.6 } = req.query;
+
+    // Get all active doctors
+    const doctors = await prisma.doctor.findMany({
+      where: { isActive: true },
+      orderBy: { name: 'asc' }
+    });
+
+    if (doctors.length < 2) {
+      return res.json({
+        success: true,
+        message: 'Not enough doctors to find duplicates',
+        data: []
+      });
+    }
+
+    // Simple Levenshtein distance calculator
+    const levenshteinDistance = (str1, str2) => {
+      const len1 = str1.length;
+      const len2 = str2.length;
+      const d = Array(len2 + 1).fill(null).map(() => Array(len1 + 1).fill(0));
+
+      for (let i = 0; i <= len1; i++) d[0][i] = i;
+      for (let j = 0; j <= len2; j++) d[j][0] = j;
+
+      for (let j = 1; j <= len2; j++) {
+        for (let i = 1; i <= len1; i++) {
+          const cost = str1[i - 1] === str2[j - 1] ? 0 : 1;
+          d[j][i] = Math.min(
+            d[j][i - 1] + 1,
+            d[j - 1][i] + 1,
+            d[j - 1][i - 1] + cost
+          );
+        }
+      }
+      return d[len2][len1];
+    };
+
+    // Calculate similarity between two names (0-1 scale)
+    const calculateSimilarity = (name1, name2) => {
+      const normName1 = name1.toLowerCase();
+      const normName2 = name2.toLowerCase();
+      const maxLen = Math.max(normName1.length, normName2.length);
+      if (maxLen === 0) return 1;
+      const distance = levenshteinDistance(normName1, normName2);
+      return 1 - (distance / maxLen);
+    };
+
+    // Find potential duplicates
+    const duplicates = [];
+    const parsedThreshold = parseFloat(threshold);
+
+    for (let i = 0; i < doctors.length; i++) {
+      for (let j = i + 1; j < doctors.length; j++) {
+        const similarity = calculateSimilarity(doctors[i].name, doctors[j].name);
+        if (similarity >= parsedThreshold) {
+          duplicates.push({
+            doctor1: doctors[i],
+            doctor2: doctors[j],
+            similarity: (similarity * 100).toFixed(1) + '%'
+          });
+        }
+      }
+    }
+
+    res.json({
+      success: true,
+      data: duplicates,
+      count: duplicates.length
+    });
+  } catch (error) {
+    console.error('Find duplicate doctors error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to find duplicate doctors'
+    });
+  }
+};
+
+// Get merge history for a doctor
+export const getDoctorMergeHistory = async (req, res) => {
+  try {
+    const { doctorId } = req.params;
+
+    // Verify doctor exists
+    const doctor = await prisma.doctor.findUnique({
+      where: { id: parseInt(doctorId) }
+    });
+
+    if (!doctor) {
+      return res.status(404).json({
+        success: false,
+        message: 'Doctor not found'
+      });
+    }
+
+    // Get merge history where this doctor was source (merged FROM)
+    const mergesFrom = await prisma.doctorMerge.findMany({
+      where: { sourceDoctorId: parseInt(doctorId) },
+      orderBy: { mergedAt: 'desc' }
+    });
+
+    // Get merge history where this doctor was target (merged TO)
+    const mergesTo = await prisma.doctorMerge.findMany({
+      where: { targetDoctorId: parseInt(doctorId) },
+      orderBy: { mergedAt: 'desc' }
+    });
+
+    res.json({
+      success: true,
+      data: {
+        doctor: {
+          id: doctor.id,
+          name: doctor.name
+        },
+        mergedFrom: mergesFrom,
+        mergedTo: mergesTo,
+        totalMerges: mergesFrom.length + mergesTo.length
+      }
+    });
+  } catch (error) {
+    console.error('Get doctor merge history error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch merge history'
+    });
+  }
+};
+
+// Merge one doctor into another
+export const mergeDoctors = async (req, res) => {
+  try {
+    const { sourceDoctorId, targetDoctorId } = req.body;
+
+    // Validate inputs
+    if (!sourceDoctorId || !targetDoctorId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Source and target doctor IDs are required'
+      });
+    }
+
+    if (sourceDoctorId === targetDoctorId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Cannot merge a doctor with themselves'
+      });
+    }
+
+    // Get source doctor
+    const sourceDoctor = await prisma.doctor.findUnique({
+      where: { id: parseInt(sourceDoctorId) }
+    });
+
+    if (!sourceDoctor) {
+      return res.status(404).json({
+        success: false,
+        message: 'Source doctor not found'
+      });
+    }
+
+    // Get target doctor
+    const targetDoctor = await prisma.doctor.findUnique({
+      where: { id: parseInt(targetDoctorId) }
+    });
+
+    if (!targetDoctor) {
+      return res.status(404).json({
+        success: false,
+        message: 'Target doctor not found'
+      });
+    }
+
+    let recordsUpdated = 0;
+    let chargesUpdated = 0;
+
+    try {
+      // Step 1: Handle DoctorTestCharge records
+      // IMPORTANT: We want to KEEP source doctor's charges and apply them to target doctor
+      // Strategy: Delete target's charges first, then update source's to target
+      
+      const sourceCharges = await prisma.doctorTestCharge.findMany({
+        where: { doctorId: parseInt(sourceDoctorId) },
+        select: { testId: true, id: true }
+      });
+
+      console.log(`Found ${sourceCharges.length} source doctor charges`);
+
+      // Delete conflicting target charges (same testId)
+      for (const charge of sourceCharges) {
+        await prisma.doctorTestCharge.deleteMany({
+          where: {
+            testId: charge.testId,
+            doctorId: parseInt(targetDoctorId)
+          }
+        });
+      }
+
+      // Update source charges to target doctor (preserving them)
+      const chargeUpdateResult = await prisma.doctorTestCharge.updateMany({
+        where: { doctorId: parseInt(sourceDoctorId) },
+        data: { doctorId: parseInt(targetDoctorId) }
+      });
+      chargesUpdated = chargeUpdateResult.count;
+      console.log(`Transferred ${chargesUpdated} charges to target doctor`);
+
+      // Step 2: Update PatientTest records (by referral doctor name - handle "Dr." prefix)
+      // Get all variants of source doctor name (with/without "Dr." prefix)
+      const variants = [
+        `Dr. ${sourceDoctor.name}`,
+        sourceDoctor.name
+      ];
+
+      let patientTestsUpdated = 0;
+      for (const variant of variants) {
+        const patientTestUpdateResult = await prisma.patientTest.updateMany({
+          where: { referralDoctor: variant },
+          data: { referralDoctor: `Dr. ${targetDoctor.name}` }
+        });
+        patientTestsUpdated += patientTestUpdateResult.count;
+      }
+      recordsUpdated = patientTestsUpdated;
+      console.log(`Updated ${recordsUpdated} patient test records`);
+
+      // Step 3: Create merge history record
+      const mergeHistory = await prisma.doctorMerge.create({
+        data: {
+          sourceDoctorId: parseInt(sourceDoctorId),
+          targetDoctorId: parseInt(targetDoctorId),
+          sourceDoctorName: sourceDoctor.name,
+          targetDoctorName: targetDoctor.name,
+          recordsUpdated: recordsUpdated,
+          chargesUpdated: chargesUpdated,
+          mergedBy: req.user?.id?.toString() || 'system'
+        }
+      });
+
+      // Step 4: Deactivate source doctor
+      await prisma.doctor.update({
+        where: { id: parseInt(sourceDoctorId) },
+        data: { isActive: false }
+      });
+
+      res.json({
+        success: true,
+        message: `Successfully merged Dr. ${sourceDoctor.name} into Dr. ${targetDoctor.name}. Transferred ${chargesUpdated} charges and updated ${recordsUpdated} patient records.`,
+        data: {
+          merge: mergeHistory,
+          summary: {
+            sourceDoctorId,
+            targetDoctorId,
+            recordsUpdated,
+            chargesUpdated,
+            mergedAt: mergeHistory.mergedAt
+          }
+        }
+      });
+    } catch (error) {
+      console.error('Error during merge transaction:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to complete merge operation: ' + error.message,
+        error: error.message
+      });
+    }
+  } catch (error) {
+    console.error('Merge doctors error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to merge doctors'
+    });
   }
 };
 
@@ -1252,7 +1517,7 @@ export const getOrganizations = async (req, res) => {
         updatedAt: true,
         sendReportsViaWhatsApp: true,
         sendReportsViaMail: true,
-        moduleAllocation: {
+        moduleAllocations: {
           select: { id: true, modules: true }
         }
       },
@@ -1284,7 +1549,7 @@ export const getOrganizationById = async (req, res) => {
         updatedAt: true,
         sendReportsViaWhatsApp: true,
         sendReportsViaMail: true,
-        moduleAllocation: {
+        moduleAllocations: {
           select: { modules: true }
         }
       }
@@ -1292,10 +1557,30 @@ export const getOrganizationById = async (req, res) => {
     if (!organization) return res.status(404).json({ success: false, message: 'Organization not found' });
     
     // Transform response to match frontend expectations
+    // moduleAllocations is an array, but organization has only one allocation record (organizationId is unique)
     const response = {
       ...organization,
-      moduleAllocation: organization.moduleAllocation?.modules || null
+      moduleAllocation: organization.moduleAllocations?.[0]?.modules || null,
+      moduleAllocations: undefined  // Remove the array version
     };
+    
+    console.log('📦 getOrganizationById FULL response:', {
+      orgId: organization.id,
+      orgName: organization.name,
+      hasModuleAllocations: !!organization.moduleAllocations,
+      moduleAllocationsCount: organization.moduleAllocations?.length,
+      modulesValue: organization.moduleAllocations?.[0]?.modules ? 'EXISTS' : 'NULL',
+      finalModuleAllocation: response.moduleAllocation ? 'EXISTS (length: ' + response.moduleAllocation.length + ')' : 'NULL',
+      responseKeys: Object.keys(response),
+      sendingToFrontend: {
+        success: true,
+        data: {
+          id: response.id,
+          name: response.name,
+          moduleAllocation: response.moduleAllocation ? '...JSON STRING...' : null
+        }
+      }
+    });
     
     res.json({ success: true, data: response });
   } catch (error) {
@@ -1703,7 +1988,6 @@ export const getAllTestCharges = async (req, res) => {
         }
       },
       orderBy: [
-        { sortOrder: 'asc' },
         { name: 'asc' }
       ]
     });
@@ -1772,7 +2056,6 @@ export const getDoctorTestCharges = async (req, res) => {
         }
       },
       orderBy: [
-        { sortOrder: 'asc' },
         { name: 'asc' }
       ]
     });
@@ -1791,9 +2074,8 @@ export const getDoctorTestCharges = async (req, res) => {
       discountS: test.doctorCharges[0]?.discountS || 0,
       // Doctor B2C (for backward compatibility) = Default B2C - discountS
       doctorB2C: Math.max(0, (test.charges[0]?.b2cCharge || 0) - (test.doctorCharges[0]?.discountS || 0)),
-      // Is customized (doctor has different discounts than default)
-      isCustomized: test.doctorCharges.length > 0 && 
-        ((test.doctorCharges[0]?.discountR || 0) > 0 || (test.doctorCharges[0]?.discountS || 0) > 0)
+      // Is customized - use the isCustomized flag if available, fallback to old logic for backward compatibility
+      isCustomized: test.doctorCharges.length > 0 ? (test.doctorCharges[0]?.isCustomized === true) : false
     }));
 
     res.json({
@@ -2114,15 +2396,21 @@ export const bulkCreateTestCharges = async (req, res) => {
             }
           });
 
+          // Determine if this is customized: if discountS (custom price) differs from discountR (default price)
+          const discountRVal = charge.discountR !== undefined ? parseFloat(charge.discountR) : 0;
+          const discountSVal = charge.discountS !== undefined ? parseFloat(charge.discountS) : 0;
+          const isCustomizedFlag = Math.abs(discountSVal - discountRVal) > 0.01; // Allow small floating point difference
+
           let result;
           if (existingCharge) {
             // Update existing doctor charge
             result = await prisma.doctorTestCharge.update({
               where: { id: existingCharge.id },
               data: {
-                discountR: charge.discountR !== undefined ? parseFloat(charge.discountR) : existingCharge.discountR,
-                discountS: charge.discountS !== undefined ? parseFloat(charge.discountS) : existingCharge.discountS,
-                discountPercent: discountPercent ? parseFloat(discountPercent) : 0
+                discountR: discountRVal,
+                discountS: discountSVal,
+                discountPercent: discountPercent ? parseFloat(discountPercent) : 0,
+                isCustomized: isCustomizedFlag
               }
             });
             updated++;
@@ -2132,9 +2420,10 @@ export const bulkCreateTestCharges = async (req, res) => {
               data: {
                 testId: parseInt(testId),
                 doctorId: parseInt(doctorId),
-                discountR: parseFloat(charge.discountR) || 0,
-                discountS: parseFloat(charge.discountS) || 0,
+                discountR: discountRVal,
+                discountS: discountSVal,
                 discountPercent: discountPercent ? parseFloat(discountPercent) : 0,
+                isCustomized: isCustomizedFlag,
                 isActive: true
               }
             });
@@ -2228,7 +2517,8 @@ export const getPackages = async (req, res) => {
         department: {
           select: {
             id: true,
-            name: true
+            name: true,
+            group: true
           }
         },
         packageTests: {
@@ -2238,7 +2528,7 @@ export const getPackages = async (req, res) => {
                 id: true,
                 name: true,
                 testCode: true,
-                sampleType: true
+                sampleTypeId: true
               }
             }
           }
@@ -2258,7 +2548,7 @@ export const getPackages = async (req, res) => {
           id: packageTest.test.id,
           name: packageTest.test.name,
           testCode: packageTest.test.testCode,
-          sampleType: packageTest.test.sampleType
+          sampleTypeId: packageTest.test.sampleTypeId
         }))
       };
     });
@@ -2285,7 +2575,8 @@ export const getAllPackages = async (req, res) => {
         department: {
           select: {
             id: true,
-            name: true
+            name: true,
+            group: true
           }
         },
         packageTests: {
@@ -2295,7 +2586,7 @@ export const getAllPackages = async (req, res) => {
                 id: true,
                 name: true,
                 testCode: true,
-                sampleType: true
+                sampleTypeId: true
               }
             }
           }
@@ -2315,7 +2606,7 @@ export const getAllPackages = async (req, res) => {
           id: packageTest.test.id,
           name: packageTest.test.name,
           testCode: packageTest.test.testCode,
-          sampleType: packageTest.test.sampleType
+          sampleTypeId: packageTest.test.sampleTypeId
         }))
       };
     });
@@ -2351,7 +2642,7 @@ export const getPackageById = async (req, res) => {
                 id: true,
                 name: true,
                 testCode: true,
-                sampleType: true
+                sampleTypeId: true
               }
             }
           }
@@ -2374,7 +2665,7 @@ export const getPackageById = async (req, res) => {
         id: packageTest.test.id,
         name: packageTest.test.name,
         testCode: packageTest.test.testCode,
-        sampleType: packageTest.test.sampleType
+        sampleTypeId: packageTest.test.sampleTypeId
       }))
     };
 
@@ -2431,9 +2722,7 @@ export const createPackage = async (req, res) => {
         name,
         code,
         departmentId: parseInt(departmentId),
-        center: center || "All Centers",
         b2cCharge: b2cCharge ? parseFloat(b2cCharge) : 0,
-        b2bCharge: b2bCharge ? parseFloat(b2bCharge) : 0,
         isActive: isActive !== undefined ? isActive : true
       }
     });
@@ -2468,7 +2757,7 @@ export const createPackage = async (req, res) => {
                 id: true,
                 name: true,
                 testCode: true,
-                sampleType: true
+                sampleTypeId: true
               }
             }
           }
@@ -2533,9 +2822,7 @@ export const updatePackage = async (req, res) => {
         name: name || undefined,
         code: code || undefined,
         departmentId: departmentId ? parseInt(departmentId) : undefined,
-        center: center || undefined,
         b2cCharge: b2cCharge !== undefined ? parseFloat(b2cCharge) : undefined,
-        b2bCharge: b2bCharge !== undefined ? parseFloat(b2bCharge) : undefined,
         isActive: isActive !== undefined ? isActive : undefined
       }
     });
@@ -2578,7 +2865,7 @@ export const updatePackage = async (req, res) => {
                 id: true,
                 name: true,
                 testCode: true,
-                sampleType: true
+                sampleTypeId: true
               }
             }
           }
@@ -2657,7 +2944,7 @@ export const getPackageTests = async (req, res) => {
             id: true,
             name: true,
             testCode: true,
-            sampleType: true,
+            sampleTypeId: true,
             department: {
               select: {
                 id: true,
@@ -2748,7 +3035,7 @@ export const addTestToPackage = async (req, res) => {
             id: true,
             name: true,
             testCode: true,
-            sampleType: true
+            sampleTypeId: true
           }
         },
         package: {
@@ -3407,7 +3694,7 @@ export const createTestParameter = async (req, res) => {
       type,
       isMandatory,
       rangeType,
-      units,
+      unitId,
       displayRangeText,
       rangeText,
       textContent,
@@ -3459,7 +3746,7 @@ export const createTestParameter = async (req, res) => {
         type: type || 'Numeric',
         isMandatory: isMandatory || false,
         rangeType: rangeType || 'BySex',
-        units: units || null,
+        unitId: unitId ? parseInt(unitId) : null,
         displayRangeText: displayRangeText || null,
         rangeText: rangeText || null,
         textContent: textContent || null,
@@ -3526,7 +3813,7 @@ export const createTestCategoryWithParameter = async (req, res) => {
       type,
       isMandatory,
       rangeType,
-      units,
+      unitId,
       displayRangeText,
       rangeText,
       textContent,
@@ -3593,7 +3880,7 @@ export const createTestCategoryWithParameter = async (req, res) => {
         type: type || 'Numeric',
         isMandatory: isMandatory || false,
         rangeType: rangeType || 'BySex',
-        units: units || null,
+        unitId: unitId ? parseInt(unitId) : null,
         displayRangeText: displayRangeText || null,
         rangeText: rangeText || null,
         textContent: textContent || null,
@@ -3798,6 +4085,70 @@ export const getTemplates = async (req, res) => {
     res.json(buildPaginatedResponse(parsedTemplates, total, page, limit));
   } catch (error) {
     console.error('Error fetching templates:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch templates',
+      error: error.message
+    });
+  }
+};
+
+// Get templates by test ID
+export const getTemplatesByTestId = async (req, res) => {
+  try {
+    const { testId } = req.params;
+
+    // Verify test exists
+    const test = await prisma.test.findUnique({
+      where: { id: parseInt(testId) }
+    });
+
+    if (!test) {
+      return res.status(404).json({
+        success: false,
+        message: 'Test not found'
+      });
+    }
+
+    // Get all templates for this test
+    const templates = await prisma.testTemplate.findMany({
+      where: { 
+        testId: parseInt(testId),
+        isActive: true
+      },
+      include: {
+        test: {
+          select: {
+            id: true,
+            name: true,
+            shortName: true
+          }
+        },
+        testCategory: {
+          select: {
+            id: true,
+            categoryName: true
+          }
+        }
+      },
+      orderBy: {
+        createdAt: 'desc'
+      }
+    });
+
+    // Parse JSON parameters for each template
+    const parsedTemplates = templates.map(template => ({
+      ...template,
+      parameters: template.parameters ? JSON.parse(template.parameters) : []
+    }));
+
+    res.json({
+      success: true,
+      data: parsedTemplates,
+      count: parsedTemplates.length
+    });
+  } catch (error) {
+    console.error('Error fetching templates by test ID:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to fetch templates',
@@ -4323,24 +4674,26 @@ export const getRoleById = async (req, res) => {
 
 export const createRole = async (req, res) => {
   try {
-    const { name, codeName, roleLanding, viewFinancialDays, discountPermissible, showB2B } = req.body;
-    if (!name || !codeName || !roleLanding) {
-      return res.status(400).json({ success: false, message: 'Name, Code Name and Role Landing are required' });
+    const { name } = req.body;
+    
+    if (!name) {
+      return res.status(400).json({ success: false, message: 'Role name is required' });
     }
+
+    // Auto-generate codeName from name (uppercase with underscores)
+    const codeName = name.trim().toUpperCase().replace(/\s+/g, '_');
+
     const role = await prisma.role.create({
       data: {
         name: name.trim(),
-        codeName: codeName.trim(),
-        roleLanding,
-        viewFinancialDays: viewFinancialDays ? parseInt(viewFinancialDays) : 30,
-        discountPermissible: discountPermissible || false,
-        showB2B: showB2B || false,
+        codeName: codeName,
+        isActive: true
       },
     });
     res.status(201).json({ success: true, message: 'Role created successfully', data: role });
   } catch (error) {
     if (error.code === 'P2002') {
-      return res.status(400).json({ success: false, message: 'Role name or code already exists' });
+      return res.status(400).json({ success: false, message: 'Role name already exists' });
     }
     res.status(500).json({ success: false, message: 'Failed to create role' });
   }
@@ -4349,25 +4702,31 @@ export const createRole = async (req, res) => {
 export const updateRole = async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, codeName, roleLanding, viewFinancialDays, discountPermissible, showB2B } = req.body;
+    const { name, isActive } = req.body;
+    
     const existing = await prisma.role.findUnique({ where: { id: parseInt(id) } });
     if (!existing) return res.status(404).json({ success: false, message: 'Role not found' });
 
+    const updateData = {};
+    if (name) {
+      updateData.name = name.trim();
+      updateData.codeName = name.trim().toUpperCase().replace(/\s+/g, '_');
+    }
+    if (isActive !== undefined) {
+      updateData.isActive = isActive;
+    }
+    if (Object.keys(updateData).length === 0) {
+      updateData.isDeleted = false; // Ensure we're not deleting
+    }
+
     const role = await prisma.role.update({
       where: { id: parseInt(id) },
-      data: {
-        name: name?.trim(),
-        codeName: codeName?.trim(),
-        roleLanding,
-        viewFinancialDays: viewFinancialDays ? parseInt(viewFinancialDays) : undefined,
-        discountPermissible,
-        showB2B,
-      },
+      data: updateData,
     });
     res.json({ success: true, message: 'Role updated successfully', data: role });
   } catch (error) {
     if (error.code === 'P2002') {
-      return res.status(400).json({ success: false, message: 'Role name or code already exists' });
+      return res.status(400).json({ success: false, message: 'Role name already exists' });
     }
     res.status(500).json({ success: false, message: 'Failed to update role' });
   }

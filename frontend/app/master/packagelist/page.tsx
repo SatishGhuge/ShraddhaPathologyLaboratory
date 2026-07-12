@@ -13,6 +13,7 @@ import {
   Eye,
   Edit
 } from "lucide-react";
+import { getAllPackages } from "@/src/api/master";
 
 const PackagesTable = () => {
   const router = useRouter();
@@ -35,14 +36,11 @@ const PackagesTable = () => {
       setLoading(true);
       setError("");
       
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/master/packages?page=${page}&limit=${ITEMS_PER_PAGE}`);
-      const result = await response.json();
+      // Fetch ALL packages (both active and inactive)
+      const result = await getAllPackages(page, ITEMS_PER_PAGE);
       
-      if (result.success) {
-        setPackages(result.data || []);
-        if (result.pagination) {
-          setPagination(result.pagination);
-        }
+      if (result && Array.isArray(result)) {
+        setPackages(result || []);
       } else {
         setError('Failed to load packages');
       }
@@ -55,6 +53,9 @@ const PackagesTable = () => {
   };
 
   const filteredData = packages.filter((pkg) => {
+    // Exclude deleted items from all views
+    if (pkg.isDeleted) return false;
+    
     // When "Show Inactive" is checked, show ONLY inactive packages
     if (showInactive && pkg.isActive) return false;
     
@@ -90,14 +91,22 @@ const PackagesTable = () => {
     try {
       setLoading(true);
       
+      // Preserve all existing data, only toggle isActive
+      const updateData = {
+        ...currentPkg,
+        isActive: !currentPkg.isActive
+      };
+      // Remove undefined/null fields that might cause issues
+      Object.keys(updateData).forEach(key => {
+        if (updateData[key] === undefined) delete updateData[key];
+      });
+      
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/master/packages/${id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({
-          isActive: !currentPkg.isActive
-        })
+        body: JSON.stringify(updateData)
       });
       
       const result = await response.json();
@@ -118,20 +127,33 @@ const PackagesTable = () => {
 
   // Delete package
   const handleDelete = async (id, name) => {
-    const confirm = window.confirm(`Are you sure you want to delete "${name}"?`);
+    const confirm = window.confirm(`Are you sure you want to permanently delete "${name}"?\n\nThis will remove it from all lists but keep it in the database.`);
     if (!confirm) return;
 
     try {
       setLoading(true);
       
+      const currentPkg = packages.find((p) => p.id === id);
+      const updateData = {
+        ...currentPkg,
+        isDeleted: true
+      };
+      Object.keys(updateData).forEach(key => {
+        if (updateData[key] === undefined) delete updateData[key];
+      });
+      
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/master/packages/${id}`, {
-        method: 'DELETE'
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(updateData)
       });
       
       const result = await response.json();
       
       if (result.success) {
-        alert('Package deleted successfully!');
+        alert('Package deleted permanently!');
         fetchPackages(); // Refresh the list
       } else {
         alert(`Error: ${result.message}`);
@@ -224,14 +246,14 @@ const PackagesTable = () => {
           </thead>
 
           <tbody>
-            {packages.length === 0 ? (
+            {filteredData.length === 0 ? (
               <tr>
                 <td colSpan={8} className="text-center py-8 text-gray-500 border border-gray-300">
                   No packages found.
                 </td>
               </tr>
             ) : (
-              packages.map((item, index) => (
+              filteredData.map((item, index) => (
                 <tr 
                   key={item.id} 
                   className={`hover:bg-gray-50 border-b border-gray-200 ${

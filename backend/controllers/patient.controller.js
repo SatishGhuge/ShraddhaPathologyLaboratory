@@ -23,14 +23,14 @@ export const createPatient = async (req, res) => {
       businessType: req.body.businessType
     });
 
-    const { 
+    let { 
       // Existing patient ID (if this is an existing patient)
       existingPatientId,
       // Patient Identity
       title, firstName, lastName, dob, age, gender, mobile, email,
       createdBy, createdAtLocation, address, location,
       // Registration Details (will be saved with each test)
-      visitType, reportMode, referralDoctor, visitDate, visitTime,
+      reportMode, referralDoctor, visitDate, visitTime,
       sampleTaken, sampleReceived, sampleBarcodeNo, patient_history,
       // Billing Details (will be saved with each test)
       totalAmount, discountPercent, discountAmount, discountRemark,
@@ -38,6 +38,20 @@ export const createPatient = async (req, res) => {
       // Tests
       tests 
     } = req.body;
+
+    // Normalize referralDoctor: remove all "Dr." prefixes and add exactly one
+    if (referralDoctor && referralDoctor.trim()) {
+      referralDoctor = referralDoctor
+        .replace(/\bDr\.?\s*/gi, '') // Remove all "Dr" or "Dr." variations
+        .trim();
+      
+      // Add exactly one "Dr." prefix if it has content
+      if (referralDoctor) {
+        referralDoctor = `Dr. ${referralDoctor}`;
+      } else {
+        referralDoctor = null;
+      }
+    }
 
     let patient;
     let isExistingPatient = false;
@@ -101,7 +115,6 @@ export const createPatient = async (req, res) => {
           organizationId: req.body.organizationId || null,
           sample: test.sample,
           charge: parseFloat(test.charge),
-          visitType,
           reportMode,
           referralDoctor,
           visitDate: visitDate ? new Date(visitDate) : new Date(),
@@ -117,8 +130,7 @@ export const createPatient = async (req, res) => {
           paidAmount: perTestPaid,
           balanceAmount: perTestBalance,
           paymentMode,
-          businessType,
-          packageName: test.packageName || null
+          businessType
         })) || []
       });
 
@@ -188,7 +200,6 @@ export const createPatient = async (req, res) => {
               organizationId: req.body.organizationId || null,
               sample: test.sample,
               charge: parseFloat(test.charge),
-              visitType,
               reportMode,
               referralDoctor,
               visitDate: visitDate ? new Date(visitDate) : new Date(),
@@ -204,8 +215,7 @@ export const createPatient = async (req, res) => {
               paidAmount: perTestPaid,
               balanceAmount: perTestBalance,
               paymentMode,
-              businessType,
-              packageName: test.packageName || null
+              businessType
             })) || []
           }
         },
@@ -283,7 +293,17 @@ export const getAllPatients = async (req, res) => {
       include: {
         tests: {
           include: {
-            test: true,
+            test: {
+              include: {
+                sample_type: {
+                  select: {
+                    id: true,
+                    Sample_Type: true,
+                    Sample_Color: true
+                  }
+                }
+              }
+            },
             department: true,
             organization: true
           }
@@ -317,7 +337,17 @@ export const getPatientById = async (req, res) => {
       include: {
         tests: {
           include: {
-            test: true,
+            test: {
+              include: {
+                sample_type: {
+                  select: {
+                    id: true,
+                    Sample_Type: true,
+                    Sample_Color: true
+                  }
+                }
+              }
+            },
             department: true,
             organization: true
           }
@@ -379,7 +409,17 @@ export const searchPatient = async (req, res) => {
       include: {
         tests: {
           include: {
-            test: true,
+            test: {
+              include: {
+                sample_type: {
+                  select: {
+                    id: true,
+                    Sample_Type: true,
+                    Sample_Color: true
+                  }
+                }
+              }
+            },
             department: true,
             organization: true
           },
@@ -704,7 +744,6 @@ export const addTestToVisit = async (req, res) => {
         sample: sampleType || existingTest.sample,
         charge: parseFloat(charge) || 0,
         status: 'Registered',
-        visitType: existingTest.visitType,
         reportMode: existingTest.reportMode,
         referralDoctor: existingTest.referralDoctor,
         visitDate: existingTest.visitDate,

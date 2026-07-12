@@ -246,7 +246,7 @@ function DateRangePicker({ value, onChange }: { value?: { start?: Date; end?: Da
 // Tests and packages are fetched from API — see state: allTests, packagesList
 
 const INIT_FORM = {
-  visitDate:"", location:"SHRADDHA", corporate:"WalkIn",
+  visitDate:"", location:"SHRADDHA",
   reportMode:"By hand", mobile:"", title:"MR", firstName:"", lastName:"",
   age:"", ageUnit:"Year", gender:"Male", referralDoctor:"",
   referralDoctorChecked:false, patient_history:"", email:"", address:""
@@ -434,6 +434,7 @@ export default function BookingPage() {
           visitMap[vid] = {
             visitId:         vid,
             visitDate:       t.visitDate,
+            location:        t.organization?.location || "",
             referralDoctor:  t.referralDoctor || "",
             patient_history: t.patient_history || "",
             organizationId:  t.organizationId || "",
@@ -457,13 +458,20 @@ export default function BookingPage() {
         visitMap[vid].tests.push({
           id: t.id,  // ✅ IMPORTANT: Include the PatientTest ID
           name: t.test?.name || "",
-          sample: t.test?.sampleType || "N/A",
+          sample: t.test?.sample_type?.Sample_Type || t.sample || "N/A",  // Use sample_type relationship if available, fallback to PatientTest.sample
+          testId: t.testId,
+          departmentId: t.departmentId,
+          organizationId: t.organizationId,
           b2cCharge: t.charge || 0,
           b2bCharge: t.charge || 0,
           isExisting: true,
           visitId: t.visitId,
           status: t.status || "Registered",
-          barcode_status: t.barcode_status || "Unprinted", // ✅ Include barcode status for highlighting
+          barcode_status: t.barcode_status || "Unprinted",
+          reportMode: t.reportMode || "",
+          referralDoctor: t.referralDoctor || "",
+          paymentMode: t.paymentMode || "Cash",
+          businessType: t.businessType || "B2C",
         });
       });
 
@@ -500,6 +508,8 @@ export default function BookingPage() {
             age: String(p.age || ""),
             gender: p.gender || "Male",
             address: p.address || "",
+            location: visit.location || "SHRADDHA",
+            patient_history: visit.patient_history || "",
             remark: visit.remarks,
             referralDoctor: visit.referralDoctor,
             referralDoctorChecked: !!visit.referralDoctor,
@@ -574,17 +584,29 @@ export default function BookingPage() {
   useEffect(() => {
     Promise.all([getTests(), getPackages(), getSpecimenTypes()])
       .then(([testsRes, packagesRes, specimens]) => {
-        const tests = Array.isArray(testsRes) ? testsRes : [];
+        // Handle getTests response which returns { data, pagination }
+        const testsData = testsRes?.data ? testsRes.data : (Array.isArray(testsRes) ? testsRes : []);
+        const tests = Array.isArray(testsData) ? testsData : [];
         const packages = Array.isArray(packagesRes) ? packagesRes : [];
         setSpecimenTypes(specimens);
+        
+        // Map tests with all database fields for proper editing
         const mappedTests = tests.map(t => ({
           id: t.id,
           name: t.name,
-          sample: t.sampleType || "N/A",
+          testCode: t.testCode || "",
+          departmentId: t.departmentId || null,
+          department: t.department || null,
+          sampleTypeId: t.sampleTypeId || null,
+          sample: t.sampleTypeId ? "Sample" : "N/A", // Show based on whether sampleTypeId exists
+          group: t.group || "",
           b2cCharge: t.charges?.[0]?.b2cCharge ?? 0,
           b2bCharge: t.charges?.[0]?.b2bCharge ?? 0,
+          categories: t.categories || [],
+          charges: t.charges || [],
         }));
         setAllTests(mappedTests);
+        
         setPackagesList(packages.map(pkg => ({
           id: pkg.id,
           name: pkg.name,
@@ -596,7 +618,10 @@ export default function BookingPage() {
             return {
               id: pt.id,
               name: pt.name,
-              sample: pt.sampleType || full.sample || "N/A",
+              testCode: full.testCode || "",
+              departmentId: full.departmentId || null,
+              sampleTypeId: full.sampleTypeId || null,
+              sample: full.sample || "N/A",
               b2cCharge: full.b2cCharge ?? 0,
               b2bCharge: full.b2bCharge ?? 0,
             };
@@ -2018,25 +2043,25 @@ export default function BookingPage() {
                     const allTests = selectedBooking.tests;
                     return (
                       <div className="bg-white rounded shadow flex flex-col flex-1 overflow-hidden">
-                        <div className="bg-slate-900 text-white px-2 py-1 font-semibold text-xs flex justify-between items-center">
-                          <span>Investigation(s)</span>
-                          <span className="text-yellow-300 text-xs">{allTests.length} test{allTests.length!==1?"s":""}</span>
+                        <div className="bg-slate-900 text-white px-1 py-0.5 font-semibold text-xs flex justify-between items-center">
+                          <span>Test(s)</span>
+                          <span className="text-yellow-300 text-xs">{allTests.length}</span>
                         </div>
                         <div className="flex-1 overflow-y-auto overflow-x-auto">
                           <table className="w-full text-xs">
                             <thead className="bg-slate-900 text-white sticky top-0">
                               <tr>
-                                <th className="p-2 text-left">Sr.No</th>
-                                <th className="p-2 text-left">Investigation(s)</th>
-                                <th className="p-2 text-center">Date</th>
-                                <th className="p-2 text-center">Amount</th>
-                                <th className="p-2 text-center" title="Barcode print status: Red=Unprinted, Blue=Printed">🔖</th>
-                                <th className="p-2 text-center">Action</th>
+                                <th className="p-1 text-left text-xs">#</th>
+                                <th className="p-1 text-left text-xs">Test</th>
+                                <th className="p-1 text-center text-xs">Date</th>
+                                <th className="p-1 text-center text-xs">Amt</th>
+                                <th className="p-1 text-center text-xs" title="Barcode: Red=Unprinted, Blue=Printed">🔖</th>
+                                <th className="p-1 text-center text-xs">Act</th>
                               </tr>
                             </thead>
                             <tbody>
                               {allTests.length === 0 ? (
-                                <tr><td colSpan={6} className="p-3 text-center text-gray-400 text-xs">No investigations added</td></tr>
+                                <tr><td colSpan={6} className="p-1 text-center text-gray-400 text-xs">No tests added</td></tr>
                               ) : allTests.map((t,i) => {
                                 const charge    = businessType==="B2C"?(t.b2cCharge||t.charge||0):(t.b2bCharge||t.charge||0);
                                 const isEditing = editingCharge?.testName===t.name;
@@ -2047,43 +2072,43 @@ export default function BookingPage() {
                                 // Highlight entire row red if barcode not printed
                                 const rowBackgroundClass = !isBarcodePrinted ? "bg-red-50 hover:bg-red-100" : (t.fromPackage||t.isPackage ? "bg-orange-50 hover:bg-orange-100" : "hover:bg-gray-50");
                                 return (
-                                  <tr key={i} className={`border-b ${rowBackgroundClass} ${!isBarcodePrinted ? "border-red-300 border-l-4 border-l-red-600" : "border-gray-200"}`}>
-                                    <td className="p-2 text-center">
-                                      <div className="flex items-center justify-center gap-1">
+                                  <tr key={i} className={`border-b text-xs ${rowBackgroundClass} ${!isBarcodePrinted ? "border-red-300 border-l-4 border-l-red-600" : "border-gray-200"}`}>
+                                    <td className="p-1 text-center">
+                                      <div className="flex items-center justify-center gap-0.5 text-xs">
                                         <span>{i+1}</span>
                                         {isNewTest && (
-                                          <span className="text-blue-600 font-bold text-sm" title="Newly added test">N</span>
+                                          <span className="text-blue-600 font-bold text-xs" title="New">N</span>
                                         )}
                                         {!isBarcodePrinted && (
-                                          <span className="text-red-600 font-bold text-sm" title="Barcode not printed">⚠</span>
+                                          <span className="text-red-600 font-bold text-xs" title="Unprinted">⚠</span>
                                         )}
                                       </div>
                                     </td>
-                                    <td className="p-2">
-                                      <div className="flex items-center gap-2 flex-wrap">
-                                        {(t.fromPackage||t.isPackage) && <span className="bg-orange-500 text-white text-xs px-1.5 py-0.5 rounded font-semibold shrink-0">PKG</span>}
-                                        <span>{t.name}</span>
+                                    <td className="p-1 text-xs">
+                                      <div className="flex items-center gap-1 flex-wrap">
+                                        {(t.fromPackage||t.isPackage) && <span className="bg-orange-500 text-white text-xs px-1 py-0 rounded font-semibold shrink-0">P</span>}
+                                        <span className="text-xs">{t.name}</span>
                                         {barcodeStatus === "Unprinted" && (
-                                          <span className="bg-red-100 text-red-700 text-xs px-1.5 py-0.5 rounded font-semibold shrink-0" title="Barcode yet to get printed">⚠ Unprinted</span>
+                                          <span className="bg-red-100 text-red-700 text-xs px-1 py-0 rounded font-semibold shrink-0" title="Unprinted">⚠</span>
                                         )}
                                       </div>
                                     </td>
-                                    <td className="p-2 text-center">{selectedBooking.date}</td>
-                                    <td className="p-2 text-center">
-                                      <div className="flex items-center justify-center gap-1">
+                                    <td className="p-1 text-center text-xs">{selectedBooking.date}</td>
+                                    <td className="p-1 text-center text-xs">
+                                      <div className="flex items-center justify-center gap-0.5 text-xs">
                                         {isEditing ? (
                                           <input type="number" autoFocus value={editingCharge.value}
                                             onChange={e=>setEditingCharge({...editingCharge,value:e.target.value})}
                                             onBlur={()=>handleSaveCharge(t.name)}
                                             onKeyDown={e=>{if(e.key==="Enter")handleSaveCharge(t.name);if(e.key==="Escape")setEditingCharge(null);}}
-                                            className="w-16 border border-gray-300 rounded px-1 py-0.5 text-center text-xs focus:outline-none focus:ring-1 focus:ring-orange-500"/>
-                                        ) : <span className="font-semibold">₹{charge}</span>}
+                                            className="w-12 border border-gray-300 rounded px-0.5 py-0 text-center text-xs focus:outline-none focus:ring-1 focus:ring-orange-500"/>
+                                        ) : <span className="font-semibold text-xs">₹{charge}</span>}
                                         <button onClick={()=>setEditingCharge({testName:t.name,value:charge})}
-                                          className="text-primary-600 hover:text-primary-700 ml-1" title="Edit charge"><Pencil size={13}/></button>
+                                          className="text-primary-600 hover:text-primary-700" title="Edit"><Pencil size={11}/></button>
                                       </div>
                                     </td>
-                                    <td className="p-2 text-center">
-                                      <div className="w-5 h-5 rounded border-2 flex items-center justify-center mx-auto" 
+                                    <td className="p-1 text-center text-xs">
+                                      <div className="w-4 h-4 rounded border-2 flex items-center justify-center mx-auto text-xs" 
                                         title={isBarcodePrinted ? "Printed" : "Unprinted"}
                                         style={isBarcodePrinted 
                                           ? { borderColor: '#3b82f6', backgroundColor: '#eff6ff', color: '#1e40af' }
@@ -2092,8 +2117,8 @@ export default function BookingPage() {
                                         {isBarcodePrinted ? '✓' : '○'}
                                       </div>
                                     </td>
-                                    <td className="p-2 text-center">
-                                      <button onClick={()=>handleDeleteTest(t)} className="text-red-600 hover:text-red-800"><X size={14}/></button>
+                                    <td className="p-1 text-center">
+                                      <button onClick={()=>handleDeleteTest(t)} className="text-red-600 hover:text-red-800"><X size={12}/></button>
                                     </td>
                                   </tr>
                                 );
@@ -2167,16 +2192,16 @@ export default function BookingPage() {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg shadow-xl w-[95%] max-w-4xl max-h-[90vh] overflow-y-auto">
             <div className="bg-gray-100 p-4 flex justify-between items-center border-b sticky top-0">
-              <h2 className="text-xl font-semibold">Edit Patient ({editingPatient.patientId})</h2>
+              <h2 className="text-lg font-semibold">Edit Patient ({editingPatient.patientId})</h2>
               <button onClick={()=>{
                 setEditingPatient(null);
                 setShowDateTimePicker(false);
               }} className="text-gray-600"><X size={24}/></button>
             </div>
-            <div className="p-6 space-y-4">
+            <div className="p-4 space-y-2 text-sm">
               {/* Registration Date with DateTime Picker */}
               <div className={style.formGrid}>
-                <label className="col-span-3 font-semibold">Registration Date</label>
+                <label className="col-span-3 font-semibold text-xs">Registration Date</label>
                 {showDateTimePicker ? (
                   <input 
                     type="datetime-local" 
@@ -2185,7 +2210,7 @@ export default function BookingPage() {
                     onChange={handleInputChange}
                     onBlur={() => setShowDateTimePicker(false)}
                     autoFocus
-                    className="col-span-9 border border-gray-300 rounded px-3 py-2 bg-white"
+                    className="col-span-9 border border-gray-300 rounded px-2 py-1 text-xs bg-white"
                   />
                 ) : (
                   <input 
@@ -2194,27 +2219,26 @@ export default function BookingPage() {
                     onClick={() => setShowDateTimePicker(true)}
                     readOnly
                     placeholder="Click to select date and time"
-                    className="col-span-9 border border-gray-300 rounded px-3 py-2 bg-white cursor-pointer"
+                    className="col-span-9 border border-gray-300 rounded px-2 py-1 text-xs bg-white cursor-pointer"
                   />
                 )}
               </div>
               
               {[
                 ["Location","location","select",null],
-                ["Corporate","corporate","select",["WalkIn"]],
                 ["Report Mode","reportMode","select",["By hand","Email","WhatsApp"]]
               ].map((f,i) => (
                 <div key={i} className={style.formGrid}>
-                  <label className="col-span-3 font-semibold">{f[0]}</label>
+                  <label className="col-span-3 font-semibold text-xs">{f[0]}</label>
                   {f[2]==="text"
-                    ? <input type="text" name={f[1] as string} value={formData[f[1] as keyof typeof formData] as any} onChange={handleInputChange} className="col-span-9 border border-gray-300 rounded px-3 py-2 bg-white"/>
-                    : <select name={f[1] as string} value={formData[f[1] as keyof typeof formData] as any} onChange={handleInputChange} className="col-span-9 border border-gray-300 rounded px-3 py-2 bg-white">
+                    ? <input type="text" name={f[1] as string} value={formData[f[1] as keyof typeof formData] as any} onChange={handleInputChange} className="col-span-9 border border-gray-300 rounded px-2 py-1 text-xs bg-white"/>
+                    : <select name={f[1] as string} value={formData[f[1] as keyof typeof formData] as any} onChange={handleInputChange} className="col-span-9 border border-gray-300 rounded px-2 py-1 text-xs bg-white">
                         {(Array.isArray(f[3]) ? f[3] : [formData[f[1] as keyof typeof formData]]).map((opt,j)=><option key={j}>{opt}</option>)}
                       </select>}
                 </div>
               ))}
               <div className={style.formGrid}>
-                <label className="col-span-3 font-semibold">Mobile</label>
+                <label className="col-span-3 font-semibold text-xs">Mobile</label>
                 <input 
                   type="text" 
                   name="mobile" 
@@ -2226,32 +2250,41 @@ export default function BookingPage() {
                     }
                   }}
                   maxLength={10}
-                  placeholder="Enter 10 digit mobile number"
-                  className="col-span-9 border border-gray-300 rounded px-3 py-2 bg-white"
+                  placeholder="10 digits"
+                  className="col-span-9 border border-gray-300 rounded px-2 py-1 text-xs bg-white"
                   title="Enter exactly 10 digits"
                 />
               </div>
               <div className={style.formGrid}>
-                <label className="col-span-3 font-semibold">Patient Name</label>
-                <select name="title" value={formData.title} onChange={handleInputChange} className="col-span-2 border border-gray-300 rounded px-3 py-2 bg-white">
-                  <option>MR</option><option>MRS</option><option>MS</option><option>BABY</option>
+                <label className="col-span-3 font-semibold text-xs">Organization</label>
+                <select name="organizationCode" value={formData.organizationCode || ""} onChange={(e) => setFormData(prev => ({...prev, organizationCode: e.target.value}))} className="col-span-9 border border-gray-300 rounded px-2 py-1 text-xs bg-white">
+                  <option value="">Select Organization</option>
+                  {organizations.map(org => (
+                    <option key={org.id} value={org.code || org.id}>{org.name}</option>
+                  ))}
                 </select>
-                <input type="text" name="firstName" value={formData.firstName} onChange={handleInputChange} className="col-span-4 border border-gray-300 rounded px-3 py-2 bg-white"/>
-                <input type="text" name="lastName"  value={formData.lastName}  onChange={handleInputChange} placeholder="LAST NAME" className="col-span-3 border border-gray-300 rounded px-3 py-2 bg-white"/>
               </div>
               <div className={style.formGrid}>
-                <label className="col-span-3 font-semibold">Age/Gender</label>
-                <input type="text" name="age" value={formData.age} onChange={handleInputChange} className="col-span-2 border border-gray-300 rounded px-3 py-2 bg-white"/>
-                <select name="ageUnit" value={formData.ageUnit} onChange={handleInputChange} className="col-span-3 border border-gray-300 rounded px-3 py-2 bg-white">
+                <label className="col-span-3 font-semibold text-xs">Patient Name</label>
+                <select name="title" value={formData.title} onChange={handleInputChange} className="col-span-2 border border-gray-300 rounded px-2 py-1 text-xs bg-white">
+                  <option>MR</option><option>MRS</option><option>MS</option><option>BABY</option>
+                </select>
+                <input type="text" name="firstName" value={formData.firstName} onChange={handleInputChange} className="col-span-4 border border-gray-300 rounded px-2 py-1 text-xs bg-white" placeholder="First"/>
+                <input type="text" name="lastName"  value={formData.lastName}  onChange={handleInputChange} placeholder="Last" className="col-span-3 border border-gray-300 rounded px-2 py-1 text-xs bg-white"/>
+              </div>
+              <div className={style.formGrid}>
+                <label className="col-span-3 font-semibold text-xs">Age/Gender</label>
+                <input type="text" name="age" value={formData.age} onChange={handleInputChange} className="col-span-2 border border-gray-300 rounded px-2 py-1 text-xs bg-white" placeholder="Age"/>
+                <select name="ageUnit" value={formData.ageUnit} onChange={handleInputChange} className="col-span-3 border border-gray-300 rounded px-2 py-1 text-xs bg-white">
                   <option>Year</option><option>Month</option><option>Day</option>
                 </select>
-                <select name="gender" value={formData.gender} onChange={handleInputChange} className="col-span-4 border border-gray-300 rounded px-3 py-2 bg-white">
+                <select name="gender" value={formData.gender} onChange={handleInputChange} className="col-span-4 border border-gray-300 rounded px-2 py-1 text-xs bg-white">
                   <option>Male</option><option>Female</option><option>Other</option>
                 </select>
               </div>
               <div className={style.formGrid}>
-                <label className="col-span-3 font-semibold">Referral Doctor</label>
-                <div className="col-span-9 flex items-center gap-2">
+                <label className="col-span-3 font-semibold text-xs">Referral Doctor</label>
+                <div className="col-span-9 flex items-center gap-1">
                   <input 
                     type="checkbox" 
                     name="referralDoctorChecked" 
@@ -2263,7 +2296,7 @@ export default function BookingPage() {
                         setShowDoctorDropdown(false);
                       }
                     }}
-                    className="w-5 h-5"
+                    className="w-4 h-4"
                   />
                   
                   {formData.referralDoctorChecked ? (
@@ -2273,8 +2306,8 @@ export default function BookingPage() {
                       name="referralDoctor" 
                       value={formData.referralDoctor} 
                       onChange={handleInputChange} 
-                      placeholder="Type referral doctor name"
-                      className="flex-1 border border-gray-300 rounded px-3 py-2 bg-white"
+                      placeholder="Type doctor name"
+                      className="flex-1 border border-gray-300 rounded px-2 py-1 text-xs bg-white"
                     />
                   ) : (
                     // When unchecked: Show searchable dropdown
@@ -2287,12 +2320,12 @@ export default function BookingPage() {
                           setShowDoctorDropdown(true);
                         }}
                         onFocus={() => setShowDoctorDropdown(true)}
-                        placeholder="Search doctor name..."
-                        className="w-full border rounded px-3 py-2 bg-white"
+                        placeholder="Search..."
+                        className="w-full border rounded px-2 py-1 text-xs bg-white"
                       />
                       
                       {showDoctorDropdown && filteredDoctors.length > 0 && (
-                        <div className="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                        <div className="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-40 overflow-y-auto">
                           {filteredDoctors.map((doctor) => (
                             <div
                               key={doctor.id}
@@ -2301,17 +2334,17 @@ export default function BookingPage() {
                                 setDoctorSearch(doctor.name);
                                 setShowDoctorDropdown(false);
                               }}
-                              className="px-4 py-2 hover:bg-gray-50 cursor-pointer border-b last:border-b-0 transition-colors"
+                              className="px-2 py-1 hover:bg-gray-50 cursor-pointer border-b last:border-b-0 transition-colors text-xs"
                             >
                               <div className="font-semibold text-gray-800">{doctor.name}</div>
-                              <div className="text-xs text-gray-500">{doctor.degree} - {doctor.specialization}</div>
+                              <div className="text-xs text-gray-500">{doctor.degree}</div>
                             </div>
                           ))}
                         </div>
                       )}
                       
                       {showDoctorDropdown && doctorSearch && filteredDoctors.length === 0 && (
-                        <div className="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg p-3 text-center text-gray-500 text-sm">
+                        <div className="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg p-2 text-center text-gray-500 text-xs">
                           No doctors found
                         </div>
                       )}
@@ -2321,27 +2354,28 @@ export default function BookingPage() {
                   {/* ===== ADD DOCTOR BUTTON ===== */}
                   <button 
                     onClick={() => setShowAddReferral(true)}
-                    className="bg-orange-500 hover:bg-orange-600 text-white rounded-full p-2"
+                    className="bg-orange-500 hover:bg-orange-600 text-white rounded-full p-1"
                     title="Add Referral Doctor">
-                    <Plus size={20}/>
+                    <Plus size={14}/>
                   </button>
                 </div>
               </div>
               <div className={style.formGrid}>
-                <label className="col-span-3 font-semibold pt-2">Patient History</label>
-                <input type="text" name="patient_history" value={formData.patient_history} onChange={handleInputChange} className="col-span-9 border border-gray-300 rounded px-3 py-2 bg-white"/>
+                <label className="col-span-3 font-semibold text-xs">Patient History</label>
+                <input type="text" name="patient_history" value={formData.patient_history} onChange={handleInputChange} className="col-span-9 border border-gray-300 rounded px-2 py-1 text-xs bg-white" placeholder="History"/>
               </div>
               <div className={style.formGrid}>
-                <label className="col-span-3 font-semibold pt-2">Email</label>
-                <input type="email" name="email" value={formData.email} onChange={handleInputChange} className="col-span-9 border border-gray-300 rounded px-3 py-2 bg-white"/>
+                <label className="col-span-3 font-semibold text-xs">Email</label>
+                <input type="email" name="email" value={formData.email} onChange={handleInputChange} className="col-span-9 border border-gray-300 rounded px-2 py-1 text-xs bg-white" placeholder="Email"/>
               </div>
               <div className={style.formGrid}>
-                <label className="col-span-3 font-semibold pt-2">Address</label>
-                <textarea name="address" value={formData.address} onChange={handleInputChange} rows={3} className="col-span-9 border border-gray-300 rounded px-3 py-2 bg-white"/>
+                <label className="col-span-3 font-semibold text-xs">Address</label>
+                <textarea name="address" value={formData.address} onChange={handleInputChange} rows={2} className="col-span-9 border border-gray-300 rounded px-2 py-1 text-xs bg-white" placeholder="Address"/>
               </div>
             </div>
-            <div className="p-6 border-t flex justify-end">
-              <button onClick={handleSaveEdit} className="bg-orange-500 text-white px-8 py-2 rounded-lg font-semibold">Save</button>
+            <div className="p-4 border-t flex justify-end gap-2">
+              <button onClick={() => setEditingPatient(null)} className="border border-gray-300 text-gray-700 px-4 py-1 rounded text-xs hover:bg-gray-50">Cancel</button>
+              <button onClick={handleSaveEdit} className="bg-orange-500 text-white px-6 py-1 rounded text-xs font-semibold hover:bg-orange-600">Save</button>
             </div>
           </div>
         </div>

@@ -132,14 +132,6 @@ const OrganizationList = () => {
                     <td className="border border-gray-300 px-3 py-1 text-center font-semibold">{o.isActive ? "Yes" : "No"}</td>
                     <td className="border border-gray-300 px-3 py-1">
                       <div className="flex gap-1 flex-wrap">
-                        {/* VIEW */}
-                        <button
-                          onClick={() => router.push(`/master/organization/view/${o.id}`)}
-                          className="bg-orange-500 text-white px-2 py-1 rounded text-xs hover:bg-orange-600 transition-colors"
-                        >
-                          View
-                        </button>
-
                         {/* EDIT */}
                         <button
                           onClick={() => router.push(`/master/organization/edit/${o.id}`)}

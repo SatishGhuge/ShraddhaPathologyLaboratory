@@ -179,13 +179,11 @@ const defaultModuleAllocation = {
   },
   reports: {
     dashboard: false,
-    dailyCollection: false,
-    monthlyCollectionSummary: false,
+    collectionReport: false,
     patientList: false,
-    centerWiseCostReport: false,
-    b2bTestwiseCostReport: false,
-    discountReport: false,
+    referralDoctorRevenue: false,
     testReport: false,
+    turnAroundTime: false,
   },
   configuration: {
     signature: false,
@@ -251,8 +249,22 @@ const EditOrganization = () => {
 
   useEffect(() => {
     if (id && (isViewMode || isEditMode)) {
+      console.log('🚀 Starting to fetch organization:', id);
       getOrganizationById((Array.isArray(id) ? id[0] : id) as string).then(organization => {
+        console.log('📥 COMPLETE organization object received:', JSON.stringify(organization, null, 2));
+        
         if (organization) {
+          console.log('✅ Organization exists, checking for moduleAllocation...');
+          console.log('📋 Organization keys:', Object.keys(organization));
+          console.log('🔍 moduleAllocation field:', {
+            exists: 'moduleAllocation' in organization,
+            value: organization.moduleAllocation,
+            type: typeof organization.moduleAllocation,
+            isNull: organization.moduleAllocation === null,
+            isUndefined: organization.moduleAllocation === undefined,
+            length: organization.moduleAllocation?.length
+          });
+          
           setFormData({
             name: organization.name || "",
             organizationType: organization.organizationType || "",
@@ -266,18 +278,28 @@ const EditOrganization = () => {
             sendReportsViaWhatsApp: organization.sendReportsViaWhatsApp || false,
             sendReportsViaMail: organization.sendReportsViaMail || false,
           });
+          
           if (organization.moduleAllocation) {
             try {
+              console.log('🔄 Attempting to parse moduleAllocation...');
               const allocation = typeof organization.moduleAllocation === 'string' 
                 ? JSON.parse(organization.moduleAllocation) 
                 : organization.moduleAllocation;
+              console.log('✅ Successfully parsed moduleAllocation:', allocation);
               setModuleAllocation(allocation);
             } catch (e) {
+              console.error('❌ Error parsing moduleAllocation:', e);
+              console.error('   Raw value was:', organization.moduleAllocation);
               setModuleAllocation(defaultModuleAllocation);
             }
+          } else {
+            console.warn('⚠️ NO moduleAllocation found - using default');
+            setModuleAllocation(defaultModuleAllocation);
           }
         }
-      }).catch(console.error);
+      }).catch(error => {
+        console.error('❌ Error fetching organization:', error);
+      });
     }
   }, [id, isViewMode, isEditMode]);
 
@@ -558,10 +580,8 @@ const EditOrganization = () => {
                       { key: 'reports.collectionReport', label: 'Collection Report' },
                       { key: 'reports.patientList', label: 'Patient List' },
                       { key: 'reports.referralDoctorRevenue', label: 'Referral Doctor Revenue' },
-                      { key: 'reports.centerWiseCostReport', label: 'Center Cost' },
-                      { key: 'reports.b2bTestwiseCostReport', label: 'B2B Cost' },
-                      { key: 'reports.discountReport', label: 'Discount' },
                       { key: 'reports.testReport', label: 'Test Report' },
+                      { key: 'reports.turnAroundTime', label: 'Turn Around Time' },
                     ]}
                     moduleAllocation={moduleAllocation}
                     toggleModule={toggleModule}

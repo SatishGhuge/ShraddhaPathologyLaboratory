@@ -91,6 +91,19 @@ export const createUnit = async (d: ApiData): Promise<any> => { const r = await 
 export const updateUnit = async (id: string, d: ApiData): Promise<any> => { const r = await apiCall(`/master/units/${id}`, { method: 'PUT', body: JSON.stringify(d) }); return r.data || r; };
 export const deleteUnit = async (id: string): Promise<ApiResponse> => apiCall(`/master/units/${id}`, { method: 'DELETE' });
 
+// ==================== SAMPLE TYPES ====================
+export const getSampleTypes = async (page: number = 1, limit: number = 20): Promise<any[]> => { 
+  const params = new URLSearchParams();
+  params.append('page', page.toString());
+  params.append('limit', limit.toString());
+  const r = await apiCall(`/master/sample-types?${params.toString()}`, { method: 'GET' }); 
+  return extractDataArray(r); 
+};
+export const getSampleTypeById = async (id: string): Promise<any | null> => { const r = await apiCall(`/master/sample-types/${id}`, { method: 'GET' }); return r.data || null; };
+export const createSampleType = async (d: ApiData): Promise<any> => { const r = await apiCall('/master/sample-types', { method: 'POST', body: JSON.stringify(d) }); return r.data || r; };
+export const updateSampleType = async (id: string, d: ApiData): Promise<any> => { const r = await apiCall(`/master/sample-types/${id}`, { method: 'PUT', body: JSON.stringify(d) }); return r.data || r; };
+export const deleteSampleType = async (id: string): Promise<ApiResponse> => apiCall(`/master/sample-types/${id}`, { method: 'DELETE' });
+
 // ==================== TEMPLATES ====================
 export const getTemplates = async (page: number = 1, limit: number = 20): Promise<any> => { 
   const params = new URLSearchParams();
@@ -100,6 +113,7 @@ export const getTemplates = async (page: number = 1, limit: number = 20): Promis
   return r; 
 };
 export const getTemplateById = async (id: string): Promise<any | null> => { const r = await apiCall(`/master/templates/${id}`, { method: 'GET' }); return r.data || null; };
+export const getTemplatesByTestId = async (testId: string | number): Promise<any[]> => { const r = await apiCall(`/master/templates/by-test/${testId}`, { method: 'GET' }); return r.data || []; };
 export const createTemplate = async (d: ApiData): Promise<any> => { const r = await apiCall('/master/templates', { method: 'POST', body: JSON.stringify(d) }); return r.data || r; };
 export const updateTemplate = async (id: string, d: ApiData): Promise<any> => { const r = await apiCall(`/master/templates/${id}`, { method: 'PUT', body: JSON.stringify(d) }); return r.data || r; };
 export const deleteTemplate = async (id: string): Promise<ApiResponse> => apiCall(`/master/templates/${id}`, { method: 'DELETE' });
@@ -123,6 +137,23 @@ export const getDoctorById = async (id: string): Promise<any | null> => { const 
 export const createDoctor = async (d: ApiData): Promise<any> => { const r = await apiCall('/master/doctors', { method: 'POST', body: JSON.stringify(d) }); return r.data || r; };
 export const updateDoctor = async (id: string, d: ApiData): Promise<any> => { const r = await apiCall(`/master/doctors/${id}`, { method: 'PUT', body: JSON.stringify(d) }); return r.data || r; };
 export const deleteDoctor = async (id: string): Promise<ApiResponse> => { const r = await apiCall(`/master/doctors/${id}`, { method: 'DELETE' }); return r; };
+export const findDuplicateDoctors = async (threshold: number = 0.6): Promise<any> => {
+  const params = new URLSearchParams();
+  params.append('threshold', threshold.toString());
+  const r = await apiCall(`/master/doctors/find-duplicates?${params.toString()}`, { method: 'GET' });
+  return r.data || [];
+};
+export const getDoctorMergeHistory = async (doctorId: string): Promise<any> => {
+  const r = await apiCall(`/master/doctors/${doctorId}/merge-history`, { method: 'GET' });
+  return r.data || null;
+};
+export const mergeDoctors = async (sourceDoctorId: number, targetDoctorId: number): Promise<any> => {
+  const r = await apiCall('/master/doctors/merge', {
+    method: 'POST',
+    body: JSON.stringify({ sourceDoctorId, targetDoctorId })
+  });
+  return r.data || r;
+};
 
 // ==================== PACKAGES ====================
 export const getPackages = async (page: number = 1, limit: number = 20): Promise<any[]> => { 
@@ -130,6 +161,14 @@ export const getPackages = async (page: number = 1, limit: number = 20): Promise
   params.append('page', page.toString());
   params.append('limit', limit.toString());
   const r = await apiCall(`/master/packages?${params.toString()}`, { method: 'GET' }); 
+  return extractDataArray(r); 
+};
+
+export const getAllPackages = async (page: number = 1, limit: number = 20): Promise<any[]> => { 
+  const params = new URLSearchParams();
+  params.append('page', page.toString());
+  params.append('limit', limit.toString());
+  const r = await apiCall(`/master/packages/all?${params.toString()}`, { method: 'GET' }); 
   return extractDataArray(r); 
 };
 
@@ -181,7 +220,16 @@ export const getOrganizations = async (page: number = 1, limit: number = 20): Pr
   const r = await apiCall(`/master/organizations?${params.toString()}`, { method: 'GET' }); 
   return extractDataArray(r); 
 };
-export const getOrganizationById = async (id: string): Promise<any | null> => { const r = await apiCall(`/master/organizations/${id}`, { method: 'GET' }); return r.data || null; };
+export const getOrganizationById = async (id: string): Promise<any | null> => { 
+  const r = await apiCall(`/master/organizations/${id}`, { method: 'GET' }); 
+  console.log('🔍 API getOrganizationById response:', {
+    hasData: !!r.data,
+    dataKeys: r.data ? Object.keys(r.data) : [],
+    hasModuleAllocation: r.data ? 'moduleAllocation' in r.data : false,
+    moduleAllocationValue: r.data?.moduleAllocation ? 'EXISTS' : 'NULL'
+  });
+  return r.data || null; 
+};
 export const createOrganization = async (d: ApiData): Promise<any> => { const r = await apiCall('/master/organizations', { method: 'POST', body: JSON.stringify(d) }); return r.data || r; };
 export const createOrganizationWithCredentials = async (d: ApiData): Promise<ApiResponse> => apiCall('/master/organizations', { method: 'POST', body: JSON.stringify(d) });
 export const updateOrganization = async (id: string, d: ApiData): Promise<any> => { const r = await apiCall(`/master/organizations/${id}`, { method: 'PUT', body: JSON.stringify(d) }); return r.data || r; };

@@ -266,8 +266,10 @@ const AddTest = () => {
     const fetchTests = async () => {
       try {
         console.log("📡 Fetching tests from API...");
-        const testsData = await getTests();
-        console.log("✅ Tests loaded:", testsData);
+        const testsResult = await getTests();
+        console.log("✅ Tests loaded:", testsResult);
+        // getTests returns { data: [], pagination: {} }, extract the data array
+        const testsData = Array.isArray(testsResult) ? testsResult : (testsResult?.data || []);
         setTests(testsData);
       } catch (err) {
         console.error('❌ Error fetching tests:', err);
@@ -537,6 +539,16 @@ const AddTest = () => {
         // Convert test name to uppercase
         const finalValue = name === 'name' ? value.toUpperCase() : value;
         const updated = { ...prev, [name]: finalValue };
+        
+        // If department changed, auto-populate the group field from the selected department
+        if (name === 'department') {
+          const selectedDept = departments.find(d => d.id.toString() === value);
+          if (selectedDept) {
+            updated.group = selectedDept.group || '';
+            console.log('📍 Auto-populated group from department:', updated.group);
+          }
+        }
+        
         console.log('Updated formData:', updated);
         return updated;
       });
@@ -1079,6 +1091,16 @@ const AddTest = () => {
                   />
 
                   <Input 
+                    label="Group" 
+                    name="group"
+                    value={formData.group}
+                    onChange={handleChange}
+                    disabled={true}
+                    placeholder="Auto-populated from Department"
+                    required={false}
+                  />
+
+                  <Input 
                     label="Sort Order" 
                     name="sortOrder"
                     type="number"
@@ -1338,13 +1360,13 @@ const AddTest = () => {
                       disabled={isViewMode}
                       required={false}
                     />
-                    <Select 
+                    <Input 
                       label="Group" 
                       name="group"
                       value={formData.group}
                       onChange={handleChange}
-                      options={["Thyroid", "Hematology", "Liver", "Kidney"]}
-                      disabled={isViewMode}
+                      disabled={true}
+                      placeholder="Auto-populated from Department"
                       required={false}
                     />
                   </div>

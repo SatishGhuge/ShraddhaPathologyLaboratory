@@ -23,6 +23,7 @@ const TestTemplets = () => {
   const [selectedTestParameters, setSelectedTestParameters] = useState<any[]>([]);
   const [autoSaveStatus, setAutoSaveStatus] = useState<any>(null);
   const [showAddCategory, setShowAddCategory] = useState(false);
+  const [showInactive, setShowInactive] = useState(false);
   const [newCategory, setNewCategory] = useState({
     categoryName: '',
     parameters: []
@@ -190,16 +191,59 @@ const TestTemplets = () => {
     const template = templates.find(t => t.id === id);
     if (!template) return;
 
-    const confirm = window.confirm(`Are you sure you want to delete this template?\n\nTemplate: ${template.templateName}\n\nThis action cannot be undone.`);
+    const confirm = window.confirm(`Are you sure you want to permanently delete this template?\n\nTemplate: ${template.templateName}\n\nThis will remove it from all lists but keep it in the database.`);
     if (!confirm) return;
 
     try {
-      await deleteTemplate(id);
-      alert('Template deleted successfully!');
+      setLoading(true);
+      
+      const updateData = {
+        testId: template.testId,
+        templateName: template.templateName,
+        parameters: template.parameters || [],
+        isDeleted: true
+      };
+      
+      await updateTemplate(id, updateData);
+      alert('Template deleted permanently!');
       fetchTemplates();
     } catch (err) {
       console.error('Error deleting template:', err);
       alert(`Failed to delete template: ${err.message}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleToggleActive = async (id) => {
+    const currentTemplate = templates.find((t) => t.id === id);
+    if (!currentTemplate) return;
+
+    const message = currentTemplate.isActive
+      ? `Do you want to Inactivate "${currentTemplate.templateName}"?\n\nThe template will be hidden from the list but can be reactivated later.`
+      : `Do you want to Activate "${currentTemplate.templateName}"?\n\nThe template will be visible in the list again.`;
+
+    const confirm = window.confirm(message);
+    if (!confirm) return;
+
+    try {
+      setLoading(true);
+      
+      const updateData = {
+        testId: currentTemplate.testId,
+        templateName: currentTemplate.templateName,
+        parameters: currentTemplate.parameters || [],
+        isActive: !currentTemplate.isActive
+      };
+
+      await updateTemplate(id, updateData);
+      alert(currentTemplate.isActive ? "Template inactivated successfully!" : "Template activated successfully!");
+      fetchTemplates();
+    } catch (err) {
+      console.error('Error updating template:', err);
+      alert('Failed to update template');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -246,10 +290,22 @@ const TestTemplets = () => {
     setSelectedTestParameters([]);
   };
 
-  const filteredTemplates = (Array.isArray(templates) ? templates : []).filter(template =>
-    template.templateName.toLowerCase().includes(search.toLowerCase()) ||
-    template.test?.name.toLowerCase().includes(search.toLowerCase())
-  );
+  const filteredTemplates = (Array.isArray(templates) ? templates : []).filter(template => {
+    // Exclude deleted items from all views
+    if (template.isDeleted) return false;
+    
+    // When "Show Inactive" is checked, show ONLY inactive templates
+    if (showInactive && template.isActive) return false;
+    
+    // When "Show Inactive" is unchecked, show ONLY active templates
+    if (!showInactive && !template.isActive) return false;
+    
+    // Filter by search
+    return (
+      template.templateName.toLowerCase().includes(search.toLowerCase()) ||
+      template.test?.name.toLowerCase().includes(search.toLowerCase())
+    );
+  });
 
   if (showForm) {
     return (
@@ -465,6 +521,16 @@ const TestTemplets = () => {
                 <RotateCwIcon size={16} className="sm:w-[18px] sm:h-[18px]" />
                 Reset
               </button>
+
+              <label className="flex items-center gap-2 px-3 py-2 bg-white border border-gray-300 rounded text-xs sm:text-sm cursor-pointer hover:bg-orange-100 transition-colors w-full sm:w-auto">
+                <input
+                  type="checkbox"
+                  checked={showInactive}
+                  onChange={(e) => setShowInactive(e.target.checked)}
+                  className="w-4 h-4 accent-orange-500"
+                />
+                <span className="text-gray-700">Show Inactive</span>
+              </label>
             </div>
 
             <button
@@ -502,16 +568,17 @@ const TestTemplets = () => {
                 <table className="w-full text-xs sm:text-sm border-collapse">
                   <thead className="bg-slate-900 text-white sticky top-0">
                     <tr>
-                      <th className="border border-gray-300 px-2 py-0.5 text-left font-semibold text-xs">Template Name</th>
-                      <th className="border border-gray-300 px-2 py-0.5 text-left font-semibold text-xs">Test Name</th>
-                      <th className="border border-gray-300 px-2 py-0.5 text-center font-semibold text-xs">Action</th>
+                      <th className="border border-gray-300 px-3 py-1 text-left font-semibold text-xs">Template Name</th>
+                      <th className="border border-gray-300 px-3 py-1 text-left font-semibold text-xs">Test Name</th>
+                      <th className="border border-gray-300 px-3 py-1 text-center font-semibold text-xs">Active</th>
+                      <th className="border border-gray-300 px-3 py-1 text-center font-semibold text-xs">Action</th>
                     </tr>
                   </thead>
 
                   <tbody>
                     {filteredTemplates.length === 0 ? (
                       <tr>
-                        <td colSpan={3} className="text-center py-8 text-gray-500">
+                        <td colSpan={4} className="text-center py-1 text-gray-500 text-xs">
                           {search ? 'No templates found matching your search.' : 'No templates found. Click "Add Template" to create one.'}
                         </td>
                       </tr>
@@ -519,28 +586,45 @@ const TestTemplets = () => {
                       filteredTemplates.map((template, index) => (
                         <tr
                           key={template.id}
-                          className={`hover:bg-blue-50 border-b border-gray-200 transition-colors ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}
+                          className={`hover:bg-blue-50 border-b border-gray-200 transition-colors ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} ${!template.isActive ? 'bg-gray-100 opacity-60' : ''}`}
                         >
-                          <td className="border border-gray-300 px-2 py-0.5 font-semibold text-gray-800 text-xs">
+                          <td className="border border-gray-300 px-3 py-1 font-semibold text-gray-800 text-xs">
                             {template.templateName}
                           </td>
 
-                          <td className="border border-gray-300 px-2 py-0.5 text-gray-700 text-xs">
+                          <td className="border border-gray-300 px-3 py-1 text-gray-700 text-xs">
                             {template.test?.name || '-'}
                           </td>
 
-                          <td className="border border-gray-300 px-2 py-0.5">
+                          <td className="border border-gray-300 px-3 py-1 text-center font-semibold text-xs">
+                            {template.isActive ? "Yes" : "No"}
+                          </td>
+
+                          <td className="border border-gray-300 px-3 py-1">
                             <div className="flex gap-1 justify-center flex-wrap">
                               <button
                                 onClick={() => handleEdit(template)}
-                                className="bg-blue-600 text-white px-2 py-0.5 rounded text-[9px] hover:bg-blue-700 transition-colors font-medium"
+                                className="bg-blue-600 text-white px-2 py-1 rounded text-[9px] hover:bg-blue-700 transition-colors font-medium whitespace-nowrap"
                               >
                                 Edit
                               </button>
 
                               <button
+                                onClick={() => handleToggleActive(template.id)}
+                                disabled={loading}
+                                className={`px-2 py-1 rounded text-[9px] text-white transition-colors disabled:opacity-50 font-medium whitespace-nowrap ${
+                                  template.isActive
+                                    ? "bg-green-600 hover:bg-green-700"
+                                    : "bg-gray-900 hover:bg-gray-900"
+                                }`}
+                                title={template.isActive ? "Click to inactivate template" : "Click to activate template"}
+                              >
+                                {template.isActive ? "Active" : "Inactive"}
+                              </button>
+
+                              <button
                                 onClick={() => handleDelete(template.id)}
-                                className="bg-red-500 text-white px-2 py-0.5 rounded text-[9px] hover:bg-red-600 transition-colors font-medium"
+                                className="bg-red-500 text-white px-2 py-1 rounded text-[9px] hover:bg-red-600 transition-colors font-medium whitespace-nowrap"
                               >
                                 Delete
                               </button>

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { ArrowLeft, User, Hospital, Mail, Phone, MapPin, Percent, GraduationCap, AlertCircle } from "lucide-react";
+import { ArrowLeft, User, Hospital, Mail, Phone, MapPin, GraduationCap, AlertCircle } from "lucide-react";
 
 interface ReferralDoctorModalProps {
   isOpen: boolean;
@@ -20,7 +20,6 @@ export default function ReferralDoctorModal({
   const [formData, setFormData] = useState({
     name: "",
     degree: "",
-    compliment: "",
     mobile: "",
     email: "",
     address: "",
@@ -43,7 +42,6 @@ export default function ReferralDoctorModal({
         setFormData({
           name: editingDoctor.name || "",
           degree: editingDoctor.degree || "",
-          compliment: editingDoctor.compliment != null ? String(editingDoctor.compliment) : "",
           mobile: editingDoctor.mobile || "",
           email: editingDoctor.email || "",
           address: editingDoctor.address || "",
@@ -56,7 +54,6 @@ export default function ReferralDoctorModal({
         setFormData({
           name: "",
           degree: "",
-          compliment: "",
           mobile: "",
           email: "",
           address: "",
@@ -97,12 +94,6 @@ export default function ReferralDoctorModal({
     if (formData.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
       newErrors.email = "Please enter a valid email address.";
     }
-    if (formData.compliment !== "") {
-      const val = Number(formData.compliment);
-      if (isNaN(val) || val < 0 || val > 100) {
-        newErrors.compliment = "Compliment % must be between 0 and 100.";
-      }
-    }
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -117,7 +108,6 @@ export default function ReferralDoctorModal({
         name: formData.name.trim(),
         type,
         degree: formData.degree || null,
-        compliment: formData.compliment !== "" ? parseFloat(formData.compliment) : null,
         mobile: formData.mobile || null,
         email: formData.email || null,
         address: formData.address || null,
@@ -170,7 +160,6 @@ export default function ReferralDoctorModal({
     setFormData({
       name: "",
       degree: "",
-      compliment: "",
       mobile: "",
       email: "",
       address: "",
@@ -241,16 +230,6 @@ export default function ReferralDoctorModal({
               <GraduationCap size={16} className="text-cyan-600 mr-2 flex-shrink-0" />
               <input type="text" name="degree" value={formData.degree} onChange={handleChange} placeholder="Degree" className="w-full py-2 outline-none bg-transparent" disabled={loading} />
             </div>
-          </div>
-
-          {/* Compliment % */}
-          <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-1">Compliment %</label>
-            <div className={`flex items-center border rounded px-2 bg-white ${errors.compliment ? "border-red-500" : "border-gray-300"}`}>
-              <Percent size={16} className="text-cyan-600 mr-2 flex-shrink-0" />
-              <input type="number" name="compliment" value={formData.compliment} onChange={handleChange} min="0" max="100" placeholder="0" className="w-full py-2 outline-none bg-transparent" disabled={loading} />
-            </div>
-            {errors.compliment && <p className="text-xs text-red-500 mt-1 flex items-center gap-1"><AlertCircle size={12}/>{errors.compliment}</p>}
           </div>
 
           {/* Mobile */}

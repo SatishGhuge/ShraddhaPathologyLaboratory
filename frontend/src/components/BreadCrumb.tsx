@@ -1,7 +1,7 @@
 "use client";
 
 import { usePathname } from "next/navigation";
-import { Home, FileText, BarChart3, IndianRupee, FolderOpen, Settings, UserPlus, Search, Send, FileSignature, Database, ClipboardCheck } from "lucide-react";
+import { Home, FileText, BarChart3, IndianRupee, FolderOpen, Settings, UserPlus, Search, Send, FileSignature, Database, ClipboardCheck, DollarSign } from "lucide-react";
 
 // Icon mapping for breadcrumb paths
 const iconMap = {
@@ -18,6 +18,10 @@ const iconMap = {
   "Signature": FileSignature,
   "Tests": Database,
   "Result": ClipboardCheck,
+  "Dashboard": BarChart3,
+  "Collection": DollarSign,
+  "Patient List": UserPlus,
+  "Referral Doctor Revenue": IndianRupee,
 };
 
 // URL to breadcrumb mapping - Comprehensive list of all pages
@@ -50,10 +54,27 @@ const urlPathMap: { [key: string]: string } = {
   "reports/report-dashboard": "Reports / Dashboard",
   "reports/collection": "Reports / Collection",
   "reports/patient-list": "Reports / Patient List",
+  "reports/referral-doctor-revenue": "Reports / Referral Doctor Revenue",
   "reports/center-wise-cost-report": "Reports / Center Wise Cost Report",
   "reports/b2b-testwise-cost-report": "Reports / B2B Testwise Cost Report",
   "reports/discount-report": "Reports / Discount Report",
   "reports/test-report": "Reports / Test Report",
+  "reports/payment-receipt": "Reports / Payment Receipt",
+  "reports/complement-all-doctors": "Reports / Complement Report",
+  "reports/turn-around-time": "Reports / Turn Around Time",
+  "reports/test-compliment": "Reports / Test Wise Complement",
+  "reports/worksheet": "Reports / Worksheet",
+  "reports/service-count": "Reports / Service Count",
+  "reports/user-login-report": "Reports / User Login Report",
+  "reports/sample-rejection-report": "Reports / Sample Rejection Report",
+  "reports/hospital-bills": "Reports / Hospital Bills",
+  "reports/monthly-collection-summary": "Reports / Monthly Collection Summary",
+  "reports/group-summary": "Reports / Group Summary",
+  "reports/detailed-worksheet": "Reports / Detailed Worksheet",
+  "reports/daily-collection": "Reports / Daily Collection",
+  "reports/patient-location-report": "Reports / Patient Location Report",
+  "reports/b2b-bulk-settlement": "Reports / B2B Bulk Settlement",
+  "reports/bulk-settlement": "Reports / Bulk Settlement",
   
   // Configuration Module
   "config/signature": "Configuration / Signature",
@@ -87,10 +108,10 @@ export default function PageHeader({ title = "", icon: Icon, path = "" }: { titl
   }
 
   return (
-    <div className="mb-3 space-y-1">
+    <div className="mb-2">
 
       {/* Breadcrumb */}
-      <div className="flex items-center gap-2 text-sm text-slate-500">
+      <div className="flex items-center gap-1 text-sm text-slate-500">
         <Home size={16} />
         <span>Home</span>
 
