@@ -664,7 +664,7 @@ const Header = () => {
         }`}>
 
         {/* Sidebar Header with Close Button */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200">
+        <div className="flex items-center justify-between px-7 py-2 border-b border-gray-200">
           <h3 className="font-bold text-primary-600">Menu</h3>
           <button
             onClick={() => setSidebarOpen(false)}

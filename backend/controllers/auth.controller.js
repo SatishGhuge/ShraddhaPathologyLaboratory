@@ -39,7 +39,8 @@ export const login = async (req, res) => {
       if (!valid) return res.status(401).json({ success: false, message: 'Invalid credentials' });
       const token = generateToken(admin.id);
       
-      // Fetch module allocation and organization details for admin
+      // Fetch module allocation and organization details ONLY if admin has organizationId
+      // Superadmins (without organizationId) see all fields - no module restrictions
       let moduleAllocation = null;
       let organizationDetails = null;
       if (admin.organizationId) {
@@ -47,7 +48,21 @@ export const login = async (req, res) => {
           where: { organizationId: admin.organizationId },
           select: { modules: true }
         });
-        moduleAllocation = orgModuleAllocation?.modules || null;
+        
+        // If organization has module allocation, use it; otherwise use empty (all false)
+        if (orgModuleAllocation?.modules) {
+          moduleAllocation = orgModuleAllocation.modules;
+        } else {
+          // Organization admin with no allocation - get default (all modules disabled)
+          moduleAllocation = JSON.stringify({
+            patient: { registration: false, tests: false },
+            masters: { testlist: false, testTemplates: false, departmentlist: false, packagelist: false, charges: false, rolelist: false, userlist: false, referralDoctorList: false, organization: false, specimenType: false, units: false },
+            reports: { dashboard: false, collectionReport: false, patientList: false, referralDoctorRevenue: false, centerWiseCostReport: false, b2bTestwiseCostReport: false, discountReport: false, testReport: false },
+            configuration: { signature: false },
+            help: { userManual: false, ultraviewer: false, anydesk: false },
+            result: false
+          });
+        }
         
         // Fetch organization name
         const organization = await prisma.organization.findUnique({
@@ -64,7 +79,7 @@ export const login = async (req, res) => {
         token, 
         admin: { 
           ...adminData, 
-          userType: 'admin',
+          userType: admin.organizationId ? 'org_admin' : 'superadmin',
           moduleAllocation: moduleAllocation,
           organization: organizationDetails
         } 

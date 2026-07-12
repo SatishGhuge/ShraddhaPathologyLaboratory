@@ -99,11 +99,12 @@ model PatientTest {
   lastUpdatedBy      String?
   lastStatusUpdateAt DateTime?
   barcode_status     String              @default("Unprinted")
+  comments           String?             @db.Text
   department         Department          @relation(fields: [departmentId], references: [id])
   organization       Organization?       @relation(fields: [organizationId], references: [id])
+  package            Package?            @relation(fields: [packageId], references: [id], onDelete: Cascade)
   patient            Patient             @relation(fields: [patientId], references: [patientId], onDelete: Cascade)
   test               Test                @relation(fields: [testId], references: [id])
-  package            Package?            @relation(fields: [packageId], references: [id], onDelete: Cascade)
   testResults        TestResult[]
   statusHistory      TestStatusHistory[]
 
@@ -116,6 +117,7 @@ model PatientTest {
   @@index([visitId])
   @@index([patientId, visitId])
   @@index([patientId], map: "patient_tests_patientId_fkey")
+  @@index([packageId], map: "patient_tests_packageId_fkey")
   @@map("patient_tests")
 }
 
@@ -139,6 +141,7 @@ model Department {
   id           Int           @id @default(autoincrement())
   name         String        @unique
   code         String?
+  group        String?
   isActive     Boolean       @default(true)
   isDeleted    Boolean       @default(false)
   createdAt    DateTime      @default(now())
@@ -182,11 +185,11 @@ model Test {
   updatedAt              DateTime            @updatedAt
   linkedTestIds          String?             @db.Text
   testparameters         testparameters[]
+  doctorTestCharges      DoctorTestCharge[]
   packageTests           PackageTest[]
   patientTests           PatientTest[]
   categories             TestCategory[]
   charges                TestCharge[]
-  doctorTestCharges      DoctorTestCharge[]
   ownedParameters        TestParameter[]     @relation("ParameterOwner")
   templates              TestTemplate[]
   department             Department          @relation(fields: [departmentId], references: [id], onDelete: Cascade)
@@ -200,6 +203,7 @@ model Test {
   @@index([testParameterId], map: "tests_testParameterId_fkey")
   @@index([isActive])
   @@index([name])
+  @@index([sampleTypeId], map: "tests_sampleTypeId_fkey")
   @@map("tests")
 }
 
@@ -379,9 +383,10 @@ model TestParameter {
   testparameters     testparameters[]
   testCategories     TestCategory[]
   testOwner          Test?            @relation("ParameterOwner", fields: [testId], references: [id], onDelete: Cascade)
+  unit               Unit?            @relation(fields: [unitId], references: [id], onDelete: Cascade)
   testResults        TestResult[]
   primaryTests       Test[]           @relation("PrimaryTestParameter")
-  unit               Unit?            @relation(fields: [unitId], references: [id], onDelete: Cascade)
+
   @@index([testId], map: "test_parameters_testId_fkey")
   @@index([unitId], map: "test_parameters_unitId_fkey")
   @@index([parameterCode])
@@ -536,7 +541,6 @@ model PaymentTransaction {
 
 model Signature {
   id             Int       @id @default(autoincrement())
-  specialty      String
   doctorName     String?
   signatureText  String?   @db.Text
   signatureImage String?   @db.Text

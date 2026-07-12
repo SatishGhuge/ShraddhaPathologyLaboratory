@@ -11,7 +11,6 @@ import {
   Save,
   Hash,
   Layers,
-  ArrowDownUp,
 } from "lucide-react";
 
 // example images (replace with your own)
@@ -31,8 +30,7 @@ const AddDepartment = () => {
   const [formData, setFormData] = useState({
     name: "",
     code: "",
-    sortOrder: "",
-    groupName: "",
+    group: "",
     isInactive: false,
   });
   const [showMessage, setShowMessage] = useState(false);
@@ -57,8 +55,7 @@ const AddDepartment = () => {
         setFormData({
           name: dept.name || "",
           code: dept.code || "",
-          sortOrder: dept.sortOrder?.toString() || "",
-          groupName: dept.groupName || "",
+          group: dept.group || "",
           isInactive: !dept.isActive,
         });
       } else {
@@ -98,10 +95,6 @@ const AddDepartment = () => {
       emptyFields.push("Department Code");
     }
     
-    if (!formData.sortOrder.trim()) {
-      emptyFields.push("Sort Order");
-    }
-    
     // If any fields are empty, show general message first
     if (emptyFields.length > 0) {
       alert("Please enter all fields!\n\nMissing fields:\n- " + emptyFields.join("\n- "));
@@ -115,7 +108,7 @@ const AddDepartment = () => {
       const departmentData = {
         name: formData.name,
         code: formData.code,
-        sortOrder: parseInt(formData.sortOrder),
+        group: formData.group || null,
         isActive: !formData.isInactive
       };
       
@@ -294,7 +287,7 @@ const AddDepartment = () => {
               </div>
             </div>
 
-            {/* Row 2: Name and Sort Order */}
+            {/* Row 2: Name and Group Name */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
               {/* Name */}
               <div>
@@ -317,20 +310,18 @@ const AddDepartment = () => {
                 </div>
               </div>
 
-              {/* Sort Order */}
+              {/* Group Name */}
               <div>
-                <label className="block text-xs sm:text-sm font-medium mb-1 text-gray-700">
-                  Sort Order
-                </label>
+                <label className="block text-xs sm:text-sm font-medium mb-1 text-gray-700">Group Name</label>
                 <div className="relative">
-                  <ArrowDownUp
+                  <Layers
                     className="absolute left-2 top-2.5 text-gray-400"
                     size={16}
                   />
                   <input
-                    type="number"
-                    name="sortOrder"
-                    value={formData.sortOrder}
+                    type="text"
+                    name="group"
+                    value={formData.group}
                     onChange={handleChange}
                     disabled={isViewMode}
                     className={`w-full pl-8 border ${inputBorder} rounded px-2 py-1.5 sm:py-1 ${inputBg} focus:outline-none focus:ring-2 ${focusRing} disabled:bg-gray-100 disabled:cursor-not-allowed text-sm`}
@@ -339,40 +330,19 @@ const AddDepartment = () => {
               </div>
             </div>
 
-            {/* Row 3: Group Name and Make Inactive - Only for Edit/View Mode */}
+            {/* Row 3: Make Inactive - Only for Edit/View Mode */}
             {(isEditMode || isViewMode) && (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 items-end">
-                {/* Group Name */}
-                <div>
-                  <label className="block text-xs sm:text-sm font-medium mb-1 text-gray-700">Group Name</label>
-                  <div className="relative">
-                    <Layers
-                      className="absolute left-2 top-2.5 text-gray-400"
-                      size={16}
-                    />
-                    <input
-                      type="text"
-                      name="groupName"
-                      value={formData.groupName}
-                      onChange={handleChange}
-                      disabled={isViewMode}
-                      className={`w-full pl-8 border ${inputBorder} rounded px-2 py-1.5 sm:py-1 ${inputBg} focus:outline-none focus:ring-2 ${focusRing} disabled:bg-gray-100 disabled:cursor-not-allowed text-sm`}
-                    />
-                  </div>
-                </div>
-
+              <div className="flex items-center gap-2">
                 {/* Make Inactive Checkbox */}
-                <div className="flex items-center gap-2 pb-0 sm:pb-1">
-                  <input
-                    type="checkbox"
-                    name="isInactive"
-                    checked={formData.isInactive}
-                    onChange={handleChange}
-                    disabled={isViewMode}
-                    className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
-                  />
-                  <label className="text-xs sm:text-sm font-medium">Make Inactive?</label>
-                </div>
+                <input
+                  type="checkbox"
+                  name="isInactive"
+                  checked={formData.isInactive}
+                  onChange={handleChange}
+                  disabled={isViewMode}
+                  className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+                />
+                <label className="text-xs sm:text-sm font-medium">Make Inactive?</label>
               </div>
             )}
 

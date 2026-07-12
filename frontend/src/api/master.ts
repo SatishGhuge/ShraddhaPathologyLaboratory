@@ -91,6 +91,19 @@ export const createUnit = async (d: ApiData): Promise<any> => { const r = await 
 export const updateUnit = async (id: string, d: ApiData): Promise<any> => { const r = await apiCall(`/master/units/${id}`, { method: 'PUT', body: JSON.stringify(d) }); return r.data || r; };
 export const deleteUnit = async (id: string): Promise<ApiResponse> => apiCall(`/master/units/${id}`, { method: 'DELETE' });
 
+// ==================== SAMPLE TYPES ====================
+export const getSampleTypes = async (page: number = 1, limit: number = 20): Promise<any[]> => { 
+  const params = new URLSearchParams();
+  params.append('page', page.toString());
+  params.append('limit', limit.toString());
+  const r = await apiCall(`/master/sample-types?${params.toString()}`, { method: 'GET' }); 
+  return extractDataArray(r); 
+};
+export const getSampleTypeById = async (id: string): Promise<any | null> => { const r = await apiCall(`/master/sample-types/${id}`, { method: 'GET' }); return r.data || null; };
+export const createSampleType = async (d: ApiData): Promise<any> => { const r = await apiCall('/master/sample-types', { method: 'POST', body: JSON.stringify(d) }); return r.data || r; };
+export const updateSampleType = async (id: string, d: ApiData): Promise<any> => { const r = await apiCall(`/master/sample-types/${id}`, { method: 'PUT', body: JSON.stringify(d) }); return r.data || r; };
+export const deleteSampleType = async (id: string): Promise<ApiResponse> => apiCall(`/master/sample-types/${id}`, { method: 'DELETE' });
+
 // ==================== TEMPLATES ====================
 export const getTemplates = async (page: number = 1, limit: number = 20): Promise<any> => { 
   const params = new URLSearchParams();
@@ -148,6 +161,14 @@ export const getPackages = async (page: number = 1, limit: number = 20): Promise
   params.append('page', page.toString());
   params.append('limit', limit.toString());
   const r = await apiCall(`/master/packages?${params.toString()}`, { method: 'GET' }); 
+  return extractDataArray(r); 
+};
+
+export const getAllPackages = async (page: number = 1, limit: number = 20): Promise<any[]> => { 
+  const params = new URLSearchParams();
+  params.append('page', page.toString());
+  params.append('limit', limit.toString());
+  const r = await apiCall(`/master/packages/all?${params.toString()}`, { method: 'GET' }); 
   return extractDataArray(r); 
 };
 
@@ -247,7 +268,16 @@ export const getOrganizations = async (page: number = 1, limit: number = 20): Pr
   const r = await apiCall(`/master/organizations?${params.toString()}`, { method: 'GET' }); 
   return extractDataArray(r); 
 };
-export const getOrganizationById = async (id: string): Promise<any | null> => { const r = await apiCall(`/master/organizations/${id}`, { method: 'GET' }); return r.data || null; };
+export const getOrganizationById = async (id: string): Promise<any | null> => { 
+  const r = await apiCall(`/master/organizations/${id}`, { method: 'GET' }); 
+  console.log('🔍 API getOrganizationById response:', {
+    hasData: !!r.data,
+    dataKeys: r.data ? Object.keys(r.data) : [],
+    hasModuleAllocation: r.data ? 'moduleAllocation' in r.data : false,
+    moduleAllocationValue: r.data?.moduleAllocation ? 'EXISTS' : 'NULL'
+  });
+  return r.data || null; 
+};
 export const createOrganization = async (d: ApiData): Promise<any> => { const r = await apiCall('/master/organizations', { method: 'POST', body: JSON.stringify(d) }); return r.data || r; };
 export const createOrganizationWithCredentials = async (d: ApiData): Promise<ApiResponse> => apiCall('/master/organizations', { method: 'POST', body: JSON.stringify(d) });
 export const updateOrganization = async (id: string, d: ApiData): Promise<any> => { const r = await apiCall(`/master/organizations/${id}`, { method: 'PUT', body: JSON.stringify(d) }); return r.data || r; };

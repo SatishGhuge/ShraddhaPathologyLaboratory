@@ -8,7 +8,7 @@ import PageHeader from "@/src/components/BreadCrumb";
 import UnitModal from "@/src/components/UnitModal";
 import { CKEditor } from "@ckeditor/ckeditor5-react";
 import ClassicEditor from "@ckeditor/ckeditor5-build-classic";
-import { getTestById, createTest, updateTest, getDepartments, getUnits, getTests } from "@/src/api/master";
+import { getTestById, createTest, updateTest, getDepartments, getUnits, getTests, getSampleTypes } from "@/src/api/master";
 
 const baseInputClass =
   "px-2 py-1 border border-gray-300 rounded text-sm bg-white focus:outline-none focus:ring-2 focus:ring-orange-500";
@@ -38,19 +38,16 @@ const AddTest = () => {
   const [formData, setFormData] = useState({
     name: "",
     department: "",
-    sortOrder: "",
     shortName: "",
-    attachFile: "Yes",
+    attachFile: false,
     imageSize: "800|600",
-    signatureId: "",
-    costForLab: "",
     preparationTime: "",
     preparationType: "",
     isNABL: false,
-    lineHeight: "",
-    profileTest: "Yes",
+    lineHeight: "1.4",
+    profileTest: false,
     reportHeader: "",
-    sampleType: "",
+    sampleTypeId: "",
     machineName: "",
     isHeader: true,
     showTestName: true,
@@ -68,6 +65,7 @@ const AddTest = () => {
   const [error, setError] = useState<any>(null);
   const [departments, setDepartments] = useState<any[]>([]);
   const [units, setUnits] = useState<any[]>([]);
+  const [sampleTypes, setSampleTypes] = useState<any[]>([]);
   const [dataLoaded, setDataLoaded] = useState(false);
   const [tests, setTests] = useState<any[]>([]);
   const [selectedTestToAdd, setSelectedTestToAdd] = useState("");
@@ -76,7 +74,6 @@ const AddTest = () => {
   const [showPreview, setShowPreview] = useState(false);
   const [specimenTypes, setSpecimenTypes] = useState<any[]>([]);
   const [showSampleTypeDropdown, setShowSampleTypeDropdown] = useState(false);
-  const [signatures, setSignatures] = useState<any[]>([]);
 
   // Draft formula state: key = "catIdx-paramIdx", value = draft string being built
   const [formulaDrafts, setFormulaDrafts] = useState({});
@@ -130,7 +127,7 @@ const AddTest = () => {
     p.decimal         = suggestion.decimal?.toString() || '';
     p.type            = suggestion.type || 'Numeric';
     p.rangeType       = suggestion.rangeType || 'BySex';
-    p.units           = suggestion.units || '';
+    p.unitId          = suggestion.unitId?.toString() || '';
     p.displayRangeText= suggestion.displayRangeText || '';
     p.rangeText       = suggestion.rangeText || '';
     p.textContent     = suggestion.textContent || '';
@@ -192,7 +189,7 @@ const AddTest = () => {
       type: "Numeric",
       isMandatory: false,
       rangeType: "BySex",
-      units: "",
+      unitId: "",
       displayRangeText: "",
       rangeText: "",
       isMultipleOptions: false,
@@ -264,7 +261,9 @@ const AddTest = () => {
         console.log("📡 Fetching tests from API...");
         const res = await getTests();
         console.log("✅ Tests loaded:", res);
-        setTests(res);
+        // getTests returns { data: [], pagination: {} }, extract the data array
+        const testsData = Array.isArray(res) ? res : (res?.data || []);
+        setTests(testsData);
       } catch (err) {
         console.error('❌ Error fetching tests:', err);
         console.error('Tests error details:', {
@@ -273,6 +272,18 @@ const AddTest = () => {
           response: err.response?.data
         });
         // Don't set error for tests, just log it
+      }
+    };
+
+    const fetchSampleTypes = async () => {
+      try {
+        console.log("📡 Fetching sample types from API...");
+        const res = await getSampleTypes();
+        console.log("✅ Sample types loaded:", res);
+        setSampleTypes(res);
+      } catch (err) {
+        console.error('❌ Error fetching sample types:', err);
+        // Don't set error for sample types, just log it
       }
     };
 
@@ -298,18 +309,8 @@ const AddTest = () => {
     fetchDepartments();
     fetchUnits();
     fetchTests();
+    fetchSampleTypes();
     fetchSpecimenTypes();
-
-    // Fetch signatures for dropdown
-    const fetchSignatures = async () => {
-      try {
-        const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || '/api';
-        const res = await fetch(`${API_BASE_URL}/signatures`);
-        const result = await res.json();
-        if (result.success) setSignatures(result.data.filter(s => s.isActive));
-      } catch (e) { console.error('Error fetching signatures:', e); }
-    };
-    fetchSignatures();
     
     // Try to load CKEditor after a short delay
     setTimeout(() => {
@@ -337,20 +338,16 @@ const AddTest = () => {
             const formDataToSet = {
               name: testData.name || "",
               department: testData.departmentId?.toString() || "",
-              speciality: testData.speciality || "Regular",
-              sortOrder: testData.sortOrder?.toString() || "",
               shortName: testData.shortName || "",
-              attachFile: testData.attachFile || "Yes",
+              attachFile: testData.attachFile || false,
               imageSize: testData.imageSize || "800|600",
-              signatureId: testData.signatureId?.toString() || "",
-              costForLab: testData.costForLab?.toString() || "",
               preparationTime: testData.preparationTime || "",
               preparationType: testData.preparationType || "",
               isNABL: testData.isNABL || false,
-              lineHeight: testData.lineHeight?.toString() || "",
-              profileTest: testData.profileTest || "Yes",
+              lineHeight: testData.lineHeight?.toString() || "1.4",
+              profileTest: testData.profileTest || false,
               reportHeader: testData.reportHeader || "",
-              sampleType: testData.sampleType || "",
+              sampleTypeId: testData.sampleTypeId ? testData.sampleTypeId.toString() : "",
               machineName: testData.machineName || "",
               isHeader: testData.isHeader !== undefined ? testData.isHeader : true,
               showTestName: testData.showTestName !== undefined ? testData.showTestName : true,
@@ -401,7 +398,7 @@ const AddTest = () => {
                           type: param.type || "Numeric",
                           isMandatory: param.isMandatory || false,
                           rangeType: param.rangeType || "BySex",
-                          units: param.units || "",
+                          unitId: param.unitId ? param.unitId.toString() : "",
                           displayRangeText: param.displayRangeText || "",
                           rangeText: param.rangeText || "",
                           textContent: param.textContent || "",
@@ -569,6 +566,16 @@ const AddTest = () => {
         // Convert test name to uppercase
         const finalValue = name === 'name' ? value.toUpperCase() : value;
         const updated = { ...prev, [name]: finalValue };
+        
+        // If department changed, auto-populate the group field from the selected department
+        if (name === 'department') {
+          const selectedDept = departments.find(d => d.id.toString() === value);
+          if (selectedDept) {
+            updated.group = selectedDept.group || '';
+            console.log('📍 Auto-populated group from department:', updated.group);
+          }
+        }
+        
         console.log('Updated formData:', updated);
         return updated;
       });
@@ -681,7 +688,7 @@ const AddTest = () => {
       type: "Numeric",
       isMandatory: false,
       rangeType: "BySex",
-      units: "",
+      unitId: "",
       displayRangeText: "",
       rangeText: "",
       isMultipleOptions: false,
@@ -729,7 +736,7 @@ const AddTest = () => {
         type: "Numeric",
         isMandatory: false,
         rangeType: "BySex",
-        units: "",
+        unitId: "",
         displayRangeText: "",
         normalRanges: [
           { gender: "Male", ll: "", ul: "", default: "", isActive: true },
@@ -850,10 +857,6 @@ const AddTest = () => {
       emptyFields.push("Department");
     }
     
-    if (!formData.sortOrder.trim()) {
-      emptyFields.push("Sort Order");
-    }
-    
     if (!formData.shortName.trim()) {
       emptyFields.push("Test Short Form");
     }
@@ -874,12 +877,10 @@ const AddTest = () => {
         shortName: formData.shortName,
         testCode: formData.testCode || null,
         departmentId: parseInt(formData.department),
-        sampleType: formData.sampleType || null,
+        sampleTypeId: formData.sampleTypeId ? parseInt(formData.sampleTypeId) : null,
         machineName: formData.machineName || null,
         group: formData.group || null,
-        sortOrder: parseInt(formData.sortOrder) || null,
         reportHeader: formData.reportHeader || null,
-        costForLab: formData.costForLab ? parseFloat(formData.costForLab) : null,
         preparationTime: formData.preparationTime || null,
         preparationType: formData.preparationType || null,
         instructionPreparation: formData.instructionPreparation || null,
@@ -887,15 +888,14 @@ const AddTest = () => {
         interpretationLabel: formData.interpretationLabel || null,
         interpretation: formData.interpretation || null,
         outsourceLab: formData.outsourceLab || null,
-        attachFile: formData.attachFile || "Yes",
+        attachFile: formData.attachFile || false,
         imageSize: formData.imageSize || "800|600",
-        signatureId: formData.signatureId ? parseInt(formData.signatureId) : null,
-        profileTest: formData.profileTest || "No",
+        profileTest: formData.profileTest || false,
         isHeader: formData.isHeader,
         showTestName: formData.showTestName,
         isNABL: formData.isNABL,
-        lineHeight: formData.lineHeight ? parseFloat(formData.lineHeight) : null,
-        linkedTestIds: formData.profileTest === "Yes" ? selectedTestsToAdd.map(t => t.id) : []
+        lineHeight: formData.lineHeight ? parseFloat(formData.lineHeight) : 1.4,
+        linkedTestIds: formData.profileTest === true ? selectedTestsToAdd.map(t => t.id) : []
       };
 
       // Prepare category data (for test_category table)
@@ -933,7 +933,7 @@ const AddTest = () => {
           type: param.type || "Numeric",
           isMandatory: param.isMandatory || false,
           rangeType: param.rangeType || "BySex",
-          units: param.units || null,
+          unitId: param.unitId ? parseInt(param.unitId) : null,
           displayRangeText: param.displayRangeText || null,
           rangeText: param.rangeText || null,
           textContent: param.textContent || null,
@@ -1107,20 +1107,24 @@ const AddTest = () => {
                     name="department"
                     value={formData.department}
                     onChange={handleChange}
-                    options={(departments || []).map(dept => ({ value: dept.id, label: dept.name }))}
+                    options={(departments || []).map(dept => ({ 
+                      value: dept.id, 
+                      label: dept.name
+                    }))}
                     required 
                     disabled={isViewMode} 
                   />
 
                   <Input 
-                    label="Sort Order" 
-                    name="sortOrder"
-                    type="number"
-                    value={formData.sortOrder}
+                    label="Group" 
+                    name="group"
+                    value={formData.group}
                     onChange={handleChange}
-                    disabled={isViewMode}
+                    disabled={true}
+                    placeholder="Auto-populated from Department"
                     required={false}
                   />
+
                   <Input 
                     label="Test Short Form" 
                     name="shortName"
@@ -1130,16 +1134,16 @@ const AddTest = () => {
                     required={false}
                   />
 
-                  <Radio 
+                  <Checkbox 
                     label="Attach File" 
                     name="attachFile" 
-                    value={formData.attachFile}
+                    checked={formData.attachFile}
                     onChange={handleChange}
                     disabled={isViewMode} 
                   />
 
-                  {/* Image size field — only when Attach File = Yes */}
-                  {formData.attachFile === 'Yes' && (
+                  {/* Image size field — only when Attach File = true */}
+                  {formData.attachFile === true && (
                     <div className="flex flex-col gap-1">
                       <label className="font-semibold text-gray-700 text-xs sm:text-sm">
                         Image width/height :
@@ -1154,21 +1158,6 @@ const AddTest = () => {
                       required={false}/>
                     </div>
                   )}
-
-                  {/* Cost For Lab – inline */}
-                  <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-3">
-                    <label className="font-semibold text-gray-700 text-xs sm:text-sm whitespace-nowrap">
-                      Cost For Lab
-                    </label>
-                    <input 
-                      name="costForLab"
-                      type="number"
-                      value={formData.costForLab}
-                      onChange={handleChange}
-                      className="w-full sm:w-32 px-2 py-1.5 sm:py-1 border border-gray-300 rounded text-xs sm:text-sm bg-white" 
-                      disabled={isViewMode} 
-                    required={false}/>
-                  </div>
 
                   <div className="flex flex-col sm:flex-row gap-3">
                     <Input 
@@ -1214,21 +1203,41 @@ const AddTest = () => {
                       required={false}/>
                     </div>
                   </div>
+
+                  {/* Preparation Instruction and Patient Instruction */}
+                  <div className="flex flex-col sm:flex-row gap-3">
+                    <Input 
+                      label="Instruction For Preparation" 
+                      name="instructionPreparation"
+                      value={formData.instructionPreparation}
+                      onChange={handleChange}
+                      disabled={isViewMode}
+                      required={false}
+                    />
+                    <Input 
+                      label="Instruction For Patient" 
+                      name="instructionPatient"
+                      value={formData.instructionPatient}
+                      onChange={handleChange}
+                      disabled={isViewMode}
+                      required={false}
+                    />
+                  </div>
                 </div>
 
                 {/* ========== RIGHT COLUMN ========== */}
                 <div className="space-y-3 sm:space-y-4">
 
-                  <Radio 
+                  <Checkbox 
                     label="Profile Test" 
                     name="profileTest" 
-                    value={formData.profileTest}
+                    checked={formData.profileTest}
                     onChange={handleChange}
                     disabled={isViewMode} 
                   />
 
-                  {/* Test to add - Only show when Profile Test is Yes */}
-                  {formData.profileTest === "Yes" && (
+                  {/* Test to add - Only show when Profile Test is true */}
+                  {formData.profileTest === true && (
                     <div>
                       <label className="font-semibold text-gray-700 text-xs sm:text-sm block mb-1">Test to add</label>
                       {/* Combined tag + select box */}
@@ -1291,16 +1300,11 @@ const AddTest = () => {
                       type="button"
                       disabled={isViewMode}
                       onClick={() => setShowSampleTypeDropdown(v => !v)}
-                      className="w-full px-2 py-1.5 border border-gray-300 rounded text-xs sm:text-sm bg-white focus:outline-none focus:ring-2 focus:ring-orange-500 disabled:bg-gray-100 disabled:cursor-not-allowed flex items-center gap-2 text-left"
+                      className="w-full px-2 py-1.5 border border-gray-300 rounded text-xs sm:text-sm bg-white focus:outline-none focus:ring-2 focus:ring-orange-500 disabled:bg-gray-100 disabled:cursor-not-allowed text-left"
                     >
-                      {formData.sampleType ? (
+                      {formData.sampleTypeId ? (
                         <>
-                          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" style={{ transform: 'rotate(45deg)', flexShrink: 0 }}>
-                            <path d="M9 3h6v11a3 3 0 0 1-6 0V3z" fill={specimenTypes.find(s => s.Sample_Type === formData.sampleType)?.Sample_Color || '#ccc'} stroke="#555" strokeWidth="1.2"/>
-                            <rect x="8" y="2" width="8" height="2" rx="1" fill="#888" stroke="#555" strokeWidth="0.8"/>
-                            <line x1="9" y1="10" x2="15" y2="10" stroke="white" strokeWidth="1" opacity="0.5"/>
-                          </svg>
-                          <span>{formData.sampleType} ({specimenTypes.find(s => s.Sample_Type === formData.sampleType)?.Sample_Color})</span>
+                          {sampleTypes.find(s => s.id === parseInt(formData.sampleTypeId))?.Sample_Type || 'Select...'}
                         </>
                       ) : (
                         <span className="text-gray-400">Please Select</span>
@@ -1310,21 +1314,16 @@ const AddTest = () => {
                       <div className="absolute z-50 top-full left-0 right-0 bg-white border border-gray-300 rounded shadow-lg mt-1 max-h-48 overflow-y-auto">
                         <div
                           className="px-3 py-2 text-xs text-gray-400 hover:bg-gray-50 cursor-pointer border-b"
-                          onClick={() => { handleChange({ target: { name: 'sampleType', value: '' } } as any); setShowSampleTypeDropdown(false); }}
+                          onClick={() => { handleChange({ target: { name: 'sampleTypeId', value: '' } } as any); setShowSampleTypeDropdown(false); }}
                         >
                           Please Select
                         </div>
-                        {(specimenTypes || []).map((type, i) => (
+                        {(sampleTypes || []).map((type) => (
                           <div
-                            key={i}
+                            key={type.id}
                             className="flex items-center gap-2 px-3 py-2 text-xs hover:bg-gray-50 cursor-pointer border-b last:border-b-0"
-                            onClick={() => { handleChange({ target: { name: 'sampleType', value: type.Sample_Type } } as any); setShowSampleTypeDropdown(false); }}
+                            onClick={() => { handleChange({ target: { name: 'sampleTypeId', value: type.id.toString() } } as any); setShowSampleTypeDropdown(false); }}
                           >
-                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" style={{ transform: 'rotate(45deg)', flexShrink: 0 }}>
-                              <path d="M9 3h6v11a3 3 0 0 1-6 0V3z" fill={type.Sample_Color || '#ccc'} stroke="#555" strokeWidth="1.2"/>
-                              <rect x="8" y="2" width="8" height="2" rx="1" fill="#888" stroke="#555" strokeWidth="0.8"/>
-                              <line x1="9" y1="10" x2="15" y2="10" stroke="white" strokeWidth="1" opacity="0.5"/>
-                            </svg>
                             <span>{type.Sample_Type} ({type.Sample_Color})</span>
                           </div>
                         ))}
@@ -1371,35 +1370,6 @@ const AddTest = () => {
                       label="Test Code" 
                       name="testCode"
                       value={formData.testCode}
-                      onChange={handleChange}
-                      disabled={isViewMode}
-                      required={false}
-                    />
-                    <Select 
-                      label="Group" 
-                      name="group"
-                      value={formData.group}
-                      onChange={handleChange}
-                      options={["Thyroid", "Hematology", "Liver", "Kidney"]}
-                      disabled={isViewMode}
-                      required={false}
-                    />
-                  </div>
-
-                  {/* Instructions – same row */}
-                  <div className="flex flex-col sm:flex-row gap-3">
-                    <Input 
-                      label="Instruction For Preparation" 
-                      name="instructionPreparation"
-                      value={formData.instructionPreparation}
-                      onChange={handleChange}
-                      disabled={isViewMode}
-                      required={false}
-                    />
-                    <Input 
-                      label="Instruction For Patient" 
-                      name="instructionPatient"
-                      value={formData.instructionPatient}
                       onChange={handleChange}
                       disabled={isViewMode}
                       required={false}
@@ -1689,14 +1659,14 @@ const AddTest = () => {
                           <div className="flex gap-1 items-center">
                             <select 
                               className="px-2 py-1.5 sm:py-1 border border-gray-300 rounded text-xs sm:text-sm w-32 bg-white focus:outline-none focus:ring-2 focus:ring-orange-500" 
-                              value={parameter.units || ""}
-                              onChange={(e) => handleParameterChange(categoryIndex, paramIndex, 'units', e.target.value)}
+                              value={parameter.unitId || ""}
+                              onChange={(e) => handleParameterChange(categoryIndex, paramIndex, 'unitId', e.target.value)}
                               disabled={isViewMode}
                               title="Select unit - linked to Unit column in preview table"
                             >
                               <option value="">Select Unit 🔗</option>
                               {(units || []).map((unit) => (
-                                <option key={unit.id} value={unit.symbol}>
+                                <option key={unit.id} value={unit.id}>
                                   {unit.symbol}
                                 </option>
                               ))}
@@ -2963,7 +2933,7 @@ const Checkbox = ({ label, checked, onChange, name, disabled }) => (
       type="checkbox"
       name={name}
       checked={checked}
-      onChange={(e) => onChange && onChange({ target: { name, value: e.target.checked, type: 'checkbox', checked: e.target.checked } })}
+      onChange={onChange}
       disabled={disabled}
       className="accent-orange-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
     />

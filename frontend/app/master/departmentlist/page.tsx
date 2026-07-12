@@ -232,7 +232,6 @@ const DepartmentTable = () => {
               <th className="border border-gray-300 px-3 py-1 text-left font-semibold">Id</th>
               <th className="border border-gray-300 px-3 py-1 text-left font-semibold">Name</th>
               <th className="border border-gray-300 px-3 py-1 text-left font-semibold">Code</th>
-              <th className="border border-gray-300 px-3 py-1 text-left font-semibold">Sort Order</th>
               <th className="border border-gray-300 px-3 py-1 text-left font-semibold">Active</th>
               <th className="border border-gray-300 px-3 py-1 text-left font-semibold">Action</th>
             </tr>
@@ -240,7 +239,7 @@ const DepartmentTable = () => {
           <tbody>
             {filteredDepartments.length === 0 ? (
               <tr>
-                <td colSpan={6} className="text-center py-8 text-gray-500 border border-gray-300">
+                <td colSpan={5} className="text-center py-8 text-gray-500 border border-gray-300">
                   No departments found.
                 </td>
               </tr>
@@ -257,7 +256,6 @@ const DepartmentTable = () => {
                   </td>
                   <td className="border border-gray-300 px-3 py-1">{dept.name}</td>
                   <td className="border border-gray-300 px-3 py-1">{dept.code || '-'}</td>
-                  <td className="border border-gray-300 px-3 py-1">{dept.sortOrder || '-'}</td>
                   
                   {/* Active column - just display text */}
                   <td className="border border-gray-300 px-3 py-1 text-center font-semibold text-sm">

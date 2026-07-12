@@ -24,11 +24,11 @@ const AddPackage = () => {
   const [error, setError] = useState("");
   
   const [formData, setFormData] = useState({
-    center: "All Centers",
-    packageName: "",
-    packageCode: "",
+    name: "",
+    code: "",
     departmentId: "",
     labTests: "",
+    b2cCharge: "",
   });
   
   const [testList, setTestList] = useState<any[]>([]);
@@ -87,11 +87,11 @@ const AddPackage = () => {
       if (result.success) {
         const pkg = result.data;
         setFormData({
-          center: pkg.center || "All Centers",
-          packageName: pkg.name || "",
-          packageCode: pkg.code || "",
+          name: pkg.name || "",
+          code: pkg.code || "",
           departmentId: pkg.departmentId?.toString() || "",
           labTests: "",
+          b2cCharge: pkg.b2cCharge?.toString() || "",
         });
         
         // Set the tests from packageTests
@@ -158,11 +158,11 @@ const AddPackage = () => {
     // Validation: Check if required fields are empty
     const emptyFields = [];
     
-    if (!formData.packageName.trim()) {
+    if (!formData.name.trim()) {
       emptyFields.push("Package Name");
     }
     
-    if (!formData.packageCode.trim()) {
+    if (!formData.code.trim()) {
       emptyFields.push("Package Code");
     }
 
@@ -181,13 +181,11 @@ const AddPackage = () => {
       setError("");
       
       const packageData = {
-        name: formData.packageName,
-        code: formData.packageCode,
+        name: formData.name,
+        code: formData.code,
         departmentId: parseInt(formData.departmentId),
-        center: formData.center,
         testIds: testList.map(test => test.id),
-        b2cCharge: 0, // Default values
-        b2bCharge: 0
+        b2cCharge: formData.b2cCharge ? parseFloat(formData.b2cCharge) : 0
       };
       
       let response;
@@ -239,11 +237,11 @@ const AddPackage = () => {
   return (
     <>
       <Header />
-      <div className="p-3 sm:p-4 md:p-6 bg-cyan-50 min-h-screen flex justify-center">
+      <div className="p-3 sm:p-4 md:p-6 bg-white min-h-screen flex justify-center">
         <div className="bg-white rounded-lg shadow-md border border-gray-200 max-w-3xl w-full">
           {/* Header */}
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between px-3 py-2 border-b border-gray-300 gap-2">
-            <h2 className="text-sm sm:text-base font-semibold text-cyan-700">
+            <h2 className="text-sm sm:text-base font-semibold text-slate-900">
               {getTitle()}
             </h2>
 
@@ -295,29 +293,9 @@ const AddPackage = () => {
           {/* Form */}
           <form onSubmit={handleSubmit} className="p-3 sm:p-4 space-y-3 sm:space-y-4">
             <div className="max-w-2xl space-y-3 sm:space-y-4">
-              {/* Center */}
-              <div className="grid grid-cols-1 md:grid-cols-3 items-start md:items-center gap-2 sm:gap-3">
-                <label className="text-xs sm:text-sm font-medium flex items-center gap-1.5 text-cyan-800">
-                  <Building2 size={14} className="text-cyan-600" />
-                  Center
-                </label>
-
-                <select
-                  name="center"
-                  value={formData.center}
-                  onChange={handleChange}
-                  disabled={isViewMode}
-                  className="md:col-span-2 border border-cyan-600 rounded-md px-2 py-1.5 sm:py-1 text-xs sm:text-sm bg-cyan-50 focus:ring-2 focus:ring-cyan-600 outline-none disabled:bg-gray-100 disabled:cursor-not-allowed"
-                >
-                  <option>All Centers</option>
-                  <option>SHRADDHA PATHOLOGY LABORATORY</option>
-                  <option>City Lab</option>
-                </select>
-              </div>
-
               {/* Department */}
               <div className="grid grid-cols-1 md:grid-cols-3 items-start md:items-center gap-2 sm:gap-3">
-                <label className="text-xs sm:text-sm font-medium flex items-center gap-1.5 text-cyan-800">
+                <label className="text-xs sm:text-sm font-medium flex items-center gap-1.5 text-gray-700">
                   <Building2 size={14} className="text-cyan-600" />
                   Department
                 </label>
@@ -327,7 +305,7 @@ const AddPackage = () => {
                   value={formData.departmentId}
                   onChange={handleChange}
                   disabled={isViewMode}
-                  className="md:col-span-2 border border-cyan-600 rounded-md px-2 py-1.5 sm:py-1 text-xs sm:text-sm bg-cyan-50 focus:ring-2 focus:ring-cyan-600 outline-none disabled:bg-gray-100 disabled:cursor-not-allowed"
+                  className="md:col-span-2 border border-gray-300 rounded-md px-2 py-1.5 sm:py-1 text-xs sm:text-sm bg-white focus:ring-2 focus:ring-orange-500 outline-none disabled:bg-gray-100 disabled:cursor-not-allowed"
                 >
                   <option value="">Select Department</option>
                   {departments.map(dept => (
@@ -340,41 +318,41 @@ const AddPackage = () => {
 
               {/* Package Name */}
               <div className="grid grid-cols-1 md:grid-cols-3 items-start md:items-center gap-2 sm:gap-4">
-                <label className="text-xs sm:text-sm font-medium flex items-center gap-1.5 text-cyan-800">
+                <label className="text-xs sm:text-sm font-medium flex items-center gap-1.5 text-gray-700">
                   <Package size={14} className="text-cyan-600" />
                   Package Name
                 </label>
 
                 <input
                   type="text"
-                  name="packageName"
-                  value={formData.packageName}
+                  name="name"
+                  value={formData.name}
                   onChange={handleChange}
                   disabled={isViewMode}
-                  className="md:col-span-2 border border-cyan-600 rounded-md px-2 py-1.5 sm:py-1 text-xs sm:text-sm bg-cyan-50 focus:ring-2 focus:ring-cyan-600 outline-none disabled:bg-gray-100 disabled:cursor-not-allowed"
+                  className="md:col-span-2 border border-gray-300 rounded-md px-2 py-1.5 sm:py-1 text-xs sm:text-sm bg-white focus:ring-2 focus:ring-orange-500 outline-none disabled:bg-gray-100 disabled:cursor-not-allowed"
                 />
               </div>
 
               {/* Package Code */}
               <div className="grid grid-cols-1 md:grid-cols-3 items-start md:items-center gap-2 sm:gap-4">
-                <label className="text-xs sm:text-sm font-medium flex items-center gap-1.5 sm:gap-2 text-cyan-800">
+                <label className="text-xs sm:text-sm font-medium flex items-center gap-1.5 sm:gap-2 text-gray-700">
                   <Hash size={16} className="text-cyan-600" />
                   Package Code
                 </label>
 
                 <input
                   type="text"
-                  name="packageCode"
-                  value={formData.packageCode}
+                  name="code"
+                  value={formData.code}
                   onChange={handleChange}
                   disabled={isViewMode}
-                  className="md:col-span-2 border border-cyan-600 rounded-md px-2 py-1.5 sm:py-1 text-xs sm:text-sm bg-cyan-50 focus:ring-2 focus:ring-cyan-600 outline-none disabled:bg-gray-100 disabled:cursor-not-allowed"
+                  className="md:col-span-2 border border-gray-300 rounded-md px-2 py-1.5 sm:py-1 text-xs sm:text-sm bg-white focus:ring-2 focus:ring-orange-500 outline-none disabled:bg-gray-100 disabled:cursor-not-allowed"
                 />
               </div>
 
               {/* Lab Tests */}
               <div className="grid grid-cols-1 md:grid-cols-3 items-start gap-2 sm:gap-4 relative">
-                <label className="text-xs sm:text-sm font-medium flex items-center gap-1.5 mt-0 md:mt-2 text-cyan-800">
+                <label className="text-xs sm:text-sm font-medium flex items-center gap-1.5 mt-0 md:mt-2 text-gray-700">
                   <FlaskConical size={14} className="text-cyan-600" />
                   Lab Tests
                 </label>
@@ -387,7 +365,7 @@ const AddPackage = () => {
                     onChange={handleChange}
                     placeholder="Search Laboratory"
                     disabled={isViewMode}
-                    className="w-full border border-cyan-600 rounded-md px-2 py-1.5 sm:py-1 text-xs sm:text-sm bg-cyan-50 focus:ring-2 focus:ring-cyan-600 outline-none disabled:bg-gray-100 disabled:cursor-not-allowed"
+                    className="w-full border border-gray-300 rounded-md px-2 py-1.5 sm:py-1 text-xs sm:text-sm bg-white focus:ring-2 focus:ring-orange-500 outline-none disabled:bg-gray-100 disabled:cursor-not-allowed"
                   />
                   
                   {/* Dropdown for search results */}
@@ -459,7 +437,7 @@ const AddPackage = () => {
                 onClick={handleSubmit}
                 type="button"
                 disabled={loading}
-                className="bg-cyan-600 hover:bg-cyan-700 text-white px-4 py-1.5 text-xs sm:text-sm rounded-md transition-colors w-full sm:w-auto disabled:opacity-50 disabled:cursor-not-allowed"
+                className="bg-orange-500 hover:bg-orange-600 text-white px-4 py-1.5 text-xs sm:text-sm rounded-md transition-colors w-full sm:w-auto disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {loading ? 'Saving...' : (isAddMode ? "Save" : "Update")}
               </button>

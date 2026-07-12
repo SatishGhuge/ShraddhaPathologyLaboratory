@@ -107,6 +107,13 @@ router.post('/specimen-types', createSpecimenType);
 router.put('/specimen-types/:id', updateSpecimenType);
 router.delete('/specimen-types/:id', deleteSpecimenType);
 
+// Sample type routes (alias for specimen types - same table)
+router.get('/sample-types', getSpecimenTypes);
+router.get('/sample-types/:id', getSpecimenTypeById);
+router.post('/sample-types', createSpecimenType);
+router.put('/sample-types/:id', updateSpecimenType);
+router.delete('/sample-types/:id', deleteSpecimenType);
+
 // Role routes
 router.get('/roles', getRoles);
 router.get('/roles/:id', getRoleById);
