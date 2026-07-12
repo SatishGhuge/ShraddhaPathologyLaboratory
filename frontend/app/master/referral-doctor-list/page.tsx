@@ -107,7 +107,6 @@ export default function ReferralListing() {
             <tr>
               <th className="border border-gray-300 px-3 py-1 text-left font-semibold">Name</th>
               <th className="border border-gray-300 px-3 py-1 text-left font-semibold">Degree</th>
-              <th className="border border-gray-300 px-3 py-1 text-left font-semibold">Compliment %</th>
               <th className="border border-gray-300 px-3 py-1 text-left font-semibold">Mobile</th>
               <th className="border border-gray-300 px-3 py-1 text-center font-semibold">Action</th>
             </tr>
@@ -115,18 +114,17 @@ export default function ReferralListing() {
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan={5} className="text-center py-4 text-gray-500 border border-gray-300">Loading...</td>
+                <td colSpan={4} className="text-center py-4 text-gray-500 border border-gray-300">Loading...</td>
               </tr>
             ) : filteredData.length === 0 ? (
               <tr>
-                <td colSpan={5} className="text-center py-4 text-gray-500 border border-gray-300">No records found</td>
+                <td colSpan={4} className="text-center py-4 text-gray-500 border border-gray-300">No records found</td>
               </tr>
             ) : (
               filteredData.map((item) => (
                 <tr key={item.id} className="hover:bg-gray-50 border-b border-gray-200">
                   <td className="border border-gray-300 px-3 py-2">Dr. {item.name}</td>
                   <td className="border border-gray-300 px-3 py-2">{item.degree || "-"}</td>
-                  <td className="border border-gray-300 px-3 py-2">{item.compliment != null ? `${item.compliment}%` : "-"}</td>
                   <td className="border border-gray-300 px-3 py-2">{item.mobile || "-"}</td>
                   <td className="border border-gray-300 px-3 py-2">
                     <div className="flex justify-center gap-1 flex-wrap">

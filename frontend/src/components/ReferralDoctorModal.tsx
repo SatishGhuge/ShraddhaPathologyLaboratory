@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { ArrowLeft, User, Hospital, Mail, Phone, MapPin, Percent, GraduationCap, AlertCircle } from "lucide-react";
+import { ArrowLeft, User, Hospital, Mail, Phone, MapPin, GraduationCap, AlertCircle } from "lucide-react";
 
 interface ReferralDoctorModalProps {
   isOpen: boolean;
@@ -20,11 +20,9 @@ export default function ReferralDoctorModal({
   const [formData, setFormData] = useState({
     name: "",
     degree: "",
-    compliment: "",
     mobile: "",
     email: "",
     address: "",
-    allowBalance: false,
     sendReportsViaWhatsApp: false,
     sendReportsViaMail: false,
   });
@@ -43,11 +41,9 @@ export default function ReferralDoctorModal({
         setFormData({
           name: editingDoctor.name || "",
           degree: editingDoctor.degree || "",
-          compliment: editingDoctor.compliment != null ? String(editingDoctor.compliment) : "",
           mobile: editingDoctor.mobile || "",
           email: editingDoctor.email || "",
           address: editingDoctor.address || "",
-          allowBalance: editingDoctor.allowBalance || false,
           sendReportsViaWhatsApp: editingDoctor.sendReportsViaWhatsApp || false,
           sendReportsViaMail: editingDoctor.sendReportsViaMail || false,
         });
@@ -56,11 +52,9 @@ export default function ReferralDoctorModal({
         setFormData({
           name: "",
           degree: "",
-          compliment: "",
           mobile: "",
           email: "",
           address: "",
-          allowBalance: false,
           sendReportsViaWhatsApp: false,
           sendReportsViaMail: false,
         });
@@ -97,12 +91,6 @@ export default function ReferralDoctorModal({
     if (formData.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
       newErrors.email = "Please enter a valid email address.";
     }
-    if (formData.compliment !== "") {
-      const val = Number(formData.compliment);
-      if (isNaN(val) || val < 0 || val > 100) {
-        newErrors.compliment = "Compliment % must be between 0 and 100.";
-      }
-    }
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -117,11 +105,9 @@ export default function ReferralDoctorModal({
         name: formData.name.trim(),
         type,
         degree: formData.degree || null,
-        compliment: formData.compliment !== "" ? parseFloat(formData.compliment) : null,
         mobile: formData.mobile || null,
         email: formData.email || null,
         address: formData.address || null,
-        allowBalance: formData.allowBalance,
         sendReportsViaWhatsApp: formData.sendReportsViaWhatsApp,
         sendReportsViaMail: formData.sendReportsViaMail,
       };
@@ -170,11 +156,9 @@ export default function ReferralDoctorModal({
     setFormData({
       name: "",
       degree: "",
-      compliment: "",
       mobile: "",
       email: "",
       address: "",
-      allowBalance: false,
       sendReportsViaWhatsApp: false,
       sendReportsViaMail: false,
     });
@@ -243,16 +227,6 @@ export default function ReferralDoctorModal({
             </div>
           </div>
 
-          {/* Compliment % */}
-          <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-1">Compliment %</label>
-            <div className={`flex items-center border rounded px-2 bg-white ${errors.compliment ? "border-red-500" : "border-gray-300"}`}>
-              <Percent size={16} className="text-cyan-600 mr-2 flex-shrink-0" />
-              <input type="number" name="compliment" value={formData.compliment} onChange={handleChange} min="0" max="100" placeholder="0" className="w-full py-2 outline-none bg-transparent" disabled={loading} />
-            </div>
-            {errors.compliment && <p className="text-xs text-red-500 mt-1 flex items-center gap-1"><AlertCircle size={12}/>{errors.compliment}</p>}
-          </div>
-
           {/* Mobile */}
           <div>
             <label className="block text-sm font-semibold text-gray-700 mb-1">Mobile</label>
@@ -280,12 +254,6 @@ export default function ReferralDoctorModal({
               <MapPin size={16} className="text-cyan-600 mt-2 mr-2 flex-shrink-0" />
               <textarea name="address" value={formData.address} onChange={handleChange} rows={2} placeholder="Address" className="w-full py-2 outline-none resize-none bg-transparent" disabled={loading} />
             </div>
-          </div>
-
-          {/* Checkbox */}
-          <div className="flex items-center gap-2">
-            <input type="checkbox" name="allowBalance" checked={formData.allowBalance} onChange={handleChange} className="w-4 h-4 accent-orange-500" disabled={loading} />
-            <span className="text-sm text-gray-700">Allow To Send Report on balance amount</span>
           </div>
 
           {/* Report Delivery Preferences */}

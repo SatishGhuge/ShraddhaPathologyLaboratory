@@ -81,6 +81,7 @@ export default function SampleTypes() {
     } catch (error) {
       console.error('Error fetching specimen types:', error);
       setErrorMsg('Failed to fetch specimen types');
+      setData([]);
     } finally {
       setLoading(false);
     }
@@ -106,17 +107,18 @@ export default function SampleTypes() {
       try {
         const result = await deleteSpecimenType(id);
         
-        if (result.success) {
+        if (result?.success) {
           setSuccessMsg('Specimen type deleted successfully');
           setCurrentPage(1);
           fetchSpecimenTypes(1);
           setTimeout(() => setSuccessMsg(''), 3000);
         } else {
-          setErrorMsg(result.message || 'Failed to delete specimen type');
+          setErrorMsg(result?.message || 'Failed to delete specimen type');
         }
-      } catch (error) {
+      } catch (error: any) {
         console.error('Error deleting specimen type:', error);
-        setErrorMsg('Failed to delete specimen type');
+        const errorMessage = error?.response?.message || error?.message || 'Failed to delete specimen type';
+        setErrorMsg(errorMessage);
       }
     }
   };
@@ -166,7 +168,8 @@ export default function SampleTypes() {
         result = await createSpecimenType(requestData);
       }
 
-      if (result.success) {
+      // Handle response from API
+      if (result?.success) {
         setSuccessMsg(editId ? 'Specimen type updated successfully' : 'Specimen type created successfully');
         setErrorMsg("");
         setShowModal(false);
@@ -175,13 +178,17 @@ export default function SampleTypes() {
         setCurrentPage(1);
         fetchSpecimenTypes(1);
         setTimeout(() => setSuccessMsg(''), 3000);
+      } else if (result?.message) {
+        setErrorMsg(result.message);
+        setSuccessMsg("");
       } else {
-        setErrorMsg(result.message || 'Failed to save specimen type');
+        setErrorMsg('Failed to save specimen type');
         setSuccessMsg("");
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error saving specimen type:', error);
-      setErrorMsg('Failed to save specimen type');
+      const errorMessage = error?.response?.message || error?.message || 'Failed to save specimen type';
+      setErrorMsg(errorMessage);
       setSuccessMsg("");
     }
   };

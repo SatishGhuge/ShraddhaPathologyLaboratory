@@ -86,6 +86,10 @@ export const login = async (req, res) => {
         select: { modules: true }
       });
       
+      console.log(`🔐 Staff user login: ${user.username}`);
+      console.log(`🔐 Module allocation found:`, !!moduleAllocation);
+      console.log(`🔐 Modules data:`, moduleAllocation?.modules?.substring(0, 100));
+      
       const { password: _, ...userData } = user;
       return res.json({ 
         success: true, 

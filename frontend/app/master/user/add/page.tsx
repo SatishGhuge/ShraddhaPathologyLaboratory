@@ -248,7 +248,8 @@ export default function AddUserForm() {
             if (user.moduleAllocation) {
               try {
                 let allocationData = user.moduleAllocation;
-                console.log('📦 Raw moduleAllocation:', allocationData, 'Type:', typeof allocationData);
+                console.log('📦 Raw moduleAllocation from API:', allocationData, 'Type:', typeof allocationData);
+                console.log('📦 Full user object:', JSON.stringify(user, null, 2));
                 
                 // If it's an object with modules property, extract it
                 if (allocationData && typeof allocationData === 'object' && 'modules' in allocationData) {
@@ -264,9 +265,11 @@ export default function AddUserForm() {
                   
                 setModuleAllocation(allocation || defaultModuleAllocation);
               } catch (e) {
-                console.error('Error parsing module allocation:', e);
+                console.error('❌ Error parsing module allocation:', e);
                 setModuleAllocation(defaultModuleAllocation);
               }
+            } else {
+              console.log('⚠️ No moduleAllocation found in user object');
             }
           }
         })
@@ -347,6 +350,20 @@ export default function AddUserForm() {
 
       if (isEditMode) {
         await updateUser((Array.isArray(id) ? id[0] : id) as string, payload);
+        
+        // If the current user is being updated, refresh their data in localStorage
+        const currentUser = JSON.parse(localStorage.getItem("admin") || "{}");
+        if (currentUser.id === parseInt((Array.isArray(id) ? id[0] : id) as string)) {
+          console.log('🔄 Updating current user in localStorage...');
+          const updatedUser = {
+            ...currentUser,
+            ...payload,
+            moduleAllocation: moduleAllocation
+          };
+          localStorage.setItem("admin", JSON.stringify(updatedUser));
+          window.dispatchEvent(new Event('storage'));
+          console.log('✅ Current user updated in localStorage');
+        }
       } else {
         await createUser(payload);
       }

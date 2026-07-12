@@ -1108,7 +1108,7 @@ export const getDoctorById = async (req, res) => {
 // Create doctor
 export const createDoctor = async (req, res) => {
   try {
-    const { name, type, degree, compliment, mobile, email, address, allowBalance, sendReportsViaWhatsApp, sendReportsViaMail } = req.body;
+    const { name, type, degree, mobile, email, address, sendReportsViaWhatsApp, sendReportsViaMail } = req.body;
     if (!name || !name.trim()) {
       return res.status(400).json({ success: false, message: 'Name is required' });
     }
@@ -1117,11 +1117,9 @@ export const createDoctor = async (req, res) => {
         name: name.trim(),
         type: type || 'Doctor',
         degree: degree || null,
-        compliment: compliment !== '' && compliment != null ? parseFloat(compliment) : null,
         mobile: mobile || null,
         email: email || null,
         address: address || null,
-        allowBalance: allowBalance || false,
         sendReportsViaWhatsApp: sendReportsViaWhatsApp || false,
         sendReportsViaMail: sendReportsViaMail || false,
         isActive: true,
@@ -1138,7 +1136,7 @@ export const createDoctor = async (req, res) => {
 export const updateDoctor = async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, type, degree, compliment, mobile, email, address, allowBalance, sendReportsViaWhatsApp, sendReportsViaMail } = req.body;
+    const { name, type, degree, mobile, email, address, sendReportsViaWhatsApp, sendReportsViaMail } = req.body;
     const existing = await prisma.doctor.findUnique({ where: { id: parseInt(id) } });
     if (!existing) return res.status(404).json({ success: false, message: 'Doctor not found' });
     const doctor = await prisma.doctor.update({
@@ -1147,11 +1145,9 @@ export const updateDoctor = async (req, res) => {
         name: name?.trim() || existing.name,
         type: type || existing.type,
         degree: degree !== undefined ? degree : existing.degree,
-        compliment: compliment !== '' && compliment != null ? parseFloat(compliment) : null,
         mobile: mobile !== undefined ? mobile : existing.mobile,
         email: email !== undefined ? email : existing.email,
         address: address !== undefined ? address : existing.address,
-        allowBalance: allowBalance !== undefined ? allowBalance : existing.allowBalance,
         sendReportsViaWhatsApp: sendReportsViaWhatsApp !== undefined ? sendReportsViaWhatsApp : existing.sendReportsViaWhatsApp,
         sendReportsViaMail: sendReportsViaMail !== undefined ? sendReportsViaMail : existing.sendReportsViaMail,
       }
@@ -4841,6 +4837,14 @@ export const createUser = async (req, res) => {
       }
     }
 
+    // Verify role exists
+    const roleExists = await prisma.role.findUnique({
+      where: { name: role }
+    });
+    if (!roleExists) {
+      return res.status(404).json({ success: false, message: `Role "${role}" not found in database` });
+    }
+
     const bcrypt = await import('bcryptjs');
     const hashed = await bcrypt.default.hash(password, 10);
     const user = await prisma.user.create({
@@ -4899,6 +4903,16 @@ export const updateUser = async (req, res) => {
       });
       if (!organization) {
         return res.status(404).json({ success: false, message: 'Organization not found' });
+      }
+    }
+
+    // Verify role exists if role is provided
+    if (role) {
+      const roleExists = await prisma.role.findUnique({
+        where: { name: role }
+      });
+      if (!roleExists) {
+        return res.status(404).json({ success: false, message: `Role "${role}" not found in database` });
       }
     }
 

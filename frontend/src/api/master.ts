@@ -157,13 +157,61 @@ export const getSpecimenTypes = async (page: number = 1, limit: number = 20): Pr
   params.append('page', page.toString());
   params.append('limit', limit.toString());
   const cacheKey = `specimen_types_page_${page}_limit_${limit}`;
-  const r = await getCachedData(cacheKey, () => apiCall(`/master/specimen-types?${params.toString()}`, { method: 'GET' })); 
-  return extractDataArray(r); 
+  try {
+    const r = await getCachedData(cacheKey, () => apiCall(`/master/specimen-types?${params.toString()}`, { method: 'GET' })); 
+    return extractDataArray(r);
+  } catch (error) {
+    console.error('Error fetching specimen types:', error);
+    return [];
+  }
 };
-export const getSpecimenTypeById = async (id: string): Promise<any | null> => { const r = await apiCall(`/master/specimen-types/${id}`, { method: 'GET' }); return r.data || null; };
-export const createSpecimenType = async (d: ApiData): Promise<any> => { clearCache(); const r = await apiCall('/master/specimen-types', { method: 'POST', body: JSON.stringify(d) }); return r.data || r; };
-export const updateSpecimenType = async (id: string, d: ApiData): Promise<any> => { clearCache(); const r = await apiCall(`/master/specimen-types/${id}`, { method: 'PUT', body: JSON.stringify(d) }); return r.data || r; };
-export const deleteSpecimenType = async (id: string): Promise<ApiResponse> => { clearCache(); return apiCall(`/master/specimen-types/${id}`, { method: 'DELETE' }); };
+export const getSpecimenTypeById = async (id: string): Promise<any | null> => { 
+  try {
+    const r = await apiCall(`/master/specimen-types/${id}`, { method: 'GET' }); 
+    return r.data || null;
+  } catch (error) {
+    console.error('Error fetching specimen type:', error);
+    return null;
+  }
+};
+export const createSpecimenType = async (d: ApiData): Promise<any> => { 
+  clearCache(); 
+  try {
+    const r = await apiCall('/master/specimen-types', { method: 'POST', body: JSON.stringify(d) }); 
+    return r;
+  } catch (error: any) {
+    console.error('Error creating specimen type:', error);
+    return { 
+      success: false, 
+      message: error?.response?.message || error?.message || 'Failed to create specimen type'
+    };
+  }
+};
+export const updateSpecimenType = async (id: string, d: ApiData): Promise<any> => { 
+  clearCache(); 
+  try {
+    const r = await apiCall(`/master/specimen-types/${id}`, { method: 'PUT', body: JSON.stringify(d) }); 
+    return r;
+  } catch (error: any) {
+    console.error('Error updating specimen type:', error);
+    return { 
+      success: false, 
+      message: error?.response?.message || error?.message || 'Failed to update specimen type'
+    };
+  }
+};
+export const deleteSpecimenType = async (id: string): Promise<ApiResponse> => { 
+  clearCache(); 
+  try {
+    return await apiCall(`/master/specimen-types/${id}`, { method: 'DELETE' });
+  } catch (error: any) {
+    console.error('Error deleting specimen type:', error);
+    return { 
+      success: false, 
+      message: error?.response?.message || error?.message || 'Failed to delete specimen type'
+    };
+  }
+};
 
 // ==================== ROLES ====================
 export const getRoles = async (page: number = 1, limit: number = 20): Promise<any[]> => { 

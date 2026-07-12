@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useContext } from "react";
+import { useState, useEffect, useContext, useCallback, useMemo } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { SidebarContext } from "@/app/layout-wrapper";
 import {
@@ -123,7 +123,7 @@ const Header = () => {
   const publicRoutes = ["/", "/login", "/seed-data"];
   const isPublicRoute = publicRoutes.includes(pathname);
 
-  // All hooks must be called BEFORE any conditional returns
+  // Read initial user from localStorage immediately on mount
   useEffect(() => {
     const user = JSON.parse(localStorage.getItem("admin") || "{}");
     setCurrentUser(user);
@@ -133,35 +133,43 @@ const Header = () => {
     return () => clearInterval(timer);
   }, []);
 
-  // Listen for storage changes (when user logs in from another tab or updates)
-  useEffect(() => {
-    const handleStorageChange = () => {
-      const user = JSON.parse(localStorage.getItem("admin") || "{}");
-      setCurrentUser(user);
-      console.log('🔍 Header - Storage changed, user updated:', user);
-    };
+  // Function to filter modules based on user type and allocation
+  // Define this BEFORE using it in useEffect
+  const filterModulesByAllocation = useCallback(() => {
+    const user = JSON.parse(localStorage.getItem("admin") || "{}");
+    setCurrentUser(user);
+    
+    const isAdmin = user.userType === 'admin' || !user.userType;
 
-    window.addEventListener('storage', handleStorageChange);
-    return () => window.removeEventListener('storage', handleStorageChange);
-  }, []);
+    console.log('🔍 Header - Filtering modules...');
+    console.log('🔍 Header - Full User Object:', JSON.stringify(user, null, 2));
+    console.log('🔍 Header - User Type:', user.userType);
+    console.log('🔍 Header - Is Admin:', isAdmin);
+    console.log('🔍 Header - Module Allocation Present:', !!user.moduleAllocation);
 
-  // Filter modules based on user module allocation
-  useEffect(() => {
-    const filterModulesByAllocation = () => {
-      const user = JSON.parse(localStorage.getItem("admin") || "{}");
-      const moduleAllocation = user.moduleAllocation;
+    // ADMINS see all modules - no filtering needed
+    if (isAdmin) {
+      console.log('🔍 Header - Admin user detected, showing all modules');
+      setModules(allModules);
+      return;
+    }
 
-      console.log('🔍 Header - User:', user);
-      console.log('🔍 Header - moduleAllocation (raw):', moduleAllocation);
-      console.log('🔍 Header - moduleAllocation type:', typeof moduleAllocation);
+    // STAFF USERS - filter based on moduleAllocation
+    const moduleAllocation = user.moduleAllocation;
+    console.log('🔍 Header - Staff user detected');
+    console.log('🔍 Header - moduleAllocation (raw):', moduleAllocation);
+    console.log('🔍 Header - moduleAllocation type:', typeof moduleAllocation);
 
-      // Only filter if moduleAllocation exists and is not empty
-      if (moduleAllocation && (typeof moduleAllocation === 'string' || typeof moduleAllocation === 'object')) {
-      try {
-        const accessible = getAccessibleModules(moduleAllocation);
-        console.log('🔍 Header - accessible (parsed):', accessible);
-        console.log('🔍 Header - accessible.masters:', accessible.masters);
-        console.log('🔍 Header - accessible.masters.hasAccess:', accessible.masters.hasAccess);
+    // If no moduleAllocation, show all modules for staff users too
+    if (!moduleAllocation) {
+      console.log('🔍 Header - No moduleAllocation found for staff user, showing all modules');
+      setModules(allModules);
+      return;
+    }
+
+    try {
+      const accessible = getAccessibleModules(moduleAllocation);
+      console.log('🔍 Header - accessible (parsed):', JSON.stringify(accessible, null, 2));
         
         const filteredModules = allModules.map(module => {
           if (module.id === "patient") {
@@ -173,7 +181,6 @@ const Header = () => {
                 return false;
               })
             };
-            console.log('🔍 Header - patient filtered:', filtered);
             return filtered;
           }
           
@@ -195,8 +202,6 @@ const Header = () => {
                 return false;
               })
             };
-            console.log('🔍 Header - master filtered:', filtered);
-            console.log('🔍 Header - master items count:', filtered.items.length);
             return filtered;
           }
           
@@ -208,14 +213,11 @@ const Header = () => {
                 if (item.path.includes("/collection")) return accessible.reports.collectionReport;
                 if (item.path.includes("patient-list")) return accessible.reports.patientList;
                 if (item.path.includes("referral-doctor-revenue")) return accessible.reports.referralDoctorRevenue;
-                if (item.path.includes("center-wise")) return accessible.reports.centerWiseCostReport;
-                if (item.path.includes("b2b-testwise")) return accessible.reports.b2bTestwiseCostReport;
-                if (item.path.includes("discount-report")) return accessible.reports.discountReport;
                 if (item.path.includes("test-report")) return accessible.reports.testReport;
+                if (item.path.includes("turn-around-time")) return (accessible?.reports as any)?.turnAroundTime;
                 return false;
               })
             };
-            console.log('🔍 Header - report filtered:', filtered);
             return filtered;
           }
           
@@ -227,7 +229,6 @@ const Header = () => {
                 return false;
               })
             };
-            console.log('🔍 Header - configuration filtered:', filtered);
             return filtered;
           }
           
@@ -241,7 +242,6 @@ const Header = () => {
                 return false;
               })
             };
-            console.log('🔍 Header - help filtered:', filtered);
             return filtered;
           }
           
@@ -249,37 +249,75 @@ const Header = () => {
             return accessible.result ? module : { ...module, items: [] };
           }
           
-          // Inventory — always visible (no allocation filter yet)
+          // Inventory — always visible
           if (module.id === "inventory") {
             return module;
           }
           
           return module;
         }).filter(module => {
-          // Hide modules with no accessible items
           const shouldHide = module.items.length === 0 && ["patient", "master", "report", "configuration", "help"].includes(module.id);
-          console.log(`🔍 Header - module ${module.id}: items=${module.items.length}, shouldHide=${shouldHide}`);
           if (shouldHide) {
-            return false;
+            console.log(`🔍 Header - Hiding empty module: ${module.id}`);
           }
-          return true;
+          return !shouldHide;
         });
         
-        console.log('🔍 Header - filteredModules:', filteredModules);
+        console.log('🔍 Header - Final filtered modules count:', filteredModules.length);
         setModules(filteredModules);
       } catch (error) {
         console.error('🔍 Header - Error parsing moduleAllocation:', error);
+        console.log('🔍 Header - Error occurred, showing all modules as fallback');
         setModules(allModules);
       }
-    } else {
-      console.log('🔍 Header - No moduleAllocation found, showing all modules');
-      setModules(allModules);
-    }
+  }, []);
+
+  // Listen for storage changes and also poll periodically for same-tab changes
+  useEffect(() => {
+    const handleStorageChange = () => {
+      const user = JSON.parse(localStorage.getItem("admin") || "{}");
+      setCurrentUser(user);
+      console.log('🔍 Header - Storage changed, user updated:', user);
+      filterModulesByAllocation();
     };
 
-    // Filter modules immediately when component mounts or user changes
+    window.addEventListener('storage', handleStorageChange);
+    
+    // Also check localStorage on a short interval to catch sync changes
+    // (storage event doesn't fire in the same tab that made the change)
+    const interval = setInterval(() => {
+      const currentStorageUser = JSON.parse(localStorage.getItem("admin") || "{}");
+      if (Object.keys(currentStorageUser).length > 0 && 
+          (!currentUser || currentStorageUser.id !== currentUser.id)) {
+        console.log('🔍 Header - Detected user change via polling');
+        setCurrentUser(currentStorageUser);
+        filterModulesByAllocation();
+      }
+    }, 500); // Check every 500ms
+    
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      clearInterval(interval);
+    };
+  }, [filterModulesByAllocation, currentUser]);
+
+  // Call filtering immediately on component mount
+  useEffect(() => {
     filterModulesByAllocation();
-  }, [currentUser]);
+  }, [filterModulesByAllocation]);
+
+  // Also filter when pathname changes (on navigation)
+  useEffect(() => {
+    filterModulesByAllocation();
+  }, [pathname, filterModulesByAllocation]);
+
+  // Also filter when currentUser changes (on login)
+  useEffect(() => {
+    if (currentUser && Object.keys(currentUser).length > 0) {
+      console.log('🔍 Header - CurrentUser changed, re-filtering modules');
+      filterModulesByAllocation();
+    }
+  }, [currentUser.id, filterModulesByAllocation]);
 
   // Determine active module based on current pathname
   useEffect(() => {
