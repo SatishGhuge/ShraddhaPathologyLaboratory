@@ -68,7 +68,7 @@ export default function ChargesManager({
       // For doctors, use dedicated endpoint that includes doctor charges
       if (entityType === "doctor") {
         const chargesResponse = await fetch(
-          `${process.env.NEXT_PUBLIC_API_URL}/master/doctors/${entityId}/charges`
+          `${process.env.NEXT_PUBLIC_API_URL}/master/doctors/${entityId}/charges?t=${Date.now()}`
         );
         const chargesResult = await chargesResponse.json();
 
@@ -83,12 +83,14 @@ export default function ChargesManager({
             department: { name: item.group },
             discountR: item.discountR || 0,
             discountS: item.discountS || 0,
+            isCustomized: item.isCustomized === true,
             charges: [
               {
                 id: null,
                 testId: item.id,
                 discountR: item.discountR || 0,
-                discountS: item.discountS || 0
+                discountS: item.discountS || 0,
+                isCustomized: item.isCustomized === true
               }
             ]
           }));
@@ -106,13 +108,13 @@ export default function ChargesManager({
           });
           setDefaultCharges(defaultChargesMap);
 
-          // Build doctor charges array
+          // Build doctor charges array - ALL charges from response, not just customized
           const doctorCharges = chargesResult.data
-            .filter((item: any) => item.isCustomized)
             .map((item: any) => ({
               testId: item.id,
               discountR: item.discountR || 0,
-              discountS: item.discountS || 0
+              discountS: item.discountS || 0,
+              isCustomized: item.isCustomized === true
             }));
           setCharges(doctorCharges);
         } else {
@@ -171,13 +173,14 @@ export default function ChargesManager({
         const defaultCharge = defaultCharges[test.id];
 
         // A test is customized if:
-        // - For doctor: doctor has a record with discountS (special price) > 0
-        // - For organization: charges differ from default
+        // - For doctor: has a record in charges with isCustomized = true
+        // - For organization: has a record in charges (exists = customized)
         let isCustomized = false;
         if (entityType === "doctor" && testCharge) {
-          // Customized if special price (discountS) is set and different from regular (discountR)
-          isCustomized = (testCharge.discountS || 0) > 0 && (testCharge.discountS !== testCharge.discountR);
+          // Use the isCustomized flag from the backend
+          isCustomized = testCharge.isCustomized === true;
         } else if (testCharge && defaultCharge) {
+          // For organization charges: check if it exists and differs from default
           isCustomized = 
             testCharge.b2cCharge !== defaultCharge.b2cCharge ||
             testCharge.b2bCharge !== defaultCharge.b2bCharge;
@@ -239,20 +242,16 @@ export default function ChargesManager({
   // Calculate totals for customized and default tests
   const totalCustomized = tests.filter((test) => {
     const testCharge = charges.find((c: any) => c.testId === test.id);
-    const defaultCharge = defaultCharges[test.id];
     
-    if (!testCharge || !defaultCharge) return false;
+    if (!testCharge) return false;
     
-    // For doctor charges: check if discountS (special price) is different from discountR (regular price)
+    // For doctor charges: check the isCustomized flag
     if (entityType === "doctor") {
-      return (testCharge.discountS || 0) > 0 && (testCharge.discountS !== testCharge.discountR);
+      return testCharge.isCustomized === true;
     }
     
-    // For organization charges: check if b2c/b2b charges differ from default
-    return (
-      testCharge.b2cCharge !== defaultCharge.b2cCharge ||
-      testCharge.b2bCharge !== defaultCharge.b2bCharge
-    );
+    // For organization charges: check if it exists (exists = customized)
+    return true;
   }).length;
 
   const totalDefault = tests.length - totalCustomized;
@@ -264,9 +263,20 @@ export default function ChargesManager({
 
   const handleChargeChange = (id: any, field: any, value: any) => {
     if (value < 0) return;
-    const updated = filteredData.map((item) =>
-      item.id === id ? { ...item, [field]: parseFloat(value) || 0 } : item
-    );
+    const updated = filteredData.map((item) => {
+      if (item.id === id) {
+        const newCharge = parseFloat(value) || 0;
+        const defaultCharge = item.defaultB2C || 0;
+        // Update isCustomized flag based on whether charge differs from default
+        const isCustomized = Math.abs(newCharge - defaultCharge) > 0.01;
+        return { 
+          ...item, 
+          [field]: newCharge,
+          isCustomized: isCustomized
+        };
+      }
+      return item;
+    });
     setFilteredData(updated);
   };
 
@@ -275,10 +285,16 @@ export default function ChargesManager({
       alert("Please enter charge value!");
       return;
     }
-    const updated = filteredData.map((item) => ({
-      ...item,
-      charges: bulkCharge ? parseFloat(bulkCharge) : item.charges,
-    }));
+    const bulkChargeValue = parseFloat(bulkCharge);
+    const updated = filteredData.map((item) => {
+      const defaultCharge = item.defaultB2C || 0;
+      const isCustomized = Math.abs(bulkChargeValue - defaultCharge) > 0.01;
+      return {
+        ...item,
+        charges: bulkChargeValue,
+        isCustomized: isCustomized
+      };
+    });
     setFilteredData(updated);
     setShowBulkModal(false);
     setBulkCharge("");

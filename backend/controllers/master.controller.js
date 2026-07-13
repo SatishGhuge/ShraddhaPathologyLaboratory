@@ -95,7 +95,6 @@ export const getDepartments = async (req, res) => {
         id: true,
         name: true,
         code: true,
-        group: true,
         isActive: true,
         isDeleted: true,
         createdAt: true,
@@ -128,7 +127,6 @@ export const getAllDepartments = async (req, res) => {
         id: true,
         name: true,
         code: true,
-        group: true,
         isActive: true,
         isDeleted: true,
         createdAt: true,
@@ -967,25 +965,11 @@ export const getTests = async (req, res) => {
         department: {
           select: {
             id: true,
-            name: true,
-            group: true
+            name: true
           }
         },
-        categories: {
-          include: {
-            testParameter: {
-              select: {
-                id: true,
-                parameterName: true,
-                type: true,
-                isMandatory: true
-              }
-            }
-          },
-          orderBy: { categoryName: 'asc' }
-        },
         charges: {
-          where: { organizationId: null }, // Only get DEFAULT charges
+          where: { organizationId: null },
           select: {
             id: true,
             b2cCharge: true,
@@ -2041,17 +2025,14 @@ export const getDoctorTestCharges = async (req, res) => {
         // Get default charges (organizationId = null)
         charges: {
           where: { organizationId: null },
-          include: {
-            organization: {
-              select: {
-                id: true,
-                name: true
-              }
-            }
+          select: {
+            id: true,
+            b2cCharge: true,
+            b2bCharge: true
           }
         },
         // Get doctor-specific charges
-        doctorCharges: {
+        doctorTestCharges: {
           where: { doctorId: parseInt(doctorId) }
         }
       },
@@ -2070,12 +2051,12 @@ export const getDoctorTestCharges = async (req, res) => {
       defaultB2C: test.charges[0]?.b2cCharge || 0,
       defaultB2B: test.charges[0]?.b2bCharge || 0,
       // Doctor charges - discountR (default time) and discountS (customized)
-      discountR: test.doctorCharges[0]?.discountR || 0,
-      discountS: test.doctorCharges[0]?.discountS || 0,
+      discountR: test.doctorTestCharges[0]?.discountR || 0,
+      discountS: test.doctorTestCharges[0]?.discountS || 0,
       // Doctor B2C (for backward compatibility) = Default B2C - discountS
-      doctorB2C: Math.max(0, (test.charges[0]?.b2cCharge || 0) - (test.doctorCharges[0]?.discountS || 0)),
+      doctorB2C: Math.max(0, (test.charges[0]?.b2cCharge || 0) - (test.doctorTestCharges[0]?.discountS || 0)),
       // Is customized - use the isCustomized flag if available, fallback to old logic for backward compatibility
-      isCustomized: test.doctorCharges.length > 0 ? (test.doctorCharges[0]?.isCustomized === true) : false
+      isCustomized: test.doctorTestCharges.length > 0 ? (test.doctorTestCharges[0]?.isCustomized === true) : false
     }));
 
     res.json({
@@ -2409,7 +2390,6 @@ export const bulkCreateTestCharges = async (req, res) => {
               data: {
                 discountR: discountRVal,
                 discountS: discountSVal,
-                discountPercent: discountPercent ? parseFloat(discountPercent) : 0,
                 isCustomized: isCustomizedFlag
               }
             });
@@ -2422,7 +2402,6 @@ export const bulkCreateTestCharges = async (req, res) => {
                 doctorId: parseInt(doctorId),
                 discountR: discountRVal,
                 discountS: discountSVal,
-                discountPercent: discountPercent ? parseFloat(discountPercent) : 0,
                 isCustomized: isCustomizedFlag,
                 isActive: true
               }

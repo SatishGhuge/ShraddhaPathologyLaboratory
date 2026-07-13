@@ -477,21 +477,26 @@ export default function PatientRegistration() {
       console.log('🔄 Fetching departments, tests, and packages...');
       
       const [deptsResponse, testsResponse, packagesResponse] = await Promise.all([
-        fetch(`${API_BASE_URL}/master/departments`),
-        fetch(`${API_BASE_URL}/master/tests`),
-        fetch(`${API_BASE_URL}/master/packages/all`)
+        fetch(`${API_BASE_URL}/master/departments`).then(r => r.json()),
+        fetch(`${API_BASE_URL}/master/tests?page=1&limit=100`).then(r => r.json()),
+        fetch(`${API_BASE_URL}/master/packages/all`).then(r => r.json())
       ]);
 
-      const [deptsResult, testsResult, packagesResult] = await Promise.all([
-        deptsResponse.json(),
-        testsResponse.json(),
-        packagesResponse.json()
-      ]);
+      console.log('Raw departments response:', deptsResponse);
+      console.log('Raw tests response:', testsResponse);
+      console.log('Raw packages response:', packagesResponse);
 
-      if (deptsResult.success && testsResult.success) {
+      // Extract data from responses (handle both success flag and direct data)
+      const depts = deptsResponse.data || (Array.isArray(deptsResponse) ? deptsResponse : deptsResponse?.success ? deptsResponse.data : []);
+      const tests = testsResponse.data || (Array.isArray(testsResponse) ? testsResponse : testsResponse?.success ? testsResponse.data : []);
+      const packages = packagesResponse.data || (Array.isArray(packagesResponse) ? packagesResponse : packagesResponse?.success ? packagesResponse.data : []);
+
+      console.log(`✅ Got ${depts.length} departments, ${tests.length} tests, ${packages.length} packages`);
+
+      if (depts && depts.length > 0 && tests && tests.length > 0) {
         // Group tests by department
         const deptMap = {};
-        deptsResult.data.forEach(dept => {
+        depts.forEach(dept => {
           deptMap[dept.id] = {
             id: dept.id,
             name: dept.name,
@@ -501,7 +506,7 @@ export default function PatientRegistration() {
         });
 
         // Add tests to their departments
-        testsResult.data.forEach(test => {
+        tests.forEach(test => {
           if (deptMap[test.departmentId] && test.isActive && !test.isDeleted) {
             deptMap[test.departmentId].tests.push({
               id: test.id,
@@ -516,8 +521,8 @@ export default function PatientRegistration() {
         });
 
         // Add packages to their departments
-        if (packagesResult.success) {
-          packagesResult.data.forEach(pkg => {
+        if (packages && packages.length > 0) {
+          packages.forEach(pkg => {
             if (deptMap[pkg.departmentId] && pkg.isActive) {
               const packageTests = pkg.packageTests?.map(pt => pt.test.name) || [];
               
@@ -539,6 +544,8 @@ export default function PatientRegistration() {
         const departmentsArray = Object.values(deptMap);
         setDepartments(departmentsArray);
         console.log('✅ Loaded departments:', departmentsArray.length);
+      } else {
+        console.warn('⚠️ No departments or tests found');
       }
     } catch (error) {
       console.error('❌ Error fetching departments:', error);
