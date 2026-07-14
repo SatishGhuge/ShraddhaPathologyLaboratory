@@ -52,16 +52,127 @@ model Patient {
   createdAtLocation String?
   address           String?       @db.Text
   location          String?
+  
+  // Authentication fields
+  password          String?       // Hashed password for patient login
+  isEmailVerified   Boolean       @default(false)
+  isActive          Boolean       @default(true)
+  registrationType  String        @default("direct") // "self", "organization", "direct"
+  organizationId    String?       // If registered via organization
+  
+  // Relations
+  tests             PatientTest[]
+  auth              PatientAuth?
+  homeVisits        HomeVisitTracking[]
+  
   createdAt         DateTime?     @default(now())
   updatedAt         DateTime      @updatedAt
-  tests             PatientTest[]
 
   @@index([mobile])
   @@index([email])
   @@index([firstName, lastName], map: "patients_name_idx")
   @@index([createdAt])
   @@index([location])
+  @@index([isEmailVerified])
   @@map("patients")
+}
+
+model PatientAuth {
+  id                 String        @id @default(cuid())
+  patientId          String        @unique
+  patient            Patient       @relation(fields: [patientId], references: [patientId], onDelete: Cascade)
+  
+  // Credentials
+  email              String        @unique
+  passwordHash       String
+  
+  // Verification
+  emailVerificationToken String?
+  emailVerificationExpiry DateTime?
+  isEmailVerified    Boolean       @default(false)
+  
+  // Password reset
+  passwordResetToken String?
+  passwordResetExpiry DateTime?
+  
+  // Login tracking
+  lastLoginAt        DateTime?
+  lastLoginIp        String?
+  loginAttempts      Int           @default(0)
+  isLocked           Boolean       @default(false)
+  lockedUntil        DateTime?
+  
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+  
+  @@index([email])
+  @@index([isEmailVerified])
+  @@map("patient_auth")
+}
+
+model Runner {
+  id                String           @id @default(cuid())
+  name              String
+  aadharCard        String           @unique
+  phone             String           @unique
+  email             String           @unique
+  address           String
+  assignedLocation  String           // Location where runner operates
+  
+  homeVisits        HomeVisitTracking[]
+  locations         RunnerLocation[]
+  
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+  
+  @@map("runners")
+}
+
+model HomeVisitTracking {
+  id                String           @id @default(cuid())
+  patientTestId     Int              @unique  // Link to existing PatientTest - one-to-one
+  patientTest       PatientTest      @relation(fields: [patientTestId], references: [id], onDelete: Cascade)
+  
+  patientId         String           // For quick lookup
+  patient           Patient          @relation(fields: [patientId], references: [patientId], onDelete: Cascade)
+  
+  runnerId          String
+  runner            Runner           @relation(fields: [runnerId], references: [id])
+  
+  visitDate         DateTime
+  visitTime         String           // "09:30"
+  patientAddress    String           @db.Text
+  status            String           @default("Scheduled") // Scheduled, RunnerArrived, SampleReceived, Completed
+  
+  locations         RunnerLocation[]
+  
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+  
+  @@index([patientTestId])
+  @@index([patientId])
+  @@index([runnerId])
+  @@index([status])
+  @@map("home_visit_tracking")
+}
+
+model RunnerLocation {
+  id                String           @id @default(cuid())
+  homeVisitTrackingId String
+  homeVisit         HomeVisitTracking @relation(fields: [homeVisitTrackingId], references: [id], onDelete: Cascade)
+  
+  runnerId          String
+  runner            Runner           @relation(fields: [runnerId], references: [id])
+  
+  latitude          Float
+  longitude         Float
+  accuracy          Float?
+  timestamp         DateTime         @default(now())
+  
+  @@index([homeVisitTrackingId])
+  @@index([runnerId])
+  @@index([timestamp])
+  @@map("runner_locations")
 }
 
 model PatientTest {
@@ -100,6 +211,8 @@ model PatientTest {
   lastStatusUpdateAt DateTime?
   barcode_status     String              @default("Unprinted")
   comments           String?             @db.Text
+  
+  // Relations
   department         Department          @relation(fields: [departmentId], references: [id])
   organization       Organization?       @relation(fields: [organizationId], references: [id])
   patient            Patient             @relation(fields: [patientId], references: [patientId], onDelete: Cascade)
@@ -107,6 +220,7 @@ model PatientTest {
   package            Package?            @relation(fields: [packageId], references: [id], onDelete: Cascade)
   testResults        TestResult[]
   statusHistory      TestStatusHistory[]
+  homeVisitTracking  HomeVisitTracking?
 
   @@index([departmentId], map: "patient_tests_departmentId_fkey")
   @@index([testId], map: "patient_tests_testId_fkey")

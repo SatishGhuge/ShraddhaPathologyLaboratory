@@ -4,6 +4,7 @@ import React, { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { User, Lock, Mail, ArrowLeft, Key, Eye, EyeOff, Home, Instagram, Facebook, Twitter } from "lucide-react";
 import { adminLogin, forgotPassword, verifyCode, resetPassword } from "@/src/api/adminAuth";
+import API_BASE_URL from "@/src/api/config";
 
 const logo = "/logo.png";
 
@@ -84,28 +85,81 @@ const AdminLogin = ({ onLogin }: { onLogin?: () => void }) => {
     setErrors(e); return Object.keys(e).length === 0;
   };
   const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault(); if (!validateLogin()) return;
-    setLoading(true); setErrors({});
+    e.preventDefault(); 
+    if (!validateLogin()) return;
+    setLoading(true); 
+    setErrors({});
+    
     try {
-      const res = await adminLogin(formData.username, formData.password);
-      localStorage.clear();
-      document.cookie = `token=${res.token}; path=/; max-age=86400; SameSite=Lax`;
-      localStorage.setItem("token", res.token);
-      localStorage.setItem("admin", JSON.stringify(res.admin));
-      
-      // Dispatch custom event to notify Header component of login
-      const loginEvent = new CustomEvent('userLoggedIn', { detail: res.admin });
-      window.dispatchEvent(loginEvent);
-      console.log('📢 Dispatched userLoggedIn event');
-      
-      if (onLogin) onLogin();
-      const role = res.admin?.role;
-      router.replace(
-        role === "Collection Center" ? "/Dashboard/collectiondashboard" :
-        role === "Franchise"         ? "/Dashboard/franchisedashboard"  :
-        role === "Patient"           ? "/patientdashboard" : "/labdashboard"
-      );
-    } catch { setErrors({ submit: "Invalid credentials. Please try again." }); setLoading(false); }
+      // Try admin login first
+      try {
+        const res = await adminLogin(formData.username, formData.password);
+        localStorage.clear();
+        document.cookie = `token=${res.token}; path=/; max-age=86400; SameSite=Lax`;
+        localStorage.setItem("token", res.token);
+        localStorage.setItem("admin", JSON.stringify(res.admin));
+        
+        // Dispatch custom event to notify Header component of login
+        const loginEvent = new CustomEvent('userLoggedIn', { detail: res.admin });
+        window.dispatchEvent(loginEvent);
+        console.log('📢 Admin logged in:', res.admin?.username || res.admin?.email);
+        
+        if (onLogin) onLogin();
+        const role = res.admin?.role;
+        router.replace(
+          role === "Collection Center" ? "/Dashboard/collectiondashboard" :
+          role === "Franchise"         ? "/Dashboard/franchisedashboard"  :
+          role === "Patient"           ? "/Dashboard/patientdash" : "/labdashboard"
+        );
+        return;
+      } catch (adminError) {
+        console.log('ℹ️ Admin login failed, trying patient login...');
+        // Admin login failed, try patient login
+      }
+
+      // Try patient login (using username/email as email for patient)
+      try {
+        const patientRes = await fetch(`${API_BASE_URL}/patient/auth/login`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            email: formData.username, // Username field can be email for patients
+            password: formData.password
+          })
+        });
+
+        const patientData = await patientRes.json();
+
+        if (!patientRes.ok) {
+          throw new Error(patientData.message || "Invalid credentials");
+        }
+
+        localStorage.clear();
+        document.cookie = `token=${patientData.token}; path=/; max-age=604800; SameSite=Lax`;
+        localStorage.setItem("token", patientData.token);
+        localStorage.setItem("patient", JSON.stringify(patientData.data));
+
+        // Dispatch custom event for patient login
+        const loginEvent = new CustomEvent('patientLoggedIn', { detail: patientData.data });
+        window.dispatchEvent(loginEvent);
+        console.log('📢 Patient logged in:', patientData.data?.patientId);
+
+        if (onLogin) onLogin();
+        router.replace("/Dashboard/patientdash");
+        return;
+      } catch (patientError) {
+        console.log('ℹ️ Patient login also failed');
+        // Both failed
+      }
+
+      // Both admin and patient login failed
+      setErrors({ submit: "Invalid credentials. Please try again." });
+    } catch (error) {
+      console.error('Login error:', error);
+      setErrors({ submit: "Invalid credentials. Please try again." });
+    } finally {
+      setLoading(false);
+    }
   };
   const handleForgotPassword = async (e: React.FormEvent) => {
     if (e?.preventDefault) e.preventDefault();
@@ -232,7 +286,7 @@ const AdminLogin = ({ onLogin }: { onLogin?: () => void }) => {
                   <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5">Username / Email</label>
                   <div className="relative">
                     <User className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={14} />
-                    <input name="username" value={formData.username} onChange={handleChange} placeholder="Enter username"
+                    <input name="username" value={formData.username} onChange={handleChange} placeholder="Admin username, patient email, or staff email"
                       className="w-full pl-9 pr-3 py-3 text-sm rounded-lg bg-gray-100 text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-orange-500" />
                   </div>
                   {errors.username && <p className="text-red-400 text-xs mt-1">{errors.username}</p>}

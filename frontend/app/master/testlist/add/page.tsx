@@ -166,7 +166,6 @@ const AddTest = () => {
     name: "",
     categoryType: "PARAMETER",
     isCategory: false,
-    sortOrder: "",
     testMethod: "",
     color: "#3b82f6",
     icon: "",
@@ -177,7 +176,6 @@ const AddTest = () => {
       machineCode: "",
       multiplyBy: "",
       decimal: "",
-      sortOrder: "",
       testMethod: "",
       isDescriptive: false,
       lowPanic: "",
@@ -1592,19 +1590,6 @@ const AddTest = () => {
                           placeholder="Category name..."
                           value={category.name || ""}
                           onChange={(e) => handleCategoryChange(categoryIndex, 'name', e.target.value)}
-                          disabled={isViewMode} 
-                        />
-                      </div>
-                      <div>
-                        <label className="block font-semibold text-gray-700 text-xs sm:text-sm mb-1">
-                          Sort Order
-                        </label>
-                        <input 
-                          className="px-2 py-1.5 sm:py-1 border border-gray-300 rounded text-xs sm:text-sm w-full sm:w-40" 
-                          placeholder="Sort Order" 
-                          type="number"
-                          value={category.sortOrder || ""}
-                          onChange={(e) => handleCategoryChange(categoryIndex, 'sortOrder', e.target.value)}
                           disabled={isViewMode} 
                         />
                       </div>
