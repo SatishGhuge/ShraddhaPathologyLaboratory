@@ -254,7 +254,9 @@ model TestCharge {
   updatedAt          DateTime            @updatedAt
   test               Test                @relation(fields: [testId], references: [id], onDelete: Cascade)
   organization       Organization?       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  @@unique([testId])
+  
+  @@unique([testId, organizationId])
+  @@index([organizationId])
   @@map("test_charges")
 }
 
