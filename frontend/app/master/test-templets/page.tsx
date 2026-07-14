@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { FileText, RotateCwIcon, X, Check, Plus, Trash2, ChevronLeft, ChevronRight } from 'lucide-react';
 import { CKEditor } from '@ckeditor/ckeditor5-react';
 import ClassicEditor from '@ckeditor/ckeditor5-build-classic';
-import { getTemplates, getTests, createTemplate, updateTemplate, deleteTemplate, getUnits, createCategoryWithParameter } from "@/src/api/master.js";
+import { getTemplates, getTests, createTemplate, updateTemplate, deleteTemplate, getUnits, createCategoryWithParameter, getTestById } from "@/src/api/master.js";
 
 const TestTemplets = () => {
 
@@ -145,40 +145,68 @@ const TestTemplets = () => {
     setShowForm(true);
   };
 
-  const handleTestChange = (testId: any) => {
+  const handleTestChange = async (testId: any) => {
     setFormData({ ...formData, testId });
     
-    const selectedTest = tests.find(t => t.id === parseInt(testId));
-    if (selectedTest && selectedTest.categories && selectedTest.categories.length > 0) {
-      const params = selectedTest.categories.map(cat => ({
-        id: cat.testParameter?.id,
-        name: cat.testParameter?.parameterName,
-        type: cat.testParameter?.type,
-        isMandatory: cat.testParameter?.isMandatory
-      }));
-      setSelectedTestParameters(params);
-    } else {
+    // Fetch full test data with categories and parameters
+    try {
+      const fullTestData = await getTestById(testId);
+      if (fullTestData && fullTestData.categories && fullTestData.categories.length > 0) {
+        // Flatten all parameters from all categories
+        const allParams = [];
+        fullTestData.categories.forEach(cat => {
+          if (cat.parameters && Array.isArray(cat.parameters)) {
+            cat.parameters.forEach(param => {
+              allParams.push({
+                id: param.id || `${cat.categoryId}-${param.parameterName}`,
+                name: param.parameterName,
+                type: param.type,
+                isMandatory: param.isMandatory
+              });
+            });
+          }
+        });
+        setSelectedTestParameters(allParams);
+      } else {
+        setSelectedTestParameters([]);
+      }
+    } catch (err) {
+      console.error('Error fetching test data:', err);
       setSelectedTestParameters([]);
     }
   };
 
-  const handleEdit = (template: any) => {
+  const handleEdit = async (template: any) => {
     setFormData({
       testId: template.testId.toString(),
       templateName: template.templateName,
       parameters: template.parameters || []
     });
     
-    const selectedTest = tests.find(t => t.id === template.testId);
-    if (selectedTest && selectedTest.categories && selectedTest.categories.length > 0) {
-      const params = selectedTest.categories.map(cat => ({
-        id: cat.testParameter?.id,
-        name: cat.testParameter?.parameterName,
-        type: cat.testParameter?.type,
-        isMandatory: cat.testParameter?.isMandatory
-      }));
-      setSelectedTestParameters(params);
-    } else {
+    // Fetch full test data with categories and parameters
+    try {
+      const fullTestData = await getTestById(template.testId.toString());
+      if (fullTestData && fullTestData.categories && fullTestData.categories.length > 0) {
+        // Flatten all parameters from all categories
+        const allParams = [];
+        fullTestData.categories.forEach(cat => {
+          if (cat.parameters && Array.isArray(cat.parameters)) {
+            cat.parameters.forEach(param => {
+              allParams.push({
+                id: param.id || `${cat.categoryId}-${param.parameterName}`,
+                name: param.parameterName,
+                type: param.type,
+                isMandatory: param.isMandatory
+              });
+            });
+          }
+        });
+        setSelectedTestParameters(allParams);
+      } else {
+        setSelectedTestParameters([]);
+      }
+    } catch (err) {
+      console.error('Error fetching test data:', err);
       setSelectedTestParameters([]);
     }
     
