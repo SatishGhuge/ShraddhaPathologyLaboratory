@@ -172,9 +172,9 @@ model Test {
   interpretationLabel    String?
   interpretation         String?             @db.Text
   outsourceLab           String?
-  attachFile             Boolean?             @default(false)
+  attachFile             String?              @default("No")
   imageSize              String?             @default("800|600")
-  profileTest            Boolean             @default(false)
+  profileTest            String              @default("No")
   isHeader               Boolean             @default(true)
   showTestName           Boolean             @default(true)
   isNABL                 Boolean             @default(false)
