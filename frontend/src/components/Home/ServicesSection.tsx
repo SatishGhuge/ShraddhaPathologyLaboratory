@@ -27,7 +27,7 @@ const serviceImages: Record<string, string> = {
 };
 
 // Fallback for any service not in the map
-const DEFAULT_IMAGE = "/tests/haematology.jpg";
+const DEFAULT_IMAGE = "/haematology.jpg";
 
 export default function ServicesSection() {
   const [services, setServices] = useState<LabService[]>(FALLBACK_SERVICES);

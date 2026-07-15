@@ -229,7 +229,7 @@ const AdminLogin = ({ onLogin }: { onLogin?: () => void }) => {
                 )}
                 {/* Username */}
                 <div className="anim-fade-up" style={{ animationDelay:"0.25s" }}>
-                  <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5">Username / Email</label>
+                  <label className="block text-[10px] font-bold text-white uppercase tracking-widest mb-1.5">Username / Email</label>
                   <div className="relative">
                     <User className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={14} />
                     <input name="username" value={formData.username} onChange={handleChange} placeholder="Enter username"
@@ -239,7 +239,7 @@ const AdminLogin = ({ onLogin }: { onLogin?: () => void }) => {
                 </div>
                 {/* Password */}
                 <div className="anim-fade-up" style={{ animationDelay:"0.35s" }}>
-                  <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5">Password</label>
+                  <label className="block text-[10px] font-bold text-white uppercase tracking-widest mb-1.5">Password</label>
                   <div className="relative">
                     <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={14} />
                     <input type={showPassword ? "text" : "password"} name="password"
@@ -366,7 +366,7 @@ const AdminLogin = ({ onLogin }: { onLogin?: () => void }) => {
             </div>
 
             {/* Card footer */}
-            <p className="text-center text-[10px] text-gray-600 mt-4 tracking-widest uppercase">
+            <p className="text-center text-[10px] text-white mt-4 tracking-widest uppercase">
               © 2026 Shraddha Diagnostic Center
             </p>
           </div>

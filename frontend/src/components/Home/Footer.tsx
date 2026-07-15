@@ -14,7 +14,7 @@ export default function Footer() {
 
           {/* About */}
           <div>
-            <Image src="/SHRADDHA-logo.jpg" alt="Shraddha Lab" width={130} height={44} className="object-contain mb-4 brightness-0 invert" />
+            <Image src="/logo.png" alt="Shraddha Lab" width={130} height={44} className="object-contain mb-4 brightness-0 invert" />
             <p className="text-gray-400 text-xs leading-relaxed mb-5">
               Delivering accurate diagnostics with compassion and care. Your health is our priority.
             </p>

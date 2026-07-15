@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
 import { RefreshCw } from "lucide-react";
+import HeroImageCarousel from "./HeroImageCarousel";
 
 const taglines = [
   "Trusted Results, Reliable Care",
@@ -96,6 +97,7 @@ export default function Hero() {
             transition={{ duration: 0.7, delay: 0.15 }}
             className="relative h-full min-h-[520px] -mr-6 lg:-mr-10"
           >
+            {/* Base hero image */}
             <Image
               src="/labhomeimage.jpg"
               alt="Lab Technician at Shraddha Pathology Laboratory"
@@ -103,8 +105,12 @@ export default function Hero() {
               className="object-cover object-center"
               priority
             />
+            
+            {/* Animated carousel overlay */}
+            <HeroImageCarousel />
+            
             {/* Subtle left fade so image blends into the light bg */}
-            <div className="absolute inset-0 bg-gradient-to-r from-[#F0F6FF] via-transparent to-transparent w-1/3" />
+            <div className="absolute inset-0 bg-gradient-to-r from-[#F0F6FF] via-transparent to-transparent w-1/3 pointer-events-none" />
           </motion.div>
         </div>
       </div>

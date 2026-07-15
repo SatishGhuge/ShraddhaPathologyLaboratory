@@ -25,7 +25,7 @@ const sections = [
     label:   "Our Vision",
     badge:   "Vision",
     icon:    Eye,
-    image:   "/pic.jpg",
+    image:   "/pic1.jpg",
     accent:  "#1D3F5F",
     bg:      "from-[#1D3F5F] to-[#152e46]",
     reverse: false,
