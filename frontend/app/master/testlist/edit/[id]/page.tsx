@@ -38,9 +38,8 @@ const AddTest = () => {
   const [formData, setFormData] = useState({
     name: "",
     department: "",
-    sortOrder: "",
     shortName: "",
-    attachFile: "Yes",
+    attachFile: false,
     imageSize: "800|600",
     signatureId: "",
     costForLab: "",
@@ -48,15 +47,14 @@ const AddTest = () => {
     preparationType: "",
     isNABL: false,
     lineHeight: "",
-    profileTest: "Yes",
+    profileTest: false,
     reportHeader: "",
-    sampleType: "",
+    sampleTypeId: "",
     machineName: "",
     isHeader: true,
     showTestName: true,
     outsourceLab: "",
     testCode: "",
-    group: "",
     instructionPreparation: "",
     instructionPatient: "",
     interpretationLabel: "",
@@ -174,7 +172,6 @@ const AddTest = () => {
     name: "",
     categoryType: "PARAMETER",
     isCategory: false,
-    sortOrder: "",
     testMethod: "",
     color: "#3b82f6",
     icon: "",
@@ -185,7 +182,6 @@ const AddTest = () => {
       machineCode: "",
       multiplyBy: "",
       decimal: "",
-      sortOrder: "",
       testMethod: "",
       isDescriptive: false,
       lowPanic: "",
@@ -344,7 +340,6 @@ const AddTest = () => {
               name: testData.name || "",
               department: testData.departmentId?.toString() || "",
               speciality: testData.speciality || "Regular",
-              sortOrder: testData.sortOrder?.toString() || "",
               shortName: testData.shortName || "",
               attachFile: testData.attachFile || "Yes",
               imageSize: testData.imageSize || "800|600",
@@ -382,7 +377,6 @@ const AddTest = () => {
                   name: category.name || "",
                   isCategory: category.isCategory || false,
                   testMethod: category.testMethod || "",
-                  sortOrder: category.sortOrder || "",
                   color: category.color || "#3b82f6",
                   icon: category.icon || "",
                   description: category.description || "",
@@ -825,10 +819,6 @@ const AddTest = () => {
       emptyFields.push("Department");
     }
     
-    if (!formData.sortOrder.trim()) {
-      emptyFields.push("Sort Order");
-    }
-    
     if (!formData.shortName.trim()) {
       emptyFields.push("Test Short Form");
     }
@@ -852,7 +842,6 @@ const AddTest = () => {
         sampleType: formData.sampleType || null,
         machineName: formData.machineName || null,
         group: formData.group || null,
-        sortOrder: parseInt(formData.sortOrder) || null,
         reportHeader: formData.reportHeader || null,
         costForLab: formData.costForLab ? parseFloat(formData.costForLab) : null,
         preparationTime: formData.preparationTime || null,
@@ -1034,7 +1023,7 @@ const AddTest = () => {
               {!isViewMode && (
                 <button
                   onClick={handlePreview}
-                  className="bg-cyan-600 text-white px-3 sm:px-4 py-1.5 rounded text-xs sm:text-sm hover:bg-cyan-700 transition-colors"
+                  className="bg-orange-500 text-white px-3 sm:px-4 py-1.5 rounded text-xs sm:text-sm hover:bg-orange-600 transition-colors"
                 >
                   Preview
                 </button>
@@ -1042,7 +1031,7 @@ const AddTest = () => {
 
               <button
                 onClick={handleCancel}
-                className="text-cyan-700 px-3 sm:px-4 py-1.5 rounded text-xs sm:text-sm hover:bg-cyan-100 w-full sm:w-auto"
+                className="text-slate-900 px-3 sm:px-4 py-1.5 rounded text-xs sm:text-sm hover:bg-orange-100 w-full sm:w-auto"
               >
                 Back to list
               </button>
@@ -1053,7 +1042,7 @@ const AddTest = () => {
             <h2 className="text-base sm:text-lg font-semibold text-slate-800">Add Test</h2>
             <button
               onClick={handleCancel}
-              className="text-cyan-700 text-xs sm:text-sm hover:underline"
+              className="text-slate-900 text-xs sm:text-sm hover:underline"
             >
               ← Back to List
             </button>
@@ -1091,25 +1080,6 @@ const AddTest = () => {
                   />
 
                   <Input 
-                    label="Group" 
-                    name="group"
-                    value={formData.group}
-                    onChange={handleChange}
-                    disabled={true}
-                    placeholder="Auto-populated from Department"
-                    required={false}
-                  />
-
-                  <Input 
-                    label="Sort Order" 
-                    name="sortOrder"
-                    type="number"
-                    value={formData.sortOrder}
-                    onChange={handleChange}
-                    disabled={isViewMode}
-                    required={false}
-                  />
-                  <Input 
                     label="Test Short Form" 
                     name="shortName"
                     value={formData.shortName}
@@ -1118,22 +1088,22 @@ const AddTest = () => {
                     required={false}
                   />
 
-                  <Radio 
+                  <Checkbox 
                     label="Attach File" 
                     name="attachFile" 
-                    value={formData.attachFile}
+                    checked={formData.attachFile}
                     onChange={handleChange}
                     disabled={isViewMode} 
                   />
 
-                  {/* Image size field — only when Attach File = Yes */}
-                  {formData.attachFile === 'Yes' && (
+                  {/* Image size field — only when Attach File = true */}
+                  {formData.attachFile === true && (
                     <div className="flex flex-col gap-1">
-                      <label className="font-semibold text-cyan-800 text-xs sm:text-sm">
+                      <label className="font-semibold text-gray-700 text-xs sm:text-sm">
                         Image width/height :
                       </label>
                       <input
-                        className="px-2 py-1.5 border border-cyan-400 rounded text-xs sm:text-sm w-48 focus:outline-none focus:ring-2 focus:ring-cyan-500 bg-cyan-50"
+                        className="px-2 py-1.5 border border-cyan-400 rounded text-xs sm:text-sm w-48 focus:outline-none focus:ring-2 focus:ring-orange-500 bg-white"
                         placeholder="width|height (Optional)"
                         name="imageSize"
                         value={formData.imageSize || ''}
@@ -1145,7 +1115,7 @@ const AddTest = () => {
 
                   {/* Cost For Lab – inline */}
                   <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-3">
-                    <label className="font-semibold text-cyan-800 text-xs sm:text-sm whitespace-nowrap">
+                    <label className="font-semibold text-gray-700 text-xs sm:text-sm whitespace-nowrap">
                       Cost For Lab
                     </label>
                     <input 
@@ -1153,7 +1123,7 @@ const AddTest = () => {
                       type="number"
                       value={formData.costForLab}
                       onChange={handleChange}
-                      className="w-full sm:w-32 px-2 py-1.5 sm:py-1 border border-cyan-600 rounded text-xs sm:text-sm bg-cyan-50" 
+                      className="w-full sm:w-32 px-2 py-1.5 sm:py-1 border border-gray-300 rounded text-xs sm:text-sm bg-white" 
                       disabled={isViewMode} 
                     required={false}/>
                   </div>
@@ -1188,7 +1158,7 @@ const AddTest = () => {
                       disabled={isViewMode} 
                     />
                     <div className="flex items-center gap-2">
-                      <label className="font-semibold text-cyan-800 text-xs sm:text-sm">
+                      <label className="font-semibold text-gray-700 text-xs sm:text-sm">
                         Line Height
                       </label>
                       <input 
@@ -1197,7 +1167,7 @@ const AddTest = () => {
                         step="0.1"
                         value={formData.lineHeight}
                         onChange={handleChange}
-                        className="w-20 px-2 py-1.5 sm:py-1 border border-cyan-600 rounded text-xs sm:text-sm bg-cyan-50" 
+                        className="w-20 px-2 py-1.5 sm:py-1 border border-gray-300 rounded text-xs sm:text-sm bg-white" 
                         disabled={isViewMode} 
                       required={false}/>
                     </div>
@@ -1218,18 +1188,18 @@ const AddTest = () => {
                   {/* Test to add - Only show when Profile Test is Yes */}
                   {formData.profileTest === "Yes" && (
                     <div>
-                      <label className="font-semibold text-cyan-800 text-xs sm:text-sm block mb-1">Test to add</label>
+                      <label className="font-semibold text-gray-700 text-xs sm:text-sm block mb-1">Test to add</label>
                       {/* Combined tag + select box */}
-                      <div className="flex flex-wrap items-center gap-1 px-2 py-1 border border-cyan-600 rounded bg-cyan-50 min-h-[32px] focus-within:ring-2 focus-within:ring-cyan-600">
+                      <div className="flex flex-wrap items-center gap-1 px-2 py-1 border border-gray-300 rounded bg-white min-h-[32px] focus-within:ring-2 focus-within:ring-orange-500">
                         {/* Tags inside the box */}
                         {selectedTestsToAdd.map(t => (
-                          <span key={t.id} className="flex items-center gap-0.5 bg-cyan-200 text-cyan-900 text-xs px-1.5 py-0.5 rounded-full whitespace-nowrap">
+                          <span key={t.id} className="flex items-center gap-0.5 bg-orange-100 text-orange-900 text-xs px-1.5 py-0.5 rounded-full whitespace-nowrap">
                             {t.name}
                             {!isViewMode && (
                               <button
                                 type="button"
                                 onClick={() => setSelectedTestsToAdd(prev => prev.filter(x => x.id !== t.id))}
-                                className="text-cyan-600 hover:text-red-500 font-bold leading-none ml-0.5 text-sm"
+                                className="text-orange-600 hover:text-red-500 font-bold leading-none ml-0.5 text-sm"
                               >×</button>
                             )}
                           </span>
@@ -1271,12 +1241,12 @@ const AddTest = () => {
                   />
                   {/* Sample Type - Custom dropdown with colored test tube */}
                   <div className="relative sample-type-dropdown">
-                    <label className="font-semibold text-cyan-800 text-xs sm:text-sm">Sample Type</label>
+                    <label className="font-semibold text-gray-700 text-xs sm:text-sm">Sample Type</label>
                     <button
                       type="button"
                       disabled={isViewMode}
                       onClick={() => setShowSampleTypeDropdown(v => !v)}
-                      className="w-full px-2 py-1.5 border border-cyan-600 rounded text-xs sm:text-sm bg-cyan-50 focus:outline-none focus:ring-2 focus:ring-cyan-600 disabled:bg-gray-100 disabled:cursor-not-allowed flex items-center gap-2 text-left"
+                      className="w-full px-2 py-1.5 border border-gray-300 rounded text-xs sm:text-sm bg-white focus:outline-none focus:ring-2 focus:ring-orange-500 disabled:bg-gray-100 disabled:cursor-not-allowed flex items-center gap-2 text-left"
                     >
                       {formData.sampleType ? (
                         <>
@@ -1292,7 +1262,7 @@ const AddTest = () => {
                       )}
                     </button>
                     {showSampleTypeDropdown && !isViewMode && (
-                      <div className="absolute z-50 top-full left-0 right-0 bg-white border border-cyan-600 rounded shadow-lg mt-1 max-h-48 overflow-y-auto">
+                      <div className="absolute z-50 top-full left-0 right-0 bg-white border border-gray-300 rounded shadow-lg mt-1 max-h-48 overflow-y-auto">
                         <div
                           className="px-3 py-2 text-xs text-gray-400 hover:bg-gray-50 cursor-pointer border-b"
                           onClick={() => { handleChange({ target: { name: 'sampleType', value: '' } }); setShowSampleTypeDropdown(false); }}
@@ -1302,7 +1272,7 @@ const AddTest = () => {
                         {specimenTypes.map((type, i) => (
                           <div
                             key={i}
-                            className="flex items-center gap-2 px-3 py-2 text-xs hover:bg-cyan-50 cursor-pointer border-b last:border-b-0"
+                            className="flex items-center gap-2 px-3 py-2 text-xs hover:bg-orange-50 cursor-pointer border-b last:border-b-0"
                             onClick={() => { handleChange({ target: { name: 'sampleType', value: type.Sample_Type } }); setShowSampleTypeDropdown(false); }}
                           >
                             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" style={{ transform: 'rotate(45deg)', flexShrink: 0 }}>
@@ -1360,15 +1330,6 @@ const AddTest = () => {
                       disabled={isViewMode}
                       required={false}
                     />
-                    <Input 
-                      label="Group" 
-                      name="group"
-                      value={formData.group}
-                      onChange={handleChange}
-                      disabled={true}
-                      placeholder="Auto-populated from Department"
-                      required={false}
-                    />
                   </div>
 
                   {/* Instructions – same row */}
@@ -1397,8 +1358,8 @@ const AddTest = () => {
 
             {/* ========== RIGHT SIDE - INTERPRETATION AREA ========== */}
             <div className="w-full xl:w-96 xl:border-l xl:border-gray-200 xl:pl-4 mt-6 xl:mt-0">
-              <div className="bg-cyan-50 border border-cyan-200 rounded-lg p-4 space-y-4">
-                <h3 className="text-lg font-semibold text-cyan-800 border-b border-cyan-300 pb-2">
+              <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 space-y-4">
+                <h3 className="text-lg font-semibold text-gray-800 border-b border-gray-300 pb-2">
                   Interpretation Section
                 </h3>
                 
@@ -1442,7 +1403,7 @@ const AddTest = () => {
                             }
                           }}
                           id="interpretation-expand-btn"
-                          className="px-3 py-1 bg-cyan-600 text-white text-xs rounded hover:bg-cyan-700 focus:outline-none"
+                          className="px-3 py-1 bg-orange-500 text-white text-xs rounded hover:bg-orange-600 focus:outline-none"
                         >
                           ⛶ Expand
                         </button>
@@ -1478,7 +1439,7 @@ const AddTest = () => {
                     )}
                   </div>
                   {!isViewMode ? (
-                    <div id="interpretation-editor" className="border border-cyan-600 rounded bg-white p-2 min-h-[400px]">
+                    <div id="interpretation-editor" className="border border-gray-300 rounded bg-white p-2 min-h-[400px]">
                       {editorLoaded ? (
                         <CKEditor
                           editor={ClassicEditor as any}
@@ -1533,7 +1494,7 @@ const AddTest = () => {
                             value={formData.interpretation}
                             onChange={handleChange}
                             placeholder="Enter interpretation details here..."
-                            className="w-full min-h-[20rem] px-3 py-2 border border-gray-300 rounded text-sm resize focus:outline-none focus:ring-2 focus:ring-cyan-600"
+                            className="w-full min-h-[20rem] px-3 py-2 border border-gray-300 rounded text-sm resize focus:outline-none focus:ring-2 focus:ring-orange-500"
                           />
                           <button
                             type="button"
@@ -1560,10 +1521,10 @@ const AddTest = () => {
 
         {/* ================= CATEGORY SECTION ================= */}
         {categories.map((category, categoryIndex) => (
-          <div key={categoryIndex} className="mt-4 bg-white border border-cyan-800 rounded">
+          <div key={categoryIndex} className="mt-4 bg-white border border-gray-300 rounded">
             {/* HEADER */}
-            <div className="flex justify-between items-center px-3 py-2 bg-cyan-100">
-              <span className="font-semibold text-cyan-800 text-xs sm:text-sm">
+            <div className="flex justify-between items-center px-3 py-2 bg-gray-100">
+              <span className="font-semibold text-gray-700 text-xs sm:text-sm">
                 Category {categoryIndex + 1}
               </span>
 
@@ -1599,7 +1560,7 @@ const AddTest = () => {
                   {category.isCategory && (
                     <div className="space-y-3 mt-3">
                       <div>
-                        <label className="block font-semibold text-cyan-800 text-xs sm:text-sm mb-1">
+                        <label className="block font-semibold text-gray-700 text-xs sm:text-sm mb-1">
                           Category Name
                         </label>
                         <input 
@@ -1611,20 +1572,7 @@ const AddTest = () => {
                         />
                       </div>
                       <div>
-                        <label className="block font-semibold text-cyan-800 text-xs sm:text-sm mb-1">
-                          Sort Order
-                        </label>
-                        <input 
-                          className="px-2 py-1.5 sm:py-1 border border-gray-300 rounded text-xs sm:text-sm w-full sm:w-40" 
-                          placeholder="Sort Order" 
-                          type="number"
-                          value={category.sortOrder || ""}
-                          onChange={(e) => handleCategoryChange(categoryIndex, 'sortOrder', e.target.value)}
-                          disabled={isViewMode} 
-                        />
-                      </div>
-                      <div>
-                        <label className="block font-semibold text-cyan-800 text-xs sm:text-sm mb-1">
+                        <label className="block font-semibold text-gray-700 text-xs sm:text-sm mb-1">
                           Category Test Method
                         </label>
                         <input 
@@ -1642,7 +1590,7 @@ const AddTest = () => {
                 {/* COLUMN 2: Parameters */}
                 <div className="flex-1 space-y-3">
                   <div className="flex justify-between items-center mb-4">
-                    <h3 className="font-semibold text-cyan-800 text-xs sm:text-sm">Parameters</h3>
+                    <h3 className="font-semibold text-gray-700 text-xs sm:text-sm">Parameters</h3>
                     {!isViewMode && (
                       <button
                         onClick={() => addParameter(categoryIndex)}
@@ -1672,7 +1620,7 @@ const AddTest = () => {
                           )}
                           {/* Select Unit Dropdown */}
                           <select 
-                            className="px-2 py-1.5 sm:py-1 border border-gray-300 rounded text-xs sm:text-sm w-32 bg-white focus:outline-none focus:ring-2 focus:ring-cyan-600" 
+                            className="px-2 py-1.5 sm:py-1 border border-gray-300 rounded text-xs sm:text-sm w-32 bg-white focus:outline-none focus:ring-2 focus:ring-orange-500" 
                             value={parameter.units || ""}
                             onChange={(e) => handleParameterChange(categoryIndex, paramIndex, 'units', e.target.value)}
                             disabled={isViewMode}
@@ -1717,16 +1665,16 @@ const AddTest = () => {
                             />
                             {/* Autocomplete dropdown */}
                             {paramSuggestionsOpen[`${categoryIndex}-${paramIndex}`] && (
-                              <ul className="absolute top-full left-0 z-50 bg-white border border-cyan-400 rounded shadow-lg w-64 max-h-48 overflow-y-auto text-xs mt-0.5">
+                              <ul className="absolute top-full left-0 z-50 bg-white border border-gray-300 rounded shadow-lg w-64 max-h-48 overflow-y-auto text-xs mt-0.5">
                                 {paramSuggestions[`${categoryIndex}-${paramIndex}`]?.map(s => (
                                   <li
                                     key={s.id}
                                     onMouseDown={() => applyParamSuggestion(categoryIndex, paramIndex, s)}
-                                    className="px-3 py-1.5 cursor-pointer hover:bg-cyan-50 border-b border-gray-100 last:border-0"
+                                    className="px-3 py-1.5 cursor-pointer hover:bg-orange-50 border-b border-gray-100 last:border-0"
                                   >
                                     <span className="font-medium text-gray-800">{s.parameterName}</span>
                                     {s.units && <span className="text-gray-400 ml-1">({s.units})</span>}
-                                    {s.type && <span className="text-cyan-500 ml-1 text-[10px]">{s.type}</span>}
+                                    {s.type && <span className="text-orange-600 ml-1 text-[10px]">{s.type}</span>}
                                   </li>
                                 ))}
                               </ul>
@@ -2908,7 +2856,7 @@ const AddTest = () => {
 
 const Input = ({ label, required, disabled, ...props }) => (
   <div>
-    <label className="font-semibold text-cyan-800 text-xs sm:text-sm">
+    <label className="font-semibold text-gray-700 text-xs sm:text-sm">
       {label}
       {required && <span className="text-red-500"> *</span>}
     </label>
@@ -2916,21 +2864,21 @@ const Input = ({ label, required, disabled, ...props }) => (
       {...props}
       disabled={disabled}
       autoComplete="off"
-      className="w-full px-2 py-1.5 sm:py-1 border border-cyan-600 rounded text-xs sm:text-sm bg-cyan-50 focus:outline-none focus:ring-2 focus:ring-cyan-600 disabled:bg-gray-100 disabled:cursor-not-allowed"
+      className="w-full px-2 py-1.5 sm:py-1 border border-gray-300 rounded text-xs sm:text-sm bg-white focus:outline-none focus:ring-2 focus:ring-orange-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
     />
   </div>
 );
 
 const Select = ({ label, options = [], required, disabled, ...props }) => (
   <div>
-    <label className="font-semibold text-cyan-800 text-xs sm:text-sm">
+    <label className="font-semibold text-gray-700 text-xs sm:text-sm">
       {label}
       {required && <span className="text-red-500"> *</span>}
     </label>
     <select
       {...props}
       disabled={disabled}
-      className="w-full px-2 py-1.5 sm:py-1 border border-cyan-600 rounded text-xs sm:text-sm bg-cyan-50 focus:outline-none focus:ring-2 focus:ring-cyan-600 disabled:bg-gray-100 disabled:cursor-not-allowed"
+      className="w-full px-2 py-1.5 sm:py-1 border border-gray-300 rounded text-xs sm:text-sm bg-white focus:outline-none focus:ring-2 focus:ring-orange-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
     >
       <option value="">Please Select</option>
       {options.map((opt, i) => {
@@ -2948,14 +2896,14 @@ const Select = ({ label, options = [], required, disabled, ...props }) => (
 );
 
 const Checkbox = ({ label, checked, onChange, name, disabled }) => (
-  <label className="flex items-center gap-2 font-semibold text-cyan-800 text-xs sm:text-sm">
+  <label className="flex items-center gap-2 font-semibold text-gray-700 text-xs sm:text-sm">
     <input
       type="checkbox"
       name={name}
       checked={checked}
       onChange={(e) => onChange && onChange({ target: { name, value: e.target.checked, type: 'checkbox', checked: e.target.checked } })}
       disabled={disabled}
-      className="accent-cyan-600 disabled:bg-gray-100 disabled:cursor-not-allowed"
+      className="accent-orange-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
     />
     {label}
   </label>

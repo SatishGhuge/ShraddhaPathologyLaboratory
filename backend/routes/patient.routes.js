@@ -2,6 +2,7 @@ import express from 'express';
 import { body } from 'express-validator';
 import {
   createPatient,
+  registerPatientWithEmail,
   getAllPatients,
   getPatientById,
   searchPatient,
@@ -43,6 +44,17 @@ router.post('/',
     body('tests').isArray().withMessage('Tests must be an array')  // Allow empty array
   ],
   createPatient
+);
+
+// Admin register patient with email notification
+router.post('/admin/register-with-email',
+  [
+    body('firstName').trim().notEmpty().withMessage('First name is required'),
+    body('email').isEmail().withMessage('Valid email is required'),
+    body('mobile').optional().trim(),
+    body('tests').optional().isArray()
+  ],
+  registerPatientWithEmail
 );
 
 // Get patient by ID

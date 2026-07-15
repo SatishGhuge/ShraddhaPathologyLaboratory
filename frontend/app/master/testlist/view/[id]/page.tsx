@@ -37,7 +37,6 @@ const AddTest = () => {
   const [formData, setFormData] = useState({
     name: "",
     department: "",
-    sortOrder: "",
     shortName: "",
     attachFile: "Yes",
     imageSize: "800|600",
@@ -155,7 +154,6 @@ const AddTest = () => {
     name: "",
     categoryType: "PARAMETER",
     isCategory: false,
-    sortOrder: "",
     testMethod: "",
     color: "#3b82f6",
     icon: "",
@@ -166,7 +164,6 @@ const AddTest = () => {
       machineCode: "",
       multiplyBy: "",
       decimal: "",
-      sortOrder: "",
       testMethod: "",
       isDescriptive: false,
       lowPanic: "",
@@ -323,7 +320,6 @@ const AddTest = () => {
               name: testData.name || "",
               department: testData.departmentId?.toString() || "",
               speciality: testData.speciality || "Regular",
-              sortOrder: testData.sortOrder?.toString() || "",
               shortName: testData.shortName || "",
               attachFile: testData.attachFile || "Yes",
               imageSize: testData.imageSize || "800|600",
@@ -360,7 +356,6 @@ const AddTest = () => {
                   categoryId: category.categoryId || crypto.randomUUID(), // ✅ Add fallback for existing tests
                   name: category.name || "",
                   isCategory: category.isCategory || false,
-                  sortOrder: category.sortOrder || "",
                   color: category.color || "#3b82f6",
                   icon: category.icon || "",
                   description: category.description || "",
@@ -803,10 +798,6 @@ const AddTest = () => {
       emptyFields.push("Department");
     }
     
-    if (!formData.sortOrder.trim()) {
-      emptyFields.push("Sort Order");
-    }
-    
     if (!formData.shortName.trim()) {
       emptyFields.push("Test Short Form");
     }
@@ -830,7 +821,6 @@ const AddTest = () => {
         sampleType: formData.sampleType || null,
         machineName: formData.machineName || null,
         group: formData.group || null,
-        sortOrder: parseInt(formData.sortOrder) || null,
         reportHeader: formData.reportHeader || null,
         costForLab: formData.costForLab ? parseFloat(formData.costForLab) : null,
         preparationTime: formData.preparationTime || null,
@@ -1566,19 +1556,6 @@ const AddTest = () => {
                           placeholder="Category name..."
                           value={category.name || ""}
                           onChange={(e) => handleCategoryChange(categoryIndex, 'name', e.target.value)}
-                          disabled={isViewMode} 
-                        />
-                      </div>
-                      <div>
-                        <label className="block font-semibold text-cyan-800 text-xs sm:text-sm mb-1">
-                          Sort Order
-                        </label>
-                        <input 
-                          className="px-2 py-1.5 sm:py-1 border border-gray-300 rounded text-xs sm:text-sm w-full sm:w-40" 
-                          placeholder="Sort Order" 
-                          type="number"
-                          value={category.sortOrder || ""}
-                          onChange={(e) => handleCategoryChange(categoryIndex, 'sortOrder', e.target.value)}
                           disabled={isViewMode} 
                         />
                       </div>

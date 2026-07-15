@@ -2,6 +2,9 @@ import prisma from '../config/database.js';
 import { validationResult } from 'express-validator';
 import { getPaginationParams, buildPaginatedResponse } from '../utils/pagination.js';
 import { generatePatientId, generateVisitId } from '../utils/idGenerator.js';
+import crypto from 'crypto';
+import bcryptjs from 'bcryptjs';
+import { emailService } from '../services/notification.service.js';
 
 // Create new patient with tests OR add tests to existing patient
 export const createPatient = async (req, res) => {
@@ -253,6 +256,34 @@ export const createPatient = async (req, res) => {
       }
     }
 
+    // Send email with credentials if patient has an email
+    if (email && patient.patientId) {
+      try {
+        // Generate random password for patients
+        const randomPassword = crypto.randomBytes(8).toString('hex').slice(0, 8);
+        const hashedPassword = await bcryptjs.hash(randomPassword, 10);
+
+        // Update patient with hashed password
+        await prisma.patient.update({
+          where: { patientId: patient.patientId },
+          data: { password: hashedPassword }
+        });
+
+        // Send email with credentials
+        await emailService.sendRegistrationCredentials(
+          email,
+          `${firstName} ${lastName || ''}`,
+          patient.patientId,
+          randomPassword,
+          'direct'
+        );
+        console.log(`✅ Credentials email sent to ${email} for patient ${patient.patientId}`);
+      } catch (emailError) {
+        console.warn('⚠️ Failed to send credentials email:', emailError.message);
+        // Don't fail the registration if email fails
+      }
+    }
+
     res.status(201).json({
       success: true,
       message: isExistingPatient 
@@ -275,6 +306,182 @@ export const createPatient = async (req, res) => {
       message: 'Failed to register patient',
       error: error.message,
       details: error.meta || error.code || 'Unknown error'
+    });
+  }
+};
+
+// ============================================================================
+// ADMIN PATIENT REGISTRATION WITH EMAIL NOTIFICATION
+// ============================================================================
+// When admin registers a patient with patient's own email (not referral doctor),
+// send patient ID + random password to their email
+export const registerPatientWithEmail = async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({
+        success: false,
+        message: 'Validation failed',
+        errors: errors.array()
+      });
+    }
+
+    const {
+      firstName,
+      lastName,
+      email,
+      mobile,
+      dob,
+      gender,
+      address,
+      location,
+      title,
+      tests = [],
+      totalAmount = 0,
+      discountPercent = 0,
+      discountAmount = 0,
+      paidAmount = 0,
+      paymentMode = 'Cash',
+      businessType = 'B2C',
+      referralDoctor = null,
+      visitDate,
+      organizationId = null
+    } = req.body;
+
+    console.log('📝 Admin registering patient with email:', { firstName, email, mobile });
+
+    // Validate email is provided (for patient, not referral doctor)
+    if (!email || !email.trim()) {
+      return res.status(400).json({
+        success: false,
+        message: 'Patient email is required for registration'
+      });
+    }
+
+    // Check if patient already exists
+    const existingPatient = await prisma.patient.findFirst({
+      where: {
+        OR: [{ email }, { mobile }]
+      }
+    });
+
+    if (existingPatient) {
+      return res.status(400).json({
+        success: false,
+        message: 'Patient already registered with this email or phone'
+      });
+    }
+
+    // Generate patient ID
+    const patientId = await generatePatientId();
+
+    // Generate random password (8 characters)
+    const randomPassword = crypto.randomBytes(8).toString('hex').slice(0, 8);
+    const hashedPassword = await bcryptjs.hash(randomPassword, 10);
+
+    // Generate visit ID
+    const visitId = await generateVisitId(visitDate);
+
+    // Create patient
+    const patient = await prisma.patient.create({
+      data: {
+        patientId,
+        title: title || 'Mr',
+        firstName,
+        lastName,
+        email,
+        mobile,
+        password: hashedPassword,
+        dob: dob ? new Date(dob) : null,
+        gender: gender || 'Male',
+        address,
+        location,
+        registrationType: 'direct',
+        isActive: true,
+        createdAtLocation: location
+      }
+    });
+
+    // Create patient tests if provided
+    if (tests && tests.length > 0) {
+      const perTestAmount = totalAmount / tests.length;
+      const perTestDiscount = discountAmount / tests.length;
+      const perTestPaid = paidAmount / tests.length;
+      const balanceAmount = (totalAmount - discountAmount) - paidAmount;
+      const perTestBalance = balanceAmount / tests.length;
+
+      await prisma.patientTest.createMany({
+        data: tests.map(test => ({
+          patientId,
+          visitId,
+          testId: test.id,
+          departmentId: test.departmentId,
+          organizationId: organizationId || null,
+          sample: test.sample || 'Blood',
+          charge: perTestAmount,
+          reportMode: 'Email',
+          referralDoctor: referralDoctor,
+          visitDate: visitDate ? new Date(visitDate) : new Date(),
+          visitTime: '10:00',
+          totalAmount: perTestAmount,
+          discountPercent,
+          discountAmount: perTestDiscount,
+          paidAmount: perTestPaid,
+          balanceAmount: perTestBalance,
+          paymentMode,
+          businessType,
+          status: 'Registered'
+        }))
+      });
+
+      // Create payment transaction if payment was made
+      if (paymentMode && paidAmount > 0) {
+        await prisma.paymentTransaction.create({
+          data: {
+            visitId,
+            patientId,
+            paymentMode,
+            paymentAmount: paidAmount,
+            remarks: `Admin registration - ${firstName}`
+          }
+        });
+      }
+    }
+
+    console.log('✅ Patient created:', patientId);
+
+    // Send email with credentials
+    try {
+      await emailService.sendRegistrationCredentials(
+        email,
+        `${firstName} ${lastName || ''}`,
+        patientId,
+        randomPassword,
+        'direct'
+      );
+      console.log(`✅ Credentials email sent to ${email}`);
+    } catch (emailError) {
+      console.warn('⚠️ Failed to send email:', emailError.message);
+      // Don't fail the registration if email fails
+    }
+
+    res.status(201).json({
+      success: true,
+      message: 'Patient registered successfully. Credentials sent to email.',
+      data: {
+        patientId: patient.patientId,
+        firstName: patient.firstName,
+        email: patient.email,
+        mobile: patient.mobile,
+        message: `Patient ID: ${patientId}, Password sent to email`
+      }
+    });
+  } catch (error) {
+    console.error('❌ Admin registration error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to register patient',
+      error: error.message
     });
   }
 };
