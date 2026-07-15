@@ -351,7 +351,7 @@ const AddTest = () => {
               lineHeight: testData.lineHeight?.toString() || "",
               profileTest: testData.profileTest || "Yes",
               reportHeader: testData.reportHeader || "",
-              sampleType: testData.sampleType || "",
+              sampleTypeId: testData.sampleTypeId?.toString() || "",
               machineName: testData.machineName || "",
               isHeader: testData.isHeader !== undefined ? testData.isHeader : true,
               showTestName: testData.showTestName !== undefined ? testData.showTestName : true,
@@ -534,13 +534,11 @@ const AddTest = () => {
         const finalValue = name === 'name' ? value.toUpperCase() : value;
         const updated = { ...prev, [name]: finalValue };
         
-        // If department changed, auto-populate the group field from the selected department
+        // If department changed, auto-populate fields from the selected department
         if (name === 'department') {
           const selectedDept = departments.find(d => d.id.toString() === value);
-          if (selectedDept) {
-            updated.group = selectedDept.group || '';
-            console.log('📍 Auto-populated group from department:', updated.group);
-          }
+          // Keep this for any future auto-population logic if needed
+          console.log('📍 Department changed to:', selectedDept?.name);
         }
         
         console.log('Updated formData:', updated);
@@ -839,9 +837,8 @@ const AddTest = () => {
         shortName: formData.shortName,
         testCode: formData.testCode || null,
         departmentId: parseInt(formData.department),
-        sampleType: formData.sampleType || null,
+        sampleTypeId: formData.sampleTypeId ? parseInt(formData.sampleTypeId) : null,
         machineName: formData.machineName || null,
-        group: formData.group || null,
         reportHeader: formData.reportHeader || null,
         costForLab: formData.costForLab ? parseFloat(formData.costForLab) : null,
         preparationTime: formData.preparationTime || null,
@@ -859,7 +856,7 @@ const AddTest = () => {
         showTestName: formData.showTestName,
         isNABL: formData.isNABL,
         lineHeight: formData.lineHeight ? parseFloat(formData.lineHeight) : null,
-        linkedTestIds: formData.profileTest === "Yes" ? selectedTestsToAdd.map(t => t.id) : []
+        linkedTestIds: formData.profileTest === true ? selectedTestsToAdd.map(t => t.id) : []
       };
 
       // Prepare category data (for test_category table)
@@ -872,7 +869,6 @@ const AddTest = () => {
         name: category.name ?? "",
         isCategory: category.isCategory || false,
         testMethod: category.testMethod || null,
-        sortOrder: category.sortOrder ? parseInt(category.sortOrder) : null,
         color: category.color || null,
         icon: category.icon || null,
         description: category.description || null,
@@ -885,7 +881,6 @@ const AddTest = () => {
           machineCode: param.machineCode || null,
           multiplyBy: param.multiplyBy || null,
           decimal: param.decimal ? parseInt(param.decimal) : null,
-          sortOrder: param.sortOrder ? parseInt(param.sortOrder) : null,
           testMethod: param.testMethod || null,
           isDescriptive: param.isDescriptive || false,
           lowPanic: param.lowPanic ? parseFloat(param.lowPanic) : null,
@@ -1185,8 +1180,8 @@ const AddTest = () => {
                     disabled={isViewMode} 
                   />
 
-                  {/* Test to add - Only show when Profile Test is Yes */}
-                  {formData.profileTest === "Yes" && (
+                  {/* Test to add - Only show when Profile Test is enabled */}
+                  {formData.profileTest === true && (
                     <div>
                       <label className="font-semibold text-gray-700 text-xs sm:text-sm block mb-1">Test to add</label>
                       {/* Combined tag + select box */}
@@ -1248,14 +1243,14 @@ const AddTest = () => {
                       onClick={() => setShowSampleTypeDropdown(v => !v)}
                       className="w-full px-2 py-1.5 border border-gray-300 rounded text-xs sm:text-sm bg-white focus:outline-none focus:ring-2 focus:ring-orange-500 disabled:bg-gray-100 disabled:cursor-not-allowed flex items-center gap-2 text-left"
                     >
-                      {formData.sampleType ? (
+                      {formData.sampleTypeId ? (
                         <>
                           <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" style={{ transform: 'rotate(45deg)', flexShrink: 0 }}>
-                            <path d="M9 3h6v11a3 3 0 0 1-6 0V3z" fill={specimenTypes.find(s => s.Sample_Type === formData.sampleType)?.Sample_Color || '#ccc'} stroke="#555" strokeWidth="1.2"/>
+                            <path d="M9 3h6v11a3 3 0 0 1-6 0V3z" fill={specimenTypes.find(s => s.Sample_Type === formData.sampleTypeId)?.Sample_Color || '#ccc'} stroke="#555" strokeWidth="1.2"/>
                             <rect x="8" y="2" width="8" height="2" rx="1" fill="#888" stroke="#555" strokeWidth="0.8"/>
                             <line x1="9" y1="10" x2="15" y2="10" stroke="white" strokeWidth="1" opacity="0.5"/>
                           </svg>
-                          <span>{formData.sampleType} ({specimenTypes.find(s => s.Sample_Type === formData.sampleType)?.Sample_Color})</span>
+                          <span>{formData.sampleTypeId} ({specimenTypes.find(s => s.Sample_Type === formData.sampleTypeId)?.Sample_Color})</span>
                         </>
                       ) : (
                         <span className="text-gray-400">Please Select</span>
@@ -1265,7 +1260,7 @@ const AddTest = () => {
                       <div className="absolute z-50 top-full left-0 right-0 bg-white border border-gray-300 rounded shadow-lg mt-1 max-h-48 overflow-y-auto">
                         <div
                           className="px-3 py-2 text-xs text-gray-400 hover:bg-gray-50 cursor-pointer border-b"
-                          onClick={() => { handleChange({ target: { name: 'sampleType', value: '' } }); setShowSampleTypeDropdown(false); }}
+                          onClick={() => { handleChange({ target: { name: 'sampleTypeId', value: '' } }); setShowSampleTypeDropdown(false); }}
                         >
                           Please Select
                         </div>
@@ -1273,7 +1268,7 @@ const AddTest = () => {
                           <div
                             key={i}
                             className="flex items-center gap-2 px-3 py-2 text-xs hover:bg-orange-50 cursor-pointer border-b last:border-b-0"
-                            onClick={() => { handleChange({ target: { name: 'sampleType', value: type.Sample_Type } }); setShowSampleTypeDropdown(false); }}
+                            onClick={() => { handleChange({ target: { name: 'sampleTypeId', value: type.Sample_Type } }); setShowSampleTypeDropdown(false); }}
                           >
                             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" style={{ transform: 'rotate(45deg)', flexShrink: 0 }}>
                               <path d="M9 3h6v11a3 3 0 0 1-6 0V3z" fill={type.Sample_Color || '#ccc'} stroke="#555" strokeWidth="1.2"/>
@@ -1787,17 +1782,6 @@ const AddTest = () => {
                           />
                           <span className="text-xs sm:text-sm">Is Descriptive</span>
                         </label>
-                        {category.isCategory && (
-                          <input 
-                            className="px-2 py-1.5 sm:py-1 border border-gray-300 rounded text-xs sm:text-sm w-full sm:w-24" 
-                            placeholder="Sort Order" 
-                            type="number"
-                            value={parameter.sortOrder || ""}
-                            onChange={(e) => handleParameterChange(categoryIndex, paramIndex, 'sortOrder', e.target.value)}
-                            disabled={isViewMode} 
-                          />
-                        )}
-
                         {category.isCategory && (
                           <input 
                             className="px-2 py-1.5 sm:py-1 border border-gray-300 rounded text-xs sm:text-sm w-full sm:w-32" 

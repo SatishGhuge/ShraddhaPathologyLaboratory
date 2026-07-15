@@ -4227,6 +4227,22 @@ export const createTemplate = async (req, res) => {
       }
     }
 
+    // Check if template with same testId and templateName already exists
+    const existingTemplate = await prisma.testTemplate.findFirst({
+      where: {
+        testId: parseInt(testId),
+        templateName: templateName
+      }
+    });
+
+    if (existingTemplate) {
+      console.warn('⚠️ Template already exists with this name for this test');
+      return res.status(409).json({
+        success: false,
+        message: `A template named "${templateName}" already exists for this test. Please use a different template name.`
+      });
+    }
+
     const template = await prisma.testTemplate.create({
       data: {
         testId: parseInt(testId),

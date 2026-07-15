@@ -850,7 +850,6 @@ const AddTest = () => {
         categoryId: category.categoryId, // ✅ Include unique category ID
         name: category.name ?? "",
         isCategory: category.isCategory || false,
-        sortOrder: category.sortOrder ? parseInt(category.sortOrder) : null,
         color: category.color || null,
         icon: category.icon || null,
         description: category.description || null,
@@ -863,7 +862,6 @@ const AddTest = () => {
           machineCode: param.machineCode || null,
           multiplyBy: param.multiplyBy || null,
           decimal: param.decimal ? parseInt(param.decimal) : null,
-          sortOrder: param.sortOrder ? parseInt(param.sortOrder) : null,
           isDescriptive: param.isDescriptive || false,
           lowPanic: param.lowPanic ? parseFloat(param.lowPanic) : null,
           highPanic: param.highPanic ? parseFloat(param.highPanic) : null,
@@ -1054,16 +1052,6 @@ const AddTest = () => {
                     options={departments.map(dept => ({ value: dept.id, label: dept.name }))}
                     required 
                     disabled={isViewMode} 
-                  />
-
-                  <Input 
-                    label="Sort Order" 
-                    name="sortOrder"
-                    type="number"
-                    value={formData.sortOrder}
-                    onChange={handleChange}
-                    disabled={isViewMode}
-                    required={false}
                   />
                   <Input 
                     label="Test Short Form" 
@@ -1765,17 +1753,6 @@ const AddTest = () => {
                           />
                           <span className="text-xs sm:text-sm">Is Descriptive</span>
                         </label>
-                        {category.isCategory && (
-                          <input 
-                            className="px-2 py-1.5 sm:py-1 border border-gray-300 rounded text-xs sm:text-sm w-full sm:w-24" 
-                            placeholder="Sort Order" 
-                            type="number"
-                            value={parameter.sortOrder || ""}
-                            onChange={(e) => handleParameterChange(categoryIndex, paramIndex, 'sortOrder', e.target.value)}
-                            disabled={isViewMode} 
-                          />
-                        )}
-
                         {category.isCategory && (
                           <input 
                             className="px-2 py-1.5 sm:py-1 border border-gray-300 rounded text-xs sm:text-sm w-full sm:w-32" 

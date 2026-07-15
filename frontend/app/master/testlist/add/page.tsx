@@ -371,7 +371,6 @@ const AddTest = () => {
                   name: category.name || "",
                   isCategory: category.isCategory || false,
                   testMethod: category.testMethod || "",
-                  sortOrder: category.sortOrder || "",
                   color: category.color || "#3b82f6",
                   icon: category.icon || "",
                   description: category.description || "",
@@ -384,7 +383,6 @@ const AddTest = () => {
                           parameterName: param.parameterName || "",
                           machineCode: param.machineCode || "",
                           decimal: param.decimal !== undefined && param.decimal !== "" ? param.decimal : "",
-                          sortOrder: param.sortOrder || "",
                           testMethod: param.testMethod || "",
                           isDescriptive: param.isDescriptive || false,
                           lowPanic: param.lowPanic?.toString() || "",
@@ -454,7 +452,6 @@ const AddTest = () => {
                         parameterName: "",
                         machineCode: "",
                         decimal: "",
-                        sortOrder: "",
                         isDescriptive: false,
                         lowPanic: "",
                         highPanic: "",
@@ -597,7 +594,6 @@ const AddTest = () => {
       name: "",
       categoryType: "PARAMETER",
       isCategory: false,
-      sortOrder: "",
       testMethod: "",
       color: "#3b82f6",
       icon: "",
@@ -608,7 +604,6 @@ const AddTest = () => {
         machineCode: "",
         decimal: "",
         multiplyBy: "",
-        sortOrder: "",
         isDescriptive: false,
         lowPanic: "",
         highPanic: "",
@@ -906,7 +901,6 @@ const AddTest = () => {
         name: category.name ?? "",
         isCategory: category.isCategory || false,
         testMethod: category.testMethod || null,
-        sortOrder: category.sortOrder ? parseInt(category.sortOrder) : null,
         color: category.color || null,
         icon: category.icon || null,
         description: category.description || null,
@@ -919,7 +913,6 @@ const AddTest = () => {
           machineCode: param.machineCode || null,
           multiplyBy: param.multiplyBy || null,
           decimal: param.decimal ? parseInt(param.decimal) : null,
-          sortOrder: param.sortOrder ? parseInt(param.sortOrder) : null,
           testMethod: param.testMethod || null,
           isDescriptive: param.isDescriptive || false,
           lowPanic: param.lowPanic ? parseFloat(param.lowPanic) : null,
@@ -1813,17 +1806,6 @@ const AddTest = () => {
                         </label>
                         {category.isCategory && (
                           <input 
-                            className="px-2 py-1.5 sm:py-1 border border-gray-300 rounded text-xs sm:text-sm w-full sm:w-24" 
-                            placeholder="Sort Order" 
-                            type="number"
-                            value={parameter.sortOrder || ""}
-                            onChange={(e) => handleParameterChange(categoryIndex, paramIndex, 'sortOrder', e.target.value)}
-                            disabled={isViewMode} 
-                          />
-                        )}
-
-                        {category.isCategory && (
-                          <input 
                             className="px-2 py-1.5 sm:py-1 border border-gray-300 rounded text-xs sm:text-sm w-full sm:w-32" 
                             placeholder="Parameter Test Method" 
                             value={parameter.testMethod || ""}
@@ -2649,7 +2631,7 @@ const AddTest = () => {
                                   <span className="italic text-gray-500">-</span>
                                 </div>
                                 <div className="border-r border-gray-400 p-2 text-xs">
-                                  {param.units || "-"}
+                                  {param.unitId || "-"}
                                 </div>
                                 <div className="p-2 text-xs">
                                   {/* For Numeric parameters */}

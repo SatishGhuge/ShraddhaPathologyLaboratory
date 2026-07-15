@@ -596,17 +596,17 @@ const TestTemplets = () => {
                 <table className="w-full text-xs border-collapse">
                   <thead className="bg-slate-900 text-white sticky top-0">
                     <tr>
-                      <th className="border border-gray-300 px-1.5 py-0.5 text-left font-semibold text-xs">Template Name</th>
-                      <th className="border border-gray-300 px-1.5 py-0.5 text-left font-semibold text-xs">Test Name</th>
-                      <th className="border border-gray-300 px-1.5 py-0.5 text-center font-semibold text-xs">Active</th>
-                      <th className="border border-gray-300 px-1.5 py-0.5 text-center font-semibold text-xs">Action</th>
+                      <th className="border border-gray-300 px-1.5 py-1 text-left font-semibold text-xs">Template Name</th>
+                      <th className="border border-gray-300 px-1.5 py-1 text-left font-semibold text-xs">Test Name</th>
+                      <th className="border border-gray-300 px-1.5 py-1 text-center font-semibold text-xs">Active</th>
+                      <th className="border border-gray-300 px-1.5 py-1 text-center font-semibold text-xs">Action</th>
                     </tr>
                   </thead>
 
                   <tbody>
                     {filteredTemplates.length === 0 ? (
                       <tr>
-                        <td colSpan={4} className="text-center py-1 text-gray-500 text-xs">
+                        <td colSpan={4} className="text-center py-1.5 text-gray-500 text-xs">
                           {search ? 'No templates found matching your search.' : 'No templates found. Click "Add Template" to create one.'}
                         </td>
                       </tr>
@@ -616,19 +616,19 @@ const TestTemplets = () => {
                           key={template.id}
                           className={`hover:bg-blue-50 border-b border-gray-200 transition-colors ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} ${!template.isActive ? 'bg-gray-100 opacity-60' : ''}`}
                         >
-                          <td className="border border-gray-300 px-1.5 py-0.5 font-semibold text-gray-800 text-xs whitespace-nowrap overflow-hidden text-ellipsis">
+                          <td className="border border-gray-300 px-1.5 py-1 font-semibold text-gray-800 text-xs whitespace-nowrap overflow-hidden text-ellipsis">
                             {template.templateName}
                           </td>
 
-                          <td className="border border-gray-300 px-1.5 py-0.5 text-gray-700 text-xs whitespace-nowrap overflow-hidden text-ellipsis">
+                          <td className="border border-gray-300 px-1.5 py-1 text-gray-700 text-xs whitespace-nowrap overflow-hidden text-ellipsis">
                             {template.test?.name || '-'}
                           </td>
 
-                          <td className="border border-gray-300 px-1.5 py-0.5 text-center font-semibold text-xs">
+                          <td className="border border-gray-300 px-1.5 py-1 text-center font-semibold text-xs">
                             {template.isActive ? "Yes" : "No"}
                           </td>
 
-                          <td className="border border-gray-300 px-1.5 py-0.5">
+                          <td className="border border-gray-300 px-1.5 py-1">
                             <div className="flex gap-0.5 justify-center flex-wrap">
                               <button
                                 onClick={() => handleEdit(template)}
