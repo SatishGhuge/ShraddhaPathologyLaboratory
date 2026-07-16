@@ -99,10 +99,12 @@ const AdminLogin = ({ onLogin }: { onLogin?: () => void }) => {
         localStorage.setItem("token", res.token);
         localStorage.setItem("admin", JSON.stringify(res.admin));
         
-        // Dispatch custom event to notify Header component of login
-        const loginEvent = new CustomEvent('userLoggedIn', { detail: res.admin });
-        window.dispatchEvent(loginEvent);
-        console.log('📢 Admin logged in:', res.admin?.username || res.admin?.email);
+        // Dispatch custom event to notify Header component of login (after a small delay to ensure storage is set)
+        setTimeout(() => {
+          const loginEvent = new CustomEvent('userLoggedIn', { detail: res.admin });
+          window.dispatchEvent(loginEvent);
+          console.log('📢 Admin logged in:', res.admin?.username || res.admin?.email);
+        }, 100);
         
         if (onLogin) onLogin();
         const role = res.admin?.role;

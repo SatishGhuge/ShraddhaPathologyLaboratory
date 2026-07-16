@@ -41,8 +41,6 @@ const AddTest = () => {
     shortName: "",
     attachFile: false,
     imageSize: "800|600",
-    signatureId: "",
-    costForLab: "",
     preparationTime: "",
     preparationType: "",
     isNABL: false,
@@ -173,6 +171,7 @@ const AddTest = () => {
     categoryType: "PARAMETER",
     isCategory: false,
     testMethod: "",
+    sortOrder: "",
     color: "#3b82f6",
     icon: "",
     description: "",
@@ -182,6 +181,7 @@ const AddTest = () => {
       machineCode: "",
       multiplyBy: "",
       decimal: "",
+      sortOrder: "",
       testMethod: "",
       isDescriptive: false,
       lowPanic: "",
@@ -194,6 +194,7 @@ const AddTest = () => {
       isMandatory: false,
       rangeType: "BySex",
       units: "",
+      unitId: "",
       displayRangeText: "",
       rangeText: "",
       isMultipleOptions: false,
@@ -339,17 +340,14 @@ const AddTest = () => {
             const formDataToSet = {
               name: testData.name || "",
               department: testData.departmentId?.toString() || "",
-              speciality: testData.speciality || "Regular",
               shortName: testData.shortName || "",
-              attachFile: testData.attachFile || "Yes",
+              attachFile: testData.attachFile === true || testData.attachFile === 1 || testData.attachFile === "Yes" || testData.attachFile === "true",
               imageSize: testData.imageSize || "800|600",
-              signatureId: testData.signatureId?.toString() || "",
-              costForLab: testData.costForLab?.toString() || "",
               preparationTime: testData.preparationTime || "",
               preparationType: testData.preparationType || "",
               isNABL: testData.isNABL || false,
               lineHeight: testData.lineHeight?.toString() || "",
-              profileTest: testData.profileTest || "Yes",
+              profileTest: testData.profileTest === true || testData.profileTest === 1 || testData.profileTest === "Yes" || testData.profileTest === "true",
               reportHeader: testData.reportHeader || "",
               sampleTypeId: testData.sampleTypeId?.toString() || "",
               machineName: testData.machineName || "",
@@ -377,6 +375,7 @@ const AddTest = () => {
                   name: category.name || "",
                   isCategory: category.isCategory || false,
                   testMethod: category.testMethod || "",
+                  sortOrder: category.sortOrder ? category.sortOrder.toString() : "",
                   color: category.color || "#3b82f6",
                   icon: category.icon || "",
                   description: category.description || "",
@@ -389,7 +388,7 @@ const AddTest = () => {
                           parameterName: param.parameterName || "",
                           machineCode: param.machineCode || "",
                           decimal: param.decimal !== undefined && param.decimal !== "" ? param.decimal : "",
-                          sortOrder: param.sortOrder || "",
+                          sortOrder: param.sortOrder ? param.sortOrder.toString() : "",
                           testMethod: param.testMethod || "",
                           isDescriptive: param.isDescriptive || false,
                           lowPanic: param.lowPanic?.toString() || "",
@@ -401,7 +400,9 @@ const AddTest = () => {
                           type: param.type || "Numeric",
                           isMandatory: param.isMandatory || false,
                           rangeType: param.rangeType || "BySex",
+                          unitId: param.unitId || (param.unit?.id ? param.unit.id : ""),
                           units: param.units || "",
+                          unit: param.unit || null,
                           displayRangeText: param.displayRangeText || "",
                           rangeText: param.rangeText || "",
                           textContent: param.textContent || "",
@@ -468,6 +469,7 @@ const AddTest = () => {
                         isMandatory: false,
                         rangeType: "BySex",
                         units: "",
+                        unitId: "",
                         displayRangeText: "",
                         normalRanges: [
                           { gender: "Male", ll: "", ul: "", default: "", isActive: true },
@@ -558,6 +560,27 @@ const AddTest = () => {
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
+  // ✅ FIX #2: Resolve linkedTestIds names once tests are loaded
+  useEffect(() => {
+    if (tests.length > 0 && selectedTestsToAdd.length > 0) {
+      const resolved = selectedTestsToAdd.map(selected => {
+        // Check if name still has placeholder format
+        if (selected.name.startsWith('Test #')) {
+          const found = tests.find(t => t.id === selected.id);
+          return found ? { id: found.id, name: found.name } : selected;
+        }
+        return selected;
+      });
+      
+      // Only update if there were actual changes
+      const hasChanges = resolved.some((r, i) => r.name !== selectedTestsToAdd[i].name);
+      if (hasChanges) {
+        console.log('✅ Resolved linked test names:', resolved);
+        setSelectedTestsToAdd(resolved);
+      }
+    }
+  }, [tests]);
+
   const addCategory = () => {
     setCategories([...categories, {
       categoryId: crypto.randomUUID(),
@@ -584,6 +607,7 @@ const AddTest = () => {
         isMandatory: false,
         rangeType: "BySex",
         units: "",
+        unitId: "",
         displayRangeText: "",
         rangeText: "",
         isMultipleOptions: false,
@@ -653,6 +677,7 @@ const AddTest = () => {
       isMandatory: false,
       rangeType: "BySex",
       units: "",
+      unitId: "",
       displayRangeText: "",
       rangeText: "",
       isMultipleOptions: false,
@@ -697,6 +722,7 @@ const AddTest = () => {
         isMandatory: false,
         rangeType: "BySex",
         units: "",
+        unitId: "",
         displayRangeText: "",
         normalRanges: [
           { gender: "Male", ll: "", ul: "", default: "", isActive: true },
@@ -840,7 +866,6 @@ const AddTest = () => {
         sampleTypeId: formData.sampleTypeId ? parseInt(formData.sampleTypeId) : null,
         machineName: formData.machineName || null,
         reportHeader: formData.reportHeader || null,
-        costForLab: formData.costForLab ? parseFloat(formData.costForLab) : null,
         preparationTime: formData.preparationTime || null,
         preparationType: formData.preparationType || null,
         instructionPreparation: formData.instructionPreparation || null,
@@ -850,7 +875,6 @@ const AddTest = () => {
         outsourceLab: formData.outsourceLab || null,
         attachFile: formData.attachFile || "Yes",
         imageSize: formData.imageSize || "800|600",
-        signatureId: formData.signatureId ? parseInt(formData.signatureId) : null,
         profileTest: formData.profileTest || "No",
         isHeader: formData.isHeader,
         showTestName: formData.showTestName,
@@ -868,6 +892,7 @@ const AddTest = () => {
         categoryId: category.categoryId, // ✅ Include unique category ID
         name: category.name ?? "",
         isCategory: category.isCategory || false,
+        sortOrder: category.sortOrder ? parseInt(category.sortOrder) : null,
         testMethod: category.testMethod || null,
         color: category.color || null,
         icon: category.icon || null,
@@ -881,6 +906,7 @@ const AddTest = () => {
           machineCode: param.machineCode || null,
           multiplyBy: param.multiplyBy || null,
           decimal: param.decimal ? parseInt(param.decimal) : null,
+          sortOrder: param.sortOrder ? parseInt(param.sortOrder) : null,
           testMethod: param.testMethod || null,
           isDescriptive: param.isDescriptive || false,
           lowPanic: param.lowPanic ? parseFloat(param.lowPanic) : null,
@@ -1108,21 +1134,7 @@ const AddTest = () => {
                     </div>
                   )}
 
-                  {/* Cost For Lab – inline */}
-                  <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-3">
-                    <label className="font-semibold text-gray-700 text-xs sm:text-sm whitespace-nowrap">
-                      Cost For Lab
-                    </label>
-                    <input 
-                      name="costForLab"
-                      type="number"
-                      value={formData.costForLab}
-                      onChange={handleChange}
-                      className="w-full sm:w-32 px-2 py-1.5 sm:py-1 border border-gray-300 rounded text-xs sm:text-sm bg-white" 
-                      disabled={isViewMode} 
-                    required={false}/>
-                  </div>
-
+                  {/* Preparation Time + Type */}
                   <div className="flex flex-col sm:flex-row gap-3">
                     <Input 
                       label="Preparation Time" 
@@ -1578,6 +1590,19 @@ const AddTest = () => {
                           disabled={isViewMode} 
                         />
                       </div>
+                      <div>
+                        <label className="block font-semibold text-gray-700 text-xs sm:text-sm mb-1">
+                          Sort Order
+                        </label>
+                        <input 
+                          className="px-2 py-1.5 sm:py-1 border border-gray-300 rounded text-xs sm:text-sm w-full sm:w-40" 
+                          placeholder="Sort order..." 
+                          type="number"
+                          value={category.sortOrder || ""}
+                          onChange={(e) => handleCategoryChange(categoryIndex, 'sortOrder', e.target.value)}
+                          disabled={isViewMode} 
+                        />
+                      </div>
                     </div>
                   )}
                 </div>
@@ -1616,14 +1641,14 @@ const AddTest = () => {
                           {/* Select Unit Dropdown */}
                           <select 
                             className="px-2 py-1.5 sm:py-1 border border-gray-300 rounded text-xs sm:text-sm w-32 bg-white focus:outline-none focus:ring-2 focus:ring-orange-500" 
-                            value={parameter.units || ""}
-                            onChange={(e) => handleParameterChange(categoryIndex, paramIndex, 'units', e.target.value)}
+                            value={parameter.unitId || ""}
+                            onChange={(e) => handleParameterChange(categoryIndex, paramIndex, 'unitId', e.target.value)}
                             disabled={isViewMode}
                             title="Select unit - linked to Unit column in preview table"
                           >
                             <option value="">Select Unit 🔗</option>
                             {units.map((unit) => (
-                              <option key={unit.id} value={unit.symbol}>
+                              <option key={unit.id} value={unit.id}>
                                 {unit.symbol}
                               </option>
                             ))}
@@ -1768,6 +1793,14 @@ const AddTest = () => {
                           type="text"
                           value={parameter.decimal !== undefined && parameter.decimal !== "" ? parameter.decimal : ""}
                           onChange={(e) => handleParameterChange(categoryIndex, paramIndex, 'decimal', e.target.value)}
+                          disabled={isViewMode} 
+                        />
+                        <input 
+                          className="px-2 py-1.5 sm:py-1 border border-gray-300 rounded text-xs sm:text-sm w-full sm:w-24" 
+                          placeholder="Sort Order" 
+                          type="number"
+                          value={parameter.sortOrder !== undefined && parameter.sortOrder !== "" ? parameter.sortOrder : ""}
+                          onChange={(e) => handleParameterChange(categoryIndex, paramIndex, 'sortOrder', e.target.value)}
                           disabled={isViewMode} 
                         />
                         
@@ -2902,7 +2935,7 @@ const Radio = ({ label, name, value, onChange, disabled }) => (
           type="radio" 
           name={name} 
           value="Yes"
-          checked={value === "Yes"}
+          checked={value === "Yes" || value === true || value === 1}
           onChange={onChange}
           disabled={disabled} 
         /> Yes
@@ -2912,7 +2945,7 @@ const Radio = ({ label, name, value, onChange, disabled }) => (
           type="radio" 
           name={name} 
           value="No"
-          checked={value === "No"}
+          checked={value === "No" || value === false || value === 0}
           onChange={onChange}
           disabled={disabled} 
         /> No

@@ -123,18 +123,8 @@ const Header = () => {
   const publicRoutes = ["/", "/login", "/seed-data"];
   const isPublicRoute = publicRoutes.includes(pathname);
 
-  // Read initial user from localStorage immediately on mount
-  useEffect(() => {
-    const user = JSON.parse(localStorage.getItem("admin") || "{}");
-    setCurrentUser(user);
-    console.log('🔍 Header - Initial user load:', user);
-
-    const timer = setInterval(() => setDateTime(new Date()), 1000);
-    return () => clearInterval(timer);
-  }, []);
-
   // Function to filter modules based on user type and allocation
-  // Define this BEFORE using it in useEffect
+  // DEFINE THIS BEFORE using it in useEffect hooks
   const filterModulesByAllocation = useCallback(() => {
     const user = JSON.parse(localStorage.getItem("admin") || "{}");
     setCurrentUser(user);
@@ -272,6 +262,30 @@ const Header = () => {
       }
   }, []);
 
+  // Read initial user from localStorage immediately on mount
+  useEffect(() => {
+    const user = JSON.parse(localStorage.getItem("admin") || "{}");
+    setCurrentUser(user);
+    console.log('🔍 Header - Initial user load:', user);
+
+    const timer = setInterval(() => setDateTime(new Date()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  // Listen for login/logout events
+  useEffect(() => {
+    const handleUserLoggedIn = (event: any) => {
+      console.log('🔍 Header - Login event detected, refreshing user data');
+      const user = JSON.parse(localStorage.getItem("admin") || "{}");
+      setCurrentUser(user);
+      setModules(allModules); // Reset modules to default, will be filtered next
+      filterModulesByAllocation(); // Trigger re-filtering with new user data
+    };
+
+    window.addEventListener('userLoggedIn', handleUserLoggedIn);
+    return () => window.removeEventListener('userLoggedIn', handleUserLoggedIn);
+  }, [filterModulesByAllocation]);
+
   // Listen for storage changes and also poll periodically for same-tab changes
   useEffect(() => {
     const handleStorageChange = () => {
@@ -303,21 +317,25 @@ const Header = () => {
 
   // Call filtering immediately on component mount
   useEffect(() => {
-    filterModulesByAllocation();
-  }, [filterModulesByAllocation]);
+    if (!isPublicRoute) {
+      filterModulesByAllocation();
+    }
+  }, [filterModulesByAllocation, isPublicRoute]);
 
   // Also filter when pathname changes (on navigation)
   useEffect(() => {
-    filterModulesByAllocation();
-  }, [pathname, filterModulesByAllocation]);
+    if (!isPublicRoute) {
+      filterModulesByAllocation();
+    }
+  }, [pathname, filterModulesByAllocation, isPublicRoute]);
 
   // Also filter when currentUser changes (on login)
   useEffect(() => {
-    if (currentUser && Object.keys(currentUser).length > 0) {
+    if (!isPublicRoute && currentUser && Object.keys(currentUser).length > 0) {
       console.log('🔍 Header - CurrentUser changed, re-filtering modules');
       filterModulesByAllocation();
     }
-  }, [currentUser.id, filterModulesByAllocation]);
+  }, [currentUser?.id, filterModulesByAllocation, isPublicRoute]);
 
   // Determine active module based on current pathname
   useEffect(() => {

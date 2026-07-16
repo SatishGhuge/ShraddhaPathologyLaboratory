@@ -40,8 +40,6 @@ const AddTest = () => {
     shortName: "",
     attachFile: "Yes",
     imageSize: "800|600",
-    signatureId: "",
-    costForLab: "",
     preparationTime: "",
     preparationType: "",
     isNABL: false,
@@ -155,6 +153,7 @@ const AddTest = () => {
     categoryType: "PARAMETER",
     isCategory: false,
     testMethod: "",
+    sortOrder: "",
     color: "#3b82f6",
     icon: "",
     description: "",
@@ -164,6 +163,7 @@ const AddTest = () => {
       machineCode: "",
       multiplyBy: "",
       decimal: "",
+      sortOrder: "",
       testMethod: "",
       isDescriptive: false,
       lowPanic: "",
@@ -319,12 +319,9 @@ const AddTest = () => {
             const formDataToSet = {
               name: testData.name || "",
               department: testData.departmentId?.toString() || "",
-              speciality: testData.speciality || "Regular",
               shortName: testData.shortName || "",
               attachFile: testData.attachFile || "Yes",
               imageSize: testData.imageSize || "800|600",
-              signatureId: testData.signatureId?.toString() || "",
-              costForLab: testData.costForLab?.toString() || "",
               preparationTime: testData.preparationTime || "",
               preparationType: testData.preparationType || "",
               isNABL: testData.isNABL || false,
@@ -356,6 +353,7 @@ const AddTest = () => {
                   categoryId: category.categoryId || crypto.randomUUID(), // ✅ Add fallback for existing tests
                   name: category.name || "",
                   isCategory: category.isCategory || false,
+                  sortOrder: category.sortOrder ? category.sortOrder.toString() : "",
                   color: category.color || "#3b82f6",
                   icon: category.icon || "",
                   description: category.description || "",
@@ -368,7 +366,7 @@ const AddTest = () => {
                           parameterName: param.parameterName || "",
                           machineCode: param.machineCode || "",
                           decimal: param.decimal !== undefined && param.decimal !== "" ? param.decimal : "",
-                          sortOrder: param.sortOrder || "",
+                          sortOrder: param.sortOrder ? param.sortOrder.toString() : "",
                           testMethod: param.testMethod || "",
                           isDescriptive: param.isDescriptive || false,
                           lowPanic: param.lowPanic?.toString() || "",
@@ -822,7 +820,6 @@ const AddTest = () => {
         machineName: formData.machineName || null,
         group: formData.group || null,
         reportHeader: formData.reportHeader || null,
-        costForLab: formData.costForLab ? parseFloat(formData.costForLab) : null,
         preparationTime: formData.preparationTime || null,
         preparationType: formData.preparationType || null,
         instructionPreparation: formData.instructionPreparation || null,
@@ -832,7 +829,6 @@ const AddTest = () => {
         outsourceLab: formData.outsourceLab || null,
         attachFile: formData.attachFile || "Yes",
         imageSize: formData.imageSize || "800|600",
-        signatureId: formData.signatureId ? parseInt(formData.signatureId) : null,
         profileTest: formData.profileTest || "No",
         isHeader: formData.isHeader,
         showTestName: formData.showTestName,
@@ -850,6 +846,7 @@ const AddTest = () => {
         categoryId: category.categoryId, // ✅ Include unique category ID
         name: category.name ?? "",
         isCategory: category.isCategory || false,
+        sortOrder: category.sortOrder ? parseInt(category.sortOrder) : null,
         color: category.color || null,
         icon: category.icon || null,
         description: category.description || null,
@@ -862,6 +859,7 @@ const AddTest = () => {
           machineCode: param.machineCode || null,
           multiplyBy: param.multiplyBy || null,
           decimal: param.decimal ? parseInt(param.decimal) : null,
+          sortOrder: param.sortOrder ? parseInt(param.sortOrder) : null,
           isDescriptive: param.isDescriptive || false,
           lowPanic: param.lowPanic ? parseFloat(param.lowPanic) : null,
           highPanic: param.highPanic ? parseFloat(param.highPanic) : null,
@@ -1093,18 +1091,6 @@ const AddTest = () => {
                       Cost For Lab
                     </label>
                     <input 
-                      name="costForLab"
-                      type="number"
-                      value={formData.costForLab}
-                      onChange={handleChange}
-                      className="w-full sm:w-32 px-2 py-1.5 sm:py-1 border border-cyan-600 rounded text-xs sm:text-sm bg-cyan-50" 
-                      disabled={isViewMode} 
-                    required={false}/>
-                  </div>
-
-                  <div className="flex flex-col sm:flex-row gap-3">
-                    <Input 
-                      label="Preparation Time" 
                       name="preparationTime"
                       value={formData.preparationTime}
                       onChange={handleChange}

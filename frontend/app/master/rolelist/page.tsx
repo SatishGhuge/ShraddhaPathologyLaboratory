@@ -12,6 +12,7 @@ const RoleList = () => {
   const [roles, setRoles] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<any>(null);
+  const [showInactive, setShowInactive] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [pagination, setPagination] = useState<any>(null);
   const ITEMS_PER_PAGE = 20;
@@ -20,13 +21,26 @@ const RoleList = () => {
   const [editingRoleId, setEditingRoleId] = useState<any>(null);
   const [saveLoading, setSaveLoading] = useState(false);
 
-  const fetchRoles = async (page: number = 1) => {
+  const fetchRoles = async (page: number = 1, includeInactive: boolean = false) => {
     setLoading(true);
     setError(null);
     try {
-      const data = await getRoles(page, ITEMS_PER_PAGE);
-      setRoles(data);
-      setPagination(null);
+      const url = new URL(`${process.env.NEXT_PUBLIC_API_URL}/master/roles`, window.location.origin);
+      url.searchParams.append('page', page.toString());
+      url.searchParams.append('limit', ITEMS_PER_PAGE.toString());
+      if (includeInactive) {
+        url.searchParams.append('includeInactive', 'true');
+      }
+      
+      const response = await fetch(url.toString());
+      const data = await response.json();
+      
+      if (data.success) {
+        setRoles(data.data || []);
+        setPagination(data.pagination || null);
+      } else {
+        setError(data.message || "Failed to fetch roles");
+      }
     } catch (err) {
       setError(err.message || "Failed to fetch roles");
     } finally {
@@ -34,7 +48,21 @@ const RoleList = () => {
     }
   };
 
-  useEffect(() => { fetchRoles(1); }, []);
+  useEffect(() => { 
+    fetchRoles(1, showInactive); 
+  }, []);
+
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search, showInactive]);
+
+  // Refetch when showInactive changes
+  useEffect(() => {
+    if (!loading) {
+      fetchRoles(1, showInactive);
+    }
+  }, [showInactive]);
 
   const handleDelete = async (role) => {
     if (!window.confirm(`Delete "${role.name}"?`)) return;
@@ -132,9 +160,16 @@ const RoleList = () => {
     }
   };
 
-  const filtered = roles.filter(r =>
-    r.name.toLowerCase().includes(search.toLowerCase())
-  );
+  const filtered = roles.filter(r => {
+    // When "Show Inactive" is checked, show ONLY inactive roles
+    if (showInactive && r.isActive) return false;
+    
+    // When "Show Inactive" is unchecked, show ONLY active roles
+    if (!showInactive && !r.isActive) return false;
+    
+    // Filter by search
+    return r.name.toLowerCase().includes(search.toLowerCase());
+  });
 
   return (
     <>
@@ -155,6 +190,16 @@ const RoleList = () => {
             >
               <RotateCcw size={16} /> Reset
             </button>
+            
+            <label className="flex items-center gap-2 px-3 py-2 bg-white border border-gray-300 rounded text-sm cursor-pointer hover:bg-gray-50 transition-colors">
+              <input
+                type="checkbox"
+                checked={showInactive}
+                onChange={(e) => setShowInactive(e.target.checked)}
+                className="w-4 h-4 accent-orange-500"
+              />
+              <span className="text-gray-700">Show Inactive</span>
+            </label>
           </div>
           <button
             onClick={handleAddNew}
@@ -184,8 +229,13 @@ const RoleList = () => {
               ) : filtered.length === 0 ? (
                 <tr><td colSpan={4} className="text-center py-6 text-gray-500">No roles found</td></tr>
               ) : (
-                filtered.map((role) => (
-                  <tr key={role.id} className="hover:bg-gray-50 border-b border-gray-200">
+                filtered.map((role, index) => (
+                  <tr 
+                    key={role.id} 
+                    className={`hover:bg-gray-50 border-b border-gray-200 ${
+                      !role.isActive ? 'bg-gray-100 opacity-60' : ''
+                    }`}
+                  >
                     <td className="border border-gray-300 px-3 py-2">{role.id}</td>
                     <td className="border border-gray-300 px-3 py-2 font-medium">{role.name}</td>
                     <td className="border border-gray-300 px-3 py-2 text-center">
@@ -202,8 +252,9 @@ const RoleList = () => {
                           className={`px-2 py-1 rounded text-xs text-white font-medium ${
                             role.isActive
                               ? "bg-green-600 hover:bg-green-700"
-                              : "bg-gray-600 hover:bg-gray-700"
+                              : "bg-gray-900 hover:bg-gray-900"
                           }`}
+                          title={role.isActive ? "Click to inactivate role" : "Click to activate role"}
                         >
                           {role.isActive ? "Active" : "Inactive"}
                         </button>

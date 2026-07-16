@@ -286,9 +286,9 @@ model Test {
   interpretationLabel    String?
   interpretation         String?             @db.Text
   outsourceLab           String?
-  attachFile             String?              @default("No")
+  attachFile             Int?                 @default(0) @db.TinyInt
   imageSize              String?             @default("800|600")
-  profileTest            String              @default("No")
+  profileTest            Int                 @default(0) @db.TinyInt
   isHeader               Boolean             @default(true)
   showTestName           Boolean             @default(true)
   isNABL                 Boolean             @default(false)
@@ -369,8 +369,9 @@ model TestCharge {
   test               Test                @relation(fields: [testId], references: [id], onDelete: Cascade)
   organization       Organization?       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   
-  @@unique([testId, organizationId])
-  @@index([organizationId])
+  @@unique([testId, organizationId], map: "test_charges_testId_organizationId_key")
+  @@index([organizationId], map: "test_charges_organizationId_fkey")
+  @@index([testId], map: "test_charges_testId_fkey")
   @@map("test_charges")
 }
 
