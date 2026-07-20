@@ -1,7 +1,7 @@
 "use client";
 
-import { usePathname } from "next/navigation";
-import { Home, FileText, BarChart3, IndianRupee, FolderOpen, Settings, UserPlus, Search, Send, FileSignature, Database, ClipboardCheck, DollarSign } from "lucide-react";
+import { usePathname, useRouter } from "next/navigation";
+import { Home, FileText, BarChart3, IndianRupee, FolderOpen, Settings, UserPlus, Search, Send, FileSignature, Database, ClipboardCheck, DollarSign, ChevronLeft } from "lucide-react";
 
 // Icon mapping for breadcrumb paths
 const iconMap = {
@@ -28,6 +28,7 @@ const iconMap = {
 const urlPathMap: { [key: string]: string } = {
   // Master Module
   "master/testlist": "Master / Tests",
+  "master/test-excel-manager": "Master / Test Excel Manager",
   "master/test-templets": "Master / Test Template",
   "master/departmentlist": "Master / Department",
   "master/packagelist": "Master / Packages",
@@ -87,6 +88,7 @@ const urlPathMap: { [key: string]: string } = {
 
 export default function PageHeader({ title = "", icon: Icon, path = "" }: { title?: string; icon?: React.ComponentType<any>; path?: string }) {
   const pathname = usePathname();
+  const router = useRouter();
   
   // Generate breadcrumb path from URL if not provided
   let pathItems: string[] = [];
@@ -107,24 +109,40 @@ export default function PageHeader({ title = "", icon: Icon, path = "" }: { titl
     }
   }
 
+  // Show back button for specific pages (test-excel-manager, etc.)
+  const showBackButton = pathname.includes('/test-excel-manager');
+
   return (
     <div className="mb-2">
 
-      {/* Breadcrumb */}
-      <div className="flex items-center gap-1 text-sm text-slate-500">
-        <Home size={16} />
-        <span>Home</span>
+      {/* Breadcrumb with optional Back Button */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-1 text-sm text-slate-500">
+          <Home size={16} />
+          <span>Home</span>
 
-        {pathItems.map((item, i) => {
-          const ItemIcon = iconMap[item] || FileText;
-          return (
-            <div key={i} className="flex items-center gap-2">
-              <span>/</span>
-              <ItemIcon size={16} />
-              <span>{item}</span>
-            </div>
-          );
-        })}
+          {pathItems.map((item, i) => {
+            const ItemIcon = iconMap[item] || FileText;
+            return (
+              <div key={i} className="flex items-center gap-2">
+                <span>/</span>
+                <ItemIcon size={16} />
+                <span>{item}</span>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Back Button */}
+        {showBackButton && (
+          <button
+            onClick={() => router.back()}
+            className="flex items-center gap-1 text-blue-600 hover:text-blue-700 font-semibold text-sm transition"
+          >
+            <ChevronLeft size={16} />
+            Back to Test List
+          </button>
+        )}
       </div>
     </div>
   );

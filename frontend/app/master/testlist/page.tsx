@@ -4,8 +4,9 @@ import { useRouter } from "next/navigation";
 import React, { useState, useEffect } from "react";
 
 
-import { FlaskConical, RotateCwIcon } from "lucide-react";
+import { FlaskConical, RotateCwIcon, Upload, FileSpreadsheet } from "lucide-react";
 import { getTests, deleteTest, updateTest } from "@/src/api/master";
+import API_BASE_URL from "@/src/api/config";
 
 const TestList = () => {
   const router = useRouter();
@@ -18,6 +19,13 @@ const TestList = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [pagination, setPagination] = useState<any>(null);
   const ITEMS_PER_PAGE = 20;
+
+  // Import modal states
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const [isImporting, setIsImporting] = useState(false);
+  const [importResult, setImportResult] = useState<any>(null);
+  const [importErrors, setImportErrors] = useState<string[]>([]);
 
   // Fetch tests from backend on component mount and when page changes
   useEffect(() => {
@@ -167,6 +175,73 @@ const TestList = () => {
     fetchTests(1);
   };
 
+  // 🔹 Handle file selection for import
+  const handleImportFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const selectedFile = e.target.files?.[0];
+    if (selectedFile) {
+      if (!selectedFile.name.endsWith('.xlsx')) {
+        alert('⚠️ Please select an Excel file (.xlsx)');
+        return;
+      }
+      setImportFile(selectedFile);
+      setImportErrors([]);
+      setImportResult(null);
+    }
+  };
+
+  // 🔹 Handle quick import from test list
+  const handleQuickImport = async () => {
+    if (!importFile) {
+      alert('⚠️ Please select a file first');
+      return;
+    }
+
+    try {
+      setIsImporting(true);
+      console.log('📤 Starting quick import...');
+
+      const formData = new FormData();
+      formData.append('file', importFile);
+
+      const response = await fetch(`${API_BASE_URL}/master/tests/import`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem('token')}`
+        },
+        body: formData
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        setImportErrors(data.data?.errors || [data.message]);
+        console.error('❌ Import validation failed:', data);
+        return;
+      }
+
+      console.log('✅ Import successful:', data);
+      setImportResult(data.data);
+      setImportErrors([]);
+      alert('✅ ' + data.data.summary);
+
+      // Refresh test list
+      setCurrentPage(1);
+      fetchTests(1);
+
+      // Close modal after 2 seconds
+      setTimeout(() => {
+        setShowImportModal(false);
+        setImportFile(null);
+      }, 2000);
+
+    } catch (error) {
+      console.error('❌ Import error:', error);
+      setImportErrors([(error as Error).message]);
+    } finally {
+      setIsImporting(false);
+    }
+  };
+
   // 🔹 Filter tests - exclude deleted, then by active/inactive and search
   const filteredTests = (Array.isArray(tests) ? tests : []).filter(test => {
     // Exclude deleted items from all views
@@ -222,12 +297,31 @@ const TestList = () => {
             </label>
           </div>
 
-          <button
-            onClick={() => router.push("/master/testlist/add")}
-            className="bg-orange-500 text-white px-4 py-2 rounded text-xs sm:text-sm hover:bg-orange-600 transition-colors w-full sm:w-auto"
-          >
-            + Add Test
-          </button>
+          <div className="flex gap-2 w-full sm:w-auto flex-wrap">
+            <button
+              onClick={() => router.push("/master/testlist/add")}
+              className="bg-orange-500 text-white px-4 py-2 rounded text-xs sm:text-sm hover:bg-orange-600 transition-colors flex-1 sm:flex-none"
+            >
+              + Add Test
+            </button>
+
+            <button
+              onClick={() => setShowImportModal(true)}
+              className="bg-purple-600 text-white px-4 py-2 rounded text-xs sm:text-sm hover:bg-purple-700 transition-colors flex-1 sm:flex-none flex items-center justify-center gap-1"
+              title="Quick import from Excel"
+            >
+              <Upload size={16} />
+              Quick Import
+            </button>
+
+            <button
+              onClick={() => router.push("/master/test-excel-manager")}
+              className="bg-green-600 text-white px-4 py-2 rounded text-xs sm:text-sm hover:bg-green-700 transition-colors flex-1 sm:flex-none"
+              title="Export/Import tests with Excel"
+            >
+              📊 Excel Manager
+            </button>
+          </div>
         </div>
 
         {/* Loading State */}
@@ -419,6 +513,96 @@ const TestList = () => {
           </div>
         )}
       </div>
+
+      {/* IMPORT MODAL */}
+      {showImportModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <FileSpreadsheet className="text-purple-600" size={24} />
+              <h2 className="text-xl font-bold text-gray-900">Quick Import Tests</h2>
+            </div>
+
+            <p className="text-gray-600 text-sm mb-4">
+              Upload an Excel file to quickly import tests with parameters and categories.
+            </p>
+
+            {/* File Input */}
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Select Excel File (.xlsx)
+              </label>
+              <input
+                type="file"
+                accept=".xlsx"
+                onChange={handleImportFileSelect}
+                className="block w-full text-sm text-gray-600 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-purple-50 file:text-purple-600 hover:file:bg-purple-100"
+              />
+              {importFile && (
+                <p className="text-sm text-green-600 mt-2 font-semibold">
+                  ✓ Selected: {importFile.name}
+                </p>
+              )}
+            </div>
+
+            {/* Errors */}
+            {importErrors.length > 0 && (
+              <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-4">
+                <p className="text-sm font-semibold text-red-900 mb-2">Errors:</p>
+                <ul className="text-xs text-red-800 space-y-1">
+                  {importErrors.slice(0, 5).map((err, idx) => (
+                    <li key={idx} className="flex items-start gap-2">
+                      <span className="text-red-600 font-bold">•</span>
+                      {err}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {/* Success */}
+            {importResult && importErrors.length === 0 && (
+              <div className="bg-green-50 border border-green-200 rounded-lg p-3 mb-4">
+                <p className="text-sm font-semibold text-green-900">✅ Import Successful!</p>
+                <p className="text-xs text-green-800 mt-1">{importResult.summary}</p>
+              </div>
+            )}
+
+            {/* Buttons */}
+            <div className="flex gap-3">
+              <button
+                onClick={handleQuickImport}
+                disabled={isImporting || !importFile || importErrors.length > 0}
+                className="flex-1 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-400 text-white font-semibold py-2 px-4 rounded-lg transition flex items-center justify-center gap-2"
+              >
+                {isImporting ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
+                    Importing...
+                  </>
+                ) : (
+                  <>
+                    <Upload size={16} />
+                    Import
+                  </>
+                )}
+              </button>
+
+              <button
+                onClick={() => {
+                  setShowImportModal(false);
+                  setImportFile(null);
+                  setImportErrors([]);
+                  setImportResult(null);
+                }}
+                className="flex-1 bg-gray-300 hover:bg-gray-400 text-gray-900 font-semibold py-2 px-4 rounded-lg transition"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       
     </>
   );
