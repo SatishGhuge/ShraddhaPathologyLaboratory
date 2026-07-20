@@ -361,9 +361,24 @@ export const getTestById = async (req, res) => {
             group: true
           }
         },
+        sample_type: {
+          select: {
+            id: true,
+            Sample_Type: true
+          }
+        },
         categories: {
           include: {
-            testParameter: true
+            testParameter: {
+              include: {
+                unit: {
+                  select: {
+                    id: true,
+                    symbol: true
+                  }
+                }
+              }
+            }
           },
           orderBy: { categoryName: 'asc' }
         }
@@ -377,11 +392,25 @@ export const getTestById = async (req, res) => {
       });
     }
 
+    console.log('🔍 RAW PRISMA RESPONSE:');
+    console.log('- Test ID:', test.id);
+    console.log('- attachFile (raw):', test.attachFile, typeof test.attachFile);
+    console.log('- profileTest (raw):', test.profileTest, typeof test.profileTest);
+    console.log('- sampleTypeId (raw):', test.sampleTypeId);
+    console.log('- sample_type (raw):', test.sample_type);
+    console.log('- categories count:', test.categories?.length);
+    if (test.categories && test.categories[0]) {
+      console.log('- first category:', test.categories[0].categoryId);
+      console.log('- first parameter:', test.categories[0].testParameter);
+    }
+
     // Reconstruct categories with parameters from TestParameter table
     // Group parameters by categoryId (unique identifier)
     const categoriesMap = new Map();
     
-    test.categories.forEach((cat) => {
+    test.categories.forEach((cat, idx) => {
+      console.log(`📋 Processing category ${idx}:`, { categoryId: cat.categoryId, categoryName: cat.categoryName, hasTestParam: !!cat.testParameter });
+      
       // Use categoryId as key to group parameters properly
       const categoryKey = cat.categoryId || cat.categoryName || 'Default';
       
@@ -415,7 +444,8 @@ export const getTestById = async (req, res) => {
           type: param.type,
           isMandatory: param.isMandatory,
           rangeType: param.rangeType,
-          units: param.units,
+          unitId: param.unitId,  // ✅ Unit ID
+          unit: param.unit,      // ✅ Full unit object with symbol
           displayRangeText: param.displayRangeText,
           rangeText: param.rangeText,
           textContent: param.textContent,
@@ -468,6 +498,11 @@ export const getTestById = async (req, res) => {
 
     // Convert map to array
     const categoriesArray = Array.from(categoriesMap.values());
+    
+    console.log('✅ Categories reconstructed:', categoriesArray.length, 'categories');
+    categoriesArray.forEach((cat, idx) => {
+      console.log(`  Category ${idx}: ${cat.name || '(unnamed)'} - ${cat.parameters.length} parameters`);
+    });
 
     // Ensure categories without parameters have at least one empty parameter
     categoriesArray.forEach(category => {
@@ -488,7 +523,8 @@ export const getTestById = async (req, res) => {
           type: "Numeric",
           isMandatory: false,
           rangeType: "BySex",
-          units: "",
+          unitId: "",  // ✅ Unit ID
+          unit: null,  // ✅ Unit object
           displayRangeText: "",
           rangeText: "",
           textContent: "",
@@ -529,9 +565,71 @@ export const getTestById = async (req, res) => {
 
     test.charges = charges;
 
+    // Log the complete response before sending
+    console.log('📤 COMPLETE RESPONSE FOR TEST ID:', test.id);
+    console.log('📊 attachFile value:', test.attachFile, 'type:', typeof test.attachFile);
+    console.log('📊 profileTest value:', test.profileTest, 'type:', typeof test.profileTest);
+    console.log('📊 sampleTypeId value:', test.sampleTypeId);
+    console.log('📊 sample_type object:', test.sample_type);
+    if (test.categories && test.categories.length > 0 && test.categories[0].parameters) {
+      console.log('📊 First parameter unitId:', test.categories[0].parameters[0]?.unitId);
+      console.log('📊 First parameter unit object:', test.categories[0].parameters[0]?.unit);
+    }
+
+    // Build response object
+    const responseData = {
+      ...test,
+      // Ensure all fields are included
+      id: test.id,
+      name: test.name,
+      shortName: test.shortName,
+      testCode: test.testCode,
+      departmentId: test.departmentId,
+      sampleTypeId: test.sampleTypeId,
+      sample_type: test.sample_type,
+      machineName: test.machineName,
+      group: test.group,
+      reportHeader: test.reportHeader,
+      preparationTime: test.preparationTime,
+      preparationType: test.preparationType,
+      instructionPreparation: test.instructionPreparation,
+      instructionPatient: test.instructionPatient,
+      interpretationLabel: test.interpretationLabel,
+      interpretation: test.interpretation,
+      outsourceLab: test.outsourceLab,
+      attachFile: test.attachFile ? true : false,  // ✅ Convert to boolean
+      imageSize: test.imageSize,
+      profileTest: test.profileTest ? true : false,  // ✅ Convert to boolean
+      isHeader: test.isHeader,
+      showTestName: test.showTestName,
+      isNABL: test.isNABL,
+      lineHeight: test.lineHeight,
+      isActive: test.isActive,
+      isDeleted: test.isDeleted,
+      linkedTestIds: (() => {
+        try {
+          // Parse linkedTestIds if it's a string, otherwise return as is
+          if (typeof test.linkedTestIds === 'string') {
+            return JSON.parse(test.linkedTestIds);
+          }
+          return test.linkedTestIds || [];
+        } catch (e) {
+          console.warn('Failed to parse linkedTestIds:', test.linkedTestIds);
+          return [];
+        }
+      })(),
+      categories: test.categories,
+      charges: test.charges,
+      department: test.department
+    };
+    
+    console.log('✅ AFTER CONVERSION - attachFile:', responseData.attachFile, 'type:', typeof responseData.attachFile);
+    console.log('✅ AFTER CONVERSION - profileTest:', responseData.profileTest, 'type:', typeof responseData.profileTest);
+
+    // Return complete test object with all fields
     res.json({
       success: true,
-      data: test
+      data: responseData
     });
   } catch (error) {
     console.error('Get test error:', error);
@@ -612,8 +710,8 @@ export const createTest = async (req, res) => {
         interpretationLabel,
         interpretation,
         outsourceLab,
-        attachFile: attachFile || false,
-        profileTest: profileTest || false,
+        attachFile: attachFile ? (typeof attachFile === 'boolean' ? 1 : (attachFile === 'Yes' || attachFile === 'true' ? 1 : 0)) : 0,
+        profileTest: profileTest ? (typeof profileTest === 'boolean' ? 1 : (profileTest === 'Yes' || profileTest === 'true' ? 1 : 0)) : 0,
         isHeader: isHeader !== undefined ? isHeader : true,
         showTestName: showTestName !== undefined ? showTestName : true,
         isNABL: isNABL || false,
@@ -766,6 +864,7 @@ export const updateTest = async (req, res) => {
       interpretation,
       outsourceLab,
       attachFile,
+      imageSize,
       profileTest,
       isHeader,
       showTestName,
@@ -776,10 +875,25 @@ export const updateTest = async (req, res) => {
       categories
     } = req.body;
 
-    // Check if test exists
-    const existingTest = await prisma.test.findUnique({
-      where: { id: parseInt(id) }
-    });
+    // Check if test exists - use raw query to avoid Prisma type coercion issues
+    let existingTest;
+    try {
+      existingTest = await prisma.test.findUnique({
+        where: { id: parseInt(id) }
+      });
+    } catch (err) {
+      // If type conversion error, try raw SQL to fetch
+      console.log('⚠️ Type conversion error, using raw SQL:', err.message);
+      const result = await prisma.$queryRaw`SELECT id FROM tests WHERE id = ${parseInt(id)}`;
+      if (!result || result.length === 0) {
+        return res.status(404).json({
+          success: false,
+          message: 'Test not found'
+        });
+      }
+      // Use a placeholder existingTest object
+      existingTest = { id: parseInt(id) };
+    }
 
     if (!existingTest) {
       return res.status(404).json({
@@ -789,37 +903,51 @@ export const updateTest = async (req, res) => {
     }
 
     // Update test basic fields
+    // Build update data object, filtering out undefined values
+    const updateData = {};
+    
+    if (name !== undefined) updateData.name = name || undefined;
+    if (shortName !== undefined) updateData.shortName = shortName || undefined;
+    if (testCode !== undefined) updateData.testCode = testCode || null;
+    if (departmentId !== undefined) updateData.department = departmentId ? { connect: { id: parseInt(departmentId) } } : undefined;
+    // ⚠️ NOTE: sampleTypeId handled separately via raw SQL due to Prisma client cache issue
+    // if (sampleTypeId !== undefined) updateData.sampleTypeId = sampleTypeId ? parseInt(sampleTypeId) : null;
+    if (machineName !== undefined) updateData.machineName = machineName || null;
+    if (group !== undefined) updateData.group = group || null;
+    if (reportHeader !== undefined) updateData.reportHeader = reportHeader || null;
+    if (preparationTime !== undefined) updateData.preparationTime = preparationTime || null;
+    if (preparationType !== undefined) updateData.preparationType = preparationType || null;
+    if (instructionPreparation !== undefined) updateData.instructionPreparation = instructionPreparation || null;
+    if (instructionPatient !== undefined) updateData.instructionPatient = instructionPatient || null;
+    if (interpretationLabel !== undefined) updateData.interpretationLabel = interpretationLabel || null;
+    if (interpretation !== undefined) updateData.interpretation = interpretation || null;
+    if (outsourceLab !== undefined) updateData.outsourceLab = outsourceLab || null;
+    if (attachFile !== undefined) updateData.attachFile = attachFile ? (typeof attachFile === 'boolean' ? 1 : (attachFile === 'Yes' || attachFile === 'true' ? 1 : 0)) : 0;
+    if (imageSize !== undefined) updateData.imageSize = imageSize || null;
+    if (profileTest !== undefined) updateData.profileTest = profileTest ? (typeof profileTest === 'boolean' ? 1 : (profileTest === 'Yes' || profileTest === 'true' ? 1 : 0)) : 0;
+    if (isHeader !== undefined) updateData.isHeader = isHeader;
+    if (showTestName !== undefined) updateData.showTestName = showTestName;
+    if (isNABL !== undefined) updateData.isNABL = isNABL;
+    if (lineHeight !== undefined) updateData.lineHeight = lineHeight ? parseFloat(lineHeight) : 1.4;
+    if (isActive !== undefined) updateData.isActive = isActive;
+    if (isDeleted !== undefined) updateData.isDeleted = isDeleted;
+    if (req.body.linkedTestIds !== undefined) updateData.linkedTestIds = JSON.stringify(req.body.linkedTestIds || []);
+
+    // Remove undefined values from updateData
+    Object.keys(updateData).forEach(key => updateData[key] === undefined && delete updateData[key]);
+
+    console.log('📝 Update data being sent:', updateData);
+
+    // Handle sampleTypeId separately via raw SQL (Prisma client cache issue workaround)
+    const testId = parseInt(id);
+    if (sampleTypeId !== undefined) {
+      console.log('📌 Updating sampleTypeId via raw SQL:', sampleTypeId);
+      await prisma.$executeRaw`UPDATE tests SET sampleTypeId = ${sampleTypeId ? parseInt(sampleTypeId) : null} WHERE id = ${testId}`;
+    }
+
     const test = await prisma.test.update({
-      where: { id: parseInt(id) },
-      data: {
-        name: name || undefined,
-        shortName: shortName || undefined,
-        testCode: testCode !== undefined ? (testCode || null) : undefined,
-        department: departmentId ? { connect: { id: parseInt(departmentId) } } : undefined,
-        sampleType: sampleType !== undefined ? (sampleType || null) : undefined,
-        testMethod: testMethod !== undefined ? (testMethod || null) : undefined,
-        machineName: machineName !== undefined ? (machineName || null) : undefined,
-        speciality: speciality || undefined,
-        group: group !== undefined ? (group || null) : undefined,
-        sortOrder: sortOrder !== undefined ? (sortOrder ? parseInt(sortOrder) : null) : undefined,
-        reportHeader: reportHeader !== undefined ? (reportHeader || null) : undefined,
-        costForLab: costForLab !== undefined ? (costForLab ? parseFloat(costForLab) : null) : undefined,
-        preparationTime: preparationTime !== undefined ? (preparationTime || null) : undefined,
-        preparationType: preparationType !== undefined ? (preparationType || null) : undefined,
-        instructionPreparation: instructionPreparation !== undefined ? (instructionPreparation || null) : undefined,
-        instructionPatient: instructionPatient !== undefined ? (instructionPatient || null) : undefined,
-        interpretationLabel: interpretationLabel !== undefined ? (interpretationLabel || null) : undefined,
-        interpretation: interpretation !== undefined ? (interpretation || null) : undefined,
-        outsourceLab: outsourceLab !== undefined ? (outsourceLab || null) : undefined,
-        attachFile: attachFile || undefined,
-        profileTest: profileTest || undefined,
-        isHeader: isHeader !== undefined ? isHeader : undefined,
-        showTestName: showTestName !== undefined ? showTestName : undefined,
-        isNABL: isNABL !== undefined ? isNABL : undefined,
-        lineHeight: lineHeight !== undefined ? (lineHeight ? parseFloat(lineHeight) : null) : undefined,
-        isActive: isActive !== undefined ? isActive : undefined,
-        linkedTestIds: req.body.linkedTestIds ? JSON.stringify(req.body.linkedTestIds) : undefined
-      }
+      where: { id: testId },
+      data: updateData
     });
 
     // Handle categories update if provided
@@ -959,33 +1087,61 @@ export const getTests = async (req, res) => {
       where: { isDeleted: false }
     });
 
-    const tests = await prisma.test.findMany({
-      where: { isDeleted: false },
-      include: {
-        department: {
-          select: {
-            id: true,
-            name: true
+    let tests;
+    try {
+      tests = await prisma.test.findMany({
+        where: { isDeleted: false },
+        include: {
+          department: {
+            select: {
+              id: true,
+              name: true
+            }
+          },
+          sample_type: {
+            select: {
+              id: true,
+              Sample_Type: true
+            }
+          },
+          charges: {
+            where: { organizationId: null },
+            select: {
+              id: true,
+              b2cCharge: true,
+              b2bCharge: true,
+              discountPercent: true,
+              specialPrice: true,
+              effectiveFrom: true,
+              effectiveTo: true,
+              isActive: true
+            }
           }
         },
-        charges: {
-          where: { organizationId: null },
-          select: {
-            id: true,
-            b2cCharge: true,
-            b2bCharge: true,
-            discountPercent: true,
-            specialPrice: true,
-            effectiveFrom: true,
-            effectiveTo: true,
-            isActive: true
-          }
-        }
-      },
-      orderBy: { name: 'asc' },
-      skip,
-      take: limit
-    });
+        orderBy: { name: 'asc' },
+        skip,
+        take: limit
+      });
+      
+      // Convert boolean fields
+      tests = tests.map(t => ({
+        ...t,
+        attachFile: t.attachFile ? true : false,
+        profileTest: t.profileTest ? true : false
+      }));
+    } catch (err) {
+      // If type conversion error, fetch with raw SQL and convert
+      console.log('⚠️ Type conversion error in findMany, using raw SQL:', err.message);
+      const rawTests = await prisma.$queryRaw`
+        SELECT * FROM tests WHERE isDeleted = false ORDER BY name ASC LIMIT ${limit} OFFSET ${skip}
+      `;
+      tests = rawTests.map(t => ({
+        ...t,
+        // Convert to boolean for consistency
+        attachFile: t.attachFile ? true : false,
+        profileTest: t.profileTest ? true : false
+      }));
+    }
 
     res.json(buildPaginatedResponse(tests, total, page, limit));
   } catch (error) {
@@ -4228,6 +4384,22 @@ export const createTemplate = async (req, res) => {
       }
     }
 
+    // Check if template with same testId and templateName already exists
+    const existingTemplate = await prisma.testTemplate.findFirst({
+      where: {
+        testId: parseInt(testId),
+        templateName: templateName
+      }
+    });
+
+    if (existingTemplate) {
+      console.warn('⚠️ Template already exists with this name for this test');
+      return res.status(409).json({
+        success: false,
+        message: `A template named "${templateName}" already exists for this test. Please use a different template name.`
+      });
+    }
+
     const template = await prisma.testTemplate.create({
       data: {
         testId: parseInt(testId),
@@ -4620,15 +4792,21 @@ export const getRoles = async (req, res) => {
   try {
     // Get pagination parameters
     const { page, limit, skip } = getPaginationParams(req.query);
+    
+    // Support optional filter for active/inactive roles
+    // By default show only active roles, but allow ?includeInactive=true
+    const includeInactive = req.query.includeInactive === 'true';
+    
+    const whereClause = includeInactive ? {} : { isActive: true };
 
     // Get total count
     const total = await prisma.role.count({
-      where: { isActive: true }
+      where: whereClause
     });
 
     // Get paginated roles
     const roles = await prisma.role.findMany({
-      where: { isActive: true },
+      where: whereClause,
       orderBy: { name: 'asc' },
       skip,
       take: limit
@@ -4660,12 +4838,11 @@ export const createRole = async (req, res) => {
     }
 
     // Auto-generate codeName from name (uppercase with underscores)
-    const codeName = name.trim().toUpperCase().replace(/\s+/g, '_');
+    // Note: codeName field doesn't exist in Role model, only name is stored
 
     const role = await prisma.role.create({
       data: {
         name: name.trim(),
-        codeName: codeName,
         isActive: true
       },
     });
@@ -4689,7 +4866,7 @@ export const updateRole = async (req, res) => {
     const updateData = {};
     if (name) {
       updateData.name = name.trim();
-      updateData.codeName = name.trim().toUpperCase().replace(/\s+/g, '_');
+      // codeName field doesn't exist in Role model
     }
     if (isActive !== undefined) {
       updateData.isActive = isActive;

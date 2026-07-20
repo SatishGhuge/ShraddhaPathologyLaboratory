@@ -117,39 +117,42 @@ const BarcodeCard = ({
   const { svg, width, height } = buildCode128Svg(label.barcodeValue);
   
   // Determine colors based on barcode_status:
-  // 1. barcode_status = 'Printed' → BLUE (barcode has been printed)
-  // 2. barcode_status = 'Unprinted' → RED (barcode NOT printed yet)
-  // 3. Modal selection → BLUE (user actively selecting for print)
+  // PRIORITY: barcode_status (Printed/Unprinted) > Selection state
+  // 1. barcode_status = 'Printed' → LIGHT BLUE (already printed - show as printed regardless of selection)
+  // 2. barcode_status = 'Unprinted' → LIGHT RED/PINK (NOT printed yet - always show red)
+  // 3. Selection → Only affects OTHER visual styling, NOT the main color
   
   const isPrinted = barcode_status === 'Printed';
   const isUnprinted = barcode_status === 'Unprinted';
   const showAsSelected = !isPrintMode && isSelected;
   
-  // Priority: Selection > Printed Status > Unprinted (Red)
-  const borderColor = showAsSelected 
-    ? 'border-blue-600' 
-    : isPrinted 
-      ? 'border-blue-600' 
-      : isUnprinted
-        ? 'border-red-600'
-        : 'border-gray-600';
+  // Priority: barcode_status > selection
+  // If barcode is printed, show blue (even if not selected)
+  // If barcode is unprinted, show red (even if selected)
+  const borderColor = isPrinted 
+    ? 'border-blue-500' 
+    : isUnprinted
+      ? 'border-red-500'
+      : showAsSelected
+        ? 'border-blue-600'
+        : 'border-gray-400';
         
-  const backgroundColor = showAsSelected 
-    ? 'bg-blue-200' 
-    : isPrinted 
-      ? 'bg-blue-200' 
-      : isUnprinted
-        ? 'bg-red-300'
-        : 'bg-gray-200';
+  const backgroundColor = isPrinted 
+    ? 'bg-blue-100' 
+    : isUnprinted
+      ? 'bg-red-200'
+      : showAsSelected
+        ? 'bg-blue-200'
+        : 'bg-gray-100';
 
   return (
     <div
       data-barcode-index={index}
       onClick={isPrintMode ? undefined : onClick}
       className={`
-        relative transition-all border-3 ${borderColor} ${backgroundColor} shadow-md rounded
-        ${isPrintMode ? 'print:cursor-default print:bg-white print:border-gray-300 print:border-2' : 'cursor-pointer hover:shadow-lg hover:border-opacity-75'}
-        ${isPrinted ? 'ring-2 ring-blue-400' : isUnprinted ? 'ring-2 ring-red-400' : isPrintMode ? '' : 'hover:ring-2 hover:ring-red-400'}
+        relative transition-all border-4 ${borderColor} ${backgroundColor} shadow-md rounded
+        ${isPrintMode ? 'print:cursor-default print:bg-white print:border-gray-300 print:border-2' : 'cursor-pointer hover:shadow-lg'}
+        ${isPrinted ? 'ring-2 ring-blue-400' : isUnprinted ? 'ring-2 ring-red-400' : isPrintMode ? '' : ''}
       `}
       style={{
         width: '220px',
@@ -157,7 +160,7 @@ const BarcodeCard = ({
         pageBreakInside: isPrintMode ? 'avoid' : 'auto',
         padding: '3px'
       }}
-      title={isPrinted ? 'Barcode: Printed ✓' : isUnprinted ? 'Barcode: Not Printed ⚠️' : 'Barcode Status Unknown'}
+      title={isPrinted ? '✓ Barcode: Printed' : isUnprinted ? '⚠ Barcode: Not Printed' : 'Barcode Status Unknown'}
     >
       {/* Organization Code - top right corner */}
       {label.organizationCode && (

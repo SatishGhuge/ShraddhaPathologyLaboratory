@@ -4,10 +4,14 @@ import dotenv from 'dotenv';
 import authRoutes from './routes/auth.routes.js';
 import adminRoutes from './routes/admin.routes.js';
 import patientRoutes from './routes/patient.routes.js';
+import patientAuthRoutes from './routes/patientAuth.routes.js';
+import patientDashboardRoutes from './routes/patientDashboard.routes.js';
+import homeVisitRoutes from './routes/homeVisit.routes.js';
 import masterRoutes from './routes/master.routes.js';
 import resultRoutes from './routes/result.routes.js';
 import signatureRoutes from './routes/signature.routes.js';
 import doctorRevenueRoutes from './routes/doctor-revenue.routes.js';
+import { emailService } from './services/notification.service.js';
 
 // Load environment variables
 dotenv.config();
@@ -34,6 +38,9 @@ app.use('/uploads', express.static('uploads'));
 
 // Routes
 app.use('/api/auth', authRoutes);
+app.use('/api/patient/auth', patientAuthRoutes);
+app.use('/api/patient/dashboard', patientDashboardRoutes);
+app.use('/api/home-visit', homeVisitRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/patients', patientRoutes);
 app.use('/api/master', masterRoutes);
@@ -69,8 +76,18 @@ app.use((req, res) => {
 });
 
 // Start server
-app.listen(PORT, () => {
+app.listen(PORT, async () => {
   console.log(`🚀 Server running on port ${PORT}`);
   console.log(`📍 Environment: ${process.env.NODE_ENV}`);
   console.log(`🌐 CORS enabled for: ${process.env.FRONTEND_URL}`);
+  
+  // Verify email service
+  console.log('\n📧 Checking email service...');
+  const emailVerified = await emailService.verifyConnection();
+  if (emailVerified) {
+    console.log('✅ Email service is ready to send credentials');
+  } else {
+    console.error('❌ Email service verification failed - credentials may not be sent');
+    console.error('   Check your .env file for EMAIL_HOST, EMAIL_PORT, EMAIL_USER, EMAIL_PASS');
+  }
 });

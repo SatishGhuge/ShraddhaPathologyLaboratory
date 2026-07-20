@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { FileText, RotateCwIcon, X, Check, Plus, Trash2, ChevronLeft, ChevronRight } from 'lucide-react';
 import { CKEditor } from '@ckeditor/ckeditor5-react';
 import ClassicEditor from '@ckeditor/ckeditor5-build-classic';
-import { getTemplates, getTests, createTemplate, updateTemplate, deleteTemplate, getUnits, createCategoryWithParameter } from "@/src/api/master.js";
+import { getTemplates, getTests, createTemplate, updateTemplate, deleteTemplate, getUnits, createCategoryWithParameter, getTestById } from "@/src/api/master.js";
 
 const TestTemplets = () => {
 
@@ -145,40 +145,68 @@ const TestTemplets = () => {
     setShowForm(true);
   };
 
-  const handleTestChange = (testId: any) => {
+  const handleTestChange = async (testId: any) => {
     setFormData({ ...formData, testId });
     
-    const selectedTest = tests.find(t => t.id === parseInt(testId));
-    if (selectedTest && selectedTest.categories && selectedTest.categories.length > 0) {
-      const params = selectedTest.categories.map(cat => ({
-        id: cat.testParameter?.id,
-        name: cat.testParameter?.parameterName,
-        type: cat.testParameter?.type,
-        isMandatory: cat.testParameter?.isMandatory
-      }));
-      setSelectedTestParameters(params);
-    } else {
+    // Fetch full test data with categories and parameters
+    try {
+      const fullTestData = await getTestById(testId);
+      if (fullTestData && fullTestData.categories && fullTestData.categories.length > 0) {
+        // Flatten all parameters from all categories
+        const allParams = [];
+        fullTestData.categories.forEach(cat => {
+          if (cat.parameters && Array.isArray(cat.parameters)) {
+            cat.parameters.forEach(param => {
+              allParams.push({
+                id: param.id || `${cat.categoryId}-${param.parameterName}`,
+                name: param.parameterName,
+                type: param.type,
+                isMandatory: param.isMandatory
+              });
+            });
+          }
+        });
+        setSelectedTestParameters(allParams);
+      } else {
+        setSelectedTestParameters([]);
+      }
+    } catch (err) {
+      console.error('Error fetching test data:', err);
       setSelectedTestParameters([]);
     }
   };
 
-  const handleEdit = (template: any) => {
+  const handleEdit = async (template: any) => {
     setFormData({
       testId: template.testId.toString(),
       templateName: template.templateName,
       parameters: template.parameters || []
     });
     
-    const selectedTest = tests.find(t => t.id === template.testId);
-    if (selectedTest && selectedTest.categories && selectedTest.categories.length > 0) {
-      const params = selectedTest.categories.map(cat => ({
-        id: cat.testParameter?.id,
-        name: cat.testParameter?.parameterName,
-        type: cat.testParameter?.type,
-        isMandatory: cat.testParameter?.isMandatory
-      }));
-      setSelectedTestParameters(params);
-    } else {
+    // Fetch full test data with categories and parameters
+    try {
+      const fullTestData = await getTestById(template.testId.toString());
+      if (fullTestData && fullTestData.categories && fullTestData.categories.length > 0) {
+        // Flatten all parameters from all categories
+        const allParams = [];
+        fullTestData.categories.forEach(cat => {
+          if (cat.parameters && Array.isArray(cat.parameters)) {
+            cat.parameters.forEach(param => {
+              allParams.push({
+                id: param.id || `${cat.categoryId}-${param.parameterName}`,
+                name: param.parameterName,
+                type: param.type,
+                isMandatory: param.isMandatory
+              });
+            });
+          }
+        });
+        setSelectedTestParameters(allParams);
+      } else {
+        setSelectedTestParameters([]);
+      }
+    } catch (err) {
+      console.error('Error fetching test data:', err);
       setSelectedTestParameters([]);
     }
     
@@ -565,20 +593,20 @@ const TestTemplets = () => {
           {!loading && !error && (
             <>
               <div className="overflow-x-auto bg-white rounded shadow-md">
-                <table className="w-full text-xs sm:text-sm border-collapse">
+                <table className="w-full text-xs border-collapse">
                   <thead className="bg-slate-900 text-white sticky top-0">
                     <tr>
-                      <th className="border border-gray-300 px-3 py-1 text-left font-semibold text-xs">Template Name</th>
-                      <th className="border border-gray-300 px-3 py-1 text-left font-semibold text-xs">Test Name</th>
-                      <th className="border border-gray-300 px-3 py-1 text-center font-semibold text-xs">Active</th>
-                      <th className="border border-gray-300 px-3 py-1 text-center font-semibold text-xs">Action</th>
+                      <th className="border border-gray-300 px-1 py-0.5 text-left font-semibold text-xs">Template Name</th>
+                      <th className="border border-gray-300 px-1 py-0.5 text-left font-semibold text-xs">Test Name</th>
+                      <th className="border border-gray-300 px-1 py-0.5 text-center font-semibold text-xs">Active</th>
+                      <th className="border border-gray-300 px-1 py-0.5 text-center font-semibold text-xs">Action</th>
                     </tr>
                   </thead>
 
                   <tbody>
                     {filteredTemplates.length === 0 ? (
                       <tr>
-                        <td colSpan={4} className="text-center py-1 text-gray-500 text-xs">
+                        <td colSpan={4} className="text-center py-1.5 text-gray-500 text-xs">
                           {search ? 'No templates found matching your search.' : 'No templates found. Click "Add Template" to create one.'}
                         </td>
                       </tr>
@@ -588,23 +616,23 @@ const TestTemplets = () => {
                           key={template.id}
                           className={`hover:bg-blue-50 border-b border-gray-200 transition-colors ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} ${!template.isActive ? 'bg-gray-100 opacity-60' : ''}`}
                         >
-                          <td className="border border-gray-300 px-3 py-1 font-semibold text-gray-800 text-xs">
+                          <td className="border border-gray-300 px-1 py-0.5 font-semibold text-gray-800 text-xs whitespace-nowrap overflow-hidden text-ellipsis">
                             {template.templateName}
                           </td>
 
-                          <td className="border border-gray-300 px-3 py-1 text-gray-700 text-xs">
+                          <td className="border border-gray-300 px-1 py-0.5 text-gray-700 text-xs whitespace-nowrap overflow-hidden text-ellipsis">
                             {template.test?.name || '-'}
                           </td>
 
-                          <td className="border border-gray-300 px-3 py-1 text-center font-semibold text-xs">
+                          <td className="border border-gray-300 px-1 py-0.5 text-center font-semibold text-xs">
                             {template.isActive ? "Yes" : "No"}
                           </td>
 
-                          <td className="border border-gray-300 px-3 py-1">
-                            <div className="flex gap-1 justify-center flex-wrap">
+                          <td className="border border-gray-300 px-1 py-0.5">
+                            <div className="flex gap-0.5 justify-center flex-wrap">
                               <button
                                 onClick={() => handleEdit(template)}
-                                className="bg-blue-600 text-white px-2 py-1 rounded text-[9px] hover:bg-blue-700 transition-colors font-medium whitespace-nowrap"
+                                className="bg-blue-600 text-white px-1 py-0 rounded text-[7px] hover:bg-blue-700 transition-colors font-medium whitespace-nowrap"
                               >
                                 Edit
                               </button>
@@ -612,7 +640,7 @@ const TestTemplets = () => {
                               <button
                                 onClick={() => handleToggleActive(template.id)}
                                 disabled={loading}
-                                className={`px-2 py-1 rounded text-[9px] text-white transition-colors disabled:opacity-50 font-medium whitespace-nowrap ${
+                                className={`px-1 py-0 rounded text-[7px] text-white transition-colors disabled:opacity-50 font-medium whitespace-nowrap ${
                                   template.isActive
                                     ? "bg-green-600 hover:bg-green-700"
                                     : "bg-gray-900 hover:bg-gray-900"
@@ -624,7 +652,7 @@ const TestTemplets = () => {
 
                               <button
                                 onClick={() => handleDelete(template.id)}
-                                className="bg-red-500 text-white px-2 py-1 rounded text-[9px] hover:bg-red-600 transition-colors font-medium whitespace-nowrap"
+                                className="bg-red-500 text-white px-1 py-0 rounded text-[7px] hover:bg-red-600 transition-colors font-medium whitespace-nowrap"
                               >
                                 Delete
                               </button>

@@ -249,7 +249,7 @@ const INIT_FORM = {
   visitDate:"", location:"SHRADDHA",
   reportMode:"By hand", mobile:"", title:"MR", firstName:"", lastName:"",
   age:"", ageUnit:"Year", gender:"Male", referralDoctor:"",
-  referralDoctorChecked:false, patient_history:"", email:"", address:""
+  referralDoctorChecked:false, patient_history:"", email:"", address:"", organizationCode:""
 };
 
 const INIT_BOOKING = [];
@@ -614,7 +614,7 @@ export default function BookingPage() {
           b2bCharge: pkg.b2bCharge || 0,
           // keep full test objects for display
           tests: (pkg.tests || []).map(pt => {
-            const full = mappedTests.find(t => t.id === pt.id) || { sample: "N/A", b2cCharge: 0, b2bCharge: 0 };
+            const full = mappedTests.find(t => t.id === pt.id) || { sample: "N/A", b2cCharge: 0, b2bCharge: 0, testCode: "", departmentId: null, sampleTypeId: null };
             return {
               id: pt.id,
               name: pt.name,
@@ -2069,18 +2069,15 @@ export default function BookingPage() {
                                 // Barcode status: RED if Unprinted, BLUE if Printed
                                 const barcodeStatus = t.barcode_status || "Unprinted";
                                 const isBarcodePrinted = barcodeStatus === "Printed";
-                                // Highlight entire row red if barcode not printed
-                                const rowBackgroundClass = !isBarcodePrinted ? "bg-red-50 hover:bg-red-100" : (t.fromPackage||t.isPackage ? "bg-orange-50 hover:bg-orange-100" : "hover:bg-gray-50");
+                                // No background color - just plain white
+                                const rowBackgroundClass = "";
                                 return (
-                                  <tr key={i} className={`border-b text-xs ${rowBackgroundClass} ${!isBarcodePrinted ? "border-red-300 border-l-4 border-l-red-600" : "border-gray-200"}`}>
+                                  <tr key={i} className={`border-b text-xs border-gray-200`}>
                                     <td className="p-1 text-center">
                                       <div className="flex items-center justify-center gap-0.5 text-xs">
                                         <span>{i+1}</span>
                                         {isNewTest && (
                                           <span className="text-blue-600 font-bold text-xs" title="New">N</span>
-                                        )}
-                                        {!isBarcodePrinted && (
-                                          <span className="text-red-600 font-bold text-xs" title="Unprinted">⚠</span>
                                         )}
                                       </div>
                                     </td>

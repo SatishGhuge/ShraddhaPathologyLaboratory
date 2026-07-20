@@ -90,6 +90,7 @@ const AddPackage = () => {
           code: pkg.code || "",
           departmentId: pkg.departmentId?.toString() || "",
           labTests: "",
+          b2cCharge: pkg.b2cCharge?.toString() || "",
         });
         
         // Set the tests from packageTests

@@ -75,13 +75,10 @@ export interface Category {
 export interface TestFormData {
   name: string;
   department: string;
-  speciality: string;
   sortOrder: string;
   shortName: string;
   attachFile: string;
   imageSize: string;
-  signatureId: string;
-  costForLab: string;
   testMethod: string;
   preparationTime: string;
   preparationType: string;

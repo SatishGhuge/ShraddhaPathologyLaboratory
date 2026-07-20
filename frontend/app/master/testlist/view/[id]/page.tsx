@@ -37,12 +37,9 @@ const AddTest = () => {
   const [formData, setFormData] = useState({
     name: "",
     department: "",
-    sortOrder: "",
     shortName: "",
     attachFile: "Yes",
     imageSize: "800|600",
-    signatureId: "",
-    costForLab: "",
     preparationTime: "",
     preparationType: "",
     isNABL: false,
@@ -155,8 +152,8 @@ const AddTest = () => {
     name: "",
     categoryType: "PARAMETER",
     isCategory: false,
-    sortOrder: "",
     testMethod: "",
+    sortOrder: "",
     color: "#3b82f6",
     icon: "",
     description: "",
@@ -322,13 +319,9 @@ const AddTest = () => {
             const formDataToSet = {
               name: testData.name || "",
               department: testData.departmentId?.toString() || "",
-              speciality: testData.speciality || "Regular",
-              sortOrder: testData.sortOrder?.toString() || "",
               shortName: testData.shortName || "",
               attachFile: testData.attachFile || "Yes",
               imageSize: testData.imageSize || "800|600",
-              signatureId: testData.signatureId?.toString() || "",
-              costForLab: testData.costForLab?.toString() || "",
               preparationTime: testData.preparationTime || "",
               preparationType: testData.preparationType || "",
               isNABL: testData.isNABL || false,
@@ -360,7 +353,7 @@ const AddTest = () => {
                   categoryId: category.categoryId || crypto.randomUUID(), // ✅ Add fallback for existing tests
                   name: category.name || "",
                   isCategory: category.isCategory || false,
-                  sortOrder: category.sortOrder || "",
+                  sortOrder: category.sortOrder ? category.sortOrder.toString() : "",
                   color: category.color || "#3b82f6",
                   icon: category.icon || "",
                   description: category.description || "",
@@ -373,7 +366,7 @@ const AddTest = () => {
                           parameterName: param.parameterName || "",
                           machineCode: param.machineCode || "",
                           decimal: param.decimal !== undefined && param.decimal !== "" ? param.decimal : "",
-                          sortOrder: param.sortOrder || "",
+                          sortOrder: param.sortOrder ? param.sortOrder.toString() : "",
                           testMethod: param.testMethod || "",
                           isDescriptive: param.isDescriptive || false,
                           lowPanic: param.lowPanic?.toString() || "",
@@ -803,10 +796,6 @@ const AddTest = () => {
       emptyFields.push("Department");
     }
     
-    if (!formData.sortOrder.trim()) {
-      emptyFields.push("Sort Order");
-    }
-    
     if (!formData.shortName.trim()) {
       emptyFields.push("Test Short Form");
     }
@@ -830,9 +819,7 @@ const AddTest = () => {
         sampleType: formData.sampleType || null,
         machineName: formData.machineName || null,
         group: formData.group || null,
-        sortOrder: parseInt(formData.sortOrder) || null,
         reportHeader: formData.reportHeader || null,
-        costForLab: formData.costForLab ? parseFloat(formData.costForLab) : null,
         preparationTime: formData.preparationTime || null,
         preparationType: formData.preparationType || null,
         instructionPreparation: formData.instructionPreparation || null,
@@ -842,7 +829,6 @@ const AddTest = () => {
         outsourceLab: formData.outsourceLab || null,
         attachFile: formData.attachFile || "Yes",
         imageSize: formData.imageSize || "800|600",
-        signatureId: formData.signatureId ? parseInt(formData.signatureId) : null,
         profileTest: formData.profileTest || "No",
         isHeader: formData.isHeader,
         showTestName: formData.showTestName,
@@ -1065,16 +1051,6 @@ const AddTest = () => {
                     required 
                     disabled={isViewMode} 
                   />
-
-                  <Input 
-                    label="Sort Order" 
-                    name="sortOrder"
-                    type="number"
-                    value={formData.sortOrder}
-                    onChange={handleChange}
-                    disabled={isViewMode}
-                    required={false}
-                  />
                   <Input 
                     label="Test Short Form" 
                     name="shortName"
@@ -1115,18 +1091,6 @@ const AddTest = () => {
                       Cost For Lab
                     </label>
                     <input 
-                      name="costForLab"
-                      type="number"
-                      value={formData.costForLab}
-                      onChange={handleChange}
-                      className="w-full sm:w-32 px-2 py-1.5 sm:py-1 border border-cyan-600 rounded text-xs sm:text-sm bg-cyan-50" 
-                      disabled={isViewMode} 
-                    required={false}/>
-                  </div>
-
-                  <div className="flex flex-col sm:flex-row gap-3">
-                    <Input 
-                      label="Preparation Time" 
                       name="preparationTime"
                       value={formData.preparationTime}
                       onChange={handleChange}
@@ -1571,19 +1535,6 @@ const AddTest = () => {
                       </div>
                       <div>
                         <label className="block font-semibold text-cyan-800 text-xs sm:text-sm mb-1">
-                          Sort Order
-                        </label>
-                        <input 
-                          className="px-2 py-1.5 sm:py-1 border border-gray-300 rounded text-xs sm:text-sm w-full sm:w-40" 
-                          placeholder="Sort Order" 
-                          type="number"
-                          value={category.sortOrder || ""}
-                          onChange={(e) => handleCategoryChange(categoryIndex, 'sortOrder', e.target.value)}
-                          disabled={isViewMode} 
-                        />
-                      </div>
-                      <div>
-                        <label className="block font-semibold text-cyan-800 text-xs sm:text-sm mb-1">
                           Category Test Method
                         </label>
                         <input 
@@ -1788,17 +1739,6 @@ const AddTest = () => {
                           />
                           <span className="text-xs sm:text-sm">Is Descriptive</span>
                         </label>
-                        {category.isCategory && (
-                          <input 
-                            className="px-2 py-1.5 sm:py-1 border border-gray-300 rounded text-xs sm:text-sm w-full sm:w-24" 
-                            placeholder="Sort Order" 
-                            type="number"
-                            value={parameter.sortOrder || ""}
-                            onChange={(e) => handleParameterChange(categoryIndex, paramIndex, 'sortOrder', e.target.value)}
-                            disabled={isViewMode} 
-                          />
-                        )}
-
                         {category.isCategory && (
                           <input 
                             className="px-2 py-1.5 sm:py-1 border border-gray-300 rounded text-xs sm:text-sm w-full sm:w-32" 

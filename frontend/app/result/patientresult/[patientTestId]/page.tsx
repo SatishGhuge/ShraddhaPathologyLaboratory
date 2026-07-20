@@ -467,23 +467,67 @@ const PatientResult = () => {
   const handleTemplateSelect = (template: any, testId: number, isSingleTest: boolean = true) => {
     try {
       console.log('📋 Template selected:', template);
+      console.log('📋 Template parameters:', template.parameters);
       
-      if (!template?.parameters || !Array.isArray(template.parameters)) {
+      if (!template?.parameters) {
         console.warn('⚠️ Template has no parameters');
-        alert('Template has no parameters to populate');
+        console.warn('Cannot populate - template has no parameters');
         return;
       }
 
+      // Ensure parameters is an array
+      let templateParams = template.parameters;
+      if (typeof templateParams === 'string') {
+        try {
+          templateParams = JSON.parse(templateParams);
+        } catch (e) {
+          console.warn('⚠️ Could not parse template parameters:', e);
+          console.warn('Template parameters are in invalid format');
+          return;
+        }
+      }
+
+      if (!Array.isArray(templateParams)) {
+        console.warn('⚠️ Template parameters is not an array:', templateParams);
+        console.warn('Template has no valid parameters to populate');
+        return;
+      }
+
+      console.log('✅ Template parameters (parsed):', templateParams);
+
       // Create a mapping from parameter ID to template value
       const templateValueMap = {};
-      template.parameters.forEach((param: any) => {
-        templateValueMap[param.id] = {
-          numericValue: param.value && !isNaN(parseFloat(param.value)) ? parseFloat(param.value) : null,
-          textValue: param.value && isNaN(parseFloat(param.value)) ? param.value : '',
+      templateParams.forEach((param: any) => {
+        console.log(`Processing template param:`, param);
+        
+        // param object structure: { id, name, value }
+        // value can be numeric, text, or HTML content
+        const paramId = param.id;
+        let numericValue = null;
+        let textValue = '';
+
+        // Check if value is numeric
+        if (param.value) {
+          const numParsed = parseFloat(param.value);
+          if (!isNaN(numParsed) && param.value.toString().trim() !== '') {
+            numericValue = numParsed;
+            console.log(`Parameter ${paramId}: numeric value = ${numericValue}`);
+          } else {
+            // It's text/HTML content
+            textValue = param.value;
+            console.log(`Parameter ${paramId}: text value = ${textValue.substring(0, 50)}...`);
+          }
+        }
+
+        templateValueMap[paramId] = {
+          numericValue: numericValue,
+          textValue: textValue,
           isAbnormal: false,
-          referenceRange: param.unit || ''
+          referenceRange: param.unit || param.referenceRange || ''
         };
       });
+
+      console.log('📊 Template value map:', templateValueMap);
 
       // If single test: update results directly
       if (isSingleTest && parameters.length > 0) {
@@ -491,6 +535,7 @@ const PatientResult = () => {
           const updated = { ...prev };
           parameters.forEach(param => {
             if (templateValueMap[param.id]) {
+              console.log(`Updating single test param ${param.id}:`, templateValueMap[param.id]);
               updated[param.id] = templateValueMap[param.id];
             }
           });
@@ -513,6 +558,7 @@ const PatientResult = () => {
           testData.parameters.forEach((param: any) => {
             const paramKey = `${testIdStr}_${param.id}`;
             if (templateValueMap[param.id]) {
+              console.log(`Updating multiple test param ${paramKey}:`, templateValueMap[param.id]);
               updated[paramKey] = templateValueMap[param.id];
             }
           });
@@ -521,10 +567,12 @@ const PatientResult = () => {
         console.log('✅ Multiple test editor populated with template values');
       }
 
-      alert(`Template "${template.templateName}" values loaded into editor!`);
+      // No alert - silently populate the template
+      console.log(`✅ Template "${template.templateName}" loaded successfully with ${templateParams.length} parameter(s)`);
     } catch (error) {
       console.error('❌ Error loading template:', error);
-      alert('Failed to load template: ' + error.message);
+      // No alert on error either - just log it
+      console.error('Failed to load template: ' + error.message);
     }
   };
 

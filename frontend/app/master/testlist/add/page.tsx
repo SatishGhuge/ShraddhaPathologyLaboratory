@@ -166,8 +166,8 @@ const AddTest = () => {
     name: "",
     categoryType: "PARAMETER",
     isCategory: false,
-    sortOrder: "",
     testMethod: "",
+    sortOrder: "",
     color: "#3b82f6",
     icon: "",
     description: "",
@@ -333,19 +333,32 @@ const AddTest = () => {
           console.log('📡 Fetching test data from API...');
           const testData = await getTestById((Array.isArray(id) ? id[0] : id) as string);
           console.log('✅ Received test data:', testData);
+          console.log('🔍 DETAILED API RESPONSE:');
+          console.log('- attachFile:', testData.attachFile, 'typeof:', typeof testData.attachFile);
+          console.log('- profileTest:', testData.profileTest, 'typeof:', typeof testData.profileTest);
+          console.log('- sampleTypeId:', testData.sampleTypeId);
+          console.log('- sample_type:', testData.sample_type);
+          console.log('- categories:', testData.categories?.length);
+          if (testData.categories && testData.categories[0]) {
+            console.log('- first category params:', testData.categories[0].parameters?.length);
+            if (testData.categories[0].parameters && testData.categories[0].parameters[0]) {
+              console.log('- first param unitId:', testData.categories[0].parameters[0].unitId);
+              console.log('- first param unit obj:', testData.categories[0].parameters[0].unit);
+            }
+          }
           
           if (testData) {
             const formDataToSet = {
               name: testData.name || "",
               department: testData.departmentId?.toString() || "",
               shortName: testData.shortName || "",
-              attachFile: testData.attachFile || false,
+              attachFile: testData.attachFile === true || testData.attachFile === 1 || testData.attachFile === "Yes" || testData.attachFile === "true",
               imageSize: testData.imageSize || "800|600",
               preparationTime: testData.preparationTime || "",
               preparationType: testData.preparationType || "",
               isNABL: testData.isNABL || false,
               lineHeight: testData.lineHeight?.toString() || "1.4",
-              profileTest: testData.profileTest || false,
+              profileTest: testData.profileTest === true || testData.profileTest === 1 || testData.profileTest === "Yes" || testData.profileTest === "true",
               reportHeader: testData.reportHeader || "",
               sampleTypeId: testData.sampleTypeId ? testData.sampleTypeId.toString() : "",
               machineName: testData.machineName || "",
@@ -373,7 +386,7 @@ const AddTest = () => {
                   name: category.name || "",
                   isCategory: category.isCategory || false,
                   testMethod: category.testMethod || "",
-                  sortOrder: category.sortOrder || "",
+                  sortOrder: category.sortOrder ? category.sortOrder.toString() : "",
                   color: category.color || "#3b82f6",
                   icon: category.icon || "",
                   description: category.description || "",
@@ -386,7 +399,7 @@ const AddTest = () => {
                           parameterName: param.parameterName || "",
                           machineCode: param.machineCode || "",
                           decimal: param.decimal !== undefined && param.decimal !== "" ? param.decimal : "",
-                          sortOrder: param.sortOrder || "",
+                          sortOrder: param.sortOrder ? param.sortOrder.toString() : "",
                           testMethod: param.testMethod || "",
                           isDescriptive: param.isDescriptive || false,
                           lowPanic: param.lowPanic?.toString() || "",
@@ -399,6 +412,7 @@ const AddTest = () => {
                           isMandatory: param.isMandatory || false,
                           rangeType: param.rangeType || "BySex",
                           unitId: param.unitId ? param.unitId.toString() : "",
+                          unit: param.unit || null,  // ✅ Add unit object from API
                           displayRangeText: param.displayRangeText || "",
                           rangeText: param.rangeText || "",
                           textContent: param.textContent || "",
@@ -456,7 +470,6 @@ const AddTest = () => {
                         parameterName: "",
                         machineCode: "",
                         decimal: "",
-                        sortOrder: "",
                         isDescriptive: false,
                         lowPanic: "",
                         highPanic: "",
@@ -599,7 +612,6 @@ const AddTest = () => {
       name: "",
       categoryType: "PARAMETER",
       isCategory: false,
-      sortOrder: "",
       testMethod: "",
       color: "#3b82f6",
       icon: "",
@@ -610,7 +622,6 @@ const AddTest = () => {
         machineCode: "",
         decimal: "",
         multiplyBy: "",
-        sortOrder: "",
         isDescriptive: false,
         lowPanic: "",
         highPanic: "",
@@ -907,8 +918,8 @@ const AddTest = () => {
         categoryId: category.categoryId, // ✅ Include unique category ID
         name: category.name ?? "",
         isCategory: category.isCategory || false,
-        testMethod: category.testMethod || null,
         sortOrder: category.sortOrder ? parseInt(category.sortOrder) : null,
+        testMethod: category.testMethod || null,
         color: category.color || null,
         icon: category.icon || null,
         description: category.description || null,
@@ -1597,19 +1608,6 @@ const AddTest = () => {
                       </div>
                       <div>
                         <label className="block font-semibold text-gray-700 text-xs sm:text-sm mb-1">
-                          Sort Order
-                        </label>
-                        <input 
-                          className="px-2 py-1.5 sm:py-1 border border-gray-300 rounded text-xs sm:text-sm w-full sm:w-40" 
-                          placeholder="Sort Order" 
-                          type="number"
-                          value={category.sortOrder || ""}
-                          onChange={(e) => handleCategoryChange(categoryIndex, 'sortOrder', e.target.value)}
-                          disabled={isViewMode} 
-                        />
-                      </div>
-                      <div>
-                        <label className="block font-semibold text-gray-700 text-xs sm:text-sm mb-1">
                           Category Test Method
                         </label>
                         <input 
@@ -1617,6 +1615,19 @@ const AddTest = () => {
                           placeholder="Category test method..." 
                           value={category.testMethod || ""}
                           onChange={(e) => handleCategoryChange(categoryIndex, 'testMethod', e.target.value)}
+                          disabled={isViewMode} 
+                        />
+                      </div>
+                      <div>
+                        <label className="block font-semibold text-gray-700 text-xs sm:text-sm mb-1">
+                          Sort Order
+                        </label>
+                        <input 
+                          className="px-2 py-1.5 sm:py-1 border border-gray-300 rounded text-xs sm:text-sm w-full sm:w-40" 
+                          placeholder="Sort order..." 
+                          type="number"
+                          value={category.sortOrder || ""}
+                          onChange={(e) => handleCategoryChange(categoryIndex, 'sortOrder', e.target.value)}
                           disabled={isViewMode} 
                         />
                       </div>
@@ -1814,6 +1825,14 @@ const AddTest = () => {
                           onChange={(e) => handleParameterChange(categoryIndex, paramIndex, 'decimal', e.target.value)}
                           disabled={isViewMode} 
                         />
+                        <input 
+                          className="px-2 py-1.5 sm:py-1 border border-gray-300 rounded text-xs sm:text-sm w-full sm:w-24" 
+                          placeholder="Sort Order" 
+                          type="number"
+                          value={parameter.sortOrder !== undefined && parameter.sortOrder !== "" ? parameter.sortOrder : ""}
+                          onChange={(e) => handleParameterChange(categoryIndex, paramIndex, 'sortOrder', e.target.value)}
+                          disabled={isViewMode} 
+                        />
                         
                         
                         <label className="flex items-center gap-1">
@@ -1826,17 +1845,6 @@ const AddTest = () => {
                           />
                           <span className="text-xs sm:text-sm">Is Descriptive</span>
                         </label>
-                        {category.isCategory && (
-                          <input 
-                            className="px-2 py-1.5 sm:py-1 border border-gray-300 rounded text-xs sm:text-sm w-full sm:w-24" 
-                            placeholder="Sort Order" 
-                            type="number"
-                            value={parameter.sortOrder || ""}
-                            onChange={(e) => handleParameterChange(categoryIndex, paramIndex, 'sortOrder', e.target.value)}
-                            disabled={isViewMode} 
-                          />
-                        )}
-
                         {category.isCategory && (
                           <input 
                             className="px-2 py-1.5 sm:py-1 border border-gray-300 rounded text-xs sm:text-sm w-full sm:w-32" 
@@ -2664,7 +2672,7 @@ const AddTest = () => {
                                   <span className="italic text-gray-500">-</span>
                                 </div>
                                 <div className="border-r border-gray-400 p-2 text-xs">
-                                  {param.units || "-"}
+                                  {param.unitId || "-"}
                                 </div>
                                 <div className="p-2 text-xs">
                                   {/* For Numeric parameters */}
@@ -2950,7 +2958,7 @@ const Radio = ({ label, name, value, onChange, disabled }) => (
           type="radio" 
           name={name} 
           value="Yes"
-          checked={value === "Yes"}
+          checked={value === "Yes" || value === true || value === 1}
           onChange={onChange}
           disabled={disabled} 
         /> Yes
@@ -2960,7 +2968,7 @@ const Radio = ({ label, name, value, onChange, disabled }) => (
           type="radio" 
           name={name} 
           value="No"
-          checked={value === "No"}
+          checked={value === "No" || value === false || value === 0}
           onChange={onChange}
           disabled={disabled} 
         /> No
