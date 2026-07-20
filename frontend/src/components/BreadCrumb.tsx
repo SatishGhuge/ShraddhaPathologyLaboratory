@@ -22,6 +22,8 @@ const iconMap = {
   "Collection": DollarSign,
   "Patient List": UserPlus,
   "Referral Doctor Revenue": IndianRupee,
+  "Inventory": FileText,
+  "Stock Transactions": FileText,
 };
 
 // URL to breadcrumb mapping - Comprehensive list of all pages
@@ -79,6 +81,9 @@ const urlPathMap: { [key: string]: string } = {
   
   // Configuration Module
   "config/signature": "Configuration / Signature",
+  
+  // Inventory Module
+  "inventory/stock-transactions": "Inventory / Stock Transactions",
   
   // Dashboard
   "labdashboard": "Dashboard",
