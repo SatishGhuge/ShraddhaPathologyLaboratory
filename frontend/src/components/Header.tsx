@@ -91,10 +91,10 @@ const allModules: NavModule[] = [
     title: "Inventory",
     icon: <Package size={20} />,
     items: [
-      { label: "Item Master",         path: "/inventory/item-master" },
-      { label: "Stock Transactions",  path: "/inventory/stock-transactions" },
-      { label: "Stock Transfers",     path: "/inventory/transfers" },
-      { label: "Expiry Tracker",      path: "/inventory/expiry-tracker" },
+      { label: "Item",                 path: "/inventory/item" },
+      { label: "Supplier",             path: "/inventory/supplier" },
+      { label: "Stock Entry",          path: "/inventory/stock-entry" },
+      { label: "Organization Transfer", path: "/inventory/org-transfer" },
     ],
   },
   {
