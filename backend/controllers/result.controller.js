@@ -88,15 +88,11 @@ export const getPatientTests = async (req, res) => {
       });
     }
 
-    // Filter by organization
+    // Filter by organization - match organization code from the dropdown
     if (organization && organization !== '') {
       andConditions.push({ 
-        test: {
-          charges: {
-            some: {
-              organizationId: organization
-            }
-          }
+        organization: {
+          code: organization
         }
       });
     }

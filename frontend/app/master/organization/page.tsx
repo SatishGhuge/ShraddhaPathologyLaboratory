@@ -11,6 +11,7 @@ const OrganizationList = () => {
 
   const [searchName, setSearchName] = useState("");
   const [searchLocation, setSearchLocation] = useState("");
+  const [showInactive, setShowInactive] = useState(false); // Checkbox for showing inactive
   const [organizations, setOrganizations] = useState<any[]>([]);
   const [filteredOrganizations, setFilteredOrganizations] = useState<any[]>([]);
 
@@ -23,18 +24,25 @@ const OrganizationList = () => {
       .catch(console.error);
   }, []);
 
-  const handleSearch = () => {
-    const filtered = organizations.filter((o) =>
-      o.name.toLowerCase().includes(searchName.toLowerCase()) &&
-      (o.location || "").toLowerCase().includes(searchLocation.toLowerCase())
-    );
+  // Apply filters whenever search or showInactive changes
+  useEffect(() => {
+    const filtered = organizations.filter((o) => {
+      const nameMatch = o.name.toLowerCase().includes(searchName.toLowerCase());
+      const locationMatch = (o.location || "").toLowerCase().includes(searchLocation.toLowerCase());
+      
+      // If showInactive is false, show only active organizations
+      // If showInactive is true, show only inactive organizations
+      const statusMatch = showInactive ? o.isActive === false : o.isActive === true;
+      
+      return nameMatch && locationMatch && statusMatch;
+    });
     setFilteredOrganizations(filtered);
-  };
+  }, [searchName, searchLocation, showInactive, organizations]);
 
   const handleReset = () => {
     setSearchName("");
     setSearchLocation("");
-    setFilteredOrganizations(organizations);
+    setShowInactive(false);
   };
 
   /* DELETE HANDLER */
@@ -67,7 +75,7 @@ const OrganizationList = () => {
 
         {/* Top Bar - Search, Reset, Add in Single Row */}
         <div className="flex flex-wrap items-center justify-between gap-3 mb-4 bg-white p-3 rounded shadow-md">
-          <div className="flex gap-2 flex-1 flex-wrap">
+          <div className="flex gap-2 flex-1 flex-wrap items-center">
             <input
               type="text"
               placeholder="Search By Name"
@@ -83,6 +91,17 @@ const OrganizationList = () => {
               onChange={(e) => setSearchLocation(e.target.value)}
               className="border border-gray-300 bg-white rounded px-3 py-2 w-48 text-sm placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500"
             />
+
+            {/* Show Inactive Checkbox */}
+            <label className="flex items-center gap-2 px-3 py-2 cursor-pointer text-sm text-gray-700 hover:bg-gray-100 rounded transition-colors">
+              <input
+                type="checkbox"
+                checked={showInactive}
+                onChange={(e) => setShowInactive(e.target.checked)}
+                className="w-4 h-4 cursor-pointer accent-orange-500 rounded"
+              />
+              <span>Show Inactive</span>
+            </label>
 
             <button
               onClick={handleReset}

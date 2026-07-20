@@ -1642,7 +1642,17 @@ async function generateOrganizationId() {
 // Get all organizations
 export const getOrganizations = async (req, res) => {
   try {
+    const { status } = req.query; // Query parameter: 'active', 'inactive', or undefined for all
+    
+    let whereClause = {};
+    if (status === 'active') {
+      whereClause = { isActive: true };
+    } else if (status === 'inactive') {
+      whereClause = { isActive: false };
+    }
+    
     const organizations = await prisma.organization.findMany({ 
+      where: whereClause,
       select: {
         id: true,
         name: true,
@@ -5140,5 +5150,120 @@ export const deleteUser = async (req, res) => {
     res.json({ success: true, message: 'User deleted successfully' });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Failed to delete user' });
+  }
+};
+
+
+// ============ EXCEL EXPORT/IMPORT ============
+
+export const exportTests = async (req, res) => {
+  try {
+    console.log('📥 Exporting tests to Excel...');
+    
+    // Import the export utility
+    const { exportTestsToExcel } = await import('../utils/excelExport.js');
+    
+    // Generate workbook
+    const workbook = await exportTestsToExcel();
+    
+    // Set response headers for file download
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', 'attachment; filename="tests_export.xlsx"');
+    
+    // Write workbook to response
+    await workbook.xlsx.write(res);
+    
+    console.log('✅ Tests exported successfully');
+    res.end();
+    
+  } catch (error) {
+    console.error('❌ Export error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to export tests',
+      error: error.message
+    });
+  }
+};
+
+export const importTests = async (req, res) => {
+  try {
+    console.log('📤 Importing tests from Excel...');
+
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        message: 'No file uploaded',
+        data: { errors: ['No file provided'] }
+      });
+    }
+
+    // Validate file type
+    if (!req.file.mimetype.includes('spreadsheet') && !req.file.originalname.endsWith('.xlsx')) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid file format. Please upload an Excel file (.xlsx)',
+        data: { errors: ['File must be Excel format (.xlsx)'] }
+      });
+    }
+
+    // Import utilities
+    const { importTestsFromExcel } = await import('../utils/excelImport.js');
+    const { validateExcelFile } = await import('../utils/excelValidation.js');
+    const ExcelJS = await import('exceljs');
+
+    // Load workbook
+    const workbook = new ExcelJS.default.Workbook();
+    await workbook.xlsx.load(req.file.buffer);
+
+    const testsSheet = workbook.getWorksheet('Tests');
+    const parametersSheet = workbook.getWorksheet('Parameters');
+    const categoriesSheet = workbook.getWorksheet('Categories');
+
+    // Pre-validate file structure
+    const preValidation = await validateExcelFile(testsSheet, parametersSheet, categoriesSheet);
+
+    if (!preValidation.isValid) {
+      return res.status(400).json({
+        success: false,
+        message: 'Excel file validation failed',
+        data: {
+          errors: preValidation.errors,
+          warnings: preValidation.warnings,
+          stats: preValidation.stats
+        }
+      });
+    }
+
+    console.log('✅ File structure valid, proceeding with import...');
+    console.log('📊 File contains:', preValidation.stats);
+
+    // Process the file
+    const result = await importTestsFromExcel(req.file.buffer);
+
+    console.log('✅ Import completed:', result);
+
+    res.json({
+      success: result.success,
+      message: result.message,
+      data: {
+        created: result.created,
+        updated: result.updated,
+        errors: result.errors,
+        warnings: result.warnings,
+        totalErrors: result.errors.length,
+        totalWarnings: result.warnings.length,
+        summary: `Created ${result.created.tests} tests, ${result.created.parameters} parameters, ${result.created.categories} categories. Updated ${result.updated.tests} tests, ${result.updated.parameters} parameters, ${result.updated.categories} categories.`
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ Import error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to import tests',
+      error: error.message,
+      data: { errors: [error.message] }
+    });
   }
 };

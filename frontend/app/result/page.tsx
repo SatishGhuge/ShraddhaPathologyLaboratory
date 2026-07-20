@@ -1769,7 +1769,7 @@ export default function Result() {
     }
   };
 
-  // Filter results based on selected status
+  // Filter results based on selected status only (organization filtering is done by backend via filters)
   const filteredResults = selectedStatus === "All" 
     ? results 
     : results.map(patient => ({
@@ -1811,10 +1811,10 @@ export default function Result() {
   const endIndex = startIndex + itemsPerPage;
   const paginatedResults = sortedAndFilteredResults.slice(startIndex, endIndex);
 
-  // Reset to page 1 when filters change
+  // Reset to page 1 when filters change (including organization)
   useEffect(() => {
     setCurrentPage(1);
-  }, [filteredResults]);
+  }, [filteredResults, selectedStatus, filters.organization]);
 
   // Get status badge color based on status
   const getStatusBadgeColor = (status: any) => {
@@ -2122,7 +2122,7 @@ export default function Result() {
                 >
                   <option value="">All Org</option>
                   {organizations.map(org => (
-                    <option key={org.id} value={org.id}>{org.code || org.name}</option>
+                    <option key={org.id} value={org.code}>{org.code || org.name}</option>
                   ))}
                 </select>
                 

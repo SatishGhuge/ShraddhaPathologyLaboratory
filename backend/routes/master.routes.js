@@ -15,7 +15,13 @@ import {
   getSpecimenTypes, getSpecimenTypeById, createSpecimenType, updateSpecimenType, deleteSpecimenType,
   getRoles, getRoleById, createRole, updateRole, deleteRole,
   getUsers, getUserById, createUser, updateUser, deleteUser,
+  exportTests,
+  importTests,
 } from '../controllers/master.controller.js';
+
+// For file upload handling
+import multer from 'multer';
+const upload = multer({ storage: multer.memoryStorage() });
 
 const router = express.Router();
 
@@ -49,6 +55,8 @@ router.delete('/organizations/:id', deleteOrganization);
 
 // Test routes — specific paths before parameterized
 router.get('/tests', getTests);
+router.get('/tests/export', exportTests);  // ✅ Export before /:id
+router.post('/tests/import', upload.single('file'), importTests);  // ✅ Import with file upload
 router.get('/tests/:id', getTestById);
 router.post('/tests', createTest);
 router.put('/tests/:id', updateTest);
