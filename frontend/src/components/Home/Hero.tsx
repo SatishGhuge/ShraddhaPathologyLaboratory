@@ -26,17 +26,17 @@ export default function Hero() {
     <section id="home" className="relative bg-[#F0F6FF] overflow-hidden">
 
       <div className="max-w-7xl mx-auto px-6 lg:px-10">
-        <div className="grid lg:grid-cols-2 min-h-[520px] items-center">
+        <div className="grid lg:grid-cols-3 min-h-[520px] items-center">
 
-          {/* ── LEFT CONTENT ── */}
+          {/* ── LEFT CONTENT (COMPACT) ── */}
           <motion.div
             initial={{ opacity: 0, x: -30 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.6 }}
-            className="py-16 lg:py-20 pr-8"
+            className="py-12 lg:py-16 lg:col-span-1"
           >
             {/* Heading */}
-            <h1 className="text-5xl lg:text-6xl xl:text-7xl font-extrabold text-[#1D3F5F] leading-[1.05] mb-6">
+            <h1 className="text-4xl lg:text-5xl xl:text-6xl font-extrabold text-[#1D3F5F] leading-[1.05] mb-4">
               Shraddha<br />
               Pathology<br />
               Laboratory
@@ -62,20 +62,20 @@ export default function Hero() {
             </div>
 
             {/* Description */}
-            <p className="text-[#64748B] text-sm leading-relaxed mb-8 max-w-sm">
+            <p className="text-[#64748B] text-xs leading-relaxed mb-6 max-w-xs">
               Advanced diagnostics, accurate results and compassionate care —
               empowering healthier lives every day.
             </p>
 
             {/* CTA Buttons */}
-            <div className="flex flex-wrap gap-3">
+            <div className="flex flex-wrap gap-2">
               <motion.button
                 whileHover={{ scale: 1.03 }}
                 whileTap={{ scale: 0.97 }}
-                className="bg-[#EB925A] hover:bg-[#d4783f] text-white font-semibold px-7 py-3 rounded-lg transition-colors flex items-center gap-2 text-sm"
+                className="bg-[#EB925A] hover:bg-[#d4783f] text-white font-semibold px-6 py-2.5 rounded-lg transition-colors flex items-center gap-2 text-xs"
               >
                 Book Test
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
                 </svg>
               </motion.button>
@@ -83,30 +83,21 @@ export default function Hero() {
               <motion.button
                 whileHover={{ scale: 1.03 }}
                 whileTap={{ scale: 0.97 }}
-                className="border-2 border-[#1D3F5F] text-[#1D3F5F] font-semibold px-7 py-3 rounded-lg hover:bg-[#1D3F5F] hover:text-white transition-colors text-sm"
+                className="border-2 border-[#1D3F5F] text-[#1D3F5F] font-semibold px-6 py-2.5 rounded-lg hover:bg-[#1D3F5F] hover:text-white transition-colors text-xs"
               >
                 View Packages
               </motion.button>
             </div>
           </motion.div>
 
-          {/* ── RIGHT IMAGE — flush to right edge ── */}
+          {/* ── RIGHT IMAGE (LARGER) ── */}
           <motion.div
             initial={{ opacity: 0, x: 40 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.7, delay: 0.15 }}
-            className="relative h-full min-h-[520px] -mr-6 lg:-mr-10"
+            className="relative h-full min-h-[520px] lg:col-span-2 -mr-6 lg:-mr-10"
           >
-            {/* Base hero image */}
-            <Image
-              src="/labhomeimage.jpg"
-              alt="Lab Technician at Shraddha Pathology Laboratory"
-              fill
-              className="object-cover object-center"
-              priority
-            />
-            
-            {/* Animated carousel overlay */}
+            {/* Animated carousel - handles all image display */}
             <HeroImageCarousel />
             
             {/* Subtle left fade so image blends into the light bg */}

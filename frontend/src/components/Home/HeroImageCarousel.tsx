@@ -1,10 +1,11 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import Image from "next/image";
 
 const CAROUSEL_IMAGES = [
+  "/labhomeimage.jpg",
   "/pic1.jpg",
   "/pic2.JPG",
   "/pic3.JPG",
@@ -17,54 +18,53 @@ const CAROUSEL_IMAGES = [
 
 export default function HeroImageCarousel() {
   const [currentImageIdx, setCurrentImageIdx] = useState(0);
-  const [isVisible, setIsVisible] = useState(false);
 
-  // Delay carousel start by 2.5 seconds
+  // Auto-slide every 3 seconds
   useEffect(() => {
-    const timer = setTimeout(() => setIsVisible(true), 2500);
-    return () => clearTimeout(timer);
-  }, []);
-
-  // Cycle through images every 3.5 seconds
-  useEffect(() => {
-    if (!isVisible) return;
-
     const interval = setInterval(() => {
       setCurrentImageIdx((prev) => (prev + 1) % CAROUSEL_IMAGES.length);
-    }, 3500);
+    }, 3000);
 
     return () => clearInterval(interval);
-  }, [isVisible]);
+  }, []);
 
   return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: isVisible ? 1 : 0 }}
-      transition={{ duration: 0.6 }}
-      className="absolute inset-0 overflow-hidden"
-    >
-      <AnimatePresence mode="wait">
-        <motion.div
-          key={currentImageIdx}
-          initial={{ opacity: 0, x: 100 }}
-          animate={{ opacity: 1, x: 0 }}
-          exit={{ opacity: 0, x: -100 }}
-          transition={{
-            duration: 0.8,
-            ease: "easeInOut",
-          }}
-          className="absolute inset-0"
-        >
-          <Image
-            src={CAROUSEL_IMAGES[currentImageIdx]}
-            alt={`Gallery image ${currentImageIdx + 1}`}
-            fill
-            className="object-cover object-center"
-            quality={90}
-            priority={currentImageIdx === 0}
-          />
-        </motion.div>
-      </AnimatePresence>
+    <div className="absolute inset-0 overflow-hidden">
+      {/* Current Image */}
+      <motion.div
+        key={`current-${currentImageIdx}`}
+        initial={{ x: "100%" }}
+        animate={{ x: 0 }}
+        transition={{
+          duration: 0.6,
+          ease: "easeInOut",
+        }}
+        className="absolute inset-0"
+      >
+        <Image
+          src={CAROUSEL_IMAGES[currentImageIdx]}
+          alt={`Gallery image ${currentImageIdx + 1}`}
+          fill
+          className="object-cover object-center"
+          quality={90}
+          priority={currentImageIdx === 0}
+        />
+      </motion.div>
+
+      {/* Next Image (preloaded, positioned off-screen right) */}
+      <motion.div
+        key={`next-${currentImageIdx}`}
+        initial={{ x: "100%" }}
+        className="absolute inset-0"
+      >
+        <Image
+          src={CAROUSEL_IMAGES[(currentImageIdx + 1) % CAROUSEL_IMAGES.length]}
+          alt={`Gallery image ${(currentImageIdx + 1) % CAROUSEL_IMAGES.length + 1}`}
+          fill
+          className="object-cover object-center"
+          quality={90}
+        />
+      </motion.div>
 
       {/* Gradient overlay for smooth fade */}
       <div className="absolute inset-0 bg-gradient-to-r from-[#F0F6FF] via-transparent to-transparent w-1/4 pointer-events-none" />
@@ -85,6 +85,6 @@ export default function HeroImageCarousel() {
           />
         ))}
       </div>
-    </motion.div>
+    </div>
   );
 }
