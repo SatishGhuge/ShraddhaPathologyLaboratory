@@ -42,8 +42,8 @@ export default function WhyChooseUs() {
 
         {/* Header */}
         <div className="text-center mb-12">
-          <p className="text-[#EB925A] text-sm font-semibold uppercase tracking-widest mb-2">Why Choose Us</p>
-          <h2 className="text-3xl lg:text-4xl font-bold text-[#1D3F5F]">
+          <p className="text-[oklch(60%_0.15_45)] text-sm font-semibold uppercase tracking-widest mb-2">Why Choose Us</p>
+          <h2 className="text-3xl lg:text-4xl font-bold text-[oklch(45%_0.085_224.283)]">
             Your Health, Our Priority
           </h2>
         </div>
@@ -59,10 +59,10 @@ export default function WhyChooseUs() {
               transition={{ delay: i * 0.08 }}
               className="flex flex-col items-center text-center group"
             >
-              <div className="w-16 h-16 bg-orange-50 rounded-full flex items-center justify-center text-2xl mb-3 group-hover:bg-[#EB925A] transition-colors duration-300">
+              <div className="w-16 h-16 bg-orange-50 rounded-full flex items-center justify-center text-2xl mb-3 group-hover:bg-[oklch(60%_0.15_45)] transition-colors duration-300">
                 {f.emoji}
               </div>
-              <h3 className="font-semibold text-[#1D3F5F] text-sm mb-1">{f.title}</h3>
+              <h3 className="font-semibold text-[oklch(45%_0.085_224.283)] text-sm mb-1">{f.title}</h3>
               <p className="text-gray-400 text-xs leading-relaxed">{f.desc}</p>
             </motion.div>
           ))}

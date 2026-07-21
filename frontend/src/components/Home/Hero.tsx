@@ -23,7 +23,7 @@ export default function Hero() {
   }, []);
 
   return (
-    <section id="home" className="relative bg-[#F0F6FF] overflow-hidden">
+    <section id="home" className="relative bg-[oklch(95%_0.01_224.283)] overflow-hidden">
 
       <div className="max-w-7xl mx-auto px-6 lg:px-10">
         <div className="grid lg:grid-cols-3 min-h-[520px] items-center">
@@ -36,7 +36,7 @@ export default function Hero() {
             className="py-12 lg:py-16 lg:col-span-1"
           >
             {/* Heading */}
-            <h1 className="text-4xl lg:text-5xl xl:text-6xl font-extrabold text-[#1D3F5F] leading-[1.05] mb-4">
+            <h1 className="text-4xl lg:text-5xl xl:text-6xl font-extrabold text-[oklch(45%_0.085_224.283)] leading-[1.05] mb-4">
               Shraddha<br />
               Pathology<br />
               Laboratory
@@ -44,7 +44,7 @@ export default function Hero() {
 
             {/* Animated tagline */}
             <div className="flex items-center gap-3 mb-4">
-              <RefreshCw size={14} className="text-[#EB925A] flex-shrink-0 animate-spin" style={{ animationDuration: "4s" }} />
+              <RefreshCw size={14} className="text-[oklch(60%_0.15_45)] flex-shrink-0 animate-spin" style={{ animationDuration: "4s" }} />
               <AnimatePresence mode="wait">
                 <motion.span
                   key={taglineIdx}
@@ -52,7 +52,7 @@ export default function Hero() {
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -8 }}
                   transition={{ duration: 0.35 }}
-                  className="text-[#1D3F5F] text-sm font-semibold"
+                  className="text-[oklch(45%_0.085_224.283)] text-sm font-semibold"
                 >
                   {taglines[taglineIdx]}
                 </motion.span>
@@ -72,7 +72,7 @@ export default function Hero() {
               <motion.button
                 whileHover={{ scale: 1.03 }}
                 whileTap={{ scale: 0.97 }}
-                className="bg-[#EB925A] hover:bg-[#d4783f] text-white font-semibold px-6 py-2.5 rounded-lg transition-colors flex items-center gap-2 text-xs"
+                className="bg-[oklch(60%_0.15_45)] hover:bg-[oklch(55%_0.14_45)] text-white font-semibold px-6 py-2.5 rounded-lg transition-colors flex items-center gap-2 text-xs"
               >
                 Book Test
                 <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -83,7 +83,7 @@ export default function Hero() {
               <motion.button
                 whileHover={{ scale: 1.03 }}
                 whileTap={{ scale: 0.97 }}
-                className="border-2 border-[#1D3F5F] text-[#1D3F5F] font-semibold px-6 py-2.5 rounded-lg hover:bg-[#1D3F5F] hover:text-white transition-colors text-xs"
+                className="border-2 border-[oklch(45%_0.085_224.283)] text-[oklch(45%_0.085_224.283)] font-semibold px-6 py-2.5 rounded-lg hover:bg-[oklch(45%_0.085_224.283)] hover:text-white transition-colors text-xs"
               >
                 View Packages
               </motion.button>
@@ -101,7 +101,7 @@ export default function Hero() {
             <HeroImageCarousel />
             
             {/* Subtle left fade so image blends into the light bg */}
-            <div className="absolute inset-0 bg-gradient-to-r from-[#F0F6FF] via-transparent to-transparent w-1/3 pointer-events-none" />
+            <div className="absolute inset-0 bg-gradient-to-r from-[oklch(95%_0.01_224.283)] via-transparent to-transparent w-1/3 pointer-events-none" />
           </motion.div>
         </div>
       </div>

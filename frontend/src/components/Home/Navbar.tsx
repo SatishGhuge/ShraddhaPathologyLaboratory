@@ -57,13 +57,13 @@ export default function Navbar() {
                 onClick={() => handleNav(label, href)}
                 className={`px-3 py-2 text-sm font-medium transition-colors whitespace-nowrap relative ${
                   active === label
-                    ? "text-[#EB925A]"
-                    : "text-[#1E293B] hover:text-[#1D3F5F]"
+                    ? "text-[oklch(60%_0.15_45)]"
+                    : "text-[#1E293B] hover:text-[oklch(45%_0.085_224.283)]"
                 }`}
               >
                 {label}
                 {active === label && (
-                  <span className="absolute bottom-0 left-3 right-3 h-0.5 bg-[#EB925A] rounded-full" />
+                  <span className="absolute bottom-0 left-3 right-3 h-0.5 bg-[oklch(60%_0.15_45)] rounded-full" />
                 )}
               </button>
             ))}
@@ -72,7 +72,7 @@ export default function Navbar() {
           {/* Right: Login + Phone */}
             <a
               href="tel:+919876543210"
-              className="flex items-center gap-2 bg-[#1D3F5F] hover:bg-[#152e46] text-white text-sm font-semibold px-4 py-2 rounded-full transition-colors whitespace-nowrap"
+              className="flex items-center gap-2 bg-[oklch(45%_0.085_224.283)] hover:bg-[oklch(40%_0.075_224.283)] text-white text-sm font-semibold px-4 py-2 rounded-full transition-colors whitespace-nowrap"
             >
               <Phone size={14} />
               +91 98765 43210
@@ -80,7 +80,7 @@ export default function Navbar() {
             <div className="hidden lg:flex items-center gap-2 flex-shrink-0">
             <Link
               href="/login"
-              className="flex items-center gap-1.5 bg-[#1D3F5F] hover:bg-[#152e46] text-white text-sm font-semibold px-4 py-2 rounded-full transition-colors whitespace-nowrap"
+              className="flex items-center gap-1.5 bg-[oklch(45%_0.085_224.283)] hover:bg-[oklch(40%_0.075_224.283)] text-white text-sm font-semibold px-4 py-2 rounded-full transition-colors whitespace-nowrap"
             >
               <LogIn size={14} />
               Login
@@ -104,7 +104,7 @@ export default function Navbar() {
               key={label}
               onClick={() => handleNav(label, href)}
               className={`block w-full text-left px-3 py-2 rounded-md text-sm font-medium ${
-                active === label ? "text-[#EB925A] bg-orange-50" : "text-[#1E293B] hover:bg-gray-50"
+                active === label ? "text-[oklch(60%_0.15_45)] bg-yellow-50" : "text-[#1E293B] hover:bg-gray-50"
               }`}
             >
               {label}
@@ -113,13 +113,13 @@ export default function Navbar() {
           <div className="pt-3 border-t border-gray-100 flex flex-col gap-2">
             <Link
               href="/login"
-              className="flex items-center gap-2 bg-[#1D3F5F] hover:bg-[#152e46] text-white text-sm font-semibold px-4 py-2 rounded-full w-fit transition-colors"
+              className="flex items-center gap-2 bg-[oklch(45%_0.085_224.283)] hover:bg-[oklch(40%_0.075_224.283)] text-white text-sm font-semibold px-4 py-2 rounded-full w-fit transition-colors"
             >
               <LogIn size={14} /> Login
             </Link>
             <a
               href="tel:+919876543210"
-              className="flex items-center gap-2 bg-[#1D3F5F] hover:bg-[#152e46] text-white text-sm font-semibold px-4 py-2 rounded-full w-fit transition-colors"
+              className="flex items-center gap-2 bg-[oklch(45%_0.085_224.283)] hover:bg-[oklch(40%_0.075_224.283)] text-white text-sm font-semibold px-4 py-2 rounded-full w-fit transition-colors"
             >
               <Phone size={14} /> +91 98765 43210
             </a>

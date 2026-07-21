@@ -57,9 +57,9 @@ function RegisterModal({ onClose }: { onClose: () => void }) {
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="bg-gradient-to-br from-[#1D3F5F] to-[#152e46] px-7 py-6 relative">
+        <div className="bg-gradient-to-br from-[oklch(45%_0.085_224.283)] to-[oklch(40%_0.075_224.283)] px-7 py-6 relative">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-[#EB925A] rounded-xl flex items-center justify-center">
+            <div className="w-10 h-10 bg-[oklch(60%_0.15_45)] rounded-xl flex items-center justify-center">
               <User size={20} className="text-white" />
             </div>
             <div>
@@ -79,7 +79,7 @@ function RegisterModal({ onClose }: { onClose: () => void }) {
         <div className="p-7">
           {submitted ? (
             <div className="text-center py-8">
-              <div className="w-16 h-16 bg-[#EB925A] rounded-full flex items-center justify-center mx-auto mb-4">
+              <div className="w-16 h-16 bg-[oklch(60%_0.15_45)] rounded-full flex items-center justify-center mx-auto mb-4">
                 <CheckCircle size={32} className="text-white" />
               </div>
               <h3 className="font-bold text-[#1E293B] text-xl mb-2">Registered Successfully!</h3>
@@ -88,7 +88,7 @@ function RegisterModal({ onClose }: { onClose: () => void }) {
               </p>
               <button
                 onClick={onClose}
-                className="bg-[#1D3F5F] text-white text-sm font-semibold px-6 py-2.5 rounded-xl hover:bg-[#152e46] transition-colors"
+                className="bg-[oklch(45%_0.085_224.283)] text-white text-sm font-semibold px-6 py-2.5 rounded-xl hover:bg-[oklch(40%_0.075_224.283)] transition-colors"
               >
                 Close
               </button>
@@ -106,7 +106,7 @@ function RegisterModal({ onClose }: { onClose: () => void }) {
                     onChange={handleChange}
                     required
                     placeholder="Full Name *"
-                    className="w-full pl-9 pr-3 py-3 border border-gray-200 rounded-xl text-sm text-[#1E293B] placeholder-[#94A3B8] focus:outline-none focus:ring-2 focus:ring-[#1D3F5F]/20 focus:border-[#1D3F5F] transition"
+                    className="w-full pl-9 pr-3 py-3 border border-gray-200 rounded-xl text-sm text-[#1E293B] placeholder-[#94A3B8] focus:outline-none focus:ring-2 focus:ring-[oklch(45%_0.085_224.283)]/20 focus:border-[oklch(45%_0.085_224.283)] transition"
                   />
                 </div>
                 <div className="relative">
@@ -120,7 +120,7 @@ function RegisterModal({ onClose }: { onClose: () => void }) {
                     type="number"
                     min={1}
                     max={120}
-                    className="w-full pl-9 pr-3 py-3 border border-gray-200 rounded-xl text-sm text-[#1E293B] placeholder-[#94A3B8] focus:outline-none focus:ring-2 focus:ring-[#1D3F5F]/20 focus:border-[#1D3F5F] transition"
+                    className="w-full pl-9 pr-3 py-3 border border-gray-200 rounded-xl text-sm text-[#1E293B] placeholder-[#94A3B8] focus:outline-none focus:ring-2 focus:ring-[oklch(45%_0.085_224.283)]/20 focus:border-[oklch(45%_0.085_224.283)] transition"
                   />
                 </div>
               </div>
@@ -136,7 +136,7 @@ function RegisterModal({ onClose }: { onClose: () => void }) {
                   placeholder="Mobile Number *"
                   type="tel"
                   maxLength={10}
-                  className="w-full pl-9 pr-3 py-3 border border-gray-200 rounded-xl text-sm text-[#1E293B] placeholder-[#94A3B8] focus:outline-none focus:ring-2 focus:ring-[#1D3F5F]/20 focus:border-[#1D3F5F] transition"
+                  className="w-full pl-9 pr-3 py-3 border border-gray-200 rounded-xl text-sm text-[#1E293B] placeholder-[#94A3B8] focus:outline-none focus:ring-2 focus:ring-[oklch(45%_0.085_224.283)]/20 focus:border-[oklch(45%_0.085_224.283)] transition"
                 />
               </div>
 
@@ -149,7 +149,7 @@ function RegisterModal({ onClose }: { onClose: () => void }) {
                   onChange={handleChange}
                   placeholder="Email Address"
                   type="email"
-                  className="w-full pl-9 pr-3 py-3 border border-gray-200 rounded-xl text-sm text-[#1E293B] placeholder-[#94A3B8] focus:outline-none focus:ring-2 focus:ring-[#1D3F5F]/20 focus:border-[#1D3F5F] transition"
+                  className="w-full pl-9 pr-3 py-3 border border-gray-200 rounded-xl text-sm text-[#1E293B] placeholder-[#94A3B8] focus:outline-none focus:ring-2 focus:ring-[oklch(45%_0.085_224.283)]/20 focus:border-[oklch(45%_0.085_224.283)] transition"
                 />
               </div>
 
@@ -162,7 +162,7 @@ function RegisterModal({ onClose }: { onClose: () => void }) {
                   onChange={handleChange}
                   required
                   placeholder="Full Address *"
-                  className="w-full pl-9 pr-3 py-3 border border-gray-200 rounded-xl text-sm text-[#1E293B] placeholder-[#94A3B8] focus:outline-none focus:ring-2 focus:ring-[#1D3F5F]/20 focus:border-[#1D3F5F] transition"
+                  className="w-full pl-9 pr-3 py-3 border border-gray-200 rounded-xl text-sm text-[#1E293B] placeholder-[#94A3B8] focus:outline-none focus:ring-2 focus:ring-[oklch(45%_0.085_224.283)]/20 focus:border-[oklch(45%_0.085_224.283)] transition"
                 />
               </div>
 
@@ -174,7 +174,7 @@ function RegisterModal({ onClose }: { onClose: () => void }) {
                   value={reg.location}
                   onChange={handleChange}
                   required
-                  className="w-full pl-9 pr-8 py-3 border border-gray-200 rounded-xl text-sm text-[#1E293B] appearance-none focus:outline-none focus:ring-2 focus:ring-[#1D3F5F]/20 focus:border-[#1D3F5F] transition bg-white cursor-pointer"
+                  className="w-full pl-9 pr-8 py-3 border border-gray-200 rounded-xl text-sm text-[#1E293B] appearance-none focus:outline-none focus:ring-2 focus:ring-[oklch(45%_0.085_224.283)]/20 focus:border-[oklch(45%_0.085_224.283)] transition bg-white cursor-pointer"
                 >
                   <option value="">Select Location / City *</option>
                   {cities.map((c) => (
@@ -199,7 +199,7 @@ function RegisterModal({ onClose }: { onClose: () => void }) {
                 disabled={loading}
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
-                className="w-full bg-[#1D3F5F] hover:bg-[#152e46] text-white font-bold py-3.5 rounded-2xl transition-colors text-sm shadow-lg shadow-[#1D3F5F]/25 disabled:opacity-60 flex items-center justify-center gap-2"
+                className="w-full bg-[oklch(45%_0.085_224.283)] hover:bg-[oklch(40%_0.075_224.283)] text-white font-bold py-3.5 rounded-2xl transition-colors text-sm shadow-lg shadow-[oklch(45%_0.085_224.283)]/25 disabled:opacity-60 flex items-center justify-center gap-2"
               >
                 {loading ? (
                   <>
@@ -270,7 +270,7 @@ export default function HomeVisitSection() {
   };
 
   return (
-    <section id="home-visit" className="bg-[#1D3F5F] py-16 lg:py-20 relative overflow-hidden">
+    <section id="home-visit" className="bg-[oklch(45%_0.085_224.283)] py-16 lg:py-20 relative overflow-hidden">
 
       <div className="absolute top-0 right-0 w-96 h-96 rounded-full bg-white/5 -translate-y-1/2 translate-x-1/2" />
       <div className="absolute bottom-0 left-0 w-64 h-64 rounded-full bg-white/5 translate-y-1/2 -translate-x-1/2" />
@@ -285,7 +285,7 @@ export default function HomeVisitSection() {
             viewport={{ once: true }}
             transition={{ duration: 0.5 }}
           >
-            <div className="w-12 h-12 bg-[#EB925A] rounded-xl flex items-center justify-center mb-5">
+            <div className="w-12 h-12 bg-[oklch(60%_0.15_45)] rounded-xl flex items-center justify-center mb-5">
               <Home size={22} className="text-white" />
             </div>
             <h2 className="text-3xl lg:text-4xl font-bold text-white mb-4 leading-tight">
@@ -298,8 +298,8 @@ export default function HomeVisitSection() {
             <ul className="space-y-4">
               {features.map((f) => (
                 <li key={f} className="flex items-center gap-3 text-blue-100 text-sm">
-                  <div className="w-6 h-6 rounded-full bg-[#EB925A]/20 border border-[#EB925A]/40 flex items-center justify-center flex-shrink-0">
-                    <CheckCircle size={14} className="text-[#EB925A]" />
+                  <div className="w-6 h-6 rounded-full bg-[oklch(60%_0.15_45)]/20 border border-[oklch(60%_0.15_45)]/40 flex items-center justify-center flex-shrink-0">
+                    <CheckCircle size={14} className="text-[oklch(60%_0.15_45)]" />
                   </div>
                   {f}
                 </li>
@@ -317,7 +317,7 @@ export default function HomeVisitSection() {
             <div className="bg-[#EBF4FF] rounded-3xl p-6 shadow-2xl border border-white/40">
               {success ? (
                 <div className="text-center py-10">
-                  <div className="w-16 h-16 bg-[#EB925A] rounded-full flex items-center justify-center mx-auto mb-4">
+                  <div className="w-16 h-16 bg-[oklch(60%_0.15_45)] rounded-full flex items-center justify-center mx-auto mb-4">
                     <CheckCircle size={32} className="text-white" />
                   </div>
                   <h3 className="font-bold text-[#1E293B] text-xl mb-2">Request Submitted!</h3>
@@ -326,7 +326,7 @@ export default function HomeVisitSection() {
                   </p>
                   <button
                     onClick={() => setSuccess(false)}
-                    className="bg-[#1D3F5F] text-white text-sm font-semibold px-6 py-2.5 rounded-xl hover:bg-[#152e46] transition-colors"
+                    className="bg-[oklch(45%_0.085_224.283)] text-white text-sm font-semibold px-6 py-2.5 rounded-xl hover:bg-[oklch(40%_0.075_224.283)] transition-colors"
                   >
                     Book Another
                   </button>
@@ -337,21 +337,21 @@ export default function HomeVisitSection() {
                   <input
                     name="fullName" value={form.fullName} onChange={handleChange} required
                     placeholder="Full Name*"
-                    className="w-full bg-white border-0 rounded-2xl px-5 py-4 text-[#1E293B] text-sm placeholder-[#94A3B8] shadow-sm focus:outline-none focus:ring-2 focus:ring-[#1D3F5F]/30 transition"
+                    className="w-full bg-white border-0 rounded-2xl px-5 py-4 text-[#1E293B] text-sm placeholder-[#94A3B8] shadow-sm focus:outline-none focus:ring-2 focus:ring-[oklch(45%_0.085_224.283)]/30 transition"
                   />
 
                   {/* Mobile */}
                   <input
                     name="mobile" value={form.mobile} onChange={handleChange} required
                     placeholder="Mobile Number*" type="tel" maxLength={10}
-                    className="w-full bg-white border-0 rounded-2xl px-5 py-4 text-[#1E293B] text-sm placeholder-[#94A3B8] shadow-sm focus:outline-none focus:ring-2 focus:ring-[#1D3F5F]/30 transition"
+                    className="w-full bg-white border-0 rounded-2xl px-5 py-4 text-[#1E293B] text-sm placeholder-[#94A3B8] shadow-sm focus:outline-none focus:ring-2 focus:ring-[oklch(45%_0.085_224.283)]/30 transition"
                   />
 
                   {/* City */}
                   <div className="relative">
                     <select
                       name="city" value={form.city} onChange={handleChange}
-                      className="w-full bg-white border-0 rounded-2xl px-5 py-4 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-[#1D3F5F]/30 transition appearance-none cursor-pointer text-[#1E293B]"
+                      className="w-full bg-white border-0 rounded-2xl px-5 py-4 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-[oklch(45%_0.085_224.283)]/30 transition appearance-none cursor-pointer text-[#1E293B]"
                     >
                       <option value="">Select City</option>
                       {cities.map((c) => <option key={c} value={c}>{c}</option>)}
@@ -368,18 +368,18 @@ export default function HomeVisitSection() {
                     <label className="flex items-start gap-3 cursor-pointer">
                       <div className="relative mt-0.5">
                         <input type="checkbox" name="agreeTerms" checked={form.agreeTerms} onChange={handleChange} className="sr-only" />
-                        <div className={`w-5 h-5 rounded flex items-center justify-center border-2 transition-colors ${form.agreeTerms ? "bg-[#1D3F5F] border-[#1D3F5F]" : "bg-white border-gray-300"}`}>
+                        <div className={`w-5 h-5 rounded flex items-center justify-center border-2 transition-colors ${form.agreeTerms ? "bg-[oklch(45%_0.085_224.283)] border-[oklch(45%_0.085_224.283)]" : "bg-white border-gray-300"}`}>
                           {form.agreeTerms && <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>}
                         </div>
                       </div>
                       <span className="text-xs text-[#475569] leading-relaxed">
-                        I agree to Shraddha Lab <a href="#" className="text-[#1D3F5F] underline font-medium hover:text-[#EB925A]">T&amp;C</a> and <a href="#" className="text-[#1D3F5F] underline font-medium hover:text-[#EB925A]">Privacy Policy</a>
+                        I agree to Shraddha Lab <a href="#" className="text-[oklch(45%_0.085_224.283)] underline font-medium hover:text-[oklch(60%_0.15_45)]">T&amp;C</a> and <a href="#" className="text-[oklch(45%_0.085_224.283)] underline font-medium hover:text-[oklch(60%_0.15_45)]">Privacy Policy</a>
                       </span>
                     </label>
                     <label className="flex items-center gap-3 cursor-pointer">
                       <div className="relative">
                         <input type="checkbox" name="whatsapp" checked={form.whatsapp} onChange={handleChange} className="sr-only" />
-                        <div className={`w-5 h-5 rounded flex items-center justify-center border-2 transition-colors ${form.whatsapp ? "bg-[#1D3F5F] border-[#1D3F5F]" : "bg-white border-gray-300"}`}>
+                        <div className={`w-5 h-5 rounded flex items-center justify-center border-2 transition-colors ${form.whatsapp ? "bg-[oklch(45%_0.085_224.283)] border-[oklch(45%_0.085_224.283)]" : "bg-white border-gray-300"}`}>
                           {form.whatsapp && <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>}
                         </div>
                       </div>
@@ -394,7 +394,7 @@ export default function HomeVisitSection() {
                   <motion.button
                     type="submit" disabled={loading}
                     whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
-                    className="w-full bg-[#EB925A] hover:bg-[#d4783f] text-white font-bold py-4 rounded-2xl transition-colors text-sm tracking-widest uppercase shadow-lg shadow-[#EB925A]/30 disabled:opacity-60 flex items-center justify-center gap-2 mt-2"
+                    className="w-full bg-[oklch(60%_0.15_45)] hover:bg-[oklch(55%_0.13_43)] text-white font-bold py-4 rounded-2xl transition-colors text-sm tracking-widest uppercase shadow-lg shadow-[oklch(60%_0.15_45)]/30 disabled:opacity-60 flex items-center justify-center gap-2 mt-2"
                   >
                     {loading ? (
                       <><svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" /></svg> Submitting...</>
@@ -416,7 +416,7 @@ export default function HomeVisitSection() {
                     onClick={() => setShowRegister(true)}
                     whileHover={{ scale: 1.02 }}
                     whileTap={{ scale: 0.98 }}
-                    className="w-full bg-[#1D3F5F] hover:bg-[#152e46] text-white font-bold py-4 rounded-2xl transition-colors text-sm tracking-widest uppercase shadow-lg shadow-[#1D3F5F]/30 flex items-center justify-center gap-2"
+                    className="w-full bg-[oklch(45%_0.085_224.283)] hover:bg-[oklch(40%_0.075_224.283)] text-white font-bold py-4 rounded-2xl transition-colors text-sm tracking-widest uppercase shadow-lg shadow-[oklch(45%_0.085_224.283)]/30 flex items-center justify-center gap-2"
                   >
                     <User size={15} />
                     Register as Patient

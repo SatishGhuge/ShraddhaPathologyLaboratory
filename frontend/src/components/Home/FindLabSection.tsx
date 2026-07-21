@@ -9,7 +9,7 @@ export default function FindLabSection() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
 
         <div className="text-center mb-10">
-          <p className="text-[#EB925A] text-xs font-bold uppercase tracking-widest mb-2">Find Lab</p>
+          <p className="text-[oklch(60%_0.15_45)] text-xs font-bold uppercase tracking-widest mb-2">Find Lab</p>
           <h2 className="text-3xl lg:text-4xl font-bold text-[#1E293B]">40+ Centers Near You</h2>
         </div>
 
@@ -45,7 +45,7 @@ export default function FindLabSection() {
             <div className="space-y-4">
               <div className="flex items-start gap-3">
                 <div className="w-8 h-8 bg-orange-50 rounded-lg flex items-center justify-center flex-shrink-0">
-                  <MapPin size={16} className="text-[#EB925A]" />
+                  <MapPin size={16} className="text-[oklch(60%_0.15_45)]" />
                 </div>
                 <div>
                   <p className="text-xs font-semibold text-[#1E293B]">Address</p>
@@ -55,27 +55,27 @@ export default function FindLabSection() {
 
               <div className="flex items-center gap-3">
                 <div className="w-8 h-8 bg-orange-50 rounded-lg flex items-center justify-center flex-shrink-0">
-                  <Phone size={16} className="text-[#EB925A]" />
+                  <Phone size={16} className="text-[oklch(60%_0.15_45)]" />
                 </div>
                 <div>
                   <p className="text-xs font-semibold text-[#1E293B]">Phone</p>
-                  <a href="tel:+919876543210" className="text-xs text-[#1D3F5F] hover:text-[#EB925A]">+91 98765 43210</a>
+                  <a href="tel:+919876543210" className="text-xs text-[oklch(45%_0.085_224.283)] hover:text-[oklch(60%_0.15_45)]">+91 98765 43210</a>
                 </div>
               </div>
 
               <div className="flex items-center gap-3">
                 <div className="w-8 h-8 bg-orange-50 rounded-lg flex items-center justify-center flex-shrink-0">
-                  <Mail size={16} className="text-[#EB925A]" />
+                  <Mail size={16} className="text-[oklch(60%_0.15_45)]" />
                 </div>
                 <div>
                   <p className="text-xs font-semibold text-[#1E293B]">Email</p>
-                  <a href="mailto:info@shraddhalab.com" className="text-xs text-[#1D3F5F] hover:text-[#EB925A]">info@shraddhalab.com</a>
+                  <a href="mailto:info@shraddhalab.com" className="text-xs text-[oklch(45%_0.085_224.283)] hover:text-[oklch(60%_0.15_45)]">info@shraddhalab.com</a>
                 </div>
               </div>
 
               <div className="flex items-start gap-3">
                 <div className="w-8 h-8 bg-orange-50 rounded-lg flex items-center justify-center flex-shrink-0">
-                  <Clock size={16} className="text-[#EB925A]" />
+                  <Clock size={16} className="text-[oklch(60%_0.15_45)]" />
                 </div>
                 <div>
                   <p className="text-xs font-semibold text-[#1E293B]">Working Hours</p>
@@ -85,7 +85,7 @@ export default function FindLabSection() {
               </div>
             </div>
 
-            <button className="mt-5 w-full flex items-center justify-center gap-2 bg-[#1D3F5F] hover:bg-[#152e46] text-white text-sm font-semibold py-3 rounded-xl transition-colors">
+            <button className="mt-5 w-full flex items-center justify-center gap-2 bg-[oklch(45%_0.085_224.283)] hover:bg-[oklch(40%_0.075_224.283)] text-white text-sm font-semibold py-3 rounded-xl transition-colors">
               <Navigation size={16} /> Get Directions
             </button>
           </motion.div>

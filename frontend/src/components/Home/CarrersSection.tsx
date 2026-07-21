@@ -44,7 +44,7 @@ export default function CareersSection() {
             initial={{ opacity: 0, x: -30 }} whileInView={{ opacity: 1, x: 0 }}
             viewport={{ once: true }}
           >
-            <div className="w-12 h-12 bg-[#EB925A] rounded-xl flex items-center justify-center mb-4">
+            <div className="w-12 h-12 bg-[oklch(60%_0.15_45)] rounded-xl flex items-center justify-center mb-4">
               <Briefcase size={22} className="text-white" />
             </div>
             <h2 className="text-3xl font-bold text-[#1E293B] mb-3">
@@ -53,7 +53,7 @@ export default function CareersSection() {
             <p className="text-[#64748B] text-sm leading-relaxed mb-5">
               Join a team that values expertise, compassion and growth. We are always looking for passionate healthcare professionals.
             </p>
-            <button className="flex items-center gap-2 bg-[#EB925A] hover:bg-[#d4783f] text-white font-semibold px-6 py-3 rounded-xl transition-colors">
+            <button className="flex items-center gap-2 bg-[oklch(60%_0.15_45)] hover:bg-[oklch(55%_0.13_43)] text-white font-semibold px-6 py-3 rounded-xl transition-colors">
               Explore Careers <ArrowRight size={16} />
             </button>
           </motion.div>
@@ -71,7 +71,7 @@ export default function CareersSection() {
                   <p className="font-semibold text-[#1E293B] text-sm">{job.title}</p>
                   <p className="text-[#64748B] text-xs mt-0.5 line-clamp-1">{job.description}</p>
                 </div>
-                <button className="flex-shrink-0 bg-[#1D3F5F] hover:bg-[#152e46] text-white text-xs font-semibold px-4 py-2 rounded-lg transition-colors">
+                <button className="flex-shrink-0 bg-[oklch(45%_0.085_224.283)] hover:bg-[oklch(40%_0.075_224.283)] text-white text-xs font-semibold px-4 py-2 rounded-lg transition-colors">
                   Apply
                 </button>
               </motion.div>

@@ -48,12 +48,12 @@ export default function ServicesSection() {
 
         <div className="flex flex-col sm:flex-row sm:items-end justify-between mb-10 gap-4">
           <div>
-            <p className="text-[#EB925A] text-xs font-bold uppercase tracking-widest mb-2">Tests & Services</p>
+            <p className="text-[oklch(60%_0.15_45)] text-xs font-bold uppercase tracking-widest mb-2">Tests & Services</p>
             <h2 className="text-3xl lg:text-4xl font-bold text-[#1E293B]">
               Comprehensive Diagnostic Solutions
             </h2>
           </div>
-          <button className="flex items-center gap-1.5 text-sm font-semibold text-[#1D3F5F] border border-[#1D3F5F] px-4 py-2 rounded-lg hover:bg-[#1D3F5F] hover:text-white transition-colors whitespace-nowrap">
+          <button className="flex items-center gap-1.5 text-sm font-semibold text-[oklch(45%_0.085_224.283)] border border-[oklch(45%_0.085_224.283)] px-4 py-2 rounded-lg hover:bg-[oklch(45%_0.085_224.283)] hover:text-white transition-colors whitespace-nowrap">
             View All Tests <ArrowRight size={14} />
           </button>
         </div>
@@ -65,7 +65,7 @@ export default function ServicesSection() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search tests..."
-            className="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1D3F5F]/20"
+            className="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[oklch(45%_0.085_224.283)]/20"
           />
         </div>
 
@@ -93,12 +93,12 @@ export default function ServicesSection() {
                     sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 16vw"
                   />
                   {/* Subtle overlay on hover */}
-                  <div className="absolute inset-0 bg-[#EB925A]/0 group-hover:bg-[#EB925A]/15 transition-colors duration-300" />
+                  <div className="absolute inset-0 bg-[oklch(60%_0.15_45)]/0 group-hover:bg-[oklch(60%_0.15_45)]/15 transition-colors duration-300" />
                 </div>
 
                 <h3 className="font-semibold text-[#1E293B] text-sm mb-1">{s.name}</h3>
                 <p className="text-[#64748B] text-xs leading-relaxed mb-3 line-clamp-2">{s.description}</p>
-                <button className="text-[#EB925A] text-xs font-semibold flex items-center gap-1 hover:gap-2 transition-all">
+                <button className="text-[oklch(60%_0.15_45)] text-xs font-semibold flex items-center gap-1 hover:gap-2 transition-all">
                   Explore <ArrowRight size={11} />
                 </button>
               </motion.div>
