@@ -189,17 +189,6 @@ export default function ItemMasterModal({
         <form onSubmit={handleSubmit} className="p-6 space-y-5">
           {/* Item ID - Auto */}
           <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs font-semibold text-gray-700 mb-1.5">
-                Item ID
-              </label>
-              <input
-                type="text"
-                value={editingItemId ? form.itemId || `IT-${editingItemId}` : "Auto"}
-                disabled
-                className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded text-sm text-gray-500 cursor-not-allowed"
-              />
-            </div>
 
             {/* Item Name - Required */}
             <div>
@@ -324,27 +313,6 @@ export default function ItemMasterModal({
                 </p>
               )}
             </div>
-          </div>
-
-          {/* Supplier */}
-          <div>
-            <label className="block text-xs font-semibold text-gray-700 mb-1.5">
-              Supplier
-            </label>
-            <select
-              name="supplierId"
-              value={form.supplierId}
-              onChange={handleInputChange}
-              className="w-full px-3 py-2 border border-gray-200 rounded text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 transition bg-white cursor-pointer"
-            >
-              <option value="">-- Select Supplier --</option>
-              {suppliers.map((supplier) => (
-                <option key={supplier.id} value={supplier.id}>
-                  {supplier.supplierName}
-                </option>
-              ))}
-            </select>
-            <p className="text-gray-400 text-[10px] mt-1">Link this item to a supplier</p>
           </div>
 
           {/* Description */}

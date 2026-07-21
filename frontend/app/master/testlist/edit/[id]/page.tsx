@@ -8,7 +8,7 @@ import PageHeader from "@/src/components/BreadCrumb";
 import UnitModal from "@/src/components/UnitModal";
 import { CKEditor } from "@ckeditor/ckeditor5-react";
 import ClassicEditor from "@ckeditor/ckeditor5-build-classic";
-import { getTestById, createTest, updateTest, getDepartments, getUnits, getTests } from "@/src/api/master.js";
+import { getTestById, createTest, updateTest, getDepartments, getUnits, getTests, getSampleTypes } from "@/src/api/master.js";
 
 const baseInputClass =
   "px-2 py-1 border border-gray-300 rounded text-sm bg-white focus:outline-none focus:ring-2 focus:ring-orange-500";
@@ -69,7 +69,7 @@ const AddTest = () => {
   const [selectedTestToAdd, setSelectedTestToAdd] = useState("");
   const [selectedTestsToAdd, setSelectedTestsToAdd] = useState<any[]>([]);
   const [showPreview, setShowPreview] = useState(false);
-  const [specimenTypes, setSpecimenTypes] = useState<any[]>([]);
+  const [sampleTypes, setSampleTypes] = useState<any[]>([]);
   const [showSampleTypeDropdown, setShowSampleTypeDropdown] = useState(false);
   const [signatures, setSignatures] = useState<any[]>([]);
   const [showUnitModal, setShowUnitModal] = useState(false);
@@ -279,29 +279,22 @@ const AddTest = () => {
       }
     };
 
-    const fetchSpecimenTypes = async () => {
+    const fetchSampleTypes = async () => {
       try {
-        console.log("📡 Fetching specimen types from API...");
-        const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || '/api';
-        const response = await fetch(`${API_BASE_URL}/master/specimen-types`);
-        const result = await response.json();
-        
-        if (result.success) {
-          console.log("✅ Specimen types loaded:", result.data);
-          setSpecimenTypes(result.data);
-        } else {
-          console.error('❌ Failed to fetch specimen types:', result.message);
-        }
+        console.log("📡 Fetching sample types from API...");
+        const sampleTypesData = await getSampleTypes();
+        console.log("✅ Sample types loaded:", sampleTypesData);
+        setSampleTypes(sampleTypesData);
       } catch (err) {
-        console.error('❌ Error fetching specimen types:', err);
-        // Don't set error for specimen types, just log it
+        console.error('❌ Error fetching sample types:', err);
+        // Don't set error for sample types, just log it
       }
     };
 
     fetchDepartments();
     fetchUnits();
     fetchTests();
-    fetchSpecimenTypes();
+    fetchSampleTypes();
 
     // Fetch signatures for dropdown
     const fetchSignatures = async () => {
@@ -328,6 +321,7 @@ const AddTest = () => {
         console.log('Test ID:', id);
         console.log('Is Edit Mode:', isEditMode);
         console.log('Is View Mode:', isViewMode);
+        console.log('sampleTypes available:', sampleTypes.length);
         
         try {
           setLoading(true);
@@ -341,13 +335,13 @@ const AddTest = () => {
               name: testData.name || "",
               department: testData.departmentId?.toString() || "",
               shortName: testData.shortName || "",
-              attachFile: testData.attachFile === true || testData.attachFile === 1 || testData.attachFile === "Yes" || testData.attachFile === "true",
+              attachFile: Boolean(testData.attachFile),
               imageSize: testData.imageSize || "800|600",
               preparationTime: testData.preparationTime || "",
               preparationType: testData.preparationType || "",
               isNABL: testData.isNABL || false,
               lineHeight: testData.lineHeight?.toString() || "",
-              profileTest: testData.profileTest === true || testData.profileTest === 1 || testData.profileTest === "Yes" || testData.profileTest === "true",
+              profileTest: Boolean(testData.profileTest),
               reportHeader: testData.reportHeader || "",
               sampleTypeId: testData.sampleTypeId?.toString() || "",
               machineName: testData.machineName || "",
@@ -363,6 +357,21 @@ const AddTest = () => {
             };
             
             console.log('📝 Setting form data:', formDataToSet);
+            console.log('🔍 attachFile conversion:', {
+              original: testData.attachFile,
+              converted: Boolean(testData.attachFile),
+              type: typeof testData.attachFile
+            });
+            console.log('🔍 profileTest conversion:', {
+              original: testData.profileTest,
+              converted: Boolean(testData.profileTest),
+              type: typeof testData.profileTest
+            });
+            console.log('🔍 sampleTypeId:', {
+              original: testData.sampleTypeId,
+              converted: testData.sampleTypeId?.toString() || "",
+              totalSampleTypes: sampleTypes.length
+            });
             setFormData(formDataToSet);
             
             // Set categories if they exist
@@ -400,7 +409,7 @@ const AddTest = () => {
                           type: param.type || "Numeric",
                           isMandatory: param.isMandatory || false,
                           rangeType: param.rangeType || "BySex",
-                          unitId: param.unitId || (param.unit?.id ? param.unit.id : ""),
+                          unitId: param.unitId ? String(param.unitId) : "",
                           units: param.units || "",
                           unit: param.unit || null,
                           displayRangeText: param.displayRangeText || "",
@@ -515,7 +524,7 @@ const AddTest = () => {
     };
     
     fetchTestData();
-  }, [id, isEditMode, isViewMode]);
+  }, [id, isEditMode, isViewMode, sampleTypes]);
 
   /* ================= HANDLERS ================= */
   const handleChange = (e: any) => {
@@ -873,9 +882,9 @@ const AddTest = () => {
         interpretationLabel: formData.interpretationLabel || null,
         interpretation: formData.interpretation || null,
         outsourceLab: formData.outsourceLab || null,
-        attachFile: formData.attachFile === true ? 1 : 0,
+        attachFile: Boolean(formData.attachFile),
         imageSize: formData.imageSize || "800|600",
-        profileTest: formData.profileTest === true ? 1 : 0,
+        profileTest: Boolean(formData.profileTest),
         isHeader: formData.isHeader,
         showTestName: formData.showTestName,
         isNABL: formData.isNABL,
@@ -918,6 +927,7 @@ const AddTest = () => {
           type: param.type || "Numeric",
           isMandatory: param.isMandatory || false,
           rangeType: param.rangeType || "BySex",
+          unitId: param.unitId ? parseInt(param.unitId) : null,
           units: param.units || null,
           displayRangeText: param.displayRangeText || null,
           rangeText: param.rangeText || null,
@@ -1027,6 +1037,10 @@ const AddTest = () => {
       </>
     );
   }
+
+  // Debug: Log units availability
+  console.log('🔍 RENDER - Units available:', units.length, units);
+  console.log('🔍 RENDER - Categories count:', categories.length);
 
   return (
     <>
@@ -1257,12 +1271,12 @@ const AddTest = () => {
                     >
                       {formData.sampleTypeId ? (
                         <>
-                          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" style={{ transform: 'rotate(45deg)', flexShrink: 0 }}>
-                            <path d="M9 3h6v11a3 3 0 0 1-6 0V3z" fill={specimenTypes.find(s => s.Sample_Type === formData.sampleTypeId)?.Sample_Color || '#ccc'} stroke="#555" strokeWidth="1.2"/>
+                          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" style={{ transform: 'rotate(45deg)' }}>
+                            <path d="M9 3h6v11a3 3 0 0 1-6 0V3z" fill={sampleTypes.find(s => s.id === parseInt(formData.sampleTypeId))?.Sample_Color || '#cccccc'} stroke="#555" strokeWidth="1.2"/>
                             <rect x="8" y="2" width="8" height="2" rx="1" fill="#888" stroke="#555" strokeWidth="0.8"/>
                             <line x1="9" y1="10" x2="15" y2="10" stroke="white" strokeWidth="1" opacity="0.5"/>
                           </svg>
-                          <span>{formData.sampleTypeId} ({specimenTypes.find(s => s.Sample_Type === formData.sampleTypeId)?.Sample_Color})</span>
+                          {sampleTypes.find(s => s.id === parseInt(formData.sampleTypeId))?.Sample_Type || 'Select...'}
                         </>
                       ) : (
                         <span className="text-gray-400">Please Select</span>
@@ -1272,22 +1286,27 @@ const AddTest = () => {
                       <div className="absolute z-50 top-full left-0 right-0 bg-white border border-gray-300 rounded shadow-lg mt-1 max-h-48 overflow-y-auto">
                         <div
                           className="px-3 py-2 text-xs text-gray-400 hover:bg-gray-50 cursor-pointer border-b"
-                          onClick={() => { handleChange({ target: { name: 'sampleTypeId', value: '' } }); setShowSampleTypeDropdown(false); }}
+                          onClick={() => { handleChange({ target: { name: 'sampleTypeId', value: '' } } as any); setShowSampleTypeDropdown(false); }}
                         >
                           Please Select
                         </div>
-                        {specimenTypes.map((type, i) => (
+                        {(sampleTypes || []).map((type) => (
                           <div
-                            key={i}
-                            className="flex items-center gap-2 px-3 py-2 text-xs hover:bg-orange-50 cursor-pointer border-b last:border-b-0"
-                            onClick={() => { handleChange({ target: { name: 'sampleTypeId', value: type.Sample_Type } }); setShowSampleTypeDropdown(false); }}
+                            key={type.id}
+                            className="flex items-center gap-3 px-3 py-2 text-xs hover:bg-gray-50 cursor-pointer border-b last:border-b-0"
+                            onClick={() => { handleChange({ target: { name: 'sampleTypeId', value: type.id.toString() } } as any); setShowSampleTypeDropdown(false); }}
                           >
-                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" style={{ transform: 'rotate(45deg)', flexShrink: 0 }}>
-                              <path d="M9 3h6v11a3 3 0 0 1-6 0V3z" fill={type.Sample_Color || '#ccc'} stroke="#555" strokeWidth="1.2"/>
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" style={{ transform: 'rotate(45deg)' }}>
+                              <path d="M9 3h6v11a3 3 0 0 1-6 0V3z" fill={type.Sample_Color || '#cccccc'} stroke="#555" strokeWidth="1.2"/>
                               <rect x="8" y="2" width="8" height="2" rx="1" fill="#888" stroke="#555" strokeWidth="0.8"/>
                               <line x1="9" y1="10" x2="15" y2="10" stroke="white" strokeWidth="1" opacity="0.5"/>
                             </svg>
-                            <span>{type.Sample_Type} ({type.Sample_Color})</span>
+                            <div className="flex flex-col">
+                              <span className="text-gray-700">{type.Sample_Type}</span>
+                              {type.Sample_Color && (
+                                <span className="text-gray-500 text-xs">{type.Sample_Color}</span>
+                              )}
+                            </div>
                           </div>
                         ))}
                       </div>

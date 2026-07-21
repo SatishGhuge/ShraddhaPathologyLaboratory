@@ -72,7 +72,6 @@ const AddTest = () => {
   const [selectedTestsToAdd, setSelectedTestsToAdd] = useState<any[]>([]);
   const [pendingTestIds, setPendingTestIds] = useState<number[]>([]);
   const [showPreview, setShowPreview] = useState(false);
-  const [specimenTypes, setSpecimenTypes] = useState<any[]>([]);
   const [showSampleTypeDropdown, setShowSampleTypeDropdown] = useState(false);
 
   // Draft formula state: key = "catIdx-paramIdx", value = draft string being built
@@ -128,6 +127,7 @@ const AddTest = () => {
     p.type            = suggestion.type || 'Numeric';
     p.rangeType       = suggestion.rangeType || 'BySex';
     p.unitId          = suggestion.unitId?.toString() || '';
+    p.unit            = suggestion.unit || null;
     p.displayRangeText= suggestion.displayRangeText || '';
     p.rangeText       = suggestion.rangeText || '';
     p.textContent     = suggestion.textContent || '';
@@ -190,6 +190,7 @@ const AddTest = () => {
       isMandatory: false,
       rangeType: "BySex",
       unitId: "",
+      unit: null,
       displayRangeText: "",
       rangeText: "",
       isMultipleOptions: false,
@@ -287,30 +288,10 @@ const AddTest = () => {
       }
     };
 
-    const fetchSpecimenTypes = async () => {
-      try {
-        console.log("📡 Fetching specimen types from API...");
-        const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || '/api';
-        const response = await fetch(`${API_BASE_URL}/master/specimen-types`);
-        const result = await response.json();
-        
-        if (result.success) {
-          console.log("✅ Specimen types loaded:", result.data);
-          setSpecimenTypes(result.data);
-        } else {
-          console.error('❌ Failed to fetch specimen types:', result.message);
-        }
-      } catch (err) {
-        console.error('❌ Error fetching specimen types:', err);
-        // Don't set error for specimen types, just log it
-      }
-    };
-
     fetchDepartments();
     fetchUnits();
     fetchTests();
     fetchSampleTypes();
-    fetchSpecimenTypes();
     
     // Try to load CKEditor after a short delay
     setTimeout(() => {
@@ -352,13 +333,13 @@ const AddTest = () => {
               name: testData.name || "",
               department: testData.departmentId?.toString() || "",
               shortName: testData.shortName || "",
-              attachFile: testData.attachFile === true || testData.attachFile === 1 || testData.attachFile === "Yes" || testData.attachFile === "true",
+              attachFile: Boolean(testData.attachFile),
               imageSize: testData.imageSize || "800|600",
               preparationTime: testData.preparationTime || "",
               preparationType: testData.preparationType || "",
               isNABL: testData.isNABL || false,
               lineHeight: testData.lineHeight?.toString() || "1.4",
-              profileTest: testData.profileTest === true || testData.profileTest === 1 || testData.profileTest === "Yes" || testData.profileTest === "true",
+              profileTest: Boolean(testData.profileTest),
               reportHeader: testData.reportHeader || "",
               sampleTypeId: testData.sampleTypeId ? testData.sampleTypeId.toString() : "",
               machineName: testData.machineName || "",
@@ -1311,10 +1292,15 @@ const AddTest = () => {
                       type="button"
                       disabled={isViewMode}
                       onClick={() => setShowSampleTypeDropdown(v => !v)}
-                      className="w-full px-2 py-1.5 border border-gray-300 rounded text-xs sm:text-sm bg-white focus:outline-none focus:ring-2 focus:ring-orange-500 disabled:bg-gray-100 disabled:cursor-not-allowed text-left"
+                      className="w-full px-2 py-1.5 border border-gray-300 rounded text-xs sm:text-sm bg-white focus:outline-none focus:ring-2 focus:ring-orange-500 disabled:bg-gray-100 disabled:cursor-not-allowed text-left flex items-center gap-2"
                     >
                       {formData.sampleTypeId ? (
                         <>
+                          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" style={{ transform: 'rotate(45deg)' }}>
+                            <path d="M9 3h6v11a3 3 0 0 1-6 0V3z" fill={sampleTypes.find(s => s.id === parseInt(formData.sampleTypeId))?.Sample_Color || '#cccccc'} stroke="#555" strokeWidth="1.2"/>
+                            <rect x="8" y="2" width="8" height="2" rx="1" fill="#888" stroke="#555" strokeWidth="0.8"/>
+                            <line x1="9" y1="10" x2="15" y2="10" stroke="white" strokeWidth="1" opacity="0.5"/>
+                          </svg>
                           {sampleTypes.find(s => s.id === parseInt(formData.sampleTypeId))?.Sample_Type || 'Select...'}
                         </>
                       ) : (
@@ -1332,10 +1318,20 @@ const AddTest = () => {
                         {(sampleTypes || []).map((type) => (
                           <div
                             key={type.id}
-                            className="flex items-center gap-2 px-3 py-2 text-xs hover:bg-gray-50 cursor-pointer border-b last:border-b-0"
+                            className="flex items-center gap-3 px-3 py-2 text-xs hover:bg-gray-50 cursor-pointer border-b last:border-b-0"
                             onClick={() => { handleChange({ target: { name: 'sampleTypeId', value: type.id.toString() } } as any); setShowSampleTypeDropdown(false); }}
                           >
-                            <span>{type.Sample_Type} ({type.Sample_Color})</span>
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" style={{ transform: 'rotate(45deg)' }}>
+                              <path d="M9 3h6v11a3 3 0 0 1-6 0V3z" fill={type.Sample_Color || '#cccccc'} stroke="#555" strokeWidth="1.2"/>
+                              <rect x="8" y="2" width="8" height="2" rx="1" fill="#888" stroke="#555" strokeWidth="0.8"/>
+                              <line x1="9" y1="10" x2="15" y2="10" stroke="white" strokeWidth="1" opacity="0.5"/>
+                            </svg>
+                            <div className="flex flex-col">
+                              <span className="text-gray-700">{type.Sample_Type}</span>
+                              {type.Sample_Color && (
+                                <span className="text-gray-500 text-xs">{type.Sample_Color}</span>
+                              )}
+                            </div>
                           </div>
                         ))}
                       </div>

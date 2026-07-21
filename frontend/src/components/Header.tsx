@@ -91,6 +91,7 @@ const allModules: NavModule[] = [
     title: "Inventory",
     icon: <Package size={20} />,
     items: [
+      { label: "Stock Transactions",    path: "/inventory/stock-transactions" },
       { label: "Item",                 path: "/inventory/item" },
       { label: "Supplier",             path: "/inventory/supplier" },
       { label: "Stock Entry",          path: "/inventory/stock-entry" },

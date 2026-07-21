@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { X } from "lucide-react";
+import { X, Plus, Trash2, Edit2, Check } from "lucide-react";
 
 interface Supplier {
   id: number;
@@ -18,10 +18,30 @@ interface Item {
   unit: string;
 }
 
+interface StockEntryItem {
+  itemId: number;
+  itemName: string;
+  unit: string;
+  itemCode: string;
+  hsnNumber: string;
+  gst: number;
+  cgst: number;
+  sgst: number;
+  batchNo: string;
+  expiryDate: string;
+  quantity: number;
+  pricePerUnit: number;
+  basicAmount: number;
+  totalAmount: number;
+}
+
 interface StockEntryForm {
   supplierId?: number;
   invoiceNo: string;
   invoiceDate: string;
+}
+
+interface ItemForm {
   itemId?: number;
   hsnNumber: string;
   unit: string;
@@ -39,7 +59,6 @@ interface StockEntryModalProps {
   onStockEntrySaved: (data: any) => void;
   suppliers: Supplier[];
   items: Item[];
-  editingEntry?: any;
 }
 
 export default function StockEntryModal({
@@ -48,33 +67,63 @@ export default function StockEntryModal({
   onStockEntrySaved,
   suppliers,
   items,
-  editingEntry,
 }: StockEntryModalProps) {
-  const [form, setForm] = useState<StockEntryForm>({
-    supplierId: undefined,
-    invoiceNo: "",
+  // Header form (Supplier, Invoice No, Invoice Date)
+  const [headerForm, setHeaderForm] = useState<StockEntryForm>({
+    supplierId: suppliers.length > 0 ? suppliers[0].id : undefined,
+    invoiceNo: "INV-2024-001",
     invoiceDate: new Date().toISOString().split("T")[0],
-    itemId: undefined,
-    hsnNumber: "",
-    unit: "",
-    itemCode: "",
-    gst: "",
-    batchNo: "",
-    expiryDate: "",
-    quantity: "",
-    pricePerUnit: "",
   });
 
+  // Item form for adding new items
+  const [itemForm, setItemForm] = useState<ItemForm>({
+    itemId: items.length > 0 ? items[0].id : undefined,
+    hsnNumber: items.length > 0 ? items[0].hsnCode : "",
+    unit: items.length > 0 ? items[0].unit : "",
+    itemCode: items.length > 0 ? items[0].itemCode : "",
+    gst: items.length > 0 ? items[0].gst : "",
+    batchNo: "BATCH-001",
+    expiryDate: new Date(new Date().setDate(new Date().getDate() + 30)).toISOString().split("T")[0],
+    quantity: 10,
+    pricePerUnit: 150,
+  });
+
+  // Selected items list - only add sample if items exist
+  const [selectedItems, setSelectedItems] = useState<StockEntryItem[]>(
+    items.length > 0
+      ? [
+          {
+            itemId: items[0].id,
+            itemName: items[0].itemName,
+            unit: items[0].unit,
+            itemCode: items[0].itemCode,
+            hsnNumber: items[0].hsnCode,
+            gst: items[0].gst,
+            cgst: 135,
+            sgst: 135,
+            batchNo: "BATCH-2024-001",
+            expiryDate: new Date(new Date().setDate(new Date().getDate() + 30))
+              .toISOString()
+              .split("T")[0],
+            quantity: 10,
+            pricePerUnit: 150,
+            basicAmount: 1500,
+            totalAmount: 1770,
+          },
+        ]
+      : []
+  );
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [editingIndex, setEditingIndex] = useState<number | null>(null);
 
   useEffect(() => {
-    if (editingEntry) {
-      setForm(editingEntry);
-    } else {
-      setForm({
+    if (!isOpen) {
+      setHeaderForm({
         supplierId: undefined,
         invoiceNo: "",
         invoiceDate: new Date().toISOString().split("T")[0],
+      });
+      setItemForm({
         itemId: undefined,
         hsnNumber: "",
         unit: "",
@@ -85,75 +134,76 @@ export default function StockEntryModal({
         quantity: "",
         pricePerUnit: "",
       });
+      setSelectedItems([]);
+      setErrors({});
     }
-    setErrors({});
-  }, [editingEntry, isOpen]);
+  }, [isOpen]);
 
-  const selectedItem = items.find((item) => item.id === form.itemId);
+  const selectedItemData = items.find((item) => item.id === itemForm.itemId);
 
-  // Auto-fetch item details when item is selected
+  // Auto-fetch item details
   useEffect(() => {
-    if (selectedItem) {
-      setForm((prev) => ({
+    if (selectedItemData) {
+      setItemForm((prev) => ({
         ...prev,
-        hsnNumber: selectedItem.hsnCode,
-        unit: selectedItem.unit,
-        itemCode: selectedItem.itemCode,
-        gst: selectedItem.gst,
+        hsnNumber: selectedItemData.hsnCode,
+        unit: selectedItemData.unit,
+        itemCode: selectedItemData.itemCode,
+        gst: selectedItemData.gst,
       }));
     }
-  }, [selectedItem]);
+  }, [selectedItemData]);
 
-  const validateForm = () => {
+  const handleAddItem = () => {
     const newErrors: Record<string, string> = {};
 
-    if (!form.supplierId) newErrors.supplierId = "Supplier is required";
-    if (!form.invoiceNo.trim()) newErrors.invoiceNo = "Invoice No is required";
-    if (!form.invoiceDate) newErrors.invoiceDate = "Invoice Date is required";
-    if (!form.itemId) newErrors.itemId = "Item is required";
-    if (!form.hsnNumber.trim()) newErrors.hsnNumber = "HSN Number is required";
-    if (!form.unit.trim()) newErrors.unit = "Unit is required";
-    if (!form.itemCode.trim()) newErrors.itemCode = "Item Code is required";
-    if (form.gst === "" || form.gst === 0) newErrors.gst = "GST % is required";
-    if (!form.batchNo.trim()) newErrors.batchNo = "Batch No is required";
-    if (!form.expiryDate) newErrors.expiryDate = "Expiry Date is required";
-    if (!form.quantity || form.quantity <= 0) newErrors.quantity = "Valid Quantity is required";
-    if (!form.pricePerUnit || form.pricePerUnit <= 0) newErrors.pricePerUnit = "Valid Price is required";
+    if (!itemForm.itemId) newErrors.itemId = "Item is required";
+    if (!itemForm.batchNo.trim()) newErrors.batchNo = "Batch No is required";
+    if (!itemForm.expiryDate) newErrors.expiryDate = "Expiry Date is required";
+    if (!itemForm.quantity || itemForm.quantity <= 0) newErrors.quantity = "Valid Quantity is required";
+    if (!itemForm.pricePerUnit || itemForm.pricePerUnit <= 0) newErrors.pricePerUnit = "Valid Price is required";
 
     setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
+    if (Object.keys(newErrors).length > 0) return;
 
-    if (!validateForm()) {
+    // Get the selected item details from items array
+    const selectedItem = items.find((item) => item.id === itemForm.itemId);
+    
+    if (!selectedItem) {
+      setErrors({ itemId: "Selected item not found" });
       return;
     }
 
-    const quantity = Number(form.quantity);
-    const pricePerUnit = Number(form.pricePerUnit);
+    const quantity = Number(itemForm.quantity);
+    const pricePerUnit = Number(itemForm.pricePerUnit);
     const basicAmount = quantity * pricePerUnit;
-    const gstPercent = Number(form.gst) || 0;
+    const gstPercent = Number(itemForm.gst) || 0;
     const cgst = basicAmount * (gstPercent / 100) / 2;
     const sgst = basicAmount * (gstPercent / 100) / 2;
-    const grandTotal = basicAmount + cgst + sgst;
+    const totalAmount = basicAmount + cgst + sgst;
 
-    onStockEntrySaved({
-      ...form,
-      quantity,
-      pricePerUnit,
-      gst: Number(form.gst),
-      basicAmount,
+    const newItem: StockEntryItem = {
+      itemId: itemForm.itemId,
+      itemName: selectedItem.itemName,
+      unit: itemForm.unit,
+      itemCode: itemForm.itemCode,
+      hsnNumber: itemForm.hsnNumber,
+      gst: Number(itemForm.gst),
       cgst,
       sgst,
-      grandTotal,
-    });
+      batchNo: itemForm.batchNo,
+      expiryDate: itemForm.expiryDate,
+      quantity,
+      pricePerUnit,
+      basicAmount,
+      totalAmount,
+    };
 
-    setForm({
-      supplierId: undefined,
-      invoiceNo: "",
-      invoiceDate: new Date().toISOString().split("T")[0],
+    setSelectedItems([...selectedItems, newItem]);
+
+    // Reset item form
+    setItemForm({
       itemId: undefined,
       hsnNumber: "",
       unit: "",
@@ -167,14 +217,155 @@ export default function StockEntryModal({
     setErrors({});
   };
 
-  const handleInputChange = (
+  const handleRemoveItem = (index: number) => {
+    setSelectedItems(selectedItems.filter((_, i) => i !== index));
+  };
+
+  const handleEditItem = (index: number) => {
+    const item = selectedItems[index];
+    setEditingIndex(index);
+    setItemForm({
+      itemId: item.itemId,
+      hsnNumber: item.hsnNumber,
+      unit: item.unit,
+      itemCode: item.itemCode,
+      gst: item.gst,
+      batchNo: item.batchNo,
+      expiryDate: item.expiryDate,
+      quantity: item.quantity,
+      pricePerUnit: item.pricePerUnit,
+    });
+  };
+
+  const handleSaveEdit = () => {
+    if (editingIndex === null) return;
+
+    const newErrors: Record<string, string> = {};
+
+    if (!itemForm.itemId) newErrors.itemId = "Item is required";
+    if (!itemForm.batchNo.trim()) newErrors.batchNo = "Batch No is required";
+    if (!itemForm.expiryDate) newErrors.expiryDate = "Expiry Date is required";
+    if (!itemForm.quantity || itemForm.quantity <= 0) newErrors.quantity = "Valid Quantity is required";
+    if (!itemForm.pricePerUnit || itemForm.pricePerUnit <= 0) newErrors.pricePerUnit = "Valid Price is required";
+
+    setErrors(newErrors);
+
+    if (Object.keys(newErrors).length > 0) return;
+
+    // Get the selected item details
+    const selectedItem = items.find((item) => item.id === itemForm.itemId);
+    
+    if (!selectedItem) {
+      setErrors({ itemId: "Selected item not found" });
+      return;
+    }
+
+    const quantity = Number(itemForm.quantity);
+    const pricePerUnit = Number(itemForm.pricePerUnit);
+    const basicAmount = quantity * pricePerUnit;
+    const gstPercent = Number(itemForm.gst) || 0;
+    const cgst = basicAmount * (gstPercent / 100) / 2;
+    const sgst = basicAmount * (gstPercent / 100) / 2;
+    const totalAmount = basicAmount + cgst + sgst;
+
+    const updatedItems = [...selectedItems];
+    updatedItems[editingIndex] = {
+      ...updatedItems[editingIndex],
+      itemName: selectedItem.itemName,
+      hsnNumber: itemForm.hsnNumber,
+      batchNo: itemForm.batchNo,
+      expiryDate: itemForm.expiryDate,
+      quantity,
+      pricePerUnit,
+      basicAmount,
+      cgst,
+      sgst,
+      totalAmount,
+    };
+
+    setSelectedItems(updatedItems);
+    setEditingIndex(null);
+    setItemForm({
+      itemId: undefined,
+      hsnNumber: "",
+      unit: "",
+      itemCode: "",
+      gst: "",
+      batchNo: "",
+      expiryDate: "",
+      quantity: "",
+      pricePerUnit: "",
+    });
+    setErrors({});
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+
+    const newErrors: Record<string, string> = {};
+
+    if (!headerForm.supplierId) newErrors.supplierId = "Supplier is required";
+    if (!headerForm.invoiceNo.trim()) newErrors.invoiceNo = "Invoice No is required";
+    if (!headerForm.invoiceDate) newErrors.invoiceDate = "Invoice Date is required";
+    if (selectedItems.length === 0) newErrors.items = "Please add at least one item";
+
+    setErrors(newErrors);
+
+    if (Object.keys(newErrors).length > 0) return;
+
+    const totalBasicAmount = selectedItems.reduce((sum, item) => sum + item.basicAmount, 0);
+    const totalCGST = selectedItems.reduce((sum, item) => sum + item.cgst, 0);
+    const totalSGST = selectedItems.reduce((sum, item) => sum + item.sgst, 0);
+    const grandTotal = selectedItems.reduce((sum, item) => sum + item.totalAmount, 0);
+
+    onStockEntrySaved({
+      ...headerForm,
+      supplierId: Number(headerForm.supplierId),
+      items: selectedItems,
+      totalBasicAmount,
+      totalCGST,
+      totalSGST,
+      grandTotal,
+    });
+
+    // Reset form
+    setHeaderForm({
+      supplierId: undefined,
+      invoiceNo: "",
+      invoiceDate: new Date().toISOString().split("T")[0],
+    });
+    setSelectedItems([]);
+    setErrors({});
+  };
+
+  const handleHeaderChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
   ) => {
     const { name, value } = e.target;
-    setForm((prev) => ({
+    setHeaderForm((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
+    if (errors[name]) {
+      setErrors((prev) => ({
+        ...prev,
+        [name]: "",
+      }));
+    }
+  };
+
+  const handleItemChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
+  ) => {
+    const { name, value } = e.target;
+    setItemForm((prev) => ({
       ...prev,
       [name]:
         name === "quantity" || name === "pricePerUnit"
+          ? value === ""
+            ? ""
+            : Number(value)
+          : name === "gst"
           ? value === ""
             ? ""
             : Number(value)
@@ -188,37 +379,22 @@ export default function StockEntryModal({
     }
   };
 
-  const handleReset = () => {
-    setForm({
-      supplierId: undefined,
-      invoiceNo: "",
-      invoiceDate: new Date().toISOString().split("T")[0],
-      itemId: undefined,
-      hsnNumber: "",
-      unit: "",
-      itemCode: "",
-      gst: "",
-      batchNo: "",
-      expiryDate: "",
-      quantity: "",
-      pricePerUnit: "",
-    });
-    setErrors({});
-  };
-
   if (!isOpen) return null;
 
-  const quantity = Number(form.quantity) || 0;
-  const pricePerUnit = Number(form.pricePerUnit) || 0;
-  const basicAmount = quantity * pricePerUnit;
-  const gstPercent = Number(form.gst) || 0;
-  const cgst = basicAmount * (gstPercent / 100) / 2;
-  const sgst = basicAmount * (gstPercent / 100) / 2;
-  const grandTotal = basicAmount + cgst + sgst;
+  // Helper function to format prices - show decimals only if they exist
+  const formatPrice = (price: number): string => {
+    const rounded = Number(price.toFixed(2));
+    return rounded % 1 === 0 ? rounded.toFixed(0) : rounded.toFixed(2);
+  };
+
+  const totalBasicAmount = selectedItems.reduce((sum, item) => sum + item.basicAmount, 0);
+  const totalCGST = selectedItems.reduce((sum, item) => sum + item.cgst, 0);
+  const totalSGST = selectedItems.reduce((sum, item) => sum + item.sgst, 0);
+  const grandTotal = selectedItems.reduce((sum, item) => sum + item.totalAmount, 0);
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg shadow-lg w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+      <div className="bg-white rounded-lg shadow-lg w-full max-w-5xl max-h-[90vh] overflow-y-auto">
         {/* Header */}
         <div className="sticky top-0 flex justify-between items-center p-4 border-b bg-white">
           <h2 className="text-lg font-bold text-gray-800">Stock Entry</h2>
@@ -232,18 +408,19 @@ export default function StockEntryModal({
 
         {/* Form Content */}
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
-          {/* Supplier & Invoice Section */}
-          <div className="border-b pb-4 space-y-3">
-            <div className="grid grid-cols-3 gap-4">
+          {/* Header Section - Supplier, Invoice No, Invoice Date */}
+          <div className="border-b pb-3 space-y-2">
+            <h3 className="text-xs font-semibold text-gray-700">Purchase Information</h3>
+            <div className="grid grid-cols-3 gap-2">
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1">
+                <label className="block text-xs font-semibold text-gray-700 mb-0.5">
                   Supplier <span className="text-red-500">*</span>
                 </label>
                 <select
                   name="supplierId"
-                  value={form.supplierId || ""}
-                  onChange={handleInputChange}
-                  className={`w-full border rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 ${
+                  value={headerForm.supplierId || ""}
+                  onChange={handleHeaderChange}
+                  className={`w-full border rounded px-2 py-1.5 text-xs focus:outline-none focus:ring-1 ${
                     errors.supplierId
                       ? "border-red-500 focus:ring-red-500"
                       : "border-gray-300 focus:ring-orange-500"
@@ -257,291 +434,324 @@ export default function StockEntryModal({
                   ))}
                 </select>
                 {errors.supplierId && (
-                  <p className="text-red-500 text-xs mt-1">{errors.supplierId}</p>
+                  <p className="text-red-500 text-xs mt-0.5">{errors.supplierId}</p>
                 )}
               </div>
 
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1">
+                <label className="block text-xs font-semibold text-gray-700 mb-0.5">
                   Invoice No <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="text"
                   name="invoiceNo"
-                  value={form.invoiceNo}
-                  onChange={handleInputChange}
-                  className={`w-full border rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 ${
+                  value={headerForm.invoiceNo}
+                  onChange={handleHeaderChange}
+                  className={`w-full border rounded px-2 py-1.5 text-xs focus:outline-none focus:ring-1 ${
                     errors.invoiceNo
                       ? "border-red-500 focus:ring-red-500"
                       : "border-gray-300 focus:ring-orange-500"
                   }`}
-                  placeholder="Enter invoice number"
+                  placeholder="Invoice No"
                 />
                 {errors.invoiceNo && (
-                  <p className="text-red-500 text-xs mt-1">{errors.invoiceNo}</p>
+                  <p className="text-red-500 text-xs mt-0.5">{errors.invoiceNo}</p>
                 )}
               </div>
 
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1">
+                <label className="block text-xs font-semibold text-gray-700 mb-0.5">
                   Invoice Date <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="date"
                   name="invoiceDate"
-                  value={form.invoiceDate}
-                  onChange={handleInputChange}
-                  className={`w-full border rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 ${
+                  value={headerForm.invoiceDate}
+                  onChange={handleHeaderChange}
+                  className={`w-full border rounded px-2 py-1.5 text-xs focus:outline-none focus:ring-1 ${
                     errors.invoiceDate
                       ? "border-red-500 focus:ring-red-500"
                       : "border-gray-300 focus:ring-orange-500"
                   }`}
                 />
                 {errors.invoiceDate && (
-                  <p className="text-red-500 text-xs mt-1">{errors.invoiceDate}</p>
+                  <p className="text-red-500 text-xs mt-0.5">{errors.invoiceDate}</p>
                 )}
               </div>
             </div>
           </div>
 
-          {/* Item Section */}
-          <div className="border-b pb-4 space-y-3">
-            <div className="grid grid-cols-2 gap-4">
+          {/* Add Item Section */}
+          <div className="border-b pb-3 space-y-2">
+            <h3 className="text-xs font-semibold text-gray-700">Add Item</h3>
+            
+            <div className="grid grid-cols-5 gap-2">
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1">
-                  Item Name <span className="text-red-500">*</span>
-                </label>
+                <label className="block text-xs font-semibold text-gray-700 mb-0.5">Item</label>
                 <select
                   name="itemId"
-                  value={form.itemId || ""}
-                  onChange={handleInputChange}
-                  className={`w-full border rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 ${
-                    errors.itemId
-                      ? "border-red-500 focus:ring-red-500"
-                      : "border-gray-300 focus:ring-orange-500"
+                  value={itemForm.itemId || ""}
+                  onChange={handleItemChange}
+                  className={`w-full border rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 ${
+                    errors.itemId ? "border-red-500 focus:ring-red-500" : "border-gray-300 focus:ring-orange-500"
                   }`}
                 >
-                  <option value="">Select Item</option>
+                  <option value="">Select</option>
                   {items.map((item) => (
                     <option key={item.id} value={item.id}>
                       {item.itemName}
                     </option>
                   ))}
                 </select>
-                {errors.itemId && (
-                  <p className="text-red-500 text-xs mt-1">{errors.itemId}</p>
-                )}
               </div>
 
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1">
-                  Unit <span className="text-red-500">*</span>
-                </label>
+                <label className="block text-xs font-semibold text-gray-700 mb-0.5">Unit</label>
                 <input
                   type="text"
                   name="unit"
-                  value={form.unit}
-                  onChange={handleInputChange}
-                  className={`w-full border rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 ${
-                    errors.unit
-                      ? "border-red-500 focus:ring-red-500"
-                      : "border-gray-300 focus:ring-orange-500"
-                  }`}
-                  placeholder="Enter unit"
+                  value={itemForm.unit}
+                  readOnly
+                  className="w-full border border-gray-300 rounded px-2 py-1 text-xs bg-gray-50"
                 />
-                {errors.unit && (
-                  <p className="text-red-500 text-xs mt-1">{errors.unit}</p>
-                )}
               </div>
-            </div>
 
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1">
-                Item Code <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="text"
-                name="itemCode"
-                value={form.itemCode}
-                readOnly
-                className="w-full border border-gray-300 rounded px-3 py-2 text-sm bg-gray-50 text-gray-600 cursor-not-allowed"
-                placeholder="Auto-fetched"
-              />
-              {errors.itemCode && (
-                <p className="text-red-500 text-xs mt-1">{errors.itemCode}</p>
-              )}
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1">
-                  HSN Number <span className="text-red-500">*</span>
-                </label>
+                <label className="block text-xs font-semibold text-gray-700 mb-0.5">Item Code</label>
+                <input
+                  type="text"
+                  name="itemCode"
+                  value={itemForm.itemCode}
+                  readOnly
+                  className="w-full border border-gray-300 rounded px-2 py-1 text-xs bg-gray-50"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 mb-0.5">HSN No</label>
                 <input
                   type="text"
                   name="hsnNumber"
-                  value={form.hsnNumber}
-                  onChange={handleInputChange}
-                  className={`w-full border rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 ${
-                    errors.hsnNumber
-                      ? "border-red-500 focus:ring-red-500"
-                      : "border-gray-300 focus:ring-orange-500"
+                  value={itemForm.hsnNumber}
+                  onChange={handleItemChange}
+                  className={`w-full border rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 ${
+                    errors.hsnNumber ? "border-red-500 focus:ring-red-500" : "border-gray-300 focus:ring-orange-500"
                   }`}
-                  placeholder="Enter HSN number"
+                  placeholder="HSN"
                 />
-                {errors.hsnNumber && (
-                  <p className="text-red-500 text-xs mt-1">{errors.hsnNumber}</p>
-                )}
               </div>
 
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1">
-                  GST % <span className="text-red-500">*</span>
-                </label>
+                <label className="block text-xs font-semibold text-gray-700 mb-0.5">GST %</label>
                 <input
                   type="number"
                   name="gst"
-                  value={form.gst}
+                  value={itemForm.gst}
                   readOnly
-                  className="w-full border border-gray-300 rounded px-3 py-2 text-sm bg-gray-50 text-gray-600 cursor-not-allowed"
-                  placeholder="Auto-fetched"
+                  className="w-full border border-gray-300 rounded px-2 py-1 text-xs bg-gray-50"
                 />
-                {errors.gst && (
-                  <p className="text-red-500 text-xs mt-1">{errors.gst}</p>
-                )}
               </div>
             </div>
 
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-6 gap-2">
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1">
-                  Batch No <span className="text-red-500">*</span>
-                </label>
+                <label className="block text-xs font-semibold text-gray-700 mb-0.5">Batch No</label>
                 <input
                   type="text"
                   name="batchNo"
-                  value={form.batchNo}
-                  onChange={handleInputChange}
-                  className={`w-full border rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 ${
-                    errors.batchNo
-                      ? "border-red-500 focus:ring-red-500"
-                      : "border-gray-300 focus:ring-orange-500"
+                  value={itemForm.batchNo}
+                  onChange={handleItemChange}
+                  className={`w-full border rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 ${
+                    errors.batchNo ? "border-red-500 focus:ring-red-500" : "border-gray-300 focus:ring-orange-500"
                   }`}
-                  placeholder="Enter batch number"
+                  placeholder="Batch"
                 />
-                {errors.batchNo && (
-                  <p className="text-red-500 text-xs mt-1">{errors.batchNo}</p>
-                )}
               </div>
 
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1">
-                  Expiry Date <span className="text-red-500">*</span>
-                </label>
+                <label className="block text-xs font-semibold text-gray-700 mb-0.5">Expiry</label>
                 <input
                   type="date"
                   name="expiryDate"
-                  value={form.expiryDate}
-                  onChange={handleInputChange}
-                  className={`w-full border rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 ${
-                    errors.expiryDate
-                      ? "border-red-500 focus:ring-red-500"
-                      : "border-gray-300 focus:ring-orange-500"
+                  value={itemForm.expiryDate}
+                  onChange={handleItemChange}
+                  className={`w-full border rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 ${
+                    errors.expiryDate ? "border-red-500 focus:ring-red-500" : "border-gray-300 focus:ring-orange-500"
                   }`}
                 />
-                {errors.expiryDate && (
-                  <p className="text-red-500 text-xs mt-1">{errors.expiryDate}</p>
-                )}
               </div>
 
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1">
-                  Quantity <span className="text-red-500">*</span>
-                </label>
+                <label className="block text-xs font-semibold text-gray-700 mb-0.5">Qty</label>
                 <input
                   type="number"
                   name="quantity"
-                  value={form.quantity}
-                  onChange={handleInputChange}
-                  className={`w-full border rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 ${
-                    errors.quantity
-                      ? "border-red-500 focus:ring-red-500"
-                      : "border-gray-300 focus:ring-orange-500"
+                  value={itemForm.quantity}
+                  onChange={handleItemChange}
+                  className={`w-full border rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 ${
+                    errors.quantity ? "border-red-500 focus:ring-red-500" : "border-gray-300 focus:ring-orange-500"
                   }`}
                   placeholder="0"
                   min="0"
                   step="1"
                 />
-                {errors.quantity && (
-                  <p className="text-red-500 text-xs mt-1">{errors.quantity}</p>
-                )}
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 mb-0.5">Price</label>
+                <input
+                  type="number"
+                  name="pricePerUnit"
+                  value={itemForm.pricePerUnit}
+                  onChange={handleItemChange}
+                  className={`w-full border rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 ${
+                    errors.pricePerUnit ? "border-red-500 focus:ring-red-500" : "border-gray-300 focus:ring-orange-500"
+                  }`}
+                  placeholder="0.00"
+                  min="0"
+                  step="0.01"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 mb-0.5">CGST %</label>
+                <input
+                  type="text"
+                  disabled
+                  value={itemForm.gst ? (Number(itemForm.gst) / 2).toFixed(2) : "0.00"}
+                  className="w-full border border-gray-300 rounded px-2 py-1 text-xs bg-gray-50 text-center"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 mb-0.5">SGST %</label>
+                <input
+                  type="text"
+                  disabled
+                  value={itemForm.gst ? (Number(itemForm.gst) / 2).toFixed(2) : "0.00"}
+                  className="w-full border border-gray-300 rounded px-2 py-1 text-xs bg-gray-50 text-center"
+                />
               </div>
             </div>
 
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1">
-                Price / Unit <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="number"
-                name="pricePerUnit"
-                value={form.pricePerUnit}
-                onChange={handleInputChange}
-                className={`w-full border rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 ${
-                  errors.pricePerUnit
-                    ? "border-red-500 focus:ring-red-500"
-                    : "border-gray-300 focus:ring-orange-500"
-                }`}
-                placeholder="0.00"
-                min="0"
-                step="0.01"
-              />
-              {errors.pricePerUnit && (
-                <p className="text-red-500 text-xs mt-1">{errors.pricePerUnit}</p>
-              )}
+            <div className="flex justify-end">
+              <button
+                type="button"
+                onClick={handleAddItem}
+                className="bg-orange-500 hover:bg-orange-600 text-white px-4 py-1 rounded text-xs flex items-center gap-1 transition-colors font-semibold"
+              >
+                <Plus size={14} /> Add
+              </button>
             </div>
+
+            {Object.keys(errors).length > 0 && (
+              <div className="mt-2 p-2 bg-red-50 border border-red-300 rounded">
+                {Object.entries(errors).map(([key, message]) => (
+                  key !== "items" && <p key={key} className="text-red-500 text-xs">{message}</p>
+                ))}
+              </div>
+            )}
           </div>
 
-          {/* Amount Section */}
-          <div className="border-b pb-4 bg-gray-50 p-4 rounded space-y-2">
-            <div className="flex justify-between">
-              <span className="font-semibold text-gray-700">Basic Amount</span>
-              <span className="font-semibold text-gray-900">
-                ₹ {basicAmount.toFixed(2)}
-              </span>
+          {/* Selected Items Table */}
+          {selectedItems.length > 0 && (
+            <div className="border-b pb-3 space-y-1">
+              <h3 className="text-xs font-semibold text-gray-700">Items</h3>
+              <div className="overflow-x-auto rounded border border-gray-300">
+                <table className="w-full text-xs">
+                  <thead className="bg-slate-900 text-white">
+                    <tr>
+                      <th className="border border-gray-300 px-2 py-1 text-left min-w-32">Item</th>
+                      <th className="border border-gray-300 px-1.5 py-1 text-left min-w-20">Batch</th>
+                      <th className="border border-gray-300 px-1.5 py-1 text-center min-w-12">Exp</th>
+                      <th className="border border-gray-300 px-1.5 py-1 text-center min-w-12">Qty</th>
+                      <th className="border border-gray-300 px-1.5 py-1 text-center min-w-16">Price</th>
+                      <th className="border border-gray-300 px-1.5 py-1 text-center min-w-16">MRP</th>
+                      <th className="border border-gray-300 px-1.5 py-1 text-center min-w-14">CGST</th>
+                      <th className="border border-gray-300 px-1.5 py-1 text-center min-w-14">SGST</th>
+                      <th className="border border-gray-300 px-1.5 py-1 text-center min-w-16">Tax</th>
+                      <th className="border border-gray-300 px-1.5 py-1 text-center min-w-16">Act</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {selectedItems.map((item, index) => {
+                      const expDate = new Date(item.expiryDate);
+                      const expDateStr = `${String(expDate.getDate()).padStart(2, "0")}/${String(expDate.getMonth() + 1).padStart(2, "0")}`;
+                      return (
+                        <tr key={index} className="hover:bg-gray-50">
+                          <td className="border border-gray-300 px-2 py-0.5 text-left">{item.itemName}</td>
+                          <td className="border border-gray-300 px-1.5 py-0.5 font-mono text-xs">{item.batchNo}</td>
+                          <td className="border border-gray-300 px-1.5 py-0.5 text-center text-xs">{expDateStr}</td>
+                          <td className="border border-gray-300 px-1.5 py-0.5 text-center font-semibold">{item.quantity}</td>
+                          <td className="border border-gray-300 px-1.5 py-0.5 text-center">₹{formatPrice(item.pricePerUnit)}</td>
+                          <td className="border border-gray-300 px-1.5 py-0.5 text-center">₹{formatPrice(item.basicAmount)}</td>
+                          <td className="border border-gray-300 px-1.5 py-0.5 text-center">₹{formatPrice(item.cgst)}</td>
+                          <td className="border border-gray-300 px-1.5 py-0.5 text-center">₹{formatPrice(item.sgst)}</td>
+                          <td className="border border-gray-300 px-1.5 py-0.5 text-center font-semibold text-blue-600">₹{formatPrice(item.totalAmount)}</td>
+                          <td className="border border-gray-300 px-1.5 py-0.5 text-center">
+                            <div className="flex justify-center gap-0.5">
+                              {editingIndex === index ? (
+                                <button
+                                  type="button"
+                                  onClick={handleSaveEdit}
+                                  className="text-green-600 hover:text-green-800 transition"
+                                  title="Save"
+                                >
+                                  <Check size={12} />
+                                </button>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={() => handleEditItem(index)}
+                                  className="text-blue-500 hover:text-blue-700 transition"
+                                  title="Edit"
+                                >
+                                  <Edit2 size={12} />
+                                </button>
+                              )}
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveItem(index)}
+                                disabled={editingIndex === index}
+                                className="text-red-500 hover:text-red-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                                title="Delete"
+                              >
+                                <Trash2 size={12} />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
             </div>
-            <div className="flex justify-between">
-              <span className="font-semibold text-gray-700">CGST</span>
-              <span className="font-semibold text-gray-900">
-                ₹ {cgst.toFixed(2)}
-              </span>
-            </div>
-            <div className="flex justify-between">
-              <span className="font-semibold text-gray-700">SGST</span>
-              <span className="font-semibold text-gray-900">
-                ₹ {sgst.toFixed(2)}
-              </span>
-            </div>
-            <div className="border-t pt-2 flex justify-between">
-              <span className="font-bold text-gray-900">Grand Total</span>
-              <span className="font-bold text-lg text-orange-600">
-                ₹ {grandTotal.toFixed(2)}
+          )}
+
+          {/* Amount Summary */}
+          <div className="border-b pb-3 bg-orange-50 p-3 rounded">
+            <div className="flex justify-between items-center">
+              <span className="font-bold text-gray-900 text-sm">Total Taxable</span>
+              <span className="font-bold text-orange-600 text-lg">
+                ₹{formatPrice(grandTotal)}
               </span>
             </div>
           </div>
 
           {/* Buttons */}
-          <div className="flex gap-3 justify-end pt-4">
+          <div className="flex gap-2 justify-end pt-3">
             <button
-              type="reset"
-              onClick={handleReset}
-              className="bg-gray-400 hover:bg-gray-500 text-white px-6 py-2 rounded text-sm transition-colors"
+              type="button"
+              onClick={onClose}
+              className="bg-gray-400 hover:bg-gray-500 text-white px-4 py-1.5 rounded text-xs transition-colors font-semibold"
             >
-              Reset
+              Cancel
             </button>
             <button
               type="submit"
-              className="bg-orange-500 hover:bg-orange-600 text-white px-6 py-2 rounded text-sm transition-colors"
+              disabled={selectedItems.length === 0}
+              className="bg-orange-500 hover:bg-orange-600 disabled:bg-gray-400 text-white px-4 py-1.5 rounded text-xs transition-colors font-semibold"
             >
               Save
             </button>

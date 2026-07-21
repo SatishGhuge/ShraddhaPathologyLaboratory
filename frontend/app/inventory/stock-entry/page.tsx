@@ -26,14 +26,21 @@ interface StockEntry {
   supplierId: number;
   invoiceNo: string;
   invoiceDate: string;
-  itemId: number;
-  batchNo: string;
-  expiryDate: string;
-  quantity: number;
-  pricePerUnit: number;
-  basicAmount: number;
-  cgst: number;
-  sgst: number;
+  items: Array<{
+    itemId: number;
+    itemName: string;
+    batchNo: string;
+    expiryDate: string;
+    quantity: number;
+    pricePerUnit: number;
+    basicAmount: number;
+    cgst: number;
+    sgst: number;
+    totalAmount: number;
+  }>;
+  totalBasicAmount: number;
+  totalCGST: number;
+  totalSGST: number;
   grandTotal: number;
   status: "Active" | "Inactive";
 }
@@ -82,14 +89,23 @@ export default function StockEntryPage() {
       supplierId: 1,
       invoiceNo: "INV-2026-001",
       invoiceDate: "2026-07-15",
-      itemId: 1,
-      batchNo: "BATCH-001",
-      expiryDate: "2027-07-15",
-      quantity: 100,
-      pricePerUnit: 110,
-      basicAmount: 11000,
-      cgst: 660,
-      sgst: 660,
+      items: [
+        {
+          itemId: 1,
+          itemName: "CBC Reagent",
+          batchNo: "BATCH-001",
+          expiryDate: "2027-07-15",
+          quantity: 100,
+          pricePerUnit: 110,
+          basicAmount: 11000,
+          cgst: 660,
+          sgst: 660,
+          totalAmount: 12320,
+        },
+      ],
+      totalBasicAmount: 11000,
+      totalCGST: 660,
+      totalSGST: 660,
       grandTotal: 12320,
       status: "Active",
     },
@@ -99,14 +115,23 @@ export default function StockEntryPage() {
       supplierId: 2,
       invoiceNo: "INV-2026-002",
       invoiceDate: "2026-07-10",
-      itemId: 2,
-      batchNo: "BATCH-002",
-      expiryDate: "2027-01-10",
-      quantity: 50,
-      pricePerUnit: 200,
-      basicAmount: 10000,
-      cgst: 900,
-      sgst: 900,
+      items: [
+        {
+          itemId: 2,
+          itemName: "Glucose Analyzer",
+          batchNo: "BATCH-002",
+          expiryDate: "2027-01-10",
+          quantity: 50,
+          pricePerUnit: 200,
+          basicAmount: 10000,
+          cgst: 900,
+          sgst: 900,
+          totalAmount: 11800,
+        },
+      ],
+      totalBasicAmount: 10000,
+      totalCGST: 900,
+      totalSGST: 900,
       grandTotal: 11800,
       status: "Inactive",
     },
@@ -138,8 +163,10 @@ export default function StockEntryPage() {
     const matchesSearch =
       getSupplierName(entry.supplierId).toLowerCase().includes(search.toLowerCase()) ||
       entry.invoiceNo.toLowerCase().includes(search.toLowerCase()) ||
-      getItemName(entry.itemId).toLowerCase().includes(search.toLowerCase()) ||
-      entry.batchNo.toLowerCase().includes(search.toLowerCase());
+      entry.items.some((item) =>
+        item.itemName.toLowerCase().includes(search.toLowerCase()) ||
+        item.batchNo.toLowerCase().includes(search.toLowerCase())
+      );
 
     // If showInactive is checked, show ONLY inactive entries
     // If showInactive is unchecked, show ONLY active entries
@@ -301,65 +328,73 @@ export default function StockEntryPage() {
             </thead>
             <tbody>
               {paginatedEntries.length > 0 ? (
-                paginatedEntries.map((entry) => (
-                  <tr key={entry.id} className="hover:bg-gray-50 border-b border-gray-200">
-                    <td className="border border-gray-300 px-3 py-2 text-gray-600 text-xs font-mono">
-                      {entry.entryId}
-                    </td>
-                    <td className="border border-gray-300 px-3 py-2 font-semibold text-gray-900">
-                      {getSupplierName(entry.supplierId)}
-                    </td>
-                    <td className="border border-gray-300 px-3 py-2 text-gray-600 text-xs font-mono">
-                      {entry.invoiceNo}
-                    </td>
-                    <td className="border border-gray-300 px-3 py-2 text-gray-600">
-                      {getItemName(entry.itemId)}
-                    </td>
-                    <td className="border border-gray-300 px-3 py-2 text-center">
-                      <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs font-semibold">
-                        {entry.quantity}
-                      </span>
-                    </td>
-                    <td className="border border-gray-300 px-3 py-2 text-center text-gray-600">
-                      ₹ {entry.pricePerUnit.toFixed(2)}
-                    </td>
-                    <td className="border border-gray-300 px-3 py-2 text-center font-semibold text-gray-900">
-                      ₹ {entry.grandTotal.toFixed(2)}
-                    </td>
-                    <td className="border border-gray-300 px-3 py-2 text-center text-gray-600 text-xs">
-                      {new Date(entry.expiryDate).toLocaleDateString("en-GB")}
-                    </td>
-                    <td className="border border-gray-300 px-3 py-2">
-                      <div className="flex justify-center gap-1 flex-wrap">
-                        <button
-                          onClick={() => handleToggleActive(entry.id)}
-                          className={`px-2 py-1 rounded text-xs font-semibold transition-colors ${
-                            entry.status === "Active"
-                              ? "bg-green-500 hover:bg-green-600 text-white"
-                              : "bg-gray-400 hover:bg-gray-500 text-white"
-                          }`}
-                        >
-                          {entry.status === "Active" ? "Active" : "Inactive"}
-                        </button>
-                        <button
-                          onClick={() => {
-                            setEditingEntry(entry);
-                            setShowModal(true);
-                          }}
-                          className="bg-blue-600 text-white px-2 py-1 rounded text-xs hover:bg-blue-700 transition-colors flex items-center gap-1"
-                        >
-                          <Edit2 size={12} /> Edit
-                        </button>
-                        <button
-                          onClick={() => handleDelete(entry.id)}
-                          className="bg-red-500 text-white px-2 py-1 rounded text-xs hover:bg-red-600 transition-colors flex items-center gap-1"
-                        >
-                          <Trash2 size={12} /> Delete
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
+                paginatedEntries.map((entry) =>
+                  entry.items.map((item, itemIndex) => (
+                    <tr key={`${entry.id}-${itemIndex}`} className="hover:bg-gray-50 border-b border-gray-200">
+                      {itemIndex === 0 && (
+                        <>
+                          <td rowSpan={entry.items.length} className="border border-gray-300 px-3 py-2 text-gray-600 text-xs font-mono">
+                            {entry.entryId}
+                          </td>
+                          <td rowSpan={entry.items.length} className="border border-gray-300 px-3 py-2 font-semibold text-gray-900">
+                            {getSupplierName(entry.supplierId)}
+                          </td>
+                          <td rowSpan={entry.items.length} className="border border-gray-300 px-3 py-2 text-gray-600 text-xs font-mono">
+                            {entry.invoiceNo}
+                          </td>
+                        </>
+                      )}
+                      <td className="border border-gray-300 px-3 py-2 text-gray-600">
+                        {item.itemName}
+                      </td>
+                      <td className="border border-gray-300 px-3 py-2 text-center">
+                        <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs font-semibold">
+                          {item.quantity}
+                        </span>
+                      </td>
+                      <td className="border border-gray-300 px-3 py-2 text-center text-gray-600">
+                        ₹ {item.pricePerUnit.toFixed(2)}
+                      </td>
+                      <td className="border border-gray-300 px-3 py-2 text-center font-semibold text-gray-900">
+                        ₹ {entry.grandTotal.toFixed(2)}
+                      </td>
+                      <td className="border border-gray-300 px-3 py-2 text-center text-gray-600 text-xs">
+                        {new Date(item.expiryDate).toLocaleDateString("en-GB")}
+                      </td>
+                      {itemIndex === 0 && (
+                        <td rowSpan={entry.items.length} className="border border-gray-300 px-3 py-2">
+                          <div className="flex justify-center gap-1 flex-wrap">
+                            <button
+                              onClick={() => handleToggleActive(entry.id)}
+                              className={`px-2 py-1 rounded text-xs font-semibold transition-colors ${
+                                entry.status === "Active"
+                                  ? "bg-green-500 hover:bg-green-600 text-white"
+                                  : "bg-gray-400 hover:bg-gray-500 text-white"
+                              }`}
+                            >
+                              {entry.status === "Active" ? "Active" : "Inactive"}
+                            </button>
+                            <button
+                              onClick={() => {
+                                setEditingEntry(entry);
+                                setShowModal(true);
+                              }}
+                              className="bg-blue-600 text-white px-2 py-1 rounded text-xs hover:bg-blue-700 transition-colors flex items-center gap-1"
+                            >
+                              <Edit2 size={12} /> Edit
+                            </button>
+                            <button
+                              onClick={() => handleDelete(entry.id)}
+                              className="bg-red-600 text-white px-2 py-1 rounded text-xs hover:bg-red-700 transition-colors flex items-center gap-1"
+                            >
+                              <Trash2 size={12} /> Delete
+                            </button>
+                          </div>
+                        </td>
+                      )}
+                    </tr>
+                  ))
+                )
               ) : (
                 <tr>
                   <td colSpan={9} className="text-center py-4 text-gray-500 border border-gray-300">
@@ -420,7 +455,6 @@ export default function StockEntryPage() {
         onStockEntrySaved={handleStockEntrySaved}
         suppliers={SAMPLE_SUPPLIERS}
         items={SAMPLE_ITEMS}
-        editingEntry={editingEntry}
       />
 
       {/* Success Message */}

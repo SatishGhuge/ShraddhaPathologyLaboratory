@@ -214,10 +214,17 @@ const PatientResult = () => {
       const hasUnits = Object.values(paramGrouped).some((categoryParams: any) =>
         (categoryParams as any[]).some(param => {
           // Check if parameter has actual non-empty unit value
-          return param.units && param.units.trim() !== '' && param.units !== '-';
+          const hasUnit = param.units && param.units.trim() !== '' && param.units !== '-';
+          if (hasUnit) {
+            console.log(`✅ Found unit: "${param.units}" for parameter: ${param.parameterName}`);
+          }
+          return hasUnit;
         })
       );
-      console.log('🔍 shouldShowUnitsColumn:', hasUnits, 'groupedParams:', Object.keys(paramGrouped));
+      console.log('🔍 shouldShowUnitsColumn:', hasUnits, 'Categories:', Object.keys(paramGrouped));
+      console.log('📊 All units in grouped params:', Object.entries(paramGrouped).flatMap(([cat, params]: any) => 
+        (params as any[]).map(p => ({ param: p.parameterName, unit: p.units || '(empty)', category: cat }))
+      ));
       return hasUnits;
     } catch (e) {
       console.error('Error in shouldShowUnitsColumn:', e);
@@ -315,8 +322,25 @@ const PatientResult = () => {
       const data = await getPatientTestById(patientTestId);
       if (data) {
         setPatientData(data.patientTest);
+        
+        // DEBUG: Log interpretation from backend
+        console.log('✅ Patient Test Data Received:');
+        console.log('   Test Name:', data.patientTest.test?.name);
+        console.log('   Has Interpretation:', !!data.patientTest.test?.interpretation);
+        console.log('   Interpretation Length:', data.patientTest.test?.interpretation?.length || 0);
+        console.log('   Interpretation Preview:', data.patientTest.test?.interpretation?.substring(0, 100) || '(empty)');
+        
         setParameters(data.parameters);
         setGroupedParameters(data.groupedParameters);
+        
+        // DEBUG: Log units from backend
+        console.log('✅ Fetched parameters from backend:');
+        console.table(data.parameters.map(p => ({
+          name: p.parameterName,
+          units: p.units,
+          type: p.type,
+          category: p.categoryName
+        })));
         const initialResults = {};
         data.parameters.forEach(param => {
           if (param.existingResult) {
@@ -1064,7 +1088,13 @@ const PatientResult = () => {
                                 })()}
                               </div>
                             </td>
-                            <td className="border p-2">{param.units || ''}</td>
+                            <td className="border p-2 text-xs">
+                              {(() => {
+                                const unitValue = param.units || '-';
+                                console.log(`🔍 Rendering UNITS for ${param.parameterName}: "${unitValue}"`);
+                                return unitValue;
+                              })()}
+                            </td>
                             <td className="border p-2">{param.type === 'Text' || param.isDescriptive ? (param.normalRange || '') : getAgeAppropriateRange(param, patientData.patient.age, patientData.patient.gender, patientData.patient.dob)}</td>
                           </tr>
                         );
@@ -1148,9 +1178,6 @@ const PatientResult = () => {
                   {saving ? 'Saving...' : 'Save'}
                 </button>
                 <button onClick={() => router.back()} className="bg-gray-500 text-white px-3 py-1 rounded text-sm">Back</button>
-                <button onClick={() => handleSaveAndPrint(true)} disabled={saving} className="bg-primary-600 text-white px-3 py-1 rounded text-sm disabled:opacity-50">
-                  Save & Print
-                </button>
               </>
             )}
           </div>
@@ -1239,45 +1266,75 @@ const PatientResult = () => {
                         <tr>
                           <td colSpan={shouldShowUnitsColumn() || shouldShowReferenceRangeColumn() ? (shouldShowUnitsColumn() && shouldShowReferenceRangeColumn() ? 4 : 3) : 2} style={{ padding: '4px 6px', fontWeight: 'bold', borderBottom: '1px solid #ccc' }}>{patientData.test.name}</td>
                         </tr>
-                        {Object.entries(groupedParameters).map(([categoryName, categoryParams]: [string, any]) => (
-                          <React.Fragment key={categoryName}>
-                            {categoryName !== 'NO_CATEGORY_HEADER' && categoryParams[0]?.showCategoryHeader && (
-                              <tr><td colSpan={shouldShowUnitsColumn() || shouldShowReferenceRangeColumn() ? (shouldShowUnitsColumn() && shouldShowReferenceRangeColumn() ? 4 : 3) : 2} style={{ padding: '4px 6px', fontWeight: 'bold', borderBottom: '1px solid #ddd' }}>{categoryName.toUpperCase()}</td></tr>
-                            )}
-                            {(categoryParams as any[]).map((param) => {
-                              const numVal = results[param.id]?.numericValue;
-                              const isAbn = results[param.id]?.isAbnormal === true || results[param.id]?.isAbnormal === 1 || isValueOutOfRange(param, numVal);
-                              const displayValue = param.type === 'Numeric' ? (numVal !== null && numVal !== undefined ? numVal : '-') : (results[param.id]?.textValue || '-');
-                              const rangeStr = shouldShowReferenceRangeColumn() ? getAgeAppropriateRange(param, patientData.patient.age, patientData.patient.gender, patientData.patient.dob) : '';
-                              return (
-                                <tr key={param.id}>
-                                  <td style={{ padding: '3px 6px', width: shouldShowUnitsColumn() || shouldShowReferenceRangeColumn() ? '30%' : '50%', fontWeight: isAbn ? 'bold' : 'normal' }}>{param.parameterName}</td>
-                                  <td style={{ padding: '3px 6px 3px 20px', width: shouldShowUnitsColumn() || shouldShowReferenceRangeColumn() ? '28%' : '50%', fontWeight: isAbn ? '900' : 'normal', color: isAbn ? '#b91c1c' : 'inherit', fontSize: '11px', whiteSpace: 'normal', wordWrap: 'break-word' }}>
-                                    {param.isDescriptive && hasHtmlTags(displayValue) ? (
-                                      <div dangerouslySetInnerHTML={{ __html: sanitizeHtml(displayValue) }} style={{ margin: 0, whiteSpace: 'normal' }} />
-                                    ) : (
-                                      <>{displayValue}{isAbn && ' *'}</>
+                        {Object.entries(groupedParameters).map(([categoryName, categoryParams]: [string, any]) => {
+                          // Filter parameters: only show those with values
+                          const paramsWithValues = (categoryParams as any[]).filter(param => {
+                            const numVal = results[param.id]?.numericValue;
+                            const textVal = results[param.id]?.textValue;
+                            const hasNumeric = numVal !== null && numVal !== undefined && numVal !== '';
+                            const hasText = textVal && textVal.trim() !== '';
+                            return hasNumeric || hasText;
+                          });
+
+                          // If no parameters with values, skip this category
+                          if (paramsWithValues.length === 0) return null;
+
+                          return (
+                            <React.Fragment key={categoryName}>
+                              {categoryName !== 'NO_CATEGORY_HEADER' && categoryParams[0]?.showCategoryHeader && (
+                                <tr><td colSpan={shouldShowUnitsColumn() || shouldShowReferenceRangeColumn() ? (shouldShowUnitsColumn() && shouldShowReferenceRangeColumn() ? 4 : 3) : 2} style={{ padding: '4px 6px', fontWeight: 'bold', borderBottom: '1px solid #ddd' }}>{categoryName.toUpperCase()}</td></tr>
+                              )}
+                              {paramsWithValues.map((param) => {
+                                const numVal = results[param.id]?.numericValue;
+                                const textVal = results[param.id]?.textValue;
+                                const isAbn = results[param.id]?.isAbnormal === true || results[param.id]?.isAbnormal === 1 || isValueOutOfRange(param, numVal);
+                                
+                                // For text parameters: show only the selected value (first tag/item), not the full text
+                                let displayValue = '-';
+                                if (param.type === 'Numeric') {
+                                  displayValue = numVal !== null && numVal !== undefined ? numVal : '-';
+                                } else if (textVal) {
+                                  // If it's a comma/comma-separated list, show only first value
+                                  const firstValue = textVal.split(',')[0].trim();
+                                  displayValue = firstValue || '-';
+                                }
+                                
+                                // Get reference range - only numeric value for numeric params
+                                const rangeStr = shouldShowReferenceRangeColumn() ? getAgeAppropriateRange(param, patientData.patient.age, patientData.patient.gender, patientData.patient.dob) : '';
+                                
+                                return (
+                                  <tr key={param.id}>
+                                    <td style={{ padding: '3px 6px', width: shouldShowUnitsColumn() || shouldShowReferenceRangeColumn() ? '30%' : '50%', fontWeight: isAbn ? 'bold' : 'normal' }}>{param.parameterName}</td>
+                                    <td style={{ padding: '3px 6px 3px 20px', width: shouldShowUnitsColumn() || shouldShowReferenceRangeColumn() ? '28%' : '50%', fontWeight: isAbn ? '900' : 'normal', color: isAbn ? '#b91c1c' : 'inherit', fontSize: '11px', whiteSpace: 'normal', wordWrap: 'break-word', textAlign: 'right' }}>
+                                      {param.isDescriptive && displayValue !== '-' && hasHtmlTags(displayValue) ? (
+                                        <div dangerouslySetInnerHTML={{ __html: sanitizeHtml(displayValue) }} style={{ margin: 0, whiteSpace: 'normal' }} />
+                                      ) : (
+                                        <>{displayValue}{isAbn && ' *'}</>
+                                      )}
+                                    </td>
+                                    {shouldShowUnitsColumn() && (
+                                      <td style={{ padding: '3px 6px', width: '12%', textAlign: 'center' }}>{param.units || '-'}</td>
                                     )}
-                                  </td>
-                                  {shouldShowUnitsColumn() && (
-                                    <td style={{ padding: '3px 6px', width: '12%' }}>{param.units || ''}</td>
-                                  )}
-                                  {shouldShowReferenceRangeColumn() && (
-                                    <td style={{ padding: '3px 6px', width: '30%' }}>{rangeStr || '-'}</td>
-                                  )}
-                                </tr>
-                              );
-                            })}
-                          </React.Fragment>
-                        ))}
+                                    {shouldShowReferenceRangeColumn() && (
+                                      <td style={{ padding: '3px 6px', width: '30%' }}>
+                                        {param.type === 'Numeric' || param.type === 'Text' ? (rangeStr || '-') : (rangeStr || '-')}
+                                      </td>
+                                    )}
+                                  </tr>
+                                );
+                              })}
+                            </React.Fragment>
+                          );
+                        })}
                       </tbody>
                     </table>
 
                     {/* Interpretation */}
                     {patientData.test.interpretation && (
-                      <div style={{ marginTop: '4mm', borderTop: '1px solid #ccc', paddingTop: '3mm', fontSize: '11px', color: '#444' }}
-                        dangerouslySetInnerHTML={{ __html: patientData.test.interpretation }}
-                      />
+                      <div style={{ marginTop: '6mm', borderTop: '1.5px solid #333', paddingTop: '4mm', fontSize: '11px', color: '#444', lineHeight: '1.5' }}>
+                        <strong style={{ display: 'block', marginBottom: '2mm', textDecoration: 'underline' }}>INTERPRETATION:</strong>
+                        <div dangerouslySetInnerHTML={{ __html: patientData.test.interpretation }} />
+                      </div>
                     )}
 
                     {/* Signature block */}

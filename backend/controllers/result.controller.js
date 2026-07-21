@@ -174,7 +174,7 @@ export const getPatientTests = async (req, res) => {
             testParameterId: true,
             numericValue: true,
             textValue: true,
-            referenceRange: true
+            selectedOption: true
           }
         },
         department: {
@@ -1244,9 +1244,7 @@ export const saveTestResults = async (req, res) => {
         testCategoryId,
         numericValue,
         textValue,
-        selectedOption,
-        isAbnormal,
-        referenceRange
+        selectedOption
       } = result;
 
       // Validate required field
@@ -1320,9 +1318,6 @@ export const saveTestResults = async (req, res) => {
             numericValue: numericValue !== null ? parseFloat(numericValue) : null,
             textValue: textValue || null,
             selectedOption: selectedOption || null,
-            referenceRange: referenceRange || null,
-            lowValue: isOutOfRange ? (numericValue < (parameter.maleLowValue || 0) ? numericValue : null) : null,
-            highValue: isOutOfRange ? (numericValue > (parameter.maleHighValue || 0) ? numericValue : null) : null,
             enteredBy: enteredBy,
             enteredAt: new Date(),
             testCategoryId: testCategoryId ? parseInt(testCategoryId) : null
@@ -1334,12 +1329,15 @@ export const saveTestResults = async (req, res) => {
             numericValue: numericValue !== null ? parseFloat(numericValue) : null,
             textValue: textValue || null,
             selectedOption: selectedOption || null,
-            referenceRange: referenceRange || null,
             enteredBy: enteredBy,
             enteredAt: new Date()
           },
           include: {
-            testParameter: true
+            testParameter: {
+              include: {
+                unit: true
+              }
+            }
           }
         });
 
@@ -1487,7 +1485,16 @@ export const sendReport = async (req, res) => {
           include: { 
             testParameter: { 
               select: { 
+                id: true,
                 parameterName: true,
+                maleLowValue: true,
+                maleHighValue: true,
+                femaleLowValue: true,
+                femaleHighValue: true,
+                childLowValue: true,
+                childHighValue: true,
+                rangeText: true,
+                displayRangeText: true,
                 unit: {
                   select: {
                     symbol: true
@@ -1526,8 +1533,7 @@ export const sendReport = async (req, res) => {
             parameterName: r.testParameter.parameterName,
             value: r.numericValue !== null ? r.numericValue : (r.textValue || '-'),
             units: r.testParameter.unit?.symbol || '',
-            referenceRange: r.referenceRange || '',
-            isAbnormal: r.isAbnormal
+            referenceRange: r.testParameter.rangeText || r.testParameter.displayRangeText || ''
           });
         });
       }
@@ -1738,9 +1744,10 @@ export const getAllTestResults = async (req, res) => {
         parameterName: tr.testParameter.parameterName,
         value: tr.numericValue || tr.textValue || tr.selectedOption,
         units: tr.testParameter.unit?.symbol || '',
-        isAbnormal: tr.isAbnormal,
-        isOutOfRange: tr.isOutOfRange,
-        referenceRange: tr.referenceRange
+        // Reference range fetched from TestParameter
+        lowValue: tr.testParameter.maleLowValue,
+        highValue: tr.testParameter.maleHighValue,
+        rangeText: tr.testParameter.rangeText
       }))
     }));
 
