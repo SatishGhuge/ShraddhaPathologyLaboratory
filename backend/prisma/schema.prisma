@@ -570,9 +570,6 @@ model TestResult {
   numericValue    Float?
   textValue       String?
   selectedOption  String?
-  lowValue        Float?
-  highValue       Float?
-  referenceRange  String?
   enteredBy       String?
   verifiedBy      String?
   enteredAt       DateTime      @default(now())

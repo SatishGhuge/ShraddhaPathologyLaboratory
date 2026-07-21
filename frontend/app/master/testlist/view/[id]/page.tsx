@@ -7,7 +7,7 @@ import Header from "@/src/components/Header";
 import PageHeader from "@/src/components/BreadCrumb";
 import { CKEditor } from "@ckeditor/ckeditor5-react";
 import ClassicEditor from "@ckeditor/ckeditor5-build-classic";
-import { getTestById, createTest, updateTest, getDepartments, getUnits, getTests } from "@/src/api/master.js";
+import { getTestById, createTest, updateTest, getDepartments, getUnits, getTests, getSampleTypes } from "@/src/api/master.js";
 
 const baseInputClass =
   "px-2 py-1 border border-gray-300 rounded text-sm bg-white focus:outline-none focus:ring-2 focus:ring-orange-500";
@@ -69,7 +69,7 @@ const AddTest = () => {
   const [selectedTestToAdd, setSelectedTestToAdd] = useState("");
   const [selectedTestsToAdd, setSelectedTestsToAdd] = useState<any[]>([]);
   const [showPreview, setShowPreview] = useState(false);
-  const [specimenTypes, setSpecimenTypes] = useState<any[]>([]);
+  const [sampleTypes, setSampleTypes] = useState<any[]>([]);
   const [showSampleTypeDropdown, setShowSampleTypeDropdown] = useState(false);
   const [signatures, setSignatures] = useState<any[]>([]);
 
@@ -258,29 +258,22 @@ const AddTest = () => {
       }
     };
 
-    const fetchSpecimenTypes = async () => {
+    const fetchSampleTypes = async () => {
       try {
-        console.log("📡 Fetching specimen types from API...");
-        const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || '/api';
-        const response = await fetch(`${API_BASE_URL}/master/specimen-types`);
-        const result = await response.json();
-        
-        if (result.success) {
-          console.log("✅ Specimen types loaded:", result.data);
-          setSpecimenTypes(result.data);
-        } else {
-          console.error('❌ Failed to fetch specimen types:', result.message);
-        }
+        console.log("📡 Fetching sample types from API...");
+        const sampleTypesData = await getSampleTypes();
+        console.log("✅ Sample types loaded:", sampleTypesData);
+        setSampleTypes(sampleTypesData);
       } catch (err) {
-        console.error('❌ Error fetching specimen types:', err);
-        // Don't set error for specimen types, just log it
+        console.error('❌ Error fetching sample types:', err);
+        // Don't set error for sample types, just log it
       }
     };
 
     fetchDepartments();
     fetchUnits();
     fetchTests();
-    fetchSpecimenTypes();
+    fetchSampleTypes();
 
     // Fetch signatures for dropdown
     const fetchSignatures = async () => {
@@ -1211,11 +1204,11 @@ const AddTest = () => {
                       {formData.sampleType ? (
                         <>
                           <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" style={{ transform: 'rotate(45deg)', flexShrink: 0 }}>
-                            <path d="M9 3h6v11a3 3 0 0 1-6 0V3z" fill={specimenTypes.find(s => s.Sample_Type === formData.sampleType)?.Sample_Color || '#ccc'} stroke="#555" strokeWidth="1.2"/>
+                            <path d="M9 3h6v11a3 3 0 0 1-6 0V3z" fill={sampleTypes.find(s => s.Sample_Type === formData.sampleType)?.Sample_Color || '#ccc'} stroke="#555" strokeWidth="1.2"/>
                             <rect x="8" y="2" width="8" height="2" rx="1" fill="#888" stroke="#555" strokeWidth="0.8"/>
                             <line x1="9" y1="10" x2="15" y2="10" stroke="white" strokeWidth="1" opacity="0.5"/>
                           </svg>
-                          <span>{formData.sampleType} ({specimenTypes.find(s => s.Sample_Type === formData.sampleType)?.Sample_Color})</span>
+                          <span>{formData.sampleType} ({sampleTypes.find(s => s.Sample_Type === formData.sampleType)?.Sample_Color})</span>
                         </>
                       ) : (
                         <span className="text-gray-400">Please Select</span>
@@ -1229,7 +1222,7 @@ const AddTest = () => {
                         >
                           Please Select
                         </div>
-                        {specimenTypes.map((type, i) => (
+                        {sampleTypes.map((type, i) => (
                           <div
                             key={i}
                             className="flex items-center gap-2 px-3 py-2 text-xs hover:bg-cyan-50 cursor-pointer border-b last:border-b-0"

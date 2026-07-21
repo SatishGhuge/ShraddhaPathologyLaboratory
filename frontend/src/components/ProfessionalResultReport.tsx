@@ -35,11 +35,28 @@ export default function ProfessionalResultReport({
   };
 
   // Check if ANY parameter has units or reference range
-  const hasAnyUnits = parameters && parameters.some((param: any) => param.units && stripHtmlTags(param.units) !== "-");
+  const hasAnyUnits = parameters && parameters.some((param: any) => {
+    if (!param.units) return false;
+    const unitText = stripHtmlTags(param.units);
+    return unitText && unitText !== "-" && unitText !== "";
+  });
+  
   const hasAnyReferenceRange = parameters && parameters.some((param: any) => {
     const er = param.existingResult;
-    const rangeText = stripHtmlTags(er?.referenceRange || param.rangeText || "-");
-    return rangeText !== "-";
+    if (!er) return false;
+    let rangeText = "-";
+    if (param.type === "Numeric") {
+      rangeText = stripHtmlTags(er?.referenceRange || param.normalRange || param.rangeText || "-");
+    } else if (param.type === "Text" || param.isDescriptive) {
+      if (er?.textValue) {
+        rangeText = stripHtmlTags(String(er.textValue));
+      } else {
+        rangeText = stripHtmlTags(param.textContent || "-");
+      }
+    } else {
+      rangeText = stripHtmlTags(er?.referenceRange || param.rangeText || "-");
+    }
+    return rangeText && rangeText !== "-" && rangeText !== "";
   });
 
   return (
@@ -166,6 +183,7 @@ export default function ProfessionalResultReport({
           font-size: 13px;
           text-align: center;
           width: 20%;
+          padding: 8px 0;
         }
         .param-unit {
           font-size: 13px;
@@ -253,61 +271,105 @@ export default function ProfessionalResultReport({
           <thead className="table-header">
             <tr>
               <th style={{ width: "40%" }}>Test Description</th>
-              <th style={{ width: "20%" }}>Result</th>
-              {hasAnyUnits && <th style={{ width: "15%" }}>Unit</th>}
+              <th style={{ width: "20%", textAlign: "center" }}>Result</th>
+              {hasAnyUnits && <th style={{ width: "15%", textAlign: "center" }}>Unit</th>}
               {hasAnyReferenceRange && <th style={{ width: "25%" }}>Reference Range</th>}
             </tr>
           </thead>
           <tbody>
             {parameters && parameters.length > 0 ? (
-              parameters.map((param: any, idx: number) => {
-                const er = param.existingResult;
-                const val = er ? (er.numericValue !== null && er.numericValue !== undefined ? er.numericValue : er.textValue || "-") : "-";
-                const isAbnormal = er?.isAbnormal || (param.parameterType === "Numeric" && er?.isOutOfRange);
-                
-                // Get category method and parameter method separately
-                const categoryMethod = param.categoryTestMethod || null;
-                const parameterMethod = param.parameterTestMethod || null;
+              parameters
+                // Filter: only show parameters with values
+                .filter((param: any) => {
+                  const er = param.existingResult;
+                  if (!er) return false;
+                  const hasNumeric = er.numericValue !== null && er.numericValue !== undefined && er.numericValue !== '';
+                  const hasText = er.textValue && String(er.textValue).trim() !== '';
+                  return hasNumeric || hasText;
+                })
+                .map((param: any, idx: number) => {
+                  const er = param.existingResult;
+                  let val = "-";
+                  
+                  if (er) {
+                    if (er.numericValue !== null && er.numericValue !== undefined) {
+                      val = er.numericValue;
+                    } else if (er.textValue) {
+                      // For text: show only first value (split by comma)
+                      const firstVal = String(er.textValue).split(',')[0].trim();
+                      val = firstVal || "-";
+                    }
+                  }
+                  
+                  const isAbnormal = er?.isAbnormal || (param.type === "Numeric" && er?.isOutOfRange);
+                  
+                  // Get category method and parameter method separately
+                  const categoryMethod = param.categoryTestMethod || null;
+                  const parameterMethod = param.parameterTestMethod || null;
 
-                // Strip HTML tags from all values
-                const resultText = stripHtmlTags(String(val));
-                const unitText = stripHtmlTags(param.units);
-                const rangeText = stripHtmlTags(er?.referenceRange || param.rangeText || "-");
+                  // Strip HTML tags from all values
+                  const resultText = stripHtmlTags(String(val));
+                  const unitText = stripHtmlTags(param.units || "-");
+                  
+                  // Get reference range based on parameter type
+                  let rangeText = "-";
+                  if (param.type === "Numeric") {
+                    // For numeric: show the calculated range
+                    rangeText = stripHtmlTags(er?.referenceRange || param.normalRange || param.rangeText || "-");
+                  } else if (param.type === "Text" || param.isDescriptive) {
+                    // For text: show the entered/selected value as reference (not all options)
+                    // If user didn't enter anything, show the default value from param.textContent
+                    if (er?.textValue) {
+                      rangeText = stripHtmlTags(String(er.textValue));
+                    } else {
+                      rangeText = stripHtmlTags(param.textContent || "-");
+                    }
+                  } else {
+                    rangeText = stripHtmlTags(er?.referenceRange || param.rangeText || "-");
+                  }
 
-                return (
-                  <tr key={idx} className="table-row">
-                    <td className="param-name">
-                      {/* Show Category Method if exists */}
-                      {categoryMethod && (
-                        <div className="param-method">Method: {categoryMethod}</div>
-                      )}
-                      
-                      {/* Show Parameter Name */}
-                      <div>{param.parameterName}</div>
-                      
-                      {/* Show Parameter Method if exists */}
-                      {parameterMethod && (
-                        <div className="param-method">Method: {parameterMethod}</div>
-                      )}
-                    </td>
-                    <td className={`param-result ${isAbnormal ? "abnormal" : ""}`}>
-                      {resultText}
-                      {isAbnormal ? " *" : ""}
-                    </td>
-                    {hasAnyUnits && <td className="param-unit">{unitText}</td>}
-                    {hasAnyReferenceRange && <td className="param-range">{rangeText}</td>}
-                  </tr>
-                );
-              })
+                  return (
+                    <tr key={idx} className="table-row">
+                      <td className="param-name">
+                        {/* Show Category Method if exists */}
+                        {categoryMethod && (
+                          <div className="param-method">Method: {categoryMethod}</div>
+                        )}
+                        
+                        {/* Show Parameter Name */}
+                        <div>{param.parameterName}</div>
+                        
+                        {/* Show Parameter Method if exists */}
+                        {parameterMethod && (
+                          <div className="param-method">Method: {parameterMethod}</div>
+                        )}
+                      </td>
+                      <td className={`param-result ${isAbnormal ? "abnormal" : ""}`}>
+                        {resultText}
+                        {isAbnormal ? " *" : ""}
+                      </td>
+                      {hasAnyUnits && <td className="param-unit" style={{ textAlign: "center" }}>{unitText}</td>}
+                      {hasAnyReferenceRange && <td className="param-range">{rangeText}</td>}
+                    </tr>
+                  );
+                })
             ) : (
               <tr className="table-row">
                 <td colSpan={hasAnyUnits && hasAnyReferenceRange ? 4 : hasAnyUnits || hasAnyReferenceRange ? 3 : 2} style={{ textAlign: "center", color: "#999" }}>
-                  No parameters available
+                  No parameters with values available
                 </td>
               </tr>
             )}
           </tbody>
         </table>
+
+        {/* INTERPRETATION */}
+        {test?.interpretation && (
+          <div style={{ marginTop: "20px", paddingTop: "15px", borderTop: "1px solid #000" }}>
+            <p style={{ fontSize: "13px", fontWeight: "bold", marginBottom: "10px", textDecoration: "underline" }}>INTERPRETATION:</p>
+            <div style={{ fontSize: "12px", lineHeight: "1.6", color: "#333" }} dangerouslySetInnerHTML={{ __html: test.interpretation }} />
+          </div>
+        )}
 
         {/* FOOTER */}
         <div className="footer">

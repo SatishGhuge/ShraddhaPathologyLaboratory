@@ -229,9 +229,6 @@ export default function ItemPage() {
                 <th className="border border-gray-300 px-3 py-2 text-center font-semibold">
                   Unit
                 </th>
-                <th className="border border-gray-300 px-3 py-2 text-left font-semibold">
-                  Supplier
-                </th>
                 <th className="border border-gray-300 px-3 py-2 text-center font-semibold">
                   Action
                 </th>

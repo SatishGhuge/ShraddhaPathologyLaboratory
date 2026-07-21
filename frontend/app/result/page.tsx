@@ -465,10 +465,10 @@ export default function Result() {
         return `${parameterData.childLowValue} - ${parameterData.childHighValue}`;
       }
       if (exactAgeInYears >= 18) {
-        if (patientGender === 'female' && parameterData.femaleActive && parameterData.femaleLowValue != null && parameterData.femaleHighValue != null) {
+        if (patientGender === 'F' && parameterData.femaleActive && parameterData.femaleLowValue != null && parameterData.femaleHighValue != null) {
           return `${parameterData.femaleLowValue} - ${parameterData.femaleHighValue}`;
         }
-        if (patientGender === 'male' && parameterData.maleActive && parameterData.maleLowValue != null && parameterData.maleHighValue != null) {
+        if (patientGender === 'M' && parameterData.maleActive && parameterData.maleLowValue != null && parameterData.maleHighValue != null) {
           return `${parameterData.maleLowValue} - ${parameterData.maleHighValue}`;
         }
       }
