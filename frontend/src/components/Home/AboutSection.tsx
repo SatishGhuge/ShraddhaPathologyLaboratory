@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { getAboutContent } from "@/services/homepageApi";
 import { AboutContent } from "@/types/homepage";
+import { SectionHeader } from "./shared";
 
 const FALLBACK = {
   vision:
@@ -26,10 +27,10 @@ const sections = [
     badge:   "Vision",
     icon:    Eye,
     image:   "/pic1.jpg",
-    accent:  "#1D3F5F",
-    bg:      "from-[#1D3F5F] to-[#152e46]",
+    accent:  "oklch(40% 0.085 224.283)",
+    bg:      "from-[oklch(45%_0.085_224.283)] to-[oklch(40%_0.075_224.283)]",
     reverse: false,
-    stat:    { value: "25+",    label: "Years of Excellence", color: "#1D3F5F" },
+    stat:    { value: "25+",    label: "Years of Excellence", color: "oklch(40% 0.085 224.283)" },
     highlights: [
       { icon: Award,       text: "NABL Accredited Standards" },
       { icon: ShieldCheck, text: "ISO Certified Processes" },
@@ -42,10 +43,10 @@ const sections = [
     badge:   "Mission",
     icon:    Target,
     image:   "/mission11.JPG",
-    accent:  "#EB925A",
-    bg:      "from-[#EB925A] to-[#d4783f]",
+    accent:  "oklch(65% 0.15 45)",
+    bg:      "from-[oklch(60%_0.15_45)] to-[oklch(65%_0.13_43)]",
     reverse: true,
-    stat:    { value: "1,500+", label: "Tests Available",     color: "#EB925A" },
+    stat:    { value: "1,500+", label: "Tests Available",     color: "oklch(60% 0.15 45)" },
     highlights: [
       { icon: FlaskConical, text: "Advanced Automated Analysers" },
       { icon: Clock,        text: "Same Day Report Delivery" },
@@ -58,10 +59,10 @@ const sections = [
     badge:   "Expert Opinion",
     icon:    Stethoscope,
     image:   "/doctor11.JPG",
-    accent:  "#1D3F5F",
-    bg:      "from-[#1D3F5F] to-[#152e46]",
+    accent:  "oklch(40% 0.085 224.283)",
+    bg:      "from-[oklch(45%_0.085_224.283)] to-[oklch(40%_0.075_224.283)]",
     reverse: false,
-    stat:    { value: "NABL",   label: "Accredited Lab",      color: "#1D3F5F" },
+    stat:    { value: "NABL",   label: "Accredited Lab",      color: "oklch(40% 0.085 224.283)" },
     highlights: [
       { icon: Stethoscope, text: "Expert Pathologists On-Site" },
       { icon: ShieldCheck, text: "100% Accurate Reporting" },
@@ -86,22 +87,13 @@ export default function AboutSection() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-10">
 
         {/* ── Section Header ── */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          transition={{ duration: 0.5 }}
-          className="text-center mb-16"
-        >
-          <p className="text-[#EB925A] text-xs font-bold uppercase tracking-widest mb-3">About Us</p>
-          <h2 className="text-3xl lg:text-4xl font-bold text-[#1E293B] mb-4 leading-tight">
-            Dedicated to Excellence in Diagnostics
-          </h2>
-          <p className="text-[#64748B] text-sm leading-relaxed max-w-2xl mx-auto">
-            Shraddha Pathology Laboratory is committed to providing high-quality, accurate and timely
-            diagnostic services using advanced technology and a patient-first approach.
-          </p>
-        </motion.div>
+        <SectionHeader
+          badge="About Us"
+          title="Dedicated to Excellence in Diagnostics"
+          description="Shraddha Pathology Laboratory is committed to providing high-quality, accurate and timely diagnostic services using advanced technology and a patient-first approach."
+          badgeColor="oklch(65% 0.15 45)"
+          centered
+        />
 
         {/* ── Alternating Rows ── */}
         <div className="space-y-16 lg:space-y-24">

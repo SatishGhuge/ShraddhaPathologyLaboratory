@@ -20,7 +20,7 @@ export default function Footer() {
             </p>
             <div className="flex gap-3">
               {[Facebook, Twitter, Instagram, Linkedin].map((Icon, i) => (
-                <a key={i} href="#" className="w-8 h-8 bg-white/10 rounded-full flex items-center justify-center hover:bg-[#EB925A] transition-colors">
+                <a key={i} href="#" className="w-8 h-8 bg-white/10 rounded-full flex items-center justify-center hover:bg-[oklch(60%_0.15_45)] transition-colors">
                   <Icon size={14} />
                 </a>
               ))}
@@ -33,8 +33,8 @@ export default function Footer() {
             <ul className="space-y-2">
               {quickLinks.map((l) => (
                 <li key={l}>
-                  <a href="#" className="text-gray-400 text-xs hover:text-[#EB925A] transition-colors flex items-center gap-1">
-                    <span className="text-[#EB925A]">›</span> {l}
+                  <a href="#" className="text-gray-400 text-xs hover:text-[oklch(60%_0.15_45)] transition-colors flex items-center gap-1">
+                    <span className="text-[oklch(60%_0.15_45)]">›</span> {l}
                   </a>
                 </li>
               ))}
@@ -47,8 +47,8 @@ export default function Footer() {
             <ul className="space-y-2">
               {services.map((s) => (
                 <li key={s}>
-                  <a href="#" className="text-gray-400 text-xs hover:text-[#EB925A] transition-colors flex items-center gap-1">
-                    <span className="text-[#EB925A]">›</span> {s}
+                  <a href="#" className="text-gray-400 text-xs hover:text-[oklch(60%_0.15_45)] transition-colors flex items-center gap-1">
+                    <span className="text-[oklch(60%_0.15_45)]">›</span> {s}
                   </a>
                 </li>
               ))}
@@ -60,19 +60,19 @@ export default function Footer() {
             <h4 className="font-semibold text-sm mb-4">Customer Support</h4>
             <ul className="space-y-3">
               <li className="flex items-center gap-2 text-gray-400 text-xs">
-                <Phone size={13} className="text-[#EB925A] flex-shrink-0" />
-                <a href="tel:+919876543210" className="hover:text-[#EB925A]">+91 98765 43210</a>
+                <Phone size={13} className="text-[oklch(60%_0.15_45)] flex-shrink-0" />
+                <a href="tel:+919876543210" className="hover:text-[oklch(60%_0.15_45)]">+91 98765 43210</a>
               </li>
               <li className="flex items-center gap-2 text-gray-400 text-xs">
-                <Mail size={13} className="text-[#EB925A] flex-shrink-0" />
-                <a href="mailto:info@shraddhalab.com" className="hover:text-[#EB925A]">info@shraddhalab.com</a>
+                <Mail size={13} className="text-[oklch(60%_0.15_45)] flex-shrink-0" />
+                <a href="mailto:info@shraddhalab.com" className="hover:text-[oklch(60%_0.15_45)]">info@shraddhalab.com</a>
               </li>
               <li className="flex items-start gap-2 text-gray-400 text-xs">
-                <Clock size={13} className="text-[#EB925A] flex-shrink-0 mt-0.5" />
+                <Clock size={13} className="text-[oklch(60%_0.15_45)] flex-shrink-0 mt-0.5" />
                 <span>Mon – Sat: 7:00 AM – 9:00 PM<br />Sunday: 7:00 AM – 2:00 PM</span>
               </li>
               <li className="flex items-start gap-2 text-gray-400 text-xs">
-                <MapPin size={13} className="text-[#EB925A] flex-shrink-0 mt-0.5" />
+                <MapPin size={13} className="text-[oklch(60%_0.15_45)] flex-shrink-0 mt-0.5" />
                 <span>123, Health Street, Medical Road,<br />Mumbai – 400001, Maharashtra</span>
               </li>
             </ul>
@@ -81,8 +81,8 @@ export default function Footer() {
             <div className="mt-5">
               <p className="text-xs font-semibold mb-2">Newsletter</p>
               <div className="flex gap-2">
-                <input placeholder="Enter your email" className="flex-1 bg-white/10 border border-white/10 rounded-lg px-3 py-2 text-xs text-white placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-[#EB925A]" />
-                <button className="bg-[#EB925A] hover:bg-[#d4783f] text-white text-xs font-semibold px-3 py-2 rounded-lg transition-colors">
+                <input placeholder="Enter your email" className="flex-1 bg-white/10 border border-white/10 rounded-lg px-3 py-2 text-xs text-white placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-[oklch(60%_0.15_45)]" />
+                <button className="bg-[oklch(60%_0.15_45)] hover:bg-[oklch(55%_0.13_43)] text-white text-xs font-semibold px-3 py-2 rounded-lg transition-colors">
                   Subscribe
                 </button>
               </div>
@@ -96,8 +96,8 @@ export default function Footer() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex flex-col sm:flex-row items-center justify-between gap-2">
           <p className="text-gray-500 text-xs">© 2026 Shraddha Pathology Laboratory. All Rights Reserved.</p>
           <div className="flex gap-4">
-            <a href="#" className="text-gray-500 text-xs hover:text-[#EB925A]">Privacy Policy</a>
-            <a href="#" className="text-gray-500 text-xs hover:text-[#EB925A]">Terms & Conditions</a>
+            <a href="#" className="text-gray-500 text-xs hover:text-[oklch(60%_0.15_45)]">Privacy Policy</a>
+            <a href="#" className="text-gray-500 text-xs hover:text-[oklch(60%_0.15_45)]">Terms & Conditions</a>
           </div>
         </div>
       </div>

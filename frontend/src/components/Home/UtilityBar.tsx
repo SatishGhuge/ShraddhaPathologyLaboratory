@@ -22,7 +22,7 @@ export default function UtilityBar() {
   };
 
   return (
-    <div className="bg-[#1D3F5F] h-10 flex items-center overflow-hidden">
+    <div className="bg-[oklch(40%_0.085_224.283)] h-10 flex items-center overflow-hidden">
       <div className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-10 flex items-center justify-between gap-4">
 
         {/* ── Quick Links (left) ── */}
@@ -31,7 +31,7 @@ export default function UtilityBar() {
             <span key={label} className="flex items-center">
               <button
                 onClick={() => handleNav(href)}
-                className="text-white/80 hover:text-white text-xs font-medium px-3 py-1 transition-colors whitespace-nowrap hover:text-[#EB925A]"
+                className="text-white/80 hover:text-white text-xs font-medium px-3 py-1 transition-colors whitespace-nowrap hover:text-[oklch(60%_0.15_45)]"
               >
                 {label}
               </button>
@@ -45,8 +45,8 @@ export default function UtilityBar() {
         {/* ── Ticker (right) ── */}
         <div className="flex-1 overflow-hidden relative">
           {/* Fade masks */}
-          <div className="absolute left-0 top-0 bottom-0 w-8 bg-gradient-to-r from-[#1D3F5F] to-transparent z-10 pointer-events-none" />
-          <div className="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-[#1D3F5F] to-transparent z-10 pointer-events-none" />
+          <div className="absolute left-0 top-0 bottom-0 w-8 bg-gradient-to-r from-[oklch(45%_0.085_224.283)] to-transparent z-10 pointer-events-none" />
+          <div className="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-[oklch(45%_0.085_224.283)] to-transparent z-10 pointer-events-none" />
 
           <div
             ref={tickerRef}

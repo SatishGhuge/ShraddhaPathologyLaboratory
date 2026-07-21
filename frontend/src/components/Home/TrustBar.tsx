@@ -14,11 +14,11 @@ export default function TrustBar() {
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
           {stats.map((s) => (
             <div key={s.label} className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-orange-50 rounded-full flex items-center justify-center text-xl flex-shrink-0">
+              <div className="w-10 h-10 bg-yellow-50 rounded-full flex items-center justify-center text-xl flex-shrink-0">
                 {s.icon}
               </div>
               <div>
-                <p className="text-sm font-semibold text-[#1D3F5F]">{s.label}</p>
+                <p className="text-sm font-semibold text-[oklch(45%_0.085_224.283)]">{s.label}</p>
                 <p className="text-xs text-gray-400">{s.sub}</p>
               </div>
             </div>

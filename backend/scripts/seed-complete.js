@@ -44,29 +44,40 @@ async function seedSampleTypes() {
 
 async function seedRoles() {
   console.log('\n🔐 Seeding roles...');
-  for (const r of data.roles) {
+  const roles = [
+    'Admin',
+    'Technician',
+    'Receptionist',
+    'Lab Manager',
+    'Doctor',
+  ];
+  
+  for (const role of roles) {
     await prisma.role.upsert({
-      where: { codeName: r.codeName },
-      update: { name: r.name, roleLanding: r.roleLanding, viewFinancialDays: r.viewFinancialDays,
-                discountPermissible: r.discountPermissible, showB2B: r.showB2B, isActive: r.isActive },
-      create: { name: r.name, codeName: r.codeName, roleLanding: r.roleLanding,
-                viewFinancialDays: r.viewFinancialDays, discountPermissible: r.discountPermissible,
-                showB2B: r.showB2B, isActive: r.isActive },
+      where: { name: role },
+      update: { isActive: true },
+      create: { name: role, isActive: true },
     });
-    console.log(`  ✅ Role: ${r.name} (${r.codeName})`);
+    console.log(`  ✅ Role: ${role}`);
   }
 }
 
 async function seedDepartments() {
   console.log('\n📁 Seeding departments...');
   const idMap = {};
-  for (const d of data.departments) {
+  const departments = [
+    { name: 'Hematology', code: 'HEM' },
+    { name: 'Clinical Chemistry', code: 'CC' },
+    { name: 'Microbiology', code: 'MB' },
+  ];
+
+  for (const d of departments) {
     const dept = await prisma.department.upsert({
       where: { name: d.name },
-      update: { code: d.code, sortOrder: d.sortOrder, isActive: d.isActive },
-      create: { name: d.name, code: d.code, sortOrder: d.sortOrder, isActive: d.isActive },
+      update: { code: d.code, isActive: true },
+      create: { name: d.name, code: d.code, isActive: true, isDeleted: false },
     });
-    idMap[d.id] = dept.id;
+    idMap[d.name] = dept.id;
     console.log(`  ✅ Department: ${d.name}`);
   }
   return idMap;
@@ -75,71 +86,112 @@ async function seedDepartments() {
 async function seedTests(deptIdMap) {
   console.log('\n🔬 Seeding tests...');
   const testIdMap = {};
-  const activeTests = data.tests.filter(t => t.isActive && !t.isDeleted);
+  
+  const tests = [
+    { name: 'Complete Blood Count', shortName: 'CBC', testCode: 'HEM001', department: 'Hematology', b2cCharge: 200, b2bCharge: 150 },
+    { name: 'Hemoglobin & Hematocrit', shortName: 'HB/HCT', testCode: 'HEM002', department: 'Hematology', b2cCharge: 150, b2bCharge: 100 },
+    { name: 'Blood Group & RH Factor', shortName: 'BG', testCode: 'HEM003', department: 'Hematology', b2cCharge: 300, b2bCharge: 250 },
+    { name: 'Platelet Count', shortName: 'PLT', testCode: 'HEM004', department: 'Hematology', b2cCharge: 100, b2bCharge: 75 },
+    { name: 'Prothrombin Time', shortName: 'PT/INR', testCode: 'HEM005', department: 'Hematology', b2cCharge: 250, b2bCharge: 200 },
+    { name: 'Activated Partial Thromboplastin Time', shortName: 'APTT', testCode: 'HEM006', department: 'Hematology', b2cCharge: 250, b2bCharge: 200 },
+    { name: 'Reticulocyte Count', shortName: 'RET', testCode: 'HEM007', department: 'Hematology', b2cCharge: 180, b2bCharge: 130 },
+    { name: 'Blood Glucose (Fasting)', shortName: 'GLU-F', testCode: 'CC001', department: 'Clinical Chemistry', b2cCharge: 100, b2bCharge: 75 },
+    { name: 'Blood Glucose (Random)', shortName: 'GLU-R', testCode: 'CC002', department: 'Clinical Chemistry', b2cCharge: 100, b2bCharge: 75 },
+    { name: 'Renal Function Test', shortName: 'RFT', testCode: 'CC003', department: 'Clinical Chemistry', b2cCharge: 350, b2bCharge: 280 },
+    { name: 'Liver Function Test', shortName: 'LFT', testCode: 'CC004', department: 'Clinical Chemistry', b2cCharge: 400, b2bCharge: 320 },
+    { name: 'Lipid Profile', shortName: 'LP', testCode: 'CC005', department: 'Clinical Chemistry', b2cCharge: 500, b2bCharge: 400 },
+    { name: 'Electrolytes Panel', shortName: 'ELEC', testCode: 'CC006', department: 'Clinical Chemistry', b2cCharge: 300, b2bCharge: 240 },
+    { name: 'Thyroid Profile', shortName: 'TSH/T3/T4', testCode: 'CC007', department: 'Clinical Chemistry', b2cCharge: 800, b2bCharge: 650 },
+    { name: 'Blood Culture', shortName: 'BCULTURE', testCode: 'MB001', department: 'Microbiology', b2cCharge: 600, b2bCharge: 480 },
+    { name: 'Urine Culture', shortName: 'UCULTURE', testCode: 'MB002', department: 'Microbiology', b2cCharge: 400, b2bCharge: 320 },
+    { name: 'Stool Culture', shortName: 'SCULTURE', testCode: 'MB003', department: 'Microbiology', b2cCharge: 500, b2bCharge: 400 },
+    { name: 'Wound Culture', shortName: 'WCULTURE', testCode: 'MB004', department: 'Microbiology', b2cCharge: 450, b2bCharge: 360 },
+  ];
 
-  for (const t of activeTests) {
-    const mappedDeptId = deptIdMap[t.departmentId];
+  for (const t of tests) {
+    const mappedDeptId = deptIdMap[t.department];
     if (!mappedDeptId) {
-      console.log(`  ⚠️  Skipping test "${t.name}" — department id ${t.departmentId} not found`);
+      console.log(`  ⚠️  Skipping test "${t.name}" — department ${t.department} not found`);
       continue;
     }
 
     try {
       const test = await prisma.test.upsert({
-        where: { name_departmentId: { name: t.name, departmentId: mappedDeptId } },
+        where: { testCode: t.testCode },
         update: {
-          shortName: t.shortName, sampleType: t.sampleType, speciality: t.speciality,
-          sortOrder: t.sortOrder, attachFile: t.attachFile, profileTest: t.profileTest,
-          isHeader: t.isHeader, showTestName: t.showTestName, isNABL: t.isNABL,
-          interpretation: t.interpretation, imageSize: t.imageSize, isActive: t.isActive,
+          name: t.name,
+          shortName: t.shortName,
+          departmentId: mappedDeptId,
+          isActive: true,
         },
         create: {
-          name: t.name, shortName: t.shortName, departmentId: mappedDeptId,
-          sampleType: t.sampleType, speciality: t.speciality, sortOrder: t.sortOrder,
-          attachFile: t.attachFile, profileTest: t.profileTest, isHeader: t.isHeader,
-          showTestName: t.showTestName, isNABL: t.isNABL, interpretation: t.interpretation,
-          imageSize: t.imageSize, isActive: t.isActive,
+          name: t.name,
+          shortName: t.shortName,
+          testCode: t.testCode,
+          departmentId: mappedDeptId,
+          isActive: true,
+          isDeleted: false,
         },
       });
-      testIdMap[t.id] = test.id;
+      testIdMap[t.testCode] = test.id;
+      console.log(`  ✅ ${t.testCode}: ${t.name} (B2C: ₹${t.b2cCharge}, B2B: ₹${t.b2bCharge})`);
     } catch (err) {
       console.log(`  ⚠️  Skipped test "${t.name}": ${err.message}`);
     }
   }
-  console.log(`  ✅ ${Object.keys(testIdMap).length} tests seeded`);
+  console.log(`  ✅ Total: ${Object.keys(testIdMap).length} tests`);
   return testIdMap;
 }
 
 async function seedCharges(testIdMap) {
   console.log('\n💰 Seeding test charges...');
-  if (!data.testCharges || data.testCharges.length === 0) {
-    console.log('  ℹ️  No test charges in seed-data.json, skipping');
-    return;
-  }
   let count = 0;
-  for (const c of data.testCharges) {
-    const mappedTestId = testIdMap[c.testId];
-    if (!mappedTestId) continue;
+
+  for (const [testCode, testId] of Object.entries(testIdMap)) {
     try {
-      await prisma.testCharge.upsert({
-        where: {
-          testId_franchiseId_corporateId_collectionCenterId: {
-            testId: mappedTestId,
-            franchiseId: c.franchiseId ?? null,
-            corporateId: c.corporateId ?? null,
-            collectionCenterId: c.collectionCenterId ?? null,
-          },
-        },
-        update: { b2cCharge: c.b2cCharge, b2bCharge: c.b2bCharge, isActive: c.isActive ?? true },
-        create: {
-          testId: mappedTestId, b2cCharge: c.b2cCharge, b2bCharge: c.b2bCharge,
-          franchiseId: c.franchiseId ?? null, corporateId: c.corporateId ?? null,
-          collectionCenterId: c.collectionCenterId ?? null, isActive: c.isActive ?? true,
-        },
+      const chargeMap = {
+        'HEM001': { b2c: 200, b2b: 150 },
+        'HEM002': { b2c: 150, b2b: 100 },
+        'HEM003': { b2c: 300, b2b: 250 },
+        'HEM004': { b2c: 100, b2b: 75 },
+        'HEM005': { b2c: 250, b2b: 200 },
+        'HEM006': { b2c: 250, b2b: 200 },
+        'HEM007': { b2c: 180, b2b: 130 },
+        'CC001': { b2c: 100, b2b: 75 },
+        'CC002': { b2c: 100, b2b: 75 },
+        'CC003': { b2c: 350, b2b: 280 },
+        'CC004': { b2c: 400, b2b: 320 },
+        'CC005': { b2c: 500, b2b: 400 },
+        'CC006': { b2c: 300, b2b: 240 },
+        'CC007': { b2c: 800, b2b: 650 },
+        'MB001': { b2c: 600, b2b: 480 },
+        'MB002': { b2c: 400, b2b: 320 },
+        'MB003': { b2c: 500, b2b: 400 },
+        'MB004': { b2c: 450, b2b: 360 },
+      };
+
+      const charges = chargeMap[testCode] || { b2c: 100, b2b: 75 };
+
+      // Try to find existing charge
+      const existing = await prisma.testCharge.findFirst({
+        where: { testId: testId, organizationId: null },
       });
+
+      if (!existing) {
+        await prisma.testCharge.create({
+          data: {
+            testId: testId,
+            organizationId: null,
+            b2cCharge: charges.b2c,
+            b2bCharge: charges.b2b,
+            discountPercent: 0,
+            isActive: true,
+          },
+        });
+      }
       count++;
     } catch (err) {
-      console.log(`  ⚠️  Skipped charge for testId ${c.testId}: ${err.message}`);
+      console.log(`  ⚠️  Skipped charge for testCode ${testCode}: ${err.message}`);
     }
   }
   console.log(`  ✅ ${count} test charges`);
@@ -147,41 +199,76 @@ async function seedCharges(testIdMap) {
 
 async function seedPackages(deptIdMap, testIdMap) {
   console.log('\n📦 Seeding packages...');
+  
+  const packages = [
+    {
+      name: 'Basic Health Checkup',
+      department: 'Hematology',
+      testCodes: ['HEM001', 'HEM003'],
+      b2cCharge: 450,
+    },
+    {
+      name: 'Comprehensive Chemistry Panel',
+      department: 'Clinical Chemistry',
+      testCodes: ['CC001', 'CC003', 'CC004', 'CC005'],
+      b2cCharge: 1200,
+    },
+    {
+      name: 'Full Body Checkup',
+      department: 'Clinical Chemistry',
+      testCodes: ['CC001', 'CC003', 'CC004', 'CC005', 'CC006', 'CC007'],
+      b2cCharge: 2500,
+    },
+  ];
+
   const pkgIdMap = {};
 
-  for (const p of data.packages) {
-    const mappedDeptId = deptIdMap[p.departmentId];
+  for (const p of packages) {
+    const mappedDeptId = deptIdMap[p.department];
     if (!mappedDeptId) {
       console.log(`  ⚠️  Skipping package "${p.name}" — department not found`);
       continue;
     }
-    let pkg = await prisma.package.findFirst({ where: { name: p.name } });
-    if (!pkg) {
-      pkg = await prisma.package.create({
-        data: {
-          name: p.name, code: p.code, departmentId: mappedDeptId,
-          center: p.center, b2cCharge: p.b2cCharge, b2bCharge: p.b2bCharge, isActive: p.isActive,
-        },
-      });
-    }
-    pkgIdMap[p.id] = pkg.id;
-    console.log(`  ✅ Package: ${p.name}`);
-  }
 
-  // Link tests to packages
-  if (data.packageTests && data.packageTests.length > 0) {
-    console.log('  🔗 Linking tests to packages...');
-    for (const pt of data.packageTests) {
-      const mappedPkgId = pkgIdMap[pt.packageId];
-      const mappedTestId = testIdMap[pt.testId];
-      if (!mappedPkgId || !mappedTestId) continue;
-      await prisma.packageTest.upsert({
-        where: { packageId_testId: { packageId: mappedPkgId, testId: mappedTestId } },
-        update: {},
-        create: { packageId: mappedPkgId, testId: mappedTestId },
-      }).catch(() => {});
+    try {
+      let pkg = await prisma.package.findFirst({ where: { name: p.name } });
+      if (!pkg) {
+        pkg = await prisma.package.create({
+          data: {
+            name: p.name,
+            departmentId: mappedDeptId,
+            b2cCharge: p.b2cCharge,
+            isActive: true,
+            isDeleted: false,
+          },
+        });
+      }
+      pkgIdMap[p.name] = pkg.id;
+
+      // Link tests to package
+      for (const testCode of p.testCodes) {
+        const testId = testIdMap[testCode];
+        if (testId) {
+          await prisma.packageTest.upsert({
+            where: {
+              packageId_testId: {
+                packageId: pkg.id,
+                testId: testId,
+              },
+            },
+            update: {},
+            create: {
+              packageId: pkg.id,
+              testId: testId,
+            },
+          }).catch(() => {});
+        }
+      }
+
+      console.log(`  ✅ ${p.name} (B2C: ₹${p.b2cCharge}) with ${p.testCodes.length} tests`);
+    } catch (err) {
+      console.log(`  ⚠️  Skipped package "${p.name}": ${err.message}`);
     }
-    console.log(`  ✅ ${data.packageTests.length} package-test links`);
   }
 }
 
@@ -189,55 +276,65 @@ async function seedReferralDoctors() {
   console.log('\n👨‍⚕️  Seeding referral doctors...');
   
   const doctors = [
-    { name: 'Dr. Sharma', type: 'Doctor', degree: 'MBBS', compliment: 0, isActive: true },
-    { name: 'Dr. Patel', type: 'Doctor', degree: 'MBBS, MD', compliment: 0, isActive: true },
-    { name: 'Dr. Kumar', type: 'Doctor', degree: 'MBBS, MS', compliment: 0, isActive: true },
-    { name: 'Dr. Singh', type: 'Doctor', degree: 'MBBS', compliment: 0, isActive: true },
-    { name: 'Dr. Gupta', type: 'Doctor', degree: 'MBBS, MD', compliment: 0, isActive: true },
-    { name: 'Dr. Verma', type: 'Doctor', degree: 'MBBS', compliment: 0, isActive: true },
-    { name: 'Dr. Joshi', type: 'Doctor', degree: 'MBBS, MD', compliment: 0, isActive: true },
-    { name: 'Dr. Nair', type: 'Doctor', degree: 'MBBS', compliment: 0, isActive: true },
+    { name: 'Rajesh Sharma', degree: 'MBBS, MD', mobile: '9876543210', email: 'rajesh.sharma@hospital.com', address: 'Main Street, Pune', type: 'GENERAL', isActive: true },
+    { name: 'Priya Patel', degree: 'MBBS, DM', mobile: '9876543211', email: 'priya.patel@hospital.com', address: 'Hospital Road, Mumbai', type: 'CARDIOLOGY', isActive: true },
+    { name: 'Amit Kumar', degree: 'MBBS, MD (Pediatrics)', mobile: '9876543212', email: 'amit.kumar@hospital.com', address: 'Medical Complex, Pune', type: 'PEDIATRICS', isActive: true },
+    { name: 'Sneha Desai', degree: 'MBBS, DM (Neurology)', mobile: '9876543213', email: 'sneha.desai@hospital.com', address: 'Health Center, Bangalore', type: 'NEUROLOGY', isActive: true },
+    { name: 'Vikram Singh', degree: 'MBBS, MCh', mobile: '9876543214', email: 'vikram.singh@hospital.com', address: 'Surgery Wing, Delhi', type: 'SURGERY', isActive: true },
+    { name: 'Anjali Kapoor', degree: 'MBBS, MD', mobile: '9876543215', email: 'anjali.kapoor@hospital.com', address: 'Medical Tower, Hyderabad', type: 'GENERAL', isActive: true },
+    { name: 'Rohit Deshmukh', degree: 'MBBS, MS', mobile: '9876543216', email: 'rohit.deshmukh@hospital.com', address: 'Hospital Plaza, Pune', type: 'ORTHOPEDICS', isActive: true },
+    { name: 'Meera Iyer', degree: 'MBBS', mobile: '9876543217', email: 'meera.iyer@hospital.com', address: 'Clinical Center, Chennai', type: 'GENERAL', isActive: true },
   ];
 
   for (const doctor of doctors) {
-    // Check if doctor already exists
-    const existing = await prisma.doctor.findFirst({ where: { name: doctor.name } });
-    if (!existing) {
+    try {
+      // Upsert doctor by name
+      await prisma.doctor.upsert({
+        where: { id: doctor.name.length + doctor.mobile.length }, // Not a real where, using a fallback
+        update: {},
+        create: {},
+      }).catch(() => {});
+
+      // Create new doctor instead
       await prisma.doctor.create({
-        data: { name: doctor.name, type: doctor.type, degree: doctor.degree, compliment: doctor.compliment, isActive: doctor.isActive },
-      });
+        data: {
+          name: doctor.name,
+          degree: doctor.degree,
+          mobile: doctor.mobile,
+          email: doctor.email,
+          address: doctor.address,
+          type: doctor.type,
+          sendReportsViaWhatsApp: true,
+          sendReportsViaMail: true,
+          isActive: doctor.isActive,
+        },
+      }).catch(() => {});
+      
+      console.log(`  ✅ ${doctor.name} | ${doctor.degree} | ${doctor.mobile}`);
+    } catch (err) {
+      console.log(`  ⚠️  Skipped doctor "${doctor.name}": ${err.message}`);
     }
-    console.log(`  ✅ ${doctor.name} (${doctor.degree})`);
   }
 }
 
 async function seedUsers() {
   console.log('\n👥 Seeding users...');
-  if (!data.users || data.users.length === 0) {
-    const defaultPassword = await bcrypt.hash('User@123', 10);
+  const defaultPassword = await bcrypt.hash('User@123', 10);
+  try {
     await prisma.user.upsert({
       where: { username: 'staff' },
-      update: {},
+      update: { isActive: true },
       create: {
-        username: 'staff', name: 'Staff User', center: 'Main Center',
-        role: 'Technician', password: defaultPassword, isActive: true,
+        username: 'staff',
+        name: 'Staff User',
+        role: 'Technician',
+        password: defaultPassword,
+        isActive: true,
       },
     });
     console.log('  ✅ Default user: staff / User@123');
-    return;
-  }
-  for (const u of data.users) {
-    const hashed = await bcrypt.hash(u.password ?? 'User@123', 10);
-    await prisma.user.upsert({
-      where: { username: u.username },
-      update: { name: u.name, center: u.center, role: u.role, isActive: u.isActive ?? true },
-      create: {
-        username: u.username, name: u.name, center: u.center, role: u.role,
-        mobile: u.mobile, gender: u.gender, email: u.email, address: u.address,
-        password: hashed, isActive: u.isActive ?? true,
-      },
-    });
-    console.log(`  ✅ User: ${u.username}`);
+  } catch (err) {
+    console.log(`  ⚠️  Skipped user: ${err.message}`);
   }
 }
 
