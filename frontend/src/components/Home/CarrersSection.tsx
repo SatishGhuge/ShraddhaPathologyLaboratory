@@ -6,6 +6,7 @@ import { Briefcase, ArrowRight } from "lucide-react";
 import Image from "next/image";
 import { getJobs } from "@/services/homepageApi";
 import { JobOpening } from "@/types/homepage";
+import { SectionButton } from "./shared";
 
 const FALLBACK: JobOpening[] = [
   { id:1, title:"Lab Technician",       description:"2+ years experience in clinical laboratory. DMLT/BMLT required.", isOpen:true, createdAt:"" },
@@ -53,9 +54,9 @@ export default function CareersSection() {
             <p className="text-[#64748B] text-sm leading-relaxed mb-5">
               Join a team that values expertise, compassion and growth. We are always looking for passionate healthcare professionals.
             </p>
-            <button className="flex items-center gap-2 bg-[oklch(60%_0.15_45)] hover:bg-[oklch(55%_0.13_43)] text-white font-semibold px-6 py-3 rounded-xl transition-colors">
+            <SectionButton variant="primary" className="gap-2">
               Explore Careers <ArrowRight size={16} />
-            </button>
+            </SectionButton>
           </motion.div>
 
           {/* Right — job cards */}
@@ -71,9 +72,12 @@ export default function CareersSection() {
                   <p className="font-semibold text-[#1E293B] text-sm">{job.title}</p>
                   <p className="text-[#64748B] text-xs mt-0.5 line-clamp-1">{job.description}</p>
                 </div>
-                <button className="flex-shrink-0 bg-[oklch(45%_0.085_224.283)] hover:bg-[oklch(40%_0.075_224.283)] text-white text-xs font-semibold px-4 py-2 rounded-lg transition-colors">
+                <SectionButton
+                  variant="outline"
+                  className="flex-shrink-0 border-[oklch(45%_0.085_224.283)] text-[oklch(45%_0.085_224.283)] text-xs px-3 py-1.5"
+                >
                   Apply
-                </button>
+                </SectionButton>
               </motion.div>
             ))}
           </div>

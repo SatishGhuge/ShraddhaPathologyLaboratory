@@ -1,6 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
+import { SectionHeader, SectionGrid } from "./shared";
 
 const features = [
   {
@@ -41,15 +42,15 @@ export default function WhyChooseUs() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
 
         {/* Header */}
-        <div className="text-center mb-12">
-          <p className="text-[oklch(60%_0.15_45)] text-sm font-semibold uppercase tracking-widest mb-2">Why Choose Us</p>
-          <h2 className="text-3xl lg:text-4xl font-bold text-[oklch(45%_0.085_224.283)]">
-            Your Health, Our Priority
-          </h2>
-        </div>
+        <SectionHeader
+          badge="Why Choose Us"
+          title="Your Health, Our Priority"
+          badgeColor="oklch(60% 0.15 45)"
+          centered
+        />
 
         {/* Grid */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-6">
+        <SectionGrid columns={6} gap="6">
           {features.map((f, i) => (
             <motion.div
               key={f.title}
@@ -66,7 +67,7 @@ export default function WhyChooseUs() {
               <p className="text-gray-400 text-xs leading-relaxed">{f.desc}</p>
             </motion.div>
           ))}
-        </div>
+        </SectionGrid>
       </div>
     </section>
   );

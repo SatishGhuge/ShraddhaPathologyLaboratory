@@ -5,6 +5,7 @@ import { motion } from "framer-motion";
 import { ArrowRight, Calendar } from "lucide-react";
 import { getBlogs } from "@/services/homepageApi";
 import { Blog } from "@/types/homepage";
+import { SectionHeader, SectionGrid } from "./shared";
 
 const FALLBACK: Blog[] = [
   { id:1, title:"Understanding Your Blood Test Report", summary:"Learn how to read your CBC report and what each value means for your health.", imageUrl:"", isPublished:true, content:"", createdAt:"2026-05-20" },
@@ -24,18 +25,14 @@ export default function BlogSection() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
 
         <div className="flex flex-col sm:flex-row sm:items-end justify-between mb-10 gap-4">
-          <div>
-            <p className="text-[oklch(60%_0.15_45)] text-xs font-bold uppercase tracking-widest mb-2">Latest Blogs</p>
-            <h2 className="text-3xl lg:text-4xl font-bold text-[#1E293B]">
-              Health &amp; Wellness Insights
-            </h2>
-          </div>
-          <button className="flex items-center gap-1.5 text-sm font-semibold text-[oklch(45%_0.085_224.283)] border border-[oklch(45%_0.085_224.283)] px-4 py-2 rounded-lg hover:bg-[oklch(45%_0.085_224.283)] hover:text-white transition-colors whitespace-nowrap">
-            View All Blogs <ArrowRight size={14} />
-          </button>
+          <SectionHeader
+            badge="Latest Blogs"
+            title="Health & Wellness Insights"
+            badgeColor="oklch(60% 0.15 45)"
+          />
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+        <SectionGrid columns={3} gap="6">
           {blogs.map((blog, i) => (
             <motion.div
               key={blog.id}
@@ -68,7 +65,7 @@ export default function BlogSection() {
               </div>
             </motion.div>
           ))}
-        </div>
+        </SectionGrid>
       </div>
     </section>
   );

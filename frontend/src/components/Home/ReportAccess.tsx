@@ -1,6 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
+import { SectionHeader, SectionButton } from "./shared";
 
 export default function ReportAccess() {
   return (
@@ -15,26 +16,24 @@ export default function ReportAccess() {
             viewport={{ once: true }}
             transition={{ duration: 0.5 }}
           >
-            <p className="text-[oklch(60%_0.15_45)] text-sm font-semibold uppercase tracking-widest mb-3">
-              Report Access
-            </p>
-            <h2 className="text-3xl lg:text-4xl font-bold text-white mb-4 leading-tight">
-              Access Your Reports<br />Anytime, Anywhere
-            </h2>
-            <p className="text-blue-200 text-sm leading-relaxed mb-8 max-w-md">
-              View, download and share your lab reports securely with just a few clicks. Get instant notifications when your reports are ready.
-            </p>
+            <div className="mb-4">
+              <p className="text-[oklch(60%_0.15_45)] text-sm font-semibold uppercase tracking-widest mb-3">
+                Report Access
+              </p>
+              <h2 className="text-3xl lg:text-4xl font-bold text-white mb-4 leading-tight">
+                Access Your Reports<br />Anytime, Anywhere
+              </h2>
+              <p className="text-blue-200 text-sm leading-relaxed mb-8 max-w-md">
+                View, download and share your lab reports securely with just a few clicks. Get instant notifications when your reports are ready.
+              </p>
+            </div>
 
-            <motion.button
-              whileHover={{ scale: 1.04 }}
-              whileTap={{ scale: 0.97 }}
-              className="bg-[oklch(60%_0.15_45)] text-white font-semibold px-7 py-3 rounded-xl hover:bg-[oklch(55%_0.13_43)] transition-colors flex items-center gap-2"
-            >
+            <SectionButton variant="primary" className="gap-2">
               View Your Reports
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
               </svg>
-            </motion.button>
+            </SectionButton>
           </motion.div>
 
           {/* Right — mockup */}

@@ -40,11 +40,11 @@ export default function Navbar() {
           {/* Logo */}
           <div className="flex-shrink-0">
             <Image
-              src="/logo.png"
+              src="/Mainlogo.png"
               alt="Shraddha Pathology Laboratory"
-              width={180}
-              height={60}
-              className="h-12 w-auto object-contain"
+              width={200}
+              height={100}
+              className="h-16 w-auto object-contain"
               priority
             />
           </div>

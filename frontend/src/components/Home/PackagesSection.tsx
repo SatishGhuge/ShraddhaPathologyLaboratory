@@ -9,6 +9,7 @@ import {
 import { useRouter } from "next/navigation";
 import { getPackages } from "@/services/homepageApi";
 import { HealthPackage } from "@/types/homepage";
+import { SectionHeader, SectionButton, SectionCard } from "./shared";
 
 import { Swiper, SwiperSlide } from "swiper/react";
 import { Navigation, Autoplay } from "swiper/modules";
@@ -106,15 +107,11 @@ function PackageCard({ pkg, onView }: { pkg: HealthPackage; onView: () => void }
     : null;
 
   return (
-    <motion.div
-      whileHover={{ y: -8, boxShadow: "0 24px 48px rgba(0,0,0,0.14)" }}
-      transition={{ duration: 0.22 }}
-      className={`relative rounded-2xl p-7 flex flex-col border-2 transition-colors duration-300 ${
-        pkg.isPopular
-          ? "bg-[oklch(45%_0.085_224.283)] border-[oklch(60%_0.15_45)] shadow-2xl shadow-[oklch(45%_0.085_224.283)]/30"
-          : "bg-white border-gray-100 shadow-lg hover:border-[oklch(60%_0.15_45)]"
-      }`}
-      style={{ minHeight: "400px" }}
+    <SectionCard
+      isPopular={pkg.isPopular}
+      minHeight="400px"
+      whileHover={pkg.isPopular ? { y: -8 } : { y: -8, boxShadow: "0 24px 48px rgba(0,0,0,0.14)" }}
+      onClick={onView}
     >
       {/* Popular badge — sits above card, needs overflow visible on parent */}
       {pkg.isPopular && (
@@ -174,7 +171,7 @@ function PackageCard({ pkg, onView }: { pkg: HealthPackage; onView: () => void }
       >
         View Details
       </button>
-    </motion.div>
+    </SectionCard>
   );
 }
 
@@ -195,25 +192,20 @@ export default function PackagesSection() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-10">
 
         {/* Header */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          className="flex flex-col sm:flex-row sm:items-end justify-between mb-12 gap-4"
-        >
-          <div>
-            <p className="text-[oklch(60%_0.15_45)] text-xs font-bold uppercase tracking-widest mb-2">Health Packages</p>
-            <h2 className="text-3xl lg:text-4xl font-bold text-[#1E293B]">
-              Curated Packages for Your Health
-            </h2>
-          </div>
-          <button
+        <div className="flex flex-col sm:flex-row sm:items-end justify-between mb-12 gap-4">
+          <SectionHeader
+            badge="Health Packages"
+            title="Curated Packages for Your Health"
+            badgeColor="oklch(60% 0.15 45)"
+          />
+          <SectionButton
+            variant="outline"
             onClick={() => router.push("/packages")}
-            className="flex items-center gap-1.5 text-sm font-semibold text-[oklch(45%_0.085_224.283)] border-2 border-[oklch(45%_0.085_224.283)] px-4 py-2.5 rounded-lg hover:bg-[oklch(45%_0.085_224.283)] hover:text-white transition-colors whitespace-nowrap"
+            className="whitespace-nowrap"
           >
             View All <ArrowRight size={14} />
-          </button>
-        </motion.div>
+          </SectionButton>
+        </div>
 
         {/* Swiper wrapper with side nav buttons */}
         <motion.div
@@ -223,8 +215,6 @@ export default function PackagesSection() {
           transition={{ delay: 0.1 }}
           className="relative"
         >
-         
-
           <Swiper
             modules={[Navigation, Autoplay]}
             loop={true}

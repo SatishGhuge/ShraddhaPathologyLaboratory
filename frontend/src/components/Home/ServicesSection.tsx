@@ -6,6 +6,7 @@ import { motion } from "framer-motion";
 import { ArrowRight, Search } from "lucide-react";
 import { getServices } from "@/services/homepageApi";
 import { LabService } from "@/types/homepage";
+import { SectionHeader, SectionGrid, SectionButton } from "./shared";
 
 const FALLBACK_SERVICES: LabService[] = [
   { id:1, name:"Hematology",     category:"Blood",     description:"Complete blood count, blood group and anemia tests.", isActive:true },
@@ -47,15 +48,14 @@ export default function ServicesSection() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
 
         <div className="flex flex-col sm:flex-row sm:items-end justify-between mb-10 gap-4">
-          <div>
-            <p className="text-[oklch(60%_0.15_45)] text-xs font-bold uppercase tracking-widest mb-2">Tests & Services</p>
-            <h2 className="text-3xl lg:text-4xl font-bold text-[#1E293B]">
-              Comprehensive Diagnostic Solutions
-            </h2>
-          </div>
-          <button className="flex items-center gap-1.5 text-sm font-semibold text-[oklch(45%_0.085_224.283)] border border-[oklch(45%_0.085_224.283)] px-4 py-2 rounded-lg hover:bg-[oklch(45%_0.085_224.283)] hover:text-white transition-colors whitespace-nowrap">
+          <SectionHeader
+            badge="Tests & Services"
+            title="Comprehensive Diagnostic Solutions"
+            badgeColor="oklch(60% 0.15 45)"
+          />
+          <SectionButton variant="outline">
             View All Tests <ArrowRight size={14} />
-          </button>
+          </SectionButton>
         </div>
 
         {/* Search */}
@@ -70,7 +70,7 @@ export default function ServicesSection() {
         </div>
 
         {/* Cards */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+        <SectionGrid columns={6} gap="4">
           {filtered.map((s, i) => {
             const imgSrc = serviceImages[s.name] ?? DEFAULT_IMAGE;
             return (
@@ -104,7 +104,7 @@ export default function ServicesSection() {
               </motion.div>
             );
           })}
-        </div>
+        </SectionGrid>
       </div>
     </section>
   );

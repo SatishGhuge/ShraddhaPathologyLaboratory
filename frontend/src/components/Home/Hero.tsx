@@ -72,7 +72,7 @@ export default function Hero() {
               <motion.button
                 whileHover={{ scale: 1.03 }}
                 whileTap={{ scale: 0.97 }}
-                className="bg-[oklch(60%_0.15_45)] hover:bg-[oklch(55%_0.14_45)] text-white font-semibold px-6 py-2.5 rounded-lg transition-colors flex items-center gap-2 text-xs"
+                className="bg-[oklch(65%_0.15_45)] hover:bg-[oklch(60%_0.14_45)] text-white font-semibold px-6 py-2.5 rounded-lg transition-colors flex items-center gap-2 text-xs"
               >
                 Book Test
                 <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">

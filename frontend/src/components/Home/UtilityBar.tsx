@@ -22,7 +22,7 @@ export default function UtilityBar() {
   };
 
   return (
-    <div className="bg-[oklch(45%_0.085_224.283)] h-10 flex items-center overflow-hidden">
+    <div className="bg-[oklch(40%_0.085_224.283)] h-10 flex items-center overflow-hidden">
       <div className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-10 flex items-center justify-between gap-4">
 
         {/* ── Quick Links (left) ── */}
