@@ -326,9 +326,18 @@ export const getPatientTestById = async (req, res) => {
           select: {
             id: true,
             name: true,
+            shortName: true,
             interpretation: true,
             attachFile: true,
-            imageSize: true
+            imageSize: true,
+            sampleTypeId: true,
+            sample_type: {
+              select: {
+                id: true,
+                Sample_Type: true,
+                Sample_Color: true
+              }
+            }
           }
         },
         testResults: {

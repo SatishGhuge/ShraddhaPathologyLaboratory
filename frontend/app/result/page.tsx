@@ -16,7 +16,7 @@ import {
   Upload,
   FileCheck,
 } from "lucide-react";
-import BarcodeModal from "@/app/components/BarcodeModal";
+import BarcodeModal, { generateBarcodeLabels } from "@/app/components/BarcodeModal";
 import API_BASE_URL from "@/src/api/config";
 
 import { FaWhatsapp } from "react-icons/fa";
@@ -626,7 +626,7 @@ export default function Result() {
       }
       
       return {
-        barcodeValue: idx === 0 ? targetPatient.visit_id : `${targetPatient.visit_id}-${idx + 1}`,
+        barcodeValue: `${targetPatient.visit_id}-${idx + 1}`,
         specimen,
         shortNamesStr: (shortNames as any[]).join(' / '),
         dateStr,
@@ -2259,13 +2259,7 @@ export default function Result() {
                       </th>
                       <th className="px-1 sm:px-2 py-0.5 sm:py-1 text-left font-semibold text-[10px] whitespace-nowrap border border-gray-300">Patient History</th>
                       <th className="px-0.5 sm:px-1 py-0.5 sm:py-1 text-center font-semibold text-[10px] whitespace-nowrap border border-gray-300">
-                        <div title="Print barcode labels for selected tests">
-                          <Barcode
-                            size={16}
-                            className="mx-auto cursor-pointer hover:text-cyan-300 transition-colors"
-                            onClick={handleBarcodePrint}
-                          />
-                        </div>
+                        Status
                       </th>
                     </tr>
                   </thead>
@@ -2743,9 +2737,6 @@ export default function Result() {
                   onClick={handleResultEntry}
                   className="flex gap-0.5 items-center bg-gray-600 hover:bg-gray-700 text-white px-1.5 py-0.5 rounded text-[13px] transition-colors">
                   <span>Result ({selectedTests.size})</span>
-                </button>
-                <button className="flex gap-0.5 items-center bg-gray-600 hover:bg-gray-700 text-white px-1.5 py-0.5 rounded text-[13px] transition-colors">
-                  <span>Save</span>
                 </button>
                 <button
                   onClick={handlePrintPreview}

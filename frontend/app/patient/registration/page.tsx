@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
-import BarcodeModal from "@/app/components/BarcodeModal";
+import BarcodeModal, { generateBarcodeLabels, getSampleTypeId, getSampleTypeName, getTestName } from "@/app/components/BarcodeModal";
 import ReferralDoctorModal from "@/src/components/ReferralDoctorModal";
 import API_BASE_URL from "@/src/api/config";
 import {RefreshCcw,Star,X,Calendar,UserPlus,ChevronDown,Printer,Download,} from "lucide-react";
@@ -1467,6 +1467,9 @@ export default function PatientRegistration() {
 
   const handleSaveRegistration = async () => {
     try {
+      // Show loading state immediately
+      setLoading(true);
+      
       // Calculate billing amounts
       const totalAmt = total;
       const discAmt = discount;
@@ -1524,10 +1527,7 @@ export default function PatientRegistration() {
         tests: expandedTests
       };
 
-      console.log('Sending patient data:', patientData);
       const response = await createPatient(patientData);
-      
-      console.log("Patient registered successfully:", response);
       
       // Handle response structure correctly - response.data contains the patient object
       const patientId = response?.data?.patientId || response?.patientId || 'N/A';
@@ -1540,25 +1540,18 @@ export default function PatientRegistration() {
       
       // Get PatientTest objects from response (these have the correct database ID)
       const patientTests = response?.data?.tests || [];
-      console.log('📋 PatientTests from response:', patientTests);
-      console.log('   Count:', patientTests.length);
-      patientTests.forEach((pt, idx) => {
-        console.log(`   [${idx}] id=${pt.id}, testId=${pt.testId}, name=${pt.test?.name}`);
-      });
       
       // Merge PatientTest data with original selectedTests to get both ID and sample type
       const testsForBarcode = patientTests.map(pt => {
         const originalTest = selectedTests.find(st => st.id === pt.testId);
-        const result = {
+        return {
           id: pt.id, // This is the PatientTest database ID - use this for API calls!
           testId: pt.testId, // Original test ID for reference
           name: originalTest?.name || pt.test?.name || 'Unknown',
-          sample: originalTest?.sample || pt.test?.sampleType || 'Unknown'
+          sample: originalTest?.sample || pt.test?.sampleType || 'Unknown',
+          sampleTypeId: pt.test?.sampleTypeId  // ✅ CRITICAL: Include sampleTypeId from test relationship
         };
-        console.log(`  Mapped: id=${result.id}, name=${result.name}, sample=${result.sample}`);
-        return result;
       });
-      console.log('🔍 Tests for barcode (with correct IDs):', testsForBarcode);
       
       // Show success message with indicator of new vs existing patient
       let message = '';
@@ -1596,12 +1589,9 @@ export default function PatientRegistration() {
       
     } catch (error) {
       console.error("Error saving registration:", error);
-      console.error("Full error details:", {
-        message: error?.message,
-        status: error?.response?.status,
-        data: error?.response?.data
-      });
       alert(`Failed to register patient: ${error.message || 'Network error - check backend server'}`);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -1618,51 +1608,62 @@ export default function PatientRegistration() {
     });
   };
 
+  // Print barcode for already registered patient
+  const handlePrintBarcode = () => {
+    if (!lastRegisteredVisitId) {
+      alert('Please save the patient registration first');
+      return;
+    }
+
+    // For registration, we use a generic sample ID (default to 1 for general registration)
+    // If specific sampleTypeId is needed, it should come from the tests being added
+    const labels = [{
+      barcodeValue: `${lastRegisteredVisitId}-1`, // Use default sample type ID 1 for registration
+      specimen: 'Sample',
+      shortNamesStr: 'Registration',
+      dateStr: new Date().toLocaleDateString(),
+      timeStr: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      testIds: [],
+      organizationCode: selectedOrganizationCode || '',
+      barcode_status: 'Unprinted',
+      sampleStatus: 'Registered'
+    }];
+
+    setBarcodeLabels(labels);
+    setBarcodePatientInfo({
+      patientName: `${title} ${firstName} ${lastName || ''}`.trim(),
+      visitId: lastRegisteredVisitId,
+      age,
+      gender,
+      ageGender: `${gender ? gender.charAt(0).toUpperCase() : 'U'}/${age || 'N/A'}Y`,
+      organizationCode: selectedOrganizationCode || ''
+    });
+
+    setSelectedBarcodeIndices(new Set([0]));
+    setShowBarcodeModal(true);
+  };
+
   // Show barcode modal after registration
   const showBarcodeAfterRegistration = (patientName: string, visitId: string, age: string, gender: string, tests: any[], organizationCode?: string) => {
-    const now = new Date();
-    const dateStr = now.toLocaleDateString('en-GB');
-    const timeStr = now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: true }).toUpperCase();
-
-    console.log('🎫 showBarcodeAfterRegistration called with tests:', tests);
-
-    // Group by specimen type and collect PATIENTTEST IDs (not test IDs!)
-    const specimenGroups: any = {};
-    const specimenTestIds: any = {};
-    tests.forEach((t, idx) => {
-      console.log(`  Test ${idx}: id=${t.id}, name=${t.name}, sample=${t.sample}`);
-      const key = t.sample || 'Unknown';
-      if (!specimenGroups[key]) {
-        specimenGroups[key] = [];
-        specimenTestIds[key] = [];
-      }
-      specimenGroups[key].push(t.name);
-      specimenTestIds[key].push(t.id); // This is now the PatientTest database ID
-      console.log(`  Added test ${t.id} to specimen group "${key}"`);
+    // 🔴 DEBUG: Log what we're sending to barcode generation
+    console.log('🔴 Registration Page - showBarcodeAfterRegistration DEBUG:');
+    console.log('   tests.length:', tests.length);
+    console.log('   visitId:', visitId);
+    tests.forEach((test, idx) => {
+      console.log(`   Test ${idx} keys:`, Object.keys(test).slice(0, 15));
+      console.log(`   Test ${idx} data:`, {
+        id: test?.id,
+        sampleTypeId: test?.sampleTypeId,
+        'test.sampleTypeId': test?.test?.sampleTypeId,
+        'test object exists': !!test?.test,
+        testKeys: test?.test ? Object.keys(test.test).slice(0, 10) : 'NO TEST OBJECT'
+      });
     });
 
-    console.log('🔍 Specimen groups:', specimenGroups);
-    console.log('🔍 Specimen test IDs:', specimenTestIds);
-
-    // Build labels - Use visitId for barcode ONLY (no organization code in barcode)
-    const specimenEntries = Object.entries(specimenGroups);
-    const labels = specimenEntries.map(([specimen, shortNames], idx) => {
-      // Barcode contains ONLY visitId, not organization code
-      let barcodeValue = idx === 0 ? visitId : `${visitId}-${idx + 1}`;
-      
-      const label = {
-        barcodeValue, // Just the visitId-based barcode
-        specimen,
-        shortNamesStr: (shortNames as any[]).join(' / '),
-        dateStr,
-        timeStr,
-        testIds: specimenTestIds[specimen] || [], // Include PatientTest IDs for API calls
-      };
-      console.log(`  Label ${idx}: testIds=`, label.testIds);
-      return label;
-    });
-
-    console.log('✅ Final barcode labels:', labels);
+    // ✅ Use centralized generateBarcodeLabels function
+    const labels = generateBarcodeLabels(tests, visitId, organizationCode || '');
+    
+    console.log('✅ Generated barcode labels using centralized function:', labels);
 
     const genderInitial = gender ? gender.charAt(0).toUpperCase() : '';
     const ageGender = genderInitial && age ? `${genderInitial}/${age} Yrs` : genderInitial || (age ? `${age} Yrs` : '');
@@ -1673,16 +1674,10 @@ export default function PatientRegistration() {
       age,
       gender,
       ageGender,
-      organizationCode: organizationCode || '', // Store separately for display only
+      organizationCode: organizationCode || '',
     });
     
-    // Add organizationCode to each label for display on barcode
-    const labelsWithOrgCode = labels.map(label => ({
-      ...label,
-      organizationCode: organizationCode || '', // ✅ Add org code to barcode labels
-    }));
-    
-    setBarcodeLabels(labelsWithOrgCode);
+    setBarcodeLabels(labels);
     setShowBarcodeModal(true);
   };
 
@@ -2744,6 +2739,15 @@ export default function PatientRegistration() {
                 title={selectedTests.length === 0 ? "Save patient information" : "Register patient with tests"}>
                 {selectedTests.length === 0 ? "Save" : "Register"}
               </button>
+
+              {lastRegisteredVisitId && (
+                <button 
+                  onClick={handlePrintBarcode} 
+                  className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded font-semibold flex items-center gap-2"
+                  title="Print barcode for registered patient">
+                  🔖 Print Barcode
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -3231,8 +3235,20 @@ export default function PatientRegistration() {
                 </button>
                 <button 
                   onClick={handleSaveRegistration}
-                  className="px-8 py-2 bg-slate-900 hover:bg-orange-600 text-white rounded-lg font-semibold transition-colors flex items-center gap-2">
-                  <span>Save Registration</span>
+                  disabled={loading}
+                  className={`px-8 py-2 rounded-lg font-semibold transition-colors flex items-center gap-2 ${
+                    loading 
+                      ? 'bg-gray-400 cursor-not-allowed text-gray-600' 
+                      : 'bg-slate-900 hover:bg-orange-600 text-white'
+                  }`}>
+                  {loading ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-gray-600 border-t-white rounded-full animate-spin"></div>
+                      <span>Saving...</span>
+                    </>
+                  ) : (
+                    <span>Save Registration</span>
+                  )}
                 </button>
               </div>
             </div>

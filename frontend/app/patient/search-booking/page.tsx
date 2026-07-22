@@ -2,7 +2,7 @@
 
 import { useRouter, useSearchParams } from "next/navigation";
 import React, { useState, useRef, useEffect } from "react";
-import BarcodeModal from "@/app/components/BarcodeModal";
+import BarcodeModal, { generateBarcodeLabels, getSampleTypeId, getSampleTypeName, getTestName } from "@/app/components/BarcodeModal";
 import BillReceipt from "@/app/components/BillReceipt";
 import API_BASE_URL from "@/src/api/config";
 
@@ -460,6 +460,7 @@ export default function BookingPage() {
           name: t.test?.name || "",
           sample: t.test?.sample_type?.Sample_Type || t.sample || "N/A",  // Use sample_type relationship if available, fallback to PatientTest.sample
           testId: t.testId,
+          sampleTypeId: t.test?.sampleTypeId,  // ✅ CRITICAL: Include sampleTypeId from test relationship
           departmentId: t.departmentId,
           organizationId: t.organizationId,
           b2cCharge: t.charge || 0,
@@ -1284,68 +1285,26 @@ export default function BookingPage() {
       return;
     }
 
-    const now = new Date();
-    const dateStr = now.toLocaleDateString('en-GB');
-    const timeStr = now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: true }).toUpperCase();
+    // 🔴 DEBUG: Log what we're sending to barcode generation
+    console.log('🔴 Search-Booking Page - handlePrintBarcode DEBUG:');
+    console.log('   booking.tests.length:', booking.tests.length);
+    booking.tests.forEach((test, idx) => {
+      console.log(`   Test ${idx} keys:`, Object.keys(test).slice(0, 15));
+      console.log(`   Test ${idx} data:`, {
+        id: test?.id,
+        visitId: booking?.visitId,
+        sampleTypeId: test?.sampleTypeId,
+        'test.sampleTypeId': test?.test?.sampleTypeId,
+        'patientTest.sampleTypeId': test?.patientTest?.sampleTypeId,
+        'test object exists': !!test?.test,
+        testKeys: test?.test ? Object.keys(test.test).slice(0, 10) : 'NO TEST OBJECT'
+      });
+    });
 
-    // Group by specimen type and collect test IDs (PatientTest IDs)
-    const specimenGroups: any = {};
-    const specimenTestIds: any = {};
-    const specimenStatuses: any = {};
-    const specimenBarcodeStatuses: any = {};
+    // ✅ Use centralized generateBarcodeLabels function
+    const labels = generateBarcodeLabels(booking.tests, booking.visitId || booking.bookingId, booking.patientData?.organizationCode || '');
     
-    booking.tests.forEach((t: any) => {
-      const key = t.sample || 'Unknown';
-      if (!specimenGroups[key]) {
-        specimenGroups[key] = [];
-        specimenTestIds[key] = [];
-        specimenStatuses[key] = [];
-        specimenBarcodeStatuses[key] = [];
-      }
-      specimenGroups[key].push(t.name);
-      // ✨ Store the patientTest ID (from the booking test object which comes from patientTest table)
-      specimenTestIds[key].push(t.id);
-      // Store status and barcode_status for each test
-      specimenStatuses[key].push(t.status || 'Registered');
-      specimenBarcodeStatuses[key].push(t.barcode_status || 'Unprinted');
-    });
-
-    // Build labels - Use visitId for barcode ONLY (no organization code in barcode)
-    const specimenEntries = Object.entries(specimenGroups);
-    const labels = specimenEntries.map(([specimen, shortNames], idx) => {
-      let barcodeValue = idx === 0 ? booking.visitId : `${booking.visitId}-${idx + 1}`;
-      
-      // Organization code stored separately for display, not in barcode
-      let organizationCode = booking.patientData?.organizationCode || '';
-      
-      // Get status and barcode_status from tests in this specimen group
-      const statuses = specimenStatuses[specimen] || [];
-      const barcodeStatuses = specimenBarcodeStatuses[specimen] || [];
-      
-      // Determine final status: if ANY test is "Received", use "Received"
-      let finalSampleStatus = 'Registered';
-      if (statuses.includes('Received')) {
-        finalSampleStatus = 'Received';
-      }
-      
-      // Get final barcode status: if ANY barcode has been printed, use "Printed"
-      let finalBarcodeStatus = 'Unprinted';
-      if (barcodeStatuses.includes('Printed')) {
-        finalBarcodeStatus = 'Printed';
-      }
-      
-      return {
-        barcodeValue, // Just the visitId-based barcode
-        organizationCode, // Store separately for display
-        specimen,
-        shortNamesStr: (shortNames as any[]).join(' / '),
-        dateStr,
-        timeStr,
-        testIds: specimenTestIds[specimen] || [], // Include test IDs for API calls
-        barcode_status: finalBarcodeStatus, // Add barcode status from database
-        sampleStatus: finalSampleStatus, // ✅ ADD SAMPLE STATUS FOR BLUE HIGHLIGHTING
-      };
-    });
+    console.log('✅ Generated barcode labels using centralized function:', labels);
 
     const genderInitial = booking.patientData?.gender ? booking.patientData.gender.charAt(0).toUpperCase() : '';
     const age = booking.patientData?.age || '';
@@ -1357,10 +1316,10 @@ export default function BookingPage() {
       age,
       gender: booking.patientData?.gender || '',
       ageGender,
-      organizationCode: booking.patientData?.organizationCode || '', // Add organization code to patient info
+      organizationCode: booking.patientData?.organizationCode || '',
     });
     setBarcodeLabels(labels);
-    setSelectedBarcodeIndices(new Set(labels.map((_, idx) => idx))); // Initialize all barcodes as selected
+    setSelectedBarcodeIndices(new Set(labels.map((_, idx) => idx)));
     setShowBarcodeModal(true);
   };
 

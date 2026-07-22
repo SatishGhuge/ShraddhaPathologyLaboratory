@@ -5,6 +5,7 @@ import { useRouter, useParams, useSearchParams } from "next/navigation";
 import React, { useState, useEffect, useCallback, useRef } from "react";
 
 import Header from "@/src/components/Header";
+import BarcodeModal, { generateBarcodeLabels, getSampleTypeId, getSampleTypeName, getTestName } from "@/app/components/BarcodeModal";
 import { getPatientTestById, updateTestStatus, updatePatientComments } from "@/src/api/result.js";
 import API_BASE_URL from "@/src/api/config";
 import { useTestTemplates } from '@/src/hooks/useTestTemplates';
@@ -110,6 +111,12 @@ const PatientResult = () => {
   const [comments, setComments] = useState('');
   const [defaultSignature, setDefaultSignature] = useState<any>(null);
 
+  // BarcodeModal state
+  const [showBarcodeModal, setShowBarcodeModal] = useState(false);
+  const [barcodeLabels, setBarcodeLabels] = useState<any[]>([]);
+  const [barcodePatientInfo, setBarcodePatientInfo] = useState<any>(null);
+  const [selectedBarcodes, setSelectedBarcodes] = useState<Set<number>>(new Set());
+
   const calculateAge = (dob: any) => {
     if (!dob) return null;
     const today = new Date();
@@ -204,6 +211,140 @@ const PatientResult = () => {
     if (value < range.low) return { icon: '↓', title: 'Below range', color: 'text-blue-600' };
     if (value > range.high) return { icon: '↑', title: 'Above range', color: 'text-red-600' };
     return null;
+  };
+
+  // Barcode handlers - SIMPLIFIED: Use centralized barcode generation from BarcodeModal
+  const handlePrintBarcode = () => {
+    if (!patientData) return;
+    
+    const testData = patientData.patientTest || patientData;
+    const baseVisitId = testData.visitId || testData.id?.toString() || 'UNKNOWN';
+    
+    // Collect all tests to generate barcodes
+    let testsForBarcode: any[] = [];
+    
+    if (allTestsData.length > 0) {
+      // Multiple tests - use the full test data objects with sampleTypeId extracted to top level
+      testsForBarcode = allTestsData.map(td => {
+        const pt = td.patientTest;
+        // ✅ Ensure sampleTypeId is at top level for barcode generation
+        return {
+          ...pt,
+          sampleTypeId: pt.sampleTypeId || pt.test?.sampleTypeId,  // Ensure top-level access
+          sampleTypeName: pt.sample_type?.Sample_Type || pt.test?.sample_type?.Sample_Type,
+          specimen: pt.sample_type?.Sample_Type || pt.test?.sample_type?.Sample_Type
+        };
+      });
+    } else if (patientData) {
+      // Single test
+      const pt = patientData;
+      testsForBarcode = [{
+        ...pt,
+        sampleTypeId: pt.sampleTypeId || pt.test?.sampleTypeId,  // Ensure top-level access
+        sampleTypeName: pt.sample_type?.Sample_Type || pt.test?.sample_type?.Sample_Type,
+        specimen: pt.sample_type?.Sample_Type || pt.test?.sample_type?.Sample_Type
+      }];
+    }
+    
+    // 🔴 DEBUG: Log what we're sending to barcode generation
+    console.log('🔴 Result Page - handlePrintBarcode DEBUG:');
+    console.log('   allTestsData.length:', allTestsData.length);
+    console.log('   testsForBarcode.length:', testsForBarcode.length);
+    testsForBarcode.forEach((test, idx) => {
+      console.log(`   Test ${idx}:`, {
+        id: test?.id,
+        visitId: test?.visitId,
+        sampleTypeId: test?.sampleTypeId,
+        'test.sampleTypeId': test?.test?.sampleTypeId,
+        'test keys': test?.test ? Object.keys(test.test).slice(0, 10) : 'NO TEST OBJECT',
+        'top level keys':Object.keys(test).slice(0, 15)
+      });
+    });
+    
+    // ✅ Use centralized generateBarcodeLabels function
+    const labels = generateBarcodeLabels(testsForBarcode, baseVisitId, testData.organizationCode || '');
+    
+    console.log('✅ Generated barcode labels using centralized function:', labels);
+    
+    setBarcodeLabels(labels);
+    setBarcodePatientInfo({
+      patientName: patientData.patient?.firstName && patientData.patient?.lastName 
+        ? `${patientData.patient?.firstName} ${patientData.patient?.lastName}` 
+        : patientData.patient?.firstName || 'Unknown',
+      visitId: baseVisitId,
+      age: calculateAge(patientData.patient?.dob)?.toString() || '',
+      gender: patientData.patient?.gender || '',
+      ageGender: `${patientData.patient?.gender?.charAt(0).toUpperCase() || 'U'}/${calculateAge(patientData.patient?.dob) || 'N/A'}Y`,
+      organizationCode: testData.organizationCode || ''
+    });
+    
+    setSelectedBarcodes(new Set(labels.map((_, i) => i)));
+    setShowBarcodeModal(true);
+  };
+
+  const handleBarcodeToggle = (index: number) => {
+    setSelectedBarcodes(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(index)) {
+        newSet.delete(index);
+      } else {
+        newSet.add(index);
+      }
+      return newSet;
+    });
+  };
+
+  const onBarcodesPrintOnly = () => {
+    // Trigger print of selected barcodes
+    const printArea = document.getElementById('barcode-print-area');
+    if (printArea) {
+      window.print();
+    }
+  };
+
+  const onBarcodesPrintAndUpdate = async () => {
+    try {
+      // Print first
+      const printArea = document.getElementById('barcode-print-area');
+      if (printArea) {
+        window.print();
+      }
+      
+      // Then update barcode status to 'Printed' for selected barcodes
+      const selectedIndices = Array.from(selectedBarcodes);
+      if (selectedIndices.length > 0) {
+        // Update backend with printed status
+        if (allTestsData.length > 0) {
+          // Multiple tests
+          await Promise.all(selectedIndices.map(idx => {
+            const test = allTestsData[idx];
+            return fetch(`${API_BASE_URL}/results/${test.patientTest.id}/barcode-status`, {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ barcode_status: 'Printed', status: 'Received' })
+            });
+          }));
+        } else if (patientData.id) {
+          // Single test
+          await fetch(`${API_BASE_URL}/results/${patientData.id}/barcode-status`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ barcode_status: 'Printed', status: 'Received' })
+          });
+        }
+        
+        alert('Barcodes printed and status updated!');
+        setShowBarcodeModal(false);
+        // Refresh data
+        if (patientData) {
+          fetchPatientTestData();
+        }
+      }
+    } catch (error) {
+      console.error('Error updating barcode status:', error);
+      alert('Barcodes printed but failed to update status');
+      setShowBarcodeModal(false);
+    }
   };
 
   // Check if any parameter has units or reference range in report
@@ -1170,12 +1311,18 @@ const PatientResult = () => {
                 <button onClick={handleSaveAllTests} disabled={saving} className="bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded text-sm disabled:opacity-50">
                   {saving ? 'Saving...' : `Save All Results (${allTestsData.length} tests)`}
                 </button>
+                <button onClick={handlePrintBarcode} className="bg-purple-600 hover:bg-purple-700 text-white px-3 py-1 rounded text-sm">
+                  🔖 Print Barcode
+                </button>
                 <button onClick={() => router.back()} className="bg-gray-500 text-white px-3 py-1 rounded text-sm">Back</button>
               </>
             ) : (
               <>
                 <button onClick={handleSave} disabled={saving} className="bg-blue-600 text-white px-3 py-1 rounded text-sm disabled:opacity-50">
                   {saving ? 'Saving...' : 'Save'}
+                </button>
+                <button onClick={handlePrintBarcode} className="bg-purple-600 hover:bg-purple-700 text-white px-3 py-1 rounded text-sm">
+                  🔖 Print Barcode
                 </button>
                 <button onClick={() => router.back()} className="bg-gray-500 text-white px-3 py-1 rounded text-sm">Back</button>
               </>
@@ -1404,6 +1551,18 @@ const PatientResult = () => {
           </div>
         )}
       </div>
+
+      {/* Barcode Modal */}
+      <BarcodeModal
+        isOpen={showBarcodeModal}
+        onClose={() => setShowBarcodeModal(false)}
+        onPrintOnly={onBarcodesPrintOnly}
+        onPrintAndUpdate={onBarcodesPrintAndUpdate}
+        barcodeLabels={barcodeLabels}
+        barcodePatientInfo={barcodePatientInfo}
+        selectedBarcodes={selectedBarcodes}
+        onBarcodeToggle={handleBarcodeToggle}
+      />
     </>
   );
 };

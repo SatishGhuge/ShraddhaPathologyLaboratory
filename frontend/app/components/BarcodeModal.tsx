@@ -12,6 +12,7 @@ interface BarcodeLabel {
   barcode_status?: string;
   sampleStatus?: string;
   isSelected?: boolean;
+  sampleTypeId?: string | number;
 }
 
 interface BarcodePatientInfo {
@@ -34,6 +35,129 @@ interface BarcodeModalProps {
   selectedBarcodes?: Set<number>;
   onBarcodeToggle?: (index: number) => void;
 }
+
+// ✅ CENTRALIZED: Helper function to extract sampleTypeId from test object (handles all data structures)
+export const getSampleTypeId = (test: any): string | number => {
+  // Try different paths to find sampleTypeId
+  return (
+    test?.sampleTypeId ||                          // Direct property
+    test?.test?.sampleTypeId ||                    // Nested in test object
+    test?.patientTest?.test?.sampleTypeId ||       // Deeply nested
+    'unknown'
+  );
+};
+
+// ✅ CENTRALIZED: Helper function to extract sample type name
+export const getSampleTypeName = (test: any): string => {
+  return (
+    test?.sampleTypeName ||                        // Direct property
+    test?.sample ||                                 // Sample name
+    test?.sample_type?.Sample_Type ||              // Nested sample_type
+    test?.specimen_type?.Sample_Type ||            // Nested specimen_type
+    test?.test?.sample_type?.Sample_Type ||        // Deeply nested
+    test?.patientTest?.specimen_type?.Sample_Type || // Deeply nested
+    'Unknown'
+  );
+};
+
+// ✅ CENTRALIZED: Helper to get short test name
+export const getTestName = (test: any): string => {
+  return (
+    test?.shortName ||
+    test?.test?.shortName ||
+    test?.patientTest?.test?.shortName ||
+    test?.name ||
+    test?.test?.name ||
+    'Test'
+  );
+};
+
+// ✅ CENTRALIZED: Generate barcode labels from raw tests array
+// This is the SINGLE SOURCE OF TRUTH for barcode generation
+export const generateBarcodeLabels = (
+  tests: any[],
+  visitId: string,
+  organizationCode: string = ''
+): BarcodeLabel[] => {
+  const now = new Date();
+  const dateStr = now.toLocaleDateString('en-GB');
+  const timeStr = now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: true }).toUpperCase();
+
+  // 🔴 DEBUG: Log entire input to see data structure
+  console.log('🔴 generateBarcodeLabels INPUT:');
+  console.log('   visitId:', visitId);
+  console.log('   organizationCode:', organizationCode);
+  console.log('   tests array count:', tests?.length || 0);
+  tests.forEach((test, idx) => {
+    console.log(`   Test ${idx}:`, {
+      keys: Object.keys(test),
+      sampleTypeId: test?.sampleTypeId,
+      'test.sampleTypeId': test?.test?.sampleTypeId,
+      'patientTest.sampleTypeId': test?.patientTest?.sampleTypeId,
+      'test.sampleTypeId (nested)': test?.test?.sampleTypeId,
+      fullObject: JSON.stringify(test, null, 2).substring(0, 500)
+    });
+  });
+
+  // Group tests by sampleTypeId
+  const specimenGroups: any = {};
+
+  tests.forEach((test) => {
+    const sampleTypeId = getSampleTypeId(test);
+    console.log(`   ➡️ Test extraction - sampleTypeId: ${sampleTypeId}, getSampleTypeId paths checked`);
+    const key = sampleTypeId;
+
+    if (!specimenGroups[key]) {
+      specimenGroups[key] = {
+        sampleTypeId,
+        sampleTypeName: getSampleTypeName(test),
+        tests: [],
+        testNames: [],
+        statuses: [],
+        barcodeStatuses: [],
+        testIds: []
+      };
+    }
+
+    specimenGroups[key].tests.push(test);
+    specimenGroups[key].testNames.push(getTestName(test));
+    specimenGroups[key].statuses.push(test.status || test.patientTest?.status || 'Registered');
+    specimenGroups[key].barcodeStatuses.push(test.barcode_status || test.patientTest?.barcode_status || 'Unprinted');
+    specimenGroups[key].testIds.push(test.id || test.patientTest?.id || test.testId);
+  });
+
+  // Create barcode labels
+  const labels: BarcodeLabel[] = Object.entries(specimenGroups).map(([sampleTypeId, groupData]: any) => {
+    const barcodeValue = `${visitId}-${sampleTypeId}`;
+
+    // Determine final status
+    let finalSampleStatus = 'Registered';
+    if (groupData.statuses.includes('Received')) {
+      finalSampleStatus = 'Received';
+    }
+
+    // Get final barcode status
+    let finalBarcodeStatus = 'Unprinted';
+    if (groupData.barcodeStatuses.includes('Printed')) {
+      finalBarcodeStatus = 'Printed';
+    }
+
+    return {
+      barcodeValue,
+      specimen: groupData.sampleTypeName,
+      shortNamesStr: groupData.testNames.join(' / '),
+      dateStr,
+      timeStr,
+      testIds: groupData.testIds,
+      organizationCode,
+      barcode_status: finalBarcodeStatus,
+      sampleStatus: finalSampleStatus,
+      sampleTypeId
+    };
+  });
+
+  return labels;
+};
 
 // Generate Code128 barcode SVG
 const buildCode128Svg = (text: any) => {
@@ -116,33 +240,34 @@ const BarcodeCard = ({
 }) => {
   const { svg, width, height } = buildCode128Svg(label.barcodeValue);
   
-  // Determine colors based on barcode_status:
-  // PRIORITY: barcode_status (Printed/Unprinted) > Selection state
-  // 1. barcode_status = 'Printed' → LIGHT BLUE (already printed - show as printed regardless of selection)
-  // 2. barcode_status = 'Unprinted' → LIGHT RED/PINK (NOT printed yet - always show red)
-  // 3. Selection → Only affects OTHER visual styling, NOT the main color
+  // Determine colors based on selection and barcode_status:
+  // PRIORITY: Selection state > barcode_status
+  // 1. isSelected → BLUE (user selected it - high priority)
+  // 2. barcode_status = 'Printed' → LIGHT BLUE (already printed)
+  // 3. barcode_status = 'Unprinted' → LIGHT RED/PINK (NOT printed yet)
   
   const isPrinted = barcode_status === 'Printed';
   const isUnprinted = barcode_status === 'Unprinted';
   const showAsSelected = !isPrintMode && isSelected;
   
-  // Priority: barcode_status > selection
-  // If barcode is printed, show blue (even if not selected)
-  // If barcode is unprinted, show red (even if selected)
-  const borderColor = isPrinted 
-    ? 'border-blue-500' 
-    : isUnprinted
-      ? 'border-red-500'
-      : showAsSelected
-        ? 'border-blue-600'
+  // Priority: Selection > barcode_status
+  // If selected, ALWAYS show blue (highest priority)
+  // If barcode is printed, show blue
+  // If barcode is unprinted and NOT selected, show red
+  const borderColor = showAsSelected 
+    ? 'border-blue-600'
+    : isPrinted 
+      ? 'border-blue-500'
+      : isUnprinted
+        ? 'border-red-500'
         : 'border-gray-400';
         
-  const backgroundColor = isPrinted 
-    ? 'bg-blue-100' 
-    : isUnprinted
-      ? 'bg-red-200'
-      : showAsSelected
-        ? 'bg-blue-200'
+  const backgroundColor = showAsSelected 
+    ? 'bg-blue-200'
+    : isPrinted 
+      ? 'bg-blue-100'
+      : isUnprinted
+        ? 'bg-red-200'
         : 'bg-gray-100';
 
   return (

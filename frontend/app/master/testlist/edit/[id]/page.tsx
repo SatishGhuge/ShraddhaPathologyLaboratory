@@ -357,21 +357,36 @@ const AddTest = () => {
             };
             
             console.log('📝 Setting form data:', formDataToSet);
-            console.log('🔍 attachFile conversion:', {
-              original: testData.attachFile,
-              converted: Boolean(testData.attachFile),
-              type: typeof testData.attachFile
-            });
-            console.log('🔍 profileTest conversion:', {
-              original: testData.profileTest,
-              converted: Boolean(testData.profileTest),
-              type: typeof testData.profileTest
-            });
-            console.log('🔍 sampleTypeId:', {
-              original: testData.sampleTypeId,
-              converted: testData.sampleTypeId?.toString() || "",
-              totalSampleTypes: sampleTypes.length
-            });
+            
+            // 🔍 DETAILED DEBUG LOGS FOR BOOLEAN FIELDS
+            console.log('%c═══ ATTACHFILE DEBUG ═══', 'color: #ff6b6b; font-weight: bold');
+            console.log('Raw from API (testData.attachFile):', testData.attachFile, `Type: ${typeof testData.attachFile}`);
+            console.log('Boolean conversion:', Boolean(testData.attachFile));
+            console.log('Setting in form as:', formDataToSet.attachFile);
+            console.log('Will checkbox be checked?', formDataToSet.attachFile === true);
+            
+            console.log('%c═══ PROFILETEST DEBUG ═══', 'color: #4ecdc4; font-weight: bold');
+            console.log('Raw from API (testData.profileTest):', testData.profileTest, `Type: ${typeof testData.profileTest}`);
+            console.log('Boolean conversion:', Boolean(testData.profileTest));
+            console.log('Setting in form as:', formDataToSet.profileTest);
+            console.log('Will checkbox be checked?', formDataToSet.profileTest === true);
+            
+            // 🔍 SAMPLETYPE DEBUG
+            console.log('%c═══ SAMPLETYPE DEBUG ═══', 'color: #ffd93d; font-weight: bold');
+            console.log('Raw from API (testData.sampleTypeId):', testData.sampleTypeId, `Type: ${typeof testData.sampleTypeId}`);
+            console.log('Converted to string:', formDataToSet.sampleTypeId);
+            console.log('Available sampleTypes in state:', sampleTypes.length);
+            if (formDataToSet.sampleTypeId) {
+              const selectedSample = sampleTypes?.find(s => s.id === parseInt(formDataToSet.sampleTypeId));
+              console.log('Looking for sample with ID:', parseInt(formDataToSet.sampleTypeId));
+              console.log('Found sample?', selectedSample ? 'YES' : 'NO');
+              if (selectedSample) {
+                console.log('Selected Sample Type:', selectedSample?.Sample_Type);
+              } else {
+                console.log('⚠️  Sample type not found! Available IDs:', sampleTypes.map(s => s.id));
+              }
+            }
+            
             setFormData(formDataToSet);
             
             // Set categories if they exist
