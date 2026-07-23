@@ -18,6 +18,7 @@ const TestList = () => {
   const [showInactive, setShowInactive] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [pagination, setPagination] = useState<any>(null);
+  const [outsourcedTestIds, setOutsourcedTestIds] = useState<Set<number>>(new Set());
   const ITEMS_PER_PAGE = 20;
 
   // Import modal states
@@ -30,7 +31,30 @@ const TestList = () => {
   // Fetch tests from backend on component mount and when page changes
   useEffect(() => {
     fetchTests(currentPage);
+    fetchOutsourcedTests();
   }, [currentPage]);
+
+  // Fetch outsourced tests to get list of test IDs linked to outsourcing labs
+  const fetchOutsourcedTests = async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/master/outsourcing`);
+      const result = await response.json();
+      
+      if (result.success && result.data) {
+        const testIds = new Set<number>();
+        result.data.forEach((lab: any) => {
+          if (lab.tests && Array.isArray(lab.tests)) {
+            lab.tests.forEach((test: any) => {
+              testIds.add(test.testId);
+            });
+          }
+        });
+        setOutsourcedTestIds(testIds);
+      }
+    } catch (err) {
+      console.error('Error fetching outsourced tests:', err);
+    }
+  };
 
   // Reset to page 1 when search or filters change
   useEffect(() => {
@@ -397,7 +421,14 @@ const TestList = () => {
                         </td>
 
                         <td className="border border-gray-300 px-3 py-1">
-                          {test.name}
+                          <div className="flex items-center gap-2">
+                            {test.name}
+                            {outsourcedTestIds.has(test.id) && (
+                              <span title="This test is available in outsourcing labs" className="text-orange-500 font-bold text-lg leading-none">
+                                ▲
+                              </span>
+                            )}
+                          </div>
                         </td>
 
                         <td className="border border-gray-300 px-3 py-1">

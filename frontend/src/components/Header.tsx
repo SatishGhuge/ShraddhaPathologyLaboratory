@@ -53,6 +53,7 @@ const allModules: NavModule[] = [
       { label: "Organization", path: "/master/organization" },
       { label: "Specimen Type", path: "/master/specimen-type" },
       { label: "Units", path: "/master/units" },
+      { label: "Outsourcing", path: "/master/outsourcing" },
     ],
   },
   {
@@ -189,6 +190,7 @@ const Header = () => {
                 if (item.path.includes("userlist")) return accessible.masters.userlist;
                 if (item.path.includes("charges")) return accessible.masters.charges;
                 if (item.path.includes("organization")) return accessible.masters.organization;
+                if (item.path.includes("outsourcing")) return (accessible.masters as any)?.outsourcing !== false;
                 return false;
               })
             };

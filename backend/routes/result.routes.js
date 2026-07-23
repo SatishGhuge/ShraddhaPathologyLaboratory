@@ -16,6 +16,9 @@ import {
   getAllTestResults,
   updatePatientComments
 } from '../controllers/result.controller.js';
+import {
+  getOutsourcingReport
+} from '../controllers/outsourcing.controller.js';
 import { upload } from '../utils/upload.js';
 import { 
   getStatusHistory,
@@ -33,6 +36,9 @@ router.get('/', getPatientTests);
 
 // Get test statistics for dashboard — must be before /:id
 router.get('/statistics', getTestStatistics);
+
+// Get outsourcing report for a patient test
+router.get('/outsourcing/:patientTestId', getOutsourcingReport);
 
 // Bulk update test statuses — must be before /:id/status
 router.put('/bulk/status', bulkUpdateTestStatus);

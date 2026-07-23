@@ -237,6 +237,8 @@ export const getPatientTests = async (req, res) => {
         result_status: normalizeStatus(patientTest.status),
         status: patientTest.status,
         barcode_status: patientTest.barcode_status || 'Unprinted',
+        isOutsourced: patientTest.isOutsourced || false,
+        outsourcedTo: patientTest.outsourcedTo || null,
         approved_date: patientTest.visitDate ? (() => {
           const d = patientTest.visitDate;
           const datePart = d.toLocaleDateString('en-GB'); // DD/MM/YYYY
@@ -699,12 +701,34 @@ export const getPatientTestById = async (req, res) => {
     console.log(`Processed ${allParameters.length} parameters in ${Object.keys(groupedParameters).length} categories`);
     console.log(`📤 RETURNING: ${totalExistingResults} parameters have existing saved results`);
 
+    // 🔧 Fetch outsourcing report data if this is an outsourced test
+    let outsourcingReport = null;
+    if (patientTest.isOutsourced) {
+      outsourcingReport = await prisma.outsourcingReport.findUnique({
+        where: { patientTestId: patientTest.id },
+        include: {
+          outsourcingLab: {
+            select: {
+              id: true,
+              labName: true,
+              code: true
+            }
+          }
+        }
+      });
+      console.log('✅ Fetched outsourcing report:', outsourcingReport ? 'Found' : 'Not found');
+      if (outsourcingReport?.extractedData) {
+        console.log('📋 Extracted data stored:', outsourcingReport.extractedData);
+      }
+    }
+
     res.json({
       success: true,
       data: {
         patientTest,
         parameters: allParameters,
         groupedParameters,
+        outsourcingReport,  // Include outsourcing data
         debug: { totalExistingResults, totalParameters: allParameters.length }
       }
     });

@@ -19,9 +19,24 @@ import {
   importTests,
 } from '../controllers/master.controller.js';
 
+import {
+  getOutsourcingLabs,
+  getAllOutsourcingLabs,
+  getOutsourcingLabById,
+  createOutsourcingLab,
+  updateOutsourcingLab,
+  deleteOutsourcingLab,
+  getOutsourcingLabTests,
+  importOutsourcingReport,
+  getOutsourcingReport,
+  getAvailableTests,
+  extractPdfData
+} from '../controllers/outsourcing.controller.js';
+
 // For file upload handling
 import multer from 'multer';
-const upload = multer({ storage: multer.memoryStorage() });
+import { upload } from '../utils/upload.js';
+const memoryUpload = multer({ storage: multer.memoryStorage() });
 
 const router = express.Router();
 
@@ -135,5 +150,22 @@ router.get('/users/:id', getUserById);
 router.post('/users', createUser);
 router.put('/users/:id', updateUser);
 router.delete('/users/:id', deleteUser);
+
+// Outsourcing Lab routes
+router.get('/outsourcing', getOutsourcingLabs);
+router.get('/outsourcing/all', getAllOutsourcingLabs);
+router.get('/outsourcing/available-tests', getAvailableTests);
+router.get('/outsourcing/:id', getOutsourcingLabById);
+router.post('/outsourcing', createOutsourcingLab);
+router.put('/outsourcing/:id', updateOutsourcingLab);
+router.delete('/outsourcing/:id', deleteOutsourcingLab);
+
+// Outsourcing Lab Tests routes
+router.get('/outsourcing/:labId/tests', getOutsourcingLabTests);
+
+// Outsourcing Reports routes
+router.post('/outsourcing-reports/extract', upload.single('reportFile'), extractPdfData);
+router.post('/outsourcing-reports/import', importOutsourcingReport);
+router.get('/outsourcing-reports/:patientTestId', getOutsourcingReport);
 
 export default router;
