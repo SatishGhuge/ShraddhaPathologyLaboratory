@@ -3263,29 +3263,13 @@ export default function PatientRegistration() {
         isOpen={showBarcodeModal}
         onClose={() => setShowBarcodeModal(false)}
         onPrintOnly={async () => {
-          const printArea = document.getElementById('barcode-print-area');
-          const allLabels = printArea.querySelectorAll('[data-barcode-index]');
-          
-          // Print all barcodes
-          const allLabelsHtml = Array.from(allLabels)
-            .map((label) => (label as HTMLElement).outerHTML)
-            .join('');
-          
-          const win = window.open('', '_blank');
-          win.document.write(`<!DOCTYPE html><html><head><title>Barcode Labels</title>
-            <style>
-              * { margin:0; padding:0; box-sizing:border-box; }
-              body { font-family: Arial, sans-serif; background: white; padding: 8mm; }
-              .labels-wrap { display: flex; flex-wrap: wrap; gap: 6mm; justify-content: flex-start; }
-              .label { width: 58mm; border: 2px solid; padding: 3px; page-break-inside: avoid; }
-              @page { size: A4; margin: 8mm; }
-              @media print { body { padding: 0; } .labels-wrap { gap: 4mm; } }
-            </style>
-          </head><body><div class="labels-wrap">${allLabelsHtml}</div></body></html>`);
-          win.document.close();
-          win.focus();
-          win.print();
-          setShowBarcodeModal(false);
+          // Trigger iframe print - handled by BarcodeModal component
+          const iframe = document.getElementById('barcode-print-frame') as HTMLIFrameElement;
+          if (iframe && iframe.contentWindow) {
+            setTimeout(() => {
+              iframe.contentWindow?.print();
+            }, 100);
+          }
         }}
         onPrintAndUpdate={async () => {
           let successCount = 0;
@@ -3330,35 +3314,13 @@ export default function PatientRegistration() {
             console.error('⚠️ Status transition failed:', error);
           }
           
-          // Print only the selected barcodes
-          const printArea = document.getElementById('barcode-print-area');
-          const allLabels = printArea.querySelectorAll('[data-barcode-index]');
-          
-          // Create a new container with only selected labels
-          const selectedLabelsHtml = Array.from(allLabels)
-            .map((label, idx) => {
-              if (selectedBarcodeIndices.has(idx)) {
-                return (label as HTMLElement).outerHTML;
-              }
-              return '';
-            })
-            .filter(html => html.length > 0)
-            .join('');
-          
-          const win = window.open('', '_blank');
-          win.document.write(`<!DOCTYPE html><html><head><title>Barcode Labels</title>
-            <style>
-              * { margin:0; padding:0; box-sizing:border-box; }
-              body { font-family: Arial, sans-serif; background: white; padding: 8mm; }
-              .labels-wrap { display: flex; flex-wrap: wrap; gap: 6mm; justify-content: flex-start; }
-              .label { width: 58mm; border: 2px solid; padding: 3px; page-break-inside: avoid; }
-              @page { size: A4; margin: 8mm; }
-              @media print { body { padding: 0; } .labels-wrap { gap: 4mm; } }
-            </style>
-          </head><body><div class="labels-wrap">${selectedLabelsHtml}</div></body></html>`);
-          win.document.close();
-          win.focus();
-          win.print();
+          // Trigger iframe print
+          const iframe = document.getElementById('barcode-print-frame') as HTMLIFrameElement;
+          if (iframe && iframe.contentWindow) {
+            setTimeout(() => {
+              iframe.contentWindow?.print();
+            }, 100);
+          }
           
           // Update barcode labels to show 'Printed' status for printed barcodes
           const updatedLabels = barcodeLabels.map((label, idx) => {

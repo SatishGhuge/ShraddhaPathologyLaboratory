@@ -1631,25 +1631,182 @@ const AddTest = () => {
                         <label className="block font-semibold text-gray-700 text-xs sm:text-sm mb-1">
                           Category Name
                         </label>
-                        <input 
-                          className="px-2 py-1.5 sm:py-1 border border-gray-300 rounded text-xs sm:text-sm w-full sm:w-40" 
-                          placeholder="Category name..."
-                          value={category.name || ""}
-                          onChange={(e) => handleCategoryChange(categoryIndex, 'name', e.target.value)}
-                          disabled={isViewMode} 
-                        />
+                        <div className="flex flex-col gap-1">
+                          {/* Category Name Input */}
+                          <input 
+                            id={`category-name-${categoryIndex}`}
+                            className="px-2 py-1.5 sm:py-1 border border-gray-300 rounded text-xs sm:text-sm w-full sm:w-40" 
+                            placeholder="Category name..."
+                            value={category.name || ""}
+                            onChange={(e) => handleCategoryChange(categoryIndex, 'name', e.target.value)}
+                            disabled={isViewMode} 
+                          />
+                          {/* Formatting Buttons - Below Input */}
+                          {!isViewMode && (
+                            <div className="flex gap-1">
+                              {/* Bold Button */}
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const input = document.getElementById(`category-name-${categoryIndex}`) as HTMLInputElement;
+                                  const start = input.selectionStart;
+                                  const end = input.selectionEnd;
+                                  const selectedText = input.value.substring(start, end);
+                                  if (selectedText) {
+                                    const newValue = input.value.substring(0, start) + `<b>${selectedText}</b>` + input.value.substring(end);
+                                    handleCategoryChange(categoryIndex, 'name', newValue);
+                                  }
+                                }}
+                                className="px-2 py-1 bg-white border border-gray-300 rounded text-xs font-bold hover:bg-gray-100"
+                                title="Bold"
+                              >
+                                B
+                              </button>
+                              {/* Italic Button */}
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const input = document.getElementById(`category-name-${categoryIndex}`) as HTMLInputElement;
+                                  const start = input.selectionStart;
+                                  const end = input.selectionEnd;
+                                  const selectedText = input.value.substring(start, end);
+                                  if (selectedText) {
+                                    const newValue = input.value.substring(0, start) + `<i>${selectedText}</i>` + input.value.substring(end);
+                                    handleCategoryChange(categoryIndex, 'name', newValue);
+                                  }
+                                }}
+                                className="px-2 py-1 bg-white border border-gray-300 rounded text-xs italic hover:bg-gray-100"
+                                title="Italic"
+                              >
+                                I
+                              </button>
+                              {/* Underline Button */}
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const input = document.getElementById(`category-name-${categoryIndex}`) as HTMLInputElement;
+                                  const start = input.selectionStart;
+                                  const end = input.selectionEnd;
+                                  const selectedText = input.value.substring(start, end);
+                                  if (selectedText) {
+                                    const newValue = input.value.substring(0, start) + `<u>${selectedText}</u>` + input.value.substring(end);
+                                    handleCategoryChange(categoryIndex, 'name', newValue);
+                                  }
+                                }}
+                                className="px-2 py-1 bg-white border border-gray-300 rounded text-xs underline hover:bg-gray-100"
+                                title="Underline"
+                              >
+                                U
+                              </button>
+                              {/* Clear Formatting Button */}
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const input = document.getElementById(`category-name-${categoryIndex}`) as HTMLInputElement;
+                                  const start = input.selectionStart;
+                                  const end = input.selectionEnd;
+                                  const selectedText = input.value.substring(start, end);
+                                  if (selectedText) {
+                                    const cleanText = selectedText
+                                      .replace(/<b>|<\/b>/g, '')
+                                      .replace(/<i>|<\/i>/g, '')
+                                      .replace(/<u>|<\/u>/g, '');
+                                    const newValue = input.value.substring(0, start) + cleanText + input.value.substring(end);
+                                    handleCategoryChange(categoryIndex, 'name', newValue);
+                                  }
+                                }}
+                                className="px-2 py-1 bg-white border border-gray-300 rounded text-xs font-bold text-red-600 hover:bg-gray-100"
+                                title="Clear formatting"
+                              >
+                                X
+                              </button>
+                            </div>
+                          )}
+                        </div>
                       </div>
                       <div>
                         <label className="block font-semibold text-gray-700 text-xs sm:text-sm mb-1">
                           Category Test Method
                         </label>
                         <input 
+                          id={`category-method-${categoryIndex}`}
                           className="px-2 py-1.5 sm:py-1 border border-gray-300 rounded text-xs sm:text-sm w-full sm:w-40" 
                           placeholder="Category test method..." 
                           value={category.testMethod || ""}
                           onChange={(e) => handleCategoryChange(categoryIndex, 'testMethod', e.target.value)}
                           disabled={isViewMode} 
                         />
+                        {!isViewMode && (
+                          <div className="flex gap-1 mt-1">
+                            {/* Bold Button */}
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const input = document.getElementById(`category-method-${categoryIndex}`) as HTMLInputElement;
+                                const start = input.selectionStart || 0;
+                                const end = input.selectionEnd || 0;
+                                const selectedText = input.value.substring(start, end);
+                                if (selectedText) {
+                                  const newValue = input.value.substring(0, start) + `<b>${selectedText}</b>` + input.value.substring(end);
+                                  handleCategoryChange(categoryIndex, 'testMethod', newValue);
+                                }
+                              }}
+                              className="px-2 py-1 bg-white border border-gray-300 rounded text-xs font-bold hover:bg-gray-100"
+                              title="Bold"
+                            >
+                              B
+                            </button>
+                            {/* Italic Button */}
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const input = document.getElementById(`category-method-${categoryIndex}`) as HTMLInputElement;
+                                const start = input.selectionStart || 0;
+                                const end = input.selectionEnd || 0;
+                                const selectedText = input.value.substring(start, end);
+                                if (selectedText) {
+                                  const newValue = input.value.substring(0, start) + `<i>${selectedText}</i>` + input.value.substring(end);
+                                  handleCategoryChange(categoryIndex, 'testMethod', newValue);
+                                }
+                              }}
+                              className="px-2 py-1 bg-white border border-gray-300 rounded text-xs italic hover:bg-gray-100"
+                              title="Italic"
+                            >
+                              I
+                            </button>
+                            {/* Underline Button */}
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const input = document.getElementById(`category-method-${categoryIndex}`) as HTMLInputElement;
+                                const start = input.selectionStart || 0;
+                                const end = input.selectionEnd || 0;
+                                const selectedText = input.value.substring(start, end);
+                                if (selectedText) {
+                                  const newValue = input.value.substring(0, start) + `<u>${selectedText}</u>` + input.value.substring(end);
+                                  handleCategoryChange(categoryIndex, 'testMethod', newValue);
+                                }
+                              }}
+                              className="px-2 py-1 bg-white border border-gray-300 rounded text-xs underline hover:bg-gray-100"
+                              title="Underline"
+                            >
+                              U
+                            </button>
+                            {/* Remove Formatting Button */}
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const currentValue = category.testMethod || "";
+                                const cleanValue = currentValue.replace(/<\/?[biu]>/gi, '');
+                                handleCategoryChange(categoryIndex, 'testMethod', cleanValue);
+                              }}
+                              className="px-2 py-1 bg-red-50 border border-red-300 rounded text-xs text-red-600 font-bold hover:bg-red-100"
+                              title="Remove Formatting"
+                            >
+                              X
+                            </button>
+                          </div>
+                        )}
                       </div>
                       <div>
                         <label className="block font-semibold text-gray-700 text-xs sm:text-sm mb-1">
@@ -1879,13 +2036,87 @@ const AddTest = () => {
                           <span className="text-xs sm:text-sm">Is Descriptive</span>
                         </label>
                         {category.isCategory && (
-                          <input 
-                            className="px-2 py-1.5 sm:py-1 border border-gray-300 rounded text-xs sm:text-sm w-full sm:w-32" 
-                            placeholder="Parameter Test Method" 
-                            value={parameter.testMethod || ""}
-                            onChange={(e) => handleParameterChange(categoryIndex, paramIndex, 'testMethod', e.target.value)}
-                            disabled={isViewMode} 
-                          />
+                          <div>
+                            <input 
+                              id={`param-method-${categoryIndex}-${paramIndex}`}
+                              className="px-2 py-1.5 sm:py-1 border border-gray-300 rounded text-xs sm:text-sm w-full sm:w-32" 
+                              placeholder="Parameter Test Method" 
+                              value={parameter.testMethod || ""}
+                              onChange={(e) => handleParameterChange(categoryIndex, paramIndex, 'testMethod', e.target.value)}
+                              disabled={isViewMode} 
+                            />
+                            {!isViewMode && (
+                              <div className="flex gap-1 mt-1">
+                                {/* Bold Button */}
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const input = document.getElementById(`param-method-${categoryIndex}-${paramIndex}`) as HTMLInputElement;
+                                    const start = input.selectionStart || 0;
+                                    const end = input.selectionEnd || 0;
+                                    const selectedText = input.value.substring(start, end);
+                                    if (selectedText) {
+                                      const newValue = input.value.substring(0, start) + `<b>${selectedText}</b>` + input.value.substring(end);
+                                      handleParameterChange(categoryIndex, paramIndex, 'testMethod', newValue);
+                                    }
+                                  }}
+                                  className="px-2 py-1 bg-white border border-gray-300 rounded text-xs font-bold hover:bg-gray-100"
+                                  title="Bold"
+                                >
+                                  B
+                                </button>
+                                {/* Italic Button */}
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const input = document.getElementById(`param-method-${categoryIndex}-${paramIndex}`) as HTMLInputElement;
+                                    const start = input.selectionStart || 0;
+                                    const end = input.selectionEnd || 0;
+                                    const selectedText = input.value.substring(start, end);
+                                    if (selectedText) {
+                                      const newValue = input.value.substring(0, start) + `<i>${selectedText}</i>` + input.value.substring(end);
+                                      handleParameterChange(categoryIndex, paramIndex, 'testMethod', newValue);
+                                    }
+                                  }}
+                                  className="px-2 py-1 bg-white border border-gray-300 rounded text-xs italic hover:bg-gray-100"
+                                  title="Italic"
+                                >
+                                  I
+                                </button>
+                                {/* Underline Button */}
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const input = document.getElementById(`param-method-${categoryIndex}-${paramIndex}`) as HTMLInputElement;
+                                    const start = input.selectionStart || 0;
+                                    const end = input.selectionEnd || 0;
+                                    const selectedText = input.value.substring(start, end);
+                                    if (selectedText) {
+                                      const newValue = input.value.substring(0, start) + `<u>${selectedText}</u>` + input.value.substring(end);
+                                      handleParameterChange(categoryIndex, paramIndex, 'testMethod', newValue);
+                                    }
+                                  }}
+                                  className="px-2 py-1 bg-white border border-gray-300 rounded text-xs underline hover:bg-gray-100"
+                                  title="Underline"
+                                >
+                                  U
+                                </button>
+                                {/* Remove Formatting Button */}
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const currentValue = parameter.testMethod || "";
+                                    const cleanValue = currentValue.replace(/<\/?[biu]>/gi, '');
+                                    handleParameterChange(categoryIndex, paramIndex, 'testMethod', cleanValue);
+                                  }}
+                                  className="px-2 py-1 bg-red-50 border border-red-300 rounded text-xs text-red-600 font-bold hover:bg-red-100"
+                                  title="Remove Formatting"
+                                >
+                                  X
+                                </button>
+                              </div>
+                            )}
+                          </div>
                         )}
 
                         {/* Inline Formula Display — shown when hasFormula=true and formula is saved */}

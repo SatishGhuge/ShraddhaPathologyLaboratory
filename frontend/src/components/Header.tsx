@@ -18,7 +18,7 @@ import {
 } from "lucide-react";
 import { getAccessibleModules } from "@/utils/modulePermissions";
 
-const logo = "/logo.png";
+const logo = "/Mainlogo.png";
 
 interface NavModule {
   id: string;
@@ -443,18 +443,17 @@ const Header = () => {
 
           {/* Logo + Brand (No Toggle Button) */}
           <div className="flex items-center gap-2">
-            {/* Logo + Brand Name - Larger */}
+            {/* Logo + Brand Name - Properly Sized */}
             <div
               onClick={handleLogoClick}
               className="flex items-center cursor-pointer hover:opacity-80 transition-opacity"
             >
-              <img src={logo} alt="Logo" className="w-12 h-12 object-contain  flex-shrink-0" />
-              <div className="flex flex-col">
-                <span className="text-xl font-bold text-primary-500 leading-tight underline decoration-primary-500 underline-offset-4">
-                  SHRADDHA
-                </span>
-                <span className="text-sm text-gray-600 leading-tight">Pathology Lab</span>
-              </div>
+              <img 
+                src={logo} 
+                alt="Shraddha Pathology Laboratory" 
+                className="h-12 w-auto object-contain"
+                style={{ maxHeight: '48px' }}
+              />
             </div>
           </div>
 

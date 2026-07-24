@@ -5,6 +5,7 @@ import React, { useState, useRef, useEffect } from "react";
 import BarcodeModal, { generateBarcodeLabels, getSampleTypeId, getSampleTypeName, getTestName } from "@/app/components/BarcodeModal";
 import BillReceipt from "@/app/components/BillReceipt";
 import API_BASE_URL from "@/src/api/config";
+import { generateCompactBarcodePrintHtml } from "@/app/utils/barcodePrintUtils";
 
 import { 
   Search, RotateCcw, Eye, Pencil, Trash2, Printer,
@@ -2979,28 +2980,13 @@ export default function BookingPage() {
       isOpen={showBarcodeModal}
       onClose={() => setShowBarcodeModal(false)}
       onPrintOnly={async () => {
-        const printArea = document.getElementById('barcode-print-area');
-        const allLabels = printArea.querySelectorAll('[data-barcode-index]');
-        
-        // Print all barcodes
-        const allLabelsHtml = Array.from(allLabels)
-          .map((label) => (label as HTMLElement).outerHTML)
-          .join('');
-        
-        const win = window.open('', '_blank');
-        win.document.write(`<!DOCTYPE html><html><head><title>Barcode Labels</title>
-          <style>
-            * { margin:0; padding:0; box-sizing:border-box; }
-            body { font-family: Arial, sans-serif; background: white; }
-            .labels-wrap { display: flex; flex-wrap: wrap; gap: 8mm; padding: 8mm; }
-            .label { width: 80mm; border: 0.5px solid #999; page-break-inside: avoid; }
-            @page { size: A4; margin: 8mm; }
-          </style>
-        </head><body><div class="labels-wrap">${allLabelsHtml}</div></body></html>`);
-        win.document.close();
-        win.focus();
-        win.print();
-        setShowBarcodeModal(false);
+        // Trigger iframe print - it's handled by BarcodeModal component
+        const iframe = document.getElementById('barcode-print-frame') as HTMLIFrameElement;
+        if (iframe && iframe.contentWindow) {
+          setTimeout(() => {
+            iframe.contentWindow?.print();
+          }, 100);
+        }
       }}
       onPrintAndUpdate={async () => {
         let successCount = 0;
@@ -3045,48 +3031,51 @@ export default function BookingPage() {
           console.error('⚠️ Status transition failed:', error);
         }
         
-        // Print only the selected barcodes
-        const printArea = document.getElementById('barcode-print-area');
-        const allLabels = printArea.querySelectorAll('[data-barcode-index]');
-        
-        // Create a new container with only selected labels
-        const selectedLabelsHtml = Array.from(allLabels)
-          .map((label, idx) => {
-            if (selectedBarcodeIndices.has(idx)) {
-              return (label as HTMLElement).outerHTML;
-            }
-            return '';
-          })
-          .filter(html => html.length > 0)
-          .join('');
-        
-        const win = window.open('', '_blank');
-        win.document.write(`<!DOCTYPE html><html><head><title>Barcode Labels</title>
-          <style>
-            * { margin:0; padding:0; box-sizing:border-box; }
-            body { font-family: Arial, sans-serif; background: white; }
-            .labels-wrap { display: flex; flex-wrap: wrap; gap: 3mm; padding: 4mm; }
-            .label { width: 60mm; border: 0.5px solid #999; page-break-inside: avoid; }
-            @page { size: A4; margin: 4mm; }
-          </style>
-        </head><body><div class="labels-wrap">${selectedLabelsHtml}</div></body></html>`);
-        win.document.close();
-        win.focus();
-        win.print();
-        
-        setShowBarcodeModal(false);
-        setBarcodeSelectedTests(new Set());
-        setBarcodeLockedPatientUid(null);
-        setBarcodeLockedVisitId(null);
-        setSelectedBarcodeIndices(new Set());
-        
-        if (successCount > 0) {
-          setTimeout(() => {
-            alert(`✅ ${successCount} test(s) marked as Received and ${selectedBarcodeIndices.size} barcode(s) printed!`);
-            // Refresh the page to show updated barcode colors
-            window.location.reload();
-          }, 800);
-        }
+        // Now print the barcodes after status update
+        setTimeout(() => {
+          console.log('📄 Status updated, now printing barcodes...');
+          
+          // Filter only selected barcode labels for printing
+          const selectedLabels = barcodeLabels.filter((_, idx) => selectedBarcodeIndices.has(idx));
+          
+          // Use unified print function with consistent formatting
+          const printHtml = generateCompactBarcodePrintHtml(
+            selectedLabels,
+            {
+              patientName: barcodePatientInfo.patientName,
+              gender: barcodePatientInfo.gender,
+              age: barcodePatientInfo.age,
+              visitId: barcodePatientInfo.visitId
+            },
+            (value: string) => buildCode128Svg(value).svg
+          );
+          
+          const iframe = document.getElementById('barcode-print-frame') as HTMLIFrameElement;
+          if (iframe && iframe.contentDocument) {
+            iframe.contentDocument.open();
+            iframe.contentDocument.write(printHtml);
+            iframe.contentDocument.close();
+            setTimeout(() => {
+              console.log('🖨️ Calling iframe print...');
+              iframe.contentWindow?.print();
+              
+              // AFTER print preview is shown, then close modal and reload
+              setTimeout(() => {
+                if (successCount > 0) {
+                  alert(`✅ ${successCount} test(s) marked as Received and ${selectedBarcodeIndices.size} barcode(s) printed!`);
+                }
+                setShowBarcodeModal(false);
+                setBarcodeSelectedTests(new Set());
+                setBarcodeLockedPatientUid(null);
+                setBarcodeLockedVisitId(null);
+                setSelectedBarcodeIndices(new Set());
+                
+                // Reload page to refresh barcode colors
+                window.location.reload();
+              }, 1000);
+            }, 300);
+          }
+        }, 500);
       }}
       barcodeLabels={barcodeLabels}
       barcodePatientInfo={barcodePatientInfo}

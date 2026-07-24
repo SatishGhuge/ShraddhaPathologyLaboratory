@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import { parseHtmlText, stripHtmlTags, HtmlPart } from "@/src/utils/htmlParser";
 
 interface ProfessionalResultReportProps {
   patient: any;
@@ -27,12 +28,6 @@ export default function ProfessionalResultReport({
 }: ProfessionalResultReportProps) {
   const patientName = `${patient.title || ""} ${patient.firstName || ""} ${patient.lastName || ""}`.trim();
   const visitDateStr = visitDate ? new Date(visitDate).toLocaleDateString("en-GB") : "-";
-
-  // Helper function to strip HTML tags
-  const stripHtmlTags = (str: string) => {
-    if (!str) return "-";
-    return str.replace(/<[^>]*>/g, "").trim();
-  };
 
   // Check if ANY parameter has units or reference range
   const hasAnyUnits = parameters && parameters.some((param: any) => {
@@ -135,7 +130,7 @@ export default function ProfessionalResultReport({
         }
         .category-header {
           font-size: 14px;
-          font-weight: normal;
+          font-weight: bold;
           text-transform: uppercase;
           text-decoration: underline;
           margin: 15px 0 10px 0;
@@ -278,81 +273,168 @@ export default function ProfessionalResultReport({
           </thead>
           <tbody>
             {parameters && parameters.length > 0 ? (
-              parameters
-                // Filter: only show parameters with values
-                .filter((param: any) => {
-                  const er = param.existingResult;
-                  if (!er) return false;
-                  const hasNumeric = er.numericValue !== null && er.numericValue !== undefined && er.numericValue !== '';
-                  const hasText = er.textValue && String(er.textValue).trim() !== '';
-                  return hasNumeric || hasText;
-                })
-                .map((param: any, idx: number) => {
-                  const er = param.existingResult;
-                  let val = "-";
-                  
-                  if (er) {
-                    if (er.numericValue !== null && er.numericValue !== undefined) {
-                      val = er.numericValue;
-                    } else if (er.textValue) {
-                      // For text: show only first value (split by comma)
-                      const firstVal = String(er.textValue).split(',')[0].trim();
-                      val = firstVal || "-";
-                    }
+              // Group parameters by category
+              (() => {
+                const grouped: any = {};
+                const categorySortOrder: any = {}; // Track sortOrder for each category
+                
+                // Group parameters and track sort order - use categoryUniqueId for grouping
+                parameters.forEach((param: any) => {
+                  const catKey = param.categoryUniqueId || param.categoryName || 'NO_CATEGORY_HEADER';
+                  if (!grouped[catKey]) {
+                    grouped[catKey] = [];
+                    // Use category's sortOrder if available, otherwise use a high number
+                    categorySortOrder[catKey] = param.categorySortOrder !== undefined ? param.categorySortOrder : 999;
                   }
-                  
-                  const isAbnormal = er?.isAbnormal || (param.type === "Numeric" && er?.isOutOfRange);
-                  
-                  // Get category method and parameter method separately
-                  const categoryMethod = param.categoryTestMethod || null;
-                  const parameterMethod = param.parameterTestMethod || null;
-
-                  // Strip HTML tags from all values
-                  const resultText = stripHtmlTags(String(val));
-                  const unitText = stripHtmlTags(param.units || "-");
-                  
-                  // Get reference range based on parameter type
-                  let rangeText = "-";
-                  if (param.type === "Numeric") {
-                    // For numeric: show the calculated range
-                    rangeText = stripHtmlTags(er?.referenceRange || param.normalRange || param.rangeText || "-");
-                  } else if (param.type === "Text" || param.isDescriptive) {
-                    // For text: show the entered/selected value as reference (not all options)
-                    // If user didn't enter anything, show the default value from param.textContent
-                    if (er?.textValue) {
-                      rangeText = stripHtmlTags(String(er.textValue));
-                    } else {
-                      rangeText = stripHtmlTags(param.textContent || "-");
+                  grouped[catKey].push(param);
+                });
+                
+                // Sort categories by their sortOrder (respecting the order set in test form)
+                return Object.entries(grouped)
+                  .sort((a: any, b: any) => {
+                    const sortA = categorySortOrder[a[0]] ?? 999;
+                    const sortB = categorySortOrder[b[0]] ?? 999;
+                    return sortA - sortB;
+                  })
+                  .flatMap(([catName, catParams]: [string, any], catIdx: number) => {
+                    const rows: any[] = [];
+                    
+                    // Show category header only once (if applicable)
+                    if (catName !== 'NO_CATEGORY_HEADER' && !catName.startsWith('__NO_NAME_') && catParams[0]?.showCategoryHeader) {
+                      const categoryMethod = catParams[0]?.categoryTestMethod || null;
+                      const categoryNameParts = parseHtmlText(catName);
+                      
+                      rows.push(
+                        <tr key={`cat-${catIdx}`} className="table-row">
+                          <td className="param-name" colSpan={hasAnyUnits && hasAnyReferenceRange ? 4 : hasAnyUnits || hasAnyReferenceRange ? 3 : 2}>
+                            {/* Category Name - Always bold by default, plus any HTML formatting */}
+                            <div>
+                              {(() => {
+                                if (typeof categoryNameParts === 'string') {
+                                  return <span style={{ fontWeight: 'bold' }}>{categoryNameParts}</span>;
+                                }
+                                return (categoryNameParts as HtmlPart[]).map((part: HtmlPart, i: number) => (
+                                  <span key={i} style={{ fontWeight: part.bold ? 'bold' : 'bold', fontStyle: part.italic ? 'italic' : 'normal', textDecoration: part.underline ? 'underline' : 'none' }}>
+                                    {part.text}
+                                  </span>
+                                ));
+                              })()}
+                            </div>
+                            
+                            {/* Category Method Below Category Name */}
+                            {categoryMethod && (
+                              <div className="param-method" style={{ marginBottom: '8px' }}>
+                                Method: 
+                                {(() => {
+                                  const methodParts = parseHtmlText(categoryMethod);
+                                  if (typeof methodParts === 'string') {
+                                    return methodParts;
+                                  }
+                                  return (methodParts as HtmlPart[]).map((part: HtmlPart, i: number) => (
+                                    <span key={i} style={{ fontWeight: part.bold ? 'bold' : 'normal', fontStyle: part.italic ? 'italic' : 'normal', textDecoration: part.underline ? 'underline' : 'none' }}>
+                                      {part.text}
+                                    </span>
+                                  ));
+                                })()}
+                              </div>
+                            )}
+                          </td>
+                        </tr>
+                      );
                     }
-                  } else {
-                    rangeText = stripHtmlTags(er?.referenceRange || param.rangeText || "-");
-                  }
+                    
+                    // Now add all parameters in this category (sorted by their sortOrder)
+                    catParams
+                      .sort((a: any, b: any) => (a.sortOrder || 999) - (b.sortOrder || 999))
+                      .filter((param: any) => {
+                        const er = param.existingResult;
+                        if (!er) return false;
+                        const hasNumeric = er.numericValue !== null && er.numericValue !== undefined && er.numericValue !== '';
+                        const hasText = er.textValue && String(er.textValue).trim() !== '';
+                        return hasNumeric || hasText;
+                      })
+                      .forEach((param: any, paramIdx: number) => {
+                        const er = param.existingResult;
+                        let val = "-";
+                        
+                        if (er) {
+                          if (er.numericValue !== null && er.numericValue !== undefined) {
+                            val = er.numericValue;
+                          } else if (er.textValue) {
+                            const firstVal = String(er.textValue).split(',')[0].trim();
+                            val = firstVal || "-";
+                          }
+                        }
+                        
+                        const isAbnormal = er?.isAbnormal || (param.type === "Numeric" && er?.isOutOfRange);
+                        const paramNameParts = parseHtmlText(param.parameterName);
+                        const resultText = stripHtmlTags(String(val));
+                        const unitText = stripHtmlTags(param.units || "-");
+                        
+                        let rangeText = "-";
+                        if (param.type === "Numeric") {
+                          rangeText = stripHtmlTags(er?.referenceRange || param.normalRange || param.rangeText || "-");
+                        } else if (param.type === "Text" || param.isDescriptive) {
+                          if (er?.textValue) {
+                            rangeText = stripHtmlTags(String(er.textValue));
+                          } else {
+                            rangeText = stripHtmlTags(param.textContent || "-");
+                          }
+                        } else {
+                          rangeText = stripHtmlTags(er?.referenceRange || param.rangeText || "-");
+                        }
+                        
+                        const parameterMethod = param.parameterTestMethod || null;
 
-                  return (
-                    <tr key={idx} className="table-row">
-                      <td className="param-name">
-                        {/* Show Category Method if exists */}
-                        {categoryMethod && (
-                          <div className="param-method">Method: {categoryMethod}</div>
-                        )}
-                        
-                        {/* Show Parameter Name */}
-                        <div>{param.parameterName}</div>
-                        
-                        {/* Show Parameter Method if exists */}
-                        {parameterMethod && (
-                          <div className="param-method">Method: {parameterMethod}</div>
-                        )}
-                      </td>
-                      <td className={`param-result ${isAbnormal ? "abnormal" : ""}`}>
-                        {resultText}
-                        {isAbnormal ? " *" : ""}
-                      </td>
-                      {hasAnyUnits && <td className="param-unit" style={{ textAlign: "center" }}>{unitText}</td>}
-                      {hasAnyReferenceRange && <td className="param-range">{rangeText}</td>}
-                    </tr>
-                  );
-                })
+                        rows.push(
+                          <tr key={`param-${catIdx}-${paramIdx}`} className="table-row">
+                            <td className="param-name">
+                              {/* Show Parameter Name with HTML formatting */}
+                              <div>
+                                {(() => {
+                                  const paramNameParts = parseHtmlText(param.parameterName);
+                                  if (typeof paramNameParts === 'string') {
+                                    return paramNameParts;
+                                  }
+                                  return (paramNameParts as HtmlPart[]).map((part: HtmlPart, i: number) => (
+                                    <span key={i} style={{ fontWeight: part.bold ? 'bold' : 'normal', fontStyle: part.italic ? 'italic' : 'normal' }}>
+                                      {part.text}
+                                    </span>
+                                  ));
+                                })()}
+                              </div>
+                              
+                              {/* Show Parameter Method if exists */}
+                              {parameterMethod && (
+                                <div className="param-method">
+                                  Method: 
+                                  {(() => {
+                                    const methodParts = parseHtmlText(parameterMethod);
+                                    if (typeof methodParts === 'string') {
+                                      return methodParts;
+                                    }
+                                    return (methodParts as HtmlPart[]).map((part: HtmlPart, i: number) => (
+                                      <span key={i} style={{ fontWeight: part.bold ? 'bold' : 'normal', fontStyle: part.italic ? 'italic' : 'normal', textDecoration: part.underline ? 'underline' : 'none' }}>
+                                        {part.text}
+                                      </span>
+                                    ));
+                                  })()}
+                                </div>
+                              )}
+                            </td>
+                            <td className={`param-result ${isAbnormal ? "abnormal" : ""}`}>
+                              {resultText}
+                              {isAbnormal ? " *" : ""}
+                            </td>
+                            {hasAnyUnits && <td className="param-unit" style={{ textAlign: "center" }}>{unitText}</td>}
+                            {hasAnyReferenceRange && <td className="param-range">{rangeText}</td>}
+                          </tr>
+                        );
+                      });
+                    
+                    return rows;
+                  });
+              })()
             ) : (
               <tr className="table-row">
                 <td colSpan={hasAnyUnits && hasAnyReferenceRange ? 4 : hasAnyUnits || hasAnyReferenceRange ? 3 : 2} style={{ textAlign: "center", color: "#999" }}>

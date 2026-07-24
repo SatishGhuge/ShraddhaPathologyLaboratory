@@ -1,5 +1,9 @@
+'use client';
+
 import React, { useState } from 'react';
-import { Barcode, X, CheckCircle } from 'lucide-react';
+import { Barcode } from 'lucide-react';
+import JsBarcode from 'jsbarcode';
+import { generateCompactBarcodePrintHtml } from '../utils/barcodePrintUtils';
 
 interface BarcodeLabel {
   barcodeValue: string;
@@ -36,31 +40,27 @@ interface BarcodeModalProps {
   onBarcodeToggle?: (index: number) => void;
 }
 
-// ✅ CENTRALIZED: Helper function to extract sampleTypeId from test object (handles all data structures)
 export const getSampleTypeId = (test: any): string | number => {
-  // Try different paths to find sampleTypeId
   return (
-    test?.sampleTypeId ||                          // Direct property
-    test?.test?.sampleTypeId ||                    // Nested in test object
-    test?.patientTest?.test?.sampleTypeId ||       // Deeply nested
+    test?.sampleTypeId ||
+    test?.test?.sampleTypeId ||
+    test?.patientTest?.test?.sampleTypeId ||
     'unknown'
   );
 };
 
-// ✅ CENTRALIZED: Helper function to extract sample type name
 export const getSampleTypeName = (test: any): string => {
   return (
-    test?.sampleTypeName ||                        // Direct property
-    test?.sample ||                                 // Sample name
-    test?.sample_type?.Sample_Type ||              // Nested sample_type
-    test?.specimen_type?.Sample_Type ||            // Nested specimen_type
-    test?.test?.sample_type?.Sample_Type ||        // Deeply nested
-    test?.patientTest?.specimen_type?.Sample_Type || // Deeply nested
+    test?.sampleTypeName ||
+    test?.sample ||
+    test?.sample_type?.Sample_Type ||
+    test?.specimen_type?.Sample_Type ||
+    test?.test?.sample_type?.Sample_Type ||
+    test?.patientTest?.specimen_type?.Sample_Type ||
     'Unknown'
   );
 };
 
-// ✅ CENTRALIZED: Helper to get short test name
 export const getTestName = (test: any): string => {
   return (
     test?.shortName ||
@@ -72,8 +72,6 @@ export const getTestName = (test: any): string => {
   );
 };
 
-// ✅ CENTRALIZED: Generate barcode labels from raw tests array
-// This is the SINGLE SOURCE OF TRUTH for barcode generation
 export const generateBarcodeLabels = (
   tests: any[],
   visitId: string,
@@ -83,28 +81,10 @@ export const generateBarcodeLabels = (
   const dateStr = now.toLocaleDateString('en-GB');
   const timeStr = now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: true }).toUpperCase();
 
-  // 🔴 DEBUG: Log entire input to see data structure
-  console.log('🔴 generateBarcodeLabels INPUT:');
-  console.log('   visitId:', visitId);
-  console.log('   organizationCode:', organizationCode);
-  console.log('   tests array count:', tests?.length || 0);
-  tests.forEach((test, idx) => {
-    console.log(`   Test ${idx}:`, {
-      keys: Object.keys(test),
-      sampleTypeId: test?.sampleTypeId,
-      'test.sampleTypeId': test?.test?.sampleTypeId,
-      'patientTest.sampleTypeId': test?.patientTest?.sampleTypeId,
-      'test.sampleTypeId (nested)': test?.test?.sampleTypeId,
-      fullObject: JSON.stringify(test, null, 2).substring(0, 500)
-    });
-  });
-
-  // Group tests by sampleTypeId
   const specimenGroups: any = {};
 
   tests.forEach((test) => {
     const sampleTypeId = getSampleTypeId(test);
-    console.log(`   ➡️ Test extraction - sampleTypeId: ${sampleTypeId}, getSampleTypeId paths checked`);
     const key = sampleTypeId;
 
     if (!specimenGroups[key]) {
@@ -126,17 +106,15 @@ export const generateBarcodeLabels = (
     specimenGroups[key].testIds.push(test.id || test.patientTest?.id || test.testId);
   });
 
-  // Create barcode labels
   const labels: BarcodeLabel[] = Object.entries(specimenGroups).map(([sampleTypeId, groupData]: any) => {
     const barcodeValue = `${visitId}-${sampleTypeId}`;
+    console.log('✅ Generated barcode value:', barcodeValue, 'Type:', typeof barcodeValue, 'Length:', barcodeValue.length);
 
-    // Determine final status
     let finalSampleStatus = 'Registered';
     if (groupData.statuses.includes('Received')) {
       finalSampleStatus = 'Received';
     }
 
-    // Get final barcode status
     let finalBarcodeStatus = 'Unprinted';
     if (groupData.barcodeStatuses.includes('Printed')) {
       finalBarcodeStatus = 'Printed';
@@ -159,181 +137,171 @@ export const generateBarcodeLabels = (
   return labels;
 };
 
-// Generate Code128 barcode SVG
-const buildCode128Svg = (text: any) => {
-  const CODE128B = [
-    '11011001100','11001101100','11001100110','10010011000','10010001100',
-    '10001001100','10011001000','10011000100','10001100100','11001001000',
-    '11001000100','11000100100','10110011100','10011011100','10011001110',
-    '10111001100','10011101100','10011100110','11001110010','11001011100',
-    '11001001110','11011100100','11001110100','11101101110','11101001100',
-    '11100101100','11100100110','11101100100','11100110100','11100110010',
-    '11011011000','11011000110','11000110110','10100011000','10001011000',
-    '10001000110','10110001000','10001101000','10001100010','11010001000',
-    '11000101000','11000100010','10110111000','10110001110','10001101110',
-    '10111011000','10111000110','10001110110','11101110110','11010001110',
-    '11000101110','11011101000','11011100010','11011101110','11101011000',
-    '11101000110','11100010110','11101101000','11101100010','11100011010',
-    '11101111010','11001000010','11110001010','10100110000','10100001100',
-    '10010110000','10010000110','10000101100','10000100110','10110010000',
-    '10110000100','10011010000','10011000010','10000110100','10000110010',
-    '11000010010','11001010000','11110111010','11000010100','10001111010',
-    '10100111100','10010111100','10010011110','10111100100','10011110100',
-    '10011110010','11110100100','11110010100','11110010010','11011011110',
-    '11011110110','11110110110','10101111000','10100011110','10001011110',
-    '10111101000','10111100010','11110101000','11110100010','10111011110',
-    '10111101110','11101011110','11110101110','11010000100','11010010000',
-    '11010011100','1100011101011'
-  ];
-  const START_B = 104;
-  const STOP = 106;
-
-  const codes = [START_B];
-  let checksum = START_B;
-  for (let i = 0; i < text.length; i++) {
-    const c = text.charCodeAt(i) - 32;
-    codes.push(c);
-    checksum += c * (i + 1);
+// Generate proper CODE128 barcode SVG
+const generateBarcodeSvg = (value: string): { svg: string; width: number; height: number } => {
+  try {
+    // Use jsbarcode's SVG rendering directly
+    const svgElement = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svgElement.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+    
+    JsBarcode(svgElement, value, {
+      format: 'CODE128',
+      width: 2,
+      height: 40,
+      margin: 0,
+      lineColor: '#000000',
+      displayValue: false,
+      background: '#ffffff'
+    });
+    
+    const width = parseInt(svgElement.getAttribute('width') || '200');
+    const height = parseInt(svgElement.getAttribute('height') || '40');
+    const innerHTML = svgElement.innerHTML;
+    
+    console.log('🔍 Barcode generated for:', value, 'SVG length:', innerHTML.length);
+    
+    return { svg: innerHTML, width, height };
+  } catch (error) {
+    console.error('❌ Barcode generation error:', error);
+    return { svg: '', width: 200, height: 40 };
   }
-  codes.push(checksum % 103);
-  codes.push(STOP);
-
-  const barWidth = 2;
-  let x = 0;
-  let bars = '';
-  const height = 60;
-
-  codes.forEach(code => {
-    const pattern = CODE128B[code];
-    if (!pattern) return;
-    for (let i = 0; i < pattern.length; i++) {
-      const w = parseInt(pattern[i]) * barWidth;
-      if (i % 2 === 0) {
-        bars += `<rect x="${x}" y="0" width="${w}" height="${height}" fill="black"/>`;
-      }
-      x += w;
-    }
-  });
-
-  return { svg: bars, width: x, height };
 };
 
-// Barcode card component - used in both modal and print preview
 const BarcodeCard = ({
   label,
   patientInfo,
   isSelected,
   index,
   onClick,
-  isPrintMode = false,
-  barcode_status = 'Unprinted',
-  sampleStatus = 'Registered'
+  barcode_status = 'Unprinted'
 }: {
   label: any;
   patientInfo: any;
   isSelected: boolean;
   index: number;
   onClick?: () => void;
-  isPrintMode?: boolean;
   barcode_status?: string;
-  sampleStatus?: string;
 }) => {
-  const { svg, width, height } = buildCode128Svg(label.barcodeValue);
-  
-  // Determine colors based on selection and barcode_status:
-  // PRIORITY: Selection state > barcode_status
-  // 1. isSelected → BLUE (user selected it - high priority)
-  // 2. barcode_status = 'Printed' → LIGHT BLUE (already printed)
-  // 3. barcode_status = 'Unprinted' → LIGHT RED/PINK (NOT printed yet)
+  const { svg, width, height } = generateBarcodeSvg(label.barcodeValue);
   
   const isPrinted = barcode_status === 'Printed';
-  const isUnprinted = barcode_status === 'Unprinted';
-  const showAsSelected = !isPrintMode && isSelected;
-  
-  // Priority: Selection > barcode_status
-  // If selected, ALWAYS show blue (highest priority)
-  // If barcode is printed, show blue
-  // If barcode is unprinted and NOT selected, show red
-  const borderColor = showAsSelected 
-    ? 'border-blue-600'
-    : isPrinted 
-      ? 'border-blue-500'
-      : isUnprinted
-        ? 'border-red-500'
-        : 'border-gray-400';
-        
-  const backgroundColor = showAsSelected 
-    ? 'bg-blue-200'
-    : isPrinted 
-      ? 'bg-blue-100'
-      : isUnprinted
-        ? 'bg-red-200'
-        : 'bg-gray-100';
+  const borderColor = isPrinted ? 'border-blue-500' : 'border-red-500';
+  const backgroundColor = isPrinted ? 'bg-blue-50' : 'bg-red-50';
+  const ringEffect = isSelected ? 'ring-2 ring-blue-400' : '';
 
   return (
     <div
       data-barcode-index={index}
-      onClick={isPrintMode ? undefined : onClick}
+      onClick={onClick}
       className={`
-        relative transition-all border-4 ${borderColor} ${backgroundColor} shadow-md rounded
-        ${isPrintMode ? 'print:cursor-default print:bg-white print:border-gray-300 print:border-2' : 'cursor-pointer hover:shadow-lg'}
-        ${isPrinted ? 'ring-2 ring-blue-400' : isUnprinted ? 'ring-2 ring-red-400' : isPrintMode ? '' : ''}
+        relative transition-all border-2 ${borderColor} ${backgroundColor} shadow-md
+        cursor-pointer hover:shadow-lg ${ringEffect}
       `}
       style={{
-        width: '220px',
+        width: '100%',
+        height: 'auto',
         fontFamily: 'Arial, sans-serif',
-        pageBreakInside: isPrintMode ? 'avoid' : 'auto',
-        padding: '3px'
-      }}
-      title={isPrinted ? '✓ Barcode: Printed' : isUnprinted ? '⚠ Barcode: Not Printed' : 'Barcode Status Unknown'}
+        display: 'flex',
+        flexDirection: 'column',
+        padding: '1.5mm',
+        boxSizing: 'border-box',
+        position: 'relative',
+        borderRadius: '0px',
+        justifyContent: 'space-between'
+      } as React.CSSProperties}
     >
-      {/* Organization Code - top right corner */}
+      <div style={{
+        position: 'absolute',
+        top: '1mm',
+        left: '1mm',
+        backgroundColor: isPrinted ? '#0ea5e9' : '#ef4444',
+        color: 'white',
+        padding: '1px 4px',
+        borderRadius: '2px',
+        fontSize: '7px',
+        fontWeight: 'bold'
+      }}>
+        {isPrinted ? 'P' : 'U'}
+      </div>
+
       {label.organizationCode && (
-        <div className="absolute top-1 right-1 text-[6px] text-gray-700 font-bold bg-white px-1 py-0.5 rounded border border-gray-400 print:text-[5px]">
+        <div style={{
+          textAlign: 'right',
+          fontSize: '5pt',
+          fontWeight: 'bold',
+          color: '#000',
+          marginBottom: '0.5mm'
+        }}>
           {label.organizationCode}
         </div>
       )}
 
-      {/* Barcode - centered, compact */}
-      <div className="flex justify-center py-0.5 print:py-0.5 print:my-1">
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          width="85%"
-          height="28"
-          viewBox={`0 0 ${width} ${height}`}
-          preserveAspectRatio="none"
-          dangerouslySetInnerHTML={{ __html: svg }}
-          style={{ pageBreakInside: 'avoid' }}
-        />
-      </div>
-
-      {/* Barcode value (Visit ID) - centered, bold */}
-      <div className="text-center font-bold text-[8px] tracking-wider py-0.5 px-1 print:text-[7px] print:py-1">
-        {label.barcodeValue}
-      </div>
-
-      {/* Date time and specimen type - very compact */}
-      <div className="flex justify-between items-center px-1 py-0 text-[6px] print:text-[6px] print:py-0.5">
-        <span className="text-gray-700 truncate print:text-gray-900">{label.dateStr}</span>
-        <span className="text-gray-600 font-medium flex-shrink-0 print:text-gray-800">({label.specimen})</span>
-      </div>
-
-      {/* Age and Gender - below specimen type */}
-      <div className="px-1 py-0.5 text-[6px] text-gray-700 leading-tight print:text-[6px] print:text-gray-900">
-        {patientInfo.age && patientInfo.gender ? (
-          <span>{patientInfo.gender.charAt(0)}/{patientInfo.age}Y</span>
+      <div style={{
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+        width: '100%',
+        height: '12mm',
+        margin: '0.5mm 0',
+        background: 'white'
+      }}>
+        {svg ? (
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="90%"
+            height="12mm"
+            viewBox={`0 0 ${width} ${height}`}
+            preserveAspectRatio="xMidYMid meet"
+            dangerouslySetInnerHTML={{ __html: svg }}
+          />
         ) : (
-          <span>{patientInfo.age ? `${patientInfo.age}Y` : ''}{patientInfo.gender ? `${patientInfo.gender.charAt(0)}` : ''}</span>
+          <div style={{ fontSize: '10px', color: '#999' }}>No barcode</div>
         )}
       </div>
 
-      {/* Patient name - compact */}
-      <div className="px-1 py-0.5 text-[6px] font-bold leading-tight truncate text-gray-800 print:text-[6px] print:text-black">
-        {patientInfo.patientName}
+      <div style={{
+        fontSize: '7pt',
+        fontWeight: 'bold',
+        textAlign: 'center',
+        color: '#000',
+        margin: '0.2mm 0'
+      }}>
+        {label.barcodeValue}
       </div>
 
-      {/* Test names - minimal height */}
-      <div className="px-1 py-0.5 text-[6px] text-gray-600 leading-tight border-t border-gray-400 max-h-[24px] overflow-hidden print:text-[6px] print:text-gray-800 print:border-gray-500 print:max-h-[30px]">
+      <div style={{
+        display: 'flex',
+        justifyContent: 'space-between',
+        fontSize: '7pt',
+        color: '#333',
+        margin: '0.3mm 0 0.2mm 0'
+      }}>
+        <span>{label.dateStr}</span>
+        <span style={{ fontWeight: 'bold' }}>{label.timeStr}</span>
+        <span style={{ fontWeight: 'bold' }}>{label.specimen}</span>
+      </div>
+
+      <div style={{
+        display: 'flex',
+        justifyContent: 'space-between',
+        fontSize: '6.5pt',
+        color: '#000',
+        margin: '0.2mm 0'
+      }}>
+        <span style={{ fontWeight: 'bold', flex: 1 }}>{patientInfo.patientName}</span>
+        <span style={{ fontWeight: 'bold', marginLeft: '1mm' }}>
+          {patientInfo.gender?.charAt(0).toUpperCase()}/{patientInfo.age}Y
+        </span>
+      </div>
+
+      <div style={{
+        fontSize: '6.5pt',
+        color: '#000',
+        textAlign: 'left',
+        overflow: 'hidden',
+        textOverflow: 'ellipsis',
+        whiteSpace: 'nowrap'
+      }}>
         {label.shortNamesStr}
       </div>
     </div>
@@ -356,70 +324,105 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({
   const selectedCount = selectedBarcodes ? selectedBarcodes.size : 0;
   const totalBarcodes = barcodeLabels?.length || 0;
 
+  const generatePrintHtml = () => {
+    return generateCompactBarcodePrintHtml(
+      barcodeLabels,
+      {
+        patientName: barcodePatientInfo.patientName,
+        gender: barcodePatientInfo.gender,
+        age: barcodePatientInfo.age,
+        visitId: barcodePatientInfo.visitId
+      },
+      (value: string) => {
+        try {
+          const svgElement = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+          svgElement.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+          
+          JsBarcode(svgElement, value, {
+            format: 'CODE128',
+            width: 2,
+            height: 40,
+            margin: 0,
+            lineColor: '#000000',
+            displayValue: false,
+            background: '#ffffff'
+          });
+          
+          return svgElement.innerHTML;
+        } catch (error) {
+          console.error('❌ Barcode generation error:', error);
+          return '';
+        }
+      }
+    );
+  };
+
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] flex flex-col">
-        {/* Header */}
-        <div className="flex items-center justify-between px-5 py-3 border-b bg-gray-800 rounded-t-lg print:hidden">
-          <h2 className="text-sm font-semibold text-white flex items-center gap-2">
-            <Barcode size={16} /> Barcode Labels — {barcodePatientInfo.patientName} | {barcodePatientInfo.visitId}
-            {selectedCount > 0 && (
-              <span className="ml-2 px-2 py-1 bg-blue-500 rounded text-xs">
-                {selectedCount}/{totalBarcodes} selected
-              </span>
-            )}
-          </h2>
-          <div className="flex gap-2">
-            <button
-              onClick={onPrintOnly}
-              disabled={isPrinting}
-              className="text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 px-3 py-1 rounded text-xs font-semibold transition"
-            >
-              Print Only
-            </button>
+    <>
+      <iframe id="barcode-print-frame" style={{ display: 'none' }} />
 
-            <button
-              onClick={onPrintAndUpdate}
-              disabled={isPrinting || selectedCount === 0}
-              title={selectedCount === 0 ? "Select at least one barcode" : "Print & update status to Received"}
-              className="text-white bg-green-600 hover:bg-green-700 disabled:opacity-50 px-3 py-1 rounded text-xs font-semibold transition"
-            >
-              Print & Update ({selectedCount})
-            </button>
+      <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4">
+        <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] flex flex-col">
+          <div className="flex items-center justify-between px-5 py-3 border-b bg-cyan-600 rounded-t-lg">
+            <h2 className="text-sm font-semibold text-white flex items-center gap-2">
+              <Barcode size={16} /> Barcode Labels — {barcodePatientInfo.patientName} | {barcodePatientInfo.visitId}
+              {selectedCount > 0 && (
+                <span className="ml-2 px-2 py-1 bg-green-500 rounded text-xs font-bold">
+                  {selectedCount}/{totalBarcodes} selected
+                </span>
+              )}
+            </h2>
+            <div className="flex gap-2">
+              <button
+                onClick={() => {
+                  const printHtml = generatePrintHtml();
+                  const iframe = document.getElementById('barcode-print-frame') as HTMLIFrameElement;
+                  if (iframe?.contentDocument) {
+                    iframe.contentDocument.open();
+                    iframe.contentDocument.write(printHtml);
+                    iframe.contentDocument.close();
+                    setTimeout(() => iframe.contentWindow?.print(), 300);
+                  }
+                }}
+                className="text-white bg-cyan-700 hover:bg-cyan-800 px-3 py-1 rounded text-xs font-semibold"
+              >
+                Print Only
+              </button>
 
-            <button
-              onClick={onClose}
-              className="text-gray-300 hover:text-white text-xl font-bold leading-none px-2"
-            >
-              ×
-            </button>
+              <button
+                onClick={onPrintAndUpdate}
+                disabled={selectedCount === 0}
+                className="text-white bg-green-600 hover:bg-green-700 disabled:opacity-50 px-3 py-1 rounded text-xs font-semibold"
+              >
+                Print & Update ({selectedCount})
+              </button>
+
+              <button onClick={onClose} className="text-gray-200 hover:text-white text-xl font-bold px-2">×</button>
+            </div>
           </div>
-        </div>
 
-        {/* Legend - REMOVED: No icons shown, just click to select */}
-        {/* Cards show BLUE when selected, or when sample status='Received', or when barcode_status='Printed' */}
-        {/* Cards show RED when unselected, unprinted, and status != 'Received' */}
-
-        {/* Barcode Cards */}
-        <div className="overflow-y-auto flex-1 p-6 bg-gray-100 print:p-4 print:bg-white print:overflow-visible">
-          <div id="barcode-print-area" className="flex flex-wrap gap-4 justify-center print:justify-start print:gap-3">
-            {barcodeLabels.map((label, idx) => (
-              <BarcodeCard
-                key={idx}
-                label={label}
-                patientInfo={barcodePatientInfo}
-                isSelected={selectedBarcodes?.has(idx) || false}
-                index={idx}
-                onClick={() => onBarcodeToggle?.(idx)}
-                isPrintMode={false}
-                barcode_status={label.barcode_status || 'Unprinted'}
-                sampleStatus={label.sampleStatus || 'Registered'}
-              />
-            ))}
+          <div className="overflow-y-auto flex-1 p-4 bg-white">
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
+              gap: '16px'
+            }}>
+              {barcodeLabels.map((label, idx) => (
+                <BarcodeCard
+                  key={idx}
+                  label={label}
+                  patientInfo={barcodePatientInfo}
+                  isSelected={selectedBarcodes?.has(idx) || false}
+                  index={idx}
+                  onClick={() => onBarcodeToggle?.(idx)}
+                  barcode_status={label.barcode_status}
+                />
+              ))}
+            </div>
           </div>
         </div>
       </div>
-    </div>
+    </>
   );
 };
 
