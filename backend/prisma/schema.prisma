@@ -276,7 +276,7 @@ model Test {
   testParameterId        Int?
   testCategoryId         Int?
   sampleTypeId           Int?
-  machineName            String?
+  machineId              Int?                // Foreign key to Machine table
   group                  String?
   reportHeader           String?
   preparationTime        String?
@@ -310,6 +310,7 @@ model Test {
   testCategory           TestCategory?       @relation("PrimaryTestCategory", fields: [testCategoryId], references: [id])
   testParameter          TestParameter?      @relation("PrimaryTestParameter", fields: [testParameterId], references: [id])
   sample_type            sample_type?        @relation(fields: [sampleTypeId], references: [id])
+  machine                Machine?            @relation(fields: [machineId], references: [id], onDelete: SetNull)
 
   @@unique([name, departmentId])
   @@index([departmentId], map: "tests_departmentId_fkey")
@@ -318,6 +319,7 @@ model Test {
   @@index([isActive])
   @@index([name])
   @@index([sampleTypeId], map: "tests_sampleTypeId_fkey")
+  @@index([machineId], map: "tests_machineId_fkey")
   @@map("tests")
 }
 
@@ -603,6 +605,17 @@ model sample_type {
   Sample_Color String
   test         Test[]
   @@map("sample_types")
+}
+
+model Machine {
+  id        Int       @id @default(autoincrement())
+  name      String    @unique
+  isActive  Boolean   @default(true)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  tests     Test[]    // Relation to Test model
+
+  @@map("machines")
 }
 
 model Role {
