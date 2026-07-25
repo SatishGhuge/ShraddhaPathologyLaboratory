@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { ArrowLeft, AlertCircle } from "lucide-react";
+import inventoryAPI from "@/lib/api/inventory.api";
 
 interface SupplierMasterModalProps {
   isOpen: boolean;
@@ -156,13 +157,27 @@ export default function SupplierMasterModal({
     try {
       setLoading(true);
 
-      const supplierData = {
-        ...form,
-        id: editingId || Date.now(),
+      const payload = {
+        supplierName: form.supplierName,
+        gstNumber: form.gstNumber,
+        email: form.email,
+        phone: form.phoneNumber,
+        address: form.address,
+        city: form.city,
+        state: form.state,
+        pinCode: form.pincode,
+        isActive: form.status === "Active"
       };
 
+      let response;
+      if (editingId) {
+        response = await inventoryAPI.suppliers.update(editingId, payload);
+      } else {
+        response = await inventoryAPI.suppliers.create(payload);
+      }
+
       setSuccessMsg(editingId ? "Supplier Updated Successfully!" : "Supplier Added Successfully!");
-      onSupplierSaved?.(supplierData);
+      onSupplierSaved?.(response.data?.data || payload);
 
       setTimeout(closeModal, 1500);
     } catch (error: any) {

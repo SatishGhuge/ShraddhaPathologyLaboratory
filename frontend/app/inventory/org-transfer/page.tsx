@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Package, RotateCcw, ChevronLeft, ChevronRight, Eye, Trash2, Plus, Download } from "lucide-react";
 import OrganizationTransferModal from "@/src/components/OrganizationTransferModal";
 import TransferDetailsModal from "@/src/components/TransferDetailsModal";
 import PageHeader from "@/src/components/BreadCrumb";
 import * as XLSX from "xlsx";
+import inventoryAPI from "@/lib/api/inventory.api";
 
 interface TransferItem {
   itemName: string;
@@ -27,35 +28,12 @@ interface OrganizationTransfer {
 }
 
 export default function OrganizationTransferPage() {
-  const [transfers, setTransfers] = useState<OrganizationTransfer[]>([
-    {
-      id: 1,
-      transferNumber: "TRF-20260718-001",
-      transferDate: "2026-07-18",
-      fromOrganization: "Main Lab",
-      toOrganization: "Nagpur Branch",
-      items: [
-        { itemName: "CBC Reagent Kit", batchNo: "B202602", expiryDate: "2028-06-30", quantity: 50 },
-        { itemName: "Urine Test Strips", batchNo: "G202504", expiryDate: "2028-05-15", quantity: 200 },
-      ],
-      remarks: "Routine monthly stock transfer",
-      createdBy: "Admin",
-      status: "Completed",
-    },
-    {
-      id: 2,
-      transferNumber: "TRF-20260717-002",
-      transferDate: "2026-07-17",
-      fromOrganization: "Main Lab",
-      toOrganization: "Pune Collection Center",
-      items: [
-        { itemName: "Blood Collection Tubes", batchNo: "T202505", expiryDate: "2028-05-20", quantity: 100 },
-      ],
-      remarks: "Emergency stock request",
-      createdBy: "Admin",
-      status: "Completed",
-    },
-  ]);
+  const [transfers, setTransfers] = useState<OrganizationTransfer[]>([]);
+  const [organizations, setOrganizations] = useState<any[]>([]);
+  const [items, setItems] = useState<any[]>([]);
+  const [stockItems, setStockItems] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
   const [search, setSearch] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
@@ -66,19 +44,72 @@ export default function OrganizationTransferPage() {
 
   const ITEMS_PER_PAGE = 10;
 
+  useEffect(() => {
+    fetchTransfers();
+  }, [currentPage]);
+
+  const fetchTransfers = async () => {
+    try {
+      setLoading(true);
+      setError("");
+      
+      const [transfersRes, itemsRes, labStocksRes] = await Promise.all([
+        inventoryAPI.transfers.getAll(currentPage, ITEMS_PER_PAGE),
+        inventoryAPI.items.getDropdownItems(),
+        inventoryAPI.labStocks.getAll(1, 100)
+      ]);
+      
+      // Map the transfers data to ensure itemName is populated
+      const mappedTransfers = (transfersRes.data.data || []).map((transfer: any) => ({
+        ...transfer,
+        items: (transfer.items || []).map((transferItem: any) => ({
+          itemName: transferItem.item?.itemName || transferItem.itemName || "-",
+          itemCode: transferItem.item?.itemCode || transferItem.itemCode || "-",
+          batchNo: transferItem.batchNo,
+          expiryDate: transferItem.expiryDate,
+          quantity: transferItem.quantity
+        }))
+      }));
+      
+      setTransfers(mappedTransfers);
+      setItems(itemsRes.data.data || []);
+      setStockItems(labStocksRes.data.data || []);
+      
+      // Fetch organizations separately
+      try {
+        const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api'}/master/organizations`, {
+          headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+        });
+        const orgsData = await response.json();
+        console.log('Organizations fetched:', orgsData);
+        setOrganizations(orgsData.data || []);
+      } catch (orgErr) {
+        console.error('Failed to fetch organizations:', orgErr);
+        setOrganizations([]);
+      }
+    } catch (err: any) {
+      console.error("Failed to fetch transfers data:", err);
+      setError("Failed to fetch transfer data");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Enhanced search - searches across multiple fields
   const filteredTransfers = transfers.filter((transfer) => {
     const searchLower = search.toLowerCase();
     return (
-      transfer.transferNumber.toLowerCase().includes(searchLower) ||
-      transfer.toOrganization.toLowerCase().includes(searchLower) ||
-      transfer.fromOrganization.toLowerCase().includes(searchLower) ||
-      transfer.items.some(
+      (transfer.transferNumber?.toLowerCase().includes(searchLower)) ||
+      (transfer.toOrganization?.toLowerCase().includes(searchLower)) ||
+      (transfer.fromOrganization?.toLowerCase().includes(searchLower)) ||
+      (transfer.toOrganization?.toLowerCase().includes(searchLower)) ||
+      (transfer.items?.some(
         (item) =>
-          item.itemName.toLowerCase().includes(searchLower) ||
-          item.batchNo.toLowerCase().includes(searchLower)
-      ) ||
-      transfer.transferDate.includes(search)
+          item.itemName?.toLowerCase().includes(searchLower) ||
+          item.batchNo?.toLowerCase().includes(searchLower)
+      )) ||
+      (transfer.transferDate?.includes(search))
     );
   });
 
@@ -89,18 +120,7 @@ export default function OrganizationTransferPage() {
   );
 
   const handleTransferComplete = (transferData: any) => {
-    const newTransfer: OrganizationTransfer = {
-      id: Math.max(0, ...transfers.map((t) => t.id)) + 1,
-      transferNumber: transferData.transferNumber,
-      transferDate: transferData.transferDate,
-      fromOrganization: "Main Lab",
-      toOrganization: transferData.organizationName,
-      items: transferData.items,
-      remarks: transferData.remarks,
-      createdBy: "Admin",
-      status: "Completed",
-    };
-    setTransfers([newTransfer, ...transfers]);
+    fetchTransfers();
     setSuccessMsg("Transfer recorded successfully!");
     setTimeout(() => setSuccessMsg(""), 3000);
   };
@@ -124,16 +144,16 @@ export default function OrganizationTransferPage() {
     transfers.forEach((transfer) => {
       transfer.items.forEach((item) => {
         exportData.push({
-          "Transfer No": transfer.transferNumber,
-          "Date": new Date(transfer.transferDate).toLocaleDateString("en-GB"),
-          "From": transfer.fromOrganization,
-          "To": transfer.toOrganization,
-          "Item": item.itemName,
-          "Batch": item.batchNo,
-          "Expiry": new Date(item.expiryDate).toLocaleDateString("en-GB"),
-          "Qty": item.quantity,
-          "Remarks": transfer.remarks,
-          "Created By": transfer.createdBy,
+          "Transfer No": transfer.transferNumber || "-",
+          "Date": transfer.transferDate ? new Date(transfer.transferDate).toLocaleDateString("en-GB") : "-",
+          "From": transfer.fromOrganization || "-",
+          "To": transfer.toOrganization || (transfer as any).organization?.name || "-",
+          "Item": item.itemName || "-",
+          "Batch": item.batchNo || "-",
+          "Expiry": item.expiryDate ? new Date(item.expiryDate).toLocaleDateString("en-GB") : "-",
+          "Qty": item.quantity || 0,
+          "Remarks": transfer.remarks || "-",
+          "Created By": transfer.createdBy || "-",
         });
       });
     });
@@ -156,6 +176,13 @@ export default function OrganizationTransferPage() {
       <div className="min-h-screen bg-white p-6">
         {/* Page Header */}
         <PageHeader title="Organization Transfer" icon={Package} path="Inventory" />
+
+        {/* Error Message */}
+        {error && (
+          <div className="mb-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
+            {error}
+          </div>
+        )}
 
         {/* Top Bar */}
         <div className="flex flex-wrap items-center justify-between gap-3 mb-4 bg-white p-3 rounded shadow-md">
@@ -202,7 +229,7 @@ export default function OrganizationTransferPage() {
           <table className="w-full text-sm border-collapse">
             <thead className="bg-slate-900 text-white">
               <tr>
-                <th className="border border-gray-300 px-3 py-2 text-left font-semibold">
+                <th className="w-32 border border-gray-300 px-3 py-2  text-left font-semibold">
                   Transfer No
                 </th>
                 <th className="border border-gray-300 px-3 py-2 text-left font-semibold">
@@ -221,21 +248,27 @@ export default function OrganizationTransferPage() {
               </tr>
             </thead>
             <tbody>
-              {paginatedTransfers.length > 0 ? (
+              {loading ? (
+                <tr>
+                  <td colSpan={6} className="text-center py-4 text-gray-500 border border-gray-300">
+                    Loading transfers...
+                  </td>
+                </tr>
+              ) : paginatedTransfers.length > 0 ? (
                 paginatedTransfers.map((transfer) => (
                   <tr key={transfer.id} className="hover:bg-gray-50 border-b border-gray-200">
                     <td className="border border-gray-300 px-3 py-2 text-gray-600 text-xs font-mono">
-                      {transfer.transferNumber}
+                      {transfer.transferNumber || transfer.id}
                     </td>
                     <td className="border border-gray-300 px-3 py-2 text-gray-600 text-sm">
                       {new Date(transfer.transferDate).toLocaleDateString("en-GB")}
                     </td>
                     <td className="border border-gray-300 px-3 py-2 font-semibold text-gray-900">
-                      {transfer.toOrganization}
+                      {transfer.toOrganization || (transfer as any).organization?.name || "-"}
                     </td>
                     <td className="border border-gray-300 px-3 py-2 text-center">
                       <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs font-semibold">
-                        {transfer.items.length}
+                        {transfer.items?.length || 0}
                       </span>
                     </td>
                    
@@ -314,22 +347,9 @@ export default function OrganizationTransferPage() {
         isOpen={showModal}
         onClose={() => setShowModal(false)}
         onTransferComplete={handleTransferComplete}
-        organizations={[
-          { id: 1, name: "Nagpur Branch", code: "NBR-001" },
-          { id: 2, name: "Pune Collection Center", code: "PCC-002" },
-          { id: 3, name: "Mumbai Hub", code: "MH-003" },
-        ]}
-        items={[
-          { id: 1, itemId: "IT-001", itemName: "CBC Reagent Kit", itemCode: "REG-001" },
-          { id: 2, itemId: "IT-002", itemName: "Urine Test Strips", itemCode: "CON-012" },
-          { id: 3, itemId: "IT-003", itemName: "Blood Collection Tubes", itemCode: "TUBE-005" },
-        ]}
-        stockItems={[
-          { id: 1, itemId: 1, batchNo: "B202601", expiryDate: "2027-12-31", availableStock: 120 },
-          { id: 2, itemId: 1, batchNo: "B202602", expiryDate: "2028-06-30", availableStock: 80 },
-          { id: 3, itemId: 2, batchNo: "G202504", expiryDate: "2028-05-15", availableStock: 300 },
-          { id: 4, itemId: 3, batchNo: "T202505", expiryDate: "2028-05-20", availableStock: 250 },
-        ]}
+        organizations={organizations}
+        items={items}
+        stockItems={stockItems}
       />
 
       {/* Transfer Details Modal */}

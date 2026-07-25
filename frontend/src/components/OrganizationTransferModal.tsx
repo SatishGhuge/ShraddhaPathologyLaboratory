@@ -3,10 +3,11 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { X, Plus, Trash2, Edit2, Check } from "lucide-react";
+import { X, Plus, Trash2, Edit2, Check, AlertCircle } from "lucide-react";
+import inventoryAPI from "@/lib/api/inventory.api";
 
 interface Organization {
-  id: number;
+  id: string;
   name: string;
   code: string;
 }
@@ -20,10 +21,13 @@ interface Item {
 
 interface StockItem {
   id: number;
-  itemId: number;
+  itemId?: number;
   batchNo: string;
   expiryDate: string;
-  availableStock: number;
+  availableQuantity: number;
+  availableStock?: number;
+  invoiceNo?: string;
+  invoiceDate?: string;
 }
 
 interface SelectedItem {
@@ -66,7 +70,7 @@ export default function OrganizationTransferModal({
   const [transferDate, setTransferDate] = useState(
     new Date().toISOString().split("T")[0]
   );
-  const [selectedOrganization, setSelectedOrganization] = useState<number>();
+  const [selectedOrganization, setSelectedOrganization] = useState<string>();
   const [selectedItem, setSelectedItem] = useState<number>();
   const [selectedBatch, setSelectedBatch] = useState("");
   const [transferQuantity, setTransferQuantity] = useState("");
@@ -77,13 +81,39 @@ export default function OrganizationTransferModal({
   const [transferResult, setTransferResult] = useState<any>(null);
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [editedQty, setEditedQty] = useState<string>("");
+  const [loading, setLoading] = useState(false);
+  const [submitError, setSubmitError] = useState("");
+  const [batches, setBatches] = useState<StockItem[]>([]);
 
   useEffect(() => {
     if (isOpen) {
       setTransferNumber(generateTransferNumber(0));
       setTransferDate(new Date().toISOString().split("T")[0]);
+      setSubmitError("");
     }
   }, [isOpen]);
+
+  // Fetch batches when item is selected
+  useEffect(() => {
+    const fetchBatches = async () => {
+      if (!selectedItem) {
+        setBatches([]);
+        return;
+      }
+      try {
+        console.log("Fetching batches for itemId:", selectedItem);
+        const res = await inventoryAPI.labStocks.getBatchesByItem(selectedItem);
+        console.log("Batches response:", res.data);
+        const batchData = res.data?.data || [];
+        console.log("Batch data set:", batchData);
+        setBatches(batchData);
+      } catch (err) {
+        console.error("Failed to fetch batches:", err);
+        setBatches([]);
+      }
+    };
+    fetchBatches();
+  }, [selectedItem]);
 
   // Handle Ctrl+S for saving edited row
   useEffect(() => {
@@ -102,7 +132,8 @@ export default function OrganizationTransferModal({
 
   const selectedOrg = organizations.find((o) => o.id === selectedOrganization);
   const selectedItemData = items.find((i) => i.id === selectedItem);
-  const availableBatches = stockItems.filter((s) => s.itemId === selectedItem);
+  // batches are already filtered by itemId from the API, so no need to filter again
+  const availableBatches = batches;
   const selectedBatchData = availableBatches.find((b) => b.batchNo === selectedBatch);
 
   const handleAddItem = () => {
@@ -115,7 +146,7 @@ export default function OrganizationTransferModal({
     }
     if (
       selectedBatchData &&
-      Number(transferQuantity) > selectedBatchData.availableStock
+      Number(transferQuantity) > selectedBatchData.availableQuantity
     ) {
       newErrors.transferQuantity = "Transfer quantity exceeds available stock";
     }
@@ -130,7 +161,7 @@ export default function OrganizationTransferModal({
         itemName: selectedItemData.itemName,
         batchNo: selectedBatch,
         expiryDate: selectedBatchData.expiryDate,
-        availableStock: selectedBatchData.availableStock,
+        availableStock: selectedBatchData.availableQuantity,
         transferQuantity: Number(transferQuantity),
       };
 
@@ -186,7 +217,7 @@ export default function OrganizationTransferModal({
     setEditedQty("");
   };
 
-  const handleTransfer = () => {
+  const handleTransfer = async () => {
     const newErrors: Record<string, string> = {};
 
     if (!selectedOrganization) {
@@ -200,30 +231,53 @@ export default function OrganizationTransferModal({
 
     if (Object.keys(newErrors).length > 0) return;
 
-    // Show success popup
-    const result = {
-      transferNumber,
-      transferDate,
-      organizationName: selectedOrg?.name,
-      itemsCount: selectedItems.length,
-      items: selectedItems,
-      remarks,
-    };
+    try {
+      setLoading(true);
+      setSubmitError("");
 
-    setTransferResult(result);
-    setShowSuccessPopup(true);
+      const payload = {
+        organizationId: String(selectedOrganization),
+        transferDate,
+        remarks,
+        items: selectedItems.map(item => ({
+          itemId: item.itemId,
+          batchNo: item.batchNo,
+          quantity: item.transferQuantity,
+          expiryDate: item.expiryDate
+        }))
+      };
 
-    // Reset form after 2 seconds
-    setTimeout(() => {
-      onTransferComplete(result);
-      setTransferNumber(generateTransferNumber(0));
-      setTransferDate(new Date().toISOString().split("T")[0]);
-      setSelectedOrganization(undefined);
-      setSelectedItems([]);
-      setRemarks("");
-      setShowSuccessPopup(false);
-      onClose();
-    }, 2500);
+      const response = await inventoryAPI.transfers.create(payload);
+      
+      const result = {
+        transferNumber: response.data.data.transferNumber || transferNumber,
+        transferDate,
+        organizationName: selectedOrg?.name,
+        itemsCount: selectedItems.length,
+        items: selectedItems,
+        remarks,
+      };
+
+      setTransferResult(result);
+      setShowSuccessPopup(true);
+
+      setTimeout(() => {
+        onTransferComplete(result);
+        setTransferNumber(generateTransferNumber(0));
+        setTransferDate(new Date().toISOString().split("T")[0]);
+        setSelectedOrganization(undefined);
+        setSelectedItems([]);
+        setRemarks("");
+        setShowSuccessPopup(false);
+        onClose();
+      }, 2500);
+
+    } catch (err: any) {
+      console.error("Failed to create transfer:", err);
+      setSubmitError(err.response?.data?.message || "Failed to create transfer");
+    } finally {
+      setLoading(false);
+    }
   };
 
   if (!isOpen) return null;
@@ -265,7 +319,7 @@ export default function OrganizationTransferModal({
                 </label>
                 <select
                   value={selectedOrganization || ""}
-                  onChange={(e) => setSelectedOrganization(Number(e.target.value))}
+                  onChange={(e) => setSelectedOrganization(e.target.value)}
                   className={`w-full border rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 ${
                     errors.selectedOrganization
                       ? "border-red-500 focus:ring-red-500"
@@ -328,7 +382,7 @@ export default function OrganizationTransferModal({
                   Available
                 </label>
                 <div className="bg-gray-50 rounded px-1.5 py-1 text-xs text-gray-700 font-semibold border border-gray-200">
-                  {selectedBatchData?.availableStock || "-"}
+                  {selectedBatchData?.availableQuantity || "-"}
                 </div>
               </div>
 
@@ -491,20 +545,27 @@ export default function OrganizationTransferModal({
             />
           </div>
 
+          {submitError && (
+            <div className="p-3 bg-red-50 border border-red-200 rounded text-red-700 text-xs flex items-center gap-2 mb-3">
+              <AlertCircle size={14} /> {submitError}
+            </div>
+          )}
+
           {/* Buttons */}
           <div className="flex gap-2 justify-end">
             <button
               onClick={onClose}
-              className="bg-gray-400 hover:bg-gray-500 text-white px-4 py-1.5 rounded text-xs transition-colors font-semibold"
+              disabled={loading}
+              className="bg-gray-400 hover:bg-gray-500 text-white px-4 py-1.5 rounded text-xs transition-colors font-semibold disabled:opacity-50"
             >
               Cancel
             </button>
             <button
               onClick={handleTransfer}
-              disabled={selectedItems.length === 0}
+              disabled={selectedItems.length === 0 || loading}
               className="bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white px-4 py-1.5 rounded text-xs transition-colors font-semibold"
             >
-              Transfer Stock
+              {loading ? "Processing..." : "Transfer Stock"}
             </button>
           </div>
         </div>
