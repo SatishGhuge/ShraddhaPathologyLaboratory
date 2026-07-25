@@ -335,10 +335,6 @@ model Test {
   testParameter          TestParameter?      @relation("PrimaryTestParameter", fields: [testParameterId], references: [id])
   sample_type            sample_type?        @relation(fields: [sampleTypeId], references: [id])
   machine                Machine?            @relation(fields: [machineId], references: [id], onDelete: SetNull)
-  department             Department         @relation(fields: [departmentId], references: [id], onDelete: Cascade)
-  testCategory           TestCategory?      @relation("PrimaryTestCategory", fields: [testCategoryId], references: [id])
-  testParameter          TestParameter?     @relation("PrimaryTestParameter", fields: [testParameterId], references: [id])
-  sample_type            sample_type?       @relation(fields: [sampleTypeId], references: [id])
 
   @@unique([name, departmentId])
   @@index([departmentId], map: "tests_departmentId_fkey")
@@ -611,19 +607,6 @@ model TestStatusHistory {
   @@index([changedAt])
   @@map("test_status_history")
 }
-
-// ============================================
-// DOCTOR & PRICING MANAGEMENT
-// ============================================
-
-model sample_type {
-  id           Int    @id @default(autoincrement())
-  Sample_Type  String @unique(map: "Sample_Type_Sample_Type_key")
-  Sample_Color String
-  test         Test[]
-  @@map("sample_types")
-}
-
 model Machine {
   id        Int       @id @default(autoincrement())
   name      String    @unique
@@ -635,33 +618,6 @@ model Machine {
   @@map("machines")
 }
 
-model Role {
-  id        Int      @id @default(autoincrement())
-  name      String   @unique
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@map("roles")
-}
-
-model User {
-  id                   Int                    @id @default(autoincrement())
-  name                 String
-  username             String                 @unique
-  role                 String
-  mobile               String?
-  gender               String?
-  email                String?
-  address              String?                @db.Text
-  password             String
-  isActive             Boolean                @default(true)
-  createdAt            DateTime               @default(now())
-  updatedAt            DateTime               @updatedAt
-  organizationId       String?
-  moduleAllocation     ModuleAllocation?
-  user_password_resets user_password_resets[]
-  organization         Organization?          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 model Doctor {
   id                     Int                @id @default(autoincrement())
   name                   String
