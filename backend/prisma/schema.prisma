@@ -860,7 +860,7 @@ model LabStock {
 
 model OrganizationStock {
   id                Int      @id @default(autoincrement())
-  organizationId    String?
+  organizationId    String
   itemId            Int
   batchNo           String
   expiryDate        DateTime
@@ -870,7 +870,7 @@ model OrganizationStock {
   updatedAt         DateTime @updatedAt
 
   item         InventoryItem @relation(fields: [itemId], references: [id])
-  organization Organization? @relation(fields: [organizationId], references: [id])
+  organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   @@unique([organizationId, itemId, batchNo])
   @@index([organizationId])

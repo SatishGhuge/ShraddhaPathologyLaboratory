@@ -186,6 +186,9 @@ export const labToOrgTransferAPI = {
     status: 'Pending' | 'Received' | 'Cancelled';
     receivedBy?: string;
   }) => api.put(`/transfers/${id}/status`, data),
+
+  delete: (id: number) =>
+    api.delete(`/transfers/${id}`),
 };
 
 // ========== ORGANIZATION STOCK API ==========

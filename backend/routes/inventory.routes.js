@@ -35,6 +35,7 @@ import {
   createLabToOrgTransfer,
   getAllLabToOrgTransfers,
   updateTransferStatus,
+  deleteLabToOrgTransfer,
   // Organization Stock
   getOrganizationStocks,
   // Summary
@@ -121,6 +122,7 @@ router.get('/transfers', authMiddleware, getAllLabToOrgTransfers);
 router.put('/transfers/:id/status', authMiddleware, [
   body('status').isIn(['Pending', 'Received', 'Cancelled']).withMessage('Invalid status')
 ], updateTransferStatus);
+router.delete('/transfers/:id', authMiddleware, deleteLabToOrgTransfer);
 
 // ========== ORGANIZATION STOCK ROUTES ==========
 router.get('/organization-stocks', authMiddleware, getOrganizationStocks);

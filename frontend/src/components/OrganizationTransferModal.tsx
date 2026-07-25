@@ -83,6 +83,7 @@ export default function OrganizationTransferModal({
   const [editedQty, setEditedQty] = useState<string>("");
   const [loading, setLoading] = useState(false);
   const [submitError, setSubmitError] = useState("");
+  const [validationErrors, setValidationErrors] = useState<string[]>([]);
   const [batches, setBatches] = useState<StockItem[]>([]);
 
   useEffect(() => {
@@ -228,6 +229,7 @@ export default function OrganizationTransferModal({
     }
 
     setErrors(newErrors);
+    setValidationErrors([]);
 
     if (Object.keys(newErrors).length > 0) return;
 
@@ -274,7 +276,15 @@ export default function OrganizationTransferModal({
 
     } catch (err: any) {
       console.error("Failed to create transfer:", err);
-      setSubmitError(err.response?.data?.message || "Failed to create transfer");
+      
+      // Handle validation errors from backend
+      if (err.response?.data?.errors && Array.isArray(err.response.data.errors)) {
+        setValidationErrors(err.response.data.errors);
+        setSubmitError("Stock validation failed. Please check the items below:");
+      } else {
+        setSubmitError(err.response?.data?.message || "Failed to create transfer");
+        setValidationErrors([]);
+      }
     } finally {
       setLoading(false);
     }
@@ -546,8 +556,18 @@ export default function OrganizationTransferModal({
           </div>
 
           {submitError && (
-            <div className="p-3 bg-red-50 border border-red-200 rounded text-red-700 text-xs flex items-center gap-2 mb-3">
-              <AlertCircle size={14} /> {submitError}
+            <div className="p-3 bg-red-50 border border-red-200 rounded text-red-700 text-xs flex items-start gap-2 mb-3">
+              <AlertCircle size={14} className="mt-0.5 flex-shrink-0" /> 
+              <div>
+                <p className="font-semibold mb-1">{submitError}</p>
+                {validationErrors.length > 0 && (
+                  <ul className="list-disc list-inside space-y-0.5">
+                    {validationErrors.map((err, idx) => (
+                      <li key={idx} className="text-red-600">{err}</li>
+                    ))}
+                  </ul>
+                )}
+              </div>
             </div>
           )}
 

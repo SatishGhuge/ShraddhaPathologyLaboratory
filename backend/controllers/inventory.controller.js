@@ -1003,10 +1003,48 @@ export const createLabToOrgTransfer = async (req, res) => {
       });
     }
 
+    console.log('[createLabToOrgTransfer] Starting transfer with organizationId:', organizationId);
+    console.log('[createLabToOrgTransfer] Items to transfer:', JSON.stringify(items));
+
+    // Validate that sufficient stock exists for all items before proceeding
+    const validationErrors = [];
+    for (const item of items) {
+      console.log(`[createLabToOrgTransfer] Validating item - ItemId: ${item.itemId}, Batch: ${item.batchNo}`);
+      
+      const labStock = await prisma.labStock.findUnique({
+        where: {
+          itemId_batchNo: {
+            itemId: parseInt(item.itemId),
+            batchNo: item.batchNo
+          }
+        },
+        include: { item: true }
+      });
+
+      if (!labStock) {
+        validationErrors.push(
+          `Stock not found for item batch: ${item.batchNo}`
+        );
+      } else if (labStock.quantityAvailable < parseInt(item.quantity)) {
+        validationErrors.push(
+          `Insufficient stock for ${labStock.item.itemName} (Batch: ${item.batchNo}). Available: ${labStock.quantityAvailable}, Requested: ${item.quantity}`
+        );
+      }
+    }
+
+    if (validationErrors.length > 0) {
+      console.log('[createLabToOrgTransfer] Validation errors:', validationErrors);
+      return res.status(400).json({
+        success: false,
+        message: 'Stock validation failed',
+        errors: validationErrors
+      });
+    }
+
     // Generate unique transferId with pattern: TRF + YYMM + 0001
     const now = new Date();
-    const year = String(now.getFullYear()).slice(-2); // 26 for 2026
-    const month = String(now.getMonth() + 1).padStart(2, '0'); // 07
+    const year = String(now.getFullYear()).slice(-2);
+    const month = String(now.getMonth() + 1).padStart(2, '0');
     const yearMonthPrefix = `TRF${year}${month}`;
 
     // Get the count of transfers created in this year-month
@@ -1019,7 +1057,7 @@ export const createLabToOrgTransfer = async (req, res) => {
     const sequence = String(countInMonth + 1).padStart(4, '0');
     let transferId = `${yearMonthPrefix}${sequence}`;
     
-    // Verify uniqueness with retry logic just in case of race condition
+    // Verify uniqueness with retry logic
     let retryCount = 0;
     while (retryCount < 5) {
       const existing = await prisma.labToOrgTransfer.findUnique({
@@ -1027,44 +1065,113 @@ export const createLabToOrgTransfer = async (req, res) => {
       });
       
       if (!existing) {
-        break; // ID is unique, proceed
+        break;
       }
       
-      // If duplicate found, increment and retry
       retryCount++;
       const newSequence = String(countInMonth + 1 + retryCount).padStart(4, '0');
       transferId = `${yearMonthPrefix}${newSequence}`;
     }
 
-    const transfer = await prisma.labToOrgTransfer.create({
-      data: {
-        transferId,
-        organizationId,
-        transferDate: new Date(transferDate),
-        remarks,
-        createdBy,
-        items: {
-          create: items.map(item => ({
-            itemId: parseInt(item.itemId),
-            batchNo: item.batchNo,
-            quantity: parseInt(item.quantity),
-            expiryDate: new Date(item.expiryDate)
-          }))
+    console.log('[createLabToOrgTransfer] Generated transferId:', transferId);
+
+    // Execute all operations within a transaction
+    const transfer = await prisma.$transaction(async (tx) => {
+      // Step 1: Create the transfer with items
+      console.log('[createLabToOrgTransfer] Creating transfer record...');
+      
+      const newTransfer = await tx.labToOrgTransfer.create({
+        data: {
+          transferId,
+          organizationId,
+          transferDate: new Date(transferDate),
+          remarks,
+          createdBy,
+          items: {
+            create: items.map(item => ({
+              itemId: parseInt(item.itemId),
+              batchNo: item.batchNo,
+              quantity: parseInt(item.quantity),
+              expiryDate: new Date(item.expiryDate)
+            }))
+          }
+        },
+        include: { items: { include: { item: true } }, organization: true }
+      });
+
+      console.log('[createLabToOrgTransfer] Transfer record created:', newTransfer.id);
+
+      // Step 2: Reduce LabStock and create/update OrganizationStock for each item
+      for (const item of items) {
+        const transferQty = parseInt(item.quantity);
+        const itemId = parseInt(item.itemId);
+        const batchNo = item.batchNo;
+
+        console.log(`[createLabToOrgTransfer] Processing item - ItemId: ${itemId}, Batch: ${batchNo}, Qty: ${transferQty}`);
+
+        try {
+          // STEP 2A: Reduce LabStock quantity
+          console.log(`  Updating LabStock with key: itemId=${itemId}, batchNo=${batchNo}`);
+          const updatedLabStock = await tx.labStock.update({
+            where: { itemId_batchNo: { itemId, batchNo } },
+            data: {
+              quantityAvailable: {
+                decrement: transferQty
+              },
+              lastStockUpdate: new Date()
+            }
+          });
+
+          console.log(`[createLabToOrgTransfer] ✓ LabStock Updated - ItemId: ${itemId}, Batch: ${batchNo}, Qty Reduced: ${transferQty}, Remaining: ${updatedLabStock.quantityAvailable}`);
+
+          // STEP 2B: Create or update OrganizationStock using upsert
+          console.log(`  Upserting OrgStock with orgId=${organizationId}, itemId=${itemId}, batch=${batchNo}`);
+          const updatedOrgStock = await tx.organizationStock.upsert({
+            where: {
+              organizationId_itemId_batchNo: {
+                organizationId,
+                itemId,
+                batchNo
+              }
+            },
+            update: {
+              quantityAvailable: {
+                increment: transferQty
+              },
+              lastStockUpdate: new Date()
+            },
+            create: {
+              organizationId,
+              itemId,
+              batchNo,
+              expiryDate: new Date(item.expiryDate),
+              quantityAvailable: transferQty,
+              lastStockUpdate: new Date()
+            }
+          });
+
+          console.log(`[createLabToOrgTransfer] ✓ OrgStock Updated/Created - OrgId: ${organizationId}, ItemId: ${itemId}, Batch: ${batchNo}, New Qty: ${updatedOrgStock.quantityAvailable}`);
+        } catch (itemError) {
+          console.error(`[ERROR] Failed to process item ${itemId}:`, itemError);
+          throw itemError;
         }
-      },
-      include: { items: { include: { item: true } }, organization: true }
+      }
+
+      return newTransfer;
     });
+
+    console.log('[createLabToOrgTransfer] ✓✓✓ Transfer completed successfully!');
 
     res.status(201).json({
       success: true,
-      message: 'Lab to organization transfer created successfully',
+      message: 'Lab to organization transfer created successfully and stock updated',
       data: transfer
     });
   } catch (error) {
     console.error('Create lab to org transfer error:', error);
     res.status(500).json({
       success: false,
-      message: 'Failed to create transfer'
+      message: 'Failed to create transfer: ' + error.message
     });
   }
 };
@@ -1120,6 +1227,121 @@ export const updateTransferStatus = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Failed to update transfer status'
+    });
+  }
+};
+
+export const deleteLabToOrgTransfer = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    console.log('[deleteLabToOrgTransfer] Deleting transfer ID:', id);
+
+    // Get the transfer with all its items
+    const transfer = await prisma.labToOrgTransfer.findUnique({
+      where: { id: parseInt(id) },
+      include: { items: true }
+    });
+
+    if (!transfer) {
+      console.log('[deleteLabToOrgTransfer] Transfer not found:', id);
+      return res.status(404).json({
+        success: false,
+        message: 'Transfer not found'
+      });
+    }
+
+    console.log('[deleteLabToOrgTransfer] Found transfer:', transfer.transferId, 'OrgId:', transfer.organizationId);
+
+    // Execute all operations within a transaction
+    const deletedTransfer = await prisma.$transaction(async (tx) => {
+      // Step 1: Restore LabStock and reduce OrganizationStock for each transferred item
+      for (const item of transfer.items) {
+        const transferQty = item.quantity;
+        const itemId = item.itemId;
+        const batchNo = item.batchNo;
+
+        console.log(`[deleteLabToOrgTransfer] Processing item - ItemId: ${itemId}, Batch: ${batchNo}, Qty: ${transferQty}`);
+
+        // Restore LabStock - add back the transferred quantity
+        const restoredLabStock = await tx.labStock.update({
+          where: {
+            itemId_batchNo: {
+              itemId,
+              batchNo
+            }
+          },
+          data: {
+            quantityAvailable: {
+              increment: transferQty
+            },
+            lastStockUpdate: new Date()
+          }
+        });
+
+        console.log(`[deleteLabToOrgTransfer] ✓ LabStock Restored - ItemId: ${itemId}, Batch: ${batchNo}, Qty Added: ${transferQty}, New Total: ${restoredLabStock.quantityAvailable}`);
+
+        // Reduce OrganizationStock or delete if quantity becomes 0
+        const orgStockKey = {
+          organizationId_itemId_batchNo: {
+            organizationId: transfer.organizationId,
+            itemId,
+            batchNo
+          }
+        };
+
+        const orgStock = await tx.organizationStock.findUnique({
+          where: orgStockKey
+        });
+
+        if (orgStock) {
+          const newQuantity = orgStock.quantityAvailable - transferQty;
+
+          if (newQuantity <= 0) {
+            // Delete organization stock if quantity becomes 0 or negative
+            await tx.organizationStock.delete({
+              where: orgStockKey
+            });
+            console.log(`[deleteLabToOrgTransfer] ✓ OrgStock Deleted - OrgId: ${transfer.organizationId}, ItemId: ${itemId}, Batch: ${batchNo}`);
+          } else {
+            // Update organization stock quantity
+            const updatedOrgStock = await tx.organizationStock.update({
+              where: orgStockKey,
+              data: {
+                quantityAvailable: newQuantity,
+                lastStockUpdate: new Date()
+              }
+            });
+            console.log(`[deleteLabToOrgTransfer] ✓ OrgStock Updated - OrgId: ${transfer.organizationId}, ItemId: ${itemId}, Batch: ${batchNo}, New Qty: ${updatedOrgStock.quantityAvailable}`);
+          }
+        }
+      }
+
+      // Step 2: Delete all transfer items
+      await tx.labToOrgTransferItem.deleteMany({
+        where: { transferId: parseInt(id) }
+      });
+
+      // Step 3: Delete the transfer
+      const deleted = await tx.labToOrgTransfer.delete({
+        where: { id: parseInt(id) }
+      });
+
+      return deleted;
+    });
+
+    console.log('[deleteLabToOrgTransfer] ✓✓✓ Transfer deleted successfully!');
+
+    res.json({
+      success: true,
+      message: 'Transfer deleted successfully and stock restored',
+      data: deletedTransfer
+    });
+  } catch (error) {
+    console.error('Delete lab to org transfer error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to delete transfer: ' + error.message
     });
   }
 };

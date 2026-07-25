@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { ArrowLeft, AlertCircle } from "lucide-react";
+import { ArrowLeft, AlertCircle, Plus } from "lucide-react";
 import inventoryAPI from "@/lib/api/inventory.api";
+import HSNMasterModal from "./HSNMasterModal";
 
 interface HSNCodeOption {
   id: number;
@@ -38,30 +39,40 @@ export default function ItemMasterModal({
   const [loadingHsn, setLoadingHsn] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [successMsg, setSuccessMsg] = useState("");
+  const [isHsnModalOpen, setIsHsnModalOpen] = useState(false);
 
   const UNITS = ["Box", "Bottle", "Kit", "Piece", "Set", "Roll", "Strip", "Vial"];
+
+  const fetchHsnCodes = async () => {
+    try {
+      setLoadingHsn(true);
+      const response = await inventoryAPI.hsn.getAll(1, 100);
+      setHsnCodes(response.data.data || []);
+    } catch (err) {
+      console.error("Failed to fetch HSN codes:", err);
+      setErrors((prev) => ({
+        ...prev,
+        submit: "Failed to load HSN codes. Please try again.",
+      }));
+    } finally {
+      setLoadingHsn(false);
+    }
+  };
 
   useEffect(() => {
     if (!isOpen) return;
 
-    const fetchHsnCodes = async () => {
-      try {
-        setLoadingHsn(true);
-        const response = await inventoryAPI.hsn.getAll(1, 100);
-        setHsnCodes(response.data.data || []);
-      } catch (err) {
-        console.error("Failed to fetch HSN codes:", err);
-        setErrors((prev) => ({
-          ...prev,
-          submit: "Failed to load HSN codes. Please try again.",
-        }));
-      } finally {
-        setLoadingHsn(false);
-      }
-    };
-
     fetchHsnCodes();
   }, [isOpen]);
+
+  const handleHsnSaved = (hsnData: any) => {
+    fetchHsnCodes();
+    setForm((prev) => ({
+      ...prev,
+      hsnCodeId: String(hsnData.id),
+      gst: String(hsnData.gstRate),
+    }));
+  };
 
   useEffect(() => {
     if (!isOpen) return;
@@ -247,9 +258,18 @@ export default function ItemMasterModal({
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-gray-700 mb-1.5">
-                HSN Code <span className="text-red-500">*</span>
-              </label>
+              <div className="flex justify-between items-center mb-1.5">
+                <label className="block text-xs font-semibold text-gray-700">
+                  HSN Code <span className="text-red-500">*</span>
+                </label>
+                <button
+                  type="button"
+                  onClick={() => setIsHsnModalOpen(true)}
+                  className="flex items-center gap-1 text-[10px] font-medium text-orange-600 hover:text-orange-700"
+                >
+                  <Plus size={12} /> Add HSN
+                </button>
+              </div>
               <select
                 name="hsnCodeId"
                 value={form.hsnCodeId}
@@ -354,6 +374,12 @@ export default function ItemMasterModal({
           </div>
         </form>
       </div>
+
+      <HSNMasterModal
+        isOpen={isHsnModalOpen}
+        onClose={() => setIsHsnModalOpen(false)}
+        onHSNSaved={handleHsnSaved}
+      />
     </div>
   );
 }

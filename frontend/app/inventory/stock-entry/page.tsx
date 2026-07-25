@@ -107,6 +107,26 @@ export default function StockEntryPage() {
     fetchData();
   }, [currentPage]);
 
+  // Listen for new item creation and refresh items
+  useEffect(() => {
+    const handleItemCreated = () => {
+      console.log("New item created, refreshing items list...");
+      // Refresh only the items, not the entire data
+      const refreshItems = async () => {
+        try {
+          const itemsRes = await inventoryAPI.items.getAll(1, 100);
+          setItems(itemsRes.data.data || []);
+        } catch (err) {
+          console.error("Failed to refresh items:", err);
+        }
+      };
+      refreshItems();
+    };
+
+    window.addEventListener('itemCreated', handleItemCreated);
+    return () => window.removeEventListener('itemCreated', handleItemCreated);
+  }, []);
+
   const fetchData = async () => {
     try {
       setLoading(true);
