@@ -691,6 +691,17 @@ export const createTest = async (req, res) => {
     }
 
     console.log('📊 Processing categories:', categories?.length || 0);
+    
+    // 🔍 DEBUG: Log boolean field conversions for CREATE
+    const attachFileValue = attachFile ? (typeof attachFile === 'boolean' ? 1 : (attachFile === 'Yes' || attachFile === 'true' ? 1 : 0)) : 0;
+    const profileTestValue = profileTest ? (typeof profileTest === 'boolean' ? 1 : (profileTest === 'Yes' || profileTest === 'true' ? 1 : 0)) : 0;
+    
+    console.log('%c═══ CREATE TEST - BOOLEAN CONVERSIONS ═══', 'color: #FFD700; font-weight: bold');
+    console.log('attachFile received:', attachFile, `Type: ${typeof attachFile}`);
+    console.log('attachFile storing in DB:', attachFileValue);
+    console.log('profileTest received:', profileTest, `Type: ${typeof profileTest}`);
+    console.log('profileTest storing in DB:', profileTestValue);
+    console.log('sampleTypeId:', sampleTypeId);
 
     // Create test first
     const test = await prisma.test.create({
@@ -710,8 +721,8 @@ export const createTest = async (req, res) => {
         interpretationLabel,
         interpretation,
         outsourceLab,
-        attachFile: attachFile ? (typeof attachFile === 'boolean' ? 1 : (attachFile === 'Yes' || attachFile === 'true' ? 1 : 0)) : 0,
-        profileTest: profileTest ? (typeof profileTest === 'boolean' ? 1 : (profileTest === 'Yes' || profileTest === 'true' ? 1 : 0)) : 0,
+        attachFile: attachFileValue,
+        profileTest: profileTestValue,
         isHeader: isHeader !== undefined ? isHeader : true,
         showTestName: showTestName !== undefined ? showTestName : true,
         isNABL: isNABL || false,
@@ -922,9 +933,40 @@ export const updateTest = async (req, res) => {
     if (interpretationLabel !== undefined) updateData.interpretationLabel = interpretationLabel || null;
     if (interpretation !== undefined) updateData.interpretation = interpretation || null;
     if (outsourceLab !== undefined) updateData.outsourceLab = outsourceLab || null;
-    if (attachFile !== undefined) updateData.attachFile = attachFile ? (typeof attachFile === 'boolean' ? 1 : (attachFile === 'Yes' || attachFile === 'true' ? 1 : 0)) : 0;
+    // Convert boolean fields properly (handle both true/false and string values)
+    if (attachFile !== undefined) {
+      let attachFileValue = 0;
+      if (typeof attachFile === 'boolean') {
+        attachFileValue = attachFile ? 1 : 0;
+      } else if (typeof attachFile === 'number') {
+        attachFileValue = attachFile ? 1 : 0;
+      } else if (typeof attachFile === 'string') {
+        attachFileValue = (attachFile === 'Yes' || attachFile === 'true' || attachFile === '1') ? 1 : 0;
+      }
+      updateData.attachFile = attachFileValue;
+      console.log('🔧 Processing attachFile:', { 
+        received: attachFile, 
+        receivedType: typeof attachFile, 
+        storing: attachFileValue 
+      });
+    }
     if (imageSize !== undefined) updateData.imageSize = imageSize || null;
-    if (profileTest !== undefined) updateData.profileTest = profileTest ? (typeof profileTest === 'boolean' ? 1 : (profileTest === 'Yes' || profileTest === 'true' ? 1 : 0)) : 0;
+    if (profileTest !== undefined) {
+      let profileTestValue = 0;
+      if (typeof profileTest === 'boolean') {
+        profileTestValue = profileTest ? 1 : 0;
+      } else if (typeof profileTest === 'number') {
+        profileTestValue = profileTest ? 1 : 0;
+      } else if (typeof profileTest === 'string') {
+        profileTestValue = (profileTest === 'Yes' || profileTest === 'true' || profileTest === '1') ? 1 : 0;
+      }
+      updateData.profileTest = profileTestValue;
+      console.log('🔧 Processing profileTest:', { 
+        received: profileTest, 
+        receivedType: typeof profileTest, 
+        storing: profileTestValue 
+      });
+    }
     if (isHeader !== undefined) updateData.isHeader = isHeader;
     if (showTestName !== undefined) updateData.showTestName = showTestName;
     if (isNABL !== undefined) updateData.isNABL = isNABL;

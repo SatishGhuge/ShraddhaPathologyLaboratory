@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, Fragment, useRef } from 'react';
 import { X, AlertCircle } from 'lucide-react';
 import API_BASE_URL from '@/src/api/config';
+import { parseHtmlText, HtmlPart } from '@/src/utils/htmlParser';
 
 // Helper function to extract ALL available options from a parameter (from ALL database fields)
 const getAllOptionsFromParameter = (param: Parameter): string[] => {
@@ -642,7 +643,19 @@ const ReadingValidationModal = ({
                       return (
                         <tr key={param.id} className={outOfRange ? 'bg-red-50' : 'bg-white hover:bg-gray-50'} style={{height: '28px'}}>
                           <td className="border p-1.5">
-                            <span className="font-medium text-gray-900 text-xs">{param.parameterName}</span>
+                            <span className="font-medium text-gray-900 text-xs">
+                              {(() => {
+                                const paramNameParts = parseHtmlText(param.parameterName);
+                                if (typeof paramNameParts === 'string') {
+                                  return paramNameParts;
+                                }
+                                return (paramNameParts as HtmlPart[]).map((part: HtmlPart, i: number) => (
+                                  <span key={i} style={{ fontWeight: part.bold ? 'bold' : 'normal', fontStyle: part.italic ? 'italic' : 'normal' }}>
+                                    {part.text}
+                                  </span>
+                                ));
+                              })()}
+                            </span>
                             {param.isMandatory && <span className="text-red-500 ml-1">*</span>}
                           </td>
                           <td className="border p-1.5 text-center">

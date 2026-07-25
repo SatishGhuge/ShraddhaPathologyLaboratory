@@ -501,7 +501,11 @@ export const getAllPatients = async (req, res) => {
         tests: {
           include: {
             test: {
-              include: {
+              select: {
+                id: true,
+                name: true,
+                shortName: true,
+                sampleTypeId: true,
                 sample_type: {
                   select: {
                     id: true,
@@ -545,7 +549,11 @@ export const getPatientById = async (req, res) => {
         tests: {
           include: {
             test: {
-              include: {
+              select: {
+                id: true,
+                name: true,
+                shortName: true,
+                sampleTypeId: true,
                 sample_type: {
                   select: {
                     id: true,
@@ -617,7 +625,11 @@ export const searchPatient = async (req, res) => {
         tests: {
           include: {
             test: {
-              include: {
+              select: {
+                id: true,
+                name: true,
+                shortName: true,
+                sampleTypeId: true,
                 sample_type: {
                   select: {
                     id: true,

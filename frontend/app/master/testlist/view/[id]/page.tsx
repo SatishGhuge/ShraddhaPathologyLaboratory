@@ -1518,13 +1518,98 @@ const AddTest = () => {
                         <label className="block font-semibold text-cyan-800 text-xs sm:text-sm mb-1">
                           Category Name
                         </label>
-                        <input 
-                          className="px-2 py-1.5 sm:py-1 border border-gray-300 rounded text-xs sm:text-sm w-full sm:w-40" 
-                          placeholder="Category name..."
-                          value={category.name || ""}
-                          onChange={(e) => handleCategoryChange(categoryIndex, 'name', e.target.value)}
-                          disabled={isViewMode} 
-                        />
+                        <div className="flex flex-col gap-1">
+                          {/* Category Name Input */}
+                          <input 
+                            id={`category-name-${categoryIndex}`}
+                            className="px-2 py-1.5 sm:py-1 border border-gray-300 rounded text-xs sm:text-sm w-full sm:w-40" 
+                            placeholder="Category name..."
+                            value={category.name || ""}
+                            onChange={(e) => handleCategoryChange(categoryIndex, 'name', e.target.value)}
+                            disabled={isViewMode} 
+                          />
+                          {/* Formatting Buttons - Below Input */}
+                          {!isViewMode && (
+                            <div className="flex gap-1">
+                              {/* Bold Button */}
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const input = document.getElementById(`category-name-${categoryIndex}`) as HTMLInputElement;
+                                  const start = input.selectionStart;
+                                  const end = input.selectionEnd;
+                                  const selectedText = input.value.substring(start, end);
+                                  if (selectedText) {
+                                    const newValue = input.value.substring(0, start) + `<b>${selectedText}</b>` + input.value.substring(end);
+                                    handleCategoryChange(categoryIndex, 'name', newValue);
+                                  }
+                                }}
+                                className="px-2 py-1 bg-white border border-gray-300 rounded text-xs font-bold hover:bg-gray-100"
+                                title="Bold"
+                              >
+                                B
+                              </button>
+                              {/* Italic Button */}
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const input = document.getElementById(`category-name-${categoryIndex}`) as HTMLInputElement;
+                                  const start = input.selectionStart;
+                                  const end = input.selectionEnd;
+                                  const selectedText = input.value.substring(start, end);
+                                  if (selectedText) {
+                                    const newValue = input.value.substring(0, start) + `<i>${selectedText}</i>` + input.value.substring(end);
+                                    handleCategoryChange(categoryIndex, 'name', newValue);
+                                  }
+                                }}
+                                className="px-2 py-1 bg-white border border-gray-300 rounded text-xs italic hover:bg-gray-100"
+                                title="Italic"
+                              >
+                                I
+                              </button>
+                              {/* Underline Button */}
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const input = document.getElementById(`category-name-${categoryIndex}`) as HTMLInputElement;
+                                  const start = input.selectionStart;
+                                  const end = input.selectionEnd;
+                                  const selectedText = input.value.substring(start, end);
+                                  if (selectedText) {
+                                    const newValue = input.value.substring(0, start) + `<u>${selectedText}</u>` + input.value.substring(end);
+                                    handleCategoryChange(categoryIndex, 'name', newValue);
+                                  }
+                                }}
+                                className="px-2 py-1 bg-white border border-gray-300 rounded text-xs underline hover:bg-gray-100"
+                                title="Underline"
+                              >
+                                U
+                              </button>
+                              {/* Clear Formatting Button */}
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const input = document.getElementById(`category-name-${categoryIndex}`) as HTMLInputElement;
+                                  const start = input.selectionStart;
+                                  const end = input.selectionEnd;
+                                  const selectedText = input.value.substring(start, end);
+                                  if (selectedText) {
+                                    const cleanText = selectedText
+                                      .replace(/<b>|<\/b>/g, '')
+                                      .replace(/<i>|<\/i>/g, '')
+                                      .replace(/<u>|<\/u>/g, '');
+                                    const newValue = input.value.substring(0, start) + cleanText + input.value.substring(end);
+                                    handleCategoryChange(categoryIndex, 'name', newValue);
+                                  }
+                                }}
+                                className="px-2 py-1 bg-white border border-gray-300 rounded text-xs font-bold text-red-600 hover:bg-gray-100"
+                                title="Clear formatting"
+                              >
+                                X
+                              </button>
+                            </div>
+                          )}
+                        </div>
                       </div>
                       <div>
                         <label className="block font-semibold text-cyan-800 text-xs sm:text-sm mb-1">

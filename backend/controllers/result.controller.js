@@ -326,9 +326,18 @@ export const getPatientTestById = async (req, res) => {
           select: {
             id: true,
             name: true,
+            shortName: true,
             interpretation: true,
             attachFile: true,
-            imageSize: true
+            imageSize: true,
+            sampleTypeId: true,
+            sample_type: {
+              select: {
+                id: true,
+                Sample_Type: true,
+                Sample_Color: true
+              }
+            }
           }
         },
         testResults: {
@@ -505,7 +514,10 @@ export const getPatientTestById = async (req, res) => {
           isMandatory: category.testParameter.isMandatory,
           categoryName: categoryName,
           categoryId: category.id,
+          // Use unique category identifier: if no name, create a unique key from categoryId so categories without names don't collapse together
+          categoryUniqueId: hasManualCategoryName ? categoryName : `__NO_NAME_${category.id}__`,
           sortOrder: category.testParameter.parameterSortOrder || 999,
+          categorySortOrder: category.sortOrder || 999,
           showCategoryHeader: hasManualCategoryName,
           
           // 🔴 SEPARATE both methods
@@ -641,6 +653,7 @@ export const getPatientTestById = async (req, res) => {
           categoryName: 'NO_CATEGORY_HEADER', // No header for direct parameters
           categoryId: null,
           sortOrder: param.parameterSortOrder || 999,
+          categorySortOrder: 999, // High value for direct parameters (no category sort)
           showCategoryHeader: false, // Don't show header for direct parameters
           
           // 🔴 For direct parameters: no category method, only parameter method

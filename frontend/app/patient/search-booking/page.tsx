@@ -2,9 +2,10 @@
 
 import { useRouter, useSearchParams } from "next/navigation";
 import React, { useState, useRef, useEffect } from "react";
-import BarcodeModal from "@/app/components/BarcodeModal";
+import BarcodeModal, { generateBarcodeLabels, getSampleTypeId, getSampleTypeName, getTestName } from "@/app/components/BarcodeModal";
 import BillReceipt from "@/app/components/BillReceipt";
 import API_BASE_URL from "@/src/api/config";
+import { generateCompactBarcodePrintHtml } from "@/app/utils/barcodePrintUtils";
 
 import { 
   Search, RotateCcw, Eye, Pencil, Trash2, Printer,
@@ -460,6 +461,7 @@ export default function BookingPage() {
           name: t.test?.name || "",
           sample: t.test?.sample_type?.Sample_Type || t.sample || "N/A",  // Use sample_type relationship if available, fallback to PatientTest.sample
           testId: t.testId,
+          sampleTypeId: t.test?.sampleTypeId,  // ✅ CRITICAL: Include sampleTypeId from test relationship
           departmentId: t.departmentId,
           organizationId: t.organizationId,
           b2cCharge: t.charge || 0,
@@ -1284,68 +1286,26 @@ export default function BookingPage() {
       return;
     }
 
-    const now = new Date();
-    const dateStr = now.toLocaleDateString('en-GB');
-    const timeStr = now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: true }).toUpperCase();
+    // 🔴 DEBUG: Log what we're sending to barcode generation
+    console.log('🔴 Search-Booking Page - handlePrintBarcode DEBUG:');
+    console.log('   booking.tests.length:', booking.tests.length);
+    booking.tests.forEach((test, idx) => {
+      console.log(`   Test ${idx} keys:`, Object.keys(test).slice(0, 15));
+      console.log(`   Test ${idx} data:`, {
+        id: test?.id,
+        visitId: booking?.visitId,
+        sampleTypeId: test?.sampleTypeId,
+        'test.sampleTypeId': test?.test?.sampleTypeId,
+        'patientTest.sampleTypeId': test?.patientTest?.sampleTypeId,
+        'test object exists': !!test?.test,
+        testKeys: test?.test ? Object.keys(test.test).slice(0, 10) : 'NO TEST OBJECT'
+      });
+    });
 
-    // Group by specimen type and collect test IDs (PatientTest IDs)
-    const specimenGroups: any = {};
-    const specimenTestIds: any = {};
-    const specimenStatuses: any = {};
-    const specimenBarcodeStatuses: any = {};
+    // ✅ Use centralized generateBarcodeLabels function
+    const labels = generateBarcodeLabels(booking.tests, booking.visitId || booking.bookingId, booking.patientData?.organizationCode || '');
     
-    booking.tests.forEach((t: any) => {
-      const key = t.sample || 'Unknown';
-      if (!specimenGroups[key]) {
-        specimenGroups[key] = [];
-        specimenTestIds[key] = [];
-        specimenStatuses[key] = [];
-        specimenBarcodeStatuses[key] = [];
-      }
-      specimenGroups[key].push(t.name);
-      // ✨ Store the patientTest ID (from the booking test object which comes from patientTest table)
-      specimenTestIds[key].push(t.id);
-      // Store status and barcode_status for each test
-      specimenStatuses[key].push(t.status || 'Registered');
-      specimenBarcodeStatuses[key].push(t.barcode_status || 'Unprinted');
-    });
-
-    // Build labels - Use visitId for barcode ONLY (no organization code in barcode)
-    const specimenEntries = Object.entries(specimenGroups);
-    const labels = specimenEntries.map(([specimen, shortNames], idx) => {
-      let barcodeValue = idx === 0 ? booking.visitId : `${booking.visitId}-${idx + 1}`;
-      
-      // Organization code stored separately for display, not in barcode
-      let organizationCode = booking.patientData?.organizationCode || '';
-      
-      // Get status and barcode_status from tests in this specimen group
-      const statuses = specimenStatuses[specimen] || [];
-      const barcodeStatuses = specimenBarcodeStatuses[specimen] || [];
-      
-      // Determine final status: if ANY test is "Received", use "Received"
-      let finalSampleStatus = 'Registered';
-      if (statuses.includes('Received')) {
-        finalSampleStatus = 'Received';
-      }
-      
-      // Get final barcode status: if ANY barcode has been printed, use "Printed"
-      let finalBarcodeStatus = 'Unprinted';
-      if (barcodeStatuses.includes('Printed')) {
-        finalBarcodeStatus = 'Printed';
-      }
-      
-      return {
-        barcodeValue, // Just the visitId-based barcode
-        organizationCode, // Store separately for display
-        specimen,
-        shortNamesStr: (shortNames as any[]).join(' / '),
-        dateStr,
-        timeStr,
-        testIds: specimenTestIds[specimen] || [], // Include test IDs for API calls
-        barcode_status: finalBarcodeStatus, // Add barcode status from database
-        sampleStatus: finalSampleStatus, // ✅ ADD SAMPLE STATUS FOR BLUE HIGHLIGHTING
-      };
-    });
+    console.log('✅ Generated barcode labels using centralized function:', labels);
 
     const genderInitial = booking.patientData?.gender ? booking.patientData.gender.charAt(0).toUpperCase() : '';
     const age = booking.patientData?.age || '';
@@ -1357,10 +1317,10 @@ export default function BookingPage() {
       age,
       gender: booking.patientData?.gender || '',
       ageGender,
-      organizationCode: booking.patientData?.organizationCode || '', // Add organization code to patient info
+      organizationCode: booking.patientData?.organizationCode || '',
     });
     setBarcodeLabels(labels);
-    setSelectedBarcodeIndices(new Set(labels.map((_, idx) => idx))); // Initialize all barcodes as selected
+    setSelectedBarcodeIndices(new Set(labels.map((_, idx) => idx)));
     setShowBarcodeModal(true);
   };
 
@@ -3020,28 +2980,13 @@ export default function BookingPage() {
       isOpen={showBarcodeModal}
       onClose={() => setShowBarcodeModal(false)}
       onPrintOnly={async () => {
-        const printArea = document.getElementById('barcode-print-area');
-        const allLabels = printArea.querySelectorAll('[data-barcode-index]');
-        
-        // Print all barcodes
-        const allLabelsHtml = Array.from(allLabels)
-          .map((label) => (label as HTMLElement).outerHTML)
-          .join('');
-        
-        const win = window.open('', '_blank');
-        win.document.write(`<!DOCTYPE html><html><head><title>Barcode Labels</title>
-          <style>
-            * { margin:0; padding:0; box-sizing:border-box; }
-            body { font-family: Arial, sans-serif; background: white; }
-            .labels-wrap { display: flex; flex-wrap: wrap; gap: 8mm; padding: 8mm; }
-            .label { width: 80mm; border: 0.5px solid #999; page-break-inside: avoid; }
-            @page { size: A4; margin: 8mm; }
-          </style>
-        </head><body><div class="labels-wrap">${allLabelsHtml}</div></body></html>`);
-        win.document.close();
-        win.focus();
-        win.print();
-        setShowBarcodeModal(false);
+        // Trigger iframe print - it's handled by BarcodeModal component
+        const iframe = document.getElementById('barcode-print-frame') as HTMLIFrameElement;
+        if (iframe && iframe.contentWindow) {
+          setTimeout(() => {
+            iframe.contentWindow?.print();
+          }, 100);
+        }
       }}
       onPrintAndUpdate={async () => {
         let successCount = 0;
@@ -3086,48 +3031,51 @@ export default function BookingPage() {
           console.error('⚠️ Status transition failed:', error);
         }
         
-        // Print only the selected barcodes
-        const printArea = document.getElementById('barcode-print-area');
-        const allLabels = printArea.querySelectorAll('[data-barcode-index]');
-        
-        // Create a new container with only selected labels
-        const selectedLabelsHtml = Array.from(allLabels)
-          .map((label, idx) => {
-            if (selectedBarcodeIndices.has(idx)) {
-              return (label as HTMLElement).outerHTML;
-            }
-            return '';
-          })
-          .filter(html => html.length > 0)
-          .join('');
-        
-        const win = window.open('', '_blank');
-        win.document.write(`<!DOCTYPE html><html><head><title>Barcode Labels</title>
-          <style>
-            * { margin:0; padding:0; box-sizing:border-box; }
-            body { font-family: Arial, sans-serif; background: white; }
-            .labels-wrap { display: flex; flex-wrap: wrap; gap: 3mm; padding: 4mm; }
-            .label { width: 60mm; border: 0.5px solid #999; page-break-inside: avoid; }
-            @page { size: A4; margin: 4mm; }
-          </style>
-        </head><body><div class="labels-wrap">${selectedLabelsHtml}</div></body></html>`);
-        win.document.close();
-        win.focus();
-        win.print();
-        
-        setShowBarcodeModal(false);
-        setBarcodeSelectedTests(new Set());
-        setBarcodeLockedPatientUid(null);
-        setBarcodeLockedVisitId(null);
-        setSelectedBarcodeIndices(new Set());
-        
-        if (successCount > 0) {
-          setTimeout(() => {
-            alert(`✅ ${successCount} test(s) marked as Received and ${selectedBarcodeIndices.size} barcode(s) printed!`);
-            // Refresh the page to show updated barcode colors
-            window.location.reload();
-          }, 800);
-        }
+        // Now print the barcodes after status update
+        setTimeout(() => {
+          console.log('📄 Status updated, now printing barcodes...');
+          
+          // Filter only selected barcode labels for printing
+          const selectedLabels = barcodeLabels.filter((_, idx) => selectedBarcodeIndices.has(idx));
+          
+          // Use unified print function with consistent formatting
+          const printHtml = generateCompactBarcodePrintHtml(
+            selectedLabels,
+            {
+              patientName: barcodePatientInfo.patientName,
+              gender: barcodePatientInfo.gender,
+              age: barcodePatientInfo.age,
+              visitId: barcodePatientInfo.visitId
+            },
+            (value: string) => buildCode128Svg(value).svg
+          );
+          
+          const iframe = document.getElementById('barcode-print-frame') as HTMLIFrameElement;
+          if (iframe && iframe.contentDocument) {
+            iframe.contentDocument.open();
+            iframe.contentDocument.write(printHtml);
+            iframe.contentDocument.close();
+            setTimeout(() => {
+              console.log('🖨️ Calling iframe print...');
+              iframe.contentWindow?.print();
+              
+              // AFTER print preview is shown, then close modal and reload
+              setTimeout(() => {
+                if (successCount > 0) {
+                  alert(`✅ ${successCount} test(s) marked as Received and ${selectedBarcodeIndices.size} barcode(s) printed!`);
+                }
+                setShowBarcodeModal(false);
+                setBarcodeSelectedTests(new Set());
+                setBarcodeLockedPatientUid(null);
+                setBarcodeLockedVisitId(null);
+                setSelectedBarcodeIndices(new Set());
+                
+                // Reload page to refresh barcode colors
+                window.location.reload();
+              }, 1000);
+            }, 300);
+          }
+        }, 500);
       }}
       barcodeLabels={barcodeLabels}
       barcodePatientInfo={barcodePatientInfo}

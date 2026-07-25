@@ -16,7 +16,7 @@ import {
   Upload,
   FileCheck,
 } from "lucide-react";
-import BarcodeModal from "@/app/components/BarcodeModal";
+import BarcodeModal, { generateBarcodeLabels } from "@/app/components/BarcodeModal";
 import API_BASE_URL from "@/src/api/config";
 
 import { FaWhatsapp } from "react-icons/fa";
@@ -626,7 +626,7 @@ export default function Result() {
       }
       
       return {
-        barcodeValue: idx === 0 ? targetPatient.visit_id : `${targetPatient.visit_id}-${idx + 1}`,
+        barcodeValue: `${targetPatient.visit_id}-${idx + 1}`,
         specimen,
         shortNamesStr: (shortNames as any[]).join(' / '),
         dateStr,
@@ -903,24 +903,62 @@ export default function Result() {
         const ptop = withHeader ? '144px' : '45px';
         const pbot = withHeader ? '136px' : '45px';
 
-        const paramRows2 = Object.entries(gp).map(([catName, catParams]: [string, any]) => {
-          let rows = '';
-          if (catName !== 'NO_CATEGORY_HEADER' && catParams[0]?.showCategoryHeader) {
-            rows += `<tr><td colSpan="4" style="padding:4px 6px;font-weight:bold;border-bottom:1px solid #ddd;background:#f5f5f5;">${catName.toUpperCase()}</td></tr>`;
-          }
-          (catParams as any[]).forEach(p => {
-            const er = p.existingResult;
-            const val = er ? (er.numericValue !== null && er.numericValue !== undefined ? er.numericValue : (er.textValue || '-')) : '-';
-            const outOfRange = isParamOutOfRange(p, er);
-            rows += `<tr>
-              <td style="padding:3px 6px;width:38%;font-weight:${outOfRange ? 'bold' : 'normal'};">${p.parameterName}</td>
-              <td style="padding:3px 6px 3px 20px;width:22%;font-size:11px;${outOfRange ? 'color:#b91c1c;font-weight:bold;' : ''}">${val}${outOfRange ? ' *' : ''}</td>
-              <td style="padding:3px 6px;width:12%;color:#555;">${p.units || ''}</td>
-              <td style="padding:3px 6px;width:28%;color:#555;">${er?.referenceRange || ''}</td>
-            </tr>`;
+        const paramRows2 = (() => {
+          // Group parameters by category
+          const grouped: any = {};
+          const categoryOrder: any = {};
+          
+          Object.entries(gp).forEach(([catName, catParams]: [string, any]) => {
+            grouped[catName] = catParams;
+            categoryOrder[catName] = catName !== 'NO_CATEGORY_HEADER' && catParams[0]?.sortOrder
+              ? catParams[0].sortOrder
+              : 999;
           });
+          
+          // Sort categories by sortOrder
+          const sortedCategories = Object.entries(grouped)
+            .sort((a: any, b: any) => categoryOrder[a[0]] - categoryOrder[b[0]]);
+          
+          let rows = '';
+          
+          sortedCategories.forEach(([catName, catParams]: [string, any]) => {
+            // Show category header only once
+            if (catName !== 'NO_CATEGORY_HEADER' && catParams[0]?.showCategoryHeader) {
+              const categoryMethod = catParams[0]?.categoryTestMethod || null;
+              rows += `<tr><td colSpan="4" style="padding:6px;font-weight:bold;border-bottom:1px solid #ddd;background:#f5f5f5;font-size:12px;">${catName.toUpperCase()}</td></tr>`;
+              
+              // Add category method below category name
+              if (categoryMethod) {
+                rows += `<tr><td colSpan="4" style="padding:3px 6px;font-size:10px;color:#666;border-bottom:1px solid #eee;background:#fafafa;">Method: ${categoryMethod}</td></tr>`;
+              }
+            }
+            
+            // Add parameters for this category (sorted by sortOrder)
+            const sortedParams = [...catParams].sort((a: any, b: any) => (a.sortOrder || 999) - (b.sortOrder || 999));
+            
+            sortedParams.forEach((p: any) => {
+              const er = p.existingResult;
+              const val = er ? (er.numericValue !== null && er.numericValue !== undefined ? er.numericValue : (er.textValue || '-')) : '-';
+              const outOfRange = isParamOutOfRange(p, er);
+              
+              // Parse parameter name to handle HTML tags
+              const paramNameHtml = p.parameterName
+                .replace(/<b>(.*?)<\/b>/g, '<strong>$1</strong>')
+                .replace(/<i>(.*?)<\/i>/g, '<em>$1</em>');
+              
+              const parameterMethod = p.parameterTestMethod ? `<div style="font-size:9px;color:#999;margin-top:2px;">Method: ${p.parameterTestMethod}</div>` : '';
+              
+              rows += `<tr>
+                <td style="padding:3px 6px;width:38%;font-weight:${outOfRange ? 'bold' : 'normal'};">${paramNameHtml}${parameterMethod}</td>
+                <td style="padding:3px 6px 3px 20px;width:22%;font-size:11px;${outOfRange ? 'color:#b91c1c;font-weight:bold;' : ''}">${val}${outOfRange ? ' *' : ''}</td>
+                <td style="padding:3px 6px;width:12%;color:#555;">${p.units || ''}</td>
+                <td style="padding:3px 6px;width:28%;color:#555;">${er?.referenceRange || ''}</td>
+              </tr>`;
+            });
+          });
+          
           return rows;
-        }).join('');
+        })();
 
         const sigHtml2 = signature ? `
           <div style="margin-top:auto;padding-top:22px;display:flex;justify-content:flex-end;">
@@ -1080,21 +1118,37 @@ export default function Result() {
     responses.forEach(r => {
       lines.push(`*${r.patientTest.test.name.toUpperCase()}*`);
       lines.push(`${'─'.repeat(30)}`);
-      Object.entries(r.groupedParameters || {}).forEach(([catName, catParams]: [string, any]) => {
-        if (catName !== 'NO_CATEGORY_HEADER' && catParams[0]?.showCategoryHeader) {
-          lines.push(`  _${catName}_`);
-        }
-        (catParams as any[]).forEach(p => {
-          const er = p.existingResult;
-          const val = er
-            ? (er.numericValue !== null && er.numericValue !== undefined ? er.numericValue : (er.textValue || '-'))
-            : '-';
-          const units = p.units ? ` ${p.units}` : '';
-          const range = er?.referenceRange ? `  [${er.referenceRange}]` : '';
-          const flag = er?.isAbnormal ? ' ⚠️' : '';
-          lines.push(`• ${p.parameterName}: *${val}*${units}${range}${flag}`);
+      
+      // Sort and display grouped parameters with proper ordering
+      Object.entries(r.groupedParameters || {})
+        .sort((a: [string, any], b: [string, any]) => {
+          const aOrder = (a[1][0]?.sortOrder || 999);
+          const bOrder = (b[1][0]?.sortOrder || 999);
+          return aOrder - bOrder;
+        })
+        .forEach(([catName, catParams]: [string, any]) => {
+          if (catName !== 'NO_CATEGORY_HEADER' && catParams[0]?.showCategoryHeader) {
+            lines.push(`  _${catName}_`);
+          }
+          
+          // Sort parameters within category by sortOrder
+          const sortedParams = [...catParams].sort((a: any, b: any) => (a.sortOrder || 999) - (b.sortOrder || 999));
+          
+          sortedParams.forEach(p => {
+            const er = p.existingResult;
+            const val = er
+              ? (er.numericValue !== null && er.numericValue !== undefined ? er.numericValue : (er.textValue || '-'))
+              : '-';
+            const units = p.units ? ` ${p.units}` : '';
+            const range = er?.referenceRange ? `  [${er.referenceRange}]` : '';
+            const flag = er?.isAbnormal ? ' ⚠️' : '';
+            
+            // Strip HTML tags from parameter name for WhatsApp
+            const paramName = p.parameterName.replace(/<[^>]*>/g, '');
+            
+            lines.push(`• ${paramName}: *${val}*${units}${range}${flag}`);
+          });
         });
-      });
       lines.push('');
     });
 
@@ -2744,9 +2798,6 @@ export default function Result() {
                   className="flex gap-0.5 items-center bg-gray-600 hover:bg-gray-700 text-white px-1.5 py-0.5 rounded text-[13px] transition-colors">
                   <span>Result ({selectedTests.size})</span>
                 </button>
-                <button className="flex gap-0.5 items-center bg-gray-600 hover:bg-gray-700 text-white px-1.5 py-0.5 rounded text-[13px] transition-colors">
-                  <span>Save</span>
-                </button>
                 <button
                   onClick={handlePrintPreview}
                   disabled={loading || selectedTests.size === 0}
@@ -3346,81 +3397,13 @@ export default function Result() {
           setBarcodeLockedVisitId(null);
         }}
         onPrintOnly={async () => {
-          const printArea = document.getElementById('barcode-print-area');
-          const printContent = printArea.innerHTML;
-          const win = window.open('', '_blank');
-          win.document.write(`<!DOCTYPE html>
-<html>
-<head>
-  <title>Barcode Labels - ${barcodePatientInfo?.patientName || 'Print'}</title>
-  <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    html, body { width: 100%; height: 100%; }
-    body { 
-      font-family: 'Arial', sans-serif; 
-      background: white; 
-      padding: 5mm;
-      margin: 0;
-    }
-    .barcode-container { 
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 5mm;
-      padding: 0;
-      page-break-after: auto;
-    }
-    .barcode-card {
-      width: 70mm;
-      height: 80mm;
-      border: 2px solid #333;
-      padding: 4px;
-      page-break-inside: avoid;
-      background: white;
-      display: flex;
-      flex-direction: column;
-      font-family: 'Arial', sans-serif;
-      font-size: 10px;
-      break-inside: avoid;
-    }
-    svg { 
-      max-width: 100%; 
-      height: auto; 
-      display: block;
-    }
-    @page { 
-      size: A4 portrait; 
-      margin: 5mm;
-      padding: 0;
-    }
-    @media print { 
-      body { 
-        padding: 5mm;
-        margin: 0;
-      }
-      .barcode-container { 
-        gap: 3mm;
-      }
-      .barcode-card {
-        border: 1px solid #000;
-        page-break-inside: avoid;
-        break-inside: avoid;
-      }
-    }
-  </style>
-</head>
-<body>
-  <div class="barcode-container">
-    ${printContent}
-  </div>
-  <script>
-    window.addEventListener('load', () => {
-      setTimeout(() => window.print(), 500);
-    });
-  </script>
-</body>
-</html>`);
-          win.document.close();
-          win.focus();
+          // Trigger iframe print - handled by BarcodeModal component
+          const iframe = document.getElementById('barcode-print-frame') as HTMLIFrameElement;
+          if (iframe && iframe.contentWindow) {
+            setTimeout(() => {
+              iframe.contentWindow?.print();
+            }, 100);
+          }
         }}
         onPrintAndUpdate={async () => {
           let successCount = 0;
