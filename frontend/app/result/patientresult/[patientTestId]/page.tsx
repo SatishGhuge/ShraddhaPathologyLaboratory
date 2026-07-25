@@ -1311,18 +1311,12 @@ const PatientResult = () => {
                 <button onClick={handleSaveAllTests} disabled={saving} className="bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded text-sm disabled:opacity-50">
                   {saving ? 'Saving...' : `Save All Results (${allTestsData.length} tests)`}
                 </button>
-                <button onClick={handlePrintBarcode} className="bg-purple-600 hover:bg-purple-700 text-white px-3 py-1 rounded text-sm">
-                  🔖 Print Barcode
-                </button>
                 <button onClick={() => router.back()} className="bg-gray-500 text-white px-3 py-1 rounded text-sm">Back</button>
               </>
             ) : (
               <>
                 <button onClick={handleSave} disabled={saving} className="bg-blue-600 text-white px-3 py-1 rounded text-sm disabled:opacity-50">
                   {saving ? 'Saving...' : 'Save'}
-                </button>
-                <button onClick={handlePrintBarcode} className="bg-purple-600 hover:bg-purple-700 text-white px-3 py-1 rounded text-sm">
-                  🔖 Print Barcode
                 </button>
                 <button onClick={() => router.back()} className="bg-gray-500 text-white px-3 py-1 rounded text-sm">Back</button>
               </>
@@ -1552,17 +1546,6 @@ const PatientResult = () => {
         )}
       </div>
 
-      {/* Barcode Modal */}
-      <BarcodeModal
-        isOpen={showBarcodeModal}
-        onClose={() => setShowBarcodeModal(false)}
-        onPrintOnly={onBarcodesPrintOnly}
-        onPrintAndUpdate={onBarcodesPrintAndUpdate}
-        barcodeLabels={barcodeLabels}
-        barcodePatientInfo={barcodePatientInfo}
-        selectedBarcodes={selectedBarcodes}
-        onBarcodeToggle={handleBarcodeToggle}
-      />
     </>
   );
 };

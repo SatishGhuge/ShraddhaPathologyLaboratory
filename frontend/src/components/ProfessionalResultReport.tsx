@@ -3,6 +3,39 @@
 import React from "react";
 import { parseHtmlText, stripHtmlTags, HtmlPart } from "@/src/utils/htmlParser";
 
+/**
+ * Render HTML text with proper styling applied
+ * Converts <b>, <i>, <u> tags to actual styled text
+ */
+const renderStyledText = (text: string | undefined, defaultBold: boolean = false): React.ReactNode => {
+  if (!text) return "-";
+  
+  const cleanText = String(text).trim();
+  if (!cleanText) return "-";
+  
+  // Parse the HTML text to get parts with styling info
+  const parsed = parseHtmlText(cleanText);
+  
+  if (typeof parsed === 'string') {
+    // No HTML tags found, just return plain text
+    return <span style={{ fontWeight: defaultBold ? 'bold' : 'normal' }}>{parsed}</span>;
+  }
+  
+  // Render each part with its own styling
+  return (parsed as HtmlPart[]).map((part: HtmlPart, i: number) => (
+    <span
+      key={i}
+      style={{
+        fontWeight: part.bold || defaultBold ? 'bold' : 'normal',
+        fontStyle: part.italic ? 'italic' : 'normal',
+        textDecoration: part.underline ? 'underline' : 'none'
+      }}
+    >
+      {part.text}
+    </span>
+  ));
+};
+
 interface ProfessionalResultReportProps {
   patient: any;
   visitDate: any;
@@ -13,6 +46,8 @@ interface ProfessionalResultReportProps {
   signature: any;
   withHeader: boolean;
   letterHeadBase64?: string;
+  printOption?: 'pagebreak' | 'nobreak'; // NEW: for handling page break logic
+  combinedTests?: any[]; // NEW: array of tests when printing multiple (for nobreak mode)
 }
 
 export default function ProfessionalResultReport({
@@ -25,6 +60,8 @@ export default function ProfessionalResultReport({
   signature,
   withHeader,
   letterHeadBase64,
+  printOption = 'pagebreak', // DEFAULT: page break mode
+  combinedTests = [], // DEFAULT: empty (single test mode)
 }: ProfessionalResultReportProps) {
   const patientName = `${patient.title || ""} ${patient.firstName || ""} ${patient.lastName || ""}`.trim();
   const visitDateStr = visitDate ? new Date(visitDate).toLocaleDateString("en-GB") : "-";
@@ -74,9 +111,20 @@ export default function ProfessionalResultReport({
         .report-content {
           position: relative;
           z-index: 1;
-          padding: 140px 53px 135px 53px;
-          min-height: 1123px;
+          padding: 140px 53px 50px 53px;
           background: none;
+          display: flex;
+          flex-direction: column;
+        }
+        .report-content.page-break {
+          min-height: 1123px;
+          page-break-after: always;
+          break-after: page;
+        }
+        .test-separator {
+          border-top: 2px solid #000;
+          margin: 20px 0;
+          padding-top: 15px;
         }
         .report-header {
           text-align: center;
@@ -103,12 +151,20 @@ export default function ProfessionalResultReport({
         .patient-info-grid {
           display: grid;
           grid-template-columns: 1fr 1fr;
-          gap: 20px;
-          margin: 15px 0;
+          gap: 15px;
+          margin: 8px 0;
+        }
+        .patient-info-grid.compact {
+          gap: 10px;
+          margin: 8px 0;
         }
         .patient-info-row {
-          font-size: 14px;
-          margin: 5px 0;
+          font-size: 12px;
+          margin: 3px 0;
+        }
+        .patient-info-row.compact {
+          font-size: 11px;
+          margin: 2px 0;
         }
         .patient-label {
           font-weight: bold;
@@ -119,28 +175,33 @@ export default function ProfessionalResultReport({
           display: inline;
         }
         .test-title {
-          font-size: 17px;
+          font-size: 16px;
           font-weight: bold;
           text-align: center;
-          margin: 15px 0;
+          margin: 10px 0;
           text-decoration: underline;
           border-top: none;
           border-bottom: none;
-          padding: 8px 0;
+          padding: 5px 0;
+        }
+        .test-title.compact {
+          font-size: 14px;
+          margin: 8px 0;
+          padding: 4px 0;
         }
         .category-header {
-          font-size: 14px;
+          font-size: 13px;
           font-weight: bold;
           text-transform: uppercase;
           text-decoration: underline;
-          margin: 15px 0 10px 0;
-          padding-bottom: 5px;
+          margin: 8px 0 5px 0;
+          padding-bottom: 3px;
           border-bottom: none;
         }
         .results-table {
           width: 100%;
           border-collapse: collapse;
-          margin: 15px 0;
+          margin: 8px 0;
           border: none;
         }
         .table-header {
@@ -149,15 +210,15 @@ export default function ProfessionalResultReport({
           border-bottom: 1px solid #000;
         }
         .table-header th {
-          font-size: 13px;
+          font-size: 12px;
           font-weight: bold;
-          padding: 8px 0;
+          padding: 5px 0;
           text-align: left;
           border: none;
         }
         .table-row td {
-          font-size: 13px;
-          padding: 8px 0;
+          font-size: 12px;
+          padding: 4px 0;
           border: none;
         }
         .table-row:last-child td {
@@ -194,15 +255,15 @@ export default function ProfessionalResultReport({
           font-weight: bold;
         }
         .footer {
-          margin-top: 30px;
+          margin-top: 10px;
           text-align: center;
           border-top: none;
-          padding-top: 15px;
+          padding-top: 8px;
         }
         .footer-text {
-          font-size: 12px;
+          font-size: 11px;
           font-weight: bold;
-          margin: 5px 0;
+          margin: 2px 0;
         }
         .signature-section {
           margin-top: auto;
@@ -224,8 +285,9 @@ export default function ProfessionalResultReport({
         <img src={letterHeadBase64} alt="Letterhead" className="letterhead-bg" />
       )}
 
-      {/* REPORT CONTENT */}
-      <div className="report-content">
+      {/* FOR PAGEBREAK MODE - Single test per page */}
+      {printOption === 'pagebreak' && (
+        <div className="report-content">
         {/* PATIENT INFORMATION */}
         <div className="patient-info-grid">
           <div>
@@ -302,40 +364,19 @@ export default function ProfessionalResultReport({
                     // Show category header only once (if applicable)
                     if (catName !== 'NO_CATEGORY_HEADER' && !catName.startsWith('__NO_NAME_') && catParams[0]?.showCategoryHeader) {
                       const categoryMethod = catParams[0]?.categoryTestMethod || null;
-                      const categoryNameParts = parseHtmlText(catName);
                       
                       rows.push(
                         <tr key={`cat-${catIdx}`} className="table-row">
                           <td className="param-name" colSpan={hasAnyUnits && hasAnyReferenceRange ? 4 : hasAnyUnits || hasAnyReferenceRange ? 3 : 2}>
-                            {/* Category Name - Always bold by default, plus any HTML formatting */}
+                            {/* Category Name - Always bold with styling applied */}
                             <div>
-                              {(() => {
-                                if (typeof categoryNameParts === 'string') {
-                                  return <span style={{ fontWeight: 'bold' }}>{categoryNameParts}</span>;
-                                }
-                                return (categoryNameParts as HtmlPart[]).map((part: HtmlPart, i: number) => (
-                                  <span key={i} style={{ fontWeight: part.bold ? 'bold' : 'bold', fontStyle: part.italic ? 'italic' : 'normal', textDecoration: part.underline ? 'underline' : 'none' }}>
-                                    {part.text}
-                                  </span>
-                                ));
-                              })()}
+                              {renderStyledText(catName, true)}
                             </div>
                             
                             {/* Category Method Below Category Name */}
                             {categoryMethod && (
                               <div className="param-method" style={{ marginBottom: '8px' }}>
-                                Method: 
-                                {(() => {
-                                  const methodParts = parseHtmlText(categoryMethod);
-                                  if (typeof methodParts === 'string') {
-                                    return methodParts;
-                                  }
-                                  return (methodParts as HtmlPart[]).map((part: HtmlPart, i: number) => (
-                                    <span key={i} style={{ fontWeight: part.bold ? 'bold' : 'normal', fontStyle: part.italic ? 'italic' : 'normal', textDecoration: part.underline ? 'underline' : 'none' }}>
-                                      {part.text}
-                                    </span>
-                                  ));
-                                })()}
+                                Method: {renderStyledText(categoryMethod, false)}
                               </div>
                             )}
                           </td>
@@ -367,7 +408,6 @@ export default function ProfessionalResultReport({
                         }
                         
                         const isAbnormal = er?.isAbnormal || (param.type === "Numeric" && er?.isOutOfRange);
-                        const paramNameParts = parseHtmlText(param.parameterName);
                         const resultText = stripHtmlTags(String(val));
                         const unitText = stripHtmlTags(param.units || "-");
                         
@@ -389,36 +429,15 @@ export default function ProfessionalResultReport({
                         rows.push(
                           <tr key={`param-${catIdx}-${paramIdx}`} className="table-row">
                             <td className="param-name">
-                              {/* Show Parameter Name with HTML formatting */}
+                              {/* Show Parameter Name with styling applied */}
                               <div>
-                                {(() => {
-                                  const paramNameParts = parseHtmlText(param.parameterName);
-                                  if (typeof paramNameParts === 'string') {
-                                    return paramNameParts;
-                                  }
-                                  return (paramNameParts as HtmlPart[]).map((part: HtmlPart, i: number) => (
-                                    <span key={i} style={{ fontWeight: part.bold ? 'bold' : 'normal', fontStyle: part.italic ? 'italic' : 'normal' }}>
-                                      {part.text}
-                                    </span>
-                                  ));
-                                })()}
+                                {renderStyledText(param.parameterName, false)}
                               </div>
                               
                               {/* Show Parameter Method if exists */}
                               {parameterMethod && (
                                 <div className="param-method">
-                                  Method: 
-                                  {(() => {
-                                    const methodParts = parseHtmlText(parameterMethod);
-                                    if (typeof methodParts === 'string') {
-                                      return methodParts;
-                                    }
-                                    return (methodParts as HtmlPart[]).map((part: HtmlPart, i: number) => (
-                                      <span key={i} style={{ fontWeight: part.bold ? 'bold' : 'normal', fontStyle: part.italic ? 'italic' : 'normal', textDecoration: part.underline ? 'underline' : 'none' }}>
-                                        {part.text}
-                                      </span>
-                                    ));
-                                  })()}
+                                  Method: {renderStyledText(parameterMethod, false)}
                                 </div>
                               )}
                             </td>
@@ -456,7 +475,6 @@ export default function ProfessionalResultReport({
         {/* FOOTER */}
         <div className="footer">
           <p className="footer-text">END OF REPORT</p>
-          <p style={{ fontSize: "11px", color: "#666" }}>This is a computer-generated report and does not require a signature</p>
           <p style={{ fontSize: "10px", color: "#999", marginTop: "10px" }}>Generated on: {new Date().toLocaleString()}</p>
         </div>
 
@@ -480,7 +498,149 @@ export default function ProfessionalResultReport({
             </div>
           </div>
         )}
-      </div>
+        </div>
+      )}
+
+      {/* FOR NOBREAK MODE - Multiple tests continuous on same page */}
+      {printOption === 'nobreak' && combinedTests && combinedTests.length > 0 && (
+        <div className="report-content">
+          {combinedTests.map((testData: any, testIdx: number) => (
+            <div key={testIdx}>
+              {/* Test separator line (not for first test) */}
+              {testIdx > 0 && <div className="test-separator" />}
+
+              {/* PATIENT INFORMATION - Compact version for each test */}
+              <div className="patient-info-grid compact">
+                <div>
+                  <p className="patient-info-row compact">
+                    <span className="patient-label">Patient:</span> <span className="patient-value">{patientName}</span>
+                  </p>
+                  <p className="patient-info-row compact">
+                    <span className="patient-label">ID:</span> <span className="patient-value">{patient.patientId || "-"}</span>
+                  </p>
+                </div>
+                <div>
+                  <p className="patient-info-row compact">
+                    <span className="patient-label">Age/Gender:</span> <span className="patient-value">{patient.age || "-"} Yrs / {patient.gender || "-"}</span>
+                  </p>
+                  <p className="patient-info-row compact">
+                    <span className="patient-label">Lab No:</span> <span className="patient-value">{visitId || "-"}</span>
+                  </p>
+                </div>
+              </div>
+
+              {/* TEST TITLE - Compact for nobreak */}
+              <div className="test-title compact">{testData.test?.name || "TEST RESULTS"}</div>
+
+              {/* RESULTS TABLE - Using testData parameters */}
+              <table className="results-table" style={{ fontSize: "11px" }}>
+                <thead className="table-header">
+                  <tr>
+                    <th style={{ width: "40%", fontSize: "11px" }}>Test Description</th>
+                    <th style={{ width: "20%", textAlign: "center", fontSize: "11px" }}>Result</th>
+                    {testData.hasAnyUnits && <th style={{ width: "15%", textAlign: "center", fontSize: "11px" }}>Unit</th>}
+                    {testData.hasAnyReferenceRange && <th style={{ width: "25%", fontSize: "11px" }}>Reference Range</th>}
+                  </tr>
+                </thead>
+                <tbody>
+                  {testData.parameters && testData.parameters.length > 0 ? (
+                    (() => {
+                      const grouped: any = {};
+                      const categorySortOrder: any = {};
+                      
+                      testData.parameters.forEach((param: any) => {
+                        const catKey = param.categoryUniqueId || param.categoryName || 'NO_CATEGORY_HEADER';
+                        if (!grouped[catKey]) {
+                          grouped[catKey] = [];
+                          categorySortOrder[catKey] = param.categorySortOrder !== undefined ? param.categorySortOrder : 999;
+                        }
+                        grouped[catKey].push(param);
+                      });
+                      
+                      return Object.entries(grouped)
+                        .sort((a: any, b: any) => {
+                          const sortA = categorySortOrder[a[0]] ?? 999;
+                          const sortB = categorySortOrder[b[0]] ?? 999;
+                          return sortA - sortB;
+                        })
+                        .flatMap(([catName, catParams]: [string, any], catIdx: number) => {
+                          const rows: any[] = [];
+                          
+                          if (catName !== 'NO_CATEGORY_HEADER' && !catName.startsWith('__NO_NAME_') && catParams[0]?.showCategoryHeader) {
+                            const categoryMethod = catParams[0]?.categoryTestMethod || null;
+                            
+                            rows.push(
+                              <tr key={`cat-${catIdx}`} className="table-row">
+                                <td className="param-name" colSpan={testData.hasAnyUnits && testData.hasAnyReferenceRange ? 4 : testData.hasAnyUnits || testData.hasAnyReferenceRange ? 3 : 2}>
+                                  <div>{renderStyledText(catName, true)}</div>
+                                  {categoryMethod && <div className="param-method">{renderStyledText(categoryMethod, false)}</div>}
+                                </td>
+                              </tr>
+                            );
+                          }
+                          
+                          catParams
+                            .sort((a: any, b: any) => (a.sortOrder || 999) - (b.sortOrder || 999))
+                            .filter((param: any) => {
+                              const er = param.existingResult;
+                              return er && (er.numericValue !== null && er.numericValue !== undefined && er.numericValue !== '' || er.textValue && String(er.textValue).trim() !== '');
+                            })
+                            .forEach((param: any, paramIdx: number) => {
+                              const er = param.existingResult;
+                              let val = "-";
+                              if (er) {
+                                val = er.numericValue !== null && er.numericValue !== undefined ? er.numericValue : (er.textValue ? String(er.textValue).split(',')[0].trim() : "-");
+                              }
+                              const isAbnormal = er?.isAbnormal || (param.type === "Numeric" && er?.isOutOfRange);
+                              const resultText = stripHtmlTags(String(val));
+                              const unitText = stripHtmlTags(param.units || "-");
+                              let rangeText = "-";
+                              if (param.type === "Numeric") {
+                                rangeText = stripHtmlTags(er?.referenceRange || param.normalRange || param.rangeText || "-");
+                              } else if (param.type === "Text" || param.isDescriptive) {
+                                rangeText = stripHtmlTags(er?.textValue ? String(er.textValue) : param.textContent || "-");
+                              } else {
+                                rangeText = stripHtmlTags(er?.referenceRange || param.rangeText || "-");
+                              }
+
+                              rows.push(
+                                <tr key={`param-${catIdx}-${paramIdx}`} className="table-row">
+                                  <td className="param-name">{renderStyledText(param.parameterName, false)}</td>
+                                  <td className={`param-result ${isAbnormal ? "abnormal" : ""}`}>{resultText}{isAbnormal ? " *" : ""}</td>
+                                  {testData.hasAnyUnits && <td className="param-unit">{unitText}</td>}
+                                  {testData.hasAnyReferenceRange && <td className="param-range">{rangeText}</td>}
+                                </tr>
+                              );
+                            });
+                          
+                          return rows;
+                        });
+                    })()
+                  ) : (
+                    <tr><td colSpan={4}>No parameters available</td></tr>
+                  )}
+                </tbody>
+              </table>
+
+              {testData.test?.interpretation && (
+                <div style={{ marginTop: "8px", fontSize: "10px", color: "#333" }} dangerouslySetInnerHTML={{ __html: testData.test.interpretation }} />
+              )}
+            </div>
+          ))}
+
+          {/* Footer - Only once */}
+          <div style={{ marginTop: "15px", paddingTop: "10px", borderTop: "2px solid #000", textAlign: "center" }}>
+            <p style={{ fontSize: "10px", color: "#666", margin: "3px 0" }}>END OF REPORT</p>
+            <p style={{ fontSize: "9px", color: "#999" }}>Generated on: {new Date().toLocaleString()}</p>
+            {signature && (
+              <div style={{ marginTop: "10px" }}>
+                {signature.signatureImage && <img src={signature.signatureImage} alt="Sig" style={{ maxWidth: "100px", maxHeight: "60px" }} />}
+                {signature.doctorName && <div style={{ fontSize: "9px", fontWeight: "bold" }}>{signature.doctorName}</div>}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

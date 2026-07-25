@@ -11,68 +11,70 @@ export interface HtmlPart {
 
 /**
  * Parse HTML string with <b> and <i> tags and return array of parts for React rendering
- * Handles both actual HTML tags and HTML entities
+ * Handles actual HTML tags (not entities)
  * @param str - HTML string to parse
  * @returns Array of parts with styling info, or plain string if no tags found
  */
 export const parseHtmlText = (str: string): string | HtmlPart[] => {
   if (!str) return "-";
   
-  // Normalize the string - convert to string first in case it's a number
-  let normalizedStr = String(str).trim();
-  
-  // Decode HTML entities first (in case they were encoded)
-  // This handles: &lt; &gt; &amp; etc.
-  let decodedStr = normalizedStr
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&amp;/g, '&');
+  // Normalize the string
+  let text = String(str).trim();
+  if (!text) return "-";
   
   const parts: HtmlPart[] = [];
   let lastIndex = 0;
-  const regex = /<b>|<\/b>|<i>|<\/i>|<u>|<\/u>/g;
+  // Match: <b>, </b>, <i>, </i>, <u>, </u>, <strong>, </strong>, <em>, </em>
+  const regex = /<(\/?)(?:b|strong|i|em|u)>/g;
   let match;
   let isBold = false;
   let isItalic = false;
   let isUnderline = false;
   let hasAnyTags = false;
 
-  while ((match = regex.exec(decodedStr)) !== null) {
+  while ((match = regex.exec(text)) !== null) {
     hasAnyTags = true;
+    
     // Add text before this tag
     if (match.index > lastIndex) {
-      const text = decodedStr.substring(lastIndex, match.index);
-      if (text) { // Add even if just whitespace
-        parts.push({ text, bold: isBold, italic: isItalic, underline: isUnderline });
+      const textContent = text.substring(lastIndex, match.index);
+      if (textContent) {
+        parts.push({ text: textContent, bold: isBold, italic: isItalic, underline: isUnderline });
       }
     }
 
-    // Toggle state based on tag
-    if (match[0] === '<b>') isBold = true;
-    else if (match[0] === '</b>') isBold = false;
-    else if (match[0] === '<i>') isItalic = true;
-    else if (match[0] === '</i>') isItalic = false;
-    else if (match[0] === '<u>') isUnderline = true;
-    else if (match[0] === '</u>') isUnderline = false;
+    // Determine which tag this is and update state
+    const fullMatch = match[0];
+    const isClosing = match[1] === '/';
+    
+    if (fullMatch.includes('b') || fullMatch.includes('strong')) {
+      isBold = !isClosing;
+    } else if (fullMatch.includes('i') || fullMatch.includes('em')) {
+      isItalic = !isClosing;
+    } else if (fullMatch.includes('u')) {
+      isUnderline = !isClosing;
+    }
 
-    lastIndex = match.index + match[0].length;
+    lastIndex = match.index + fullMatch.length;
   }
 
   // Add remaining text
-  if (lastIndex < decodedStr.length) {
-    const text = decodedStr.substring(lastIndex);
-    if (text) { // Add even if just whitespace
-      parts.push({ text, bold: isBold, italic: isItalic, underline: isUnderline });
+  if (lastIndex < text.length) {
+    const textContent = text.substring(lastIndex);
+    if (textContent) {
+      parts.push({ text: textContent, bold: isBold, italic: isItalic, underline: isUnderline });
     }
   }
 
   // If no tags found, return plain text
-  if (!hasAnyTags) return normalizedStr;
-  if (parts.length === 0) return normalizedStr;
+  if (!hasAnyTags) return text;
+  if (parts.length === 0) return text;
   
-  // Filter out empty parts and consolidate
+  // Filter out empty parts
   const cleanedParts = parts.filter(p => p.text.length > 0);
-  if (cleanedParts.length === 0) return normalizedStr;
+  if (cleanedParts.length === 0) return text;
+  
+  // If we only have one part with no styling, return as plain string
   if (cleanedParts.length === 1 && !cleanedParts[0].bold && !cleanedParts[0].italic && !cleanedParts[0].underline) {
     return cleanedParts[0].text;
   }
@@ -83,16 +85,14 @@ export const parseHtmlText = (str: string): string | HtmlPart[] => {
 
 /**
  * Strip HTML tags from a string
- * Handles both actual HTML tags and HTML entities
  * @param str - String with HTML tags
  * @returns Plain text without HTML tags
  */
 export const stripHtmlTags = (str: string): string => {
   if (!str) return "-";
-  return str
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&amp;/g, '&')
+  
+  // Simply remove all HTML tags
+  return String(str)
     .replace(/<[^>]*>/g, "")
     .trim();
 };
