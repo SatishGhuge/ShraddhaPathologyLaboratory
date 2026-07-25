@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Package, RotateCcw, ChevronLeft, ChevronRight, Edit2, Trash2, Plus } from "lucide-react";
 import StockEntryModal from "@/src/components/StockEntryModal";
 import PageHeader from "@/src/components/BreadCrumb";
+import inventoryAPI from "@/lib/api/inventory.api";
 
 interface Supplier {
   id: number;
@@ -28,7 +29,12 @@ interface StockEntry {
   invoiceDate: string;
   items: Array<{
     itemId: number;
-    itemName: string;
+    itemName?: string; // For backward compatibility
+    item?: {
+      id: number;
+      itemName: string;
+      itemCode: string;
+    };
     batchNo: string;
     expiryDate: string;
     quantity: number;
@@ -82,60 +88,11 @@ const SAMPLE_ITEMS: Item[] = [
 ];
 
 export default function StockEntryPage() {
-  const [stockEntries, setStockEntries] = useState<StockEntry[]>([
-    {
-      id: 1,
-      entryId: "SE-001",
-      supplierId: 1,
-      invoiceNo: "INV-2026-001",
-      invoiceDate: "2026-07-15",
-      items: [
-        {
-          itemId: 1,
-          itemName: "CBC Reagent",
-          batchNo: "BATCH-001",
-          expiryDate: "2027-07-15",
-          quantity: 100,
-          pricePerUnit: 110,
-          basicAmount: 11000,
-          cgst: 660,
-          sgst: 660,
-          totalAmount: 12320,
-        },
-      ],
-      totalBasicAmount: 11000,
-      totalCGST: 660,
-      totalSGST: 660,
-      grandTotal: 12320,
-      status: "Active",
-    },
-    {
-      id: 2,
-      entryId: "SE-002",
-      supplierId: 2,
-      invoiceNo: "INV-2026-002",
-      invoiceDate: "2026-07-10",
-      items: [
-        {
-          itemId: 2,
-          itemName: "Glucose Analyzer",
-          batchNo: "BATCH-002",
-          expiryDate: "2027-01-10",
-          quantity: 50,
-          pricePerUnit: 200,
-          basicAmount: 10000,
-          cgst: 900,
-          sgst: 900,
-          totalAmount: 11800,
-        },
-      ],
-      totalBasicAmount: 10000,
-      totalCGST: 900,
-      totalSGST: 900,
-      grandTotal: 11800,
-      status: "Inactive",
-    },
-  ]);
+  const [stockEntries, setStockEntries] = useState<StockEntry[]>([]);
+  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [items, setItems] = useState<Item[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
   const [search, setSearch] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
@@ -146,15 +103,61 @@ export default function StockEntryPage() {
 
   const ITEMS_PER_PAGE = 10;
 
+  useEffect(() => {
+    fetchData();
+  }, [currentPage]);
+
+  // Listen for new item creation and refresh items
+  useEffect(() => {
+    const handleItemCreated = () => {
+      console.log("New item created, refreshing items list...");
+      // Refresh only the items, not the entire data
+      const refreshItems = async () => {
+        try {
+          const itemsRes = await inventoryAPI.items.getAll(1, 100);
+          setItems(itemsRes.data.data || []);
+        } catch (err) {
+          console.error("Failed to refresh items:", err);
+        }
+      };
+      refreshItems();
+    };
+
+    window.addEventListener('itemCreated', handleItemCreated);
+    return () => window.removeEventListener('itemCreated', handleItemCreated);
+  }, []);
+
+  const fetchData = async () => {
+    try {
+      setLoading(true);
+      setError("");
+      
+      const [entriesRes, suppliersRes, itemsRes] = await Promise.all([
+        inventoryAPI.stockEntries.getAll(currentPage, ITEMS_PER_PAGE),
+        inventoryAPI.suppliers.getAll(1, 100),
+        inventoryAPI.items.getAll(1, 100)
+      ]);
+      
+      setStockEntries(entriesRes.data.data || []);
+      setSuppliers(suppliersRes.data.data || []);
+      setItems(itemsRes.data.data || []);
+    } catch (err: any) {
+      console.error("Failed to fetch data:", err);
+      setError("Failed to fetch stock entries data");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Get supplier name by ID
   const getSupplierName = (supplierId: number) => {
-    const supplier = SAMPLE_SUPPLIERS.find((s) => s.id === supplierId);
+    const supplier = suppliers.find((s) => s.id === supplierId);
     return supplier?.supplierName || "-";
   };
 
   // Get item name by ID
   const getItemName = (itemId: number) => {
-    const item = SAMPLE_ITEMS.find((i) => i.id === itemId);
+    const item = items.find((i) => i.id === itemId);
     return item?.itemName || "-";
   };
 
@@ -163,10 +166,11 @@ export default function StockEntryPage() {
     const matchesSearch =
       getSupplierName(entry.supplierId).toLowerCase().includes(search.toLowerCase()) ||
       entry.invoiceNo.toLowerCase().includes(search.toLowerCase()) ||
-      entry.items.some((item) =>
-        item.itemName.toLowerCase().includes(search.toLowerCase()) ||
-        item.batchNo.toLowerCase().includes(search.toLowerCase())
-      );
+      entry.items.some((item) => {
+        const itemName = item.item?.itemName || item.itemName || "";
+        return itemName.toLowerCase().includes(search.toLowerCase()) ||
+               item.batchNo.toLowerCase().includes(search.toLowerCase());
+      });
 
     // If showInactive is checked, show ONLY inactive entries
     // If showInactive is unchecked, show ONLY active entries
@@ -181,11 +185,17 @@ export default function StockEntryPage() {
     currentPage * ITEMS_PER_PAGE
   );
 
-  const handleDelete = (id: number) => {
-    if (window.confirm("Are you sure you want to delete this stock entry?")) {
-      setStockEntries(stockEntries.filter((entry) => entry.id !== id));
-      setSuccessMsg("Stock entry deleted successfully!");
-      setTimeout(() => setSuccessMsg(""), 2000);
+  const handleDelete = async (id: number) => {
+    if (window.confirm("Are you sure you want to delete this stock entry? This action cannot be undone.")) {
+      try {
+        await inventoryAPI.stockEntries.delete(id);
+        setStockEntries(stockEntries.filter((entry) => entry.id !== id));
+        setSuccessMsg("Stock entry deleted successfully!");
+        setTimeout(() => setSuccessMsg(""), 2000);
+      } catch (err: any) {
+        setError(err.response?.data?.message || "Failed to delete stock entry");
+        setTimeout(() => setError(""), 3000);
+      }
     }
   };
 
@@ -216,23 +226,7 @@ export default function StockEntryPage() {
   };
 
   const handleStockEntrySaved = (entryData: any) => {
-    if (editingEntry) {
-      // Update existing entry
-      setStockEntries(
-        stockEntries.map((entry) =>
-          entry.id === editingEntry.id ? { ...entry, ...entryData } : entry
-        )
-      );
-    } else {
-      // Add new entry
-      const newEntry: StockEntry = {
-        id: Math.max(0, ...stockEntries.map((e) => e.id)) + 1,
-        entryId: `SE-${String(Math.max(0, ...stockEntries.map((e) => e.id)) + 1).padStart(3, "0")}`,
-        ...entryData,
-        status: "Active",
-      };
-      setStockEntries([newEntry, ...stockEntries]);
-    }
+    fetchData(); // Refresh list from server
     setShowModal(false);
     setEditingEntry(null);
     setSuccessMsg("Stock entry saved successfully!");
@@ -244,6 +238,13 @@ export default function StockEntryPage() {
       <div className="min-h-screen bg-white p-6">
         {/* Page Header */}
         <PageHeader title="Stock Entry" icon={Package} path="Inventory" />
+
+        {/* Error Message */}
+        {error && (
+          <div className="mb-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
+            {error}
+          </div>
+        )}
 
         {/* Top Bar */}
         <div className="flex flex-wrap items-center justify-between gap-3 mb-4 bg-white p-3 rounded shadow-md">
@@ -327,7 +328,13 @@ export default function StockEntryPage() {
               </tr>
             </thead>
             <tbody>
-              {paginatedEntries.length > 0 ? (
+              {loading ? (
+                <tr>
+                  <td colSpan={9} className="text-center py-4 text-gray-500 border border-gray-300">
+                    Loading stock entries...
+                  </td>
+                </tr>
+              ) : paginatedEntries.length > 0 ? (
                 paginatedEntries.map((entry) =>
                   entry.items.map((item, itemIndex) => (
                     <tr key={`${entry.id}-${itemIndex}`} className="hover:bg-gray-50 border-b border-gray-200">
@@ -345,7 +352,7 @@ export default function StockEntryPage() {
                         </>
                       )}
                       <td className="border border-gray-300 px-3 py-2 text-gray-600">
-                        {item.itemName}
+                        {item.item?.itemName || item.itemName || "-"}
                       </td>
                       <td className="border border-gray-300 px-3 py-2 text-center">
                         <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs font-semibold">
@@ -453,8 +460,9 @@ export default function StockEntryPage() {
           setEditingEntry(null);
         }}
         onStockEntrySaved={handleStockEntrySaved}
-        suppliers={SAMPLE_SUPPLIERS}
-        items={SAMPLE_ITEMS}
+        suppliers={suppliers}
+        items={items}
+        editingEntry={editingEntry}
       />
 
       {/* Success Message */}

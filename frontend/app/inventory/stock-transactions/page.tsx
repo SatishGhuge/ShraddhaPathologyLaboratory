@@ -1,14 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   AlertCircle, AlertTriangle, Package, ChevronLeft, ChevronRight,
   Search, X, Check
 } from "lucide-react";
+import inventoryAPI from "@/lib/api/inventory.api";
 
 /* ─── Types ─────────────────────────────────────────────── */
 interface StockTransaction {
   id: number;
+  itemId: number;
   itemName: string;
   itemCode: string;
   unit: string;
@@ -61,79 +63,6 @@ function formatDate(dateStr: string): string {
   return new Date(dateStr).toLocaleDateString("en-GB");
 }
 
-/* ─── Mock Data ─────────────────────────────────────────────── */
-const MOCK_STOCK_DATA: StockTransaction[] = [
-  {
-    id: 1,
-    itemName: "CBC Reagent Kit",
-    itemCode: "REG-001",
-    unit: "Kit",
-    availableQuantity: 8,
-    minimumStockLevel: 10,
-    expiryDate: "2027-03-15",
-    batchNo: "BATCH-001",
-    supplier: "MedSupply Co.",
-    remarks: "Premium quality kit"
-  },
-  {
-    id: 2,
-    itemName: "Urine Test Strips",
-    itemCode: "CON-012",
-    unit: "Box",
-    availableQuantity: 5,
-    minimumStockLevel: 15,
-    expiryDate: "2026-09-20",
-    batchNo: "BATCH-002",
-    supplier: "LabKit India",
-    remarks: "Fast results"
-  },
-  {
-    id: 3,
-    itemName: "Blood Collection Tubes",
-    itemCode: "TUBE-005",
-    unit: "Pack",
-    availableQuantity: 45,
-    minimumStockLevel: 20,
-    expiryDate: "2028-06-10",
-    batchNo: "BATCH-003",
-    supplier: "BioLab Pvt Ltd"
-  },
-  {
-    id: 4,
-    itemName: "Serum Separator Tubes",
-    itemCode: "CON-007",
-    unit: "Box",
-    availableQuantity: 0,
-    minimumStockLevel: 20,
-    expiryDate: "2025-12-01",
-    batchNo: "BATCH-004",
-    supplier: "MedSupply Co.",
-    remarks: "Out of stock - order placed"
-  },
-  {
-    id: 5,
-    itemName: "HbA1c Reagent",
-    itemCode: "REG-008",
-    unit: "Bottle",
-    availableQuantity: 32,
-    minimumStockLevel: 8,
-    expiryDate: "2027-08-25",
-    batchNo: "BATCH-005",
-    supplier: "BioLab Pvt Ltd"
-  },
-  {
-    id: 6,
-    itemName: "Lancets (28G)",
-    itemCode: "CON-003",
-    unit: "Box",
-    availableQuantity: 2,
-    minimumStockLevel: 30,
-    expiryDate: "2026-11-15",
-    batchNo: "BATCH-006",
-    supplier: "QuickDiag",
-    remarks: "Critical - urgent reorder needed"
-  },
-];
 
 /* ═══════════════════════════════════════════════════════════
    QUANTITY UPDATE MODAL
@@ -176,9 +105,6 @@ function QuantityUpdateModal({ item, isOpen, onClose, onUpdate }: QuantityUpdate
     }
 
     onUpdate(qty, remark);
-    setQuantity("");
-    setRemark("");
-    onClose();
   };
 
   if (!isOpen) return null;
@@ -279,15 +205,46 @@ function QuantityUpdateModal({ item, isOpen, onClose, onUpdate }: QuantityUpdate
    MAIN PAGE
 ══════════════════════════════════════════════════════════════ */
 export default function StockTransactionsPage() {
-  const [transactions, setTransactions] = useState<StockTransaction[]>(MOCK_STOCK_DATA);
+  const [transactions, setTransactions] = useState<StockTransaction[]>([]);
   const [search, setSearch] = useState("");
   const [filterAlert, setFilterAlert] = useState("all");
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedItem, setSelectedItem] = useState<StockTransaction | null>(null);
   const [showModal, setShowModal] = useState(false);
   const [successMsg, setSuccessMsg] = useState("");
+  const [loading, setLoading] = useState(true);
 
   const ITEMS_PER_PAGE = 15;
+
+  const fetchData = async () => {
+    try {
+      setLoading(true);
+      const res = await inventoryAPI.labStocks.getAll(1, 100);
+      const stocks = res.data?.data || [];
+      const mapped = stocks.map((s: any) => ({
+        id: s.id,
+        itemId: s.itemId,
+        itemName: s.item?.itemName || "-",
+        itemCode: s.item?.itemCode || "-",
+        unit: s.item?.unit || "Box",
+        availableQuantity: s.quantityAvailable || s.availableQuantity || 0,
+        minimumStockLevel: s.minimumStockLevel || 0,
+        expiryDate: s.expiryDate,
+        batchNo: s.batchNo,
+        supplier: "Internal",
+        remarks: ""
+      }));
+      setTransactions(mapped);
+    } catch (err) {
+      console.error("Failed to fetch lab stocks", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchData();
+  }, [currentPage]);
 
   // Filter transactions
   const filteredTransactions = transactions.filter((tx) => {
@@ -318,21 +275,43 @@ export default function StockTransactionsPage() {
     setShowModal(true);
   };
 
-  const handleQuantityUpdate = (quantity: number, remark: string) => {
+  const handleQuantityUpdate = async (quantity: number, remark: string) => {
     if (!selectedItem) return;
 
-    const newQuantity = selectedItem.availableQuantity - quantity;
+    try {
+      await inventoryAPI.transactions.create({
+        itemId: selectedItem.itemId,
+        batchNo: selectedItem.batchNo,
+        quantity: quantity,
+        transactionType: "OUT",
+        reason: remark || "Manual adjustment"
+      });
+      
+      const newQuantity = selectedItem.availableQuantity - quantity;
+      
+      // Update the transactions state immediately for UI responsiveness
+      setTransactions((prev) =>
+        prev.map((tx) =>
+          tx.id === selectedItem.id
+            ? { ...tx, availableQuantity: newQuantity, remarks: remark || tx.remarks }
+            : tx
+        )
+      );
 
-    setTransactions((prev) =>
-      prev.map((tx) =>
-        tx.id === selectedItem.id
-          ? { ...tx, availableQuantity: newQuantity, remarks: remark || tx.remarks }
-          : tx
-      )
-    );
-
-    setSuccessMsg(`Updated ${selectedItem.itemName}. New qty: ${newQuantity} ${selectedItem.unit}`);
-    setTimeout(() => setSuccessMsg(""), 2000);
+      setSuccessMsg(`Updated ${selectedItem.itemName}. New qty: ${newQuantity} ${selectedItem.unit}`);
+      
+      // Re-fetch data after a short delay to ensure database is updated
+      setTimeout(() => {
+        fetchData();
+      }, 500);
+      
+      setTimeout(() => setSuccessMsg(""), 3000);
+      setShowModal(false);
+      setSelectedItem(null);
+    } catch (err) {
+      console.error("Failed to update stock", err);
+      alert("Failed to update stock.");
+    }
   };
 
   const criticalItems = transactions.filter(
