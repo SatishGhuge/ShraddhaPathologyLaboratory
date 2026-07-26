@@ -299,7 +299,7 @@ model Test {
   testParameterId        Int?
   testCategoryId         Int?
   sampleTypeId           Int?
-  machineId              Int?                // Foreign key to Machine table
+  machineId              Int?              // Foreign key to Machine table (optional)
   group                  String?
   reportHeader           String?
   preparationTime        String?
@@ -334,7 +334,7 @@ model Test {
   testCategory           TestCategory?       @relation("PrimaryTestCategory", fields: [testCategoryId], references: [id])
   testParameter          TestParameter?      @relation("PrimaryTestParameter", fields: [testParameterId], references: [id])
   sample_type            sample_type?        @relation(fields: [sampleTypeId], references: [id])
-  machine                Machine?            @relation(fields: [machineId], references: [id], onDelete: SetNull)
+  machine                Machine?           @relation(fields: [machineId], references: [id], onDelete: SetNull)
 
   @@unique([name, departmentId])
   @@index([departmentId], map: "tests_departmentId_fkey")
@@ -351,7 +351,7 @@ model Package {
   id           Int           @id @default(autoincrement())
   name         String
   code         String?
-  departmentId Int
+  departmentId Int?
   b2cCharge    Float         @default(0)
   isActive     Boolean       @default(true)
   isDeleted    Boolean       @default(false)
@@ -359,7 +359,7 @@ model Package {
   updatedAt    DateTime      @updatedAt
   packageTests PackageTest[]
   patientTests PatientTest[]
-  department   Department    @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+  department   Department?   @relation(fields: [departmentId], references: [id], onDelete: SetNull)
 
   @@index([departmentId], map: "packages_departmentId_fkey")
   @@map("packages")

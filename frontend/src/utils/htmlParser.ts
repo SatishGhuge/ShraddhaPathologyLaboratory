@@ -11,8 +11,8 @@ export interface HtmlPart {
 
 /**
  * Parse HTML string with <b> and <i> tags and return array of parts for React rendering
- * Handles actual HTML tags (not entities)
- * @param str - HTML string to parse
+ * Handles both actual HTML tags AND HTML-encoded entities
+ * @param str - HTML string to parse (can contain <b> or &lt;b>)
  * @returns Array of parts with styling info, or plain string if no tags found
  */
 export const parseHtmlText = (str: string): string | HtmlPart[] => {
@@ -21,6 +21,13 @@ export const parseHtmlText = (str: string): string | HtmlPart[] => {
   // Normalize the string
   let text = String(str).trim();
   if (!text) return "-";
+  
+  // First, decode HTML entities: &lt; → <, &gt; → >
+  // This handles both actual tags and encoded tags
+  text = text
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&amp;/g, '&');
   
   const parts: HtmlPart[] = [];
   let lastIndex = 0;
@@ -84,15 +91,23 @@ export const parseHtmlText = (str: string): string | HtmlPart[] => {
 };
 
 /**
- * Strip HTML tags from a string
- * @param str - String with HTML tags
+ * Strip HTML tags from a string (handles both actual tags and entity-encoded tags)
+ * @param str - String with HTML tags (or entity-encoded tags like &lt;b>)
  * @returns Plain text without HTML tags
  */
 export const stripHtmlTags = (str: string): string => {
   if (!str) return "-";
   
-  // Simply remove all HTML tags
-  return String(str)
+  let text = String(str);
+  
+  // First decode HTML entities
+  text = text
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&amp;/g, '&');
+  
+  // Then remove all HTML tags
+  return text
     .replace(/<[^>]*>/g, "")
     .trim();
 };

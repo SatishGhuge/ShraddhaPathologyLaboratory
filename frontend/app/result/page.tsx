@@ -3231,7 +3231,7 @@ export default function Result() {
                   onClick={handlePrint}
                   className="bg-blue-600 text-white px-4 py-1.5 rounded text-sm hover:bg-blue-700"
                 >
-                  Print
+                  🖨️ Print
                 </button>
                 <button
                   onClick={() => setShowReportModal(false)}
@@ -3248,21 +3248,41 @@ export default function Result() {
               {/* Print styles */}
               <style>{`
                 @media print {
-                  body * { visibility: hidden !important; }
-                  .report-page, .report-page * { visibility: visible !important; }
+                  * { visibility: hidden; }
+                  .report-page,
+                  .report-page * {
+                    visibility: visible !important;
+                  }
+                  body {
+                    margin: 0;
+                    padding: 0;
+                    background: white;
+                  }
                   .report-page {
-                    position: relative !important;
-                    width: 100% !important;
+                    position: absolute !important;
+                    left: 0;
+                    top: 0;
+                    width: 100%;
                     margin: 0 !important;
-                    padding: 20px !important;
+                    padding: 0 !important;
                     box-shadow: none !important;
                     page-break-after: always;
+                    page-break-inside: avoid;
                     overflow: visible !important;
                     background: white !important;
+                    border-radius: 0 !important;
                   }
-                  .report-page:last-child { page-break-after: avoid; }
-                  .no-print { display: none !important; }
-                  @page { size: A4; margin: 10mm; }
+                  .report-page:last-child {
+                    page-break-after: avoid;
+                  }
+                  .no-print {
+                    display: none !important;
+                    visibility: hidden !important;
+                  }
+                  @page {
+                    size: A4;
+                    margin: 0;
+                  }
                 }
               `}</style>
 

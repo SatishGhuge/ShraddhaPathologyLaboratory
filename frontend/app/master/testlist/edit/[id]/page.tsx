@@ -863,10 +863,6 @@ const AddTest = () => {
       emptyFields.push("Test Name");
     }
     
-    if (!formData.department) {
-      emptyFields.push("Department");
-    }
-    
     if (!formData.shortName.trim()) {
       emptyFields.push("Test Short Form");
     }
@@ -886,7 +882,7 @@ const AddTest = () => {
         name: formData.name,
         shortName: formData.shortName,
         testCode: formData.testCode || null,
-        departmentId: parseInt(formData.department),
+        departmentId: formData.department ? parseInt(formData.department) : null,
         sampleTypeId: formData.sampleTypeId ? parseInt(formData.sampleTypeId) : null,
         machineName: formData.machineName || null,
         reportHeader: formData.reportHeader || null,
@@ -1788,7 +1784,7 @@ const AddTest = () => {
                         <input 
                           className="px-2 py-1.5 sm:py-1 border border-gray-300 rounded text-xs sm:text-sm w-full sm:w-40" 
                           placeholder="Sort order..." 
-                          type="number"
+                          type="text"
                           value={category.sortOrder || ""}
                           onChange={(e) => handleCategoryChange(categoryIndex, 'sortOrder', e.target.value)}
                           disabled={isViewMode} 
@@ -1989,7 +1985,7 @@ const AddTest = () => {
                         <input 
                           className="px-2 py-1.5 sm:py-1 border border-gray-300 rounded text-xs sm:text-sm w-full sm:w-24" 
                           placeholder="Sort Order" 
-                          type="number"
+                          type="text"
                           value={parameter.sortOrder !== undefined && parameter.sortOrder !== "" ? parameter.sortOrder : ""}
                           onChange={(e) => handleParameterChange(categoryIndex, paramIndex, 'sortOrder', e.target.value)}
                           disabled={isViewMode} 
@@ -2103,8 +2099,7 @@ const AddTest = () => {
                         <input 
                           className="px-2 py-1.5 sm:py-1 border border-gray-300 rounded text-xs sm:text-sm w-full sm:w-24" 
                           placeholder="Low Panic" 
-                          type="number"
-                          step="0.01"
+                          type="text"
                           value={parameter.lowPanic || ""}
                           onChange={(e) => handleParameterChange(categoryIndex, paramIndex, 'lowPanic', e.target.value)}
                           disabled={isViewMode} 
@@ -2112,8 +2107,7 @@ const AddTest = () => {
                         <input 
                           className="px-2 py-1.5 sm:py-1 border border-gray-300 rounded text-xs sm:text-sm w-full sm:w-24" 
                           placeholder="High Panic" 
-                          type="number"
-                          step="0.01"
+                          type="text"
                           value={parameter.highPanic || ""}
                           onChange={(e) => handleParameterChange(categoryIndex, paramIndex, 'highPanic', e.target.value)}
                           disabled={isViewMode} 
@@ -2578,8 +2572,7 @@ const AddTest = () => {
                                   <td className="border border-gray-300 p-1">
                                     <input 
                                       className="w-full px-2 py-1 border border-gray-300 rounded text-xs sm:text-sm" 
-                                      type="number"
-                                      step="0.01"
+                                      type="text"
                                       value={ageRange.ll || ""}
                                       onChange={(e) => handleAgeRangeChange(categoryIndex, paramIndex, ageIndex, 'll', e.target.value)}
                                       disabled={isViewMode} 
@@ -2588,8 +2581,7 @@ const AddTest = () => {
                                   <td className="border border-gray-300 p-1">
                                     <input 
                                       className="w-full px-2 py-1 border border-gray-300 rounded text-xs sm:text-sm" 
-                                      type="number"
-                                      step="0.01"
+                                      type="text"
                                       value={ageRange.ul || ""}
                                       onChange={(e) => handleAgeRangeChange(categoryIndex, paramIndex, ageIndex, 'ul', e.target.value)}
                                       disabled={isViewMode} 
@@ -2675,8 +2667,7 @@ const AddTest = () => {
                                       <input 
                                         className="w-full px-2 py-1 border border-gray-300 rounded text-xs sm:text-sm" 
                                         placeholder="Min"
-                                        type="number"
-                                        step="0.01"
+                                        type="text"
                                         value={rangeValue.min || ""}
                                         onChange={(e) => handleRangeValueChange(categoryIndex, paramIndex, rangeIndex, 'min', e.target.value)}
                                         disabled={isViewMode} 
@@ -2686,8 +2677,7 @@ const AddTest = () => {
                                       <input 
                                         className="w-full px-2 py-1 border border-gray-300 rounded text-xs sm:text-sm" 
                                         placeholder="Max"
-                                        type="number"
-                                        step="0.01"
+                                        type="text"
                                         value={rangeValue.max || ""}
                                         onChange={(e) => handleRangeValueChange(categoryIndex, paramIndex, rangeIndex, 'max', e.target.value)}
                                         disabled={isViewMode} 
@@ -2759,8 +2749,7 @@ const AddTest = () => {
                                   <td className="border border-gray-300 p-1">
                                     <input 
                                       className="w-full px-2 py-1 border border-gray-300 rounded text-xs sm:text-sm" 
-                                      type="number"
-                                      step="0.01"
+                                      type="text"
                                       value={range.ll || ""}
                                       onChange={(e) => handleNormalRangeChange(categoryIndex, paramIndex, rangeIndex, 'll', e.target.value)}
                                       disabled={isViewMode} 
@@ -2769,8 +2758,7 @@ const AddTest = () => {
                                   <td className="border border-gray-300 p-1">
                                     <input 
                                       className="w-full px-2 py-1 border border-gray-300 rounded text-xs sm:text-sm" 
-                                      type="number"
-                                      step="0.01"
+                                      type="text"
                                       value={range.ul || ""}
                                       onChange={(e) => handleNormalRangeChange(categoryIndex, paramIndex, rangeIndex, 'ul', e.target.value)}
                                       disabled={isViewMode} 

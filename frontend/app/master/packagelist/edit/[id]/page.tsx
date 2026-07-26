@@ -165,10 +165,6 @@ const AddPackage = () => {
     if (!formData.code.trim()) {
       emptyFields.push("Package Code");
     }
-
-    if (!formData.departmentId) {
-      emptyFields.push("Department");
-    }
     
     // If any fields are empty, show general message first
     if (emptyFields.length > 0) {
@@ -183,7 +179,7 @@ const AddPackage = () => {
       const packageData = {
         name: formData.name,
         code: formData.code,
-        departmentId: parseInt(formData.departmentId),
+        departmentId: formData.departmentId ? parseInt(formData.departmentId) : null,
         testIds: testList.map(test => test.id),
         b2cCharge: formData.b2cCharge ? parseFloat(formData.b2cCharge) : 0
       };
@@ -392,6 +388,23 @@ const AddPackage = () => {
                     </div>
                   )}
                 </div>
+              </div>
+
+              {/* B2C Charge */}
+              <div className="grid grid-cols-1 md:grid-cols-3 items-start md:items-center gap-2 sm:gap-4">
+                <label className="text-xs sm:text-sm font-medium text-gray-700">
+                  B2C Charge
+                </label>
+
+                <input
+                  type="text"
+                  name="b2cCharge"
+                  value={formData.b2cCharge}
+                  onChange={handleChange}
+                  placeholder="0"
+                  disabled={isViewMode}
+                  className="md:col-span-2 border border-gray-300 rounded-md px-2 py-1.5 sm:py-1 text-xs sm:text-sm bg-white focus:ring-2 focus:ring-orange-500 outline-none disabled:bg-gray-100 disabled:cursor-not-allowed"
+                />
               </div>
             </div>
 
