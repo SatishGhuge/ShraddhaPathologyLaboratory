@@ -521,6 +521,24 @@ export const createStockEntry = async (req, res) => {
       });
     }
 
+    // Fetch supplier to check state for IGST determination
+    const supplier = await prisma.supplier.findUnique({
+      where: { id: parseInt(supplierId) }
+    });
+
+    if (!supplier) {
+      return res.status(404).json({
+        success: false,
+        message: 'Supplier not found'
+      });
+    }
+
+    // Determine if supplier is from outside Maharashtra for IGST calculation
+    const isOutOfMaharashtra = supplier.state && 
+      supplier.state.toLowerCase().trim() !== 'maharashtra';
+
+    console.log(`[createStockEntry] Supplier: ${supplier.supplierName}, State: ${supplier.state}, Out of Maharashtra: ${isOutOfMaharashtra}`);
+
     // Generate unique entryId with pattern: SE + YYMM + 0001
     const now = new Date();
     const year = String(now.getFullYear()).slice(-2); // 26 for 2026
@@ -558,12 +576,44 @@ export const createStockEntry = async (req, res) => {
     let totalCGST = 0;
     let totalSGST = 0;
     let totalIGST = 0;
+    let calculatedIGSTPercent = igstPercent || 0;
 
-    const itemsData = items.map(item => {
+    // Process items with automatic IGST/CGST+SGST calculation
+    const itemsData = await Promise.all(items.map(async (item) => {
       const basicAmount = item.quantity * item.pricePerUnit;
-      const cgstAmount = (basicAmount * item.cgstPercent) / 100;
-      const sgstAmount = (basicAmount * item.sgstPercent) / 100;
-      const igstAmount = (basicAmount * (igstPercent || 0)) / 100;
+      
+      let cgstAmount = 0;
+      let sgstAmount = 0;
+      let igstAmount = 0;
+      let finalIGSTPercent = 0;
+
+      if (isOutOfMaharashtra) {
+        // For out-of-state suppliers: Use IGST only
+        // Fetch HSN code to get GST rate
+        const inventoryItem = await prisma.inventoryItem.findUnique({
+          where: { id: parseInt(item.itemId) },
+          include: { hsnCode: true }
+        });
+
+        if (inventoryItem && inventoryItem.hsnCode) {
+          finalIGSTPercent = inventoryItem.hsnCode.gstRate;
+          igstAmount = (basicAmount * finalIGSTPercent) / 100;
+          calculatedIGSTPercent = finalIGSTPercent; // Use HSN GST rate as IGST
+        } else {
+          console.warn(`[createStockEntry] No HSN code found for item ${item.itemId}`);
+          igstAmount = 0;
+        }
+
+        console.log(`[createStockEntry] Out-of-state item ${item.itemId}: IGST Rate = ${finalIGSTPercent}%, Amount = ${igstAmount}`);
+      } else {
+        // For Maharashtra suppliers: Use CGST + SGST
+        cgstAmount = (basicAmount * item.cgstPercent) / 100;
+        sgstAmount = (basicAmount * item.sgstPercent) / 100;
+        igstAmount = 0;
+
+        console.log(`[createStockEntry] In-state item ${item.itemId}: CGST = ${item.cgstPercent}%, SGST = ${item.sgstPercent}%`);
+      }
+
       const totalAmount = basicAmount + cgstAmount + sgstAmount + igstAmount;
 
       totalBasicAmount += basicAmount;
@@ -577,11 +627,31 @@ export const createStockEntry = async (req, res) => {
         cgstAmount,
         sgstAmount,
         igstAmount,
-        totalAmount
+        totalAmount,
+        finalIGSTPercent
       };
-    });
+    }));
 
     const grandTotal = totalBasicAmount + totalCGST + totalSGST + totalIGST;
+
+    // Prepare tax type and summary for clarity
+    const taxType = isOutOfMaharashtra ? "IGST" : "CGST_SGST";
+    const taxSummary = isOutOfMaharashtra ? 
+      {
+        taxType: "IGST",
+        description: "Integrated GST (Out-of-State Supply)",
+        taxRate: calculatedIGSTPercent,
+        totalTaxAmount: totalIGST
+      } : 
+      {
+        taxType: "CGST_SGST",
+        description: "Combined State GST (In-State Supply)",
+        cgstRate: itemsData.length > 0 ? parseFloat(itemsData[0].cgstPercent || 0) : 0,
+        sgstRate: itemsData.length > 0 ? parseFloat(itemsData[0].sgstPercent || 0) : 0,
+        totalCGST: totalCGST,
+        totalSGST: totalSGST,
+        totalTaxAmount: totalCGST + totalSGST
+      };
 
     const stockEntry = await prisma.stockEntry.create({
       data: {
@@ -589,7 +659,7 @@ export const createStockEntry = async (req, res) => {
         supplierId: parseInt(supplierId),
         invoiceNo,
         invoiceDate: new Date(invoiceDate),
-        igstPercent: igstPercent || 0,
+        igstPercent: calculatedIGSTPercent,
         totalBasicAmount,
         totalCGST,
         totalSGST,
@@ -605,11 +675,11 @@ export const createStockEntry = async (req, res) => {
             quantity: parseInt(item.quantity),
             pricePerUnit: parseFloat(item.pricePerUnit),
             basicAmount: item.basicAmount,
-            cgstPercent: parseFloat(item.cgstPercent),
+            cgstPercent: parseFloat(isOutOfMaharashtra ? 0 : item.cgstPercent),
             cgstAmount: item.cgstAmount,
-            sgstPercent: parseFloat(item.sgstPercent),
+            sgstPercent: parseFloat(isOutOfMaharashtra ? 0 : item.sgstPercent),
             sgstAmount: item.sgstAmount,
-            igstPercent: parseFloat(item.igstPercent || 0),
+            igstPercent: parseFloat(item.finalIGSTPercent || 0),
             igstAmount: item.igstAmount,
             totalAmount: item.totalAmount
           }))
@@ -663,7 +733,17 @@ export const createStockEntry = async (req, res) => {
     res.status(201).json({
       success: true,
       message: 'Stock entry created successfully and lab stock updated',
-      data: stockEntry
+      data: {
+        ...stockEntry,
+        taxType: taxType,
+        taxSummary: taxSummary,
+        supplierInfo: {
+          id: stockEntry.supplier.id,
+          name: stockEntry.supplier.supplierName,
+          state: stockEntry.supplier.state,
+          isOutOfState: isOutOfMaharashtra
+        }
+      }
     });
   } catch (error) {
     console.error('Create stock entry error:', error);
