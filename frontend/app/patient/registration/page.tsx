@@ -372,6 +372,16 @@ export default function PatientRegistration() {
       setOrganizations(orgs);
       console.log('📋 Organizations loaded:', orgs);
     }).catch(console.error);
+    
+    // Generate temporary Visit ID immediately on form load (for bill display before save)
+    // Format: YYYYMMDD + 0001 (matching actual backend Visit ID format)
+    const today = new Date();
+    const year = String(today.getFullYear());
+    const month = String(today.getMonth() + 1).padStart(2, '0');
+    const day = String(today.getDate()).padStart(2, '0');
+    const tempVisitId = `${year}${month}${day}0001`;
+    setLastRegisteredVisitId(tempVisitId);
+    console.log('✅ Temporary Visit ID generated:', tempVisitId);
   }, []);
 
   // Fetch organization-specific charges when organization is selected
@@ -1804,7 +1814,8 @@ export default function PatientRegistration() {
       visitId: lastRegisteredVisitId,
       patientId: existingPatientId || `NEW-${Date.now()}`,
       name: `${title} ${firstName} ${lastName || ''}`.trim(),
-      date: new Date(date).toLocaleDateString("en-GB"),
+      date: date || new Date().toISOString().split("T")[0],
+      time: time || new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       tests: selectedTests.map(t => ({
         name: t.name,
         sample: t.sample,
@@ -1856,7 +1867,8 @@ export default function PatientRegistration() {
       visitId: lastRegisteredVisitId,
       patientId: existingPatientId || `NEW-${Date.now()}`,
       name: `${title} ${firstName} ${lastName || ''}`.trim(),
-      date: new Date(date).toLocaleDateString("en-GB"),
+      date: date || new Date().toISOString().split("T")[0],
+      time: time || new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       tests: selectedTests.map(t => ({
         name: t.name,
         sample: t.sample,

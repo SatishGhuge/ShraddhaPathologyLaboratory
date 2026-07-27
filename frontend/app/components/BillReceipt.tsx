@@ -26,6 +26,39 @@ const BillReceipt: React.FC<BillReceiptProps> = ({ booking, billing, businessTyp
     ? `${booking.patientData?.title || ''} ${booking.patientData?.firstName} ${booking.patientData?.lastName}`.trim()
     : booking.name;
 
+  // Format date as DD/MM/YYYY
+  const formatDate = (dateStr: string) => {
+    if (!dateStr) {
+      const now = new Date();
+      const day = String(now.getDate()).padStart(2, '0');
+      const month = String(now.getMonth() + 1).padStart(2, '0');
+      const year = now.getFullYear();
+      return `${day}/${month}/${year}`;
+    }
+    
+    // If already formatted as DD/MM/YYYY
+    if (typeof dateStr === 'string' && dateStr.match(/^\d{1,2}\/\d{1,2}\/\d{4}$/)) {
+      return dateStr;
+    }
+    
+    // If YYYY-MM-DD format
+    if (typeof dateStr === 'string' && dateStr.match(/^\d{4}-\d{2}-\d{2}$/)) {
+      const parts = dateStr.split('-');
+      return `${parts[2]}/${parts[1]}/${parts[0]}`;
+    }
+    
+    try {
+      const date = new Date(dateStr);
+      if (isNaN(date.getTime())) return 'Invalid Date';
+      const day = String(date.getDate()).padStart(2, '0');
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const year = date.getFullYear();
+      return `${day}/${month}/${year}`;
+    } catch {
+      return dateStr || 'N/A';
+    }
+  };
+
   return (
     <>
       <style>{`
@@ -39,72 +72,73 @@ const BillReceipt: React.FC<BillReceiptProps> = ({ booking, billing, businessTyp
         }
       `}</style>
       
-      <div className="overflow-y-auto flex-1 bg-white print:p-0" id="bill-print-area" style={{ fontFamily: 'Arial, sans-serif', padding: '2rem' }}>
+      <div className="overflow-y-auto flex-1 bg-white print:p-0" id="bill-print-area" style={{ fontFamily: 'Arial, sans-serif', fontSize: '13px', padding: '2rem' }}>
         {/* HEADER - Centered */}
-        <div className="text-center mb-6 pb-4 border-b-2 border-gray-800">
-          <h1 className="text-2xl font-bold mb-1">SHRADDHA PATHOLOGY LABORATORY</h1>
-          <p className="text-sm font-semibold mb-0.5">DR. VIKAS K. MANDLECHA M.D.(Path)</p>
-          <p className="text-sm mb-0.5">Regd. No. 67625</p>
-          <p className="text-sm mb-1">B.G.Corner, Ground Floor, Besides Sarswat Bank, Nigdi, Pune-44</p>
-          <p className="text-sm">Ph. No.:8551800234 / 8793383381</p>
+        <div className="text-center mb-4 pb-3" style={{ borderBottom: '2px solid #000' }}>
+          <h1 style={{ fontSize: '18px', fontWeight: 'bold', margin: '0 0 4px 0' }}>SHRADDHA PATHOLOGY LABORATORY</h1>
+          <p style={{ fontSize: '12px', margin: '2px 0', fontWeight: '500' }}>DR. VIKAS K. MANDLECHA M.D.(Path)</p>
+          <p style={{ fontSize: '12px', margin: '2px 0' }}>Regd. No. 67625</p>
+          <p style={{ fontSize: '12px', margin: '2px 0' }}>B.G.Corner, Ground Floor, Besides Sarswat Bank, Nigdi, Pune-44</p>
+          <p style={{ fontSize: '12px', margin: '2px 0' }}>Ph. No.:8551800234 / 8793383381</p>
         </div>
 
         {/* RECEIPT Title */}
-        <div className="text-center text-lg font-bold mb-4 pb-2 border-b border-gray-800">
-          RECEIPT
+        <div className="text-center my-3" style={{ borderBottom: '2px solid #000', paddingBottom: '4px' }}>
+          <h2 style={{ fontSize: '16px', fontWeight: 'bold', margin: '0' }}>RECEIPT</h2>
         </div>
 
-        {/* Patient Details - Single Row Header */}
-        <div className="flex justify-between items-start text-xs mb-4" style={{ pageBreakInside: 'avoid' }}>
-          <div>
-            <div className="flex mb-1">
-              <span className="w-32 font-semibold">Visit ID :</span>
-              <span className="font-bold text-blue-600">{booking.visitId || 'N/A'}</span>
+        {/* Patient Details - Two Row Layout */}
+        <div style={{ marginBottom: '3px', borderBottom: '2px solid #000', paddingBottom: '4px' }}>
+          {/* First Row: Visit ID, Name, Sex/Age */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '20px', marginBottom: '3px', fontSize: '13px' }}>
+            <div>
+              <span style={{ fontWeight: 'bold' }}>Visit ID :</span>
+              <span style={{ marginLeft: '8px', color: '#0066cc', fontWeight: 'bold' }}>{booking.visitId || 'N/A'}</span>
             </div>
-            <div className="flex mb-1">
-              <span className="w-32 font-semibold">Payment Mode :</span>
-              <span>{billing.paymentMode || 'CASH'}</span>
+            <div>
+              <span style={{ fontWeight: 'bold' }}>Name :</span>
+              <span style={{ marginLeft: '8px' }}>{patientName} (ID: {booking.patientData?.id || 'N/A'})</span>
             </div>
-          </div>
-          <div>
-            <div className="flex mb-1">
-              <span className="w-32 font-semibold">Name :</span>
-              <span>{patientName} (ID: {booking.patientData?.id || 'N/A'})</span>
-            </div>
-            <div className="flex mb-1">
-              <span className="w-32 font-semibold">Referral :</span>
-              <span>{booking.patientData?.referralDoctor || 'N/A'}</span>
+            <div>
+              <span style={{ fontWeight: 'bold' }}>Sex / Age :</span>
+              <span style={{ marginLeft: '8px' }}>{booking.patientData?.gender?.charAt(0) || 'M'} / {booking.patientData?.age || '—'} years</span>
             </div>
           </div>
-          <div>
-            <div className="flex mb-1">
-              <span className="w-24 font-semibold">Sex / Age :</span>
-              <span>{booking.patientData?.gender?.charAt(0) || 'M'} / {booking.patientData?.age || '—'} years</span>
+
+          {/* Second Row: Payment Mode, Referral, Date & Time */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '20px', fontSize: '13px' }}>
+            <div>
+              <span style={{ fontWeight: 'bold' }}>Payment Mode :</span>
+              <span style={{ marginLeft: '8px' }}>{billing.paymentMode || 'CASH'}</span>
             </div>
-            <div className="flex mb-1">
-              <span className="w-24 font-semibold">Date & Time :</span>
-              <span>{booking.date}</span>
+            <div>
+              <span style={{ fontWeight: 'bold' }}>Referral :</span>
+              <span style={{ marginLeft: '8px' }}>{booking.patientData?.referralDoctor || 'N/A'}</span>
+            </div>
+            <div>
+              <span style={{ fontWeight: 'bold' }}>Date:</span>
+              <span style={{ marginLeft: '8px' }}>{formatDate(booking.date)}</span>
             </div>
           </div>
         </div>
 
-        {/* Tests Table with horizontal lines */}
-        <table className="w-full text-xs mb-4" style={{ borderCollapse: 'collapse', pageBreakInside: 'avoid' }}>
+        {/* Tests Table */}
+        <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '8px', fontSize: '13px' }}>
           <thead>
             <tr style={{ borderTop: '1px solid #000', borderBottom: '1px solid #000' }}>
-              <th className="text-left py-2 px-1" style={{ width: '5%', pageBreakInside: 'avoid' }}>Sr.</th>
-              <th className="text-left py-2 px-1" style={{ width: '55%', pageBreakInside: 'avoid' }}>Test Name</th>
-              <th className="text-left py-2 px-1" style={{ width: '20%', pageBreakInside: 'avoid' }}>Test Price</th>
+              <th style={{ textAlign: 'left', padding: '8px 4px', width: '8%', fontWeight: 'bold' }}>Sr.</th>
+              <th style={{ textAlign: 'left', padding: '8px 4px', width: '70%', fontWeight: 'bold' }}>Test Name</th>
+              <th style={{ textAlign: 'right', padding: '8px 4px', width: '22%', fontWeight: 'bold' }}>Test Price</th>
             </tr>
           </thead>
           <tbody>
             {booking.tests.map((t: any, i: number) => {
               const charge = businessType === "B2C" ? (t.b2cCharge || t.charge || 0) : (t.b2bCharge || t.charge || 0);
               return (
-                <tr key={i} style={{ borderBottom: '1px solid #ccc', pageBreakInside: 'avoid' }}>
-                  <td className="text-left py-1.5 px-1">{i + 1}</td>
-                  <td className="text-left py-1.5 px-1">{t.name}</td>
-                  <td className="text-left py-1.5 px-1">{Math.round(charge).toFixed(2)}</td>
+                <tr key={i} style={{ borderBottom: '1px solid #ddd' }}>
+                  <td style={{ textAlign: 'left', padding: '6px 4px' }}>{i + 1}</td>
+                  <td style={{ textAlign: 'left', padding: '6px 4px' }}>{t.name}</td>
+                  <td style={{ textAlign: 'right', padding: '6px 4px' }}>{Math.round(charge).toFixed(2)}</td>
                 </tr>
               );
             })}
@@ -112,43 +146,41 @@ const BillReceipt: React.FC<BillReceiptProps> = ({ booking, billing, businessTyp
         </table>
 
         {/* Summary Section */}
-        <div className="border-t-2 border-b-2 border-gray-800 py-2 mb-2" style={{ pageBreakInside: 'avoid' }}>
-          <div className="flex justify-between text-xs mb-1">
+        <div style={{ borderTop: '2px solid #000', borderBottom: '2px solid #000', paddingTop: '6px', paddingBottom: '6px', marginBottom: '8px', fontSize: '13px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '3px' }}>
             <span>Gross Amount :</span>
-            <span className="font-bold">{Math.round(billTotal).toFixed(2)}</span>
+            <span style={{ fontWeight: 'bold' }}>{Math.round(billTotal).toFixed(2)}</span>
           </div>
           
           {/* Discount Breakdown */}
           {(currentDiscountPercent > 0 || currentDiscountAmount > 0) && (
-            <>
-              <div className="flex justify-between text-xs mb-1">
-                <span>Discount {currentDiscountPercent > 0 ? `(${currentDiscountPercent}%)` : '(Fixed)'} :</span>
-                <span className="font-bold text-red-600">-{billDiscountAmount.toFixed(2)}</span>
-              </div>
-            </>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '3px' }}>
+              <span>Discount {currentDiscountPercent > 0 ? `(${currentDiscountPercent}%)` : '(Fixed)'} :</span>
+              <span style={{ fontWeight: 'bold', color: '#cc0000' }}>-{billDiscountAmount.toFixed(2)}</span>
+            </div>
           )}
           
-          <div className="flex justify-between text-xs mb-2 pt-1 border-t border-gray-400">
-            <span className="font-bold">Net Amount :</span>
-            <span className="font-bold text-green-600">{Math.round(billNetAmount).toFixed(2)}</span>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '3px' }}>
+            <span style={{ fontWeight: 'bold' }}>Net Amount :</span>
+            <span style={{ fontWeight: 'bold', color: '#00aa00' }}>{Math.round(billNetAmount).toFixed(2)}</span>
           </div>
           
-          <div className="flex justify-between text-xs mb-1">
+          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
             <span>Payable Amount (in words) :</span>
-            <span className="font-semibold">{numberToWords(Math.round(billNetAmount))} Only</span>
+            <span style={{ fontWeight: 'bold' }}>{numberToWords(Math.round(billNetAmount))} Only</span>
           </div>
         </div>
 
         {/* Remarks Section */}
         {billing.remarks && (
-          <div className="bg-yellow-50 border border-yellow-200 p-2 mb-2 rounded text-xs" style={{ pageBreakInside: 'avoid' }}>
-            <div className="font-semibold text-gray-700 mb-1">Remarks / Notes :</div>
-            <div className="text-gray-800">{billing.remarks}</div>
+          <div style={{ backgroundColor: '#fffacd', border: '1px solid #ffeb99', padding: '8px', marginBottom: '8px', borderRadius: '4px', fontSize: '12px' }}>
+            <div style={{ fontWeight: 'bold', marginBottom: '4px', color: '#333' }}>Remarks / Notes :</div>
+            <div style={{ color: '#333' }}>{billing.remarks}</div>
           </div>
         )}
 
         {/* Footer */}
-        <div className="text-center text-xs text-gray-600 mt-6" style={{ pageBreakInside: 'avoid' }}>
+        <div className="text-center" style={{ marginTop: '12px', fontSize: '12px', color: '#666' }}>
           <p>Thank you for choosing SHRADDHA PATHOLOGY LABORATORY</p>
         </div>
       </div>
