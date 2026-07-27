@@ -74,12 +74,12 @@ export default function SupplierMasterModal({
           supplierName: editingSupplier.supplierName || "",
           gstNumber: editingSupplier.gstNumber || "",
           email: editingSupplier.email || "",
-          phoneNumber: editingSupplier.phoneNumber || "",
+          phoneNumber: editingSupplier.phone || editingSupplier.phoneNumber || "",
           address: editingSupplier.address || "",
           city: editingSupplier.city || "",
           state: editingSupplier.state || "",
-          pincode: editingSupplier.pincode || "",
-          status: editingSupplier.status || "Active",
+          pincode: editingSupplier.pinCode || editingSupplier.pincode || "",
+          status: editingSupplier.isActive ? "Active" : "Inactive",
         });
       } else {
         setEditingId(null);
@@ -398,7 +398,35 @@ export default function SupplierMasterModal({
           </div>
 
           {/* Status - Radio Buttons */}
-         
+          <div>
+            <label className="block text-xs font-semibold text-gray-700 mb-2">
+              Status
+            </label>
+            <div className="flex gap-4">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="radio"
+                  name="status"
+                  value="Active"
+                  checked={form.status === "Active"}
+                  onChange={(e) => handleStatusChange(e.target.value)}
+                  className="w-4 h-4 text-orange-500 cursor-pointer"
+                />
+                <span className="text-sm text-gray-700">Active</span>
+              </label>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="radio"
+                  name="status"
+                  value="Inactive"
+                  checked={form.status === "Inactive"}
+                  onChange={(e) => handleStatusChange(e.target.value)}
+                  className="w-4 h-4 text-orange-500 cursor-pointer"
+                />
+                <span className="text-sm text-gray-700">Inactive</span>
+              </label>
+            </div>
+          </div>
 
           {/* Error Message */}
           {errors.submit && (

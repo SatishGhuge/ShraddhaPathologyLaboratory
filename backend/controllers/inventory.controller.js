@@ -1121,21 +1121,20 @@ export const createLabToOrgTransfer = async (req, res) => {
       });
     }
 
-    // Generate unique transferId with pattern: TRF + YYMM + 0001
+    // Generate unique transferId with pattern: T + YY + 0001
     const now = new Date();
     const year = String(now.getFullYear()).slice(-2);
-    const month = String(now.getMonth() + 1).padStart(2, '0');
-    const yearMonthPrefix = `TRF${year}${month}`;
+    const yearPrefix = `T${year}`;
 
-    // Get the count of transfers created in this year-month
-    const countInMonth = await prisma.labToOrgTransfer.count({
+    // Get the count of transfers created in this year
+    const countInYear = await prisma.labToOrgTransfer.count({
       where: {
-        transferId: { startsWith: yearMonthPrefix }
+        transferId: { startsWith: yearPrefix }
       }
     });
 
-    const sequence = String(countInMonth + 1).padStart(4, '0');
-    let transferId = `${yearMonthPrefix}${sequence}`;
+    const sequence = String(countInYear + 1).padStart(4, '0');
+    let transferId = `${yearPrefix}${sequence}`;
     
     // Verify uniqueness with retry logic
     let retryCount = 0;
@@ -1149,8 +1148,8 @@ export const createLabToOrgTransfer = async (req, res) => {
       }
       
       retryCount++;
-      const newSequence = String(countInMonth + 1 + retryCount).padStart(4, '0');
-      transferId = `${yearMonthPrefix}${newSequence}`;
+      const newSequence = String(countInYear + 1 + retryCount).padStart(4, '0');
+      transferId = `${yearPrefix}${newSequence}`;
     }
 
     console.log('[createLabToOrgTransfer] Generated transferId:', transferId);
