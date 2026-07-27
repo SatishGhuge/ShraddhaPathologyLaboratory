@@ -329,6 +329,18 @@ export default function Result() {
   // State for Reading Validation Modal
   const [showReadingValidationModal, setShowReadingValidationModal] = useState(false);
   const [readingValidationData, setReadingValidationData] = useState<any>(null);
+
+  // State for expandable columns (tracks which column headers are expanded)
+  const [expandedColumns, setExpandedColumns] = useState<Set<string>>(new Set());
+
+  // State for print options modal (Page Break vs No Page Break)
+  const [showPrintOptionsModal, setShowPrintOptionsModal] = useState(false);
+  const [printOption, setPrintOption] = useState<'pagebreak' | 'nobreak'>('pagebreak');
+
+  // State for test selection modal (for No Page Break option)
+  const [showTestSelectionModal, setShowTestSelectionModal] = useState(false);
+  const [testSelectionOrder, setTestSelectionOrder] = useState<string[]>([]);
+  const [testSelectionData, setTestSelectionData] = useState<any>([]);
   
   // State for Authenticate Modal
   const [showAuthenticateModal, setShowAuthenticateModal] = useState(false);
@@ -386,6 +398,29 @@ export default function Result() {
 
   // Organizations state
   const [organizations, setOrganizations] = useState<any[]>([]);
+
+  // Letterhead state
+  const [letterheadBase64, setLetterheadBase64] = useState<string>('');
+
+  // Load letterhead from public folder on mount
+  React.useEffect(() => {
+    const loadLetterhead = async () => {
+      try {
+        const response = await fetch('/LetterHead.jpeg');
+        const blob = await response.blob();
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          const base64 = reader.result as string;
+          setLetterheadBase64(base64);
+        };
+        reader.readAsDataURL(blob);
+      } catch (error) {
+        console.error('Error loading letterhead:', error);
+      }
+    };
+    
+    loadLetterhead();
+  }, []);
   
   const [settingsFormData, setSettingsFormData] = useState({
     selectedTests: {},
@@ -925,11 +960,20 @@ export default function Result() {
             // Show category header only once
             if (catName !== 'NO_CATEGORY_HEADER' && catParams[0]?.showCategoryHeader) {
               const categoryMethod = catParams[0]?.categoryTestMethod || null;
-              rows += `<tr><td colSpan="4" style="padding:6px;font-weight:bold;border-bottom:1px solid #ddd;background:#f5f5f5;font-size:12px;">${catName.toUpperCase()}</td></tr>`;
+              // Parse category name to handle HTML tags - category is ALWAYS bold
+              const categoryNameHtml = catName
+                .replace(/<b>(.*?)<\/b>/g, '<strong>$1</strong>')
+                .replace(/<i>(.*?)<\/i>/g, '<em>$1</em>')
+                .replace(/<u>(.*?)<\/u>/g, '<u>$1</u>');
+              rows += `<tr><td colSpan="4" style="padding:6px;font-weight:bold;border-bottom:1px solid #ddd;background:#f5f5f5;font-size:12px;"><strong>${categoryNameHtml}</strong></td></tr>`;
               
               // Add category method below category name
               if (categoryMethod) {
-                rows += `<tr><td colSpan="4" style="padding:3px 6px;font-size:10px;color:#666;border-bottom:1px solid #eee;background:#fafafa;">Method: ${categoryMethod}</td></tr>`;
+                const methodHtml = categoryMethod
+                  .replace(/<b>(.*?)<\/b>/g, '<strong>$1</strong>')
+                  .replace(/<i>(.*?)<\/i>/g, '<em>$1</em>')
+                  .replace(/<u>(.*?)<\/u>/g, '<u>$1</u>');
+                rows += `<tr><td colSpan="4" style="padding:3px 6px;font-size:10px;color:#666;border-bottom:1px solid #eee;background:#fafafa;">Method: ${methodHtml}</td></tr>`;
               }
             }
             
@@ -941,12 +985,13 @@ export default function Result() {
               const val = er ? (er.numericValue !== null && er.numericValue !== undefined ? er.numericValue : (er.textValue || '-')) : '-';
               const outOfRange = isParamOutOfRange(p, er);
               
-              // Parse parameter name to handle HTML tags
+              // Parse parameter name to handle HTML tags and underline
               const paramNameHtml = p.parameterName
                 .replace(/<b>(.*?)<\/b>/g, '<strong>$1</strong>')
-                .replace(/<i>(.*?)<\/i>/g, '<em>$1</em>');
+                .replace(/<i>(.*?)<\/i>/g, '<em>$1</em>')
+                .replace(/<u>(.*?)<\/u>/g, '<u>$1</u>');
               
-              const parameterMethod = p.parameterTestMethod ? `<div style="font-size:9px;color:#999;margin-top:2px;">Method: ${p.parameterTestMethod}</div>` : '';
+              const parameterMethod = p.parameterTestMethod ? `<div style="font-size:9px;color:#999;margin-top:2px;">Method: ${p.parameterTestMethod.replace(/<b>(.*?)<\/b>/g, '<strong>$1</strong>').replace(/<i>(.*?)<\/i>/g, '<em>$1</em>').replace(/<u>(.*?)<\/u>/g, '<u>$1</u>')}</div>` : '';
               
               rows += `<tr>
                 <td style="padding:3px 6px;width:38%;font-weight:${outOfRange ? 'bold' : 'normal'};">${paramNameHtml}${parameterMethod}</td>
@@ -1212,6 +1257,62 @@ export default function Result() {
   // Print — loads report data, opens modal with Professional Report Component
   const handlePrintPreview = async () => {
     if (selectedTests.size === 0) { alert('Please select a test to print'); return; }
+    
+    // If multiple tests selected from same patient/visit, show print options modal
+    if (selectedTests.size > 1) {
+      // Verify all selected tests are from same patient and visit
+      const testIds = Array.from(selectedTests);
+      const responses = await Promise.all(testIds.map(id => getPatientTestById(id)));
+      
+      const firstTest = responses[0];
+      const samePatient = responses.every(r => r.patientTest.patientId === firstTest.patientTest.patientId);
+      const sameVisit = responses.every(r => r.patientTest.visitId === firstTest.patientTest.visitId);
+      
+      if (samePatient && sameVisit) {
+        // Show print options modal
+        setShowPrintOptionsModal(true);
+        return;
+      }
+    }
+    
+    // Single test or tests from different patient/visit - proceed with default print
+    await proceedWithPrint('pagebreak');
+  };
+
+  // Proceed with printing based on selected option
+  const proceedWithPrint = async (option: 'pagebreak' | 'nobreak') => {
+    if (selectedTests.size === 0) { alert('Please select a test to print'); return; }
+    
+    // If no page break selected, show test selection modal first
+    if (option === 'nobreak') {
+      try {
+        setLoading(true);
+        const testIds = Array.from(selectedTests);
+        const responses = await Promise.all(testIds.map(id => getPatientTestById(id)));
+        
+        // Prepare test data for selection modal
+        const testsForSelection = responses.map((r, idx) => ({
+          testId: r.patientTest.id.toString(),
+          testName: r.patientTest.test.name,
+          shortName: r.patientTest.test.shortName,
+          selected: true,
+          order: idx
+        }));
+        
+        setTestSelectionData(testsForSelection);
+        setTestSelectionOrder(testIds);
+        setShowTestSelectionModal(true);
+        setShowPrintOptionsModal(false);
+      } catch (err) {
+        console.error('Error preparing test selection:', err);
+        alert('Error: ' + err.message);
+      } finally {
+        setLoading(false);
+      }
+      return;
+    }
+    
+    // Page break option - proceed with print
     try {
       setLoading(true);
       const testIds = Array.from(selectedTests);
@@ -1268,15 +1369,15 @@ export default function Result() {
         groupedParameters: first.groupedParameters,
         combinedTests,
         signature,
-        letterHeadBase64
+        letterHeadBase64,
+        printOption: option
       });
       setReportWithHeader(true);
       setShowReportModal(true);
-      // Record print icon for selected tests
-      markSentIcons(testIds, 'print');
+      setShowPrintOptionsModal(false);
     } catch (err) {
-      console.error('Print preview error:', err);
-      alert('Failed to load print preview: ' + err.message);
+      console.error('Error loading report:', err);
+      alert('Error loading report: ' + err.message);
     } finally {
       setLoading(false);
     }
@@ -2296,22 +2397,21 @@ export default function Result() {
                       <th className="px-1 sm:px-2 py-0.5 sm:py-1 text-left font-semibold text-[10px] whitespace-nowrap border border-gray-300">Org ID</th>
                       <th className="px-1 sm:px-2 py-0.5 sm:py-1 text-left font-semibold text-[10px] whitespace-nowrap border border-gray-300">Patient Name</th>
                       <th className="px-1 sm:px-2 py-0.5 sm:py-1 text-left font-semibold text-[10px] whitespace-nowrap border border-gray-300">Age</th>
-                      <th className="px-1 sm:px-2 py-0.5 sm:py-1 text-left font-semibold text-[10px] whitespace-nowrap border border-gray-300">Gender</th>
+                      <th className="px-0.5 sm:px-1 py-0.5 sm:py-1 text-center font-semibold text-[10px] whitespace-nowrap border border-gray-300">Gender</th>
                       <th className="px-2 sm:px-3 py-0.5 sm:py-1 text-left font-semibold text-[10px] whitespace-nowrap border border-gray-300 min-w-[200px]">Services</th>
                       <th className="px-1 sm:px-2 py-0.5 sm:py-1 text-left font-semibold text-[10px] whitespace-nowrap border border-gray-300">Result</th>
                       <th className="px-1 sm:px-2 py-0.5 sm:py-1 text-left font-semibold text-[10px] whitespace-nowrap border border-gray-300">Unit</th>
                       <th className="px-1 sm:px-2 py-0.5 sm:py-1 text-left font-semibold text-[10px] whitespace-nowrap border border-gray-300">Ref. Interval</th>
                       <th className="px-1 sm:px-2 py-0.5 sm:py-1 text-left font-semibold text-[10px] whitespace-nowrap border border-gray-300">Referral Doc</th>
-                      <th className="px-1 sm:px-2 py-0.5 sm:py-1 text-left font-semibold text-[10px] whitespace-nowrap border border-gray-300">
-                        Previous Test Result
+                      <th className="px-1 sm:px-2 py-0.5 sm:py-1 text-left font-semibold text-[10px] whitespace-nowrap border border-gray-300" title="Previous Test Result">
+                        PTR
                       </th>
-                      <th className="px-1 sm:px-2 py-0.5 sm:py-1 text-left font-semibold text-[10px] whitespace-nowrap border border-gray-300">
-                        All Test Results
+                      <th className="px-1 sm:px-2 py-0.5 sm:py-1 text-left font-semibold text-[10px] whitespace-nowrap border border-gray-300" title="All Test Results">
+                        ATR
                       </th>
                       <th className="px-0.5 sm:px-1 py-0.5 sm:py-1 text-center font-semibold text-[10px] whitespace-nowrap border border-gray-300">
                         <span className="text-[9px]">S.Taken</span>
                       </th>
-                      <th className="px-1 sm:px-2 py-0.5 sm:py-1 text-left font-semibold text-[10px] whitespace-nowrap border border-gray-300">Patient History</th>
                       <th className="px-0.5 sm:px-1 py-0.5 sm:py-1 text-center font-semibold text-[10px] whitespace-nowrap border border-gray-300">
                         <div title="Print barcode labels for selected tests">
                           <Barcode
@@ -2321,12 +2421,15 @@ export default function Result() {
                           />
                         </div>
                       </th>
+                      <th className="px-1 sm:px-2 py-0.5 sm:py-1 text-center font-semibold text-[10px] whitespace-nowrap border border-gray-300">
+                        <span className="text-[9px]">History</span>
+                      </th>
                     </tr>
                   </thead>
-                  <tbody className="bg-white">
+                  <tbody>
                     {loading ? (
                       <tr>
-                        <td colSpan={16} className="text-center p-2 text-gray-500 text-sm border border-gray-300">
+                        <td colSpan={17} className="text-center p-2 text-gray-500 text-sm border border-gray-300">
                           <div className="flex items-center justify-center gap-2">
                             <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-cyan-600"></div>
                             Loading...
@@ -2335,7 +2438,7 @@ export default function Result() {
                       </tr>
                     ) : paginatedResults.length === 0 ? (
                       <tr>
-                        <td colSpan={16} className="text-center p-2 text-gray-500 text-xs sm:text-sm border border-gray-300">
+                        <td colSpan={17} className="text-center p-2 text-gray-500 text-xs sm:text-sm border border-gray-300">
                           No records found for {selectedStatus} status
                         </td>
                       </tr>
@@ -2416,19 +2519,21 @@ export default function Result() {
                             {/* Column 5: Age (show only on first test row) */}
                             <td className="px-1 sm:px-2 py-0.5 sm:py-1 text-[11px] font-medium border border-gray-300 text-center">
                               {testIndex === 0 && (
-                                <span className="font-semibold text-gray-900">{patient.age || '-'} Yrs</span>
+                                <span className="font-semibold text-gray-900">{patient.age || '-'} Y</span>
                               )}
                             </td>
 
                             {/* Column 6: Gender (show only on first test row) */}
-                            <td className="px-1 sm:px-2 py-0.5 sm:py-1 text-[11px] font-medium border border-gray-300 text-center">
+                            <td className="px-0.5 sm:px-1 py-0.5 sm:py-1 text-[11px] font-medium border border-gray-300 text-center">
                               {testIndex === 0 && (
-                                <span className="font-semibold text-gray-900">{patient.gender || '-'}</span>
+                                <span className="font-semibold text-gray-900">
+                                  {patient.gender ? (patient.gender === 'Male' ? 'M' : patient.gender === 'Female' ? 'F' : patient.gender) : '-'}
+                                </span>
                               )}
                             </td>
 
                             {/* Column 7: Services (with icons) */}
-                            <td className="px-2 sm:px-3 py-0.5 sm:py-1 text-[11px] border border-gray-300 min-w-[200px]" title={test.test_name}>
+                            <td className="px-2 sm:px-4 py-0.5 sm:py-1 text-[11px] border border-gray-300 min-w-[280px]" title={test.test_name}>
                               <div className="flex items-center gap-1">
                                 <span 
                                   className="flex-1 cursor-pointer hover:text-cyan-700 hover:font-semibold transition-colors"
@@ -2582,17 +2687,11 @@ export default function Result() {
 
                             {/* Column 11: Referral Doc */}
                             <td className="px-1 sm:px-2 py-0.5 sm:py-1 text-[11px] border border-gray-300">
-                              <span className="inline-flex items-center gap-1">
+                              <span>
                                 {test.ref_by === "SELF" ? (
-                                  <>
-                                    <span className="text-orange-600 text-[10px]">👤</span>
-                                    <span>{test.ref_by}</span>
-                                  </>
+                                  <span>{test.ref_by}</span>
                                 ) : (
-                                  <>
-                                    <span className="text-blue-600 text-[10px]">👨‍⚕️</span>
-                                    <span>{test.ref_by}</span>
-                                  </>
+                                  <span>{test.ref_by}</span>
                                 )}
                               </span>
                             </td>
@@ -2606,7 +2705,7 @@ export default function Result() {
                                   className="text-cyan-600 hover:text-cyan-800 hover:underline font-medium text-xs disabled:opacity-50"
                                   title="View previous test result"
                                 >
-                                  {previousResultLoading ? '...' : '📋 View'}
+                                  {previousResultLoading ? '...' : 'View'}
                                 </button>
                               </div>
                             </td>
@@ -2620,7 +2719,7 @@ export default function Result() {
                                   className="text-cyan-600 hover:text-cyan-800 hover:underline font-medium text-xs disabled:opacity-50"
                                   title="View all test results"
                                 >
-                                  {allResultsLoading ? '...' : '📊 View'}
+                                  {allResultsLoading ? '...' : 'View'}
                                 </button>
                               </div>
                             </td>
@@ -2688,31 +2787,7 @@ export default function Result() {
                                 />
                               </div>
                             </td>
-
-                            {/* Column 15: Patient History (display patient_history text only, show only on first test row) */}
-                            <td className="px-1 sm:px-2 py-0.5 sm:py-1 text-[11px] border border-gray-300 relative">
-                              {testIndex === 0 && (
-                                <div className="relative group cursor-help">
-                                  {patient.patient_history ? (
-                                    <>
-                                      <span className="truncate block max-w-xs" title={patient.patient_history}>
-                                        {patient.patient_history}
-                                      </span>
-                                      {/* Tooltip on hover */}
-                                      <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 hidden group-hover:flex flex-col items-center z-50 pointer-events-none">
-                                        <span className="bg-gray-800 text-white text-[10px] font-semibold rounded px-2 py-1 whitespace-normal max-w-xs shadow-lg">
-                                          {patient.patient_history}
-                                        </span>
-                                        <span className="w-2 h-2 bg-gray-800 rotate-45 -mt-1" />
-                                      </span>
-                                    </>
-                                  ) : (
-                                    <span className="text-gray-400 italic">—</span>
-                                  )}
-                                </div>
-                              )}
-                            </td>
-
+                            
                             {/* Column 16: Barcode checkbox */}
                             <td className="px-0.5 sm:px-1 py-0.5 sm:py-1 text-center border border-gray-300">
                               <input
@@ -2722,6 +2797,24 @@ export default function Result() {
                                 disabled={isBarcodeCheckboxDisabled(patient)}
                                 onChange={(e) => handleBarcodeSelection(test.test_id, e.target.checked, patient)}
                               />
+                            </td>
+
+                            {/* Column 17: Patient History (Always visible with truncated text) */}
+                            <td className="px-1 sm:px-2 py-0.5 sm:py-1 text-[11px] border border-gray-300 relative group">
+                              {testIndex === 0 && patient.patient_history && (
+                                <>
+                                  <div className="text-xs text-gray-700 line-clamp-2 cursor-help">
+                                    {patient.patient_history}
+                                  </div>
+                                  {/* Tooltip on hover - shows full text */}
+                                  <div className="absolute left-0 top-full mt-1 hidden group-hover:block z-50 bg-gray-800 text-white text-xs rounded px-2 py-1 whitespace-normal max-w-xs shadow-lg">
+                                    {patient.patient_history}
+                                  </div>
+                                </>
+                              )}
+                              {(testIndex !== 0 || !patient.patient_history) && (
+                                <span className="text-gray-400">-</span>
+                              )}
                             </td>
                           </tr>
                         ));
@@ -3138,7 +3231,7 @@ export default function Result() {
                   onClick={handlePrint}
                   className="bg-blue-600 text-white px-4 py-1.5 rounded text-sm hover:bg-blue-700"
                 >
-                  Print
+                  🖨️ Print
                 </button>
                 <button
                   onClick={() => setShowReportModal(false)}
@@ -3155,21 +3248,41 @@ export default function Result() {
               {/* Print styles */}
               <style>{`
                 @media print {
-                  body * { visibility: hidden !important; }
-                  .report-page, .report-page * { visibility: visible !important; }
+                  * { visibility: hidden; }
+                  .report-page,
+                  .report-page * {
+                    visibility: visible !important;
+                  }
+                  body {
+                    margin: 0;
+                    padding: 0;
+                    background: white;
+                  }
                   .report-page {
-                    position: relative !important;
-                    width: 100% !important;
+                    position: absolute !important;
+                    left: 0;
+                    top: 0;
+                    width: 100%;
                     margin: 0 !important;
-                    padding: 20px !important;
+                    padding: 0 !important;
                     box-shadow: none !important;
                     page-break-after: always;
+                    page-break-inside: avoid;
                     overflow: visible !important;
                     background: white !important;
+                    border-radius: 0 !important;
                   }
-                  .report-page:last-child { page-break-after: avoid; }
-                  .no-print { display: none !important; }
-                  @page { size: A4; margin: 10mm; }
+                  .report-page:last-child {
+                    page-break-after: avoid;
+                  }
+                  .no-print {
+                    display: none !important;
+                    visibility: hidden !important;
+                  }
+                  @page {
+                    size: A4;
+                    margin: 0;
+                  }
                 }
               `}</style>
 
@@ -3527,6 +3640,231 @@ export default function Result() {
           parameters={authenticateData.parameters}
           groupedParameters={authenticateData.groupedParameters}
         />
+      )}
+
+      {/* Test Selection Modal - for No Page Break option */}
+      {showTestSelectionModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-lg w-full p-6">
+            <h2 className="text-lg font-bold text-gray-800 mb-2">Select Tests for Continuous Print</h2>
+            <p className="text-sm text-gray-600 mb-4">Choose which tests to include and their order. Tests will print continuously on the same page with line separators.</p>
+            
+            <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 mb-4 max-h-[400px] overflow-y-auto">
+              {testSelectionData.map((test, idx) => (
+                <div key={test.testId} className="flex items-center gap-3 p-2 mb-2 bg-white rounded border border-gray-200 hover:bg-blue-50">
+                  <input
+                    type="checkbox"
+                    id={`test-${test.testId}`}
+                    checked={test.selected}
+                    onChange={(e) => {
+                      const updated = [...testSelectionData];
+                      updated[idx].selected = e.target.checked;
+                      setTestSelectionData(updated);
+                    }}
+                    className="accent-cyan-600 cursor-pointer"
+                  />
+                  <label htmlFor={`test-${test.testId}`} className="flex-1 cursor-pointer">
+                    <div className="font-semibold text-gray-800">{test.testName}</div>
+                    {test.shortName && <div className="text-xs text-gray-600">{test.shortName}</div>}
+                  </label>
+                  <div className="flex gap-1">
+                    <button
+                      onClick={() => {
+                        if (idx > 0) {
+                          const updated = [...testSelectionData];
+                          [updated[idx], updated[idx - 1]] = [updated[idx - 1], updated[idx]];
+                          updated[idx].order = idx;
+                          updated[idx - 1].order = idx - 1;
+                          setTestSelectionData(updated);
+                        }
+                      }}
+                      disabled={idx === 0}
+                      className="px-2 py-1 bg-gray-200 hover:bg-gray-300 disabled:bg-gray-100 text-gray-700 rounded text-xs font-semibold transition-colors"
+                      title="Move up"
+                    >
+                      ↑
+                    </button>
+                    <button
+                      onClick={() => {
+                        if (idx < testSelectionData.length - 1) {
+                          const updated = [...testSelectionData];
+                          [updated[idx], updated[idx + 1]] = [updated[idx + 1], updated[idx]];
+                          updated[idx].order = idx;
+                          updated[idx + 1].order = idx + 1;
+                          setTestSelectionData(updated);
+                        }
+                      }}
+                      disabled={idx === testSelectionData.length - 1}
+                      className="px-2 py-1 bg-gray-200 hover:bg-gray-300 disabled:bg-gray-100 text-gray-700 rounded text-xs font-semibold transition-colors"
+                      title="Move down"
+                    >
+                      ↓
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => {
+                  setShowTestSelectionModal(false);
+                  setTestSelectionData([]);
+                  setTestSelectionOrder([]);
+                }}
+                className="flex-1 px-4 py-2 bg-gray-300 hover:bg-gray-400 text-gray-800 font-semibold rounded-lg transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={async () => {
+                  const selectedTests = testSelectionData.filter(t => t.selected);
+                  if (selectedTests.length === 0) {
+                    alert('Please select at least one test');
+                    return;
+                  }
+                  
+                  try {
+                    setLoading(true);
+                    // Fetch only selected tests in the new order
+                    const responses = await Promise.all(
+                      selectedTests.map(t => getPatientTestById(t.testId))
+                    );
+                    const first = responses[0];
+
+                    // Fetch signature
+                    let signature = first.patientTest.test?.signature || null;
+                    if (!signature) {
+                      try {
+                        const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || '/api';
+                        const testSpeciality = first.patientTest.test?.speciality || 'Regular';
+                        const sigRes = await fetch(`${API_BASE_URL}/signatures/by-specialty/${encodeURIComponent(testSpeciality)}`);
+                        const sigData = await sigRes.json();
+                        if (sigData.success && sigData.data) signature = sigData.data;
+                        else {
+                          const allRes = await fetch(`${API_BASE_URL}/signatures`);
+                          const allData = await allRes.json();
+                          if (allData.success && allData.data.length > 0) {
+                            const active = allData.data.filter(s => s.isActive);
+                            if (active.length > 0) signature = active[0];
+                          }
+                        }
+                      } catch (e) { console.warn('Could not fetch signature', e); }
+                    }
+
+                    // Convert LetterHead to base64
+                    let letterHeadBase64 = '';
+                    try {
+                      const imgRes = await fetch(LetterHead);
+                      const blob = await imgRes.blob();
+                      letterHeadBase64 = await new Promise<string>(resolve => {
+                        const reader = new FileReader();
+                        reader.onloadend = () => resolve(reader.result as string);
+                        reader.readAsDataURL(blob);
+                      });
+                    } catch (e) { console.warn('Could not load letterhead', e); }
+
+                    // Build combined tests array in selected order
+                    const combinedTests = responses.map(r => ({
+                      name: r.patientTest.test.name,
+                      interpretation: r.patientTest.test.interpretation,
+                      groupedParameters: r.groupedParameters,
+                      parameters: r.parameters
+                    }));
+
+                    // Set report data and open modal
+                    setReportData({
+                      patient: first.patientTest.patient,
+                      visitId: first.patientTest.visitId,
+                      visitDate: first.patientTest.visitDate,
+                      test: first.patientTest.test,
+                      parameters: first.parameters,
+                      groupedParameters: first.groupedParameters,
+                      combinedTests,
+                      signature,
+                      letterHeadBase64,
+                      printOption: 'nobreak'
+                    });
+                    setReportWithHeader(true);
+                    setShowReportModal(true);
+                    setShowTestSelectionModal(false);
+                    setTestSelectionData([]);
+                    setTestSelectionOrder([]);
+                  } catch (err) {
+                    console.error('Error loading report:', err);
+                    alert('Error: ' + err.message);
+                  } finally {
+                    setLoading(false);
+                  }
+                }}
+                disabled={loading || testSelectionData.filter(t => t.selected).length === 0}
+                className="flex-1 px-4 py-2 bg-cyan-600 hover:bg-cyan-700 text-white font-semibold rounded-lg transition-colors disabled:opacity-50"
+              >
+                {loading ? 'Loading...' : 'Print Continuous'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Print Options Modal - Page Break vs No Page Break */}
+      {showPrintOptionsModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
+            <h2 className="text-lg font-bold text-gray-800 mb-4">Print Options</h2>
+            <p className="text-sm text-gray-600 mb-6">You have selected multiple tests. How would you like to print them?</p>
+            
+            <div className="space-y-3 mb-6">
+              {/* Option 1: Page Break */}
+              <label className="flex items-start gap-3 p-3 border-2 border-cyan-200 rounded-lg cursor-pointer hover:bg-cyan-50 transition-colors" onClick={() => setPrintOption('pagebreak')}>
+                <input
+                  type="radio"
+                  name="printOption"
+                  value="pagebreak"
+                  checked={printOption === 'pagebreak'}
+                  onChange={() => setPrintOption('pagebreak')}
+                  className="mt-1 accent-cyan-600"
+                />
+                <div className="flex-1">
+                  <div className="font-semibold text-gray-800">Each report on separate page</div>
+                  <div className="text-xs text-gray-600 mt-1">Each test report will start on a new page with proper headers and formatting</div>
+                </div>
+              </label>
+
+              {/* Option 2: No Page Break */}
+              <label className="flex items-start gap-3 p-3 border-2 border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors" onClick={() => setPrintOption('nobreak')}>
+                <input
+                  type="radio"
+                  name="printOption"
+                  value="nobreak"
+                  checked={printOption === 'nobreak'}
+                  onChange={() => setPrintOption('nobreak')}
+                  className="mt-1 accent-cyan-600"
+                />
+                <div className="flex-1">
+                  <div className="font-semibold text-gray-800">Continuous on same page</div>
+                  <div className="text-xs text-gray-600 mt-1">All test reports will be continuous with line separators between them (no page breaks)</div>
+                </div>
+              </label>
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowPrintOptionsModal(false)}
+                className="flex-1 px-4 py-2 bg-gray-300 hover:bg-gray-400 text-gray-800 font-semibold rounded-lg transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => proceedWithPrint(printOption)}
+                disabled={loading}
+                className="flex-1 px-4 py-2 bg-cyan-600 hover:bg-cyan-700 text-white font-semibold rounded-lg transition-colors disabled:opacity-50"
+              >
+                {loading ? 'Loading...' : 'Print'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </>
   );

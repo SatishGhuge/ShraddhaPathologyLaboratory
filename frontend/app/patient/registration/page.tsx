@@ -512,7 +512,7 @@ export default function PatientRegistration() {
               id: test.id,
               name: test.name,
               departmentId: test.departmentId, // Add departmentId
-              sample: test.sampleType || "N/A",
+              sample: test.sample_type?.Sample_Type || "N/A",
               b2cCharge: test.charges?.[0]?.b2cCharge || 0,
               b2bCharge: test.charges?.[0]?.b2bCharge || 0,
               department: deptMap[test.departmentId].name
