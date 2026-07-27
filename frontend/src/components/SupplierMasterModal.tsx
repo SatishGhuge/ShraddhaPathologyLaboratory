@@ -33,6 +33,7 @@ export default function SupplierMasterModal({
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [successMsg, setSuccessMsg] = useState("");
+  const [allSuppliers, setAllSuppliers] = useState<any[]>([]);
 
   const STATES = [
     "Andhra Pradesh",
@@ -68,6 +69,17 @@ export default function SupplierMasterModal({
   // Initialize form when modal opens or editing supplier changes
   useEffect(() => {
     if (isOpen) {
+      // Fetch all suppliers for uniqueness checking
+      const fetchSuppliers = async () => {
+        try {
+          const response = await inventoryAPI.suppliers.getAll(1, 1000);
+          setAllSuppliers(response.data?.data || []);
+        } catch (error) {
+          console.error('Failed to fetch suppliers:', error);
+        }
+      };
+      fetchSuppliers();
+
       if (editingSupplier) {
         setEditingId(editingSupplier.id);
         setForm({
@@ -128,6 +140,30 @@ export default function SupplierMasterModal({
       newErrors.pincode = "Pincode must be 6 digits";
     }
 
+    // Check for duplicate GST number
+    if (form.gstNumber) {
+      const duplicateGst = allSuppliers.find(
+        (supplier) => 
+          supplier.gstNumber === form.gstNumber && 
+          supplier.id !== editingId
+      );
+      if (duplicateGst) {
+        newErrors.gstNumber = "GST Number already exists. Please use a unique GST Number.";
+      }
+    }
+
+    // Check for duplicate phone number
+    if (form.phoneNumber) {
+      const duplicatePhone = allSuppliers.find(
+        (supplier) => 
+          supplier.phone === form.phoneNumber && 
+          supplier.id !== editingId
+      );
+      if (duplicatePhone) {
+        newErrors.phoneNumber = "Phone number already exists. Please use a unique phone number.";
+      }
+    }
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -182,7 +218,9 @@ export default function SupplierMasterModal({
       setTimeout(closeModal, 1500);
     } catch (error: any) {
       console.error("Error saving supplier:", error);
-      setErrors({ submit: error.message || "Failed to save supplier" });
+      // Extract error message from backend response
+      const errorMessage = error.response?.data?.message || error.message || "Failed to save supplier";
+      setErrors({ submit: errorMessage });
     } finally {
       setLoading(false);
     }

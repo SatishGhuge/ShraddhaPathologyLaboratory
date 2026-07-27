@@ -367,6 +367,7 @@ export const createSupplier = async (req, res) => {
       });
     }
 
+    // Check for duplicate supplier name
     const existingSupplier = await prisma.supplier.findUnique({
       where: { supplierName }
     });
@@ -374,8 +375,34 @@ export const createSupplier = async (req, res) => {
     if (existingSupplier) {
       return res.status(400).json({
         success: false,
-        message: 'Supplier already exists'
+        message: 'Supplier with this name already exists'
       });
+    }
+
+    // Check for duplicate GST number if provided
+    if (gstNumber) {
+      const gstExists = await prisma.supplier.findUnique({
+        where: { gstNumber }
+      });
+      if (gstExists) {
+        return res.status(400).json({
+          success: false,
+          message: 'GST Number already exists. Please use a unique GST Number.'
+        });
+      }
+    }
+
+    // Check for duplicate phone if provided
+    if (phone) {
+      const phoneExists = await prisma.supplier.findUnique({
+        where: { phone }
+      });
+      if (phoneExists) {
+        return res.status(400).json({
+          success: false,
+          message: 'Phone number already exists. Please use a unique phone number.'
+        });
+      }
     }
 
     const newSupplier = await prisma.supplier.create({
@@ -389,6 +416,30 @@ export const createSupplier = async (req, res) => {
     });
   } catch (error) {
     console.error('Create supplier error:', error);
+    
+    // Handle Prisma unique constraint errors
+    if (error.code === 'P2002') {
+      const field = error.meta?.target?.[0];
+      if (field === 'gstNumber') {
+        return res.status(400).json({
+          success: false,
+          message: 'GST Number already exists. Please use a unique GST Number.'
+        });
+      }
+      if (field === 'phone') {
+        return res.status(400).json({
+          success: false,
+          message: 'Phone number already exists. Please use a unique phone number.'
+        });
+      }
+      if (field === 'supplierName') {
+        return res.status(400).json({
+          success: false,
+          message: 'Supplier with this name already exists.'
+        });
+      }
+    }
+    
     res.status(500).json({
       success: false,
       message: 'Failed to create supplier'
@@ -454,6 +505,44 @@ export const updateSupplier = async (req, res) => {
     const { id } = req.params;
     const { email, phone, address, city, state, pinCode, gstNumber, isActive } = req.body;
 
+    // Get the current supplier to compare
+    const currentSupplier = await prisma.supplier.findUnique({
+      where: { id: parseInt(id) }
+    });
+
+    if (!currentSupplier) {
+      return res.status(404).json({
+        success: false,
+        message: 'Supplier not found'
+      });
+    }
+
+    // Check for duplicate GST number if it's being changed
+    if (gstNumber && gstNumber !== currentSupplier.gstNumber) {
+      const gstExists = await prisma.supplier.findUnique({
+        where: { gstNumber }
+      });
+      if (gstExists) {
+        return res.status(400).json({
+          success: false,
+          message: 'GST Number already exists. Please use a unique GST Number.'
+        });
+      }
+    }
+
+    // Check for duplicate phone if it's being changed
+    if (phone && phone !== currentSupplier.phone) {
+      const phoneExists = await prisma.supplier.findUnique({
+        where: { phone }
+      });
+      if (phoneExists) {
+        return res.status(400).json({
+          success: false,
+          message: 'Phone number already exists. Please use a unique phone number.'
+        });
+      }
+    }
+
     const supplier = await prisma.supplier.update({
       where: { id: parseInt(id) },
       data: { email, phone, address, city, state, pinCode, gstNumber, isActive }
@@ -466,6 +555,24 @@ export const updateSupplier = async (req, res) => {
     });
   } catch (error) {
     console.error('Update supplier error:', error);
+    
+    // Handle Prisma unique constraint errors
+    if (error.code === 'P2002') {
+      const field = error.meta?.target?.[0];
+      if (field === 'gstNumber') {
+        return res.status(400).json({
+          success: false,
+          message: 'GST Number already exists. Please use a unique GST Number.'
+        });
+      }
+      if (field === 'phone') {
+        return res.status(400).json({
+          success: false,
+          message: 'Phone number already exists. Please use a unique phone number.'
+        });
+      }
+    }
+    
     res.status(500).json({
       success: false,
       message: 'Failed to update supplier'

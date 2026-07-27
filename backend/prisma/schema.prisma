@@ -774,12 +774,12 @@ model Supplier {
   id           Int      @id @default(autoincrement())
   supplierName String   @unique
   email        String?
-  phone        String?
+  phone        String?   @unique
   address      String?  @db.Text
   city         String?
   state        String?
   pinCode      String?
-  gstNumber    String?
+  gstNumber    String?   @unique
   isActive     Boolean  @default(true)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
