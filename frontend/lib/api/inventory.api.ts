@@ -126,6 +126,22 @@ export const stockEntryAPI = {
   getById: (id: number) =>
     api.get(`/stock-entries/${id}`),
 
+  update: (id: number, data: {
+    supplierId: number;
+    invoiceNo: string;
+    invoiceDate: string | Date;
+    items: Array<{
+      itemId: number;
+      batchNo: string;
+      expiryDate: string | Date;
+      quantity: number;
+      pricePerUnit: number;
+      cgstPercent: number;
+      sgstPercent: number;
+    }>;
+    remarks?: string;
+  }) => api.put(`/stock-entries/${id}`, data),
+
   delete: (id: number) =>
     api.delete(`/stock-entries/${id}`),
 };

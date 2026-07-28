@@ -983,6 +983,158 @@ export const deleteStockEntry = async (req, res) => {
   }
 };
 
+// Update Stock Entry
+export const updateStockEntry = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { supplierId, invoiceNo, invoiceDate, items, remarks } = req.body;
+
+    if (!supplierId || !invoiceNo || !items || items.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Supplier ID, invoice number, and at least one item are required'
+      });
+    }
+
+    // Check if stock entry exists
+    const stockEntry = await prisma.stockEntry.findUnique({
+      where: { id: parseInt(id) },
+      include: { items: true }
+    });
+
+    if (!stockEntry) {
+      return res.status(404).json({
+        success: false,
+        message: 'Stock entry not found'
+      });
+    }
+
+    // Fetch supplier to check state for IGST determination
+    const supplier = await prisma.supplier.findUnique({
+      where: { id: parseInt(supplierId) }
+    });
+
+    if (!supplier) {
+      return res.status(404).json({
+        success: false,
+        message: 'Supplier not found'
+      });
+    }
+
+    // Determine if supplier is from outside Maharashtra for IGST calculation
+    const isOutOfMaharashtra = supplier.state && 
+      supplier.state.toLowerCase().trim() !== 'maharashtra';
+
+    let totalBasicAmount = 0;
+    let totalCGST = 0;
+    let totalSGST = 0;
+    let totalIGST = 0;
+    let calculatedIGSTPercent = 0;
+
+    // Process items with automatic IGST/CGST+SGST calculation
+    const itemsData = await Promise.all(items.map(async (item) => {
+      const basicAmount = item.quantity * item.pricePerUnit;
+      
+      let cgstAmount = 0;
+      let sgstAmount = 0;
+      let igstAmount = 0;
+      let finalIGSTPercent = 0;
+
+      if (isOutOfMaharashtra) {
+        // For out-of-state suppliers: Use IGST only
+        const inventoryItem = await prisma.inventoryItem.findUnique({
+          where: { id: parseInt(item.itemId) },
+          include: { hsnCode: true }
+        });
+
+        if (inventoryItem && inventoryItem.hsnCode) {
+          finalIGSTPercent = inventoryItem.hsnCode.gstRate;
+          igstAmount = (basicAmount * finalIGSTPercent) / 100;
+          calculatedIGSTPercent = finalIGSTPercent;
+        } else {
+          igstAmount = 0;
+        }
+      } else {
+        // For Maharashtra suppliers: Use CGST + SGST
+        cgstAmount = (basicAmount * item.cgstPercent) / 100;
+        sgstAmount = (basicAmount * item.sgstPercent) / 100;
+        igstAmount = 0;
+      }
+
+      const totalAmount = basicAmount + cgstAmount + sgstAmount + igstAmount;
+
+      totalBasicAmount += basicAmount;
+      totalCGST += cgstAmount;
+      totalSGST += sgstAmount;
+      totalIGST += igstAmount;
+
+      return {
+        ...item,
+        basicAmount,
+        cgstAmount,
+        sgstAmount,
+        igstAmount,
+        totalAmount,
+        finalIGSTPercent
+      };
+    }));
+
+    const grandTotal = totalBasicAmount + totalCGST + totalSGST + totalIGST;
+
+    // Delete old items
+    await prisma.stockEntryItem.deleteMany({
+      where: { stockEntryId: parseInt(id) }
+    });
+
+    // Update stock entry
+    const updatedEntry = await prisma.stockEntry.update({
+      where: { id: parseInt(id) },
+      data: {
+        supplierId: parseInt(supplierId),
+        invoiceNo,
+        invoiceDate: new Date(invoiceDate),
+        totalBasicAmount,
+        totalCGST,
+        totalSGST,
+        totalIGST,
+        grandTotal,
+        remarks,
+        updatedAt: new Date(),
+        items: {
+          create: itemsData.map(item => ({
+            itemId: parseInt(item.itemId),
+            batchNo: item.batchNo,
+            expiryDate: new Date(item.expiryDate),
+            quantity: parseInt(item.quantity),
+            pricePerUnit: parseFloat(item.pricePerUnit),
+            basicAmount: item.basicAmount,
+            cgstPercent: item.cgstPercent,
+            cgstAmount: item.cgstAmount,
+            sgstPercent: item.sgstPercent,
+            sgstAmount: item.sgstAmount,
+            igstPercent: item.finalIGSTPercent,
+            igstAmount: item.igstAmount,
+            totalAmount: item.totalAmount
+          }))
+        }
+      },
+      include: { items: true }
+    });
+
+    res.json({
+      success: true,
+      message: 'Stock entry updated successfully',
+      data: updatedEntry
+    });
+  } catch (error) {
+    console.error('Update stock entry error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to update stock entry: ' + error.message
+    });
+  }
+};
+
 // ========== LAB STOCK MANAGEMENT ==========
 
 export const getLabStocks = async (req, res) => {

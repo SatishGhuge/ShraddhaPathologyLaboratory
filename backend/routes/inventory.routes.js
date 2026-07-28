@@ -24,6 +24,7 @@ import {
   createStockEntry,
   getAllStockEntries,
   getStockEntryById,
+  updateStockEntry,
   deleteStockEntry,
   // Lab Stock
   getLabStocks,
@@ -95,6 +96,12 @@ router.post('/stock-entries', authMiddleware, [
 
 router.get('/stock-entries', authMiddleware, getAllStockEntries);
 router.get('/stock-entries/:id', authMiddleware, getStockEntryById);
+router.put('/stock-entries/:id', authMiddleware, [
+  body('supplierId').isInt().withMessage('Valid supplier ID is required'),
+  body('invoiceNo').trim().notEmpty().withMessage('Invoice number is required'),
+  body('invoiceDate').isISO8601().withMessage('Valid invoice date is required'),
+  body('items').isArray({ min: 1 }).withMessage('At least one item is required')
+], updateStockEntry);
 router.delete('/stock-entries/:id', authMiddleware, deleteStockEntry);
 
 // ========== LAB STOCK ROUTES ==========
