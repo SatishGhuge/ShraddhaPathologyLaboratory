@@ -12,6 +12,7 @@ import resultRoutes from './routes/result.routes.js';
 import signatureRoutes from './routes/signature.routes.js';
 import doctorRevenueRoutes from './routes/doctor-revenue.routes.js';
 import machineRoutes from './routes/machine.routes.js';
+import machineConfigRoutes from './routes/machine-config.routes.js';
 import { emailService } from './services/notification.service.js';
 
 // Load environment variables
@@ -47,6 +48,7 @@ app.use('/api/patients', patientRoutes);
 app.use('/api/master', masterRoutes);
 app.use('/api/results', resultRoutes);
 app.use('/api/signatures', signatureRoutes);
+app.use('/api/machines', machineConfigRoutes);
 app.use('/api/doctor-revenue', doctorRevenueRoutes);
 app.use('/api/machine/v1', machineRoutes);
 
@@ -60,7 +62,7 @@ app.get('/api/health', (req, res) => {
 });
 
 // Error handling middleware
-app.use((err, req, res, next) => {
+app.use((err, req, res) => {
   console.error(err.stack);
   res.status(err.status || 500).json({
     success: false,

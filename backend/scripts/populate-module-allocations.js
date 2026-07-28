@@ -32,6 +32,7 @@ const defaultModuleAllocation = {
   },
   configuration: {
     signature: false,
+    machines: false,
   },
   help: {
     userManual: false,

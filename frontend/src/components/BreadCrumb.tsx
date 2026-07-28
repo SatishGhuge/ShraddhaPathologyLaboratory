@@ -16,6 +16,7 @@ const iconMap = {
   "Outsourcing for Test": Send,
   "Configuration": Settings,
   "Signature": FileSignature,
+  "Machines": Database,
   "Tests": Database,
   "Result": ClipboardCheck,
   "Dashboard": BarChart3,
@@ -81,6 +82,7 @@ const urlPathMap: { [key: string]: string } = {
   
   // Configuration Module
   "config/signature": "Configuration / Signature",
+  "config/machines": "Configuration / Machines",
   
   // Inventory Module
   "inventory/stock-transactions": "Inventory / Stock Transactions",

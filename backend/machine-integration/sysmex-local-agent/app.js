@@ -70,10 +70,6 @@ const ASTMFrame = {
     return Buffer.from(frame, 'utf8');
   },
 
-  /**
-   * Build ASTM Order (O) record
-   * Format: O|seq|visitId|patientId|patientName||priority|||||testCodes
-   */
   order(data) {
     const {
       visitId = '',
@@ -85,7 +81,6 @@ const ASTMFrame = {
     } = data;
 
     const record = `O|${sequenceNumber}|${visitId}|${patientId}|${patientName}||${priority}|||||${testCodes}`;
-    console.log(`[ASTM] Order: ${record}`);
     return this.build(record);
   },
 
@@ -178,7 +173,6 @@ const Database = {
         VALUES (?, ?, ?, 'PENDING')
       `;
       const [result] = await dbPool.execute(query, [sampleId, rawAstm, JSON.stringify(parsedData)]);
-      console.log(`[DB] Saved result for ${visitId}/${sampleId} (ID: ${result.insertId})`);
       return result.insertId;
     } catch (err) {
       console.error(`[DB ERROR] ${err.message}`);
@@ -192,7 +186,6 @@ const Database = {
         `UPDATE pending_results SET status = 'SYNCED', synced_at = NOW() WHERE id = ?`,
         [recordId]
       );
-      console.log(`[DB] Record ${recordId} synced`);
     } catch (err) {
       console.error(`[DB ERROR] ${err.message}`);
     }
@@ -204,7 +197,6 @@ const Database = {
         `UPDATE pending_results SET status = 'OFFLINE_QUEUED' WHERE id = ?`,
         [recordId]
       );
-      console.log(`[DB] Record ${recordId} queued for retry`);
     } catch (err) {
       console.error(`[DB ERROR] ${err.message}`);
     }
@@ -321,9 +313,7 @@ const ResultSync = {
     try {
       await CloudAPI.sendResult(payload);
       await Database.markSynced(recordId);
-      console.log(`[SYNC] Record ${recordId} synced`);
     } catch (err) {
-      console.warn(`[SYNC] Record ${recordId} queued (offline)`);
       await Database.markOfflineQueued(recordId);
     }
   },
@@ -332,7 +322,6 @@ const ResultSync = {
     const records = await Database.getPendingOffline();
     if (records.length === 0) return;
 
-    console.log(`[SYNC] Retrying ${records.length} offline records...`);
     for (const record of records) {
       const payload = typeof record.data_json === 'string' 
         ? JSON.parse(record.data_json) 
@@ -361,23 +350,17 @@ const QueryHandler = {
         return;
       }
 
-      console.log(`[QUERY] analyzer=${analyzer}, visitId=${visitId}, sampleId=${sampleId}`);
-
-      // Pass analyzer to query endpoint
       const orderData = await CloudAPI.fetchOrder(visitId, sampleId, analyzer);
 
-      // Validate response structure
       if (!orderData.patientTests || !Array.isArray(orderData.patientTests)) {
         throw new Error('Backend response missing patientTests array');
       }
 
       if (orderData.patientTests.length === 0) {
-        console.warn(`[QUERY] No tests found for ${analyzer}/${visitId}/${sampleId}`);
         socket.write(Buffer.from([ASTM.NAK]));
         return;
       }
 
-      // Extract test codes from response
       const testCodes = orderData.patientTests
         .map(t => t.testCode)
         .filter(code => code)
@@ -404,10 +387,8 @@ const QueryHandler = {
       socket.write(terminator);
       socket.write(Buffer.from([ASTM.ACK]));
 
-      console.log(`[QUERY] SUCCESS: Sent ${orderData.patientTests.length} test(s): ${testCodes}`);
-
     } catch (err) {
-      console.error(`[QUERY ERROR] Failed to process query for ${analyzer}/${visitId}/${sampleId}: ${err.message}`);
+      console.error(`[QUERY ERROR] Failed to process query: ${err.message}`);
       socket.write(Buffer.from([ASTM.NAK]));
     }
   }
@@ -425,37 +406,22 @@ const ResultHandler = {
         return;
       }
 
-      console.log(`[RESULT] Processing ${visitId}/${sampleId}`);
-
-      // Save to local database first (for offline support)
       const recordId = await Database.saveResult(visitId, sampleId, rawAstm, parsedData);
-
-      // Build correct payload structure for backend API
       const payload = this.buildPayload(visitId, sampleId, parsedData);
-
-      // Try to sync immediately
       await ResultSync.sync(recordId, payload);
     } catch (err) {
       console.error(`[RESULT ERROR] ${err.message}`);
     }
   },
 
-  /**
-   * Build payload in format expected by /api/machine/v1/results
-   * Converts parsed ASTM data to backend API format
-   */
   buildPayload(visitId, sampleId, parsedData) {
     const results = [];
-
-    // Group parameters by test code
-    // parsedData.parameters = { "CBC_WBC": "7.5", "CBC_RBC": "4.8", "DIFF_NE": "60" }
     const testMap = {};
 
     for (const [key, value] of Object.entries(parsedData.parameters || {})) {
       const [testCode, paramCode] = key.split('_');
       
       if (!testCode || !paramCode) {
-        console.warn(`[RESULT] Skipping malformed parameter key: ${key}`);
         continue;
       }
 
@@ -469,7 +435,6 @@ const ResultHandler = {
       testMap[testCode].parameters[paramCode] = value;
     }
 
-    // Convert to array format (backend will look up patientTestId)
     for (const [testCode, data] of Object.entries(testMap)) {
       results.push({
         testCode: data.testCode,
@@ -477,19 +442,12 @@ const ResultHandler = {
       });
     }
 
-    if (results.length === 0) {
-      console.warn(`[RESULT] No valid parameters extracted from ASTM data`);
-    }
-
-    const payload = {
+    return {
       visitId: visitId,
       sampleId: sampleId,
       results: results,
       timestamp: new Date().toISOString()
     };
-
-    console.log(`[RESULT] Built payload: ${results.length} test(s) with parameters`);
-    return payload;
   }
 };
 
@@ -503,19 +461,15 @@ function createTcpServer() {
     let buffer = '';
 
     socket.on('data', async data => {
-      // Handshake
       if (data.length === 1 && data[0] === ASTM.ENQ) {
         socket.write(Buffer.from([ASTM.ACK]));
-        console.log(`[TCP] Handshake`);
         return;
       }
 
       buffer += data.toString('utf8');
       socket.write(Buffer.from([ASTM.ACK]));
 
-      // Check transmission end
       if (data.includes('L|1|N') || data.includes('\x04')) {
-        console.log('[TCP] Transmission complete');
         const parsed = ASTMParser.parse(buffer);
 
         if (parsed.frameType === 'QUERY') {

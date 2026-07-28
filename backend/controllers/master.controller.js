@@ -651,6 +651,7 @@ export const createTest = async (req, res) => {
       testCode,
       departmentId,
       sampleTypeId,
+      machineId,
       machineName,
       group,
       reportHeader,
@@ -711,6 +712,7 @@ export const createTest = async (req, res) => {
         testCode,
         departmentId: parseInt(departmentId),
         sampleTypeId: sampleTypeId ? parseInt(sampleTypeId) : null,
+        machineId: machineId ? parseInt(machineId) : null,
         machineName,
         group,
         reportHeader,
@@ -864,6 +866,7 @@ export const updateTest = async (req, res) => {
       testCode,
       departmentId,
       sampleTypeId,
+      machineId,
       machineName,
       group,
       reportHeader,
@@ -921,6 +924,7 @@ export const updateTest = async (req, res) => {
     if (shortName !== undefined) updateData.shortName = shortName || undefined;
     if (testCode !== undefined) updateData.testCode = testCode || null;
     if (departmentId !== undefined) updateData.department = departmentId ? { connect: { id: parseInt(departmentId) } } : undefined;
+    if (machineId !== undefined) updateData.machine = machineId ? { connect: { id: parseInt(machineId) } } : { disconnect: true };
     // ⚠️ NOTE: sampleTypeId handled separately via raw SQL due to Prisma client cache issue
     // if (sampleTypeId !== undefined) updateData.sampleTypeId = sampleTypeId ? parseInt(sampleTypeId) : null;
     if (machineName !== undefined) updateData.machineName = machineName || null;

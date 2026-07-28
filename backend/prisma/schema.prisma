@@ -310,7 +310,7 @@ model Test {
   testCategory           TestCategory?       @relation("PrimaryTestCategory", fields: [testCategoryId], references: [id])
   testParameter          TestParameter?      @relation("PrimaryTestParameter", fields: [testParameterId], references: [id])
   sample_type            sample_type?        @relation(fields: [sampleTypeId], references: [id])
-  machine                Machine?            @relation(fields: [machineId], references: [id], onDelete: SetNull)
+  machine                Machine?            @relation("MachineTests", fields: [machineId], references: [id], onDelete: SetNull)
 
   @@unique([name, departmentId])
   @@index([departmentId], map: "tests_departmentId_fkey")
@@ -613,8 +613,9 @@ model Machine {
   isActive  Boolean   @default(true)
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
-  tests     Test[]    // Relation to Test model
+  tests     Test[]    @relation("MachineTests")
 
+  @@index([isActive])
   @@map("machines")
 }
 
