@@ -387,16 +387,7 @@ export default function OrganizationTransferModal({
                 </select>
               </div>
 
-              <div>
-                <label className="block text-xs font-semibold text-gray-600 mb-0.5">
-                  Available
-                </label>
-                <div className="bg-gray-50 rounded px-1.5 py-1 text-xs text-gray-700 font-semibold border border-gray-200">
-                  {selectedBatchData?.availableQuantity || "-"}
-                </div>
-              </div>
-
-              <div>
+                   <div>
                 <label className="block text-xs font-semibold text-gray-600 mb-0.5">
                   Batch <span className="text-red-500">*</span>
                 </label>
@@ -417,6 +408,17 @@ export default function OrganizationTransferModal({
                   ))}
                 </select>
               </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-0.5">
+                  Available
+                </label>
+                <div className="bg-gray-50 rounded px-1.5 py-1 text-xs text-gray-700 font-semibold border border-gray-200">
+                  {selectedBatchData?.availableQuantity || "-"}
+                </div>
+              </div>
+
+         
 
               <div>
                 <label className="block text-xs font-semibold text-gray-600 mb-0.5">
