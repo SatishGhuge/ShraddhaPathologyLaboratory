@@ -6,7 +6,6 @@ import { useRouter, useParams, usePathname } from "next/navigation";
 import Header from "@/src/components/Header";
 import PageHeader from "@/src/components/BreadCrumb";
 import UnitModal from "@/src/components/UnitModal";
-import ProfessionalResultReport from "@/src/components/ProfessionalResultReport";
 import { CKEditor } from "@ckeditor/ckeditor5-react";
 import ClassicEditor from "@ckeditor/ckeditor5-build-classic";
 import { getTestById, createTest, updateTest, getDepartments, getUnits, getTests, getSampleTypes } from "@/src/api/master.js";
@@ -2848,55 +2847,7 @@ const AddTest = () => {
 
               {/* Modal Content */}
               <div className="p-4 overflow-y-auto max-h-[calc(90vh-120px)]" style={{fontFamily: "Arial, sans-serif"}}>
-                <ProfessionalResultReport
-                  patient={{ 
-                    firstName: "Sample",
-                    lastName: "Patient",
-                    patientId: "TEST-001",
-                    mobile: "9876543210",
-                    age: 45,
-                    gender: "M",
-                    title: ""
-                  }}
-                  visitDate={new Date().toISOString()}
-                  visitId="VISIT-001"
-                  test={{ 
-                    name: formData.name || "TEST RESULTS",
-                    interpretation: formData.interpretation || ""
-                  }}
-                  parameters={
-                    // First sort categories by categorySortOrder (include empty name categories)
-                    categories
-                      .map((cat, catIdx) => ({
-                        ...cat,
-                        catIdx,
-                        categorySortOrder: parseInt(cat.sortOrder) || 999
-                      }))
-                      .sort((a, b) => a.categorySortOrder - b.categorySortOrder)
-                      .flatMap((cat) => 
-                        // Then sort parameters within each category by sortOrder
-                        cat.parameters
-                          .filter(p => p.parameterName)
-                          .map((param, paramIdx) => ({
-                            ...param,
-                            categoryName: cat.name || '', // Allow null/empty names
-                            categoryUniqueId: cat.name || `__cat_${cat.catIdx}__`,
-                            showCategoryHeader: cat.name && cat.name !== "Default", // Only show header if name exists
-                            categorySortOrder: cat.categorySortOrder,
-                            sortOrder: parseInt(param.sortOrder) || 999,
-                            categoryTestMethod: cat.testMethod || null,
-                            parameterTestMethod: param.testMethod || null,
-                            existingResult: null
-                          }))
-                          .sort((a, b) => a.sortOrder - b.sortOrder)
-                      )
-                  }
-                  groupedParameters={{}}
-                  signature={null}
-                  withHeader={false}
-                  letterHeadBase64=""
-                  printOption="pagebreak"
-                />
+                <p className="text-gray-600 text-sm">Report preview removed</p>
               </div>
 
               {/* Modal Footer */}
