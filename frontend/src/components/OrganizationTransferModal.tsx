@@ -91,10 +91,13 @@ export default function OrganizationTransferModal({
       setTransferNumber(generateTransferNumber(0));
       setTransferDate(new Date().toISOString().split("T")[0]);
       setSubmitError("");
+      setSelectedItem(undefined);
+      setSelectedBatch("");
+      setBatches([]); // Clear batches to force fresh fetch
     }
   }, [isOpen]);
 
-  // Fetch batches when item is selected
+  // Fetch batches when item is selected - ALWAYS fetch fresh data from lab stock
   useEffect(() => {
     const fetchBatches = async () => {
       if (!selectedItem) {
@@ -102,11 +105,18 @@ export default function OrganizationTransferModal({
         return;
       }
       try {
-        console.log("Fetching batches for itemId:", selectedItem);
-        const res = await inventoryAPI.labStocks.getBatchesByItem(selectedItem);
-        console.log("Batches response:", res.data);
-        const batchData = res.data?.data || [];
-        console.log("Batch data set:", batchData);
+        console.log("Fetching FRESH batches for itemId:", selectedItem);
+        // Fetch from lab stock grouped endpoint to get real-time available quantities
+        const res = await inventoryAPI.labStocks.getByItem(selectedItem);
+        console.log("Fresh batches response:", res.data);
+        const batchData = (res.data?.data || []).map((stock: any) => ({
+          id: stock.id,
+          batchNo: stock.batchNo,
+          expiryDate: stock.expiryDate,
+          availableQuantity: stock.quantityAvailable, // Real-time quantity from database
+          lastStockUpdate: stock.lastStockUpdate
+        }));
+        console.log("Fresh batch data set:", batchData);
         setBatches(batchData);
       } catch (err) {
         console.error("Failed to fetch batches:", err);
@@ -136,6 +146,17 @@ export default function OrganizationTransferModal({
   // batches are already filtered by itemId from the API, so no need to filter again
   const availableBatches = batches;
   const selectedBatchData = availableBatches.find((b) => b.batchNo === selectedBatch);
+  
+  // Calculate remaining available quantity after accounting for already-selected transfers
+  const calculateRemainingQuantity = (batchNo: string, itemId: number): number => {
+    if (!selectedBatchData) return 0;
+    const alreadyTransferred = selectedItems
+      .filter(item => item.itemId === itemId && item.batchNo === batchNo)
+      .reduce((sum, item) => sum + item.transferQuantity, 0);
+    return Math.max(0, selectedBatchData.availableQuantity - alreadyTransferred);
+  };
+  
+  const remainingQuantity = selectedBatchData && selectedItem ? calculateRemainingQuantity(selectedBatch, selectedItem) : 0;
 
   const handleAddItem = () => {
     const newErrors: Record<string, string> = {};
@@ -147,9 +168,9 @@ export default function OrganizationTransferModal({
     }
     if (
       selectedBatchData &&
-      Number(transferQuantity) > selectedBatchData.availableQuantity
+      Number(transferQuantity) > remainingQuantity
     ) {
-      newErrors.transferQuantity = "Transfer quantity exceeds available stock";
+      newErrors.transferQuantity = `Transfer quantity exceeds remaining stock (${remainingQuantity})`;
     }
 
     setErrors(newErrors);
@@ -180,11 +201,12 @@ export default function OrganizationTransferModal({
         setSelectedItems([...selectedItems, newItem]);
       }
 
-      // Reset fields
+      // Reset fields and refresh batch data with fresh quantities from database
       setSelectedItem(undefined);
       setSelectedBatch("");
       setTransferQuantity("");
       setErrors({});
+      setBatches([]); // Force refresh of batch data
     }
   };
 
@@ -206,8 +228,15 @@ export default function OrganizationTransferModal({
       return;
     }
 
-    if (qty > selectedItems[editingIndex].availableStock) {
-      alert(`Transfer quantity cannot exceed available stock (${selectedItems[editingIndex].availableStock})`);
+    const remainingStock = selectedItems[editingIndex].availableStock - 
+      selectedItems
+        .filter((item, idx) => idx !== editingIndex && 
+                item.itemId === selectedItems[editingIndex].itemId && 
+                item.batchNo === selectedItems[editingIndex].batchNo)
+        .reduce((sum, item) => sum + item.transferQuantity, 0);
+
+    if (qty > remainingStock) {
+      alert(`Transfer quantity cannot exceed remaining stock (${remainingStock})`);
       return;
     }
 
@@ -414,7 +443,7 @@ export default function OrganizationTransferModal({
                   Available
                 </label>
                 <div className="bg-gray-50 rounded px-1.5 py-1 text-xs text-gray-700 font-semibold border border-gray-200">
-                  {selectedBatchData?.availableQuantity || "-"}
+                  {remainingQuantity || "-"}
                 </div>
               </div>
 
