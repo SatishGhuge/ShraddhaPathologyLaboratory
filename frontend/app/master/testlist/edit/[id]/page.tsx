@@ -6,6 +6,7 @@ import { useRouter, useParams, usePathname } from "next/navigation";
 import Header from "@/src/components/Header";
 import PageHeader from "@/src/components/BreadCrumb";
 import UnitModal from "@/src/components/UnitModal";
+import ProfessionalResultReport from "@/src/components/ProfessionalResultReport";
 import { CKEditor } from "@ckeditor/ckeditor5-react";
 import ClassicEditor from "@ckeditor/ckeditor5-build-classic";
 import { getTestById, createTest, updateTest, getDepartments, getUnits, getTests, getSampleTypes } from "@/src/api/master.js";
@@ -878,10 +879,6 @@ const AddTest = () => {
       emptyFields.push("Test Name");
     }
     
-    if (!formData.department) {
-      emptyFields.push("Department");
-    }
-    
     if (!formData.shortName.trim()) {
       emptyFields.push("Test Short Form");
     }
@@ -901,7 +898,7 @@ const AddTest = () => {
         name: formData.name,
         shortName: formData.shortName,
         testCode: formData.testCode || null,
-        departmentId: parseInt(formData.department),
+        departmentId: formData.department ? parseInt(formData.department) : null,
         sampleTypeId: formData.sampleTypeId ? parseInt(formData.sampleTypeId) : null,
         machineName: formData.machineName || null,
         reportHeader: formData.reportHeader || null,
@@ -1803,7 +1800,7 @@ const AddTest = () => {
                         <input 
                           className="px-2 py-1.5 sm:py-1 border border-gray-300 rounded text-xs sm:text-sm w-full sm:w-40" 
                           placeholder="Sort order..." 
-                          type="number"
+                          type="text"
                           value={category.sortOrder || ""}
                           onChange={(e) => handleCategoryChange(categoryIndex, 'sortOrder', e.target.value)}
                           disabled={isViewMode} 
@@ -2004,7 +2001,7 @@ const AddTest = () => {
                         <input 
                           className="px-2 py-1.5 sm:py-1 border border-gray-300 rounded text-xs sm:text-sm w-full sm:w-24" 
                           placeholder="Sort Order" 
-                          type="number"
+                          type="text"
                           value={parameter.sortOrder !== undefined && parameter.sortOrder !== "" ? parameter.sortOrder : ""}
                           onChange={(e) => handleParameterChange(categoryIndex, paramIndex, 'sortOrder', e.target.value)}
                           disabled={isViewMode} 
@@ -2118,8 +2115,7 @@ const AddTest = () => {
                         <input 
                           className="px-2 py-1.5 sm:py-1 border border-gray-300 rounded text-xs sm:text-sm w-full sm:w-24" 
                           placeholder="Low Panic" 
-                          type="number"
-                          step="0.01"
+                          type="text"
                           value={parameter.lowPanic || ""}
                           onChange={(e) => handleParameterChange(categoryIndex, paramIndex, 'lowPanic', e.target.value)}
                           disabled={isViewMode} 
@@ -2127,8 +2123,7 @@ const AddTest = () => {
                         <input 
                           className="px-2 py-1.5 sm:py-1 border border-gray-300 rounded text-xs sm:text-sm w-full sm:w-24" 
                           placeholder="High Panic" 
-                          type="number"
-                          step="0.01"
+                          type="text"
                           value={parameter.highPanic || ""}
                           onChange={(e) => handleParameterChange(categoryIndex, paramIndex, 'highPanic', e.target.value)}
                           disabled={isViewMode} 
@@ -2593,8 +2588,7 @@ const AddTest = () => {
                                   <td className="border border-gray-300 p-1">
                                     <input 
                                       className="w-full px-2 py-1 border border-gray-300 rounded text-xs sm:text-sm" 
-                                      type="number"
-                                      step="0.01"
+                                      type="text"
                                       value={ageRange.ll || ""}
                                       onChange={(e) => handleAgeRangeChange(categoryIndex, paramIndex, ageIndex, 'll', e.target.value)}
                                       disabled={isViewMode} 
@@ -2603,8 +2597,7 @@ const AddTest = () => {
                                   <td className="border border-gray-300 p-1">
                                     <input 
                                       className="w-full px-2 py-1 border border-gray-300 rounded text-xs sm:text-sm" 
-                                      type="number"
-                                      step="0.01"
+                                      type="text"
                                       value={ageRange.ul || ""}
                                       onChange={(e) => handleAgeRangeChange(categoryIndex, paramIndex, ageIndex, 'ul', e.target.value)}
                                       disabled={isViewMode} 
@@ -2690,8 +2683,7 @@ const AddTest = () => {
                                       <input 
                                         className="w-full px-2 py-1 border border-gray-300 rounded text-xs sm:text-sm" 
                                         placeholder="Min"
-                                        type="number"
-                                        step="0.01"
+                                        type="text"
                                         value={rangeValue.min || ""}
                                         onChange={(e) => handleRangeValueChange(categoryIndex, paramIndex, rangeIndex, 'min', e.target.value)}
                                         disabled={isViewMode} 
@@ -2701,8 +2693,7 @@ const AddTest = () => {
                                       <input 
                                         className="w-full px-2 py-1 border border-gray-300 rounded text-xs sm:text-sm" 
                                         placeholder="Max"
-                                        type="number"
-                                        step="0.01"
+                                        type="text"
                                         value={rangeValue.max || ""}
                                         onChange={(e) => handleRangeValueChange(categoryIndex, paramIndex, rangeIndex, 'max', e.target.value)}
                                         disabled={isViewMode} 
@@ -2774,8 +2765,7 @@ const AddTest = () => {
                                   <td className="border border-gray-300 p-1">
                                     <input 
                                       className="w-full px-2 py-1 border border-gray-300 rounded text-xs sm:text-sm" 
-                                      type="number"
-                                      step="0.01"
+                                      type="text"
                                       value={range.ll || ""}
                                       onChange={(e) => handleNormalRangeChange(categoryIndex, paramIndex, rangeIndex, 'll', e.target.value)}
                                       disabled={isViewMode} 
@@ -2784,8 +2774,7 @@ const AddTest = () => {
                                   <td className="border border-gray-300 p-1">
                                     <input 
                                       className="w-full px-2 py-1 border border-gray-300 rounded text-xs sm:text-sm" 
-                                      type="number"
-                                      step="0.01"
+                                      type="text"
                                       value={range.ul || ""}
                                       onChange={(e) => handleNormalRangeChange(categoryIndex, paramIndex, rangeIndex, 'ul', e.target.value)}
                                       disabled={isViewMode} 
@@ -2858,234 +2847,56 @@ const AddTest = () => {
               </div>
 
               {/* Modal Content */}
-              <div className="p-6">
-                {/* Title - Department Name as Main Title */}
-                <div className="mb-4 text-center">
-                  <h2 className="text-base font-bold underline">
-                    {formData.department && departments.find(d => d.id == formData.department) 
-                      ? departments.find(d => d.id == formData.department)?.name 
-                      : "DEPARTMENT NAME"}
-                  </h2>
-                  <p className="text-xs mt-2 text-gray-600">
-                    {formData.name || "TEST NAME"}
-                  </p>
-                </div>
-
-                {/* Table Header */}
-                <div className="border border-gray-400 mb-4">
-                  <div className="grid grid-cols-4 gap-0 border-b border-gray-400 bg-gray-100">
-                    <div className="border-r border-gray-400 p-2 font-bold text-xs underline">Test Description</div>
-                    <div className="border-r border-gray-400 p-2 font-bold text-xs underline">Result</div>
-                    <div 
-                      id="preview-unit-column"
-                      className="border-r border-gray-400 p-2 font-bold text-xs underline transition-colors duration-500 cursor-pointer hover:bg-cyan-100"
-                      onClick={() => {
-                        const unitsSection = document.querySelector('h3[title="Click to navigate to Unit column in preview table"]');
-                        if (unitsSection) {
-                          unitsSection.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                          // Add a temporary highlight effect
-                          unitsSection.classList.add('bg-yellow-200', 'px-2', 'py-1', 'rounded');
-                          setTimeout(() => {
-                            unitsSection.classList.remove('bg-yellow-200', 'px-2', 'py-1', 'rounded');
-                          }, 2000);
-                        }
-                      }}
-                      title="Click to navigate back to Units section"
-                    >
-                      Unit 🔗
-                    </div>
-                    <div className="p-2 font-bold text-xs underline">Biological Reference Range</div>
-                  </div>
-
-                  {/* Table Body - Categories and Parameters */}
-                  {categories && categories.length > 0 ? (
-                    categories.map((category, catIndex) => (
-                      <div key={catIndex}>
-                        {/* Category Row - Only show if category has a name and not "Default" */}
-                        {category.name && category.name !== "Default" && (
-                          <div className="grid grid-cols-4 gap-0 border-b border-gray-400">
-                            <div className="col-span-4 border-r border-gray-400 p-2 font-bold text-xs underline bg-gray-50">
-                              {category.name}
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Parameters under Category */}
-                        {category.parameters && category.parameters.length > 0 ? (
-                          category.parameters.map((param, paramIndex) => (
-                            param.parameterName && (
-                              <div key={paramIndex} className="grid grid-cols-4 gap-0 border-b border-gray-400">
-                                <div className="border-r border-gray-400 p-2 text-xs">
-                                  <span className="font-bold">{param.parameterName}</span>
-                                </div>
-                                <div className="border-r border-gray-400 p-2 text-xs">
-                                  <span className="italic text-gray-500">-</span>
-                                </div>
-                                <div className="border-r border-gray-400 p-2 text-xs">
-                                  {param.units || "-"}
-                                </div>
-                                <div className="p-2 text-xs">
-                                  {/* For Numeric parameters */}
-                                  {param.type === "Numeric" && (
-                                    <div className="space-y-1">
-                                      {/* Show parameter details */}
-                                      {param.decimal && (
-                                        <div className="text-gray-600">Decimal: {param.decimal}</div>
-                                      )}
-                                      {param.lowPanic && (
-                                        <div className="text-red-600">Low Panic: {param.lowPanic}</div>
-                                      )}
-                                      {param.highPanic && (
-                                        <div className="text-red-600">High Panic: {param.highPanic}</div>
-                                      )}
-                                      
-                                      {/* BySex Range Display */}
-                                      {param.rangeType === "BySex" && (
-                                        <div className="mt-2">
-                                          {param.normalRanges?.map((range, idx) => (
-                                            range.isActive && (
-                                              <div key={idx} className="ml-2">
-                                                {(range as any).lowValue !== undefined && (range as any).lowValue !== null ? (range as any).lowValue : (range.ll || "-")} - {(range as any).highValue !== undefined && (range as any).highValue !== null ? (range as any).highValue : (range.ul || "-")}
-                                                {range.default && <span className="text-gray-600"> ({range.default})</span>}
-                                              </div>
-                                            )
-                                          ))}
-                                        </div>
-                                      )}
-                                      
-                                      {/* ByAge Range Display */}
-                                      {param.rangeType === "ByAge" && (
-                                        <div className="mt-2">
-                                          {param.ageRanges && param.ageRanges.length > 0 ? (
-                                            param.ageRanges.map((ageRange, idx) => {
-                                              // Show ranges where age is between 12-100
-                                              const isInRange = (() => {
-                                                if (ageRange.label && ageRange.label.includes("Between")) {
-                                                  const from = parseInt((ageRange as any).from);
-                                                  const to = parseInt((ageRange as any).to);
-                                                  // Check if range overlaps with 12-100
-                                                  return !isNaN(from) && !isNaN(to) && from >= 12 && to <= 100;
-                                                }
-                                                // For Less Than and More Than ranges, check if they fall in 12-100
-                                                if (ageRange.label && (ageRange.label.includes("Less Than") || ageRange.label.includes("More Than"))) {
-                                                  const value = parseInt((ageRange as any).value);
-                                                  return !isNaN(value) && value >= 12 && value <= 100;
-                                                }
-                                                return false;
-                                              })();
-
-                                              return ageRange.isActive && isInRange && (
-                                                <div key={idx} className="ml-2">
-                                                  {ageRange.label.includes("Between") ? (
-                                                    <span>{ageRange.ll || "-"} - {ageRange.ul || "-"}</span>
-                                                  ) : (
-                                                    <span>{ageRange.ll || "-"} - {ageRange.ul || "-"}</span>
-                                                  )}
-                                                  {ageRange.default && <span className="text-gray-600"> ({ageRange.default})</span>}
-                                                </div>
-                                              );
-                                            })
-                                          ) : (
-                                            <div className="ml-2 italic text-gray-500">-</div>
-                                          )}
-                                        </div>
-                                      )}
-                                      
-                                      {/* ByRange Display */}
-                                      {param.rangeType === "ByRange" && (
-                                        <div className="mt-2">
-                                          {param.rangeValues && param.rangeValues.length > 0 ? (
-                                            param.rangeValues.map((rv, idx) => (
-                                              rv.isActive && (
-                                                <div key={idx} className="ml-2">
-                                                  {rv.min || "-"} - {rv.max || "-"}
-                                                  {rv.interpretation && <span className="text-gray-600"> ({rv.interpretation})</span>}
-                                                </div>
-                                              )
-                                            ))
-                                          ) : (
-                                            <div className="ml-2 italic text-gray-500">-</div>
-                                          )}
-                                        </div>
-                                      )}
-                                    </div>
-                                  )}
-                                  
-                                  {/* For Text parameters */}
-                                  {param.type === "Text" && (
-                                    <div className="space-y-1">
-                                      <div className="font-semibold text-orange-800">Text Parameter:</div>
-                                      {param.rangeText && (
-                                        <div className="ml-2">
-                                          <strong>Range Text:</strong> {param.rangeText}
-                                        </div>
-                                      )}
-                                      {param.textContent && (
-                                        <div className="ml-2">
-                                          <strong>Content:</strong> {param.textContent}
-                                        </div>
-                                      )}
-                                      {param.isMultipleOptions && (
-                                        <div className="ml-2 text-blue-600">
-                                          <strong>Multiple Options:</strong> Yes
-                                        </div>
-                                      )}
-                                    </div>
-                                  )}
-                                  
-                                  {/* For TextEditor parameters */}
-                                  {param.type === "TextEditor" && (
-                                    <div className="space-y-1">
-                                      <div className="font-semibold text-teal-800">Rich Text Parameter:</div>
-                                      {param.textContent && (
-                                        <div className="ml-2">
-                                          <strong>Content:</strong> 
-                                          <div className="mt-1 p-2 bg-gray-50 border rounded text-xs" dangerouslySetInnerHTML={{ __html: param.textContent }} />
-                                        </div>
-                                      )}
-                                    </div>
-                                  )}
-                                  
-                                  {/* Show additional parameter info for all types */}
-                                  <div className="mt-2 pt-2 border-t border-gray-200">
-                                    {param.isMandatory && (
-                                      <div className="text-red-600 font-semibold">★ Mandatory Field</div>
-                                    )}
-                                    {param.isDescriptive && (
-                                      <div className="text-blue-600">📝 Descriptive Parameter</div>
-                                    )}
-                                    {param.isNABL && (
-                                      <div className="text-green-600">✓ NABL Accredited</div>
-                                    )}
-                                    {param.machineCode && (
-                                      <div className="text-gray-600">Machine Code: {param.machineCode}</div>
-                                    )}
-                                    {param.parameterCode && (
-                                      <div className="text-gray-600">Parameter Code: {param.parameterCode}</div>
-                                    )}
-                                    {param.formula && param.hasFormula && (
-                                      <div className="text-purple-600">Formula: {param.formula}</div>
-                                    )}
-                                  </div>
-                                </div>
-                              </div>
-                            )
-                          ))
-                        ) : (
-                          <div className="grid grid-cols-4 gap-0 border-b border-gray-400">
-                            <div className="col-span-4 p-2 text-xs text-gray-500 italic">
-                              No parameters in this category
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    ))
-                  ) : (
-                    <div className="p-4 text-center text-gray-500 italic">
-                      No categories or parameters added. Add categories and parameters to see preview.
-                    </div>
-                  )}
-                </div>
+              <div className="p-4 overflow-y-auto max-h-[calc(90vh-120px)]" style={{fontFamily: "Arial, sans-serif"}}>
+                <ProfessionalResultReport
+                  patient={{ 
+                    firstName: "Sample",
+                    lastName: "Patient",
+                    patientId: "TEST-001",
+                    mobile: "9876543210",
+                    age: 45,
+                    gender: "M",
+                    title: ""
+                  }}
+                  visitDate={new Date().toISOString()}
+                  visitId="VISIT-001"
+                  test={{ 
+                    name: formData.name || "TEST RESULTS",
+                    interpretation: formData.interpretation || ""
+                  }}
+                  parameters={
+                    // First sort categories by categorySortOrder (include empty name categories)
+                    categories
+                      .map((cat, catIdx) => ({
+                        ...cat,
+                        catIdx,
+                        categorySortOrder: parseInt(cat.sortOrder) || 999
+                      }))
+                      .sort((a, b) => a.categorySortOrder - b.categorySortOrder)
+                      .flatMap((cat) => 
+                        // Then sort parameters within each category by sortOrder
+                        cat.parameters
+                          .filter(p => p.parameterName)
+                          .map((param, paramIdx) => ({
+                            ...param,
+                            categoryName: cat.name || '', // Allow null/empty names
+                            categoryUniqueId: cat.name || `__cat_${cat.catIdx}__`,
+                            showCategoryHeader: cat.name && cat.name !== "Default", // Only show header if name exists
+                            categorySortOrder: cat.categorySortOrder,
+                            sortOrder: parseInt(param.sortOrder) || 999,
+                            categoryTestMethod: cat.testMethod || null,
+                            parameterTestMethod: param.testMethod || null,
+                            existingResult: null
+                          }))
+                          .sort((a, b) => a.sortOrder - b.sortOrder)
+                      )
+                  }
+                  groupedParameters={{}}
+                  signature={null}
+                  withHeader={false}
+                  letterHeadBase64=""
+                  printOption="pagebreak"
+                />
               </div>
 
               {/* Modal Footer */}

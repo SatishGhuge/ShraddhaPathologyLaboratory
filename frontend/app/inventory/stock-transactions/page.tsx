@@ -1,14 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   AlertCircle, AlertTriangle, Package, ChevronLeft, ChevronRight,
   Search, X, Check
 } from "lucide-react";
+import inventoryAPI from "@/lib/api/inventory.api";
 
 /* ─── Types ─────────────────────────────────────────────── */
 interface StockTransaction {
   id: number;
+  itemId: number;
   itemName: string;
   itemCode: string;
   unit: string;
@@ -61,79 +63,6 @@ function formatDate(dateStr: string): string {
   return new Date(dateStr).toLocaleDateString("en-GB");
 }
 
-/* ─── Mock Data ─────────────────────────────────────────────── */
-const MOCK_STOCK_DATA: StockTransaction[] = [
-  {
-    id: 1,
-    itemName: "CBC Reagent Kit",
-    itemCode: "REG-001",
-    unit: "Kit",
-    availableQuantity: 8,
-    minimumStockLevel: 10,
-    expiryDate: "2027-03-15",
-    batchNo: "BATCH-001",
-    supplier: "MedSupply Co.",
-    remarks: "Premium quality kit"
-  },
-  {
-    id: 2,
-    itemName: "Urine Test Strips",
-    itemCode: "CON-012",
-    unit: "Box",
-    availableQuantity: 5,
-    minimumStockLevel: 15,
-    expiryDate: "2026-09-20",
-    batchNo: "BATCH-002",
-    supplier: "LabKit India",
-    remarks: "Fast results"
-  },
-  {
-    id: 3,
-    itemName: "Blood Collection Tubes",
-    itemCode: "TUBE-005",
-    unit: "Pack",
-    availableQuantity: 45,
-    minimumStockLevel: 20,
-    expiryDate: "2028-06-10",
-    batchNo: "BATCH-003",
-    supplier: "BioLab Pvt Ltd"
-  },
-  {
-    id: 4,
-    itemName: "Serum Separator Tubes",
-    itemCode: "CON-007",
-    unit: "Box",
-    availableQuantity: 0,
-    minimumStockLevel: 20,
-    expiryDate: "2025-12-01",
-    batchNo: "BATCH-004",
-    supplier: "MedSupply Co.",
-    remarks: "Out of stock - order placed"
-  },
-  {
-    id: 5,
-    itemName: "HbA1c Reagent",
-    itemCode: "REG-008",
-    unit: "Bottle",
-    availableQuantity: 32,
-    minimumStockLevel: 8,
-    expiryDate: "2027-08-25",
-    batchNo: "BATCH-005",
-    supplier: "BioLab Pvt Ltd"
-  },
-  {
-    id: 6,
-    itemName: "Lancets (28G)",
-    itemCode: "CON-003",
-    unit: "Box",
-    availableQuantity: 2,
-    minimumStockLevel: 30,
-    expiryDate: "2026-11-15",
-    batchNo: "BATCH-006",
-    supplier: "QuickDiag",
-    remarks: "Critical - urgent reorder needed"
-  },
-];
 
 /* ═══════════════════════════════════════════════════════════
    QUANTITY UPDATE MODAL
@@ -176,9 +105,6 @@ function QuantityUpdateModal({ item, isOpen, onClose, onUpdate }: QuantityUpdate
     }
 
     onUpdate(qty, remark);
-    setQuantity("");
-    setRemark("");
-    onClose();
   };
 
   if (!isOpen) return null;
@@ -279,15 +205,48 @@ function QuantityUpdateModal({ item, isOpen, onClose, onUpdate }: QuantityUpdate
    MAIN PAGE
 ══════════════════════════════════════════════════════════════ */
 export default function StockTransactionsPage() {
-  const [transactions, setTransactions] = useState<StockTransaction[]>(MOCK_STOCK_DATA);
+  const [transactions, setTransactions] = useState<StockTransaction[]>([]);
   const [search, setSearch] = useState("");
   const [filterAlert, setFilterAlert] = useState("all");
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedItem, setSelectedItem] = useState<StockTransaction | null>(null);
   const [showModal, setShowModal] = useState(false);
   const [successMsg, setSuccessMsg] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [pagination, setPagination] = useState<any>(null);
 
   const ITEMS_PER_PAGE = 15;
+
+  const fetchData = async () => {
+    try {
+      setLoading(true);
+      const res = await inventoryAPI.labStocks.getAll(currentPage, ITEMS_PER_PAGE);
+      const stocks = res.data?.data || [];
+      const mapped = stocks.map((s: any) => ({
+        id: s.id,
+        itemId: s.itemId,
+        itemName: s.item?.itemName || "-",
+        itemCode: s.item?.itemCode || "-",
+        unit: s.item?.unit || "Box",
+        availableQuantity: s.quantityAvailable || s.availableQuantity || 0,
+        minimumStockLevel: s.minimumStockLevel || 0,
+        expiryDate: s.expiryDate,
+        batchNo: s.batchNo,
+        supplier: "Internal",
+        remarks: ""
+      }));
+      setTransactions(mapped);
+      setPagination(res.data?.pagination || null);
+    } catch (err) {
+      console.error("Failed to fetch lab stocks", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchData();
+  }, [currentPage]);
 
   // Filter transactions
   const filteredTransactions = transactions.filter((tx) => {
@@ -318,21 +277,43 @@ export default function StockTransactionsPage() {
     setShowModal(true);
   };
 
-  const handleQuantityUpdate = (quantity: number, remark: string) => {
+  const handleQuantityUpdate = async (quantity: number, remark: string) => {
     if (!selectedItem) return;
 
-    const newQuantity = selectedItem.availableQuantity - quantity;
+    try {
+      await inventoryAPI.transactions.create({
+        itemId: selectedItem.itemId,
+        batchNo: selectedItem.batchNo,
+        quantity: quantity,
+        transactionType: "OUT",
+        reason: remark || "Manual adjustment"
+      });
+      
+      const newQuantity = selectedItem.availableQuantity - quantity;
+      
+      // Update the transactions state immediately for UI responsiveness
+      setTransactions((prev) =>
+        prev.map((tx) =>
+          tx.id === selectedItem.id
+            ? { ...tx, availableQuantity: newQuantity, remarks: remark || tx.remarks }
+            : tx
+        )
+      );
 
-    setTransactions((prev) =>
-      prev.map((tx) =>
-        tx.id === selectedItem.id
-          ? { ...tx, availableQuantity: newQuantity, remarks: remark || tx.remarks }
-          : tx
-      )
-    );
-
-    setSuccessMsg(`Updated ${selectedItem.itemName}. New qty: ${newQuantity} ${selectedItem.unit}`);
-    setTimeout(() => setSuccessMsg(""), 2000);
+      setSuccessMsg(`Updated ${selectedItem.itemName}. New qty: ${newQuantity} ${selectedItem.unit}`);
+      
+      // Re-fetch data after a short delay to ensure database is updated
+      setTimeout(() => {
+        fetchData();
+      }, 500);
+      
+      setTimeout(() => setSuccessMsg(""), 3000);
+      setShowModal(false);
+      setSelectedItem(null);
+    } catch (err) {
+      console.error("Failed to update stock", err);
+      alert("Failed to update stock.");
+    }
   };
 
   const criticalItems = transactions.filter(
@@ -402,10 +383,21 @@ export default function StockTransactionsPage() {
 
       {/* Stock Table */}
       <div className="bg-white rounded border border-gray-300 overflow-hidden">
+        {/* Pagination Header */}
+        {pagination && (
+          <div className="border-b p-3 bg-gray-50 flex justify-between items-center text-xs sm:text-sm">
+            <span className="text-sm font-semibold text-gray-700">
+              Page {pagination?.page || 1} of {pagination?.totalPages || 1} 
+              {pagination?.total && ` (Total: ${pagination.total})`}
+            </span>
+          </div>
+        )}
+
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="bg-slate-900 text-white">
               <tr className="border-b border-gray-300">
+                <th className="px-3 py-2 text-left text-xs font-semibold">Id</th>
                 <th className="px-3 py-2 text-left text-xs font-semibold">Item Name</th>
                 <th className="px-3 py-2 text-left text-xs font-semibold">Code</th>
                 <th className="px-3 py-2 text-left text-xs font-semibold">Batch No</th>
@@ -416,71 +408,97 @@ export default function StockTransactionsPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-300">
-              {paginatedTransactions.length > 0 ? (
-                paginatedTransactions.map((tx) => {
-                  const alertType = getAlertType(tx.availableQuantity, tx.minimumStockLevel, tx.expiryDate);
-                  const alertMessage = getAlertMessage(alertType, tx.availableQuantity, tx.minimumStockLevel, tx.expiryDate);
+              {loading ? (
+                <tr>
+                  <td colSpan={8} className="px-3 py-4 text-center text-gray-500">
+                    Loading stock transactions...
+                  </td>
+                </tr>
+              ) : transactions.length > 0 ? (
+                transactions
+                  .filter((tx) => {
+                    const matchesSearch =
+                      tx.itemName.toLowerCase().includes(search.toLowerCase()) ||
+                      tx.itemCode.toLowerCase().includes(search.toLowerCase());
 
-                  // Tooltip content
-                  const getTooltip = () => {
-                    if (alertType === "expired") return "Expired";
-                    if (alertType === "expiring") {
-                      const diff = Math.floor((new Date(tx.expiryDate).getTime() - Date.now()) / 86400000);
-                      return `Expires in ${diff} days`;
-                    }
-                    if (alertType === "minimum") return `Low Stock: ${tx.availableQuantity}/${tx.minimumStockLevel}`;
-                    return "In Stock";
-                  };
+                    if (!matchesSearch) return false;
 
-                  return (
-                    <tr key={tx.id} className="hover:bg-gray-50 transition h-10">
-                      <td className="px-3 py-1.5">
-                        <p className="font-semibold text-gray-900 cursor-pointer hover:text-blue-600 text-sm" onClick={() => handleItemClick(tx)}>
-                          {tx.itemName}
-                        </p>
-                      </td>
-                      <td className="px-3 py-1.5 text-xs text-gray-700">{tx.itemCode}</td>
-                      <td className="px-3 py-1.5 text-xs text-gray-700">{tx.batchNo}</td>
-                      <td className="px-3 py-1.5 text-center">
-                        <span className="text-xs font-semibold text-gray-900">{tx.availableQuantity}</span>
-                      </td>
-                      <td className="px-3 py-1.5 text-xs text-gray-700">{formatDate(tx.expiryDate)}</td>
-                      <td className="px-3 py-1.5 text-center">
-                        <div className="relative group inline-flex">
-                          {alertType === "expired" && (
-                            <AlertTriangle size={18} className="text-red-600 cursor-help" />
-                          )}
-                          {alertType === "expiring" && (
-                            <AlertTriangle size={18} className="text-yellow-600 cursor-help" />
-                          )}
-                          {alertType === "minimum" && (
-                            <div className="text-orange-600 cursor-help font-bold text-lg">↓</div>
-                          )}
-                          {alertType === "none" && (
-                            <div className="text-green-600 text-xs font-semibold">OK</div>
-                          )}
-                          
-                          {/* Tooltip */}
-                          <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 bg-gray-800 text-white text-xs rounded whitespace-nowrap pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity z-10">
-                            {getTooltip()}
-                            <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-l-transparent border-r-transparent border-t-gray-800"></div>
+                    const alertType = getAlertType(tx.availableQuantity, tx.minimumStockLevel, tx.expiryDate);
+
+                    if (filterAlert === "all") return true;
+                    if (filterAlert === "critical") return alertType === "expired" || (alertType === "minimum" && tx.availableQuantity === 0);
+                    if (filterAlert === "expiring") return alertType === "expiring" || alertType === "expired";
+                    if (filterAlert === "lowstock") return alertType === "minimum";
+
+                    return true;
+                  })
+                  .map((tx, index) => {
+                    const alertType = getAlertType(tx.availableQuantity, tx.minimumStockLevel, tx.expiryDate);
+                    const alertMessage = getAlertMessage(alertType, tx.availableQuantity, tx.minimumStockLevel, tx.expiryDate);
+
+                    // Tooltip content
+                    const getTooltip = () => {
+                      if (alertType === "expired") return "Expired";
+                      if (alertType === "expiring") {
+                        const diff = Math.floor((new Date(tx.expiryDate).getTime() - Date.now()) / 86400000);
+                        return `Expires in ${diff} days`;
+                      }
+                      if (alertType === "minimum") return `Low Stock: ${tx.availableQuantity}/${tx.minimumStockLevel}`;
+                      return "In Stock";
+                    };
+
+                    return (
+                      <tr key={tx.id} className="hover:bg-gray-50 transition h-10">
+                        <td className="px-3 py-1.5 font-semibold text-gray-900">
+                          {((pagination?.page || 1) - 1) * ITEMS_PER_PAGE + index + 1}
+                        </td>
+                        <td className="px-3 py-1.5">
+                          <p className="font-semibold text-gray-900 cursor-pointer hover:text-blue-600 text-sm" onClick={() => handleItemClick(tx)}>
+                            {tx.itemName}
+                          </p>
+                        </td>
+                        <td className="px-3 py-1.5 text-xs text-gray-700">{tx.itemCode}</td>
+                        <td className="px-3 py-1.5 text-xs text-gray-700">{tx.batchNo}</td>
+                        <td className="px-3 py-1.5 text-center">
+                          <span className="text-xs font-semibold text-gray-900">{tx.availableQuantity}</span>
+                        </td>
+                        <td className="px-3 py-1.5 text-xs text-gray-700">{formatDate(tx.expiryDate)}</td>
+                        <td className="px-3 py-1.5 text-center">
+                          <div className="relative group inline-flex">
+                            {alertType === "expired" && (
+                              <AlertTriangle size={18} className="text-red-600 cursor-help" />
+                            )}
+                            {alertType === "expiring" && (
+                              <AlertTriangle size={18} className="text-yellow-600 cursor-help" />
+                            )}
+                            {alertType === "minimum" && (
+                              <div className="text-orange-600 cursor-help font-bold text-lg">↓</div>
+                            )}
+                            {alertType === "none" && (
+                              <div className="text-green-600 text-xs font-semibold">OK</div>
+                            )}
+                            
+                            {/* Tooltip */}
+                            <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 bg-gray-800 text-white text-xs rounded whitespace-nowrap pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                              {getTooltip()}
+                              <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-l-transparent border-r-transparent border-t-gray-800"></div>
+                            </div>
                           </div>
-                        </div>
-                      </td>
-                      <td className="px-3 py-1.5 text-center">
-                        <button
-                          onClick={() => handleItemClick(tx)}
-                          className="inline-flex items-center px-2 py-1 text-xs rounded bg-blue-100 text-blue-600 hover:bg-blue-200 transition font-medium"
-                        >
-                          Update
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })
+                        </td>
+                        <td className="px-3 py-1.5 text-center">
+                          <button
+                            onClick={() => handleItemClick(tx)}
+                            className="inline-flex items-center px-2 py-1 text-xs rounded bg-blue-100 text-blue-600 hover:bg-blue-200 transition font-medium"
+                          >
+                            Update
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })
               ) : (
                 <tr>
-                  <td colSpan={7} className="px-3 py-6 text-center text-gray-500">
+                  <td colSpan={8} className="px-3 py-6 text-center text-gray-500">
                     <p className="text-sm">No stock transactions found</p>
                   </td>
                 </tr>
@@ -488,32 +506,61 @@ export default function StockTransactionsPage() {
             </tbody>
           </table>
         </div>
-      </div>
 
-      {/* Pagination */}
-      {totalPages > 1 && (
-        <div className="flex items-center justify-between bg-white rounded border border-gray-300 p-3 mt-4">
-          <p className="text-xs text-gray-600">
-            Page {currentPage} of {totalPages} • {filteredTransactions.length} items
-          </p>
-          <div className="flex gap-2">
+        {/* Pagination Controls */}
+        {pagination && pagination.totalPages > 1 && (
+          <div className="border-t p-3 bg-gray-50 flex items-center justify-between text-xs sm:text-sm">
             <button
-              onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+              onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
               disabled={currentPage === 1}
-              className="p-1.5 hover:bg-gray-100 rounded disabled:opacity-50 disabled:cursor-not-allowed transition"
+              className={`px-3 py-1 rounded ${currentPage === 1 ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-orange-500 text-white hover:bg-orange-600'}`}
             >
-              <ChevronLeft size={16} />
+              ← Previous
             </button>
+
+            <div className="flex items-center gap-1">
+              {(() => {
+                const pages = [];
+                const totalPages = pagination.totalPages;
+                
+                if (totalPages <= 5) {
+                  for (let i = 1; i <= totalPages; i++) pages.push(i);
+                } else {
+                  if (currentPage <= 3) {
+                    pages.push(1, 2, 3, 4, '...', totalPages);
+                  } else if (currentPage >= totalPages - 2) {
+                    pages.push(1, '...', totalPages - 3, totalPages - 2, totalPages - 1, totalPages);
+                  } else {
+                    pages.push(1, '...', currentPage - 1, currentPage, currentPage + 1, '...', totalPages);
+                  }
+                }
+
+                return pages.map((page, idx) => (
+                  page === '...' ? (
+                    <span key={idx} className="px-2">...</span>
+                  ) : (
+                    <button
+                      key={idx}
+                      onClick={() => setCurrentPage(page as number)}
+                      className={`w-7 h-7 rounded ${currentPage === page ? 'bg-orange-500 text-white font-bold' : 'bg-white border hover:bg-gray-100'}`}
+                    >
+                      {page}
+                    </button>
+                  )
+                ));
+              })()}
+            </div>
+
             <button
-              onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
-              disabled={currentPage === totalPages}
-              className="p-1.5 hover:bg-gray-100 rounded disabled:opacity-50 disabled:cursor-not-allowed transition"
+              onClick={() => setCurrentPage(p => Math.min(pagination.totalPages, p + 1))}
+              disabled={currentPage === pagination.totalPages}
+              className={`px-3 py-1 rounded ${currentPage === pagination.totalPages ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-orange-500 text-white hover:bg-orange-600'}`}
             >
-              <ChevronRight size={16} />
+              Next →
             </button>
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
       {/* Quantity Update Modal */}
       {selectedItem && (

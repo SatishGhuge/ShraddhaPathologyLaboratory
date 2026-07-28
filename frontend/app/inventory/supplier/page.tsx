@@ -1,62 +1,30 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Users, RotateCcw, ChevronLeft, ChevronRight, Edit2, Trash2, Plus } from "lucide-react";
 import SupplierMasterModal from "@/src/components/SupplierMasterModal";
-import PageHeader from "@/src/components/BreadCrumb";
+import inventoryAPI from "@/lib/api/inventory.api";
 
 interface Supplier {
   id: number;
   supplierName: string;
-  gstNumber: string;
-  email: string;
-  phoneNumber: string;
-  address: string;
-  city: string;
-  state: string;
-  pincode: string;
-  status: "Active" | "Inactive";
+  gstNumber?: string;
+  email?: string;
+  phone?: string;
+  address?: string;
+  city?: string;
+  state?: string;
+  pinCode?: string;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export default function SupplierPage() {
-  const [suppliers, setSuppliers] = useState<Supplier[]>([
-    {
-      id: 1,
-      supplierName: "MedSupply Co.",
-      gstNumber: "27AABCT1234H1Z0",
-      email: "contact@medsupply.com",
-      phoneNumber: "9876543210",
-      address: "123 Medical Street, Industrial Area",
-      city: "Mumbai",
-      state: "Maharashtra",
-      pincode: "400001",
-      status: "Active",
-    },
-    {
-      id: 2,
-      supplierName: "LabKit India",
-      gstNumber: "29AABCT5678H1Z0",
-      email: "sales@labkit.com",
-      phoneNumber: "9988776655",
-      address: "456 Lab Park, Tech Zone",
-      city: "Bangalore",
-      state: "Karnataka",
-      pincode: "560034",
-      status: "Active",
-    },
-    {
-      id: 3,
-      supplierName: "BioLab Pvt Ltd",
-      gstNumber: "33AABCT9012H1Z0",
-      email: "support@biolab.in",
-      phoneNumber: "9876543219",
-      address: "789 Science Avenue",
-      city: "Chennai",
-      state: "Tamil Nadu",
-      pincode: "600001",
-      status: "Inactive",
-    },
-  ]);
+  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [pagination, setPagination] = useState<any>(null);
 
   const [search, setSearch] = useState("");
   const [filterStatus, setFilterStatus] = useState("All");
@@ -68,33 +36,37 @@ export default function SupplierPage() {
 
   const ITEMS_PER_PAGE = 10;
 
-  // Filter suppliers based on search and status
-  const filteredSuppliers = suppliers.filter((supplier) => {
-    const matchesSearch =
-      supplier.supplierName.toLowerCase().includes(search.toLowerCase()) ||
-      supplier.gstNumber.toLowerCase().includes(search.toLowerCase()) ||
-      supplier.city.toLowerCase().includes(search.toLowerCase()) ||
-      supplier.phoneNumber.includes(search);
-    const matchesStatus = filterStatus === "All" || supplier.status === filterStatus;
-    
-    // If showInactive is checked, show ONLY inactive suppliers
-    // If showInactive is unchecked, show ONLY active suppliers
-    const matchesInactiveFilter = showInactive ? supplier.status === "Inactive" : supplier.status === "Active";
-    
-    return matchesSearch && matchesStatus && matchesInactiveFilter;
-  });
+  // Fetch suppliers from API
+  useEffect(() => {
+    fetchSuppliers();
+  }, [currentPage]);
 
-  const totalPages = Math.ceil(filteredSuppliers.length / ITEMS_PER_PAGE);
-  const paginatedSuppliers = filteredSuppliers.slice(
-    (currentPage - 1) * ITEMS_PER_PAGE,
-    currentPage * ITEMS_PER_PAGE
-  );
+  const fetchSuppliers = async () => {
+    try {
+      setLoading(true);
+      setError("");
+      const response = await inventoryAPI.suppliers.getAll(currentPage, ITEMS_PER_PAGE);
+      setSuppliers(response.data.data || []);
+      setPagination(response.data.pagination || null);
+    } catch (err: any) {
+      setError(err.response?.data?.message || "Failed to fetch suppliers");
+      console.error("Fetch error:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-  const handleDelete = (id: number) => {
-    if (window.confirm("Are you sure you want to delete this supplier?")) {
-      setSuppliers(suppliers.filter((supplier) => supplier.id !== id));
-      setSuccessMsg("Supplier deleted successfully!");
-      setTimeout(() => setSuccessMsg(""), 2000);
+  const handleDelete = async (id: number) => {
+    if (window.confirm("Are you sure you want to delete this supplier? This action cannot be undone.")) {
+      try {
+        await inventoryAPI.suppliers.delete(id);
+        setSuppliers(suppliers.filter((supplier) => supplier.id !== id));
+        setSuccessMsg("Supplier deleted successfully!");
+        setTimeout(() => setSuccessMsg(""), 2000);
+      } catch (err: any) {
+        setError(err.response?.data?.message || "Failed to delete supplier");
+        setTimeout(() => setError(""), 3000);
+      }
     }
   };
 
@@ -102,9 +74,9 @@ export default function SupplierPage() {
     const currentSupplier = suppliers.find((s) => s.id === id);
     if (!currentSupplier) return;
 
-    const message = currentSupplier.status === "Active"
-      ? `Do you want to Inactivate "${currentSupplier.supplierName}"?\n\nThe supplier will be hidden from the list but can be reactivated later.`
-      : `Do you want to Activate "${currentSupplier.supplierName}"?\n\nThe supplier will be visible in the list again.`;
+    const message = currentSupplier.isActive
+      ? `Do you want to Inactivate "${currentSupplier.supplierName}"?`
+      : `Do you want to Activate "${currentSupplier.supplierName}"?`;
 
     const confirm = window.confirm(message);
     if (!confirm) return;
@@ -112,12 +84,12 @@ export default function SupplierPage() {
     setSuppliers(
       suppliers.map((s) =>
         s.id === id
-          ? { ...s, status: s.status === "Active" ? "Inactive" : "Active" }
+          ? { ...s, isActive: !s.isActive }
           : s
       )
     );
     setSuccessMsg(
-      currentSupplier.status === "Active"
+      currentSupplier.isActive
         ? "Supplier inactivated successfully!"
         : "Supplier activated successfully!"
     );
@@ -125,30 +97,22 @@ export default function SupplierPage() {
   };
 
   const handleSupplierSaved = (supplierData: any) => {
-    if (editingSupplier) {
-      // Update existing supplier
-      setSuppliers(
-        suppliers.map((supplier) =>
-          supplier.id === editingSupplier.id ? { ...supplier, ...supplierData } : supplier
-        )
-      );
-    } else {
-      // Add new supplier
-      const newSupplier: Supplier = {
-        id: Math.max(0, ...suppliers.map((s) => s.id)) + 1,
-        ...supplierData,
-      };
-      setSuppliers([newSupplier, ...suppliers]);
-    }
     setShowModal(false);
     setEditingSupplier(null);
+    fetchSuppliers();
+    setSuccessMsg(editingSupplier ? "Supplier updated successfully!" : "Supplier created successfully!");
+    setTimeout(() => setSuccessMsg(""), 2000);
   };
 
   return (
     <>
       <div className="min-h-screen bg-white p-6">
-        {/* Page Header */}
-        <PageHeader title="Supplier" icon={Users} path="Inventory" />
+        {/* Error Message */}
+        {error && (
+          <div className="mb-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
+            {error}
+          </div>
+        )}
 
         {/* Top Bar */}
         <div className="flex flex-wrap items-center justify-between gap-3 mb-4 bg-white p-3 rounded shadow-md">
@@ -163,30 +127,19 @@ export default function SupplierPage() {
               }}
               className="border border-gray-300 bg-white rounded px-3 py-2 w-80 text-sm placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500"
             />
-            <select
-              value={filterStatus}
-              onChange={(e) => {
-                setFilterStatus(e.target.value);
-                setCurrentPage(1);
-              }}
-              className="border border-gray-300 bg-white rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
-            >
-              <option>All</option>
-              <option>Active</option>
-              <option>Inactive</option>
-            </select>
             <button
               onClick={() => {
                 setSearch("");
                 setFilterStatus("All");
                 setCurrentPage(1);
+                fetchSuppliers();
               }}
               className="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded text-sm transition-colors flex items-center gap-1"
             >
               <RotateCcw size={16} />
               Reset
             </button>
-            <label className="flex items-center gap-2 px-3 py-2 bg-white border border-gray-300 rounded text-xs sm:text-sm cursor-pointer hover:bg-gray-50 transition-colors w-full sm:w-auto">
+             <label className="flex items-center gap-2 px-3 py-2 bg-white border border-gray-300 rounded text-xs sm:text-sm cursor-pointer hover:bg-gray-50 transition-colors w-full sm:w-auto">
               <input
                 type="checkbox"
                 checked={showInactive}
@@ -210,129 +163,186 @@ export default function SupplierPage() {
           </button>
         </div>
 
-        {/* Table */}
-        <div className="overflow-x-auto bg-white rounded shadow-md">
-          <table className="w-full text-sm border-collapse">
-            <thead className="bg-slate-900 text-white">
-              <tr>
-                <th className="border border-gray-300 px-3 py-2 text-left font-semibold">
-                  Supplier Name
-                </th>
-                <th className="border border-gray-300 px-3 py-2 text-left font-semibold">
-                  GST Number
-                </th>
-                <th className="border border-gray-300 px-3 py-2 text-left font-semibold">
-                  Email
-                </th>
-                <th className="border border-gray-300 px-3 py-2 text-center font-semibold">
-                  Phone
-                </th>
-                <th className="border border-gray-300 px-3 py-2 text-left font-semibold">
-                  City
-                </th>
-                <th className="border border-gray-300 px-3 py-2 text-center font-semibold">
-                  Action
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {paginatedSuppliers.length > 0 ? (
-                paginatedSuppliers.map((supplier) => (
-                  <tr key={supplier.id} className="hover:bg-gray-50 border-b border-gray-200">
-                    <td className="border border-gray-300 px-3 py-2 font-semibold text-gray-900">
-                      {supplier.supplierName}
-                    </td>
-                    <td className="border border-gray-300 px-3 py-2 text-gray-600 text-xs font-mono">
-                      {supplier.gstNumber}
-                    </td>
-                    <td className="border border-gray-300 px-3 py-2 text-gray-600 text-xs">
-                      {supplier.email || "-"}
-                    </td>
-                    <td className="border border-gray-300 px-3 py-2 text-center text-gray-600 text-sm">
-                      {supplier.phoneNumber}
-                    </td>
-                    <td className="border border-gray-300 px-3 py-2 text-gray-600">
-                      {supplier.city}
-                    </td>
-                    <td className="border border-gray-300 px-3 py-2">
-                      <div className="flex justify-center gap-1 flex-wrap">
-                        <button
-                          onClick={() => handleToggleActive(supplier.id)}
-                          className={`px-2 py-1 rounded text-xs font-semibold transition-colors ${
-                            supplier.status === "Active"
-                              ? "bg-green-500 hover:bg-green-600 text-white"
-                              : "bg-gray-400 hover:bg-gray-500 text-white"
-                          }`}
-                        >
-                          {supplier.status === "Active" ? "Active" : "Inactive"}
-                        </button>
-                        <button
-                          onClick={() => {
-                            setEditingSupplier(supplier);
-                            setShowModal(true);
-                          }}
-                          className="bg-blue-600 text-white px-2 py-1 rounded text-xs hover:bg-blue-700 transition-colors flex items-center gap-1"
-                        >
-                          <Edit2 size={12} /> Edit
-                        </button>
-                        <button
-                          onClick={() => handleDelete(supplier.id)}
-                          className="bg-red-500 text-white px-2 py-1 rounded text-xs hover:bg-red-600 transition-colors flex items-center gap-1"
-                        >
-                          <Trash2 size={12} /> Delete
-                        </button>
-                      </div>
+        {/* Table with Pagination */}
+        <div className="bg-white rounded shadow-md overflow-hidden flex flex-col">
+          {/* Pagination Header */}
+          {pagination && (
+            <div className="border-b p-3 bg-gray-50 flex justify-between items-center text-xs sm:text-sm">
+              <span className="text-sm font-semibold text-gray-700">
+                Page {pagination?.page || 1} of {pagination?.totalPages || 1} 
+                {pagination?.total && ` (Total: ${pagination.total})`}
+              </span>
+            </div>
+          )}
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm border-collapse">
+              <thead className="bg-slate-900 text-white">
+                <tr>
+                  <th className="border border-gray-300 px-3 py-2 text-left font-semibold">
+                    Id
+                  </th>
+                  <th className="border border-gray-300 px-3 py-2 text-left font-semibold">
+                    Supplier Name
+                  </th>
+                  <th className="border border-gray-300 px-3 py-2 text-left font-semibold">
+                    GST Number
+                  </th>
+                  <th className="border border-gray-300 px-3 py-2 text-left font-semibold">
+                    Email
+                  </th>
+                  <th className="border border-gray-300 px-3 py-2 text-center font-semibold">
+                    Phone
+                  </th>
+                  <th className="border border-gray-300 px-3 py-2 text-left font-semibold">
+                    City
+                  </th>
+                  
+                  <th className="border border-gray-300 px-3 py-2 text-center font-semibold">
+                    Action
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {loading ? (
+                  <tr>
+                    <td colSpan={7} className="text-center py-4 text-gray-500 border border-gray-300">
+                      Loading suppliers...
                     </td>
                   </tr>
-                ))
-              ) : (
-                <tr>
-                  <td colSpan={7} className="text-center py-4 text-gray-500 border border-gray-300">
-                    No suppliers found
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+                ) : suppliers.length > 0 ? (
+                  suppliers
+                    .filter((supplier) => {
+                      const matchesSearch =
+                        supplier.supplierName.toLowerCase().includes(search.toLowerCase()) ||
+                        supplier.gstNumber?.toLowerCase().includes(search.toLowerCase()) ||
+                        supplier.city?.toLowerCase().includes(search.toLowerCase()) ||
+                        supplier.phone?.includes(search) ||
+                        supplier.email?.toLowerCase().includes(search.toLowerCase());
+                      
+                      const matchesInactiveFilter = showInactive 
+                        ? supplier.isActive === false 
+                        : supplier.isActive === true;
+                      
+                      return matchesSearch && matchesInactiveFilter;
+                    })
+                    .map((supplier, index) => (
+                    <tr key={supplier.id} className="hover:bg-gray-50 border-b border-gray-200">
+                      <td className="border border-gray-300 px-3 py-2 font-semibold text-gray-900">
+                        {((pagination?.page || 1) - 1) * ITEMS_PER_PAGE + index + 1}
+                      </td>
+                      <td className="border border-gray-300 px-3 py-2 font-semibold text-gray-900">
+                        {supplier.supplierName}
+                      </td>
+                      <td className="border border-gray-300 px-3 py-2 text-gray-600 text-xs font-mono">
+                        {supplier.gstNumber || "-"}
+                      </td>
+                      <td className="border border-gray-300 px-3 py-2 text-gray-600 text-xs">
+                        {supplier.email || "-"}
+                      </td>
+                      <td className="border border-gray-300 px-3 py-2 text-center text-gray-600 text-sm">
+                        {supplier.phone || "-"}
+                      </td>
+                      <td className="border border-gray-300 px-3 py-2 text-gray-600">
+                        {supplier.city || "-"}
+                      </td>
+                      
+                      <td className="border border-gray-300 px-3 py-2">
+                        <div className="flex justify-center gap-1 flex-wrap">
+                          <button
+                            onClick={() => handleToggleActive(supplier.id)}
+                            className={`px-2 py-1 rounded text-xs font-semibold transition-colors ${
+                              supplier.isActive
+                                ? "bg-green-500 hover:bg-green-600 text-white"
+                                : "bg-gray-400 hover:bg-gray-500 text-white"
+                            }`}
+                          >
+                            {supplier.isActive ? "Active" : "Inactive"}
+                          </button>
+                          <button
+                            onClick={() => {
+                              setEditingSupplier(supplier);
+                              setShowModal(true);
+                            }}
+                            className="bg-blue-600 text-white px-2 py-1 rounded text-xs hover:bg-blue-700 transition-colors flex items-center gap-1"
+                          >
+                            <Edit2 size={12} /> Edit
+                          </button>
+                          <button
+                            onClick={() => handleDelete(supplier.id)}
+                            className="bg-red-500 text-white px-2 py-1 rounded text-xs hover:bg-red-600 transition-colors flex items-center gap-1"
+                          >
+                            <Trash2 size={12} /> Delete
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={7} className="text-center py-4 text-gray-500 border border-gray-300">
+                      No suppliers found
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
 
-        {/* Pagination */}
-        {totalPages > 1 && (
-          <div className="flex items-center justify-between gap-2 mt-4 p-3 bg-white rounded shadow-md">
-            <span className="text-sm text-gray-600">
-              Page {currentPage} of {totalPages}
-            </span>
-            <div className="flex gap-2">
+          {/* Pagination Controls */}
+          {pagination && pagination.totalPages > 1 && (
+            <div className="border-t p-3 bg-gray-50 flex items-center justify-between text-xs sm:text-sm">
               <button
-                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
                 disabled={currentPage === 1}
-                className="p-2 border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50 transition-colors"
+                className={`px-3 py-1 rounded ${currentPage === 1 ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-orange-500 text-white hover:bg-orange-600'}`}
               >
-                <ChevronLeft size={16} />
+                ← Previous
               </button>
-              {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-                <button
-                  key={page}
-                  onClick={() => setCurrentPage(page)}
-                  className={`px-3 py-1.5 rounded text-sm transition-colors ${
-                    currentPage === page
-                      ? "bg-orange-500 text-white"
-                      : "border border-gray-300 hover:bg-gray-50"
-                  }`}
-                >
-                  {page}
-                </button>
-              ))}
+
+              <div className="flex items-center gap-1">
+                {(() => {
+                  const pages = [];
+                  const totalPages = pagination.totalPages;
+                  
+                  if (totalPages <= 5) {
+                    for (let i = 1; i <= totalPages; i++) pages.push(i);
+                  } else {
+                    if (currentPage <= 3) {
+                      pages.push(1, 2, 3, 4, '...', totalPages);
+                    } else if (currentPage >= totalPages - 2) {
+                      pages.push(1, '...', totalPages - 3, totalPages - 2, totalPages - 1, totalPages);
+                    } else {
+                      pages.push(1, '...', currentPage - 1, currentPage, currentPage + 1, '...', totalPages);
+                    }
+                  }
+
+                  return pages.map((page, idx) => (
+                    page === '...' ? (
+                      <span key={idx} className="px-2">...</span>
+                    ) : (
+                      <button
+                        key={idx}
+                        onClick={() => setCurrentPage(page as number)}
+                        className={`w-7 h-7 rounded ${currentPage === page ? 'bg-orange-500 text-white font-bold' : 'bg-white border hover:bg-gray-100'}`}
+                      >
+                        {page}
+                      </button>
+                    )
+                  ));
+                })()}
+              </div>
+
               <button
-                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                disabled={currentPage === totalPages}
-                className="p-2 border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50 transition-colors"
+                onClick={() => setCurrentPage(p => Math.min(pagination.totalPages, p + 1))}
+                disabled={currentPage === pagination.totalPages}
+                className={`px-3 py-1 rounded ${currentPage === pagination.totalPages ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-orange-500 text-white hover:bg-orange-600'}`}
               >
-                <ChevronRight size={16} />
+                Next →
               </button>
             </div>
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
       {/* Modal */}

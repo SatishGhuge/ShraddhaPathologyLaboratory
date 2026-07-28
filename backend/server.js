@@ -13,6 +13,7 @@ import signatureRoutes from './routes/signature.routes.js';
 import doctorRevenueRoutes from './routes/doctor-revenue.routes.js';
 import machineRoutes from './routes/machine.routes.js';
 import machineConfigRoutes from './routes/machine-config.routes.js';
+import inventoryRoutes from './routes/inventory.routes.js';
 import { emailService } from './services/notification.service.js';
 
 // Load environment variables
@@ -51,6 +52,7 @@ app.use('/api/signatures', signatureRoutes);
 app.use('/api/machines', machineConfigRoutes);
 app.use('/api/doctor-revenue', doctorRevenueRoutes);
 app.use('/api/machine/v1', machineRoutes);
+app.use('/api/inventory', inventoryRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {

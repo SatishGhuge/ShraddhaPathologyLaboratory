@@ -587,7 +587,7 @@ export const getTestById = async (req, res) => {
       departmentId: test.departmentId,
       sampleTypeId: test.sampleTypeId,
       sample_type: test.sample_type,
-      machineName: test.machineName,
+      machineId: test.machineId,
       group: test.group,
       reportHeader: test.reportHeader,
       preparationTime: test.preparationTime,
@@ -694,8 +694,8 @@ export const createTest = async (req, res) => {
     console.log('📊 Processing categories:', categories?.length || 0);
     
     // 🔍 DEBUG: Log boolean field conversions for CREATE
-    const attachFileValue = attachFile ? (typeof attachFile === 'boolean' ? 1 : (attachFile === 'Yes' || attachFile === 'true' ? 1 : 0)) : 0;
-    const profileTestValue = profileTest ? (typeof profileTest === 'boolean' ? 1 : (profileTest === 'Yes' || profileTest === 'true' ? 1 : 0)) : 0;
+    const attachFileValue = attachFile ? (typeof attachFile === 'boolean' ? attachFile : (attachFile === 'Yes' || attachFile === 'true' ? true : false)) : false;
+    const profileTestValue = profileTest ? (typeof profileTest === 'boolean' ? profileTest : (profileTest === 'Yes' || profileTest === 'true' ? true : false)) : false;
     
     console.log('%c═══ CREATE TEST - BOOLEAN CONVERSIONS ═══', 'color: #FFD700; font-weight: bold');
     console.log('attachFile received:', attachFile, `Type: ${typeof attachFile}`);
@@ -927,7 +927,7 @@ export const updateTest = async (req, res) => {
     if (machineId !== undefined) updateData.machine = machineId ? { connect: { id: parseInt(machineId) } } : { disconnect: true };
     // ⚠️ NOTE: sampleTypeId handled separately via raw SQL due to Prisma client cache issue
     // if (sampleTypeId !== undefined) updateData.sampleTypeId = sampleTypeId ? parseInt(sampleTypeId) : null;
-    if (machineName !== undefined) updateData.machineName = machineName || null;
+    if (machineName !== undefined) updateData.machine = machineName ? { connect: { id: parseInt(machineName) } } : undefined;
     if (group !== undefined) updateData.group = group || null;
     if (reportHeader !== undefined) updateData.reportHeader = reportHeader || null;
     if (preparationTime !== undefined) updateData.preparationTime = preparationTime || null;
@@ -939,13 +939,13 @@ export const updateTest = async (req, res) => {
     if (outsourceLab !== undefined) updateData.outsourceLab = outsourceLab || null;
     // Convert boolean fields properly (handle both true/false and string values)
     if (attachFile !== undefined) {
-      let attachFileValue = 0;
+      let attachFileValue = false;
       if (typeof attachFile === 'boolean') {
-        attachFileValue = attachFile ? 1 : 0;
+        attachFileValue = attachFile;
       } else if (typeof attachFile === 'number') {
-        attachFileValue = attachFile ? 1 : 0;
+        attachFileValue = attachFile ? true : false;
       } else if (typeof attachFile === 'string') {
-        attachFileValue = (attachFile === 'Yes' || attachFile === 'true' || attachFile === '1') ? 1 : 0;
+        attachFileValue = (attachFile === 'Yes' || attachFile === 'true' || attachFile === '1') ? true : false;
       }
       updateData.attachFile = attachFileValue;
       console.log('🔧 Processing attachFile:', { 
@@ -956,13 +956,13 @@ export const updateTest = async (req, res) => {
     }
     if (imageSize !== undefined) updateData.imageSize = imageSize || null;
     if (profileTest !== undefined) {
-      let profileTestValue = 0;
+      let profileTestValue = false;
       if (typeof profileTest === 'boolean') {
-        profileTestValue = profileTest ? 1 : 0;
+        profileTestValue = profileTest;
       } else if (typeof profileTest === 'number') {
-        profileTestValue = profileTest ? 1 : 0;
+        profileTestValue = profileTest ? true : false;
       } else if (typeof profileTest === 'string') {
-        profileTestValue = (profileTest === 'Yes' || profileTest === 'true' || profileTest === '1') ? 1 : 0;
+        profileTestValue = (profileTest === 'Yes' || profileTest === 'true' || profileTest === '1') ? true : false;
       }
       updateData.profileTest = profileTestValue;
       console.log('🔧 Processing profileTest:', { 
@@ -2888,23 +2888,25 @@ export const createPackage = async (req, res) => {
     } = req.body;
 
     // Validate required fields
-    if (!name || !departmentId) {
+    if (!name) {
       return res.status(400).json({
         success: false,
-        message: 'Name and department are required'
+        message: 'Package name is required'
       });
     }
 
-    // Check if department exists
-    const department = await prisma.department.findUnique({
-      where: { id: parseInt(departmentId) }
-    });
-
-    if (!department) {
-      return res.status(404).json({
-        success: false,
-        message: 'Department not found'
+    // Check if department exists (if provided)
+    if (departmentId) {
+      const department = await prisma.department.findUnique({
+        where: { id: parseInt(departmentId) }
       });
+
+      if (!department) {
+        return res.status(404).json({
+          success: false,
+          message: 'Department not found'
+        });
+      }
     }
 
     // Create package
@@ -2912,7 +2914,7 @@ export const createPackage = async (req, res) => {
       data: {
         name,
         code,
-        departmentId: parseInt(departmentId),
+        departmentId: departmentId ? parseInt(departmentId) : null,
         b2cCharge: b2cCharge ? parseFloat(b2cCharge) : 0,
         isActive: isActive !== undefined ? isActive : true
       }

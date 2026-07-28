@@ -85,7 +85,11 @@ const urlPathMap: { [key: string]: string } = {
   "config/machines": "Configuration / Machines",
   
   // Inventory Module
+  "inventory/item": "Inventory / Item",
+  "inventory/supplier": "Inventory / Supplier",
+  "inventory/stock-entry": "Inventory / Stock Entry",
   "inventory/stock-transactions": "Inventory / Stock Transactions",
+  "inventory/org-transfer": "Inventory / Organization Transfer",
   
   // Dashboard
   "labdashboard": "Dashboard",
@@ -120,21 +124,27 @@ export default function PageHeader({ title = "", icon: Icon, path = "" }: { titl
   const showBackButton = pathname.includes('/test-excel-manager');
 
   return (
-    <div className="mb-2">
-
-      {/* Breadcrumb with optional Back Button */}
+    <div className="mb-4">
+      {/* Breadcrumb Navigation */}
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-1 text-sm text-slate-500">
-          <Home size={16} />
-          <span>Home</span>
+        <div className="flex items-center gap-1 text-sm text-slate-600">
+          {/* Home link */}
+          <button
+            onClick={() => router.push('/')}
+            className="flex items-center gap-1 hover:text-blue-600 transition"
+          >
+            <Home size={16} />
+            <span className="font-medium">Home</span>
+          </button>
 
+          {/* Breadcrumb items */}
           {pathItems.map((item, i) => {
             const ItemIcon = iconMap[item] || FileText;
             return (
-              <div key={i} className="flex items-center gap-2">
-                <span>/</span>
-                <ItemIcon size={16} />
-                <span>{item}</span>
+              <div key={i} className="flex items-center gap-1">
+                <span className="text-slate-400">/</span>
+                <ItemIcon size={16} className="text-slate-500" />
+                <span className="font-medium">{item}</span>
               </div>
             );
           })}

@@ -890,10 +890,6 @@ const AddTest = () => {
       emptyFields.push("Test Name");
     }
     
-    if (!formData.department) {
-      emptyFields.push("Department");
-    }
-    
     if (!formData.shortName.trim()) {
       emptyFields.push("Test Short Form");
     }
@@ -913,7 +909,7 @@ const AddTest = () => {
         name: formData.name,
         shortName: formData.shortName,
         testCode: formData.testCode || null,
-        departmentId: parseInt(formData.department),
+        departmentId: formData.department ? parseInt(formData.department) : null,
         sampleTypeId: formData.sampleTypeId ? parseInt(formData.sampleTypeId) : null,
         machineId: formData.machineId ? parseInt(formData.machineId) : null,
         group: formData.group || null,
@@ -1087,6 +1083,18 @@ const AddTest = () => {
   return (
     <>
       <Header />
+
+      <style>{`
+        /* Hide spinner arrows from number inputs */
+        input[type="number"]::-webkit-outer-spin-button,
+        input[type="number"]::-webkit-inner-spin-button {
+          -webkit-appearance: none;
+          margin: 0;
+        }
+        input[type="number"] {
+          -moz-appearance: textfield;
+        }
+      `}</style>
 
        <div className="p-3 sm:p-4 md:p-6 bg-white min-h-screen">
         {/* TOP BAR */}

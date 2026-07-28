@@ -1,11 +1,15 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { ArrowLeft, AlertCircle } from "lucide-react";
+import { ArrowLeft, AlertCircle, Plus } from "lucide-react";
+import inventoryAPI from "@/lib/api/inventory.api";
+import HSNMasterModal from "./HSNMasterModal";
 
-interface SupplierOption {
+interface HSNCodeOption {
   id: number;
-  supplierName: string;
+  hsnCode: string;
+  category: string;
+  gstRate: number;
 }
 
 interface ItemMasterModalProps {
@@ -13,7 +17,6 @@ interface ItemMasterModalProps {
   onClose: () => void;
   onItemSaved?: (item: any) => void;
   editingItem?: any | null;
-  suppliers?: SupplierOption[];
 }
 
 export default function ItemMasterModal({
@@ -21,102 +24,115 @@ export default function ItemMasterModal({
   onClose,
   onItemSaved,
   editingItem = null,
-  suppliers = [],
 }: ItemMasterModalProps) {
   const [form, setForm] = useState({
-    itemId: "",
     itemName: "",
     itemCode: "",
-    hsnCode: "",
+    hsnCodeId: "",
     gst: "",
     unit: "Box",
-    description: "",
-    supplierId: "",
   });
 
-  const [editingItemId, setEditingItemId] = useState<any>(null);
+  const [hsnCodes, setHsnCodes] = useState<HSNCodeOption[]>([]);
+  const [editingItemId, setEditingItemId] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
+  const [loadingHsn, setLoadingHsn] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [successMsg, setSuccessMsg] = useState("");
+  const [isHsnModalOpen, setIsHsnModalOpen] = useState(false);
 
-  const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || '/api';
-
-  // Common units for dropdown
   const UNITS = ["Box", "Bottle", "Kit", "Piece", "Set", "Roll", "Strip", "Vial"];
 
-  // HSN codes - sample data
-  const HSN_CODES = [
-    { code: "30061100", desc: "Sterile surgical catgut, similar materials and sterilized surgical ligatures" },
-    { code: "30061900", desc: "Other sterilized surgical ligatures and similar materials" },
-    { code: "30020000", desc: "Human blood, animal blood prepared for therapeutic or diagnostic uses" },
-    { code: "30040000", desc: "Medicaments consisting of mixed unsorted ingredients" },
-    { code: "30024090", desc: "Other medicaments containing antibiotics" },
-  ];
-
-  // Initialize form when modal opens or editing item changes
-  useEffect(() => {
-    if (isOpen) {
-      if (editingItem) {
-        setEditingItemId(editingItem.id);
-        setForm({
-          itemId: editingItem.itemId || "",
-          itemName: editingItem.itemName || "",
-          itemCode: editingItem.itemCode || "",
-          hsnCode: editingItem.hsnCode || "",
-          gst: editingItem.gst || "",
-          unit: editingItem.unit || "Box",
-          description: editingItem.description || "",
-          supplierId: editingItem.supplierId || "",
-        });
-      } else {
-        setEditingItemId(null);
-        setForm({
-          itemId: "",
-          itemName: "",
-          itemCode: "",
-          hsnCode: "",
-          gst: "",
-          unit: "Box",
-          description: "",
-          supplierId: "",
-        });
-      }
-      setErrors({});
-      setSuccessMsg("");
+  const fetchHsnCodes = async () => {
+    try {
+      setLoadingHsn(true);
+      const response = await inventoryAPI.hsn.getAll(1, 100);
+      setHsnCodes(response.data.data || []);
+    } catch (err) {
+      console.error("Failed to fetch HSN codes:", err);
+      setErrors((prev) => ({
+        ...prev,
+        submit: "Failed to load HSN codes. Please try again.",
+      }));
+    } finally {
+      setLoadingHsn(false);
     }
+  };
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    fetchHsnCodes();
+  }, [isOpen]);
+
+  const handleHsnSaved = (hsnData: any) => {
+    fetchHsnCodes();
+    setForm((prev) => ({
+      ...prev,
+      hsnCodeId: String(hsnData.id),
+      gst: String(hsnData.gstRate),
+    }));
+  };
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    if (editingItem) {
+      setEditingItemId(editingItem.id);
+      setForm({
+        itemName: editingItem.itemName || "",
+        itemCode: editingItem.itemCode || "",
+        hsnCodeId: String(editingItem.hsnCodeId || editingItem.hsnCode?.id || ""),
+        gst: String(editingItem.hsnCode?.gstRate ?? ""),
+        unit: editingItem.unit || "Box",
+      });
+    } else {
+      setEditingItemId(null);
+      setForm({
+        itemName: "",
+        itemCode: "",
+        hsnCodeId: "",
+        gst: "",
+        unit: "Box",
+      });
+    }
+    setErrors({});
+    setSuccessMsg("");
   }, [isOpen, editingItem]);
 
-  // Validate form
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
 
     if (!form.itemName.trim()) newErrors.itemName = "Item Name is required";
     if (!form.itemCode.trim()) newErrors.itemCode = "Item Code is required";
-    if (!form.hsnCode.trim()) newErrors.hsnCode = "HSN Code is required";
-    if (!form.gst || form.gst.toString().trim() === "") newErrors.gst = "GST % is required";
+    if (!form.hsnCodeId) newErrors.hsnCodeId = "HSN Code is required";
     if (!form.unit.trim()) newErrors.unit = "Unit is required";
-
-    // Validate GST is a valid number
-    if (form.gst && isNaN(parseFloat(form.gst.toString()))) {
-      newErrors.gst = "GST must be a valid number";
-    }
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
-  // Handle input change
   const handleInputChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
   ) => {
     const { name, value } = e.target;
-    setForm((prev) => ({ ...prev, [name]: value }));
+
+    if (name === "hsnCodeId") {
+      const selected = hsnCodes.find((h) => String(h.id) === value);
+      setForm((prev) => ({
+        ...prev,
+        hsnCodeId: value,
+        gst: selected ? String(selected.gstRate) : "",
+      }));
+    } else {
+      setForm((prev) => ({ ...prev, [name]: value }));
+    }
+
     if (errors[name]) {
       setErrors((prev) => ({ ...prev, [name]: "" }));
     }
   };
 
-  // Submit handler
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
@@ -124,22 +140,35 @@ export default function ItemMasterModal({
 
     try {
       setLoading(true);
+      setErrors({});
 
-      // For now, we'll just simulate the save since no backend is needed for frontend-only design
-      // In production, this would call the API
-      const itemData = {
-        ...form,
-        id: editingItemId || Date.now(),
-        gst: parseFloat(form.gst),
+      const payload = {
+        itemName: form.itemName.trim(),
+        itemCode: form.itemCode.trim(),
+        hsnCodeId: parseInt(form.hsnCodeId, 10),
+        unit: form.unit,
       };
 
+      let response;
+      if (editingItemId) {
+        response = await inventoryAPI.items.update(editingItemId, {
+          itemName: payload.itemName,
+          hsnCodeId: payload.hsnCodeId,
+          unit: payload.unit,
+        });
+      } else {
+        response = await inventoryAPI.items.create(payload);
+      }
+
+      const itemData = response.data.data;
       setSuccessMsg(editingItemId ? "Item Updated Successfully!" : "Item Added Successfully!");
       onItemSaved?.(itemData);
-
       setTimeout(closeModal, 1500);
     } catch (error: any) {
-      console.error('Error saving item:', error);
-      setErrors({ submit: error.message || 'Failed to save item' });
+      console.error("Error saving item:", error);
+      setErrors({
+        submit: error.response?.data?.message || error.message || "Failed to save item",
+      });
     } finally {
       setLoading(false);
     }
@@ -147,14 +176,11 @@ export default function ItemMasterModal({
 
   const closeModal = () => {
     setForm({
-      itemId: "",
       itemName: "",
       itemCode: "",
-      hsnCode: "",
+      hsnCodeId: "",
       gst: "",
       unit: "Box",
-      description: "",
-      supplierId: "",
     });
     setEditingItemId(null);
     setErrors({});
@@ -167,7 +193,6 @@ export default function ItemMasterModal({
   return (
     <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex justify-center items-center z-50 p-4">
       <div className="bg-white w-full max-w-2xl rounded-lg shadow-lg">
-        {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-slate-50 to-white">
           <div>
             <h2 className="text-lg font-bold text-slate-900">
@@ -185,12 +210,8 @@ export default function ItemMasterModal({
           </button>
         </div>
 
-        {/* Form */}
         <form onSubmit={handleSubmit} className="p-6 space-y-5">
-          {/* Item ID - Auto */}
           <div className="grid grid-cols-2 gap-4">
-
-            {/* Item Name - Required */}
             <div>
               <label className="block text-xs font-semibold text-gray-700 mb-1.5">
                 Item Name <span className="text-red-500">*</span>
@@ -213,7 +234,6 @@ export default function ItemMasterModal({
             </div>
           </div>
 
-          {/* Item Code - Required */}
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-semibold text-gray-700 mb-1.5">
@@ -224,10 +244,11 @@ export default function ItemMasterModal({
                 name="itemCode"
                 value={form.itemCode}
                 onChange={handleInputChange}
+                disabled={!!editingItemId}
                 placeholder="e.g., REG-001"
                 className={`w-full px-3 py-2 border rounded text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 transition ${
                   errors.itemCode ? "border-red-500 bg-red-50" : "border-gray-200"
-                }`}
+                } ${editingItemId ? "bg-gray-100 cursor-not-allowed" : ""}`}
               />
               {errors.itemCode && (
                 <p className="text-red-500 text-xs mt-1 flex items-center gap-1">
@@ -236,59 +257,66 @@ export default function ItemMasterModal({
               )}
             </div>
 
-            {/* HSN Code - Required */}
             <div>
-              <label className="block text-xs font-semibold text-gray-700 mb-1.5">
-                HSN Code <span className="text-red-500">*</span>
-              </label>
+              <div className="flex justify-between items-center mb-1.5">
+                <label className="block text-xs font-semibold text-gray-700">
+                  HSN Code <span className="text-red-500">*</span>
+                </label>
+                <button
+                  type="button"
+                  onClick={() => setIsHsnModalOpen(true)}
+                  className="flex items-center gap-1 text-[10px] font-medium text-orange-600 hover:text-orange-700"
+                >
+                  <Plus size={12} /> Add HSN
+                </button>
+              </div>
               <select
-                name="hsnCode"
-                value={form.hsnCode}
+                name="hsnCodeId"
+                value={form.hsnCodeId}
                 onChange={handleInputChange}
+                disabled={loadingHsn}
                 className={`w-full px-3 py-2 border rounded text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 transition bg-white cursor-pointer ${
-                  errors.hsnCode ? "border-red-500 bg-red-50" : "border-gray-200"
+                  errors.hsnCodeId ? "border-red-500 bg-red-50" : "border-gray-200"
                 }`}
               >
-                <option value="">▼ Select HSN Code</option>
-                {HSN_CODES.map((hsn) => (
-                  <option key={hsn.code} value={hsn.code}>
-                    {hsn.code} - {hsn.desc.substring(0, 40)}...
+                <option value="">
+                  {loadingHsn ? "Loading HSN codes..." : "Select HSN Code"}
+                </option>
+                {hsnCodes.map((hsn) => (
+                  <option key={hsn.id} value={hsn.id}>
+                    {hsn.hsnCode} - {hsn.category}
                   </option>
                 ))}
               </select>
-              {errors.hsnCode && (
+              {errors.hsnCodeId && (
                 <p className="text-red-500 text-xs mt-1 flex items-center gap-1">
-                  <AlertCircle size={12} /> {errors.hsnCode}
+                  <AlertCircle size={12} /> {errors.hsnCodeId}
+                </p>
+              )}
+              {!loadingHsn && hsnCodes.length === 0 && (
+                <p className="text-amber-600 text-xs mt-1">
+                  No HSN codes found. Add HSN codes in the backend first.
                 </p>
               )}
             </div>
           </div>
 
-          {/* GST % - Required & Auto Fetch */}
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-semibold text-gray-700 mb-1.5">
-                GST % <span className="text-red-500">*</span>
+                GST %
               </label>
               <input
                 type="text"
                 name="gst"
                 value={form.gst}
-                onChange={handleInputChange}
-                placeholder="Auto Fetch"
-                className={`w-full px-3 py-2 border rounded text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 transition ${
-                  errors.gst ? "border-red-500 bg-red-50" : "border-gray-200"
-                }`}
+                readOnly
+                placeholder="Auto from HSN"
+                className="w-full px-3 py-2 border border-gray-200 rounded text-sm bg-gray-50"
               />
-              {errors.gst && (
-                <p className="text-red-500 text-xs mt-1 flex items-center gap-1">
-                  <AlertCircle size={12} /> {errors.gst}
-                </p>
-              )}
               <p className="text-gray-400 text-[10px] mt-1">Based on HSN code selection</p>
             </div>
 
-            {/* Unit - Required */}
             <div>
               <label className="block text-xs font-semibold text-gray-700 mb-1.5">
                 Unit <span className="text-red-500">*</span>
@@ -315,36 +343,18 @@ export default function ItemMasterModal({
             </div>
           </div>
 
-          {/* Description */}
-          <div>
-            <label className="block text-xs font-semibold text-gray-700 mb-1.5">
-              Description
-            </label>
-            <textarea
-              name="description"
-              value={form.description}
-              onChange={handleInputChange}
-              placeholder="Enter item description (optional)"
-              rows={3}
-              className="w-full px-3 py-2 border border-gray-200 rounded text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 transition resize-none"
-            />
-          </div>
-
-          {/* Error Message */}
           {errors.submit && (
             <div className="p-3 bg-red-50 border border-red-200 rounded text-red-700 text-xs flex items-center gap-2">
               <AlertCircle size={14} /> {errors.submit}
             </div>
           )}
 
-          {/* Success Message */}
           {successMsg && (
             <div className="p-3 bg-green-50 border border-green-200 rounded text-green-700 text-xs">
               ✓ {successMsg}
             </div>
           )}
 
-          {/* Actions */}
           <div className="flex gap-3 pt-2 border-t border-gray-100">
             <button
               type="button"
@@ -356,7 +366,7 @@ export default function ItemMasterModal({
             </button>
             <button
               type="submit"
-              disabled={loading}
+              disabled={loading || loadingHsn}
               className="flex-1 py-2.5 px-4 bg-orange-500 hover:bg-orange-600 text-white font-semibold rounded text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {loading ? "Saving..." : editingItemId ? "Update Item" : "Save Item"}
@@ -364,6 +374,12 @@ export default function ItemMasterModal({
           </div>
         </form>
       </div>
+
+      <HSNMasterModal
+        isOpen={isHsnModalOpen}
+        onClose={() => setIsHsnModalOpen(false)}
+        onHSNSaved={handleHsnSaved}
+      />
     </div>
   );
 }

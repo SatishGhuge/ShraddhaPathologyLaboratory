@@ -1,11 +1,27 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { X, Plus, Trash2, Edit2, Check } from "lucide-react";
+import { X, Plus, Trash2, Edit2, Check, AlertCircle } from "lucide-react";
+import inventoryAPI from "@/lib/api/inventory.api";
+import ItemMasterModal from "@/src/components/ItemMasterModal";
 
 interface Supplier {
   id: number;
   supplierName: string;
+  state?: string;
+  city?: string;
+  email?: string;
+  phone?: string;
+  address?: string;
+  gstNumber?: string;
+}
+
+interface HSNCodeObj {
+  id: number;
+  hsnCode: string;
+  category: string;
+  gstRate: number;
+  isActive: boolean;
 }
 
 interface Item {
@@ -13,8 +29,8 @@ interface Item {
   itemId: string;
   itemName: string;
   itemCode: string;
-  hsnCode: string;
-  gst: number;
+  hsnCode: HSNCodeObj | string;
+  gst?: number;
   unit: string;
 }
 
@@ -59,6 +75,21 @@ interface StockEntryModalProps {
   onStockEntrySaved: (data: any) => void;
   suppliers: Supplier[];
   items: Item[];
+  editingEntry?: any;
+}
+
+interface TaxInfo {
+  taxType: "IGST" | "CGST_SGST";
+  description: string;
+  supplierState: string;
+  isOutOfState: boolean;
+  taxRate?: number;
+  cgstRate?: number;
+  sgstRate?: number;
+  totalTaxAmount?: number;
+  totalCGST?: number;
+  totalSGST?: number;
+  totalIGST?: number;
 }
 
 export default function StockEntryModal({
@@ -67,6 +98,7 @@ export default function StockEntryModal({
   onStockEntrySaved,
   suppliers,
   items,
+  editingEntry,
 }: StockEntryModalProps) {
   // Header form (Supplier, Invoice No, Invoice Date)
   const [headerForm, setHeaderForm] = useState<StockEntryForm>({
@@ -75,13 +107,30 @@ export default function StockEntryModal({
     invoiceDate: new Date().toISOString().split("T")[0],
   });
 
+  // Track supplier details to determine tax type
+  const [selectedSupplier, setSelectedSupplier] = useState<any>(null);
+  const [isOutOfState, setIsOutOfState] = useState(false);
+
   // Item form for adding new items
+  const getHsnCodeValue = (hsnCode: any): string => {
+    return typeof hsnCode === 'object' 
+      ? hsnCode?.hsnCode || "" 
+      : hsnCode || "";
+  };
+
+  const getGstValue = (item: any): number | "" => {
+    if (typeof item.hsnCode === 'object' && item.hsnCode?.gstRate) {
+      return item.hsnCode.gstRate;
+    }
+    return item.gst || "";
+  };
+
   const [itemForm, setItemForm] = useState<ItemForm>({
     itemId: items.length > 0 ? items[0].id : undefined,
-    hsnNumber: items.length > 0 ? items[0].hsnCode : "",
+    hsnNumber: items.length > 0 ? getHsnCodeValue(items[0].hsnCode) : "",
     unit: items.length > 0 ? items[0].unit : "",
     itemCode: items.length > 0 ? items[0].itemCode : "",
-    gst: items.length > 0 ? items[0].gst : "",
+    gst: items.length > 0 ? getGstValue(items[0]) : "",
     batchNo: "BATCH-001",
     expiryDate: new Date(new Date().setDate(new Date().getDate() + 30)).toISOString().split("T")[0],
     quantity: 10,
@@ -89,32 +138,13 @@ export default function StockEntryModal({
   });
 
   // Selected items list - only add sample if items exist
-  const [selectedItems, setSelectedItems] = useState<StockEntryItem[]>(
-    items.length > 0
-      ? [
-          {
-            itemId: items[0].id,
-            itemName: items[0].itemName,
-            unit: items[0].unit,
-            itemCode: items[0].itemCode,
-            hsnNumber: items[0].hsnCode,
-            gst: items[0].gst,
-            cgst: 135,
-            sgst: 135,
-            batchNo: "BATCH-2024-001",
-            expiryDate: new Date(new Date().setDate(new Date().getDate() + 30))
-              .toISOString()
-              .split("T")[0],
-            quantity: 10,
-            pricePerUnit: 150,
-            basicAmount: 1500,
-            totalAmount: 1770,
-          },
-        ]
-      : []
-  );
+  const [selectedItems, setSelectedItems] = useState<StockEntryItem[]>([]);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [submitError, setSubmitError] = useState("");
+  const [showItemModal, setShowItemModal] = useState(false);
+  const [taxInfo, setTaxInfo] = useState<TaxInfo | null>(null);
 
   useEffect(() => {
     if (!isOpen) {
@@ -136,23 +166,93 @@ export default function StockEntryModal({
       });
       setSelectedItems([]);
       setErrors({});
-    }
-  }, [isOpen]);
+      setSubmitError("");
+    } else if (isOpen && editingEntry) {
+      // Populate form when editing an existing entry
+      console.log("🔧 EDIT MODE: Loading entry data...", editingEntry);
+      
+      setHeaderForm({
+        supplierId: editingEntry.supplierId,
+        invoiceNo: editingEntry.invoiceNo,
+        invoiceDate: editingEntry.invoiceDate.split("T")[0],
+      });
 
-  const selectedItemData = items.find((item) => item.id === itemForm.itemId);
+      // Populate selected items from the entry
+      const mappedItems = editingEntry.items.map((item: any) => {
+        // Get item details from nested item object or direct properties
+        const itemDetails = item.item || {};
+        
+        // Calculate GST from cgstPercent if gst is not available
+        // cgstPercent and sgstPercent are half percentages (CGST = GST/2, SGST = GST/2)
+        const gstPercent = (item.cgstPercent && item.sgstPercent) 
+          ? (item.cgstPercent + item.sgstPercent) 
+          : 0;
+        
+        const mappedItem = {
+          itemId: item.itemId,
+          itemName: itemDetails.itemName || item.itemName || "-",
+          unit: itemDetails.unit || item.unit || "",
+          itemCode: itemDetails.itemCode || item.itemCode || "",
+          hsnNumber: item.hsnNumber || "",
+          gst: gstPercent,
+          cgst: item.cgstAmount || 0,
+          sgst: item.sgstAmount || 0,
+          batchNo: item.batchNo,
+          expiryDate: item.expiryDate.split("T")[0],
+          quantity: item.quantity,
+          pricePerUnit: item.pricePerUnit,
+          basicAmount: item.basicAmount,
+          totalAmount: item.totalAmount,
+        };
+        
+        console.log("📦 Mapped item:", mappedItem);
+        return mappedItem;
+      });
+
+      console.log("✅ Selected items mapped:", mappedItems.length, "items");
+      setSelectedItems(mappedItems);
+      setEditingIndex(null); // Reset editing index so we see Edit buttons
+      setItemForm({
+        itemId: undefined,
+        hsnNumber: "",
+        unit: "",
+        itemCode: "",
+        gst: "",
+        batchNo: "",
+        expiryDate: "",
+        quantity: "",
+        pricePerUnit: "",
+      });
+      setErrors({});
+      setSubmitError("");
+    }
+  }, [isOpen, editingEntry]);
+
+  const selectedItemData = items.find((item) => item.id === Number(itemForm.itemId));
 
   // Auto-fetch item details
   useEffect(() => {
     if (selectedItemData) {
       setItemForm((prev) => ({
         ...prev,
-        hsnNumber: selectedItemData.hsnCode,
-        unit: selectedItemData.unit,
-        itemCode: selectedItemData.itemCode,
-        gst: selectedItemData.gst,
+        hsnNumber: getHsnCodeValue(selectedItemData.hsnCode),
+        unit: selectedItemData.unit || "",
+        itemCode: selectedItemData.itemCode || "",
+        gst: getGstValue(selectedItemData),
       }));
     }
   }, [selectedItemData]);
+
+  // Listen for new item creation
+  useEffect(() => {
+    const handleItemCreated = () => {
+      // Refetch items from parent - we'll use a callback
+      console.log("Item created, parent should refresh items list");
+    };
+
+    window.addEventListener('itemCreated', handleItemCreated);
+    return () => window.removeEventListener('itemCreated', handleItemCreated);
+  }, []);
 
   const handleAddItem = () => {
     const newErrors: Record<string, string> = {};
@@ -168,7 +268,7 @@ export default function StockEntryModal({
     if (Object.keys(newErrors).length > 0) return;
 
     // Get the selected item details from items array
-    const selectedItem = items.find((item) => item.id === itemForm.itemId);
+    const selectedItem = items.find((item) => item.id === Number(itemForm.itemId));
     
     if (!selectedItem) {
       setErrors({ itemId: "Selected item not found" });
@@ -253,7 +353,7 @@ export default function StockEntryModal({
     if (Object.keys(newErrors).length > 0) return;
 
     // Get the selected item details
-    const selectedItem = items.find((item) => item.id === itemForm.itemId);
+    const selectedItem = items.find((item) => item.id === Number(itemForm.itemId));
     
     if (!selectedItem) {
       setErrors({ itemId: "Selected item not found" });
@@ -299,7 +399,15 @@ export default function StockEntryModal({
     setErrors({});
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleItemSavedFromModal = async (newItem: any) => {
+    // Close the item modal
+    setShowItemModal(false);
+    
+    // Trigger parent refresh via custom event
+    window.dispatchEvent(new CustomEvent('itemCreated'));
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     const newErrors: Record<string, string> = {};
@@ -313,29 +421,83 @@ export default function StockEntryModal({
 
     if (Object.keys(newErrors).length > 0) return;
 
-    const totalBasicAmount = selectedItems.reduce((sum, item) => sum + item.basicAmount, 0);
-    const totalCGST = selectedItems.reduce((sum, item) => sum + item.cgst, 0);
-    const totalSGST = selectedItems.reduce((sum, item) => sum + item.sgst, 0);
-    const grandTotal = selectedItems.reduce((sum, item) => sum + item.totalAmount, 0);
+    try {
+      setLoading(true);
+      setSubmitError("");
 
-    onStockEntrySaved({
-      ...headerForm,
-      supplierId: Number(headerForm.supplierId),
-      items: selectedItems,
-      totalBasicAmount,
-      totalCGST,
-      totalSGST,
-      grandTotal,
-    });
+      const payload = {
+        supplierId: Number(headerForm.supplierId),
+        invoiceNo: headerForm.invoiceNo,
+        invoiceDate: headerForm.invoiceDate,
+        items: selectedItems.map((item) => ({
+          itemId: item.itemId,
+          batchNo: item.batchNo,
+          expiryDate: item.expiryDate,
+          quantity: item.quantity,
+          pricePerUnit: item.pricePerUnit,
+          cgstPercent: item.gst / 2,
+          sgstPercent: item.gst / 2,
+        })),
+      };
 
-    // Reset form
-    setHeaderForm({
-      supplierId: undefined,
-      invoiceNo: "",
-      invoiceDate: new Date().toISOString().split("T")[0],
-    });
-    setSelectedItems([]);
-    setErrors({});
+      let response;
+      if (editingEntry) {
+        // In edit mode - for now just show a message
+        // Note: You would need to create an update API endpoint on the backend
+        setSubmitError("Edit functionality requires backend update API implementation");
+        console.log("Edit payload:", payload);
+        // TODO: Call update API when available
+        // response = await inventoryAPI.stockEntries.update(editingEntry.id, payload);
+      } else {
+        // Create new stock entry
+        response = await inventoryAPI.stockEntries.create(payload);
+        console.log("🎯 Stock Entry Response:", response.data);
+        
+        // Extract and set tax information from response
+        if (response.data.data) {
+          const taxSummary = response.data.data.taxSummary;
+          const supplierInfo = response.data.data.supplierInfo;
+          
+          if (taxSummary && supplierInfo) {
+            setTaxInfo({
+              taxType: response.data.data.taxType,
+              description: taxSummary.description,
+              supplierState: supplierInfo.state,
+              isOutOfState: supplierInfo.isOutOfState,
+              taxRate: taxSummary.taxRate,
+              cgstRate: taxSummary.cgstRate,
+              sgstRate: taxSummary.sgstRate,
+              totalTaxAmount: taxSummary.totalTaxAmount,
+              totalCGST: taxSummary.totalCGST,
+              totalSGST: taxSummary.totalSGST,
+              totalIGST: taxSummary.totalIGST,
+            });
+            
+            console.log("✅ Tax Info Set:", {
+              taxType: response.data.data.taxType,
+              supplierState: supplierInfo.state,
+              description: taxSummary.description,
+            });
+          }
+        }
+        
+        onStockEntrySaved(response.data.data);
+      }
+
+      // Reset form
+      setHeaderForm({
+        supplierId: suppliers.length > 0 ? suppliers[0].id : undefined,
+        invoiceNo: "",
+        invoiceDate: new Date().toISOString().split("T")[0],
+      });
+      setSelectedItems([]);
+      setErrors({});
+    } catch (err: any) {
+      console.error("Failed to save stock entry:", err);
+      setSubmitError(err.response?.data?.message || "Failed to save stock entry");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleHeaderChange = (
@@ -346,6 +508,20 @@ export default function StockEntryModal({
       ...prev,
       [name]: value,
     }));
+    
+    // When supplier changes, fetch supplier details to determine tax type
+    if (name === "supplierId") {
+      const supplier = suppliers.find(s => s.id === parseInt(value));
+      if (supplier) {
+        setSelectedSupplier(supplier);
+        // Check if supplier is from outside Maharashtra
+        const outOfState = supplier.state && 
+          supplier.state.toLowerCase().trim() !== 'maharashtra';
+        setIsOutOfState(outOfState);
+        console.log(`✅ Supplier Selected: ${supplier.supplierName}, State: ${supplier.state}, Out of State: ${outOfState}`);
+      }
+    }
+    
     if (errors[name]) {
       setErrors((prev) => ({
         ...prev,
@@ -361,7 +537,7 @@ export default function StockEntryModal({
     setItemForm((prev) => ({
       ...prev,
       [name]:
-        name === "quantity" || name === "pricePerUnit"
+        name === "quantity" || name === "pricePerUnit" || name === "itemId"
           ? value === ""
             ? ""
             : Number(value)
@@ -387,6 +563,26 @@ export default function StockEntryModal({
     return rounded % 1 === 0 ? rounded.toFixed(0) : rounded.toFixed(2);
   };
 
+  // Calculate current item total for preview
+  const calculateItemTotal = () => {
+    const quantity = Number(itemForm.quantity) || 0;
+    const pricePerUnit = Number(itemForm.pricePerUnit) || 0;
+    const gst = Number(itemForm.gst) || 0;
+
+    if (quantity <= 0 || pricePerUnit <= 0) {
+      return { basicAmount: 0, cgst: 0, sgst: 0, total: 0 };
+    }
+
+    const basicAmount = quantity * pricePerUnit;
+    const cgst = basicAmount * (gst / 100) / 2;
+    const sgst = basicAmount * (gst / 100) / 2;
+    const total = basicAmount + cgst + sgst;
+
+    return { basicAmount, cgst, sgst, total };
+  };
+
+  const itemTotal = calculateItemTotal();
+
   const totalBasicAmount = selectedItems.reduce((sum, item) => sum + item.basicAmount, 0);
   const totalCGST = selectedItems.reduce((sum, item) => sum + item.cgst, 0);
   const totalSGST = selectedItems.reduce((sum, item) => sum + item.sgst, 0);
@@ -397,7 +593,9 @@ export default function StockEntryModal({
       <div className="bg-white rounded-lg shadow-lg w-full max-w-5xl max-h-[90vh] overflow-y-auto">
         {/* Header */}
         <div className="sticky top-0 flex justify-between items-center p-4 border-b bg-white">
-          <h2 className="text-lg font-bold text-gray-800">Stock Entry</h2>
+          <h2 className="text-lg font-bold text-gray-800">
+            {editingEntry ? `Edit Stock Entry - ${editingEntry.entryId}` : "Stock Entry"}
+          </h2>
           <button
             onClick={onClose}
             className="text-gray-500 hover:text-gray-700 transition"
@@ -411,6 +609,24 @@ export default function StockEntryModal({
           {/* Header Section - Supplier, Invoice No, Invoice Date */}
           <div className="border-b pb-3 space-y-2">
             <h3 className="text-xs font-semibold text-gray-700">Purchase Information</h3>
+            
+            {/* Tax Type Indicator */}
+            {selectedSupplier && (
+              <div className={`${isOutOfState ? 'bg-green-100 border-green-300' : 'bg-blue-100 border-blue-300'} border rounded px-3 py-2`}>
+                <p className="text-xs">
+                  <span className="font-semibold text-gray-700">📍 Supplier State: </span>
+                  <span className="font-bold text-gray-900">{selectedSupplier.state}</span>
+                  <span className="ml-4 font-semibold text-gray-700">
+                    {isOutOfState ? (
+                      <span className="text-green-700">✓ IGST WILL BE APPLIED</span>
+                    ) : (
+                      <span className="text-blue-700">✓ CGST + SGST WILL BE APPLIED</span>
+                    )}
+                  </span>
+                </p>
+              </div>
+            )}
+            
             <div className="grid grid-cols-3 gap-2">
               <div>
                 <label className="block text-xs font-semibold text-gray-700 mb-0.5">
@@ -486,23 +702,33 @@ export default function StockEntryModal({
             <h3 className="text-xs font-semibold text-gray-700">Add Item</h3>
             
             <div className="grid grid-cols-5 gap-2">
-              <div>
+              <div className="col-span-1">
                 <label className="block text-xs font-semibold text-gray-700 mb-0.5">Item</label>
-                <select
-                  name="itemId"
-                  value={itemForm.itemId || ""}
-                  onChange={handleItemChange}
-                  className={`w-full border rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 ${
-                    errors.itemId ? "border-red-500 focus:ring-red-500" : "border-gray-300 focus:ring-orange-500"
-                  }`}
-                >
-                  <option value="">Select</option>
-                  {items.map((item) => (
-                    <option key={item.id} value={item.id}>
-                      {item.itemName}
-                    </option>
-                  ))}
-                </select>
+                <div className="flex gap-1">
+                  <select
+                    name="itemId"
+                    value={itemForm.itemId || ""}
+                    onChange={handleItemChange}
+                    className={`flex-1 border rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 ${
+                      errors.itemId ? "border-red-500 focus:ring-red-500" : "border-gray-300 focus:ring-orange-500"
+                    }`}
+                  >
+                    <option value="">Select</option>
+                    {items.map((item) => (
+                      <option key={item.id} value={item.id}>
+                        {item.itemName}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    onClick={() => setShowItemModal(true)}
+                    title="Add new item"
+                    className=" text-orange-600 text-bold px-2 py-2 rounded text-xl transition-colors"
+                  >
+                    <Plus size={16} />
+                  </button>
+                </div>
               </div>
 
               <div>
@@ -614,27 +840,67 @@ export default function StockEntryModal({
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-gray-700 mb-0.5">CGST %</label>
+                <label className="block text-xs font-semibold text-gray-700 mb-0.5">
+                  {isOutOfState ? "IGST %" : "CGST %"} 
+                  <span className="text-green-600 font-bold"> </span>
+                </label>
                 <input
                   type="text"
                   disabled
-                  value={itemForm.gst ? (Number(itemForm.gst) / 2).toFixed(2) : "0.00"}
-                  className="w-full border border-gray-300 rounded px-2 py-1 text-xs bg-gray-50 text-center"
+                  value={isOutOfState 
+                    ? (itemForm.gst ? Number(itemForm.gst).toFixed(2) : "0.00")
+                    : (itemForm.gst ? (Number(itemForm.gst) / 2).toFixed(2) : "0.00")
+                  }
+                  className="w-full border-2 border-green-500 rounded px-2 py-1 text-xs bg-green-50 text-center font-semibold text-green-700"
                 />
               </div>
 
-              <div>
-                <label className="block text-xs font-semibold text-gray-700 mb-0.5">SGST %</label>
-                <input
-                  type="text"
-                  disabled
-                  value={itemForm.gst ? (Number(itemForm.gst) / 2).toFixed(2) : "0.00"}
-                  className="w-full border border-gray-300 rounded px-2 py-1 text-xs bg-gray-50 text-center"
-                />
-              </div>
+              {!isOutOfState && (
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 mb-0.5">
+                    SGST % 
+                    <span className="text-green-600 font-bold"></span>
+                  </label>
+                  <input
+                    type="text"
+                    disabled
+                    value={itemForm.gst ? (Number(itemForm.gst) / 2).toFixed(2) : "0.00"}
+                    className="w-full border-2 border-green-500 rounded px-2 py-1 text-xs bg-green-50 text-center font-semibold text-green-700"
+                  />
+                </div>
+              )}
             </div>
 
-            <div className="flex justify-end">
+            <div className="flex justify-between items-center">
+              <div className={`${isOutOfState ? 'bg-green-50 border-green-300' : 'bg-blue-50 border-blue-300'} border rounded px-3 py-1.5 flex items-center gap-4`}>
+                <div className="flex gap-4 text-xs">
+                  <div>
+                    <span className="text-gray-600">Basic: </span>
+                    <span className="font-semibold text-gray-800">₹{formatPrice(itemTotal.basicAmount)}</span>
+                  </div>
+                  {isOutOfState ? (
+                    <div>
+                      <span className="text-gray-600">IGST: </span>
+                      <span className="font-semibold text-green-700">₹{formatPrice(itemTotal.cgst + itemTotal.sgst)}</span>
+                    </div>
+                  ) : (
+                    <>
+                      <div>
+                        <span className="text-gray-600">CGST: </span>
+                        <span className="font-semibold text-gray-800">₹{formatPrice(itemTotal.cgst)}</span>
+                      </div>
+                      <div>
+                        <span className="text-gray-600">SGST: </span>
+                        <span className="font-semibold text-gray-800">₹{formatPrice(itemTotal.sgst)}</span>
+                      </div>
+                    </>
+                  )}
+                  <div className={`${isOutOfState ? 'border-green-300' : 'border-blue-300'} border-l pl-4`}>
+                    <span className="text-gray-600">Total: </span>
+                    <span className={`font-bold text-sm ${isOutOfState ? 'text-green-600' : 'text-blue-600'}`}>₹{formatPrice(itemTotal.total)}</span>
+                  </div>
+                </div>
+              </div>
               <button
                 type="button"
                 onClick={handleAddItem}
@@ -667,8 +933,14 @@ export default function StockEntryModal({
                       <th className="border border-gray-300 px-1.5 py-1 text-center min-w-12">Qty</th>
                       <th className="border border-gray-300 px-1.5 py-1 text-center min-w-16">Price</th>
                       <th className="border border-gray-300 px-1.5 py-1 text-center min-w-16">MRP</th>
-                      <th className="border border-gray-300 px-1.5 py-1 text-center min-w-14">CGST</th>
-                      <th className="border border-gray-300 px-1.5 py-1 text-center min-w-14">SGST</th>
+                      {isOutOfState ? (
+                        <th className="border border-gray-300 px-1.5 py-1 text-center min-w-14 bg-green-700">IGST</th>
+                      ) : (
+                        <>
+                          <th className="border border-gray-300 px-1.5 py-1 text-center min-w-14">CGST</th>
+                          <th className="border border-gray-300 px-1.5 py-1 text-center min-w-14">SGST</th>
+                        </>
+                      )}
                       <th className="border border-gray-300 px-1.5 py-1 text-center min-w-16">Tax</th>
                       <th className="border border-gray-300 px-1.5 py-1 text-center min-w-16">Act</th>
                     </tr>
@@ -685,8 +957,14 @@ export default function StockEntryModal({
                           <td className="border border-gray-300 px-1.5 py-0.5 text-center font-semibold">{item.quantity}</td>
                           <td className="border border-gray-300 px-1.5 py-0.5 text-center">₹{formatPrice(item.pricePerUnit)}</td>
                           <td className="border border-gray-300 px-1.5 py-0.5 text-center">₹{formatPrice(item.basicAmount)}</td>
-                          <td className="border border-gray-300 px-1.5 py-0.5 text-center">₹{formatPrice(item.cgst)}</td>
-                          <td className="border border-gray-300 px-1.5 py-0.5 text-center">₹{formatPrice(item.sgst)}</td>
+                          {isOutOfState ? (
+                            <td className="border border-gray-300 px-1.5 py-0.5 text-center bg-green-50">₹{formatPrice(item.cgst + item.sgst)}</td>
+                          ) : (
+                            <>
+                              <td className="border border-gray-300 px-1.5 py-0.5 text-center">₹{formatPrice(item.cgst)}</td>
+                              <td className="border border-gray-300 px-1.5 py-0.5 text-center">₹{formatPrice(item.sgst)}</td>
+                            </>
+                          )}
                           <td className="border border-gray-300 px-1.5 py-0.5 text-center font-semibold text-blue-600">₹{formatPrice(item.totalAmount)}</td>
                           <td className="border border-gray-300 px-1.5 py-0.5 text-center">
                             <div className="flex justify-center gap-0.5">
@@ -739,24 +1017,102 @@ export default function StockEntryModal({
             </div>
           </div>
 
+          {/* Tax Information Display */}
+          {taxInfo && (
+            <div className="border-b pb-3 bg-green-50 p-3 rounded">
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="font-semibold text-gray-700">📍 Supplier State:</span>
+                  <span className="font-bold text-gray-900">{taxInfo.supplierState}</span>
+                </div>
+                
+                {taxInfo.isOutOfState ? (
+                  <>
+                    <div className="flex items-center justify-between bg-green-100 p-2 rounded">
+                      <span className="font-semibold text-gray-700">💰 Tax Type:</span>
+                      <span className="font-bold text-green-700 text-lg">IGST (Out-of-State)</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="font-semibold text-gray-700">📊 IGST Rate:</span>
+                      <span className="font-bold text-gray-900">{taxInfo.taxRate}%</span>
+                    </div>
+                    <div className="border-t border-green-300 pt-2 flex items-center justify-between">
+                      <span className="font-semibold text-gray-700">💵 Total IGST:</span>
+                      <span className="font-bold text-green-700 text-lg">₹{formatPrice(taxInfo.totalIGST || 0)}</span>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="flex items-center justify-between bg-blue-100 p-2 rounded">
+                      <span className="font-semibold text-gray-700">💰 Tax Type:</span>
+                      <span className="font-bold text-blue-700 text-lg">CGST + SGST (In-State)</span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="flex items-center justify-between">
+                        <span className="font-semibold text-gray-700">📊 CGST:</span>
+                        <span className="font-bold text-gray-900">{taxInfo.cgstRate}%</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="font-semibold text-gray-700">📊 SGST:</span>
+                        <span className="font-bold text-gray-900">{taxInfo.sgstRate}%</span>
+                      </div>
+                    </div>
+                    <div className="border-t border-blue-300 pt-2 space-y-1">
+                      <div className="flex items-center justify-between">
+                        <span className="text-gray-700">Total CGST:</span>
+                        <span className="font-bold text-gray-900">₹{formatPrice(taxInfo.totalCGST || 0)}</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-gray-700">Total SGST:</span>
+                        <span className="font-bold text-gray-900">₹{formatPrice(taxInfo.totalSGST || 0)}</span>
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
+          )}
+
+          {submitError && (
+            <div className="p-3 bg-red-50 border border-red-200 rounded text-red-700 text-xs flex items-center gap-2">
+              <AlertCircle size={14} /> {submitError}
+            </div>
+          )}
+
           {/* Buttons */}
           <div className="flex gap-2 justify-end pt-3">
             <button
               type="button"
               onClick={onClose}
-              className="bg-gray-400 hover:bg-gray-500 text-white px-4 py-1.5 rounded text-xs transition-colors font-semibold"
+              disabled={loading}
+              className="bg-gray-400 hover:bg-gray-500 text-white px-4 py-1.5 rounded text-xs transition-colors font-semibold disabled:opacity-50"
             >
               Cancel
             </button>
             <button
               type="submit"
-              disabled={selectedItems.length === 0}
-              className="bg-orange-500 hover:bg-orange-600 disabled:bg-gray-400 text-white px-4 py-1.5 rounded text-xs transition-colors font-semibold"
+              disabled={selectedItems.length === 0 || loading}
+              className="bg-orange-500 hover:bg-orange-600 disabled:bg-gray-400 text-white px-4 py-1.5 rounded text-xs transition-colors font-semibold flex items-center gap-2"
             >
-              Save
+              {loading ? "Saving..." : "Save"}
             </button>
           </div>
         </form>
+
+        {/* Nested Item Master Modal */}
+        <ItemMasterModal
+          isOpen={showItemModal}
+          onClose={() => {
+            setShowItemModal(false);
+            // Refresh items after item is added
+            // The parent component should handle refreshing the items list
+          }}
+          onItemSaved={() => {
+            setShowItemModal(false);
+            // Trigger a refresh of items by calling parent to refetch
+            window.dispatchEvent(new CustomEvent('itemCreated'));
+          }}
+        />
       </div>
     </div>
   );
