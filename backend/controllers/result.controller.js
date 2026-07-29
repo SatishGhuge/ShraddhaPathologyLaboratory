@@ -811,9 +811,9 @@ function getNormalRange(parameter, patient) {
       for (const range of ageRanges) {
         if (!range.enabled) continue;
         
-        // Check gender match - if range has gender specified, it must match patient gender
+        // Check gender match - if range has gender specified, it must match patient gender or be 'both'
         const rangeGender = range.gender?.toLowerCase();
-        if (rangeGender && rangeGender !== patientGender) continue;
+        if (rangeGender && rangeGender !== 'both' && rangeGender !== patientGender) continue;
         
         let ageMatches = false;
         
@@ -860,6 +860,22 @@ function getNormalRange(parameter, patient) {
       if (patientGender === 'male' && parameter.maleActive && 
           parameter.maleLowValue !== null && parameter.maleHighValue !== null) {
         return `${parameter.maleLowValue} - ${parameter.maleHighValue}`;
+      }
+      
+      // If gender doesn't match M/F and no specific range found, try to use any default value from normalRanges
+      if (!['male', 'female'].includes(patientGender)) {
+        if (parameter.normalRanges) {
+          try {
+            const normalRanges = JSON.parse(parameter.normalRanges);
+            for (const range of normalRanges) {
+              if (range.defaultValue) {
+                return range.defaultValue;
+              }
+            }
+          } catch (error) {
+            console.warn('Error parsing normal ranges:', error);
+          }
+        }
       }
     }
   }

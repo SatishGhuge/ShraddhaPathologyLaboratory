@@ -2540,6 +2540,7 @@ const AddTest = () => {
                                         >
                                           <option value="Male">Male</option>
                                           <option value="Female">Female</option>
+                                          <option value="Both">Both</option>
                                         </select>
                                       </div>
                                     ) : (
@@ -2627,7 +2628,7 @@ const AddTest = () => {
                                             +
                                           </button>
                                         )}
-                                        {(ageRange as any).isNewlyAdded && (
+                                        {ageIndex >= 5 && (
                                           <button
                                             onClick={() => removeAgeRange(categoryIndex, paramIndex, ageIndex)}
                                             className="bg-red-500 text-white px-1 py-0.5 rounded text-xs hover:bg-red-600"
@@ -2701,7 +2702,7 @@ const AddTest = () => {
                                           >
                                             +
                                           </button>
-                                          {(rangeValue as any).isNewlyAdded && (
+                                          {rangeIndex >= 5 && (
                                             <button
                                               onClick={() => removeRangeValue(categoryIndex, paramIndex, rangeIndex)}
                                               className="bg-red-500 text-white px-1 py-0.5 rounded text-xs hover:bg-red-600"

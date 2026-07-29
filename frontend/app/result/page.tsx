@@ -491,7 +491,8 @@ export default function Result() {
         for (const range of ageRanges) {
           if (!range.enabled) continue;
           const rangeGender = range.gender?.toLowerCase();
-          if (rangeGender && rangeGender !== patientGender) continue;
+          // Skip if gender doesn't match, unless it's 'both' (which applies to all)
+          if (rangeGender && rangeGender !== 'both' && rangeGender !== patientGender) continue;
           
           let ageMatches = false;
           if (range.label?.includes('Between') && range.from != null && range.to != null) {
@@ -519,6 +520,21 @@ export default function Result() {
         if (patientGender === 'M' && parameterData.maleActive && parameterData.maleLowValue != null && parameterData.maleHighValue != null) {
           return `${parameterData.maleLowValue} - ${parameterData.maleHighValue}`;
         }
+        // If gender doesn't match M/F and no specific range found, try to use any default value from normalRanges
+        if (!['m', 'f'].includes(patientGender)) {
+          if (parameterData.normalRanges) {
+            try {
+              const normalRanges = JSON.parse(parameterData.normalRanges);
+              for (const range of normalRanges) {
+                if (range.defaultValue) {
+                  return range.defaultValue;
+                }
+              }
+            } catch (e) {
+              console.warn('Error parsing normal ranges:', e);
+            }
+          }
+        }
       }
     }
     
@@ -543,7 +559,8 @@ export default function Result() {
         for (const range of ageRanges) {
           if (!range.enabled) continue;
           const rangeGender = range.gender?.toLowerCase();
-          if (rangeGender && rangeGender !== patientGender) continue;
+          // Skip if gender doesn't match, unless it's 'both' (which applies to all)
+          if (rangeGender && rangeGender !== 'both' && rangeGender !== patientGender) continue;
           
           let ageMatches = false;
           if (range.label?.includes('Between') && range.from != null && range.to != null) {
