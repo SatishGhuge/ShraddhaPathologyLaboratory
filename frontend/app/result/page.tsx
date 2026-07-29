@@ -1427,7 +1427,7 @@ export default function Result() {
       // ❌ NO modal - trigger print immediately after a small delay to allow render
       setShowPrintOptionsModal(false);
       
-      // Trigger print after rendering completes
+      // Trigger print after rendering completes (increased delay for state updates)
       setTimeout(() => {
         directPrintReport({
           patient: first.patientTest.patient,
@@ -1444,7 +1444,7 @@ export default function Result() {
           results: resultsMap,
           referralDoctor: first.patientTest.referralDoctor
         });
-      }, 100);
+      }, 200);
     } catch (err) {
       console.error('Error loading report:', err);
       alert('Error loading report: ' + err.message);
@@ -1488,15 +1488,18 @@ export default function Result() {
       />
     );
 
-    // Wait for render, then print
-    setTimeout(() => {
-      window.print();
-      // Clean up after print
+    // Wait for render and DOM update, then print
+    // Use requestAnimationFrame to ensure render is complete, then add buffer
+    requestAnimationFrame(() => {
       setTimeout(() => {
-        root.unmount();
-        document.body.removeChild(printContainer);
-      }, 100);
-    }, 500);
+        window.print();
+        // Clean up after print dialog closes
+        setTimeout(() => {
+          root.unmount();
+          document.body.removeChild(printContainer);
+        }, 500);
+      }, 800);
+    });
   };
 
   // Open upload modal for a patient

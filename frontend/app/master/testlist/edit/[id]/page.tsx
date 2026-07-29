@@ -200,7 +200,7 @@ const AddTest = () => {
       isMultipleOptions: false,
       textContent: "",
       normalRanges: [
-        { gender: "Male", ll: "", ul: "", default: "", isActive: true },
+        { gender: "Male", ll: "", ul: "", default: "", isActive: false },
         { gender: "Female", ll: "", ul: "", default: "", isActive: false },
         { gender: "Child", ll: "", ul: "", default: "", isActive: false }
       ],
@@ -440,7 +440,7 @@ const AddTest = () => {
                                 isActive: range.isActive !== undefined ? range.isActive : true
                               }))
                             : [
-                                { gender: "Male", ll: "", ul: "", default: "", isActive: true },
+                                { gender: "Male", ll: "", ul: "", default: "", isActive: false },
                                 { gender: "Female", ll: "", ul: "", default: "", isActive: false },
                                 { gender: "Child", ll: "", ul: "", default: "", isActive: false }
                               ],
@@ -496,7 +496,7 @@ const AddTest = () => {
                         unitId: "",
                         displayRangeText: "",
                         normalRanges: [
-                          { gender: "Male", ll: "", ul: "", default: "", isActive: true },
+                          { gender: "Male", ll: "", ul: "", default: "", isActive: false },
                           { gender: "Female", ll: "", ul: "", default: "", isActive: false },
                           { gender: "Child", ll: "", ul: "", default: "", isActive: false }
                         ]
@@ -637,7 +637,7 @@ const AddTest = () => {
         isMultipleOptions: false,
         textContent: "",
         normalRanges: [
-          { gender: "Male", ll: "", ul: "", default: "", isActive: true },
+          { gender: "Male", ll: "", ul: "", default: "", isActive: false },
           { gender: "Female", ll: "", ul: "", default: "", isActive: false },
           { gender: "Child", ll: "", ul: "", default: "", isActive: false }
         ]
@@ -707,7 +707,7 @@ const AddTest = () => {
       isMultipleOptions: false,
       textContent: "",
       normalRanges: [
-        { gender: "Male", ll: "", ul: "", default: "", isActive: true },
+        { gender: "Male", ll: "", ul: "", default: "", isActive: false },
         { gender: "Female", ll: "", ul: "", default: "", isActive: false },
         { gender: "Child", ll: "", ul: "", default: "", isActive: false }
       ],
@@ -749,7 +749,7 @@ const AddTest = () => {
         unitId: "",
         displayRangeText: "",
         normalRanges: [
-          { gender: "Male", ll: "", ul: "", default: "", isActive: true },
+          { gender: "Male", ll: "", ul: "", default: "", isActive: false },
           { gender: "Female", ll: "", ul: "", default: "", isActive: false },
           { gender: "Child", ll: "", ul: "", default: "", isActive: false }
         ],
@@ -1607,8 +1607,9 @@ const AddTest = () => {
                             className="px-2 py-1.5 sm:py-1 border border-gray-300 rounded text-xs sm:text-sm w-full sm:w-40" 
                             placeholder="Category name..."
                             value={category.name || ""}
-                            onChange={(e) => handleCategoryChange(categoryIndex, 'name', e.target.value)}
-                            disabled={isViewMode} 
+                            onChange={(e) => handleCategoryChange(categoryIndex, 'name', e.target.value.toUpperCase())}
+                            disabled={isViewMode}
+                            style={{ textTransform: 'uppercase' }}
                           />
                           {/* Formatting Buttons - Below Input */}
                           {!isViewMode && (
@@ -1702,8 +1703,9 @@ const AddTest = () => {
                           className="px-2 py-1.5 sm:py-1 border border-gray-300 rounded text-xs sm:text-sm w-full sm:w-40" 
                           placeholder="Category test method..." 
                           value={category.testMethod || ""}
-                          onChange={(e) => handleCategoryChange(categoryIndex, 'testMethod', e.target.value)}
-                          disabled={isViewMode} 
+                          onChange={(e) => handleCategoryChange(categoryIndex, 'testMethod', e.target.value.toUpperCase())}
+                          disabled={isViewMode}
+                          style={{ textTransform: 'uppercase' }}
                         />
                         {!isViewMode && (
                           <div className="flex gap-1 mt-1">
@@ -1862,13 +1864,14 @@ const AddTest = () => {
                               className="px-2 py-1.5 sm:py-1 border border-gray-300 rounded text-xs sm:text-sm w-full sm:w-40" 
                               placeholder="Parameter Name" 
                               value={parameter.parameterName || ""}
-                              onChange={(e) => handleParamNameSearch(categoryIndex, paramIndex, e.target.value)}
+                              onChange={(e) => handleParamNameSearch(categoryIndex, paramIndex, e.target.value.toUpperCase())}
                               onBlur={() => {
                                 const key = `${categoryIndex}-${paramIndex}`;
                                 setTimeout(() => setParamSuggestionsOpen(prev => ({ ...prev, [key]: false })), 150);
                               }}
                               autoComplete="off"
-                              disabled={isViewMode} 
+                              disabled={isViewMode}
+                              style={{ textTransform: 'uppercase' }}
                             />
                             {/* Autocomplete dropdown */}
                             {paramSuggestionsOpen[`${categoryIndex}-${paramIndex}`] && (
@@ -2002,89 +2005,88 @@ const AddTest = () => {
                           />
                           <span className="text-xs sm:text-sm">Is Descriptive</span>
                         </label>
-                        {category.isCategory && (
-                          <div>
-                            <input 
-                              id={`param-method-${categoryIndex}-${paramIndex}`}
-                              className="px-2 py-1.5 sm:py-1 border border-gray-300 rounded text-xs sm:text-sm w-full sm:w-32" 
-                              placeholder="Parameter Test Method" 
-                              value={parameter.testMethod || ""}
-                              onChange={(e) => handleParameterChange(categoryIndex, paramIndex, 'testMethod', e.target.value)}
-                              disabled={isViewMode} 
-                            />
-                            {!isViewMode && (
-                              <div className="flex gap-1 mt-1">
-                                {/* Bold Button */}
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    const input = document.getElementById(`param-method-${categoryIndex}-${paramIndex}`) as HTMLInputElement;
-                                    const start = input.selectionStart || 0;
-                                    const end = input.selectionEnd || 0;
-                                    const selectedText = input.value.substring(start, end);
-                                    if (selectedText) {
-                                      const newValue = input.value.substring(0, start) + `<b>${selectedText}</b>` + input.value.substring(end);
-                                      handleParameterChange(categoryIndex, paramIndex, 'testMethod', newValue);
-                                    }
-                                  }}
-                                  className="px-2 py-1 bg-white border border-gray-300 rounded text-xs font-bold hover:bg-gray-100"
-                                  title="Bold"
-                                >
-                                  B
-                                </button>
-                                {/* Italic Button */}
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    const input = document.getElementById(`param-method-${categoryIndex}-${paramIndex}`) as HTMLInputElement;
-                                    const start = input.selectionStart || 0;
-                                    const end = input.selectionEnd || 0;
-                                    const selectedText = input.value.substring(start, end);
-                                    if (selectedText) {
-                                      const newValue = input.value.substring(0, start) + `<i>${selectedText}</i>` + input.value.substring(end);
-                                      handleParameterChange(categoryIndex, paramIndex, 'testMethod', newValue);
-                                    }
-                                  }}
-                                  className="px-2 py-1 bg-white border border-gray-300 rounded text-xs italic hover:bg-gray-100"
-                                  title="Italic"
-                                >
-                                  I
-                                </button>
-                                {/* Underline Button */}
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    const input = document.getElementById(`param-method-${categoryIndex}-${paramIndex}`) as HTMLInputElement;
-                                    const start = input.selectionStart || 0;
-                                    const end = input.selectionEnd || 0;
-                                    const selectedText = input.value.substring(start, end);
-                                    if (selectedText) {
-                                      const newValue = input.value.substring(0, start) + `<u>${selectedText}</u>` + input.value.substring(end);
-                                      handleParameterChange(categoryIndex, paramIndex, 'testMethod', newValue);
-                                    }
-                                  }}
-                                  className="px-2 py-1 bg-white border border-gray-300 rounded text-xs underline hover:bg-gray-100"
-                                  title="Underline"
-                                >
-                                  U
-                                </button>
-                                {/* Remove Formatting Button */}
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    const currentValue = parameter.testMethod || "";
-                                    const cleanValue = currentValue.replace(/<\/?[biu]>/gi, '');
-                                    handleParameterChange(categoryIndex, paramIndex, 'testMethod', cleanValue);
-                                  }}
-                                  className="px-2 py-1 bg-red-50 border border-red-300 rounded text-xs text-red-600 font-bold hover:bg-red-100"
-                                  title="Remove Formatting"
-                                >
-                                  X
-                                </button>
-                              </div>
-                            )}
-                          </div>
-                        )}
+                        <div>
+                          <input 
+                            id={`param-method-${categoryIndex}-${paramIndex}`}
+                            className="px-2 py-1.5 sm:py-1 border border-gray-300 rounded text-xs sm:text-sm w-full sm:w-32" 
+                            placeholder="Parameter Test Method" 
+                            value={parameter.testMethod || ""}
+                            onChange={(e) => handleParameterChange(categoryIndex, paramIndex, 'testMethod', e.target.value.toUpperCase())}
+                            disabled={isViewMode}
+                            style={{ textTransform: 'uppercase' }}
+                          />
+                          {!isViewMode && (
+                            <div className="flex gap-1 mt-1">
+                              {/* Bold Button */}
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const input = document.getElementById(`param-method-${categoryIndex}-${paramIndex}`) as HTMLInputElement;
+                                  const start = input.selectionStart || 0;
+                                  const end = input.selectionEnd || 0;
+                                  const selectedText = input.value.substring(start, end);
+                                  if (selectedText) {
+                                    const newValue = input.value.substring(0, start) + `<b>${selectedText}</b>` + input.value.substring(end);
+                                    handleParameterChange(categoryIndex, paramIndex, 'testMethod', newValue);
+                                  }
+                                }}
+                                className="px-2 py-1 bg-white border border-gray-300 rounded text-xs font-bold hover:bg-gray-100"
+                                title="Bold"
+                              >
+                                B
+                              </button>
+                              {/* Italic Button */}
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const input = document.getElementById(`param-method-${categoryIndex}-${paramIndex}`) as HTMLInputElement;
+                                  const start = input.selectionStart || 0;
+                                  const end = input.selectionEnd || 0;
+                                  const selectedText = input.value.substring(start, end);
+                                  if (selectedText) {
+                                    const newValue = input.value.substring(0, start) + `<i>${selectedText}</i>` + input.value.substring(end);
+                                    handleParameterChange(categoryIndex, paramIndex, 'testMethod', newValue);
+                                  }
+                                }}
+                                className="px-2 py-1 bg-white border border-gray-300 rounded text-xs italic hover:bg-gray-100"
+                                title="Italic"
+                              >
+                                I
+                              </button>
+                              {/* Underline Button */}
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const input = document.getElementById(`param-method-${categoryIndex}-${paramIndex}`) as HTMLInputElement;
+                                  const start = input.selectionStart || 0;
+                                  const end = input.selectionEnd || 0;
+                                  const selectedText = input.value.substring(start, end);
+                                  if (selectedText) {
+                                    const newValue = input.value.substring(0, start) + `<u>${selectedText}</u>` + input.value.substring(end);
+                                    handleParameterChange(categoryIndex, paramIndex, 'testMethod', newValue);
+                                  }
+                                }}
+                                className="px-2 py-1 bg-white border border-gray-300 rounded text-xs underline hover:bg-gray-100"
+                                title="Underline"
+                              >
+                                U
+                              </button>
+                              {/* Remove Formatting Button */}
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const currentValue = parameter.testMethod || "";
+                                  const cleanValue = currentValue.replace(/<\/?[biu]>/gi, '');
+                                  handleParameterChange(categoryIndex, paramIndex, 'testMethod', cleanValue);
+                                }}
+                                className="px-2 py-1 bg-red-50 border border-red-300 rounded text-xs text-red-600 font-bold hover:bg-red-100"
+                                title="Remove Formatting"
+                              >
+                                X
+                              </button>
+                            </div>
+                          )}
+                        </div>
 
                         {/* Inline Formula Display — shown when hasFormula=true and formula is saved */}
                         {parameter.hasFormula && parameter.formula && (
@@ -2498,7 +2500,7 @@ const AddTest = () => {
                           // By Age Table Structure
                           <table className="border-collapse border border-gray-300 text-xs sm:text-sm min-w-[700px]  resize min-h-[3rem]">
                             <thead>
-                              <tr className="bg-cyan-700 text-white">
+                              <tr className="bg-orange-700 text-white">
                                 <th className="border border-gray-300 px-2 py-1 text-left w-32">Label</th>
                                 <th className="border border-gray-300 px-2 py-1 w-40">Input Fields</th>
                                 <th className="border border-gray-300 px-2 py-1 w-20">LL</th>
@@ -2512,31 +2514,22 @@ const AddTest = () => {
                               {parameter.ageRanges && parameter.ageRanges.map((ageRange, ageIndex) => (
                                 <tr key={ageIndex} className="bg-white">
                                   <td className="border border-gray-300 px-2 py-1">
-                                    <div className="flex items-center gap-1">
-                                      <input 
-                                        type="checkbox" 
-                                        className="w-3 h-3" 
-                                        checked={ageRange.isActive || false}
-                                        onChange={(e) => handleAgeRangeChange(categoryIndex, paramIndex, ageIndex, 'isActive', e.target.checked)}
-                                        disabled={isViewMode} 
-                                      />
-                                      {ageRange.label.includes("Between") ? (
-                                        <div className="flex items-center gap-1">
-                                          <span className="text-xs sm:text-sm">Between</span>
-                                          <select 
-                                            className="px-1 py-0.5 border border-gray-300 rounded text-xs" 
-                                            value={(ageRange as any).gender || "Male"}
-                                            onChange={(e) => handleAgeRangeChange(categoryIndex, paramIndex, ageIndex, 'gender', e.target.value)}
-                                            disabled={isViewMode}
-                                          >
-                                            <option value="Male">Male</option>
-                                            <option value="Female">Female</option>
-                                          </select>
-                                        </div>
-                                      ) : (
-                                        <span className="text-xs sm:text-sm">{ageRange.label}</span>
-                                      )}
-                                    </div>
+                                    {ageRange.label.includes("Between") ? (
+                                      <div className="flex items-center gap-1">
+                                        <span className="text-xs sm:text-sm">Between</span>
+                                        <select 
+                                          className="px-1 py-0.5 border border-gray-300 rounded text-xs" 
+                                          value={(ageRange as any).gender || "Male"}
+                                          onChange={(e) => handleAgeRangeChange(categoryIndex, paramIndex, ageIndex, 'gender', e.target.value)}
+                                          disabled={isViewMode}
+                                        >
+                                          <option value="Male">Male</option>
+                                          <option value="Female">Female</option>
+                                        </select>
+                                      </div>
+                                    ) : (
+                                      <span className="text-xs sm:text-sm">{ageRange.label}</span>
+                                    )}
                                   </td>
                                   <td className="border border-gray-300 p-1">
                                     {ageRange.label.includes("Between") ? (
@@ -2652,16 +2645,7 @@ const AddTest = () => {
                                 {parameter.rangeValues && parameter.rangeValues.map((rangeValue, rangeIndex) => (
                                   <tr key={rangeIndex} className="bg-white">
                                     <td className="border border-gray-300 px-2 py-1">
-                                      <label className="flex items-center gap-1">
-                                        <input 
-                                          type="checkbox" 
-                                          className="w-3 h-3" 
-                                          checked={rangeValue.isActive || false}
-                                          onChange={(e) => handleRangeValueChange(categoryIndex, paramIndex, rangeIndex, 'isActive', e.target.checked)}
-                                          disabled={isViewMode} 
-                                        />
-                                        <span className="text-xs sm:text-sm">{rangeValue.label}</span>
-                                      </label>
+                                      <span className="text-xs sm:text-sm">{rangeValue.label}</span>
                                     </td>
                                     <td className="border border-gray-300 p-1">
                                       <input 
@@ -2735,16 +2719,7 @@ const AddTest = () => {
                               {parameter.normalRanges && parameter.normalRanges.map((range, rangeIndex) => (
                                 <tr key={rangeIndex} className="bg-white">
                                   <td className="border border-gray-300 px-2 py-1">
-                                    <label className="flex items-center gap-1">
-                                      <input 
-                                        type="checkbox" 
-                                        className="w-3 h-3" 
-                                        checked={range.isActive || false}
-                                        onChange={(e) => handleNormalRangeChange(categoryIndex, paramIndex, rangeIndex, 'isActive', e.target.checked)}
-                                        disabled={isViewMode} 
-                                      />
-                                      <span className="text-xs sm:text-sm">{range.gender}</span>
-                                    </label>
+                                    <span className="text-xs sm:text-sm">{range.gender}</span>
                                   </td>
                                   <td className="border border-gray-300 p-1">
                                     <input 
@@ -2870,7 +2845,7 @@ const AddTest = () => {
               Cancel
             </button>
             {!isViewMode && (
-              <button onClick={handleSave} className="bg-cyan-600 text-white px-4 py-2 rounded hover:bg-cyan-700 transition-colors text-xs sm:text-sm w-full sm:w-auto" disabled={loading}>
+              <button onClick={handleSave} className="bg-orange-600 text-white px-4 py-2 rounded hover:bg-orange-700 transition-colors text-xs sm:text-sm w-full sm:w-auto" disabled={loading}>
                 {loading ? "Saving..." : (isAddMode ? "Save" : "Save Changes")}
               </button>
             )}

@@ -130,15 +130,25 @@ const ProfessionalReport = React.forwardRef<HTMLDivElement, ProfessionalReportPr
       let dead = false;
       (async () => {
         try {
+          // Use letterhead passed as prop first
           if (letterhead?.fullPageImage || letterhead?.headerImage) {
-            if (!dead) setLh(letterhead);
+            if (!dead) {
+              setLh(letterhead);
+              setReady(true);
+            }
             return;
           }
-          // Fetch from API if not provided
-          const r = await fetch('/api/letterhead/active');
-          const d = await r.json();
-          if (!dead && d.success && d.data?.length > 0) {
-            setLh(d.data[0]);
+          
+          // Try to fetch from API if not provided
+          try {
+            const r = await fetch('/api/letterhead/active', { signal: AbortSignal.timeout(3000) });
+            const d = await r.json();
+            if (!dead && d.success && d.data?.length > 0) {
+              setLh(d.data[0]);
+            }
+          } catch (fetchErr) {
+            console.warn('[ProfessionalReport] API letterhead fetch failed', fetchErr);
+            // Continue - we'll use letterHeadBase64 as fallback
           }
         } catch (e) {
           console.warn('[ProfessionalReport] letterhead load error', e);
