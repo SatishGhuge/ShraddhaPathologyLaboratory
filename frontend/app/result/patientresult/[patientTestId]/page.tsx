@@ -12,6 +12,7 @@ import { useTestTemplates } from '@/src/hooks/useTestTemplates';
 import InlineTemplateSelector from '@/app/components/InlineTemplateSelector';
 import { CKEditor } from '@ckeditor/ckeditor5-react';
 import ClassicEditor from '@ckeditor/ckeditor5-build-classic';
+import { parseHtmlText, stripHtmlTags, HtmlPart } from '@/src/utils/htmlParser';
 const LetterHead = "/LetterHead.jpeg";
 
 // Autocomplete text input with suggestion dropdown and multi-select tags
@@ -90,6 +91,34 @@ const PatientResult = () => {
   const testIdsParam = searchParams.get('testIds'); // For multiple tests
   
   const router = useRouter();
+
+  // Helper function to render styled text with HTML tags
+  const renderStyledText = (text: string | undefined, defaultBold: boolean = false): React.ReactNode => {
+    if (!text) return "-";
+    
+    const cleanText = String(text).trim();
+    if (!cleanText) return "-";
+    
+    const parsed = parseHtmlText(cleanText);
+    
+    if (typeof parsed === 'string') {
+      if (defaultBold) return <b>{parsed}</b>;
+      return parsed;
+    }
+    
+    return (parsed as HtmlPart[]).map((part: HtmlPart, i: number) => {
+      const isBold = part.bold || defaultBold;
+      const isItalic = part.italic;
+      const isUnderline = part.underline;
+      
+      let element: React.ReactNode = part.text;
+      if (isUnderline) element = <u>{element}</u>;
+      if (isItalic) element = <i>{element}</i>;
+      if (isBold) element = <b>{element}</b>;
+      
+      return <React.Fragment key={i}>{element}</React.Fragment>;
+    });
+  };
 
   // Initialize template hook
   const { templateCache, fetchTemplatesForTests, getTemplates } = useTestTemplates();
@@ -1044,12 +1073,14 @@ const PatientResult = () => {
                       </tr>
                     </thead>
                     <tbody>
-                      {Object.entries(testData.groupedParameters || {}).map(([categoryName, categoryParams]: [string, any]) => (
-                        <React.Fragment key={categoryName}>
-                          {categoryName !== 'NO_CATEGORY_HEADER' && categoryParams[0]?.showCategoryHeader && (
-                            <tr className="bg-gray-200 font-semibold"><td colSpan={4} className="p-2">{categoryName.toUpperCase()}</td></tr>
+                      {Object.entries(testData.groupedParameters || {})
+                        .sort(([, paramsA]: any, [, paramsB]: any) => (paramsA[0]?.categorySortOrder ?? 999) - (paramsB[0]?.categorySortOrder ?? 999))
+                        .map(([categoryKey, categoryParams]: [string, any]) => (
+                        <React.Fragment key={categoryKey}>
+                          {categoryKey !== 'NO_CATEGORY_HEADER' && !categoryKey.startsWith('__NO_NAME_') && categoryParams[0]?.showCategoryHeader && (
+                            <tr className="bg-gray-200 font-semibold"><td colSpan={4} className="p-2">{stripHtmlTags(categoryParams[0]?.categoryName || '').toUpperCase()}</td></tr>
                           )}
-                          {(categoryParams as any[]).map((param) => {
+                          {(categoryParams as any[]).sort((a, b) => (a.sortOrder ?? 999) - (b.sortOrder ?? 999)).map((param) => {
                             const paramKey = `${multipleTestIds[testIdx]}_${param.id}`;
                             const outOfRange = isValueOutOfRange(param, results[paramKey]?.numericValue);
                             const isFormula = param.hasFormula && param.formula;
@@ -1060,7 +1091,7 @@ const PatientResult = () => {
                               : [];
                             return (
                               <tr key={param.id} className="bg-purple-100">
-                                <td className="border p-2">{param.parameterName}</td>
+                                <td className="border p-2">{(param.parameterName || '').toUpperCase()}</td>
                                 <td className="border p-2">
                                   <div className="flex items-center gap-2">
                                     {param.type === 'Numeric' ? (
@@ -1163,18 +1194,20 @@ const PatientResult = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {Object.entries(groupedParameters).map(([categoryName, categoryParams]: [string, any]) => (
-                    <React.Fragment key={categoryName}>
-                      {categoryName !== 'NO_CATEGORY_HEADER' && categoryParams[0]?.showCategoryHeader && (
-                        <tr className="bg-gray-200 font-semibold"><td colSpan={4} className="p-2">{categoryName.toUpperCase()}</td></tr>
+                  {Object.entries(groupedParameters)
+                    .sort(([, paramsA]: any, [, paramsB]: any) => (paramsA[0]?.categorySortOrder ?? 999) - (paramsB[0]?.categorySortOrder ?? 999))
+                    .map(([categoryKey, categoryParams]: [string, any]) => (
+                    <React.Fragment key={categoryKey}>
+                      {categoryKey !== 'NO_CATEGORY_HEADER' && !categoryKey.startsWith('__NO_NAME_') && categoryParams[0]?.showCategoryHeader && (
+                        <tr className="bg-gray-200 font-semibold"><td colSpan={4} className="p-2">{renderStyledText((categoryParams[0]?.categoryName || '').toUpperCase(), true)}</td></tr>
                       )}
-                      {(categoryParams as any[]).map((param) => {
+                      {(categoryParams as any[]).sort((a, b) => (a.sortOrder ?? 999) - (b.sortOrder ?? 999)).map((param) => {
                         const outOfRange = isValueOutOfRange(param, results[param.id]?.numericValue);
                         const isFormula = param.hasFormula && param.formula;
                         const inputClass = outOfRange ? "border-2 border-red-500 bg-red-50 px-2 py-1 w-24 rounded" : "border border-gray-300 px-2 py-1 w-24 rounded";
                         return (
                           <tr key={param.id} className="bg-purple-100">
-                            <td className="border p-2">{param.parameterName}{param.isMandatory && <span className="text-red-500">*</span>}</td>
+                            <td className="border p-2">{renderStyledText((param.parameterName || '').toUpperCase(), false)}{param.isMandatory && <span className="text-red-500">*</span>}</td>
                             <td className="border p-2">
                               <div className="flex items-center gap-2">
                                 {isFormula ? (
@@ -1231,12 +1264,12 @@ const PatientResult = () => {
                             </td>
                             <td className="border p-2 text-xs">
                               {(() => {
-                                const unitValue = param.units || '-';
+                                const unitValue = stripHtmlTags(param.units || '') || '-';
                                 console.log(`🔍 Rendering UNITS for ${param.parameterName}: "${unitValue}"`);
                                 return unitValue;
                               })()}
                             </td>
-                            <td className="border p-2">{param.type === 'Text' || param.isDescriptive ? (param.normalRange || '') : getAgeAppropriateRange(param, patientData.patient.age, patientData.patient.gender, patientData.patient.dob)}</td>
+                            <td className="border p-2">{param.type === 'Text' || param.isDescriptive ? stripHtmlTags(param.normalRange || '') : stripHtmlTags(getAgeAppropriateRange(param, patientData.patient.age, patientData.patient.gender, patientData.patient.dob) || '')}</td>
                           </tr>
                         );
                       })}
@@ -1423,7 +1456,7 @@ const PatientResult = () => {
                           return (
                             <React.Fragment key={categoryName}>
                               {categoryName !== 'NO_CATEGORY_HEADER' && categoryParams[0]?.showCategoryHeader && (
-                                <tr><td colSpan={shouldShowUnitsColumn() || shouldShowReferenceRangeColumn() ? (shouldShowUnitsColumn() && shouldShowReferenceRangeColumn() ? 4 : 3) : 2} style={{ padding: '4px 6px', fontWeight: 'bold', borderBottom: '1px solid #ddd' }}>{categoryName.toUpperCase()}</td></tr>
+                                <tr><td colSpan={shouldShowUnitsColumn() || shouldShowReferenceRangeColumn() ? (shouldShowUnitsColumn() && shouldShowReferenceRangeColumn() ? 4 : 3) : 2} style={{ padding: '4px 6px', fontWeight: 'bold', borderBottom: '1px solid #ddd' }}>{stripHtmlTags(categoryName || '').toUpperCase()}</td></tr>
                               )}
                               {paramsWithValues.map((param) => {
                                 const numVal = results[param.id]?.numericValue;
@@ -1445,7 +1478,7 @@ const PatientResult = () => {
                                 
                                 return (
                                   <tr key={param.id}>
-                                    <td style={{ padding: '3px 6px', width: shouldShowUnitsColumn() || shouldShowReferenceRangeColumn() ? '30%' : '50%', fontWeight: isAbn ? 'bold' : 'normal' }}>{param.parameterName}</td>
+                                    <td style={{ padding: '3px 6px', width: shouldShowUnitsColumn() || shouldShowReferenceRangeColumn() ? '30%' : '50%', fontWeight: isAbn ? 'bold' : 'normal' }}>{stripHtmlTags(param.parameterName || '')}</td>
                                     <td style={{ padding: '3px 6px 3px 20px', width: shouldShowUnitsColumn() || shouldShowReferenceRangeColumn() ? '28%' : '50%', fontWeight: isAbn ? '900' : 'normal', color: isAbn ? '#b91c1c' : 'inherit', fontSize: '11px', whiteSpace: 'normal', wordWrap: 'break-word', textAlign: 'right' }}>
                                       {param.isDescriptive && displayValue !== '-' && hasHtmlTags(displayValue) ? (
                                         <div dangerouslySetInnerHTML={{ __html: sanitizeHtml(displayValue) }} style={{ margin: 0, whiteSpace: 'normal' }} />
@@ -1454,11 +1487,11 @@ const PatientResult = () => {
                                       )}
                                     </td>
                                     {shouldShowUnitsColumn() && (
-                                      <td style={{ padding: '3px 6px', width: '12%', textAlign: 'center' }}>{param.units || '-'}</td>
+                                      <td style={{ padding: '3px 6px', width: '12%', textAlign: 'center' }}>{stripHtmlTags(param.units || '') || '-'}</td>
                                     )}
                                     {shouldShowReferenceRangeColumn() && (
                                       <td style={{ padding: '3px 6px', width: '30%' }}>
-                                        {param.type === 'Numeric' || param.type === 'Text' ? (rangeStr || '-') : (rangeStr || '-')}
+                                        {param.type === 'Numeric' || param.type === 'Text' ? stripHtmlTags(rangeStr || '') : stripHtmlTags(rangeStr || '')}
                                       </td>
                                     )}
                                   </tr>

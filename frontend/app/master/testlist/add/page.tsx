@@ -120,7 +120,7 @@ const AddTest = () => {
     const key = `${catIdx}-${paramIdx}`;
     const updatedCategories = [...categories];
     const p = updatedCategories[catIdx].parameters[paramIdx];
-    p.parameterName   = suggestion.parameterName;
+    p.parameterName   = (suggestion.parameterName || '').toUpperCase();
     p.machineCode     = suggestion.machineCode || '';
     p.multiplyBy      = suggestion.multiplyBy || '';
     p.decimal         = suggestion.decimal?.toString() || '';
@@ -660,13 +660,17 @@ const AddTest = () => {
 
   const handleCategoryChange = (categoryIndex: any, field: any, value: any) => {
     const updatedCategories = [...categories];
-    updatedCategories[categoryIndex][field] = value;
+    // Convert testMethod and name to uppercase
+    const finalValue = (field === 'testMethod' || field === 'name') ? (value || '').toUpperCase() : value;
+    updatedCategories[categoryIndex][field] = finalValue;
     setCategories(updatedCategories);
   };
 
   const handleParameterChange = (categoryIndex, parameterIndex, field, value) => {
     const updatedCategories = [...categories];
-    updatedCategories[categoryIndex].parameters[parameterIndex][field] = value;
+    // Convert testMethod and parameterName to uppercase
+    const finalValue = (field === 'testMethod' || field === 'parameterName') ? (value || '').toUpperCase() : value;
+    updatedCategories[categoryIndex].parameters[parameterIndex][field] = finalValue;
     
     // If range type is changed, ensure proper initialization
     if (field === 'rangeType') {
@@ -1601,7 +1605,7 @@ const AddTest = () => {
             {/* HEADER */}
             <div className="flex justify-between items-center px-3 py-2 bg-orange-100">
               <span className="font-semibold text-gray-700 text-xs sm:text-sm">
-                Category {categoryIndex + 1}
+                Category {categoryIndex + 1}{category.isCategory && category.name ? `: ${category.name.toUpperCase()}` : ''}
               </span>
 
               {categories.length > 1 && !isViewMode && (
@@ -1852,7 +1856,7 @@ const AddTest = () => {
                       {/* Parameter Header with Delete Button and Select Unit */}
                       <div className="flex justify-between items-center mb-3">
                         <h4 className="font-medium text-gray-700 text-xs sm:text-sm">
-                          Parameter {paramIndex + 1}: {parameter.parameterName || 'Unnamed Parameter'}
+                          Parameter {paramIndex + 1}: {(parameter.parameterName || 'Unnamed Parameter').toUpperCase()}
                         </h4>
                         <div className="flex items-center gap-2">
                           {/* Delete Parameter Button */}

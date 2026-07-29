@@ -2,6 +2,7 @@
 
 import { useRouter, useSearchParams } from "next/navigation";
 import React, { useState, useEffect, useRef } from "react";
+import ReactDOM from "react-dom/client";
 import {
   RefreshCcw,
   Download,
@@ -17,6 +18,7 @@ import {
   FileCheck,
 } from "lucide-react";
 import BarcodeModal, { generateBarcodeLabels } from "@/app/components/BarcodeModal";
+import ProfessionalReport from "@/app/components/ProfessionalReport";
 import API_BASE_URL from "@/src/api/config";
 
 import { FaWhatsapp } from "react-icons/fa";
@@ -36,8 +38,16 @@ import {
 import { getOrganizations } from "@/src/api/master";
 import ReadingValidationModal from "@/app/components/ReadingValidationModal";
 import AuthenticateModal from "@/app/components/AuthenticateModal";
-import ProfessionalResultReport from "@/src/components/ProfessionalResultReport";
 const LetterHead = "/LetterHead.jpeg";
+
+// ── Type definition for Letterhead from DB ──
+interface LetterheadDB {
+  id?: number;
+  letterheadName?: string;
+  headerImage?: string;   // base64 data-URI
+  footerImage?: string;   // base64 data-URI
+  fullPageImage?: string; // full-page letterhead image (new)
+}
 
 /* ── Per-test row with ALL date fields inside Edit Details modal ── */
 function PerTestDateRow({ test, onSave, onStatusChange, rowBg }: { test: any; onSave: (testId: string, data: any) => void; onStatusChange: (testId: string, status: string) => void; rowBg: string }) {
@@ -398,6 +408,9 @@ export default function Result() {
 
   // Organizations state
   const [organizations, setOrganizations] = useState<any[]>([]);
+  
+  // Departments state
+  const [departments, setDepartments] = useState<any[]>([]);
 
   // Letterhead state
   const [letterheadBase64, setLetterheadBase64] = useState<string>('');
@@ -1279,7 +1292,7 @@ export default function Result() {
     await proceedWithPrint('pagebreak');
   };
 
-  // Proceed with printing based on selected option
+  // Proceed with printing based on selected option - DIRECT PRINT PREVIEW (no modal)
   const proceedWithPrint = async (option: 'pagebreak' | 'nobreak') => {
     if (selectedTests.size === 0) { alert('Please select a test to print'); return; }
     
@@ -1312,24 +1325,28 @@ export default function Result() {
       return;
     }
     
-    // Page break option - proceed with print
+    // Page break option - proceed with DIRECT print preview
     try {
       setLoading(true);
       const testIds = Array.from(selectedTests);
       const responses = await Promise.all(testIds.map(id => getPatientTestById(id)));
       const first = responses[0];
 
+      // Debug: Log the parameters received
+      console.log('📋 Parameters received from API:', first.parameters);
+      console.log('📋 Full response:', first);
+
       // Fetch signature
       let signature = first.patientTest.test?.signature || null;
       if (!signature) {
         try {
-          const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || '/api';
+          const API_BASE_URL_LOCAL = process.env.NEXT_PUBLIC_API_URL || '/api';
           const testSpeciality = first.patientTest.test?.speciality || 'Regular';
-          const sigRes = await fetch(`${API_BASE_URL}/signatures/by-specialty/${encodeURIComponent(testSpeciality)}`);
+          const sigRes = await fetch(`${API_BASE_URL_LOCAL}/signatures/by-specialty/${encodeURIComponent(testSpeciality)}`);
           const sigData = await sigRes.json();
           if (sigData.success && sigData.data) signature = sigData.data;
           else {
-            const allRes = await fetch(`${API_BASE_URL}/signatures`);
+            const allRes = await fetch(`${API_BASE_URL_LOCAL}/signatures`);
             const allData = await allRes.json();
             if (allData.success && allData.data.length > 0) {
               const active = allData.data.filter(s => s.isActive);
@@ -1339,27 +1356,57 @@ export default function Result() {
         } catch (e) { console.warn('Could not fetch signature', e); }
       }
 
-      // Convert LetterHead to base64
+      // Fetch letterhead with full-page background image from DB (NEW APPROACH)
+      let letterheadDB: LetterheadDB | null = null;
       let letterHeadBase64 = '';
       try {
-        const imgRes = await fetch(LetterHead);
-        const blob = await imgRes.blob();
-        letterHeadBase64 = await new Promise<string>(resolve => {
-          const reader = new FileReader();
-          reader.onloadend = () => resolve(reader.result as string);
-          reader.readAsDataURL(blob);
-        });
-      } catch (e) { console.warn('Could not load letterhead', e); }
+        const lhRes = await fetch('/api/letterhead/active');
+        const lhData = await lhRes.json();
+        if (lhData.success && lhData.data?.length > 0) {
+          letterheadDB = lhData.data[0];
+          console.log('✅ Letterhead loaded from DB:', letterheadDB);
+        }
+      } catch (e) {
+        console.warn('Could not fetch letterhead from DB', e);
+      }
 
-      // Build combined tests array
+      // Fallback: Convert static LetterHead to base64 if DB letterhead not available
+      if (!letterheadDB) {
+        try {
+          const imgRes = await fetch(LetterHead);
+          const blob = await imgRes.blob();
+          letterHeadBase64 = await new Promise<string>(resolve => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(reader.result as string);
+            reader.readAsDataURL(blob);
+          });
+        } catch (e) { console.warn('Could not load static letterhead', e); }
+      }
+
+      // Build combined tests array with results data
       const combinedTests = responses.map(r => ({
         name: r.patientTest.test.name,
         interpretation: r.patientTest.test.interpretation,
+        signature: r.patientTest.test.signature || signature,
         groupedParameters: r.groupedParameters,
         parameters: r.parameters
       }));
 
-      // Set report data and open modal
+      // Build results object mapping parameter IDs to their values
+      const resultsMap: any = {};
+      responses.forEach(r => {
+        r.parameters.forEach((param: any) => {
+          if (param.existingResult) {
+            resultsMap[param.id] = {
+              numericValue: param.existingResult.numericValue,
+              textValue: param.existingResult.textValue,
+              isAbnormal: param.existingResult.isAbnormal
+            };
+          }
+        });
+      });
+
+      // Set report data for direct print (do NOT open modal)
       setReportData({
         patient: first.patientTest.patient,
         visitId: first.patientTest.visitId,
@@ -1369,12 +1416,35 @@ export default function Result() {
         groupedParameters: first.groupedParameters,
         combinedTests,
         signature,
+        letterhead: letterheadDB,
         letterHeadBase64,
-        printOption: option
+        printOption: option,
+        results: resultsMap,
+        referralDoctor: first.patientTest.referralDoctor
       });
+      
       setReportWithHeader(true);
-      setShowReportModal(true);
+      // ❌ NO modal - trigger print immediately after a small delay to allow render
       setShowPrintOptionsModal(false);
+      
+      // Trigger print after rendering completes
+      setTimeout(() => {
+        directPrintReport({
+          patient: first.patientTest.patient,
+          visitId: first.patientTest.visitId,
+          visitDate: first.patientTest.visitDate,
+          test: first.patientTest.test,
+          parameters: first.parameters,
+          groupedParameters: first.groupedParameters,
+          combinedTests,
+          signature,
+          letterhead: letterheadDB,
+          letterHeadBase64,
+          printOption: option,
+          results: resultsMap,
+          referralDoctor: first.patientTest.referralDoctor
+        });
+      }, 100);
     } catch (err) {
       console.error('Error loading report:', err);
       alert('Error loading report: ' + err.message);
@@ -1383,9 +1453,50 @@ export default function Result() {
     }
   };
 
-  // Handle print from modal
-  const handlePrint = () => {
-    window.print();
+  // Direct print report - renders ProfessionalReport in hidden div and triggers browser print
+  const directPrintReport = (reportProps: any) => {
+    const printContainer = document.createElement('div');
+    printContainer.id = 'print-report-container';
+    printContainer.style.position = 'fixed';
+    printContainer.style.left = '0';
+    printContainer.style.top = '0';
+    printContainer.style.width = '100%';
+    printContainer.style.height = '100%';
+    printContainer.style.zIndex = '9999';
+    printContainer.style.visibility = 'hidden';
+    
+    document.body.appendChild(printContainer);
+
+    // Render the report in the hidden container using React
+    const root = ReactDOM.createRoot(printContainer);
+    
+    root.render(
+      <ProfessionalReport
+        patient={reportProps.patient}
+        visitId={reportProps.visitId}
+        visitDate={reportProps.visitDate}
+        test={reportProps.test}
+        parameters={reportProps.parameters}
+        groupedParameters={reportProps.groupedParameters}
+        combinedTests={reportProps.combinedTests}
+        signature={reportProps.signature}
+        letterhead={reportProps.letterhead}
+        letterHeadBase64={reportProps.letterHeadBase64}
+        printOption={reportProps.printOption}
+        results={reportProps.results}
+        referralDoctor={reportProps.referralDoctor}
+      />
+    );
+
+    // Wait for render, then print
+    setTimeout(() => {
+      window.print();
+      // Clean up after print
+      setTimeout(() => {
+        root.unmount();
+        document.body.removeChild(printContainer);
+      }, 100);
+    }, 500);
   };
 
   // Open upload modal for a patient
@@ -1752,6 +1863,30 @@ export default function Result() {
     fetchOrganizations();
   }, []);
 
+  // Fetch departments on component mount
+  useEffect(() => {
+    const fetchDepartments = async () => {
+      try {
+        const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || '/api';
+        const res = await fetch(`${API_BASE_URL}/master/departments`);
+        const data = await res.json();
+        
+        // 🔴 DEBUG: Log departments response
+        console.log(`🔴 Frontend - Departments API Response:`, data);
+        console.log(`🔴 Frontend - Departments Status:`, data.success);
+        console.log(`🔴 Frontend - Departments Data:`, data.data);
+        
+        if (data.success && Array.isArray(data.data)) {
+          console.log(`✅ Loaded ${data.data.length} departments:`, data.data.map(d => d.name));
+          setDepartments(data.data);
+        }
+      } catch (err) {
+        console.error('Error fetching departments:', err);
+      }
+    };
+    fetchDepartments();
+  }, []);
+
   // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: any) => {
@@ -1851,6 +1986,17 @@ export default function Result() {
       [key]: value
     }));
   };
+
+  // Listen for filter changes and refetch data (IMPORTANT: includes department, organization, testName filters)
+  useEffect(() => {
+    // Save filters to localStorage
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('resultPageFilters', JSON.stringify(filters));
+    }
+    
+    // Fetch results with new filters
+    fetchResults();
+  }, [filters]);
 
   // Handle search
   const handleSearch = () => {
@@ -2265,9 +2411,9 @@ export default function Result() {
                   className="h-8 rounded border border-gray-300 px-2 text-xs focus:outline-none focus:ring-1 focus:ring-cyan-600"
                 >
                   <option value="">All Dept</option>
-                  <option value="Haematology">Haematology</option>
-                  <option value="Biochemistry">Biochemistry</option>
-                  <option value="Microbiology">Microbiology</option>
+                  {departments.map(dept => (
+                    <option key={dept.id} value={dept.name}>{dept.name}</option>
+                  ))}
                 </select>
                 
                 <select 
@@ -3218,105 +3364,8 @@ export default function Result() {
         </div>
       )}
 
-      {/* Report Modal - Using Professional Report Component */}
-      {showReportModal && reportData && (
-        <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-5xl max-h-[95vh] flex flex-col">
-
-            {/* Modal Toolbar - hidden on print */}
-            <div className="flex items-center justify-between px-4 py-3 border-b no-print flex-shrink-0">
-              <h2 className="text-base font-semibold text-gray-900">Professional Report - {reportData.test?.name}</h2>
-              <div className="flex gap-2">
-                <button
-                  onClick={handlePrint}
-                  className="bg-blue-600 text-white px-4 py-1.5 rounded text-sm hover:bg-blue-700"
-                >
-                  🖨️ Print
-                </button>
-                <button
-                  onClick={() => setShowReportModal(false)}
-                  className="text-gray-400 hover:text-gray-700 text-2xl font-bold leading-none px-1"
-                >
-                  ×
-                </button>
-              </div>
-            </div>
-
-            {/* Scrollable preview area */}
-            <div className="overflow-y-auto flex-1 bg-gray-100 p-6">
-
-              {/* Print styles */}
-              <style>{`
-                @media print {
-                  * { visibility: hidden; }
-                  .report-page,
-                  .report-page * {
-                    visibility: visible !important;
-                  }
-                  body {
-                    margin: 0;
-                    padding: 0;
-                    background: white;
-                  }
-                  .report-page {
-                    position: absolute !important;
-                    left: 0;
-                    top: 0;
-                    width: 100%;
-                    margin: 0 !important;
-                    padding: 0 !important;
-                    box-shadow: none !important;
-                    page-break-after: always;
-                    page-break-inside: avoid;
-                    overflow: visible !important;
-                    background: white !important;
-                    border-radius: 0 !important;
-                  }
-                  .report-page:last-child {
-                    page-break-after: avoid;
-                  }
-                  .no-print {
-                    display: none !important;
-                    visibility: hidden !important;
-                  }
-                  @page {
-                    size: A4;
-                    margin: 0;
-                  }
-                }
-              `}</style>
-
-              {/* Render Professional Report Component */}
-              {(reportData.combinedTests || [reportData]).map((testData, idx) => (
-                <div
-                  key={idx}
-                  className="report-page"
-                  id={idx === 0 ? 'report-print-page' : undefined}
-                  style={{
-                    backgroundColor: '#fff',
-                    boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-                    padding: '0',
-                    marginBottom: '16px',
-                    borderRadius: '4px',
-                  }}
-                >
-                  <ProfessionalResultReport
-                    patient={reportData.patient}
-                    visitDate={reportData.visitDate}
-                    visitId={reportData.visitId}
-                    test={testData.test || testData}
-                    groupedParameters={testData.groupedParameters || reportData.groupedParameters}
-                    parameters={testData.parameters || reportData.parameters}
-                    signature={reportData.signature}
-                    withHeader={reportWithHeader}
-                    letterHeadBase64={reportData.letterHeadBase64}
-                  />
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Report Modal - REMOVED - Direct print preview now used instead */}
+      {/* showReportModal is no longer used - directPrintReport handles printing directly */}
 
       {/* Upload File Modal */}
       {showUploadModal && uploadPatient && (
