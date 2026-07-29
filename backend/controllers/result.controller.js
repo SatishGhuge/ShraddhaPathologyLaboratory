@@ -252,7 +252,7 @@ export const getPatientTests = async (req, res) => {
         result_status: normalizeStatus(patientTest.status),
         status: patientTest.status,
         barcode_status: patientTest.barcode_status || 'Unprinted',
-        isOutsourced: patientTest.isOutsourced || false,
+        isOutsourced: patientTest.test?.isOutsourced || false,
         outsourcedTo: patientTest.outsourcedTo || null,
         approved_date: patientTest.visitDate ? (() => {
           const d = patientTest.visitDate;
@@ -734,7 +734,7 @@ export const getPatientTestById = async (req, res) => {
 
     // 🔧 Fetch outsourcing report data if this is an outsourced test
     let outsourcingReport = null;
-    if (patientTest.isOutsourced) {
+    if (patientTest.test?.isOutsourced) {
       outsourcingReport = await prisma.outsourcingReport.findUnique({
         where: { patientTestId: patientTest.id },
         include: {
