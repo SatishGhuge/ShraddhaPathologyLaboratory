@@ -152,6 +152,9 @@ export const labStockAPI = {
   getAll: (page = 1, limit = 10) =>
     api.get('/lab-stocks', { params: { page, limit } }),
 
+  getAllGrouped: (page = 1, limit = 10, search = '') =>
+    api.get('/stock-transactions', { params: { page, limit, search } }),
+
   getByItem: (itemId: number) =>
     api.get(`/lab-stocks/item/${itemId}`),
 

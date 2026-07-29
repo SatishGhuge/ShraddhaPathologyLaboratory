@@ -221,20 +221,15 @@ export const getBatchesByItem = async (req, res) => {
     
     console.log(`[getBatchesByItem] Fetching batches for itemId: ${itemId}`);
 
-    // Fetch batches from stock_entry_items table
-    const batches = await prisma.stockEntryItem.findMany({
+    // Fetch batches from lab_stocks table (real-time available quantities)
+    const batches = await prisma.labStock.findMany({
       where: { itemId: parseInt(itemId) },
       select: {
         id: true,
         batchNo: true,
-        quantity: true,
+        quantityAvailable: true,
         expiryDate: true,
-        stockEntry: {
-          select: {
-            invoiceNo: true,
-            invoiceDate: true
-          }
-        }
+        lastStockUpdate: true
       },
       orderBy: { expiryDate: 'asc' }
     });
@@ -245,10 +240,9 @@ export const getBatchesByItem = async (req, res) => {
     const formattedBatches = batches.map(batch => ({
       id: batch.id,
       batchNo: batch.batchNo,
-      availableQuantity: batch.quantity,
+      availableQuantity: batch.quantityAvailable,
       expiryDate: batch.expiryDate,
-      invoiceNo: batch.stockEntry?.invoiceNo,
-      invoiceDate: batch.stockEntry?.invoiceDate
+      lastStockUpdate: batch.lastStockUpdate
     }));
 
     res.json({
@@ -1154,6 +1148,112 @@ export const getLabStocks = async (req, res) => {
     res.json(buildPaginatedResponse(data, total, page, limit, 'Lab stocks fetched successfully'));
   } catch (error) {
     console.error('Get lab stocks error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch lab stocks'
+    });
+  }
+};
+
+// Get Lab Stock Grouped by Item
+export const getLabStocksGroupedByItem = async (req, res) => {
+  try {
+    const { page = 1, limit = 10, search = '' } = req.query;
+    const pageNum = parseInt(page);
+    const limitNum = parseInt(limit);
+    const skip = (pageNum - 1) * limitNum;
+
+    // Get all lab stocks with item details
+    const allStocks = await prisma.labStock.findMany({
+      include: { item: { include: { hsnCode: true } } },
+      orderBy: { createdAt: 'desc' }
+    });
+
+    // Group by itemId and calculate summaries
+    const groupedData = new Map();
+
+    allStocks.forEach((stock) => {
+      const itemId = stock.itemId;
+      
+      if (!groupedData.has(itemId)) {
+        groupedData.set(itemId, {
+          itemId: stock.itemId,
+          itemName: stock.item.itemName,
+          itemCode: stock.item.itemCode,
+          unit: stock.item.unit,
+          hsnCode: stock.item.hsnCode,
+          totalQuantity: 0,
+          totalBatches: 0,
+          nearestExpiryDate: null,
+          batches: [],
+          alertStatus: 'OK'
+        });
+      }
+
+      const itemGroup = groupedData.get(itemId);
+      itemGroup.totalQuantity += stock.quantityAvailable;
+      itemGroup.totalBatches += 1;
+      itemGroup.batches.push({
+        batchNo: stock.batchNo,
+        quantityAvailable: stock.quantityAvailable,
+        expiryDate: stock.expiryDate,
+        lastStockUpdate: stock.lastStockUpdate,
+        id: stock.id
+      });
+
+      // Calculate nearest expiry date
+      if (!itemGroup.nearestExpiryDate || new Date(stock.expiryDate) < new Date(itemGroup.nearestExpiryDate)) {
+        itemGroup.nearestExpiryDate = stock.expiryDate;
+      }
+
+      // Determine alert status
+      const daysUntilExpiry = Math.floor((new Date(stock.expiryDate) - new Date()) / (1000 * 60 * 60 * 24));
+      if (daysUntilExpiry < 0) {
+        itemGroup.alertStatus = 'EXPIRED';
+      } else if (daysUntilExpiry < 30) {
+        itemGroup.alertStatus = 'EXPIRING';
+      } else if (stock.quantityAvailable < 10) {
+        itemGroup.alertStatus = 'LOW_STOCK';
+      }
+    });
+
+    // Convert map to array
+    let groupedArray = Array.from(groupedData.values());
+
+    // Apply search filter
+    if (search) {
+      const searchLower = search.toLowerCase();
+      groupedArray = groupedArray.filter(
+        (item) =>
+          item.itemName.toLowerCase().includes(searchLower) ||
+          item.itemCode.toLowerCase().includes(searchLower)
+      );
+    }
+
+    // Get total count after filtering
+    const total = groupedArray.length;
+
+    // Apply pagination
+    const paginatedData = groupedArray.slice(skip, skip + limitNum);
+
+    // Sort batches by expiry date within each item
+    paginatedData.forEach((item) => {
+      item.batches.sort((a, b) => new Date(a.expiryDate) - new Date(b.expiryDate));
+    });
+
+    res.json({
+      success: true,
+      message: 'Lab stocks grouped by item fetched successfully',
+      data: paginatedData,
+      pagination: {
+        page: pageNum,
+        limit: limitNum,
+        total,
+        totalPages: Math.ceil(total / limitNum)
+      }
+    });
+  } catch (error) {
+    console.error('Get lab stocks grouped error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to fetch lab stocks'
