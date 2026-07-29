@@ -133,9 +133,7 @@ export const createPatient = async (req, res) => {
           paidAmount: perTestPaid,
           balanceAmount: perTestBalance,
           paymentMode,
-          businessType,
-          isOutsourced: test.isOutsourced || false,
-          outsourcedTo: test.outsourcedTo || null
+          businessType
         })) || []
       });
 
@@ -220,9 +218,7 @@ export const createPatient = async (req, res) => {
               paidAmount: perTestPaid,
               balanceAmount: perTestBalance,
               paymentMode,
-              businessType,
-              isOutsourced: test.isOutsourced || false,
-              outsourcedTo: test.outsourcedTo || null
+              businessType
             })) || []
           }
         },

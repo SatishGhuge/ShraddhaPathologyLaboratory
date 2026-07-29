@@ -306,7 +306,6 @@ model PatientTest {
   lastStatusUpdateAt DateTime?
   barcode_status     String              @default("Unprinted")
   comments           String?             @db.Text
-  isOutsourced       Boolean             @default(false)
   outsourcedTo       String?
   homeVisitTracking  HomeVisitTracking?
   outsourcingReport  OutsourcingReport?
@@ -328,7 +327,6 @@ model PatientTest {
   @@index([patientId, visitId])
   @@index([patientId], map: "patient_tests_patientId_fkey")
   @@index([packageId], map: "patient_tests_packageId_fkey")
-  @@index([isOutsourced])
   @@map("patient_tests")
 }
 

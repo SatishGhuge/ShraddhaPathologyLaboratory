@@ -176,7 +176,12 @@ export const getPatientTests = async (req, res) => {
                     femaleActive: true,
                     childLowValue: true,
                     childHighValue: true,
-                    childActive: true
+                    childActive: true,
+                    unit: {
+                      select: {
+                        symbol: true
+                      }
+                    }
                   }
                 }
               }
@@ -252,7 +257,7 @@ export const getPatientTests = async (req, res) => {
         result_status: normalizeStatus(patientTest.status),
         status: patientTest.status,
         barcode_status: patientTest.barcode_status || 'Unprinted',
-        isOutsourced: patientTest.isOutsourced || false,
+        isOutsourced: patientTest.test?.isOutsourced || false,
         outsourcedTo: patientTest.outsourcedTo || null,
         approved_date: patientTest.visitDate ? (() => {
           const d = patientTest.visitDate;
@@ -282,6 +287,10 @@ export const getPatientTests = async (req, res) => {
         parameter_id: patientTest.test.categories?.length === 1 ? (patientTest.test.categories?.[0]?.testParameter?.id || null) : null,
         // Add method name for reports (only for single parameter tests)
         method_name: patientTest.test.categories?.length === 1 ? (patientTest.test.categories?.[0]?.testParameter?.testMethod || '') : '',
+        // ✅ GET UNIT from the parameter object (which now includes unit data)
+        unit: patientTest.test.categories?.length === 1 && patientTest.test.categories?.[0]?.testParameter 
+          ? (patientTest.test.categories[0].testParameter.unit?.symbol || '') 
+          : '',
         // For ref_interval, include full parameter data so frontend can calculate based on patient demographics
         ref_interval_data: patientTest.test.categories?.length === 1 ? (patientTest.test.categories?.[0]?.testParameter || null) : null,
         // For result, get the numeric or text value from the first test result if single parameter
@@ -734,7 +743,7 @@ export const getPatientTestById = async (req, res) => {
 
     // 🔧 Fetch outsourcing report data if this is an outsourced test
     let outsourcingReport = null;
-    if (patientTest.isOutsourced) {
+    if (patientTest.test?.isOutsourced) {
       outsourcingReport = await prisma.outsourcingReport.findUnique({
         where: { patientTestId: patientTest.id },
         include: {
