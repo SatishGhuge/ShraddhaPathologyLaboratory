@@ -24,9 +24,11 @@ import {
   createStockEntry,
   getAllStockEntries,
   getStockEntryById,
+  updateStockEntry,
   deleteStockEntry,
   // Lab Stock
   getLabStocks,
+  getLabStocksGroupedByItem,
   getLabStockByItem,
   // Stock Transaction
   createStockTransaction,
@@ -95,6 +97,12 @@ router.post('/stock-entries', authMiddleware, [
 
 router.get('/stock-entries', authMiddleware, getAllStockEntries);
 router.get('/stock-entries/:id', authMiddleware, getStockEntryById);
+router.put('/stock-entries/:id', authMiddleware, [
+  body('supplierId').isInt().withMessage('Valid supplier ID is required'),
+  body('invoiceNo').trim().notEmpty().withMessage('Invoice number is required'),
+  body('invoiceDate').isISO8601().withMessage('Valid invoice date is required'),
+  body('items').isArray({ min: 1 }).withMessage('At least one item is required')
+], updateStockEntry);
 router.delete('/stock-entries/:id', authMiddleware, deleteStockEntry);
 
 // ========== LAB STOCK ROUTES ==========
@@ -102,14 +110,15 @@ router.get('/lab-stocks', authMiddleware, getLabStocks);
 router.get('/lab-stocks/item/:itemId', authMiddleware, getLabStockByItem);
 
 // ========== STOCK TRANSACTION ROUTES ==========
+// Get stock transactions grouped by item (main view)
+router.get('/stock-transactions', authMiddleware, getLabStocksGroupedByItem);
+// Create a new stock transaction
 router.post('/stock-transactions', authMiddleware, [
   body('itemId').isInt().withMessage('Valid item ID is required'),
   body('batchNo').trim().notEmpty().withMessage('Batch number is required'),
   body('quantity').isInt({ min: 1 }).withMessage('Quantity must be a positive integer'),
   body('transactionType').isIn(['IN', 'OUT', 'RETURN', 'DAMAGED', 'EXPIRY', 'LOSS']).withMessage('Invalid transaction type')
 ], createStockTransaction);
-
-router.get('/stock-transactions', authMiddleware, getAllStockTransactions);
 
 // ========== LAB TO ORGANIZATION TRANSFER ROUTES ==========
 router.post('/transfers', authMiddleware, [

@@ -167,6 +167,8 @@ export default function StockEntryModal({
       setSelectedItems([]);
       setErrors({});
       setSubmitError("");
+      setSelectedSupplier(null);
+      setIsOutOfState(false);
     } else if (isOpen && editingEntry) {
       // Populate form when editing an existing entry
       console.log("🔧 EDIT MODE: Loading entry data...", editingEntry);
@@ -177,16 +179,24 @@ export default function StockEntryModal({
         invoiceDate: editingEntry.invoiceDate.split("T")[0],
       });
 
+      // Set supplier and determine tax type IMMEDIATELY
+      const supplier = suppliers.find(s => s.id === editingEntry.supplierId);
+      if (supplier) {
+        setSelectedSupplier(supplier);
+        const outOfState = supplier.state && 
+          supplier.state.toLowerCase().trim() !== 'maharashtra';
+        setIsOutOfState(outOfState);
+        console.log(`✅ Supplier Restored: ${supplier.supplierName}, State: ${supplier.state}, Out of State: ${outOfState}`);
+      }
+
       // Populate selected items from the entry
       const mappedItems = editingEntry.items.map((item: any) => {
-        // Get item details from nested item object or direct properties
         const itemDetails = item.item || {};
         
-        // Calculate GST from cgstPercent if gst is not available
-        // cgstPercent and sgstPercent are half percentages (CGST = GST/2, SGST = GST/2)
-        const gstPercent = (item.cgstPercent && item.sgstPercent) 
-          ? (item.cgstPercent + item.sgstPercent) 
-          : 0;
+        // For IGST: igstPercent is the full rate
+        // For CGST+SGST: cgstPercent + sgstPercent = full GST rate
+        const gstPercent = item.igstPercent || 
+          (item.cgstPercent && item.sgstPercent ? (item.cgstPercent + item.sgstPercent) : 0);
         
         const mappedItem = {
           itemId: item.itemId,
@@ -211,7 +221,7 @@ export default function StockEntryModal({
 
       console.log("✅ Selected items mapped:", mappedItems.length, "items");
       setSelectedItems(mappedItems);
-      setEditingIndex(null); // Reset editing index so we see Edit buttons
+      setEditingIndex(null);
       setItemForm({
         itemId: undefined,
         hsnNumber: "",
@@ -226,7 +236,7 @@ export default function StockEntryModal({
       setErrors({});
       setSubmitError("");
     }
-  }, [isOpen, editingEntry]);
+  }, [isOpen, editingEntry, suppliers]);
 
   const selectedItemData = items.find((item) => item.id === Number(itemForm.itemId));
 
@@ -442,45 +452,14 @@ export default function StockEntryModal({
 
       let response;
       if (editingEntry) {
-        // In edit mode - for now just show a message
-        // Note: You would need to create an update API endpoint on the backend
-        setSubmitError("Edit functionality requires backend update API implementation");
-        console.log("Edit payload:", payload);
-        // TODO: Call update API when available
-        // response = await inventoryAPI.stockEntries.update(editingEntry.id, payload);
+        // UPDATE mode - use the new update API
+        response = await inventoryAPI.stockEntries.update(editingEntry.id, payload);
+        console.log("✅ Stock Entry Updated:", response.data);
+        onStockEntrySaved(response.data.data);
       } else {
-        // Create new stock entry
+        // CREATE mode
         response = await inventoryAPI.stockEntries.create(payload);
-        console.log("🎯 Stock Entry Response:", response.data);
-        
-        // Extract and set tax information from response
-        if (response.data.data) {
-          const taxSummary = response.data.data.taxSummary;
-          const supplierInfo = response.data.data.supplierInfo;
-          
-          if (taxSummary && supplierInfo) {
-            setTaxInfo({
-              taxType: response.data.data.taxType,
-              description: taxSummary.description,
-              supplierState: supplierInfo.state,
-              isOutOfState: supplierInfo.isOutOfState,
-              taxRate: taxSummary.taxRate,
-              cgstRate: taxSummary.cgstRate,
-              sgstRate: taxSummary.sgstRate,
-              totalTaxAmount: taxSummary.totalTaxAmount,
-              totalCGST: taxSummary.totalCGST,
-              totalSGST: taxSummary.totalSGST,
-              totalIGST: taxSummary.totalIGST,
-            });
-            
-            console.log("✅ Tax Info Set:", {
-              taxType: response.data.data.taxType,
-              supplierState: supplierInfo.state,
-              description: taxSummary.description,
-            });
-          }
-        }
-        
+        console.log("🎯 Stock Entry Created:", response.data);
         onStockEntrySaved(response.data.data);
       }
 

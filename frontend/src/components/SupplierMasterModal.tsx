@@ -33,6 +33,7 @@ export default function SupplierMasterModal({
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [successMsg, setSuccessMsg] = useState("");
+  const [allSuppliers, setAllSuppliers] = useState<any[]>([]);
 
   const STATES = [
     "Andhra Pradesh",
@@ -68,18 +69,29 @@ export default function SupplierMasterModal({
   // Initialize form when modal opens or editing supplier changes
   useEffect(() => {
     if (isOpen) {
+      // Fetch all suppliers for uniqueness checking
+      const fetchSuppliers = async () => {
+        try {
+          const response = await inventoryAPI.suppliers.getAll(1, 1000);
+          setAllSuppliers(response.data?.data || []);
+        } catch (error) {
+          console.error('Failed to fetch suppliers:', error);
+        }
+      };
+      fetchSuppliers();
+
       if (editingSupplier) {
         setEditingId(editingSupplier.id);
         setForm({
           supplierName: editingSupplier.supplierName || "",
           gstNumber: editingSupplier.gstNumber || "",
           email: editingSupplier.email || "",
-          phoneNumber: editingSupplier.phoneNumber || "",
+          phoneNumber: editingSupplier.phone || editingSupplier.phoneNumber || "",
           address: editingSupplier.address || "",
           city: editingSupplier.city || "",
           state: editingSupplier.state || "",
-          pincode: editingSupplier.pincode || "",
-          status: editingSupplier.status || "Active",
+          pincode: editingSupplier.pinCode || editingSupplier.pincode || "",
+          status: editingSupplier.isActive ? "Active" : "Inactive",
         });
       } else {
         setEditingId(null);
@@ -126,6 +138,30 @@ export default function SupplierMasterModal({
     // Validate pincode (6 digits)
     if (form.pincode && !/^\d{6}$/.test(form.pincode)) {
       newErrors.pincode = "Pincode must be 6 digits";
+    }
+
+    // Check for duplicate GST number
+    if (form.gstNumber) {
+      const duplicateGst = allSuppliers.find(
+        (supplier) => 
+          supplier.gstNumber === form.gstNumber && 
+          supplier.id !== editingId
+      );
+      if (duplicateGst) {
+        newErrors.gstNumber = "GST Number already exists. Please use a unique GST Number.";
+      }
+    }
+
+    // Check for duplicate phone number
+    if (form.phoneNumber) {
+      const duplicatePhone = allSuppliers.find(
+        (supplier) => 
+          supplier.phone === form.phoneNumber && 
+          supplier.id !== editingId
+      );
+      if (duplicatePhone) {
+        newErrors.phoneNumber = "Phone number already exists. Please use a unique phone number.";
+      }
     }
 
     setErrors(newErrors);
@@ -182,7 +218,9 @@ export default function SupplierMasterModal({
       setTimeout(closeModal, 1500);
     } catch (error: any) {
       console.error("Error saving supplier:", error);
-      setErrors({ submit: error.message || "Failed to save supplier" });
+      // Extract error message from backend response
+      const errorMessage = error.response?.data?.message || error.message || "Failed to save supplier";
+      setErrors({ submit: errorMessage });
     } finally {
       setLoading(false);
     }
@@ -398,7 +436,35 @@ export default function SupplierMasterModal({
           </div>
 
           {/* Status - Radio Buttons */}
-         
+          <div>
+            <label className="block text-xs font-semibold text-gray-700 mb-2">
+              Status
+            </label>
+            <div className="flex gap-4">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="radio"
+                  name="status"
+                  value="Active"
+                  checked={form.status === "Active"}
+                  onChange={(e) => handleStatusChange(e.target.value)}
+                  className="w-4 h-4 text-orange-500 cursor-pointer"
+                />
+                <span className="text-sm text-gray-700">Active</span>
+              </label>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="radio"
+                  name="status"
+                  value="Inactive"
+                  checked={form.status === "Inactive"}
+                  onChange={(e) => handleStatusChange(e.target.value)}
+                  className="w-4 h-4 text-orange-500 cursor-pointer"
+                />
+                <span className="text-sm text-gray-700">Inactive</span>
+              </label>
+            </div>
+          </div>
 
           {/* Error Message */}
           {errors.submit && (
