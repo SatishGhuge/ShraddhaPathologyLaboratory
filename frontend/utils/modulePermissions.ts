@@ -28,6 +28,7 @@ export const defaultModuleAllocation = {
     testReport: false,
   },
   configuration: {
+    letterhead: false,
     signature: false,
   },
   help: {
@@ -102,7 +103,8 @@ export const getAccessibleModules = (moduleAllocation: any) => {
       testReport: allocation.reports.testReport,
     },
     configuration: {
-      hasAccess: allocation.configuration.signature,
+      hasAccess: allocation.configuration.letterhead || allocation.configuration.signature,
+      letterhead: allocation.configuration.letterhead,
       signature: allocation.configuration.signature,
     },
     help: {

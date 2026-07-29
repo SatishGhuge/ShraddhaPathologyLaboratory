@@ -10,6 +10,7 @@ import homeVisitRoutes from './routes/homeVisit.routes.js';
 import masterRoutes from './routes/master.routes.js';
 import resultRoutes from './routes/result.routes.js';
 import signatureRoutes from './routes/signature.routes.js';
+import letterheadRoutes from './routes/letterhead.routes.js';
 import doctorRevenueRoutes from './routes/doctor-revenue.routes.js';
 import inventoryRoutes from './routes/inventory.routes.js';
 import { emailService } from './services/notification.service.js';
@@ -47,6 +48,7 @@ app.use('/api/patients', patientRoutes);
 app.use('/api/master', masterRoutes);
 app.use('/api/results', resultRoutes);
 app.use('/api/signatures', signatureRoutes);
+app.use('/api/letterhead', letterheadRoutes);
 app.use('/api/doctor-revenue', doctorRevenueRoutes);
 app.use('/api/inventory', inventoryRoutes);
 

@@ -46,6 +46,10 @@ export const getPatientTests = async (filters: Filters = {}, page: number = 1, l
   
   const url = `${API_BASE_URL}/results${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
   
+  // 🔴 DEBUG: Log URL being called
+  console.log(`🔴 Frontend - API Call: ${url}`);
+  console.log(`🔴 Frontend - Filters:`, filters);
+  
   const response = await fetch(url);
   const result: ApiResponse = await response.json();
   

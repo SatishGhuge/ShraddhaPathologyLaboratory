@@ -45,6 +45,15 @@ export const getPatientTests = async (req, res) => {
     // Build where condition for filtering
     const andConditions = [];
 
+    // 🔴 DEBUG: Log all incoming filters
+    console.log('🔴 Result Controller - getPatientTests Filters:');
+    console.log('   department:', department);
+    console.log('   organization:', organization);
+    console.log('   status:', status);
+    console.log('   testName:', testName);
+    console.log('   fromDate:', fromDate);
+    console.log('   toDate:', toDate);
+
     // Filter by status
     if (status && status !== 'All') {
       andConditions.push({ status });
@@ -77,13 +86,13 @@ export const getPatientTests = async (req, res) => {
       });
     }
 
-    // Filter by department
+    // Filter by department - use case-insensitive comparison
     if (department && department !== '') {
+      console.log(`🔴 Applying department filter: "${department}"`);
+      // Use contains for case-insensitive matching (MySQL default is case-insensitive)
       andConditions.push({ 
         department: { 
-          name: { 
-            contains: department.toLowerCase()
-          } 
+          name: department  // Direct equality - MySQL is case-insensitive by default
         } 
       });
     }
@@ -110,10 +119,16 @@ export const getPatientTests = async (req, res) => {
 
     const whereCondition = andConditions.length > 0 ? { AND: andConditions } : {};
 
+    // 🔴 DEBUG: Log the where condition
+    console.log('🔴 WHERE condition:', JSON.stringify(whereCondition, null, 2));
+
     // Get total count for pagination
     const total = await prisma.patientTest.count({
       where: whereCondition
     });
+
+    // 🔴 DEBUG: Log total count
+    console.log(`🔴 Total records found: ${total}`);
 
     // Get paginated data
     const patientTests = await prisma.patientTest.findMany({
@@ -571,11 +586,13 @@ export const getPatientTestById = async (req, res) => {
 
         allParameters.push(parameter);
 
-        // Group by category name
-        if (!groupedParameters[categoryName]) {
-          groupedParameters[categoryName] = [];
+        // Group by UNIQUE category identifier (not just category name)
+        // This ensures categories without names still get their own group
+        const groupKey = parameter.categoryUniqueId || parameter.categoryName || 'NO_CATEGORY_HEADER';
+        if (!groupedParameters[groupKey]) {
+          groupedParameters[groupKey] = [];
         }
-        groupedParameters[categoryName].push(parameter);
+        groupedParameters[groupKey].push(parameter);
       }
     });
 
@@ -700,12 +717,13 @@ export const getPatientTestById = async (req, res) => {
 
         allParameters.push(parameter);
 
-        // Group by test name
-        const categoryName = 'NO_CATEGORY_HEADER';
-        if (!groupedParameters[categoryName]) {
-          groupedParameters[categoryName] = [];
+        // Group by UNIQUE category identifier
+        // For direct parameters, use the unique ID to avoid collapsing them together
+        const groupKey = parameter.categoryUniqueId || parameter.categoryName || 'NO_CATEGORY_HEADER';
+        if (!groupedParameters[groupKey]) {
+          groupedParameters[groupKey] = [];
         }
-        groupedParameters[categoryName].push(parameter);
+        groupedParameters[groupKey].push(parameter);
       });
     }
 
