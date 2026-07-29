@@ -1380,20 +1380,6 @@ export default function Result() {
         console.warn('Could not fetch letterhead from DB', e);
       }
 
-      // Build combined tests array
-      // 🔧 PART 3: Include outsourcing data (NO database fetch)
-      const combinedTests = responses.map((r) => {
-        return {
-          name: r.patientTest.test.name,
-          interpretation: r.patientTest.test.interpretation,
-          groupedParameters: r.groupedParameters,
-          parameters: r.parameters,
-          // 🔧 PART 3: Include outsourcing flag and report data
-          isOutsourced: r.patientTest.isOutsourced || false,
-          outsourcedTo: r.patientTest.outsourcedTo || null,
-          outsourcingReport: r.outsourcingReport || null  // Include outsourcing report from response
-        };
-      });
       // Fallback: Convert static LetterHead to base64 if DB letterhead not available
       if (!letterheadDB) {
         try {
@@ -1413,7 +1399,11 @@ export default function Result() {
         interpretation: r.patientTest.test.interpretation,
         signature: r.patientTest.test.signature || signature,
         groupedParameters: r.groupedParameters,
-        parameters: r.parameters
+        parameters: r.parameters,
+        // Include outsourcing data if available
+        isOutsourced: r.patientTest.isOutsourced || false,
+        outsourcedTo: r.patientTest.outsourcedTo || null,
+        outsourcingReport: r.outsourcingReport || null
       }));
 
       // Build results object mapping parameter IDs to their values
@@ -3917,7 +3907,7 @@ export default function Result() {
                     } catch (e) { console.warn('Could not load letterhead', e); }
 
                     // Build combined tests array in selected order
-                    const combinedTests = responses.map(r => ({
+                    const selectedCombinedTests = responses.map(r => ({
                       name: r.patientTest.test.name,
                       interpretation: r.patientTest.test.interpretation,
                       groupedParameters: r.groupedParameters,
@@ -3932,7 +3922,7 @@ export default function Result() {
                       test: first.patientTest.test,
                       parameters: first.parameters,
                       groupedParameters: first.groupedParameters,
-                      combinedTests,
+                      combinedTests: selectedCombinedTests,
                       signature,
                       letterHeadBase64,
                       printOption: 'nobreak'
