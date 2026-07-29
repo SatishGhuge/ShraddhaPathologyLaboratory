@@ -1,7 +1,7 @@
 "use client";
 
 import { usePathname, useRouter } from "next/navigation";
-import { Home, FileText, BarChart3, IndianRupee, FolderOpen, Settings, UserPlus, Search, Send, FileSignature, Database, ClipboardCheck, DollarSign, ChevronLeft } from "lucide-react";
+import { Home, FileText, BarChart3, IndianRupee, FolderOpen, Settings, UserPlus, Search, Send, FileSignature, Database, ClipboardCheck, DollarSign, ChevronLeft, Image } from "lucide-react";
 
 // Icon mapping for breadcrumb paths
 const iconMap = {
@@ -15,6 +15,7 @@ const iconMap = {
   "Search for Booking": Search,
   "Outsourcing for Test": Send,
   "Configuration": Settings,
+  "Letterhead": Image,
   "Signature": FileSignature,
   "Machines": Database,
   "Tests": Database,
@@ -81,6 +82,7 @@ const urlPathMap: { [key: string]: string } = {
   "reports/bulk-settlement": "Reports / Bulk Settlement",
   
   // Configuration Module
+  "config/letterhead": "Configuration / Letterhead",
   "config/signature": "Configuration / Signature",
   "config/machines": "Configuration / Machines",
   

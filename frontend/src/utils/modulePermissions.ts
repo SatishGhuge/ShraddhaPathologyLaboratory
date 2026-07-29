@@ -35,6 +35,7 @@ export interface ModulePermissions {
     [key: string]: any;
   };
   configuration: {
+    letterhead: boolean;
     signature: boolean;
   };
   help: {
@@ -80,6 +81,7 @@ export const getAccessibleModules = (moduleAllocation: string | object | null): 
       turnAroundTime: false,
     },
     configuration: {
+      letterhead: false,
       signature: false,
     },
     help: {
@@ -133,6 +135,7 @@ export const getAccessibleModules = (moduleAllocation: string | object | null): 
         turnAroundTime: allocation?.reports?.turnAroundTime ?? false,
       },
       configuration: {
+        letterhead: allocation?.configuration?.letterhead ?? false,
         signature: allocation?.configuration?.signature ?? false,
       },
       help: {

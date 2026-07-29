@@ -217,6 +217,7 @@ const defaultModuleAllocation = {
     turnAroundTime: false,
   },
   configuration: {
+    letterhead: false,
     signature: false,
   },
   help: {
@@ -594,6 +595,7 @@ const AddOrganization = () => {
                     title="Configuration"
                     icon={Lock}
                     items={[
+                      { key: 'configuration.letterhead', label: 'Letterhead' },
                       { key: 'configuration.signature', label: 'Signature' },
                     ]}
                     moduleAllocation={moduleAllocation}

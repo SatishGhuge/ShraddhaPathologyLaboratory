@@ -74,6 +74,7 @@ const allModules: NavModule[] = [
     title: "Configuration",
     icon: <Settings size={20} />,
     items: [
+      { label: "Letterhead", path: "/config/letterhead" },
       { label: "Signature", path: "/config/signature" },
       { label: "Machines", path: "/config/machines" },
     ],
@@ -219,6 +220,7 @@ const Header = () => {
             const filtered = {
               ...module,
               items: module.items.filter(item => {
+                if (item.label === "Letterhead") return accessible.configuration.letterhead;
                 if (item.label === "Signature") return accessible.configuration.signature;
                 if (item.label === "Machines") return accessible.configuration.machines;
                 return false;

@@ -34,6 +34,41 @@ const router = express.Router();
 // Get all patient tests for results page
 router.get('/', getPatientTests);
 
+// 🔴 DEBUG ENDPOINT: Get department statistics
+router.get('/debug/departments', async (req, res) => {
+  try {
+    const departments = await prisma.department.findMany({
+      where: { isActive: true },
+      include: {
+        patientTests: {
+          select: { id: true }
+        }
+      },
+      orderBy: { name: 'asc' }
+    });
+
+    const stats = departments.map(d => ({
+      id: d.id,
+      name: d.name,
+      code: d.code,
+      testCount: d.patientTests.length
+    }));
+
+    res.json({
+      success: true,
+      message: 'Department statistics',
+      data: stats
+    });
+  } catch (error) {
+    console.error('Debug departments error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch department statistics',
+      error: error.message
+    });
+  }
+});
+
 // Get test statistics for dashboard — must be before /:id
 router.get('/statistics', getTestStatistics);
 
