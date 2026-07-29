@@ -8,7 +8,8 @@ import PageHeader from "@/src/components/BreadCrumb";
 import UnitModal from "@/src/components/UnitModal";
 import { CKEditor } from "@ckeditor/ckeditor5-react";
 import ClassicEditor from "@ckeditor/ckeditor5-build-classic";
-import { getTestById, createTest, updateTest, getDepartments, getUnits, getTests } from "@/src/api/master.js";
+import { getTestById, createTest, updateTest, getDepartments, getUnits, getTests, getSampleTypes } from "@/src/api/master.js";
+import { getMachinesDropdown } from "@/src/api/machines";
 
 const baseInputClass =
   "px-2 py-1 border border-gray-300 rounded text-sm bg-white focus:outline-none focus:ring-2 focus:ring-orange-500";
@@ -48,7 +49,7 @@ const AddTest = () => {
     profileTest: false,
     reportHeader: "",
     sampleTypeId: "",
-    machineName: "",
+    machineId: "",
     isHeader: true,
     showTestName: true,
     outsourceLab: "",
@@ -64,12 +65,13 @@ const AddTest = () => {
   const [error, setError] = useState<any>(null);
   const [departments, setDepartments] = useState<any[]>([]);
   const [units, setUnits] = useState<any[]>([]);
+  const [machines, setMachines] = useState<any[]>([]);
   const [dataLoaded, setDataLoaded] = useState(false);
   const [tests, setTests] = useState<any[]>([]);
   const [selectedTestToAdd, setSelectedTestToAdd] = useState("");
   const [selectedTestsToAdd, setSelectedTestsToAdd] = useState<any[]>([]);
   const [showPreview, setShowPreview] = useState(false);
-  const [specimenTypes, setSpecimenTypes] = useState<any[]>([]);
+  const [sampleTypes, setSampleTypes] = useState<any[]>([]);
   const [showSampleTypeDropdown, setShowSampleTypeDropdown] = useState(false);
   const [signatures, setSignatures] = useState<any[]>([]);
   const [showUnitModal, setShowUnitModal] = useState(false);
@@ -279,29 +281,35 @@ const AddTest = () => {
       }
     };
 
-    const fetchSpecimenTypes = async () => {
+    const fetchSampleTypes = async () => {
       try {
-        console.log("📡 Fetching specimen types from API...");
-        const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || '/api';
-        const response = await fetch(`${API_BASE_URL}/master/specimen-types`);
-        const result = await response.json();
-        
-        if (result.success) {
-          console.log("✅ Specimen types loaded:", result.data);
-          setSpecimenTypes(result.data);
-        } else {
-          console.error('❌ Failed to fetch specimen types:', result.message);
-        }
+        console.log("📡 Fetching sample types from API...");
+        const sampleTypesData = await getSampleTypes();
+        console.log("✅ Sample types loaded:", sampleTypesData);
+        setSampleTypes(sampleTypesData);
       } catch (err) {
-        console.error('❌ Error fetching specimen types:', err);
-        // Don't set error for specimen types, just log it
+        console.error('❌ Error fetching sample types:', err);
+        // Don't set error for sample types, just log it
+      }
+    };
+
+    const fetchMachines = async () => {
+      try {
+        console.log("📡 Fetching machines from API...");
+        const res = await getMachinesDropdown();
+        console.log("✅ Machines loaded:", res);
+        setMachines(res);
+      } catch (err) {
+        console.error('❌ Error fetching machines:', err);
+        // Don't set error for machines, just log it
       }
     };
 
     fetchDepartments();
     fetchUnits();
     fetchTests();
-    fetchSpecimenTypes();
+    fetchSampleTypes();
+    fetchMachines();
 
     // Fetch signatures for dropdown
     const fetchSignatures = async () => {
@@ -328,6 +336,7 @@ const AddTest = () => {
         console.log('Test ID:', id);
         console.log('Is Edit Mode:', isEditMode);
         console.log('Is View Mode:', isViewMode);
+        console.log('sampleTypes available:', sampleTypes.length);
         
         try {
           setLoading(true);
@@ -341,16 +350,16 @@ const AddTest = () => {
               name: testData.name || "",
               department: testData.departmentId?.toString() || "",
               shortName: testData.shortName || "",
-              attachFile: testData.attachFile === true || testData.attachFile === 1 || testData.attachFile === "Yes" || testData.attachFile === "true",
+              attachFile: Boolean(testData.attachFile),
               imageSize: testData.imageSize || "800|600",
               preparationTime: testData.preparationTime || "",
               preparationType: testData.preparationType || "",
               isNABL: testData.isNABL || false,
               lineHeight: testData.lineHeight?.toString() || "",
-              profileTest: testData.profileTest === true || testData.profileTest === 1 || testData.profileTest === "Yes" || testData.profileTest === "true",
+              profileTest: Boolean(testData.profileTest),
               reportHeader: testData.reportHeader || "",
               sampleTypeId: testData.sampleTypeId?.toString() || "",
-              machineName: testData.machineName || "",
+              machineId: testData.machineId ? testData.machineId.toString() : "",
               isHeader: testData.isHeader !== undefined ? testData.isHeader : true,
               showTestName: testData.showTestName !== undefined ? testData.showTestName : true,
               outsourceLab: testData.outsourceLab || "",
@@ -363,6 +372,36 @@ const AddTest = () => {
             };
             
             console.log('📝 Setting form data:', formDataToSet);
+            
+            // 🔍 DETAILED DEBUG LOGS FOR BOOLEAN FIELDS
+            console.log('%c═══ ATTACHFILE DEBUG ═══', 'color: #ff6b6b; font-weight: bold');
+            console.log('Raw from API (testData.attachFile):', testData.attachFile, `Type: ${typeof testData.attachFile}`);
+            console.log('Boolean conversion:', Boolean(testData.attachFile));
+            console.log('Setting in form as:', formDataToSet.attachFile);
+            console.log('Will checkbox be checked?', formDataToSet.attachFile === true);
+            
+            console.log('%c═══ PROFILETEST DEBUG ═══', 'color: #4ecdc4; font-weight: bold');
+            console.log('Raw from API (testData.profileTest):', testData.profileTest, `Type: ${typeof testData.profileTest}`);
+            console.log('Boolean conversion:', Boolean(testData.profileTest));
+            console.log('Setting in form as:', formDataToSet.profileTest);
+            console.log('Will checkbox be checked?', formDataToSet.profileTest === true);
+            
+            // 🔍 SAMPLETYPE DEBUG
+            console.log('%c═══ SAMPLETYPE DEBUG ═══', 'color: #ffd93d; font-weight: bold');
+            console.log('Raw from API (testData.sampleTypeId):', testData.sampleTypeId, `Type: ${typeof testData.sampleTypeId}`);
+            console.log('Converted to string:', formDataToSet.sampleTypeId);
+            console.log('Available sampleTypes in state:', sampleTypes.length);
+            if (formDataToSet.sampleTypeId) {
+              const selectedSample = sampleTypes?.find(s => s.id === parseInt(formDataToSet.sampleTypeId));
+              console.log('Looking for sample with ID:', parseInt(formDataToSet.sampleTypeId));
+              console.log('Found sample?', selectedSample ? 'YES' : 'NO');
+              if (selectedSample) {
+                console.log('Selected Sample Type:', selectedSample?.Sample_Type);
+              } else {
+                console.log('⚠️  Sample type not found! Available IDs:', sampleTypes.map(s => s.id));
+              }
+            }
+            
             setFormData(formDataToSet);
             
             // Set categories if they exist
@@ -400,7 +439,7 @@ const AddTest = () => {
                           type: param.type || "Numeric",
                           isMandatory: param.isMandatory || false,
                           rangeType: param.rangeType || "BySex",
-                          unitId: param.unitId || (param.unit?.id ? param.unit.id : ""),
+                          unitId: param.unitId ? String(param.unitId) : "",
                           units: param.units || "",
                           unit: param.unit || null,
                           displayRangeText: param.displayRangeText || "",
@@ -515,7 +554,7 @@ const AddTest = () => {
     };
     
     fetchTestData();
-  }, [id, isEditMode, isViewMode]);
+  }, [id, isEditMode, isViewMode, sampleTypes]);
 
   /* ================= HANDLERS ================= */
   const handleChange = (e: any) => {
@@ -839,10 +878,6 @@ const AddTest = () => {
       emptyFields.push("Test Name");
     }
     
-    if (!formData.department) {
-      emptyFields.push("Department");
-    }
-    
     if (!formData.shortName.trim()) {
       emptyFields.push("Test Short Form");
     }
@@ -862,7 +897,7 @@ const AddTest = () => {
         name: formData.name,
         shortName: formData.shortName,
         testCode: formData.testCode || null,
-        departmentId: parseInt(formData.department),
+        departmentId: formData.department ? parseInt(formData.department) : null,
         sampleTypeId: formData.sampleTypeId ? parseInt(formData.sampleTypeId) : null,
         machineName: formData.machineName || null,
         reportHeader: formData.reportHeader || null,
@@ -873,9 +908,9 @@ const AddTest = () => {
         interpretationLabel: formData.interpretationLabel || null,
         interpretation: formData.interpretation || null,
         outsourceLab: formData.outsourceLab || null,
-        attachFile: formData.attachFile === true ? 1 : 0,
+        attachFile: Boolean(formData.attachFile),
         imageSize: formData.imageSize || "800|600",
-        profileTest: formData.profileTest === true ? 1 : 0,
+        profileTest: Boolean(formData.profileTest),
         isHeader: formData.isHeader,
         showTestName: formData.showTestName,
         isNABL: formData.isNABL,
@@ -918,6 +953,7 @@ const AddTest = () => {
           type: param.type || "Numeric",
           isMandatory: param.isMandatory || false,
           rangeType: param.rangeType || "BySex",
+          unitId: param.unitId ? parseInt(param.unitId) : null,
           units: param.units || null,
           displayRangeText: param.displayRangeText || null,
           rangeText: param.rangeText || null,
@@ -1027,6 +1063,10 @@ const AddTest = () => {
       </>
     );
   }
+
+  // Debug: Log units availability
+  console.log('🔍 RENDER - Units available:', units.length, units);
+  console.log('🔍 RENDER - Categories count:', categories.length);
 
   return (
     <>
@@ -1257,12 +1297,12 @@ const AddTest = () => {
                     >
                       {formData.sampleTypeId ? (
                         <>
-                          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" style={{ transform: 'rotate(45deg)', flexShrink: 0 }}>
-                            <path d="M9 3h6v11a3 3 0 0 1-6 0V3z" fill={specimenTypes.find(s => s.Sample_Type === formData.sampleTypeId)?.Sample_Color || '#ccc'} stroke="#555" strokeWidth="1.2"/>
+                          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" style={{ transform: 'rotate(45deg)' }}>
+                            <path d="M9 3h6v11a3 3 0 0 1-6 0V3z" fill={sampleTypes.find(s => s.id === parseInt(formData.sampleTypeId))?.Sample_Color || '#cccccc'} stroke="#555" strokeWidth="1.2"/>
                             <rect x="8" y="2" width="8" height="2" rx="1" fill="#888" stroke="#555" strokeWidth="0.8"/>
                             <line x1="9" y1="10" x2="15" y2="10" stroke="white" strokeWidth="1" opacity="0.5"/>
                           </svg>
-                          <span>{formData.sampleTypeId} ({specimenTypes.find(s => s.Sample_Type === formData.sampleTypeId)?.Sample_Color})</span>
+                          {sampleTypes.find(s => s.id === parseInt(formData.sampleTypeId))?.Sample_Type || 'Select...'}
                         </>
                       ) : (
                         <span className="text-gray-400">Please Select</span>
@@ -1272,33 +1312,38 @@ const AddTest = () => {
                       <div className="absolute z-50 top-full left-0 right-0 bg-white border border-gray-300 rounded shadow-lg mt-1 max-h-48 overflow-y-auto">
                         <div
                           className="px-3 py-2 text-xs text-gray-400 hover:bg-gray-50 cursor-pointer border-b"
-                          onClick={() => { handleChange({ target: { name: 'sampleTypeId', value: '' } }); setShowSampleTypeDropdown(false); }}
+                          onClick={() => { handleChange({ target: { name: 'sampleTypeId', value: '' } } as any); setShowSampleTypeDropdown(false); }}
                         >
                           Please Select
                         </div>
-                        {specimenTypes.map((type, i) => (
+                        {(sampleTypes || []).map((type) => (
                           <div
-                            key={i}
-                            className="flex items-center gap-2 px-3 py-2 text-xs hover:bg-orange-50 cursor-pointer border-b last:border-b-0"
-                            onClick={() => { handleChange({ target: { name: 'sampleTypeId', value: type.Sample_Type } }); setShowSampleTypeDropdown(false); }}
+                            key={type.id}
+                            className="flex items-center gap-3 px-3 py-2 text-xs hover:bg-gray-50 cursor-pointer border-b last:border-b-0"
+                            onClick={() => { handleChange({ target: { name: 'sampleTypeId', value: type.id.toString() } } as any); setShowSampleTypeDropdown(false); }}
                           >
-                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" style={{ transform: 'rotate(45deg)', flexShrink: 0 }}>
-                              <path d="M9 3h6v11a3 3 0 0 1-6 0V3z" fill={type.Sample_Color || '#ccc'} stroke="#555" strokeWidth="1.2"/>
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" style={{ transform: 'rotate(45deg)' }}>
+                              <path d="M9 3h6v11a3 3 0 0 1-6 0V3z" fill={type.Sample_Color || '#cccccc'} stroke="#555" strokeWidth="1.2"/>
                               <rect x="8" y="2" width="8" height="2" rx="1" fill="#888" stroke="#555" strokeWidth="0.8"/>
                               <line x1="9" y1="10" x2="15" y2="10" stroke="white" strokeWidth="1" opacity="0.5"/>
                             </svg>
-                            <span>{type.Sample_Type} ({type.Sample_Color})</span>
+                            <div className="flex flex-col">
+                              <span className="text-gray-700">{type.Sample_Type}</span>
+                              {type.Sample_Color && (
+                                <span className="text-gray-500 text-xs">{type.Sample_Color}</span>
+                              )}
+                            </div>
                           </div>
                         ))}
                       </div>
                     )}
                   </div>
                   <Select 
-                    label="Machine Name" 
-                    name="machineName"
-                    value={formData.machineName}
+                    label="Machine" 
+                    name="machineId"
+                    value={formData.machineId}
                     onChange={handleChange}
-                    options={["Cobas e411", "Sysmex XN-1000", "Architect i2000", "Manual"]}
+                    options={machines.map(m => ({ value: m.id.toString(), label: m.name }))}
                     disabled={isViewMode}
                     required={false}
                   />
@@ -1530,7 +1575,7 @@ const AddTest = () => {
         {categories.map((category, categoryIndex) => (
           <div key={categoryIndex} className="mt-4 bg-white border border-gray-300 rounded">
             {/* HEADER */}
-            <div className="flex justify-between items-center px-3 py-2 bg-gray-100">
+            <div className="flex justify-between items-center px-3 py-2 bg-orange-100">
               <span className="font-semibold text-gray-700 text-xs sm:text-sm">
                 Category {categoryIndex + 1}
               </span>
@@ -1570,25 +1615,182 @@ const AddTest = () => {
                         <label className="block font-semibold text-gray-700 text-xs sm:text-sm mb-1">
                           Category Name
                         </label>
-                        <input 
-                          className="px-2 py-1.5 sm:py-1 border border-gray-300 rounded text-xs sm:text-sm w-full sm:w-40" 
-                          placeholder="Category name..."
-                          value={category.name || ""}
-                          onChange={(e) => handleCategoryChange(categoryIndex, 'name', e.target.value)}
-                          disabled={isViewMode} 
-                        />
+                        <div className="flex flex-col gap-1">
+                          {/* Category Name Input */}
+                          <input 
+                            id={`category-name-${categoryIndex}`}
+                            className="px-2 py-1.5 sm:py-1 border border-gray-300 rounded text-xs sm:text-sm w-full sm:w-40" 
+                            placeholder="Category name..."
+                            value={category.name || ""}
+                            onChange={(e) => handleCategoryChange(categoryIndex, 'name', e.target.value)}
+                            disabled={isViewMode} 
+                          />
+                          {/* Formatting Buttons - Below Input */}
+                          {!isViewMode && (
+                            <div className="flex gap-1">
+                              {/* Bold Button */}
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const input = document.getElementById(`category-name-${categoryIndex}`) as HTMLInputElement;
+                                  const start = input.selectionStart;
+                                  const end = input.selectionEnd;
+                                  const selectedText = input.value.substring(start, end);
+                                  if (selectedText) {
+                                    const newValue = input.value.substring(0, start) + `<b>${selectedText}</b>` + input.value.substring(end);
+                                    handleCategoryChange(categoryIndex, 'name', newValue);
+                                  }
+                                }}
+                                className="px-2 py-1 bg-white border border-gray-300 rounded text-xs font-bold hover:bg-gray-100"
+                                title="Bold"
+                              >
+                                B
+                              </button>
+                              {/* Italic Button */}
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const input = document.getElementById(`category-name-${categoryIndex}`) as HTMLInputElement;
+                                  const start = input.selectionStart;
+                                  const end = input.selectionEnd;
+                                  const selectedText = input.value.substring(start, end);
+                                  if (selectedText) {
+                                    const newValue = input.value.substring(0, start) + `<i>${selectedText}</i>` + input.value.substring(end);
+                                    handleCategoryChange(categoryIndex, 'name', newValue);
+                                  }
+                                }}
+                                className="px-2 py-1 bg-white border border-gray-300 rounded text-xs italic hover:bg-gray-100"
+                                title="Italic"
+                              >
+                                I
+                              </button>
+                              {/* Underline Button */}
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const input = document.getElementById(`category-name-${categoryIndex}`) as HTMLInputElement;
+                                  const start = input.selectionStart;
+                                  const end = input.selectionEnd;
+                                  const selectedText = input.value.substring(start, end);
+                                  if (selectedText) {
+                                    const newValue = input.value.substring(0, start) + `<u>${selectedText}</u>` + input.value.substring(end);
+                                    handleCategoryChange(categoryIndex, 'name', newValue);
+                                  }
+                                }}
+                                className="px-2 py-1 bg-white border border-gray-300 rounded text-xs underline hover:bg-gray-100"
+                                title="Underline"
+                              >
+                                U
+                              </button>
+                              {/* Clear Formatting Button */}
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const input = document.getElementById(`category-name-${categoryIndex}`) as HTMLInputElement;
+                                  const start = input.selectionStart;
+                                  const end = input.selectionEnd;
+                                  const selectedText = input.value.substring(start, end);
+                                  if (selectedText) {
+                                    const cleanText = selectedText
+                                      .replace(/<b>|<\/b>/g, '')
+                                      .replace(/<i>|<\/i>/g, '')
+                                      .replace(/<u>|<\/u>/g, '');
+                                    const newValue = input.value.substring(0, start) + cleanText + input.value.substring(end);
+                                    handleCategoryChange(categoryIndex, 'name', newValue);
+                                  }
+                                }}
+                                className="px-2 py-1 bg-white border border-gray-300 rounded text-xs font-bold text-red-600 hover:bg-gray-100"
+                                title="Clear formatting"
+                              >
+                                X
+                              </button>
+                            </div>
+                          )}
+                        </div>
                       </div>
                       <div>
                         <label className="block font-semibold text-gray-700 text-xs sm:text-sm mb-1">
                           Category Test Method
                         </label>
                         <input 
+                          id={`category-method-${categoryIndex}`}
                           className="px-2 py-1.5 sm:py-1 border border-gray-300 rounded text-xs sm:text-sm w-full sm:w-40" 
                           placeholder="Category test method..." 
                           value={category.testMethod || ""}
                           onChange={(e) => handleCategoryChange(categoryIndex, 'testMethod', e.target.value)}
                           disabled={isViewMode} 
                         />
+                        {!isViewMode && (
+                          <div className="flex gap-1 mt-1">
+                            {/* Bold Button */}
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const input = document.getElementById(`category-method-${categoryIndex}`) as HTMLInputElement;
+                                const start = input.selectionStart || 0;
+                                const end = input.selectionEnd || 0;
+                                const selectedText = input.value.substring(start, end);
+                                if (selectedText) {
+                                  const newValue = input.value.substring(0, start) + `<b>${selectedText}</b>` + input.value.substring(end);
+                                  handleCategoryChange(categoryIndex, 'testMethod', newValue);
+                                }
+                              }}
+                              className="px-2 py-1 bg-white border border-gray-300 rounded text-xs font-bold hover:bg-gray-100"
+                              title="Bold"
+                            >
+                              B
+                            </button>
+                            {/* Italic Button */}
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const input = document.getElementById(`category-method-${categoryIndex}`) as HTMLInputElement;
+                                const start = input.selectionStart || 0;
+                                const end = input.selectionEnd || 0;
+                                const selectedText = input.value.substring(start, end);
+                                if (selectedText) {
+                                  const newValue = input.value.substring(0, start) + `<i>${selectedText}</i>` + input.value.substring(end);
+                                  handleCategoryChange(categoryIndex, 'testMethod', newValue);
+                                }
+                              }}
+                              className="px-2 py-1 bg-white border border-gray-300 rounded text-xs italic hover:bg-gray-100"
+                              title="Italic"
+                            >
+                              I
+                            </button>
+                            {/* Underline Button */}
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const input = document.getElementById(`category-method-${categoryIndex}`) as HTMLInputElement;
+                                const start = input.selectionStart || 0;
+                                const end = input.selectionEnd || 0;
+                                const selectedText = input.value.substring(start, end);
+                                if (selectedText) {
+                                  const newValue = input.value.substring(0, start) + `<u>${selectedText}</u>` + input.value.substring(end);
+                                  handleCategoryChange(categoryIndex, 'testMethod', newValue);
+                                }
+                              }}
+                              className="px-2 py-1 bg-white border border-gray-300 rounded text-xs underline hover:bg-gray-100"
+                              title="Underline"
+                            >
+                              U
+                            </button>
+                            {/* Remove Formatting Button */}
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const currentValue = category.testMethod || "";
+                                const cleanValue = currentValue.replace(/<\/?[biu]>/gi, '');
+                                handleCategoryChange(categoryIndex, 'testMethod', cleanValue);
+                              }}
+                              className="px-2 py-1 bg-red-50 border border-red-300 rounded text-xs text-red-600 font-bold hover:bg-red-100"
+                              title="Remove Formatting"
+                            >
+                              X
+                            </button>
+                          </div>
+                        )}
                       </div>
                       <div>
                         <label className="block font-semibold text-gray-700 text-xs sm:text-sm mb-1">
@@ -1597,7 +1799,7 @@ const AddTest = () => {
                         <input 
                           className="px-2 py-1.5 sm:py-1 border border-gray-300 rounded text-xs sm:text-sm w-full sm:w-40" 
                           placeholder="Sort order..." 
-                          type="number"
+                          type="text"
                           value={category.sortOrder || ""}
                           onChange={(e) => handleCategoryChange(categoryIndex, 'sortOrder', e.target.value)}
                           disabled={isViewMode} 
@@ -1798,7 +2000,7 @@ const AddTest = () => {
                         <input 
                           className="px-2 py-1.5 sm:py-1 border border-gray-300 rounded text-xs sm:text-sm w-full sm:w-24" 
                           placeholder="Sort Order" 
-                          type="number"
+                          type="text"
                           value={parameter.sortOrder !== undefined && parameter.sortOrder !== "" ? parameter.sortOrder : ""}
                           onChange={(e) => handleParameterChange(categoryIndex, paramIndex, 'sortOrder', e.target.value)}
                           disabled={isViewMode} 
@@ -1816,13 +2018,87 @@ const AddTest = () => {
                           <span className="text-xs sm:text-sm">Is Descriptive</span>
                         </label>
                         {category.isCategory && (
-                          <input 
-                            className="px-2 py-1.5 sm:py-1 border border-gray-300 rounded text-xs sm:text-sm w-full sm:w-32" 
-                            placeholder="Parameter Test Method" 
-                            value={parameter.testMethod || ""}
-                            onChange={(e) => handleParameterChange(categoryIndex, paramIndex, 'testMethod', e.target.value)}
-                            disabled={isViewMode} 
-                          />
+                          <div>
+                            <input 
+                              id={`param-method-${categoryIndex}-${paramIndex}`}
+                              className="px-2 py-1.5 sm:py-1 border border-gray-300 rounded text-xs sm:text-sm w-full sm:w-32" 
+                              placeholder="Parameter Test Method" 
+                              value={parameter.testMethod || ""}
+                              onChange={(e) => handleParameterChange(categoryIndex, paramIndex, 'testMethod', e.target.value)}
+                              disabled={isViewMode} 
+                            />
+                            {!isViewMode && (
+                              <div className="flex gap-1 mt-1">
+                                {/* Bold Button */}
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const input = document.getElementById(`param-method-${categoryIndex}-${paramIndex}`) as HTMLInputElement;
+                                    const start = input.selectionStart || 0;
+                                    const end = input.selectionEnd || 0;
+                                    const selectedText = input.value.substring(start, end);
+                                    if (selectedText) {
+                                      const newValue = input.value.substring(0, start) + `<b>${selectedText}</b>` + input.value.substring(end);
+                                      handleParameterChange(categoryIndex, paramIndex, 'testMethod', newValue);
+                                    }
+                                  }}
+                                  className="px-2 py-1 bg-white border border-gray-300 rounded text-xs font-bold hover:bg-gray-100"
+                                  title="Bold"
+                                >
+                                  B
+                                </button>
+                                {/* Italic Button */}
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const input = document.getElementById(`param-method-${categoryIndex}-${paramIndex}`) as HTMLInputElement;
+                                    const start = input.selectionStart || 0;
+                                    const end = input.selectionEnd || 0;
+                                    const selectedText = input.value.substring(start, end);
+                                    if (selectedText) {
+                                      const newValue = input.value.substring(0, start) + `<i>${selectedText}</i>` + input.value.substring(end);
+                                      handleParameterChange(categoryIndex, paramIndex, 'testMethod', newValue);
+                                    }
+                                  }}
+                                  className="px-2 py-1 bg-white border border-gray-300 rounded text-xs italic hover:bg-gray-100"
+                                  title="Italic"
+                                >
+                                  I
+                                </button>
+                                {/* Underline Button */}
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const input = document.getElementById(`param-method-${categoryIndex}-${paramIndex}`) as HTMLInputElement;
+                                    const start = input.selectionStart || 0;
+                                    const end = input.selectionEnd || 0;
+                                    const selectedText = input.value.substring(start, end);
+                                    if (selectedText) {
+                                      const newValue = input.value.substring(0, start) + `<u>${selectedText}</u>` + input.value.substring(end);
+                                      handleParameterChange(categoryIndex, paramIndex, 'testMethod', newValue);
+                                    }
+                                  }}
+                                  className="px-2 py-1 bg-white border border-gray-300 rounded text-xs underline hover:bg-gray-100"
+                                  title="Underline"
+                                >
+                                  U
+                                </button>
+                                {/* Remove Formatting Button */}
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const currentValue = parameter.testMethod || "";
+                                    const cleanValue = currentValue.replace(/<\/?[biu]>/gi, '');
+                                    handleParameterChange(categoryIndex, paramIndex, 'testMethod', cleanValue);
+                                  }}
+                                  className="px-2 py-1 bg-red-50 border border-red-300 rounded text-xs text-red-600 font-bold hover:bg-red-100"
+                                  title="Remove Formatting"
+                                >
+                                  X
+                                </button>
+                              </div>
+                            )}
+                          </div>
                         )}
 
                         {/* Inline Formula Display — shown when hasFormula=true and formula is saved */}
@@ -1838,8 +2114,7 @@ const AddTest = () => {
                         <input 
                           className="px-2 py-1.5 sm:py-1 border border-gray-300 rounded text-xs sm:text-sm w-full sm:w-24" 
                           placeholder="Low Panic" 
-                          type="number"
-                          step="0.01"
+                          type="text"
                           value={parameter.lowPanic || ""}
                           onChange={(e) => handleParameterChange(categoryIndex, paramIndex, 'lowPanic', e.target.value)}
                           disabled={isViewMode} 
@@ -1847,8 +2122,7 @@ const AddTest = () => {
                         <input 
                           className="px-2 py-1.5 sm:py-1 border border-gray-300 rounded text-xs sm:text-sm w-full sm:w-24" 
                           placeholder="High Panic" 
-                          type="number"
-                          step="0.01"
+                          type="text"
                           value={parameter.highPanic || ""}
                           onChange={(e) => handleParameterChange(categoryIndex, paramIndex, 'highPanic', e.target.value)}
                           disabled={isViewMode} 
@@ -2313,8 +2587,7 @@ const AddTest = () => {
                                   <td className="border border-gray-300 p-1">
                                     <input 
                                       className="w-full px-2 py-1 border border-gray-300 rounded text-xs sm:text-sm" 
-                                      type="number"
-                                      step="0.01"
+                                      type="text"
                                       value={ageRange.ll || ""}
                                       onChange={(e) => handleAgeRangeChange(categoryIndex, paramIndex, ageIndex, 'll', e.target.value)}
                                       disabled={isViewMode} 
@@ -2323,8 +2596,7 @@ const AddTest = () => {
                                   <td className="border border-gray-300 p-1">
                                     <input 
                                       className="w-full px-2 py-1 border border-gray-300 rounded text-xs sm:text-sm" 
-                                      type="number"
-                                      step="0.01"
+                                      type="text"
                                       value={ageRange.ul || ""}
                                       onChange={(e) => handleAgeRangeChange(categoryIndex, paramIndex, ageIndex, 'ul', e.target.value)}
                                       disabled={isViewMode} 
@@ -2383,7 +2655,7 @@ const AddTest = () => {
                           <div className="space-y-3">
                             <table className="border-collapse border border-gray-300 text-xs sm:text-sm min-w-[650px]">
                               <thead>
-                                <tr className="bg-cyan-700 text-white">
+                                <tr className="bg-orange-700 text-white">
                                   <th className="border border-gray-300 px-2 py-1 text-center w-32">Label</th>
                                   <th className="border border-gray-300 px-2 py-1 text-center w-24">Min</th>
                                   <th className="border border-gray-300 px-2 py-1 text-center w-24">Max</th>
@@ -2410,8 +2682,7 @@ const AddTest = () => {
                                       <input 
                                         className="w-full px-2 py-1 border border-gray-300 rounded text-xs sm:text-sm" 
                                         placeholder="Min"
-                                        type="number"
-                                        step="0.01"
+                                        type="text"
                                         value={rangeValue.min || ""}
                                         onChange={(e) => handleRangeValueChange(categoryIndex, paramIndex, rangeIndex, 'min', e.target.value)}
                                         disabled={isViewMode} 
@@ -2421,8 +2692,7 @@ const AddTest = () => {
                                       <input 
                                         className="w-full px-2 py-1 border border-gray-300 rounded text-xs sm:text-sm" 
                                         placeholder="Max"
-                                        type="number"
-                                        step="0.01"
+                                        type="text"
                                         value={rangeValue.max || ""}
                                         onChange={(e) => handleRangeValueChange(categoryIndex, paramIndex, rangeIndex, 'max', e.target.value)}
                                         disabled={isViewMode} 
@@ -2468,7 +2738,7 @@ const AddTest = () => {
                           // Original By Sex Table Structure
                           <table className="border-collapse border border-gray-300 text-xs sm:text-sm min-w-[600px]">
                             <thead>
-                              <tr className="bg-cyan-700 text-white">
+                              <tr className="bg-orange-700 text-white">
                                 <th className="border border-gray-300 px-2 py-1 text-left w-24">Gender</th>
                                 <th className="border border-gray-300 px-2 py-1 w-20">LOW</th>
                                 <th className="border border-gray-300 px-2 py-1 w-20">HIGH</th>
@@ -2494,8 +2764,7 @@ const AddTest = () => {
                                   <td className="border border-gray-300 p-1">
                                     <input 
                                       className="w-full px-2 py-1 border border-gray-300 rounded text-xs sm:text-sm" 
-                                      type="number"
-                                      step="0.01"
+                                      type="text"
                                       value={range.ll || ""}
                                       onChange={(e) => handleNormalRangeChange(categoryIndex, paramIndex, rangeIndex, 'll', e.target.value)}
                                       disabled={isViewMode} 
@@ -2504,8 +2773,7 @@ const AddTest = () => {
                                   <td className="border border-gray-300 p-1">
                                     <input 
                                       className="w-full px-2 py-1 border border-gray-300 rounded text-xs sm:text-sm" 
-                                      type="number"
-                                      step="0.01"
+                                      type="text"
                                       value={range.ul || ""}
                                       onChange={(e) => handleNormalRangeChange(categoryIndex, paramIndex, rangeIndex, 'ul', e.target.value)}
                                       disabled={isViewMode} 
@@ -2578,234 +2846,8 @@ const AddTest = () => {
               </div>
 
               {/* Modal Content */}
-              <div className="p-6">
-                {/* Title - Department Name as Main Title */}
-                <div className="mb-4 text-center">
-                  <h2 className="text-base font-bold underline">
-                    {formData.department && departments.find(d => d.id == formData.department) 
-                      ? departments.find(d => d.id == formData.department)?.name 
-                      : "DEPARTMENT NAME"}
-                  </h2>
-                  <p className="text-xs mt-2 text-gray-600">
-                    {formData.name || "TEST NAME"}
-                  </p>
-                </div>
-
-                {/* Table Header */}
-                <div className="border border-gray-400 mb-4">
-                  <div className="grid grid-cols-4 gap-0 border-b border-gray-400 bg-gray-100">
-                    <div className="border-r border-gray-400 p-2 font-bold text-xs underline">Test Description</div>
-                    <div className="border-r border-gray-400 p-2 font-bold text-xs underline">Result</div>
-                    <div 
-                      id="preview-unit-column"
-                      className="border-r border-gray-400 p-2 font-bold text-xs underline transition-colors duration-500 cursor-pointer hover:bg-cyan-100"
-                      onClick={() => {
-                        const unitsSection = document.querySelector('h3[title="Click to navigate to Unit column in preview table"]');
-                        if (unitsSection) {
-                          unitsSection.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                          // Add a temporary highlight effect
-                          unitsSection.classList.add('bg-yellow-200', 'px-2', 'py-1', 'rounded');
-                          setTimeout(() => {
-                            unitsSection.classList.remove('bg-yellow-200', 'px-2', 'py-1', 'rounded');
-                          }, 2000);
-                        }
-                      }}
-                      title="Click to navigate back to Units section"
-                    >
-                      Unit 🔗
-                    </div>
-                    <div className="p-2 font-bold text-xs underline">Biological Reference Range</div>
-                  </div>
-
-                  {/* Table Body - Categories and Parameters */}
-                  {categories && categories.length > 0 ? (
-                    categories.map((category, catIndex) => (
-                      <div key={catIndex}>
-                        {/* Category Row - Only show if category has a name and not "Default" */}
-                        {category.name && category.name !== "Default" && (
-                          <div className="grid grid-cols-4 gap-0 border-b border-gray-400">
-                            <div className="col-span-4 border-r border-gray-400 p-2 font-bold text-xs underline bg-gray-50">
-                              {category.name}
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Parameters under Category */}
-                        {category.parameters && category.parameters.length > 0 ? (
-                          category.parameters.map((param, paramIndex) => (
-                            param.parameterName && (
-                              <div key={paramIndex} className="grid grid-cols-4 gap-0 border-b border-gray-400">
-                                <div className="border-r border-gray-400 p-2 text-xs">
-                                  <span className="font-bold">{param.parameterName}</span>
-                                </div>
-                                <div className="border-r border-gray-400 p-2 text-xs">
-                                  <span className="italic text-gray-500">-</span>
-                                </div>
-                                <div className="border-r border-gray-400 p-2 text-xs">
-                                  {param.units || "-"}
-                                </div>
-                                <div className="p-2 text-xs">
-                                  {/* For Numeric parameters */}
-                                  {param.type === "Numeric" && (
-                                    <div className="space-y-1">
-                                      {/* Show parameter details */}
-                                      {param.decimal && (
-                                        <div className="text-gray-600">Decimal: {param.decimal}</div>
-                                      )}
-                                      {param.lowPanic && (
-                                        <div className="text-red-600">Low Panic: {param.lowPanic}</div>
-                                      )}
-                                      {param.highPanic && (
-                                        <div className="text-red-600">High Panic: {param.highPanic}</div>
-                                      )}
-                                      
-                                      {/* BySex Range Display */}
-                                      {param.rangeType === "BySex" && (
-                                        <div className="mt-2">
-                                          {param.normalRanges?.map((range, idx) => (
-                                            range.isActive && (
-                                              <div key={idx} className="ml-2">
-                                                {(range as any).lowValue !== undefined && (range as any).lowValue !== null ? (range as any).lowValue : (range.ll || "-")} - {(range as any).highValue !== undefined && (range as any).highValue !== null ? (range as any).highValue : (range.ul || "-")}
-                                                {range.default && <span className="text-gray-600"> ({range.default})</span>}
-                                              </div>
-                                            )
-                                          ))}
-                                        </div>
-                                      )}
-                                      
-                                      {/* ByAge Range Display */}
-                                      {param.rangeType === "ByAge" && (
-                                        <div className="mt-2">
-                                          {param.ageRanges && param.ageRanges.length > 0 ? (
-                                            param.ageRanges.map((ageRange, idx) => {
-                                              // Show ranges where age is between 12-100
-                                              const isInRange = (() => {
-                                                if (ageRange.label && ageRange.label.includes("Between")) {
-                                                  const from = parseInt((ageRange as any).from);
-                                                  const to = parseInt((ageRange as any).to);
-                                                  // Check if range overlaps with 12-100
-                                                  return !isNaN(from) && !isNaN(to) && from >= 12 && to <= 100;
-                                                }
-                                                // For Less Than and More Than ranges, check if they fall in 12-100
-                                                if (ageRange.label && (ageRange.label.includes("Less Than") || ageRange.label.includes("More Than"))) {
-                                                  const value = parseInt((ageRange as any).value);
-                                                  return !isNaN(value) && value >= 12 && value <= 100;
-                                                }
-                                                return false;
-                                              })();
-
-                                              return ageRange.isActive && isInRange && (
-                                                <div key={idx} className="ml-2">
-                                                  {ageRange.label.includes("Between") ? (
-                                                    <span>{ageRange.ll || "-"} - {ageRange.ul || "-"}</span>
-                                                  ) : (
-                                                    <span>{ageRange.ll || "-"} - {ageRange.ul || "-"}</span>
-                                                  )}
-                                                  {ageRange.default && <span className="text-gray-600"> ({ageRange.default})</span>}
-                                                </div>
-                                              );
-                                            })
-                                          ) : (
-                                            <div className="ml-2 italic text-gray-500">-</div>
-                                          )}
-                                        </div>
-                                      )}
-                                      
-                                      {/* ByRange Display */}
-                                      {param.rangeType === "ByRange" && (
-                                        <div className="mt-2">
-                                          {param.rangeValues && param.rangeValues.length > 0 ? (
-                                            param.rangeValues.map((rv, idx) => (
-                                              rv.isActive && (
-                                                <div key={idx} className="ml-2">
-                                                  {rv.min || "-"} - {rv.max || "-"}
-                                                  {rv.interpretation && <span className="text-gray-600"> ({rv.interpretation})</span>}
-                                                </div>
-                                              )
-                                            ))
-                                          ) : (
-                                            <div className="ml-2 italic text-gray-500">-</div>
-                                          )}
-                                        </div>
-                                      )}
-                                    </div>
-                                  )}
-                                  
-                                  {/* For Text parameters */}
-                                  {param.type === "Text" && (
-                                    <div className="space-y-1">
-                                      <div className="font-semibold text-orange-800">Text Parameter:</div>
-                                      {param.rangeText && (
-                                        <div className="ml-2">
-                                          <strong>Range Text:</strong> {param.rangeText}
-                                        </div>
-                                      )}
-                                      {param.textContent && (
-                                        <div className="ml-2">
-                                          <strong>Content:</strong> {param.textContent}
-                                        </div>
-                                      )}
-                                      {param.isMultipleOptions && (
-                                        <div className="ml-2 text-blue-600">
-                                          <strong>Multiple Options:</strong> Yes
-                                        </div>
-                                      )}
-                                    </div>
-                                  )}
-                                  
-                                  {/* For TextEditor parameters */}
-                                  {param.type === "TextEditor" && (
-                                    <div className="space-y-1">
-                                      <div className="font-semibold text-teal-800">Rich Text Parameter:</div>
-                                      {param.textContent && (
-                                        <div className="ml-2">
-                                          <strong>Content:</strong> 
-                                          <div className="mt-1 p-2 bg-gray-50 border rounded text-xs" dangerouslySetInnerHTML={{ __html: param.textContent }} />
-                                        </div>
-                                      )}
-                                    </div>
-                                  )}
-                                  
-                                  {/* Show additional parameter info for all types */}
-                                  <div className="mt-2 pt-2 border-t border-gray-200">
-                                    {param.isMandatory && (
-                                      <div className="text-red-600 font-semibold">★ Mandatory Field</div>
-                                    )}
-                                    {param.isDescriptive && (
-                                      <div className="text-blue-600">📝 Descriptive Parameter</div>
-                                    )}
-                                    {param.isNABL && (
-                                      <div className="text-green-600">✓ NABL Accredited</div>
-                                    )}
-                                    {param.machineCode && (
-                                      <div className="text-gray-600">Machine Code: {param.machineCode}</div>
-                                    )}
-                                    {param.parameterCode && (
-                                      <div className="text-gray-600">Parameter Code: {param.parameterCode}</div>
-                                    )}
-                                    {param.formula && param.hasFormula && (
-                                      <div className="text-purple-600">Formula: {param.formula}</div>
-                                    )}
-                                  </div>
-                                </div>
-                              </div>
-                            )
-                          ))
-                        ) : (
-                          <div className="grid grid-cols-4 gap-0 border-b border-gray-400">
-                            <div className="col-span-4 p-2 text-xs text-gray-500 italic">
-                              No parameters in this category
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    ))
-                  ) : (
-                    <div className="p-4 text-center text-gray-500 italic">
-                      No categories or parameters added. Add categories and parameters to see preview.
-                    </div>
-                  )}
-                </div>
+              <div className="p-4 overflow-y-auto max-h-[calc(90vh-120px)]" style={{fontFamily: "Arial, sans-serif"}}>
+                <p className="text-gray-600 text-sm">Report preview removed</p>
               </div>
 
               {/* Modal Footer */}

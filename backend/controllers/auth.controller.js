@@ -58,7 +58,7 @@ export const login = async (req, res) => {
             patient: { registration: false, tests: false },
             masters: { testlist: false, testTemplates: false, departmentlist: false, packagelist: false, charges: false, rolelist: false, userlist: false, referralDoctorList: false, organization: false, specimenType: false, units: false },
             reports: { dashboard: false, collectionReport: false, patientList: false, referralDoctorRevenue: false, centerWiseCostReport: false, b2bTestwiseCostReport: false, discountReport: false, testReport: false },
-            configuration: { signature: false },
+            configuration: { signature: false, machines: false },
             help: { userManual: false, ultraviewer: false, anydesk: false },
             result: false
           });

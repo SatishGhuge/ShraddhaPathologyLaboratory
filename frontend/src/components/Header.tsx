@@ -18,7 +18,7 @@ import {
 } from "lucide-react";
 import { getAccessibleModules } from "@/utils/modulePermissions";
 
-const logo = "/logo.png";
+const logo = "/Mainlogo.png";
 
 interface NavModule {
   id: string;
@@ -75,6 +75,7 @@ const allModules: NavModule[] = [
     icon: <Settings size={20} />,
     items: [
       { label: "Signature", path: "/config/signature" },
+      { label: "Machines", path: "/config/machines" },
     ],
   },
   {
@@ -92,6 +93,7 @@ const allModules: NavModule[] = [
     title: "Inventory",
     icon: <Package size={20} />,
     items: [
+      { label: "Stock Transactions",    path: "/inventory/stock-transactions" },
       { label: "Item",                 path: "/inventory/item" },
       { label: "Supplier",             path: "/inventory/supplier" },
       { label: "Stock Entry",          path: "/inventory/stock-entry" },
@@ -218,6 +220,7 @@ const Header = () => {
               ...module,
               items: module.items.filter(item => {
                 if (item.label === "Signature") return accessible.configuration.signature;
+                if (item.label === "Machines") return accessible.configuration.machines;
                 return false;
               })
             };
@@ -444,18 +447,17 @@ const Header = () => {
 
           {/* Logo + Brand (No Toggle Button) */}
           <div className="flex items-center gap-2">
-            {/* Logo + Brand Name - Larger */}
+            {/* Logo + Brand Name - Properly Sized */}
             <div
               onClick={handleLogoClick}
               className="flex items-center cursor-pointer hover:opacity-80 transition-opacity"
             >
-              <img src={logo} alt="Logo" className="w-12 h-12 object-contain  flex-shrink-0" />
-              <div className="flex flex-col">
-                <span className="text-xl font-bold text-primary-500 leading-tight underline decoration-primary-500 underline-offset-4">
-                  SHRADDHA
-                </span>
-                <span className="text-sm text-gray-600 leading-tight">Pathology Lab</span>
-              </div>
+              <img 
+                src={logo} 
+                alt="Shraddha Pathology Laboratory" 
+                className="h-12 w-auto object-contain"
+                style={{ maxHeight: '48px' }}
+              />
             </div>
           </div>
 

@@ -174,7 +174,7 @@ export const getPatientTests = async (req, res) => {
             testParameterId: true,
             numericValue: true,
             textValue: true,
-            referenceRange: true
+            selectedOption: true
           }
         },
         department: {
@@ -328,9 +328,18 @@ export const getPatientTestById = async (req, res) => {
           select: {
             id: true,
             name: true,
+            shortName: true,
             interpretation: true,
             attachFile: true,
-            imageSize: true
+            imageSize: true,
+            sampleTypeId: true,
+            sample_type: {
+              select: {
+                id: true,
+                Sample_Type: true,
+                Sample_Color: true
+              }
+            }
           }
         },
         testResults: {
@@ -507,7 +516,10 @@ export const getPatientTestById = async (req, res) => {
           isMandatory: category.testParameter.isMandatory,
           categoryName: categoryName,
           categoryId: category.id,
+          // Use unique category identifier: if no name, create a unique key from categoryId so categories without names don't collapse together
+          categoryUniqueId: hasManualCategoryName ? categoryName : `__NO_NAME_${category.id}__`,
           sortOrder: category.testParameter.parameterSortOrder || 999,
+          categorySortOrder: category.sortOrder || 999,
           showCategoryHeader: hasManualCategoryName,
           
           // 🔴 SEPARATE both methods
@@ -643,6 +655,7 @@ export const getPatientTestById = async (req, res) => {
           categoryName: 'NO_CATEGORY_HEADER', // No header for direct parameters
           categoryId: null,
           sortOrder: param.parameterSortOrder || 999,
+          categorySortOrder: 999, // High value for direct parameters (no category sort)
           showCategoryHeader: false, // Don't show header for direct parameters
           
           // 🔴 For direct parameters: no category method, only parameter method
@@ -1268,9 +1281,7 @@ export const saveTestResults = async (req, res) => {
         testCategoryId,
         numericValue,
         textValue,
-        selectedOption,
-        isAbnormal,
-        referenceRange
+        selectedOption
       } = result;
 
       // Validate required field
@@ -1344,9 +1355,6 @@ export const saveTestResults = async (req, res) => {
             numericValue: numericValue !== null ? parseFloat(numericValue) : null,
             textValue: textValue || null,
             selectedOption: selectedOption || null,
-            referenceRange: referenceRange || null,
-            lowValue: isOutOfRange ? (numericValue < (parameter.maleLowValue || 0) ? numericValue : null) : null,
-            highValue: isOutOfRange ? (numericValue > (parameter.maleHighValue || 0) ? numericValue : null) : null,
             enteredBy: enteredBy,
             enteredAt: new Date(),
             testCategoryId: testCategoryId ? parseInt(testCategoryId) : null
@@ -1358,12 +1366,15 @@ export const saveTestResults = async (req, res) => {
             numericValue: numericValue !== null ? parseFloat(numericValue) : null,
             textValue: textValue || null,
             selectedOption: selectedOption || null,
-            referenceRange: referenceRange || null,
             enteredBy: enteredBy,
             enteredAt: new Date()
           },
           include: {
-            testParameter: true
+            testParameter: {
+              include: {
+                unit: true
+              }
+            }
           }
         });
 
@@ -1511,7 +1522,16 @@ export const sendReport = async (req, res) => {
           include: { 
             testParameter: { 
               select: { 
+                id: true,
                 parameterName: true,
+                maleLowValue: true,
+                maleHighValue: true,
+                femaleLowValue: true,
+                femaleHighValue: true,
+                childLowValue: true,
+                childHighValue: true,
+                rangeText: true,
+                displayRangeText: true,
                 unit: {
                   select: {
                     symbol: true
@@ -1550,8 +1570,7 @@ export const sendReport = async (req, res) => {
             parameterName: r.testParameter.parameterName,
             value: r.numericValue !== null ? r.numericValue : (r.textValue || '-'),
             units: r.testParameter.unit?.symbol || '',
-            referenceRange: r.referenceRange || '',
-            isAbnormal: r.isAbnormal
+            referenceRange: r.testParameter.rangeText || r.testParameter.displayRangeText || ''
           });
         });
       }
@@ -1762,9 +1781,10 @@ export const getAllTestResults = async (req, res) => {
         parameterName: tr.testParameter.parameterName,
         value: tr.numericValue || tr.textValue || tr.selectedOption,
         units: tr.testParameter.unit?.symbol || '',
-        isAbnormal: tr.isAbnormal,
-        isOutOfRange: tr.isOutOfRange,
-        referenceRange: tr.referenceRange
+        // Reference range fetched from TestParameter
+        lowValue: tr.testParameter.maleLowValue,
+        highValue: tr.testParameter.maleHighValue,
+        rangeText: tr.testParameter.rangeText
       }))
     }));
 

@@ -31,8 +31,8 @@ export default function CapabilitiesSection() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
 
         <div className="text-center mb-12">
-          <p className="text-[#EB925A] text-xs font-bold uppercase tracking-widest mb-2">Technical Capabilities</p>
-          <h2 className="text-3xl lg:text-4xl font-bold text-[#1D3F5F]">
+          <p className="text-[oklch(60%_0.15_45)] text-xs font-bold uppercase tracking-widest mb-2">Technical Capabilities</p>
+          <h2 className="text-3xl lg:text-4xl font-bold text-[oklch(45%_0.085_224.283)]">
             Advanced Technology, Accurate Results.
           </h2>
         </div>
@@ -47,10 +47,10 @@ export default function CapabilitiesSection() {
                 viewport={{ once: true }} transition={{ delay: i * 0.07 }}
                 className="text-center group"
               >
-                <div className="w-14 h-14 bg-[#F8FAFC] rounded-2xl flex items-center justify-center text-[#1D3F5F] mx-auto mb-3 group-hover:bg-[#1D3F5F] group-hover:text-white transition-colors shadow-sm">
+                <div className="w-14 h-14 bg-[#F8FAFC] rounded-2xl flex items-center justify-center text-[oklch(45%_0.085_224.283)] mx-auto mb-3 group-hover:bg-[oklch(45%_0.085_224.283)] group-hover:text-white transition-colors shadow-sm">
                   <Icon size={24} />
                 </div>
-                <h3 className="font-semibold text-[#1D3F5F] text-xs mb-1">{cap.title}</h3>
+                <h3 className="font-semibold text-[oklch(45%_0.085_224.283)] text-xs mb-1">{cap.title}</h3>
                 <p className="text-[#64748B] text-[11px] leading-relaxed">{cap.description}</p>
               </motion.div>
             );

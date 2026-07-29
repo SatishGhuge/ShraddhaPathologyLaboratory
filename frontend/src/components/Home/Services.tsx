@@ -57,8 +57,8 @@ export default function Services() {
 
         {/* Header */}
         <div className="text-center mb-12">
-          <p className="text-[#EB925A] text-sm font-semibold uppercase tracking-widest mb-2">Our Services</p>
-          <h2 className="text-3xl lg:text-4xl font-bold text-[#1D3F5F] mb-3">
+          <p className="text-[oklch(60%_0.15_45)] text-sm font-semibold uppercase tracking-widest mb-2">Our Services</p>
+          <h2 className="text-3xl lg:text-4xl font-bold text-[oklch(45%_0.085_224.283)] mb-3">
             Comprehensive Diagnostic Services
           </h2>
           <p className="text-gray-500 max-w-xl mx-auto text-sm">
@@ -78,12 +78,12 @@ export default function Services() {
               whileHover={{ y: -6, boxShadow: "0 12px 30px rgba(0,0,0,0.1)" }}
               className="bg-white rounded-xl p-5 shadow-sm cursor-pointer group transition-all"
             >
-              <div className="w-12 h-12 bg-orange-50 rounded-xl flex items-center justify-center text-[#EB925A] mb-4 group-hover:bg-[#EB925A] group-hover:text-white transition-colors">
+              <div className="w-12 h-12 bg-orange-50 rounded-xl flex items-center justify-center text-[oklch(60%_0.15_45)] mb-4 group-hover:bg-[oklch(60%_0.15_45)] group-hover:text-white transition-colors">
                 {s.icon}
               </div>
-              <h3 className="font-semibold text-[#1D3F5F] mb-2">{s.title}</h3>
+              <h3 className="font-semibold text-[oklch(45%_0.085_224.283)] mb-2">{s.title}</h3>
               <p className="text-gray-500 text-xs leading-relaxed mb-4">{s.desc}</p>
-              <a href="#" className="text-[#EB925A] text-xs font-semibold flex items-center gap-1 hover:gap-2 transition-all">
+              <a href="#" className="text-[oklch(60%_0.15_45)] text-xs font-semibold flex items-center gap-1 hover:gap-2 transition-all">
                 Learn More
                 <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />

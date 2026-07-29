@@ -44,6 +44,8 @@ const apiCall = async <T = any>(endpoint: string, options: RequestInit & { heade
   }
 };
 
+export { apiCall, ApiResponse };
+
 // Helper function to extract data array from API response
 const extractDataArray = (response: any): any[] => {
   if (Array.isArray(response)) return response;

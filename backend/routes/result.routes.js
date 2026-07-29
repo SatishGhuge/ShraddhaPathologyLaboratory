@@ -52,6 +52,49 @@ router.get('/:id', getPatientTestById);
 // Update test status
 router.put('/:id/status', updateTestStatus);
 
+// Update barcode status (when barcode is printed)
+router.patch('/:id/barcode-status', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { barcode_status, status } = req.body;
+    
+    const patientTestId = parseInt(id);
+    if (isNaN(patientTestId)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid patient test ID'
+      });
+    }
+    
+    // Update the barcode status and optionally the test status
+    const updateData = {};
+    if (barcode_status) {
+      updateData.barcode_status = barcode_status;
+    }
+    if (status) {
+      updateData.status = status;
+    }
+    
+    const updatedTest = await prisma.patientTest.update({
+      where: { id: patientTestId },
+      data: updateData
+    });
+    
+    res.json({
+      success: true,
+      message: 'Barcode status updated successfully',
+      data: updatedTest
+    });
+  } catch (error) {
+    console.error('Error updating barcode status:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to update barcode status',
+      error: error.message
+    });
+  }
+});
+
 // Update test result
 router.put('/:id/result', updateTestResult);
 

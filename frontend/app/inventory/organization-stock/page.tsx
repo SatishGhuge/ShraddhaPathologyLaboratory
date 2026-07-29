@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 
+
 // Organization Stock is accessible via the "Organization Stock" button
 // inside Stock Transfers (/inventory/transfers). This redirect handles
 // any direct navigation to this URL.

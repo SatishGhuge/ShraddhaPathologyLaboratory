@@ -5,6 +5,7 @@ import { useRouter, useParams, useSearchParams } from "next/navigation";
 import React, { useState, useEffect, useCallback, useRef } from "react";
 
 import Header from "@/src/components/Header";
+import BarcodeModal, { generateBarcodeLabels, getSampleTypeId, getSampleTypeName, getTestName } from "@/app/components/BarcodeModal";
 import { getPatientTestById, updateTestStatus, updatePatientComments } from "@/src/api/result.js";
 import API_BASE_URL from "@/src/api/config";
 import { useTestTemplates } from '@/src/hooks/useTestTemplates';
@@ -109,6 +110,13 @@ const PatientResult = () => {
   const [showComment, setShowComment] = useState(false);
   const [comments, setComments] = useState('');
   const [defaultSignature, setDefaultSignature] = useState<any>(null);
+
+  // BarcodeModal state
+  const [showBarcodeModal, setShowBarcodeModal] = useState(false);
+  const [barcodeLabels, setBarcodeLabels] = useState<any[]>([]);
+  const [barcodePatientInfo, setBarcodePatientInfo] = useState<any>(null);
+  const [selectedBarcodes, setSelectedBarcodes] = useState<Set<number>>(new Set());
+
   
   // 🔧 PART 2: State for outsourced tests
   const [isOutsourced, setIsOutsourced] = useState(false);
@@ -211,6 +219,140 @@ const PatientResult = () => {
     return null;
   };
 
+  // Barcode handlers - SIMPLIFIED: Use centralized barcode generation from BarcodeModal
+  const handlePrintBarcode = () => {
+    if (!patientData) return;
+    
+    const testData = patientData.patientTest || patientData;
+    const baseVisitId = testData.visitId || testData.id?.toString() || 'UNKNOWN';
+    
+    // Collect all tests to generate barcodes
+    let testsForBarcode: any[] = [];
+    
+    if (allTestsData.length > 0) {
+      // Multiple tests - use the full test data objects with sampleTypeId extracted to top level
+      testsForBarcode = allTestsData.map(td => {
+        const pt = td.patientTest;
+        // ✅ Ensure sampleTypeId is at top level for barcode generation
+        return {
+          ...pt,
+          sampleTypeId: pt.sampleTypeId || pt.test?.sampleTypeId,  // Ensure top-level access
+          sampleTypeName: pt.sample_type?.Sample_Type || pt.test?.sample_type?.Sample_Type,
+          specimen: pt.sample_type?.Sample_Type || pt.test?.sample_type?.Sample_Type
+        };
+      });
+    } else if (patientData) {
+      // Single test
+      const pt = patientData;
+      testsForBarcode = [{
+        ...pt,
+        sampleTypeId: pt.sampleTypeId || pt.test?.sampleTypeId,  // Ensure top-level access
+        sampleTypeName: pt.sample_type?.Sample_Type || pt.test?.sample_type?.Sample_Type,
+        specimen: pt.sample_type?.Sample_Type || pt.test?.sample_type?.Sample_Type
+      }];
+    }
+    
+    // 🔴 DEBUG: Log what we're sending to barcode generation
+    console.log('🔴 Result Page - handlePrintBarcode DEBUG:');
+    console.log('   allTestsData.length:', allTestsData.length);
+    console.log('   testsForBarcode.length:', testsForBarcode.length);
+    testsForBarcode.forEach((test, idx) => {
+      console.log(`   Test ${idx}:`, {
+        id: test?.id,
+        visitId: test?.visitId,
+        sampleTypeId: test?.sampleTypeId,
+        'test.sampleTypeId': test?.test?.sampleTypeId,
+        'test keys': test?.test ? Object.keys(test.test).slice(0, 10) : 'NO TEST OBJECT',
+        'top level keys':Object.keys(test).slice(0, 15)
+      });
+    });
+    
+    // ✅ Use centralized generateBarcodeLabels function
+    const labels = generateBarcodeLabels(testsForBarcode, baseVisitId, testData.organizationCode || '');
+    
+    console.log('✅ Generated barcode labels using centralized function:', labels);
+    
+    setBarcodeLabels(labels);
+    setBarcodePatientInfo({
+      patientName: patientData.patient?.firstName && patientData.patient?.lastName 
+        ? `${patientData.patient?.firstName} ${patientData.patient?.lastName}` 
+        : patientData.patient?.firstName || 'Unknown',
+      visitId: baseVisitId,
+      age: calculateAge(patientData.patient?.dob)?.toString() || '',
+      gender: patientData.patient?.gender || '',
+      ageGender: `${patientData.patient?.gender?.charAt(0).toUpperCase() || 'U'}/${calculateAge(patientData.patient?.dob) || 'N/A'}Y`,
+      organizationCode: testData.organizationCode || ''
+    });
+    
+    setSelectedBarcodes(new Set(labels.map((_, i) => i)));
+    setShowBarcodeModal(true);
+  };
+
+  const handleBarcodeToggle = (index: number) => {
+    setSelectedBarcodes(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(index)) {
+        newSet.delete(index);
+      } else {
+        newSet.add(index);
+      }
+      return newSet;
+    });
+  };
+
+  const onBarcodesPrintOnly = () => {
+    // Trigger print of selected barcodes
+    const printArea = document.getElementById('barcode-print-area');
+    if (printArea) {
+      window.print();
+    }
+  };
+
+  const onBarcodesPrintAndUpdate = async () => {
+    try {
+      // Print first
+      const printArea = document.getElementById('barcode-print-area');
+      if (printArea) {
+        window.print();
+      }
+      
+      // Then update barcode status to 'Printed' for selected barcodes
+      const selectedIndices = Array.from(selectedBarcodes);
+      if (selectedIndices.length > 0) {
+        // Update backend with printed status
+        if (allTestsData.length > 0) {
+          // Multiple tests
+          await Promise.all(selectedIndices.map(idx => {
+            const test = allTestsData[idx];
+            return fetch(`${API_BASE_URL}/results/${test.patientTest.id}/barcode-status`, {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ barcode_status: 'Printed', status: 'Received' })
+            });
+          }));
+        } else if (patientData.id) {
+          // Single test
+          await fetch(`${API_BASE_URL}/results/${patientData.id}/barcode-status`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ barcode_status: 'Printed', status: 'Received' })
+          });
+        }
+        
+        alert('Barcodes printed and status updated!');
+        setShowBarcodeModal(false);
+        // Refresh data
+        if (patientData) {
+          fetchPatientTestData();
+        }
+      }
+    } catch (error) {
+      console.error('Error updating barcode status:', error);
+      alert('Barcodes printed but failed to update status');
+      setShowBarcodeModal(false);
+    }
+  };
+
   // Check if any parameter has units or reference range in report
   const shouldShowUnitsColumn = (paramGrouped = groupedParameters) => {
     try {
@@ -219,10 +361,17 @@ const PatientResult = () => {
       const hasUnits = Object.values(paramGrouped).some((categoryParams: any) =>
         (categoryParams as any[]).some(param => {
           // Check if parameter has actual non-empty unit value
-          return param.units && param.units.trim() !== '' && param.units !== '-';
+          const hasUnit = param.units && param.units.trim() !== '' && param.units !== '-';
+          if (hasUnit) {
+            console.log(`✅ Found unit: "${param.units}" for parameter: ${param.parameterName}`);
+          }
+          return hasUnit;
         })
       );
-      console.log('🔍 shouldShowUnitsColumn:', hasUnits, 'groupedParams:', Object.keys(paramGrouped));
+      console.log('🔍 shouldShowUnitsColumn:', hasUnits, 'Categories:', Object.keys(paramGrouped));
+      console.log('📊 All units in grouped params:', Object.entries(paramGrouped).flatMap(([cat, params]: any) => 
+        (params as any[]).map(p => ({ param: p.parameterName, unit: p.units || '(empty)', category: cat }))
+      ));
       return hasUnits;
     } catch (e) {
       console.error('Error in shouldShowUnitsColumn:', e);
@@ -321,6 +470,14 @@ const PatientResult = () => {
       if (data) {
         setPatientData(data.patientTest);
         
+        // DEBUG: Log interpretation from backend
+        console.log('✅ Patient Test Data Received:');
+        console.log('   Test Name:', data.patientTest.test?.name);
+        console.log('   Has Interpretation:', !!data.patientTest.test?.interpretation);
+        console.log('   Interpretation Length:', data.patientTest.test?.interpretation?.length || 0);
+        console.log('   Interpretation Preview:', data.patientTest.test?.interpretation?.substring(0, 100) || '(empty)');
+        
+        
         // 🔧 PART 2: Check if test is outsourced
         if (data.patientTest?.isOutsourced) {
           console.log(`⚠️ Test is outsourced to: ${data.patientTest.outsourcedTo}`);
@@ -353,6 +510,15 @@ const PatientResult = () => {
         
         setParameters(data.parameters);
         setGroupedParameters(data.groupedParameters);
+        
+        // DEBUG: Log units from backend
+        console.log('✅ Fetched parameters from backend:');
+        console.table(data.parameters.map(p => ({
+          name: p.parameterName,
+          units: p.units,
+          type: p.type,
+          category: p.categoryName
+        })));
         const initialResults = {};
         data.parameters.forEach(param => {
           if (param.existingResult) {
@@ -1150,7 +1316,13 @@ const PatientResult = () => {
                                 })()}
                               </div>
                             </td>
-                            <td className="border p-2">{param.units || ''}</td>
+                            <td className="border p-2 text-xs">
+                              {(() => {
+                                const unitValue = param.units || '-';
+                                console.log(`🔍 Rendering UNITS for ${param.parameterName}: "${unitValue}"`);
+                                return unitValue;
+                              })()}
+                            </td>
                             <td className="border p-2">{param.type === 'Text' || param.isDescriptive ? (param.normalRange || '') : getAgeAppropriateRange(param, patientData.patient.age, patientData.patient.gender, patientData.patient.dob)}</td>
                           </tr>
                         );
@@ -1234,9 +1406,6 @@ const PatientResult = () => {
                   {saving ? 'Saving...' : 'Save'}
                 </button>
                 <button onClick={() => router.back()} className="bg-gray-500 text-white px-3 py-1 rounded text-sm">Back</button>
-                <button onClick={() => handleSaveAndPrint(true)} disabled={saving} className="bg-primary-600 text-white px-3 py-1 rounded text-sm disabled:opacity-50">
-                  Save & Print
-                </button>
               </>
             )}
           </div>
@@ -1325,45 +1494,75 @@ const PatientResult = () => {
                         <tr>
                           <td colSpan={shouldShowUnitsColumn() || shouldShowReferenceRangeColumn() ? (shouldShowUnitsColumn() && shouldShowReferenceRangeColumn() ? 4 : 3) : 2} style={{ padding: '4px 6px', fontWeight: 'bold', borderBottom: '1px solid #ccc' }}>{patientData.test.name}</td>
                         </tr>
-                        {Object.entries(groupedParameters).map(([categoryName, categoryParams]: [string, any]) => (
-                          <React.Fragment key={categoryName}>
-                            {categoryName !== 'NO_CATEGORY_HEADER' && categoryParams[0]?.showCategoryHeader && (
-                              <tr><td colSpan={shouldShowUnitsColumn() || shouldShowReferenceRangeColumn() ? (shouldShowUnitsColumn() && shouldShowReferenceRangeColumn() ? 4 : 3) : 2} style={{ padding: '4px 6px', fontWeight: 'bold', borderBottom: '1px solid #ddd' }}>{categoryName.toUpperCase()}</td></tr>
-                            )}
-                            {(categoryParams as any[]).map((param) => {
-                              const numVal = results[param.id]?.numericValue;
-                              const isAbn = results[param.id]?.isAbnormal === true || results[param.id]?.isAbnormal === 1 || isValueOutOfRange(param, numVal);
-                              const displayValue = param.type === 'Numeric' ? (numVal !== null && numVal !== undefined ? numVal : '-') : (results[param.id]?.textValue || '-');
-                              const rangeStr = shouldShowReferenceRangeColumn() ? getAgeAppropriateRange(param, patientData.patient.age, patientData.patient.gender, patientData.patient.dob) : '';
-                              return (
-                                <tr key={param.id}>
-                                  <td style={{ padding: '3px 6px', width: shouldShowUnitsColumn() || shouldShowReferenceRangeColumn() ? '30%' : '50%', fontWeight: isAbn ? 'bold' : 'normal' }}>{param.parameterName}</td>
-                                  <td style={{ padding: '3px 6px 3px 20px', width: shouldShowUnitsColumn() || shouldShowReferenceRangeColumn() ? '28%' : '50%', fontWeight: isAbn ? '900' : 'normal', color: isAbn ? '#b91c1c' : 'inherit', fontSize: '11px', whiteSpace: 'normal', wordWrap: 'break-word' }}>
-                                    {param.isDescriptive && hasHtmlTags(displayValue) ? (
-                                      <div dangerouslySetInnerHTML={{ __html: sanitizeHtml(displayValue) }} style={{ margin: 0, whiteSpace: 'normal' }} />
-                                    ) : (
-                                      <>{displayValue}{isAbn && ' *'}</>
+                        {Object.entries(groupedParameters).map(([categoryName, categoryParams]: [string, any]) => {
+                          // Filter parameters: only show those with values
+                          const paramsWithValues = (categoryParams as any[]).filter(param => {
+                            const numVal = results[param.id]?.numericValue;
+                            const textVal = results[param.id]?.textValue;
+                            const hasNumeric = numVal !== null && numVal !== undefined && numVal !== '';
+                            const hasText = textVal && textVal.trim() !== '';
+                            return hasNumeric || hasText;
+                          });
+
+                          // If no parameters with values, skip this category
+                          if (paramsWithValues.length === 0) return null;
+
+                          return (
+                            <React.Fragment key={categoryName}>
+                              {categoryName !== 'NO_CATEGORY_HEADER' && categoryParams[0]?.showCategoryHeader && (
+                                <tr><td colSpan={shouldShowUnitsColumn() || shouldShowReferenceRangeColumn() ? (shouldShowUnitsColumn() && shouldShowReferenceRangeColumn() ? 4 : 3) : 2} style={{ padding: '4px 6px', fontWeight: 'bold', borderBottom: '1px solid #ddd' }}>{categoryName.toUpperCase()}</td></tr>
+                              )}
+                              {paramsWithValues.map((param) => {
+                                const numVal = results[param.id]?.numericValue;
+                                const textVal = results[param.id]?.textValue;
+                                const isAbn = results[param.id]?.isAbnormal === true || results[param.id]?.isAbnormal === 1 || isValueOutOfRange(param, numVal);
+                                
+                                // For text parameters: show only the selected value (first tag/item), not the full text
+                                let displayValue = '-';
+                                if (param.type === 'Numeric') {
+                                  displayValue = numVal !== null && numVal !== undefined ? numVal : '-';
+                                } else if (textVal) {
+                                  // If it's a comma/comma-separated list, show only first value
+                                  const firstValue = textVal.split(',')[0].trim();
+                                  displayValue = firstValue || '-';
+                                }
+                                
+                                // Get reference range - only numeric value for numeric params
+                                const rangeStr = shouldShowReferenceRangeColumn() ? getAgeAppropriateRange(param, patientData.patient.age, patientData.patient.gender, patientData.patient.dob) : '';
+                                
+                                return (
+                                  <tr key={param.id}>
+                                    <td style={{ padding: '3px 6px', width: shouldShowUnitsColumn() || shouldShowReferenceRangeColumn() ? '30%' : '50%', fontWeight: isAbn ? 'bold' : 'normal' }}>{param.parameterName}</td>
+                                    <td style={{ padding: '3px 6px 3px 20px', width: shouldShowUnitsColumn() || shouldShowReferenceRangeColumn() ? '28%' : '50%', fontWeight: isAbn ? '900' : 'normal', color: isAbn ? '#b91c1c' : 'inherit', fontSize: '11px', whiteSpace: 'normal', wordWrap: 'break-word', textAlign: 'right' }}>
+                                      {param.isDescriptive && displayValue !== '-' && hasHtmlTags(displayValue) ? (
+                                        <div dangerouslySetInnerHTML={{ __html: sanitizeHtml(displayValue) }} style={{ margin: 0, whiteSpace: 'normal' }} />
+                                      ) : (
+                                        <>{displayValue}{isAbn && ' *'}</>
+                                      )}
+                                    </td>
+                                    {shouldShowUnitsColumn() && (
+                                      <td style={{ padding: '3px 6px', width: '12%', textAlign: 'center' }}>{param.units || '-'}</td>
                                     )}
-                                  </td>
-                                  {shouldShowUnitsColumn() && (
-                                    <td style={{ padding: '3px 6px', width: '12%' }}>{param.units || ''}</td>
-                                  )}
-                                  {shouldShowReferenceRangeColumn() && (
-                                    <td style={{ padding: '3px 6px', width: '30%' }}>{rangeStr || '-'}</td>
-                                  )}
-                                </tr>
-                              );
-                            })}
-                          </React.Fragment>
-                        ))}
+                                    {shouldShowReferenceRangeColumn() && (
+                                      <td style={{ padding: '3px 6px', width: '30%' }}>
+                                        {param.type === 'Numeric' || param.type === 'Text' ? (rangeStr || '-') : (rangeStr || '-')}
+                                      </td>
+                                    )}
+                                  </tr>
+                                );
+                              })}
+                            </React.Fragment>
+                          );
+                        })}
                       </tbody>
                     </table>
 
                     {/* Interpretation */}
                     {patientData.test.interpretation && (
-                      <div style={{ marginTop: '4mm', borderTop: '1px solid #ccc', paddingTop: '3mm', fontSize: '11px', color: '#444' }}
-                        dangerouslySetInnerHTML={{ __html: patientData.test.interpretation }}
-                      />
+                      <div style={{ marginTop: '6mm', borderTop: '1.5px solid #333', paddingTop: '4mm', fontSize: '11px', color: '#444', lineHeight: '1.5' }}>
+                        <strong style={{ display: 'block', marginBottom: '2mm', textDecoration: 'underline' }}>INTERPRETATION:</strong>
+                        <div dangerouslySetInnerHTML={{ __html: patientData.test.interpretation }} />
+                      </div>
                     )}
 
                     {/* Signature block */}
@@ -1435,6 +1634,7 @@ const PatientResult = () => {
         </>
         )}
       </div>
+
     </>
   );
 };

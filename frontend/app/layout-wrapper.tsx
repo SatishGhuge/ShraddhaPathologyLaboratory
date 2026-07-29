@@ -58,10 +58,14 @@ export function LayoutWrapper({ children }: { children: ReactNode }) {
     return <div className="flex items-center justify-center min-h-screen">Loading...</div>;
   }
 
+  // Determine if this is the registration page to apply minimal padding
+  const isRegistrationPage = pathname.includes('/patient/registration');
+  const containerPadding = isRegistrationPage ? 'p-2 sm:p-3' : 'p-3 sm:p-4 md:p-6';
+
   return (
     <SidebarContext.Provider value={{ sidebarOpen, setSidebarOpen }}>
       <Header />
-      <div className={`transition-all duration-300 ${!isPublicRoute ? `mt-14 ${sidebarOpen ? 'ml-48' : 'ml-0'} p-3 sm:p-4 md:p-6` : ""}`}>
+      <div className={`transition-all duration-300 ${!isPublicRoute ? `mt-14 ${sidebarOpen ? 'ml-48' : 'ml-0'} ${containerPadding}` : ""}`}>
         {/* Auto-render breadcrumb for non-public routes, but NOT on dashboard */}
         {!isPublicRoute && !pathname.includes('/labdashboard') && !pathname.includes('/dashboard') && <PageHeader />}
         {children}

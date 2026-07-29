@@ -561,7 +561,7 @@ const EditOrganization = () => {
                       { key: 'masters.userlist', label: 'Users' },
                       { key: 'masters.referralDoctorList', label: 'Referral Doctors' },
                       { key: 'masters.organization', label: 'Organization' },
-                      { key: 'masters.specimenType', label: 'Specimen Type' },
+                      { key: 'masters.sampleType', label: 'Sample Type' },
                       { key: 'masters.units', label: 'Units' },
                     ]}
                     moduleAllocation={moduleAllocation}

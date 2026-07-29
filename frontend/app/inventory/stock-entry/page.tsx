@@ -1,9 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Package, RotateCcw, ChevronLeft, ChevronRight, Edit2, Trash2, Plus } from "lucide-react";
 import StockEntryModal from "@/src/components/StockEntryModal";
-import PageHeader from "@/src/components/BreadCrumb";
+import inventoryAPI from "@/lib/api/inventory.api";
 
 interface Supplier {
   id: number;
@@ -26,14 +26,26 @@ interface StockEntry {
   supplierId: number;
   invoiceNo: string;
   invoiceDate: string;
-  itemId: number;
-  batchNo: string;
-  expiryDate: string;
-  quantity: number;
-  pricePerUnit: number;
-  basicAmount: number;
-  cgst: number;
-  sgst: number;
+  items: Array<{
+    itemId: number;
+    itemName?: string; // For backward compatibility
+    item?: {
+      id: number;
+      itemName: string;
+      itemCode: string;
+    };
+    batchNo: string;
+    expiryDate: string;
+    quantity: number;
+    pricePerUnit: number;
+    basicAmount: number;
+    cgst: number;
+    sgst: number;
+    totalAmount: number;
+  }>;
+  totalBasicAmount: number;
+  totalCGST: number;
+  totalSGST: number;
   grandTotal: number;
   status: "Active" | "Inactive";
 }
@@ -75,42 +87,12 @@ const SAMPLE_ITEMS: Item[] = [
 ];
 
 export default function StockEntryPage() {
-  const [stockEntries, setStockEntries] = useState<StockEntry[]>([
-    {
-      id: 1,
-      entryId: "SE-001",
-      supplierId: 1,
-      invoiceNo: "INV-2026-001",
-      invoiceDate: "2026-07-15",
-      itemId: 1,
-      batchNo: "BATCH-001",
-      expiryDate: "2027-07-15",
-      quantity: 100,
-      pricePerUnit: 110,
-      basicAmount: 11000,
-      cgst: 660,
-      sgst: 660,
-      grandTotal: 12320,
-      status: "Active",
-    },
-    {
-      id: 2,
-      entryId: "SE-002",
-      supplierId: 2,
-      invoiceNo: "INV-2026-002",
-      invoiceDate: "2026-07-10",
-      itemId: 2,
-      batchNo: "BATCH-002",
-      expiryDate: "2027-01-10",
-      quantity: 50,
-      pricePerUnit: 200,
-      basicAmount: 10000,
-      cgst: 900,
-      sgst: 900,
-      grandTotal: 11800,
-      status: "Inactive",
-    },
-  ]);
+  const [stockEntries, setStockEntries] = useState<StockEntry[]>([]);
+  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [items, setItems] = useState<Item[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [pagination, setPagination] = useState<any>(null);
 
   const [search, setSearch] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
@@ -121,44 +103,70 @@ export default function StockEntryPage() {
 
   const ITEMS_PER_PAGE = 10;
 
+  useEffect(() => {
+    fetchData();
+  }, [currentPage]);
+
+  // Listen for new item creation and refresh items
+  useEffect(() => {
+    const handleItemCreated = () => {
+      console.log("New item created, refreshing items list...");
+      // Refresh only the items, not the entire data
+      const refreshItems = async () => {
+        try {
+          const itemsRes = await inventoryAPI.items.getAll(1, 100);
+          setItems(itemsRes.data.data || []);
+        } catch (err) {
+          console.error("Failed to refresh items:", err);
+        }
+      };
+      refreshItems();
+    };
+
+    window.addEventListener('itemCreated', handleItemCreated);
+    return () => window.removeEventListener('itemCreated', handleItemCreated);
+  }, []);
+
+  const fetchData = async () => {
+    try {
+      setLoading(true);
+      setError("");
+      
+      const [entriesRes, suppliersRes, itemsRes] = await Promise.all([
+        inventoryAPI.stockEntries.getAll(currentPage, ITEMS_PER_PAGE),
+        inventoryAPI.suppliers.getAll(1, 100),
+        inventoryAPI.items.getAll(1, 100)
+      ]);
+      
+      setStockEntries(entriesRes.data.data || []);
+      setPagination(entriesRes.data.pagination || null);
+      setSuppliers(suppliersRes.data.data || []);
+      setItems(itemsRes.data.data || []);
+    } catch (err: any) {
+      console.error("Failed to fetch data:", err);
+      setError("Failed to fetch stock entries data");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Get supplier name by ID
   const getSupplierName = (supplierId: number) => {
-    const supplier = SAMPLE_SUPPLIERS.find((s) => s.id === supplierId);
+    const supplier = suppliers.find((s) => s.id === supplierId);
     return supplier?.supplierName || "-";
   };
 
-  // Get item name by ID
-  const getItemName = (itemId: number) => {
-    const item = SAMPLE_ITEMS.find((i) => i.id === itemId);
-    return item?.itemName || "-";
-  };
-
-  // Filter entries based on search and inactive filter
-  const filteredEntries = stockEntries.filter((entry) => {
-    const matchesSearch =
-      getSupplierName(entry.supplierId).toLowerCase().includes(search.toLowerCase()) ||
-      entry.invoiceNo.toLowerCase().includes(search.toLowerCase()) ||
-      getItemName(entry.itemId).toLowerCase().includes(search.toLowerCase()) ||
-      entry.batchNo.toLowerCase().includes(search.toLowerCase());
-
-    // If showInactive is checked, show ONLY inactive entries
-    // If showInactive is unchecked, show ONLY active entries
-    const matchesInactiveFilter = showInactive ? entry.status === "Inactive" : entry.status === "Active";
-
-    return matchesSearch && matchesInactiveFilter;
-  });
-
-  const totalPages = Math.ceil(filteredEntries.length / ITEMS_PER_PAGE);
-  const paginatedEntries = filteredEntries.slice(
-    (currentPage - 1) * ITEMS_PER_PAGE,
-    currentPage * ITEMS_PER_PAGE
-  );
-
-  const handleDelete = (id: number) => {
-    if (window.confirm("Are you sure you want to delete this stock entry?")) {
-      setStockEntries(stockEntries.filter((entry) => entry.id !== id));
-      setSuccessMsg("Stock entry deleted successfully!");
-      setTimeout(() => setSuccessMsg(""), 2000);
+  const handleDelete = async (id: number) => {
+    if (window.confirm("Are you sure you want to delete this stock entry? This action cannot be undone.")) {
+      try {
+        await inventoryAPI.stockEntries.delete(id);
+        setStockEntries(stockEntries.filter((entry) => entry.id !== id));
+        setSuccessMsg("Stock entry deleted successfully!");
+        setTimeout(() => setSuccessMsg(""), 2000);
+      } catch (err: any) {
+        setError(err.response?.data?.message || "Failed to delete stock entry");
+        setTimeout(() => setError(""), 3000);
+      }
     }
   };
 
@@ -189,23 +197,7 @@ export default function StockEntryPage() {
   };
 
   const handleStockEntrySaved = (entryData: any) => {
-    if (editingEntry) {
-      // Update existing entry
-      setStockEntries(
-        stockEntries.map((entry) =>
-          entry.id === editingEntry.id ? { ...entry, ...entryData } : entry
-        )
-      );
-    } else {
-      // Add new entry
-      const newEntry: StockEntry = {
-        id: Math.max(0, ...stockEntries.map((e) => e.id)) + 1,
-        entryId: `SE-${String(Math.max(0, ...stockEntries.map((e) => e.id)) + 1).padStart(3, "0")}`,
-        ...entryData,
-        status: "Active",
-      };
-      setStockEntries([newEntry, ...stockEntries]);
-    }
+    fetchData(); // Refresh list from server
     setShowModal(false);
     setEditingEntry(null);
     setSuccessMsg("Stock entry saved successfully!");
@@ -215,8 +207,12 @@ export default function StockEntryPage() {
   return (
     <>
       <div className="min-h-screen bg-white p-6">
-        {/* Page Header */}
-        <PageHeader title="Stock Entry" icon={Package} path="Inventory" />
+        {/* Error Message */}
+        {error && (
+          <div className="mb-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
+            {error}
+          </div>
+        )}
 
         {/* Top Bar */}
         <div className="flex flex-wrap items-center justify-between gap-3 mb-4 bg-white p-3 rounded shadow-md">
@@ -265,149 +261,197 @@ export default function StockEntryPage() {
           </button>
         </div>
 
-        {/* Table */}
-        <div className="overflow-x-auto bg-white rounded shadow-md">
-          <table className="w-full text-sm border-collapse">
-            <thead className="bg-slate-900 text-white">
-              <tr>
-                <th className="border border-gray-300 px-3 py-2 text-left font-semibold">
-                  Entry ID
-                </th>
-                <th className="border border-gray-300 px-3 py-2 text-left font-semibold">
-                  Supplier
-                </th>
-                <th className="border border-gray-300 px-3 py-2 text-left font-semibold">
-                  Invoice No
-                </th>
-                <th className="border border-gray-300 px-3 py-2 text-left font-semibold">
-                  Item Name
-                </th>
-                <th className="border border-gray-300 px-3 py-2 text-center font-semibold">
-                  Quantity
-                </th>
-                <th className="border border-gray-300 px-3 py-2 text-center font-semibold">
-                  Price/Unit
-                </th>
-                <th className="border border-gray-300 px-3 py-2 text-center font-semibold">
-                  Grand Total
-                </th>
-                <th className="border border-gray-300 px-3 py-2 text-center font-semibold">
-                  Expiry Date
-                </th>
-                <th className="border border-gray-300 px-3 py-2 text-center font-semibold">
-                  Action
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {paginatedEntries.length > 0 ? (
-                paginatedEntries.map((entry) => (
-                  <tr key={entry.id} className="hover:bg-gray-50 border-b border-gray-200">
-                    <td className="border border-gray-300 px-3 py-2 text-gray-600 text-xs font-mono">
-                      {entry.entryId}
-                    </td>
-                    <td className="border border-gray-300 px-3 py-2 font-semibold text-gray-900">
-                      {getSupplierName(entry.supplierId)}
-                    </td>
-                    <td className="border border-gray-300 px-3 py-2 text-gray-600 text-xs font-mono">
-                      {entry.invoiceNo}
-                    </td>
-                    <td className="border border-gray-300 px-3 py-2 text-gray-600">
-                      {getItemName(entry.itemId)}
-                    </td>
-                    <td className="border border-gray-300 px-3 py-2 text-center">
-                      <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs font-semibold">
-                        {entry.quantity}
-                      </span>
-                    </td>
-                    <td className="border border-gray-300 px-3 py-2 text-center text-gray-600">
-                      ₹ {entry.pricePerUnit.toFixed(2)}
-                    </td>
-                    <td className="border border-gray-300 px-3 py-2 text-center font-semibold text-gray-900">
-                      ₹ {entry.grandTotal.toFixed(2)}
-                    </td>
-                    <td className="border border-gray-300 px-3 py-2 text-center text-gray-600 text-xs">
-                      {new Date(entry.expiryDate).toLocaleDateString("en-GB")}
-                    </td>
-                    <td className="border border-gray-300 px-3 py-2">
-                      <div className="flex justify-center gap-1 flex-wrap">
-                        <button
-                          onClick={() => handleToggleActive(entry.id)}
-                          className={`px-2 py-1 rounded text-xs font-semibold transition-colors ${
-                            entry.status === "Active"
-                              ? "bg-green-500 hover:bg-green-600 text-white"
-                              : "bg-gray-400 hover:bg-gray-500 text-white"
-                          }`}
-                        >
-                          {entry.status === "Active" ? "Active" : "Inactive"}
-                        </button>
-                        <button
-                          onClick={() => {
-                            setEditingEntry(entry);
-                            setShowModal(true);
-                          }}
-                          className="bg-blue-600 text-white px-2 py-1 rounded text-xs hover:bg-blue-700 transition-colors flex items-center gap-1"
-                        >
-                          <Edit2 size={12} /> Edit
-                        </button>
-                        <button
-                          onClick={() => handleDelete(entry.id)}
-                          className="bg-red-500 text-white px-2 py-1 rounded text-xs hover:bg-red-600 transition-colors flex items-center gap-1"
-                        >
-                          <Trash2 size={12} /> Delete
-                        </button>
-                      </div>
+        {/* Table with Pagination */}
+        <div className="bg-white rounded shadow-md overflow-hidden flex flex-col">
+          {/* Pagination Header */}
+          {pagination && (
+            <div className="border-b p-3 bg-gray-50 flex justify-between items-center text-xs sm:text-sm">
+              <span className="text-sm font-semibold text-gray-700">
+                Page {pagination?.page || 1} of {pagination?.totalPages || 1} 
+                {pagination?.total && ` (Total: ${pagination.total})`}
+              </span>
+            </div>
+          )}
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm border-collapse">
+              <thead className="bg-slate-900 text-white">
+                <tr>
+                  <th className="border border-gray-300 px-3 py-2 text-left font-semibold">
+                    Id
+                  </th>
+                  <th className="border border-gray-300 px-3 py-2 text-left font-semibold">
+                    Entry ID
+                  </th>
+                  <th className="border border-gray-300 px-3 py-2 text-left font-semibold">
+                    Supplier
+                  </th>
+                  <th className="border border-gray-300 px-3 py-2 text-left font-semibold">
+                    Invoice No
+                  </th>
+                  <th className="border border-gray-300 px-3 py-2 text-left font-semibold">
+                    Item Name
+                  </th>
+                  <th className="border border-gray-300 px-3 py-2 text-center font-semibold">
+                    Quantity
+                  </th>
+                  <th className="border border-gray-300 px-3 py-2 text-center font-semibold">
+                    Price/Unit
+                  </th>
+                  <th className="border border-gray-300 px-3 py-2 text-center font-semibold">
+                    Grand Total
+                  </th>
+                  <th className="border border-gray-300 px-3 py-2 text-center font-semibold">
+                    Expiry Date
+                  </th>
+                  <th className="border border-gray-300 px-3 py-2 text-center font-semibold">
+                    Action
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {loading ? (
+                  <tr>
+                    <td colSpan={10} className="text-center py-4 text-gray-500 border border-gray-300">
+                      Loading stock entries...
                     </td>
                   </tr>
-                ))
-              ) : (
-                <tr>
-                  <td colSpan={9} className="text-center py-4 text-gray-500 border border-gray-300">
-                    No stock entries found
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+                ) : stockEntries.length > 0 ? (
+                  stockEntries.map((entry, entryIndex) =>
+                    entry.items.map((item, itemIndex) => (
+                      <tr key={`${entry.id}-${itemIndex}`} className="hover:bg-gray-50 border-b border-gray-200">
+                        {itemIndex === 0 && (
+                          <>
+                            <td rowSpan={entry.items.length} className="border border-gray-300 px-3 py-2 font-semibold text-gray-900">
+                              {((pagination?.page || 1) - 1) * ITEMS_PER_PAGE + entryIndex + 1}
+                            </td>
+                            <td rowSpan={entry.items.length} className="border border-gray-300 px-3 py-2 text-gray-600 text-xs font-mono">
+                              {entry.entryId}
+                            </td>
+                            <td rowSpan={entry.items.length} className="border border-gray-300 px-3 py-2 font-semibold text-gray-900">
+                              {getSupplierName(entry.supplierId)}
+                            </td>
+                            <td rowSpan={entry.items.length} className="border border-gray-300 px-3 py-2 text-gray-600 text-xs font-mono">
+                              {entry.invoiceNo}
+                            </td>
+                          </>
+                        )}
+                        <td className="border border-gray-300 px-3 py-2 text-gray-600">
+                          {item.item?.itemName || item.itemName || "-"}
+                        </td>
+                        <td className="border border-gray-300 px-3 py-2 text-center">
+                          <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs font-semibold">
+                            {item.quantity}
+                          </span>
+                        </td>
+                        <td className="border border-gray-300 px-3 py-2 text-center text-gray-600">
+                          ₹ {item.pricePerUnit.toFixed(2)}
+                        </td>
+                        <td className="border border-gray-300 px-3 py-2 text-center font-semibold text-gray-900">
+                          ₹ {entry.grandTotal.toFixed(2)}
+                        </td>
+                        <td className="border border-gray-300 px-3 py-2 text-center text-gray-600 text-xs">
+                          {new Date(item.expiryDate).toLocaleDateString("en-GB")}
+                        </td>
+                        {itemIndex === 0 && (
+                          <td rowSpan={entry.items.length} className="border border-gray-300 px-3 py-2">
+                            <div className="flex justify-center gap-1 flex-wrap">
+                              <button
+                                onClick={() => handleToggleActive(entry.id)}
+                                className={`px-2 py-1 rounded text-xs font-semibold transition-colors ${
+                                  entry.status === "Active"
+                                    ? "bg-green-500 hover:bg-green-600 text-white"
+                                    : "bg-gray-400 hover:bg-gray-500 text-white"
+                                }`}
+                              >
+                                {entry.status === "Active" ? "Active" : "Inactive"}
+                              </button>
+                              <button
+                                onClick={() => {
+                                  setEditingEntry(entry);
+                                  setShowModal(true);
+                                }}
+                                className="bg-blue-600 text-white px-2 py-1 rounded text-xs hover:bg-blue-700 transition-colors flex items-center gap-1"
+                              >
+                                <Edit2 size={12} /> Edit
+                              </button>
+                              <button
+                                onClick={() => handleDelete(entry.id)}
+                                className="bg-red-600 text-white px-2 py-1 rounded text-xs hover:bg-red-700 transition-colors flex items-center gap-1"
+                              >
+                                <Trash2 size={12} /> Delete
+                              </button>
+                            </div>
+                          </td>
+                        )}
+                      </tr>
+                    ))
+                  )
+                ) : (
+                  <tr>
+                    <td colSpan={10} className="text-center py-4 text-gray-500 border border-gray-300">
+                      No stock entries found
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
 
-        {/* Pagination */}
-        {totalPages > 1 && (
-          <div className="flex items-center justify-between gap-2 mt-4 p-3 bg-white rounded shadow-md">
-            <span className="text-sm text-gray-600">
-              Page {currentPage} of {totalPages}
-            </span>
-            <div className="flex gap-2">
+          {/* Pagination Controls */}
+          {pagination && pagination.totalPages > 1 && (
+            <div className="border-t p-3 bg-gray-50 flex items-center justify-between text-xs sm:text-sm">
               <button
-                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
                 disabled={currentPage === 1}
-                className="p-2 border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50 transition-colors"
+                className={`px-3 py-1 rounded ${currentPage === 1 ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-orange-500 text-white hover:bg-orange-600'}`}
               >
-                <ChevronLeft size={16} />
+                ← Previous
               </button>
-              {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-                <button
-                  key={page}
-                  onClick={() => setCurrentPage(page)}
-                  className={`px-3 py-1.5 rounded text-sm transition-colors ${
-                    currentPage === page
-                      ? "bg-orange-500 text-white"
-                      : "border border-gray-300 hover:bg-gray-50"
-                  }`}
-                >
-                  {page}
-                </button>
-              ))}
+
+              <div className="flex items-center gap-1">
+                {(() => {
+                  const pages = [];
+                  const totalPages = pagination.totalPages;
+                  
+                  if (totalPages <= 5) {
+                    for (let i = 1; i <= totalPages; i++) pages.push(i);
+                  } else {
+                    if (currentPage <= 3) {
+                      pages.push(1, 2, 3, 4, '...', totalPages);
+                    } else if (currentPage >= totalPages - 2) {
+                      pages.push(1, '...', totalPages - 3, totalPages - 2, totalPages - 1, totalPages);
+                    } else {
+                      pages.push(1, '...', currentPage - 1, currentPage, currentPage + 1, '...', totalPages);
+                    }
+                  }
+
+                  return pages.map((page, idx) => (
+                    page === '...' ? (
+                      <span key={idx} className="px-2">...</span>
+                    ) : (
+                      <button
+                        key={idx}
+                        onClick={() => setCurrentPage(page as number)}
+                        className={`w-7 h-7 rounded ${currentPage === page ? 'bg-orange-500 text-white font-bold' : 'bg-white border hover:bg-gray-100'}`}
+                      >
+                        {page}
+                      </button>
+                    )
+                  ));
+                })()}
+              </div>
+
               <button
-                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                disabled={currentPage === totalPages}
-                className="p-2 border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50 transition-colors"
+                onClick={() => setCurrentPage(p => Math.min(pagination.totalPages, p + 1))}
+                disabled={currentPage === pagination.totalPages}
+                className={`px-3 py-1 rounded ${currentPage === pagination.totalPages ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-orange-500 text-white hover:bg-orange-600'}`}
               >
-                <ChevronRight size={16} />
+                Next →
               </button>
             </div>
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
       {/* Modal */}
@@ -418,8 +462,8 @@ export default function StockEntryPage() {
           setEditingEntry(null);
         }}
         onStockEntrySaved={handleStockEntrySaved}
-        suppliers={SAMPLE_SUPPLIERS}
-        items={SAMPLE_ITEMS}
+        suppliers={suppliers}
+        items={items}
         editingEntry={editingEntry}
       />
 

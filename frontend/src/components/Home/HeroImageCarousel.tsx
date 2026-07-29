@@ -9,10 +9,8 @@ const CAROUSEL_IMAGES = [
   "/pic1.jpg",
   "/pic2.JPG",
   "/pic3.JPG",
-  "/pic4.JPG",
   "/pic5.JPG",
   "/pic6.JPG",
-  "/pic7.JPG",
   "/pic8.JPG",
 ];
 

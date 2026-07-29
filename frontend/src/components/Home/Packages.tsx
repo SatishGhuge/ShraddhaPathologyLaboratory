@@ -51,8 +51,8 @@ export default function Packages() {
 
         {/* Header */}
         <div className="text-center mb-12">
-          <p className="text-[#EB925A] text-sm font-semibold uppercase tracking-widest mb-2">Health Packages</p>
-          <h2 className="text-3xl lg:text-4xl font-bold text-[#1D3F5F] mb-3">
+          <p className="text-[oklch(60%_0.15_45)] text-sm font-semibold uppercase tracking-widest mb-2">Health Packages</p>
+          <h2 className="text-3xl lg:text-4xl font-bold text-[oklch(45%_0.085_224.283)] mb-3">
             Affordable Packages for Every Need
           </h2>
           <p className="text-gray-500 text-sm max-w-md mx-auto">
@@ -72,27 +72,27 @@ export default function Packages() {
               whileHover={{ y: -6 }}
               className={`relative rounded-2xl p-6 shadow-sm transition-all ${
                 pkg.popular
-                  ? "bg-[#1D3F5F] text-white shadow-xl scale-105"
-                  : "bg-white text-[#1D3F5F]"
+                  ? "bg-[oklch(45%_0.085_224.283)] text-white shadow-xl scale-105"
+                  : "bg-white text-[oklch(45%_0.085_224.283)]"
               }`}
             >
               {/* Popular badge */}
               {pkg.popular && (
                 <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-                  <span className="bg-[#EB925A] text-white text-xs font-bold px-4 py-1 rounded-full">
+                  <span className="bg-[oklch(60%_0.15_45)] text-white text-xs font-bold px-4 py-1 rounded-full">
                     MOST POPULAR
                   </span>
                 </div>
               )}
 
-              <h3 className={`font-bold text-lg mb-1 ${pkg.popular ? "text-white" : "text-[#1D3F5F]"}`}>
+              <h3 className={`font-bold text-lg mb-1 ${pkg.popular ? "text-white" : "text-[oklch(45%_0.085_224.283)]"}`}>
                 {pkg.name}
               </h3>
               <p className={`text-xs mb-4 ${pkg.popular ? "text-blue-200" : "text-gray-400"}`}>
                 {pkg.popular ? "Advanced tests for detailed health insights" : "Essential tests for a quick health overview"}
               </p>
 
-              <p className="text-4xl font-bold mb-6 text-[#EB925A]">
+              <p className="text-4xl font-bold mb-6 text-[oklch(60%_0.15_45)]">
                 {pkg.price}
               </p>
 
@@ -100,7 +100,7 @@ export default function Packages() {
                 {pkg.tests.map((test) => (
                   <li key={test} className="flex items-center gap-2 text-sm">
                     <svg
-                      className="w-4 h-4 flex-shrink-0 text-[#EB925A]"
+                      className="w-4 h-4 flex-shrink-0 text-[oklch(60%_0.15_45)]"
                       fill="none" stroke="currentColor" viewBox="0 0 24 24"
                     >
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
@@ -115,8 +115,8 @@ export default function Packages() {
                 whileTap={{ scale: 0.97 }}
                 className={`w-full py-3 rounded-xl font-semibold text-sm transition-colors ${
                   pkg.popular
-                    ? "bg-[#EB925A] text-white hover:bg-[#d4783f]"
-                    : "border-2 border-[#1D3F5F] text-[#1D3F5F] hover:bg-[#1D3F5F] hover:text-white"
+                    ? "bg-[oklch(60%_0.15_45)] text-white hover:bg-[oklch(55%_0.13_43)]"
+                    : "border-2 border-[oklch(45%_0.085_224.283)] text-[oklch(45%_0.085_224.283)] hover:bg-[oklch(45%_0.085_224.283)] hover:text-white"
                 }`}
               >
                 view
