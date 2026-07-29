@@ -249,7 +249,7 @@ export default function Result() {
   const router = useRouter();
   const searchParams = useSearchParams();
   
-  const queryStatus = searchParams.get('status') || 'All';
+  const queryStatus = (searchParams?.get('status') || 'All') as string;
   const [selectedStatus, setSelectedStatus] = useState(queryStatus);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
@@ -507,22 +507,34 @@ export default function Result() {
       }
     }
     
-    // Fallback to gender and age-based ranges
+    // ✅ IMPROVED: Fallback to gender and age-based ranges
+    // Don't require Active flag - just check if values exist
     if (parameterData.rangeType === 'BySex' || parameterData.rangeType === 'ByGenderAndAge') {
-      if (exactAgeInYears < 18 && parameterData.childActive && parameterData.childLowValue != null && parameterData.childHighValue != null) {
+      if (exactAgeInYears < 18 && parameterData.childLowValue != null && parameterData.childHighValue != null) {
         return `${parameterData.childLowValue} - ${parameterData.childHighValue}`;
       }
       if (exactAgeInYears >= 18) {
-        if (patientGender === 'F' && parameterData.femaleActive && parameterData.femaleLowValue != null && parameterData.femaleHighValue != null) {
+        if (patientGender === 'female' && parameterData.femaleLowValue != null && parameterData.femaleHighValue != null) {
           return `${parameterData.femaleLowValue} - ${parameterData.femaleHighValue}`;
         }
-        if (patientGender === 'M' && parameterData.maleActive && parameterData.maleLowValue != null && parameterData.maleHighValue != null) {
+        if (patientGender === 'male' && parameterData.maleLowValue != null && parameterData.maleHighValue != null) {
           return `${parameterData.maleLowValue} - ${parameterData.maleHighValue}`;
         }
       }
     }
     
-    // Final fallback to display range text
+    // Final fallback: return numeric ranges if available (for any range type)
+    if (patientGender === 'female' && parameterData.femaleLowValue != null && parameterData.femaleHighValue != null) {
+      return `${parameterData.femaleLowValue} - ${parameterData.femaleHighValue}`;
+    }
+    if (patientGender === 'male' && parameterData.maleLowValue != null && parameterData.maleHighValue != null) {
+      return `${parameterData.maleLowValue} - ${parameterData.maleHighValue}`;
+    }
+    if (parameterData.childLowValue != null && parameterData.childHighValue != null) {
+      return `${parameterData.childLowValue} - ${parameterData.childHighValue}`;
+    }
+    
+    // Last resort: return display text or range text
     return parameterData.displayRangeText || parameterData.rangeText || '-';
   };
 
@@ -616,16 +628,16 @@ export default function Result() {
       return;
     }
 
-    let targetPatient = null;
+    let targetPatient: any = null;
     for (const patient of sortedAndFilteredResults) {
-      if (patient.patient_uid === barcodeLockedPatientUid && patient.visit_id === barcodeLockedVisitId) {
+      if ((patient as any).patient_uid === barcodeLockedPatientUid && (patient as any).visit_id === barcodeLockedVisitId) {
         targetPatient = patient;
         break;
       }
     }
     if (!targetPatient) return;
 
-    const selectedTestsList = targetPatient.tests.filter(t => barcodeSelectedTests.has(t.test_id));
+    const selectedTestsList = (targetPatient as any).tests.filter((t: any) => barcodeSelectedTests.has(t.test_id));
     const now = new Date();
     const dateStr = now.toLocaleDateString('en-GB');
     const timeStr = now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: true }).toUpperCase();
@@ -638,22 +650,22 @@ export default function Result() {
     const specimenBarcodeStatuses = {}; // Track ALL barcode statuses for each specimen group
     
     selectedTestsList.forEach(t => {
-      const key = t.specimen_type || 'Unknown';
+      const key = (t as any).specimen_type || 'Unknown';
       if (!specimenGroups[key]) {
         specimenGroups[key] = [];
         specimenTestIds[key] = [];
         specimenTestStatuses[key] = []; // Store array of all test statuses
         specimenBarcodeStatuses[key] = []; // Store array of all barcode statuses
       }
-      specimenGroups[key].push(t.test_short_name || t.test_name);
-      specimenTestIds[key].push(t.test_id);
-      specimenTestStatuses[key].push(t.status || 'Registered'); // Store each test's status
-      specimenBarcodeStatuses[key].push(t.barcode_status || 'Unprinted'); // Store each barcode's status
+      specimenGroups[key].push((t as any).test_short_name || (t as any).test_name);
+      specimenTestIds[key].push((t as any).test_id);
+      specimenTestStatuses[key].push((t as any).status || 'Registered'); // Store each test's status
+      specimenBarcodeStatuses[key].push((t as any).barcode_status || 'Unprinted'); // Store each barcode's status
     });
 
     // Build labels — barcode value = visitId for first specimen, visitId-2, visitId-3 ...
     const specimenEntries = Object.entries(specimenGroups);
-    const labels = specimenEntries.map(([specimen, shortNames], idx) => {
+    const labels = specimenEntries.map(([specimen, shortNames]: any, idx: number) => {
       const statuses = specimenTestStatuses[specimen] || [];
       const barcodeStatuses = specimenBarcodeStatuses[specimen] || [];
       
@@ -674,7 +686,7 @@ export default function Result() {
       }
       
       return {
-        barcodeValue: `${targetPatient.visit_id}-${idx + 1}`,
+        barcodeValue: `${(targetPatient as any).visit_id}-${idx + 1}`,
         specimen,
         shortNamesStr: (shortNames as any[]).join(' / '),
         dateStr,
@@ -685,23 +697,23 @@ export default function Result() {
       };
     });
 
-    const genderInitial = targetPatient.gender ? targetPatient.gender.charAt(0).toUpperCase() : '';
-    const age = targetPatient.age || '';
+    const genderInitial = (targetPatient as any).gender ? (targetPatient as any).gender.charAt(0).toUpperCase() : '';
+    const age = (targetPatient as any).age || '';
 
     setBarcodePatientInfo({
-      patientName: targetPatient.patient_name || '',
-      visitId: targetPatient.visit_id || '',
+      patientName: (targetPatient as any).patient_name || '',
+      visitId: (targetPatient as any).visit_id || '',
       age,
-      gender: targetPatient.gender || '',
+      gender: (targetPatient as any).gender || '',
       // Pre-formatted age/gender string: "F/27 Yrs" or "M/45 Yrs"
       ageGender: genderInitial && age ? `${genderInitial}/${age} Yrs` : genderInitial || (age ? `${age} Yrs` : ''),
-      organizationCode: targetPatient.organizationCode || '', // ✅ Include organization code
+      organizationCode: (targetPatient as any).organizationCode || '', // ✅ Include organization code
     });
     
     // Add organizationCode to each label
     const labelsWithOrgCode = labels.map(label => ({
       ...label,
-      organizationCode: targetPatient.organizationCode || '', // ✅ Add org code to barcode labels
+      organizationCode: (targetPatient as any).organizationCode || '', // ✅ Add org code to barcode labels
     }));
     
     setBarcodeLabels(labelsWithOrgCode);
@@ -1103,7 +1115,7 @@ export default function Result() {
         || (uploadedFiles[Array.from(selectedTests)[0] as string]?.serverPath);
       if (attachmentPath && !attachmentPath.endsWith('.pdf')) {
         try {
-          const baseUrl = process.env.NEXT_PUBLIC_API_URL.replace('/api', '');
+          const baseUrl = (process.env.NEXT_PUBLIC_API_URL || '').replace('/api', '');
           const src = attachmentPath.startsWith('http') ? attachmentPath : `${baseUrl}${attachmentPath}`;
           const attachBase64 = await toBase64(src) as string;
           pdf.addPage();
@@ -1131,10 +1143,10 @@ export default function Result() {
       if (!patient.email) { alert('No email address saved for this patient.'); return; }
 
       // Build results payload matching what the backend email function expects
-      const allResults = [];
-      responses.forEach(r => {
+      const allResults: any[] = [];
+      responses.forEach((r: any) => {
         allResults.push({ isHeader: true, testName: r.patientTest.test.name });
-        r.parameters.forEach(p => {
+        r.parameters.forEach((p: any) => {
           const er = p.existingResult;
           if (!er) return;
           allResults.push({
@@ -1517,12 +1529,12 @@ export default function Result() {
   };
 
   // Open upload modal for a patient
-  const handleUploadClick = (patient, specificTest = null) => {
+  const handleUploadClick = (patient: any, specificTest: any = null) => {
     setUploadPatient(patient);
     // If opened from a specific test icon — pre-select ONLY that test
     // If opened from patient level — all unchecked
-    const initial = {};
-    patient.tests.forEach(t => {
+    const initial: any = {};
+    patient.tests.forEach((t: any) => {
       initial[t.test_id] = specificTest ? t.test_id === specificTest.test_id : false;
     });
     setUploadSelectedTests(initial);
@@ -2306,13 +2318,13 @@ export default function Result() {
       setLoading(true);
       
       // Get selected test IDs and their new statuses
-      const updates = [];
-      Object.keys(settingsFormData.selectedTests).forEach(testId => {
-        if (settingsFormData.selectedTests[testId]) {
+      const updates: any[] = [];
+      Object.keys(settingsFormData.selectedTests).forEach((testId: string) => {
+        if ((settingsFormData.selectedTests as any)[testId]) {
           updates.push({
             id: parseInt(testId),
-            status: settingsFormData.testStatuses[testId],
-            remarks: settingsFormData.testRemarks[testId]
+            status: (settingsFormData.testStatuses as any)[testId],
+            remarks: (settingsFormData.testRemarks as any)[testId]
           });
         }
       });
@@ -3510,7 +3522,7 @@ export default function Result() {
               <div className="mb-5">
                 <input
                   type="file"
-                  onChange={(e) => setUploadFile(e.target.files[0] || null)}
+                  onChange={(e) => setUploadFile((e.target.files?.[0]) || null)}
                   className="text-sm text-gray-600 file:mr-2 file:py-1 file:px-3 file:border file:border-gray-300 file:rounded file:text-xs file:bg-white file:text-gray-700 hover:file:bg-gray-50"
                 />
               </div>
@@ -3705,6 +3717,10 @@ export default function Result() {
           
           // Print only the selected barcodes
           const printArea = document.getElementById('barcode-print-area');
+          if (!printArea) {
+            console.error('Barcode print area not found');
+            return;
+          }
           const allLabels = printArea.querySelectorAll('[data-barcode-index]');
           
           // Create a new container with only selected labels
@@ -3719,6 +3735,10 @@ export default function Result() {
             .join('');
           
           const win = window.open('', '_blank');
+          if (!win) {
+            console.error('Could not open print window');
+            return;
+          }
           win.document.write(`<!DOCTYPE html><html><head><title>Barcode Labels</title>
             <style>
               * { margin:0; padding:0; box-sizing:border-box; }

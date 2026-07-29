@@ -1491,9 +1491,7 @@ export default function PatientRegistration() {
         department: item.department || "General",
         sample: item.sample || "N/A",
         charge: businessType === "B2C" ? item.b2cCharge : item.b2bCharge,
-        packageName: item.fromPackage || null,
-        isOutsourced: item.isOutsourced || false,
-        outsourcedTo: item.outsourcedTo || null
+        packageName: item.fromPackage || null
       }));
       
       // Prepare patient data for backend with all fields

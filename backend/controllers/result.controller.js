@@ -176,7 +176,12 @@ export const getPatientTests = async (req, res) => {
                     femaleActive: true,
                     childLowValue: true,
                     childHighValue: true,
-                    childActive: true
+                    childActive: true,
+                    unit: {
+                      select: {
+                        symbol: true
+                      }
+                    }
                   }
                 }
               }
@@ -282,6 +287,10 @@ export const getPatientTests = async (req, res) => {
         parameter_id: patientTest.test.categories?.length === 1 ? (patientTest.test.categories?.[0]?.testParameter?.id || null) : null,
         // Add method name for reports (only for single parameter tests)
         method_name: patientTest.test.categories?.length === 1 ? (patientTest.test.categories?.[0]?.testParameter?.testMethod || '') : '',
+        // ✅ GET UNIT from the parameter object (which now includes unit data)
+        unit: patientTest.test.categories?.length === 1 && patientTest.test.categories?.[0]?.testParameter 
+          ? (patientTest.test.categories[0].testParameter.unit?.symbol || '') 
+          : '',
         // For ref_interval, include full parameter data so frontend can calculate based on patient demographics
         ref_interval_data: patientTest.test.categories?.length === 1 ? (patientTest.test.categories?.[0]?.testParameter || null) : null,
         // For result, get the numeric or text value from the first test result if single parameter

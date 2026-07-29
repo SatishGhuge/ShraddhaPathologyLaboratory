@@ -43,7 +43,7 @@ const urlPathMap: { [key: string]: string } = {
   "master/referral-doctor-list": "Master / Referral Doctors",
   "master/referral-doctor": "Master / Referral Doctor",
   "master/organization": "Master / Organization",
-  "master/specimen-type": "Master / Specimen Type",
+  "master/sample-type": "Master / Sample Type",
   "master/units": "Master / Units",
   "master/microbiology-organism": "Master / Microbiology Organism",
   "master/outsourcing": "Master / Outsourcing",

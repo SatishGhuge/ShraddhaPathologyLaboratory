@@ -51,7 +51,7 @@ const allModules: NavModule[] = [
       { label: "Users", path: "/master/userlist" },
       { label: "Referral Doctors", path: "/master/referral-doctor-list" },
       { label: "Organization", path: "/master/organization" },
-      { label: "Specimen Type", path: "/master/specimen-type" },
+      { label: "Sample Type", path: "/master/sample-type" },
       { label: "Units", path: "/master/units" },
       { label: "Outsourcing", path: "/master/outsourcing" },
     ],
@@ -125,7 +125,7 @@ const Header = () => {
 
   // Check if on public route
   const publicRoutes = ["/", "/login", "/seed-data"];
-  const isPublicRoute = publicRoutes.includes(pathname);
+  const isPublicRoute = pathname ? publicRoutes.includes(pathname) : false;
 
   // Function to filter modules based on user type and allocation
   // DEFINE THIS BEFORE using it in useEffect hooks
@@ -185,7 +185,7 @@ const Header = () => {
                 if (item.path.includes("testlist")) return accessible.masters.testlist;
                 if (item.path.includes("units")) return accessible.masters.units;
                 if (item.path.includes("referral-doctor")) return accessible.masters.referralDoctorList;
-                if (item.path.includes("specimen-type")) return accessible.masters.specimenType;
+                if (item.path.includes("sample-type")) return accessible.masters.specimenType;
                 if (item.path.includes("test-templets")) return accessible.masters.testTemplates;
                 if (item.path.includes("departmentlist")) return accessible.masters.departmentlist;
                 if (item.path.includes("packagelist")) return accessible.masters.packagelist;
@@ -349,6 +349,8 @@ const Header = () => {
     // Don't close sidebar on navigation - user can manually close if needed
     // setSidebarOpen(false);  // REMOVED - sidebar should stay open
 
+    if (!pathname) return;
+    
     const pathSegments = pathname.split('/').filter(Boolean);
     if (pathSegments.length > 0) {
       let moduleId = pathSegments[0];
@@ -739,7 +741,7 @@ const Header = () => {
               </div>
               {selectedModule.items.map((item, index) => {
                 // Check if this item's path matches the current pathname
-                const isActive = pathname === item.path || pathname.startsWith(item.path + '/');
+                const isActive = pathname && (pathname === item.path || pathname.startsWith(item.path + '/'));
                 return (
                   <button
                     key={`${selectedModule.id}-${index}`}
