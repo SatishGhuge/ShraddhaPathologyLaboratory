@@ -328,6 +328,7 @@ model PatientTest {
   @@index([patientId, visitId])
   @@index([patientId], map: "patient_tests_patientId_fkey")
   @@index([packageId], map: "patient_tests_packageId_fkey")
+  @@index([isOutsourced])
   @@map("patient_tests")
 }
 
@@ -397,6 +398,7 @@ model Test {
   createdAt              DateTime           @default(now())
   updatedAt              DateTime           @updatedAt
   linkedTestIds          String?            @db.Text
+  isOutsourced           Boolean            @default(false)
 
   testparameters         testparameters[]
   doctorTestCharges      DoctorTestCharge[]
@@ -419,9 +421,9 @@ model Test {
   @@index([testCategoryId], map: "tests_testCategoryId_fkey")
   @@index([testParameterId], map: "tests_testParameterId_fkey")
   @@index([isActive])
+  @@index([isOutsourced])
   @@index([name])
   @@index([sampleTypeId], map: "tests_sampleTypeId_fkey")
-  @@index([isOutsourced])
   @@index([machineId], map: "tests_machineId_fkey")
   @@map("tests")
 }
@@ -537,29 +539,6 @@ model DoctorMerge {
   @@index([targetDoctorId])
   @@index([mergedAt])
   @@map("doctor_merges")
-}
-
-model Organization {
-  id                     String            @id
-  name                   String            @unique
-  code                   String?
-  location               String?
-  address                String?           @db.Text
-  mobile                 String?
-  email                  String?
-  date                   DateTime?
-  isActive               Boolean           @default(true)
-  createdAt              DateTime          @default(now())
-  updatedAt              DateTime          @updatedAt
-  sendReportsViaMail     Boolean           @default(false)
-  sendReportsViaWhatsApp Boolean           @default(false)
-  admins                 Admin[]
-  moduleAllocations      ModuleAllocation?
-  patientTest            PatientTest[]
-  testcharge             TestCharge[]
-  users                  User[]
-
-  @@map("organizations")
 }
 
 model TestParameter {
@@ -693,66 +672,6 @@ model sample_type {
 // PATIENT TEST EXECUTION & RESULTS
 // ============================================
 
-model PatientTest {
-  id                 Int       @id @default(autoincrement())
-  patientId          String
-  visitId            String
-  testId             Int
-  packageId          Int?
-  departmentId       Int
-  sample             String
-  charge             Float
-  status             String    @default("Registered")
-  reportMode         String?
-  referralDoctor     String?
-  visitDate          DateTime?
-  visitTime          String?
-  sampleBarcodeNo    String?
-  patient_history    String?   @db.Text
-  totalAmount        Float     @default(0)
-  discountPercent    Float     @default(0)
-  discountAmount     Float     @default(0)
-  discountRemark     String?
-  paidAmount         Float     @default(0)
-  balanceAmount      Float     @default(0)
-  paymentMode        String?
-  businessType       String?
-  createdAt          DateTime  @default(now())
-  updatedAt          DateTime  @updatedAt
-  sampleReceived     DateTime?
-  sampleTaken        DateTime?
-  resultDate         DateTime?
-  isExcluded         Boolean   @default(false)
-  attachmentPath     String?
-  organizationId     String?
-  lastUpdatedBy      String?
-  lastStatusUpdateAt DateTime?
-  barcode_status     String    @default("Unprinted")
-  comments           String?   @db.Text
-
-  // Relations
-  department        Department          @relation(fields: [departmentId], references: [id])
-  organization      Organization?       @relation(fields: [organizationId], references: [id])
-  package           Package?            @relation(fields: [packageId], references: [id], onDelete: Cascade)
-  patient           Patient             @relation(fields: [patientId], references: [patientId], onDelete: Cascade)
-  test              Test                @relation(fields: [testId], references: [id])
-  testResults       TestResult[]
-  statusHistory     TestStatusHistory[]
-  homeVisitTracking HomeVisitTracking?
-
-  @@index([departmentId], map: "patient_tests_departmentId_fkey")
-  @@index([testId], map: "patient_tests_testId_fkey")
-  @@index([organizationId], map: "patient_tests_organizationId_fkey")
-  @@index([status])
-  @@index([barcode_status])
-  @@index([visitDate])
-  @@index([visitId])
-  @@index([patientId, visitId])
-  @@index([patientId], map: "patient_tests_patientId_fkey")
-  @@index([packageId], map: "patient_tests_packageId_fkey")
-  @@map("patient_tests")
-}
-
 model TestResult {
   id              Int           @id @default(autoincrement())
   patientTestId   Int
@@ -776,21 +695,6 @@ model TestResult {
   @@map("test_results")
 }
 
-model TestStatusHistory {
-  id             Int         @id @default(autoincrement())
-  patientTestId  Int
-  previousStatus String
-  newStatus      String
-  changedBy      String?
-  changedAt      DateTime    @default(now())
-  triggerType    String
-  remarks        String?     @db.Text
-  patientTest    PatientTest @relation(fields: [patientTestId], references: [id], onDelete: Cascade)
-
-  @@index([patientTestId])
-  @@index([changedAt])
-  @@map("test_status_history")
-}
 model Machine {
   id        Int       @id @default(autoincrement())
   name      String    @unique
@@ -800,88 +704,6 @@ model Machine {
   tests     Test[]    @relation("MachineTests")
 
   @@map("machines")
-}
-
-model Doctor {
-  id                     Int                @id @default(autoincrement())
-  name                   String
-  degree                 String?
-  mobile                 String?
-  specialty              String?
-  isActive               Boolean            @default(true)
-  createdAt              DateTime           @default(now())
-  updatedAt              DateTime           @updatedAt
-  address                String?            @db.Text
-  email                  String?
-  type                   String             @default("Doctor")
-  sendReportsViaMail     Boolean            @default(false)
-  sendReportsViaWhatsApp Boolean            @default(false)
-  testCharges            DoctorTestCharge[]
-  mergedTo               DoctorMerge[]      @relation("SourceDoctor")
-  mergedFrom             DoctorMerge[]      @relation("TargetDoctor")
-
-  @@map("doctors")
-}
-
-model DoctorMerge {
-  id                Int        @id @default(autoincrement())
-  sourceDoctorId   Int
-  targetDoctorId   Int
-  sourceDoctorName String
-  targetDoctorName String
-  recordsUpdated   Int      @default(0)
-  chargesUpdated   Int      @default(0)
-  mergedAt         DateTime @default(now())
-  mergedBy         String?
-  sourceDoctor     Doctor   @relation("SourceDoctor", fields: [sourceDoctorId], references: [id], onDelete: Cascade)
-  targetDoctor     Doctor   @relation("TargetDoctor", fields: [targetDoctorId], references: [id], onDelete: Cascade)
-
-  @@index([sourceDoctorId])
-  @@index([targetDoctorId])
-  @@index([mergedAt])
-  @@map("doctor_merges")
-}
-
-model TestCharge {
-  id              Int           @id @default(autoincrement())
-  testId          Int
-  organizationId  String?
-  b2cCharge       Float
-  b2bCharge       Float
-  discountPercent Float?        @default(0)
-  specialPrice    Float?
-  effectiveFrom   DateTime      @default(now())
-  effectiveTo     DateTime?
-  isActive        Boolean       @default(true)
-  createdAt       DateTime      @default(now())
-  updatedAt       DateTime      @updatedAt
-  test            Test          @relation(fields: [testId], references: [id], onDelete: Cascade)
-  organization    Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-
-  @@unique([testId, organizationId], map: "test_charges_testId_organizationId_key")
-  @@index([organizationId], map: "test_charges_organizationId_fkey")
-  @@index([testId], map: "test_charges_testId_fkey")
-  @@map("test_charges")
-}
-
-model DoctorTestCharge {
-  id            Int       @id @default(autoincrement())
-  testId        Int
-  doctorId      Int
-  discountR     Float?    @default(0)
-  discountS     Float?    @default(0)
-  isCustomized  Boolean   @default(false)
-  effectiveFrom DateTime  @default(now())
-  effectiveTo   DateTime?
-  isActive      Boolean   @default(true)
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  doctor        Doctor    @relation(fields: [doctorId], references: [id], onDelete: Cascade)
-  test          Test      @relation(fields: [testId], references: [id], onDelete: Cascade)
-
-  @@unique([testId, doctorId])
-  @@index([doctorId], map: "doctor_test_charges_doctorId_fkey")
-  @@map("doctor_test_charges")
 }
 
 model PaymentTransaction {
