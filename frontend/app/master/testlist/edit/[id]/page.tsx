@@ -899,7 +899,7 @@ const AddTest = () => {
         testCode: formData.testCode || null,
         departmentId: formData.department ? parseInt(formData.department) : null,
         sampleTypeId: formData.sampleTypeId ? parseInt(formData.sampleTypeId) : null,
-        machineName: formData.machineName || null,
+        machineId: formData.machineId ? parseInt(formData.machineId) : null,
         reportHeader: formData.reportHeader || null,
         preparationTime: formData.preparationTime || null,
         preparationType: formData.preparationType || null,
