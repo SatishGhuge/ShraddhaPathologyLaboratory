@@ -958,17 +958,23 @@ export const updateTest = async (req, res) => {
       updateData.profileTest = convertToBoolean(profileTest);
     }
 
+    // Handle sampleTypeId separately using relation syntax
+    const testId = parseInt(id);
+    if (sampleTypeId !== undefined) {
+      console.log('📌 Updating sampleTypeId:', sampleTypeId);
+      updateData.sample_type = sampleTypeId ? { connect: { id: parseInt(sampleTypeId) } } : { disconnect: true };
+    }
+
+    // Handle machineId separately using relation syntax
+    if (machineId !== undefined) {
+      console.log('📌 Updating machineId:', machineId);
+      updateData.machine = machineId ? { connect: { id: parseInt(machineId) } } : { disconnect: true };
+    }
+
     // Remove undefined values from updateData
     Object.keys(updateData).forEach(key => updateData[key] === undefined && delete updateData[key]);
 
     console.log('📝 Update data being sent:', updateData);
-
-    // Handle sampleTypeId separately
-    const testId = parseInt(id);
-    if (sampleTypeId !== undefined) {
-      console.log('📌 Updating sampleTypeId:', sampleTypeId);
-      updateData.sampleTypeId = sampleTypeId ? parseInt(sampleTypeId) : null;
-    }
 
     const test = await prisma.test.update({
       where: { id: testId },
