@@ -36,7 +36,8 @@
       {
         "name": "next"
       }
-    ]
+    ],
+    "strictNullChecks": true
   },
   "ignoreDeprecations": "5.0",
   "include": [
@@ -44,8 +45,9 @@
     "middleware.ts",
     "src",
     ".next/types/**/*.ts",
-    "next-env.d.ts"
-, "utils/cache.ts"  ],
+    "next-env.d.ts",
+    "utils/cache.ts"
+  ],
   "references": [
     {
       "path": "./tsconfig.node.json"

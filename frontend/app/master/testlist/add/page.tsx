@@ -9,6 +9,7 @@ import UnitModal from "@/src/components/UnitModal";
 import { CKEditor } from "@ckeditor/ckeditor5-react";
 import ClassicEditor from "@ckeditor/ckeditor5-build-classic";
 import { getTestById, createTest, updateTest, getDepartments, getUnits, getTests, getSampleTypes } from "@/src/api/master";
+import { getMachinesDropdown } from "@/src/api/machines";
 
 const baseInputClass =
   "px-2 py-1 border border-gray-300 rounded text-sm bg-white focus:outline-none focus:ring-2 focus:ring-orange-500";
@@ -48,7 +49,7 @@ const AddTest = () => {
     profileTest: false,
     reportHeader: "",
     sampleTypeId: "",
-    machineName: "",
+    machineId: "",
     isHeader: true,
     showTestName: true,
     outsourceLab: "",
@@ -66,6 +67,7 @@ const AddTest = () => {
   const [departments, setDepartments] = useState<any[]>([]);
   const [units, setUnits] = useState<any[]>([]);
   const [sampleTypes, setSampleTypes] = useState<any[]>([]);
+  const [machines, setMachines] = useState<any[]>([]);
   const [dataLoaded, setDataLoaded] = useState(false);
   const [tests, setTests] = useState<any[]>([]);
   const [selectedTestToAdd, setSelectedTestToAdd] = useState("");
@@ -288,10 +290,23 @@ const AddTest = () => {
       }
     };
 
+    const fetchMachines = async () => {
+      try {
+        console.log("📡 Fetching machines from API...");
+        const res = await getMachinesDropdown();
+        console.log("✅ Machines loaded:", res);
+        setMachines(res);
+      } catch (err) {
+        console.error('❌ Error fetching machines:', err);
+        // Don't set error for machines, just log it
+      }
+    };
+
     fetchDepartments();
     fetchUnits();
     fetchTests();
     fetchSampleTypes();
+    fetchMachines();
     
     // Try to load CKEditor after a short delay
     setTimeout(() => {
@@ -342,7 +357,7 @@ const AddTest = () => {
               profileTest: Boolean(testData.profileTest),
               reportHeader: testData.reportHeader || "",
               sampleTypeId: testData.sampleTypeId ? testData.sampleTypeId.toString() : "",
-              machineName: testData.machineName || "",
+              machineId: testData.machineId ? testData.machineId.toString() : "",
               isHeader: testData.isHeader !== undefined ? testData.isHeader : true,
               showTestName: testData.showTestName !== undefined ? testData.showTestName : true,
               outsourceLab: testData.outsourceLab || "",
@@ -900,7 +915,7 @@ const AddTest = () => {
         testCode: formData.testCode || null,
         departmentId: formData.department ? parseInt(formData.department) : null,
         sampleTypeId: formData.sampleTypeId ? parseInt(formData.sampleTypeId) : null,
-        machineName: formData.machineName || null,
+        machineId: formData.machineId ? parseInt(formData.machineId) : null,
         group: formData.group || null,
         reportHeader: formData.reportHeader || null,
         preparationTime: formData.preparationTime || null,
@@ -1387,11 +1402,11 @@ const AddTest = () => {
                     )}
                   </div>
                   <Select 
-                    label="Machine Name" 
-                    name="machineName"
-                    value={formData.machineName}
+                    label="Machine" 
+                    name="machineId"
+                    value={formData.machineId}
                     onChange={handleChange}
-                    options={["Cobas e411", "Sysmex XN-1000", "Architect i2000", "Manual"]}
+                    options={machines.map(m => ({ value: m.id.toString(), label: m.name }))}
                     disabled={isViewMode}
                     required={false}
                   />

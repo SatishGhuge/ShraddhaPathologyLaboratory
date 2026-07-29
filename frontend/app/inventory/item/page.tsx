@@ -3,7 +3,6 @@
 import { useState, useEffect } from "react";
 import { Package, RotateCcw, ChevronLeft, ChevronRight, Edit2, Trash2, Plus } from "lucide-react";
 import ItemMasterModal from "@/src/components/ItemMasterModal";
-import PageHeader from "@/src/components/BreadCrumb";
 import inventoryAPI from "@/lib/api/inventory.api";
 
 interface Item {
@@ -22,6 +21,7 @@ export default function ItemPage() {
   const [items, setItems] = useState<Item[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [pagination, setPagination] = useState<any>(null);
 
   const [search, setSearch] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
@@ -43,6 +43,7 @@ export default function ItemPage() {
       setError("");
       const response = await inventoryAPI.items.getAll(currentPage, ITEMS_PER_PAGE);
       setItems(response.data.data || []);
+      setPagination(response.data.pagination || null);
     } catch (err: any) {
       setError(err.response?.data?.message || "Failed to fetch items");
       console.error("Fetch error:", err);
@@ -102,9 +103,6 @@ export default function ItemPage() {
   return (
     <>
       <div className="min-h-screen bg-white p-6">
-        {/* Page Header */}
-        <PageHeader title="Item" icon={Package} path="Inventory" />
-
         {/* Error Message */}
         {error && (
           <div className="mb-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
@@ -160,104 +158,176 @@ export default function ItemPage() {
           </button>
         </div>
 
-        {/* Table */}
-        <div className="overflow-x-auto bg-white rounded shadow-md">
-          <table className="w-full text-sm border-collapse">
-            <thead className="bg-slate-900 text-white">
-              <tr>
-                <th className="border border-gray-300 px-3 py-2 text-left font-semibold">
-                  Item Name
-                </th>
-                <th className="border border-gray-300 px-3 py-2 text-left font-semibold">
-                  Item Code
-                </th>
-                <th className="border border-gray-300 px-3 py-2 text-left font-semibold">
-                  HSN Code
-                </th>
-                <th className="border border-gray-300 px-3 py-2 text-center font-semibold">
-                  Unit
-                </th>
-                
-                <th className="border border-gray-300 px-3 py-2 text-center font-semibold">
-                  Action
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {loading ? (
+        {/* Table with Pagination */}
+        <div className="bg-white rounded shadow-md overflow-hidden flex flex-col">
+          {/* Pagination Header */}
+          {pagination && (
+            <div className="border-b p-3 bg-gray-50 flex justify-between items-center text-xs sm:text-sm">
+              <span className="text-sm font-semibold text-gray-700">
+                Page {pagination?.page || 1} of {pagination?.totalPages || 1} 
+                {pagination?.total && ` (Total: ${pagination.total})`}
+              </span>
+            </div>
+          )}
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm border-collapse">
+              <thead className="bg-slate-900 text-white">
                 <tr>
-                  <td colSpan={6} className="text-center py-4 text-gray-500 border border-gray-300">
-                    Loading items...
-                  </td>
-                </tr>
-              ) : items.length > 0 ? (
-                items
-                  .filter((item) => {
-                    const matchesSearch =
-                      item.itemName.toLowerCase().includes(search.toLowerCase()) ||
-                      item.itemCode.toLowerCase().includes(search.toLowerCase());
-                    
-                    const matchesInactiveFilter = showInactive 
-                      ? item.isActive === false 
-                      : item.isActive === true;
-                    
-                    return matchesSearch && matchesInactiveFilter;
-                  })
-                  .map((item) => (
-                  <tr key={item.id} className="hover:bg-gray-50 border-b border-gray-200">
-                    <td className="border border-gray-300 px-3 py-2 font-semibold text-gray-900">
-                      {item.itemName}
-                    </td>
-                    <td className="border border-gray-300 px-3 py-2 text-gray-600 text-xs font-mono">
-                      {item.itemCode}
-                    </td>
-                    <td className="border border-gray-300 px-3 py-2 text-gray-600">
-                      {item.hsnCode?.hsnCode || "-"} ({item.hsnCode?.gstRate || 0}%)
-                    </td>
-                    <td className="border border-gray-300 px-3 py-2 text-center text-gray-600">
-                      {item.unit}
-                    </td>
+                  <th className="border border-gray-300 px-3 py-2 text-left font-semibold">
+                    Id
+                  </th>
+                  <th className="border border-gray-300 px-3 py-2 text-left font-semibold">
+                    Item Name
+                  </th>
+                  <th className="border border-gray-300 px-3 py-2 text-left font-semibold">
+                    Item Code
+                  </th>
+                  <th className="border border-gray-300 px-3 py-2 text-left font-semibold">
+                    HSN Code
+                  </th>
+                  <th className="border border-gray-300 px-3 py-2 text-center font-semibold">
+                    Unit
+                  </th>
                   
-                    <td className="border border-gray-300 px-3 py-2">
-                      <div className="flex justify-center gap-1 flex-wrap">
-                        <button
-                          onClick={() => handleToggleActive(item.id)}
-                          className={`px-2 py-1 rounded text-xs font-semibold transition-colors ${
-                            item.isActive
-                              ? "bg-green-500 hover:bg-green-600 text-white"
-                              : "bg-gray-400 hover:bg-gray-500 text-white"
-                          }`}
-                        >
-                          {item.isActive ? "Active" : "Inactive"}
-                        </button>
-                        <button
-                          onClick={() => {
-                            setEditingItem(item);
-                            setShowModal(true);
-                          }}
-                          className="bg-blue-600 text-white px-2 py-1 rounded text-xs hover:bg-blue-700 transition-colors flex items-center gap-1"
-                        >
-                          <Edit2 size={12} /> Edit
-                        </button>
-                        <button
-                          onClick={() => handleDelete(item.id)}
-                          className="bg-red-500 text-white px-2 py-1 rounded text-xs hover:bg-red-600 transition-colors flex items-center gap-1"
-                        >
-                          <Trash2 size={12} /> Delete
-                        </button>
-                      </div>
+                  <th className="border border-gray-300 px-3 py-2 text-center font-semibold">
+                    Action
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {loading ? (
+                  <tr>
+                    <td colSpan={6} className="text-center py-4 text-gray-500 border border-gray-300">
+                      Loading items...
                     </td>
                   </tr>
-                ))
-              ) : (
-                <tr>
-                  <td colSpan={6} className="text-center py-4 text-gray-500 border border-gray-300">
-                    No items found
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+                ) : items.length > 0 ? (
+                  items
+                    .filter((item) => {
+                      const matchesSearch =
+                        item.itemName.toLowerCase().includes(search.toLowerCase()) ||
+                        item.itemCode.toLowerCase().includes(search.toLowerCase());
+                      
+                      const matchesInactiveFilter = showInactive 
+                        ? item.isActive === false 
+                        : item.isActive === true;
+                      
+                      return matchesSearch && matchesInactiveFilter;
+                    })
+                    .map((item, index) => (
+                    <tr key={item.id} className="hover:bg-gray-50 border-b border-gray-200">
+                      <td className="border border-gray-300 px-3 py-2 font-semibold text-gray-900">
+                        {((pagination?.page || 1) - 1) * ITEMS_PER_PAGE + index + 1}
+                      </td>
+                      <td className="border border-gray-300 px-3 py-2 font-semibold text-gray-900">
+                        {item.itemName}
+                      </td>
+                      <td className="border border-gray-300 px-3 py-2 text-gray-600 text-xs font-mono">
+                        {item.itemCode}
+                      </td>
+                      <td className="border border-gray-300 px-3 py-2 text-gray-600">
+                        {item.hsnCode?.hsnCode || "-"} ({item.hsnCode?.gstRate || 0}%)
+                      </td>
+                      <td className="border border-gray-300 px-3 py-2 text-center text-gray-600">
+                        {item.unit}
+                      </td>
+                    
+                      <td className="border border-gray-300 px-3 py-2">
+                        <div className="flex justify-center gap-1 flex-wrap">
+                          <button
+                            onClick={() => handleToggleActive(item.id)}
+                            className={`px-2 py-1 rounded text-xs font-semibold transition-colors ${
+                              item.isActive
+                                ? "bg-green-500 hover:bg-green-600 text-white"
+                                : "bg-gray-400 hover:bg-gray-500 text-white"
+                            }`}
+                          >
+                            {item.isActive ? "Active" : "Inactive"}
+                          </button>
+                          <button
+                            onClick={() => {
+                              setEditingItem(item);
+                              setShowModal(true);
+                            }}
+                            className="bg-blue-600 text-white px-2 py-1 rounded text-xs hover:bg-blue-700 transition-colors flex items-center gap-1"
+                          >
+                            <Edit2 size={12} /> Edit
+                          </button>
+                          <button
+                            onClick={() => handleDelete(item.id)}
+                            className="bg-red-500 text-white px-2 py-1 rounded text-xs hover:bg-red-600 transition-colors flex items-center gap-1"
+                          >
+                            <Trash2 size={12} /> Delete
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={6} className="text-center py-4 text-gray-500 border border-gray-300">
+                      No items found
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Pagination Controls */}
+          {pagination && pagination.totalPages > 1 && (
+            <div className="border-t p-3 bg-gray-50 flex items-center justify-between text-xs sm:text-sm">
+              <button
+                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+                className={`px-3 py-1 rounded ${currentPage === 1 ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-orange-500 text-white hover:bg-orange-600'}`}
+              >
+                ← Previous
+              </button>
+
+              <div className="flex items-center gap-1">
+                {(() => {
+                  const pages = [];
+                  const totalPages = pagination.totalPages;
+                  
+                  if (totalPages <= 5) {
+                    for (let i = 1; i <= totalPages; i++) pages.push(i);
+                  } else {
+                    if (currentPage <= 3) {
+                      pages.push(1, 2, 3, 4, '...', totalPages);
+                    } else if (currentPage >= totalPages - 2) {
+                      pages.push(1, '...', totalPages - 3, totalPages - 2, totalPages - 1, totalPages);
+                    } else {
+                      pages.push(1, '...', currentPage - 1, currentPage, currentPage + 1, '...', totalPages);
+                    }
+                  }
+
+                  return pages.map((page, idx) => (
+                    page === '...' ? (
+                      <span key={idx} className="px-2">...</span>
+                    ) : (
+                      <button
+                        key={idx}
+                        onClick={() => setCurrentPage(page as number)}
+                        className={`w-7 h-7 rounded ${currentPage === page ? 'bg-orange-500 text-white font-bold' : 'bg-white border hover:bg-gray-100'}`}
+                      >
+                        {page}
+                      </button>
+                    )
+                  ));
+                })()}
+              </div>
+
+              <button
+                onClick={() => setCurrentPage(p => Math.min(pagination.totalPages, p + 1))}
+                disabled={currentPage === pagination.totalPages}
+                className={`px-3 py-1 rounded ${currentPage === pagination.totalPages ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-orange-500 text-white hover:bg-orange-600'}`}
+              >
+                Next →
+              </button>
+            </div>
+          )}
         </div>
       </div>
 

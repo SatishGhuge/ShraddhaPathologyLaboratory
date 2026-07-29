@@ -1,74 +1,39 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import {
-  AlertCircle, AlertTriangle, Package, ChevronLeft, ChevronRight,
-  Search, X, Check
-} from "lucide-react";
+import { ChevronDown, ChevronRight, AlertCircle, CheckCircle, AlertTriangle, Search, RotateCcw, X, Check } from "lucide-react";
 import inventoryAPI from "@/lib/api/inventory.api";
 
-/* ─── Types ─────────────────────────────────────────────── */
-interface StockTransaction {
+interface BatchDetail {
   id: number;
+  batchNo: string;
+  quantityAvailable: number;
+  expiryDate: string;
+  lastStockUpdate: string;
+}
+
+interface GroupedLabStock {
   itemId: number;
   itemName: string;
   itemCode: string;
   unit: string;
-  availableQuantity: number;
-  minimumStockLevel: number;
-  expiryDate: string;
-  batchNo: string;
-  supplier: string;
-  remarks?: string;
+  hsnCode: any;
+  totalQuantity: number;
+  totalBatches: number;
+  nearestExpiryDate: string;
+  batches: BatchDetail[];
+  alertStatus: "OK" | "LOW_STOCK" | "EXPIRING" | "EXPIRED";
 }
 
-type AlertType = "none" | "minimum" | "expiring" | "expired";
-
-/* ─── Helper Functions ─────────────────────────────────────── */
-function getAlertType(stock: number, minimum: number, expiryDate: string): AlertType {
-  if (expiryDate) {
-    const diff = Math.floor((new Date(expiryDate).getTime() - Date.now()) / 86400000);
-    if (diff < 0) return "expired";
-    if (diff <= 30) return "expiring";
-  }
-  if (stock <= minimum) return "minimum";
-  return "none";
+interface PaginationInfo {
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
 }
 
-function getAlertColor(alertType: AlertType): string {
-  switch (alertType) {
-    case "expired":
-      return "text-red-700 bg-red-50";
-    case "expiring":
-      return "text-yellow-700 bg-yellow-50";
-    case "minimum":
-      return "text-orange-700 bg-orange-50";
-    default:
-      return "text-green-700 bg-green-50";
-  }
-}
-
-function getAlertMessage(alertType: AlertType, stock: number, minimum: number, expiryDate: string): string {
-  if (alertType === "expired") return "Expired";
-  if (alertType === "expiring") {
-    const diff = Math.floor((new Date(expiryDate).getTime() - Date.now()) / 86400000);
-    return `Expires in ${diff} days`;
-  }
-  if (alertType === "minimum") return `Low Stock (${stock}/${minimum})`;
-  return "In Stock";
-}
-
-function formatDate(dateStr: string): string {
-  if (!dateStr) return "-";
-  return new Date(dateStr).toLocaleDateString("en-GB");
-}
-
-
-/* ═══════════════════════════════════════════════════════════
-   QUANTITY UPDATE MODAL
-══════════════════════════════════════════════════════════════ */
 interface QuantityUpdateModalProps {
-  item: StockTransaction;
+  item: BatchDetail & { itemName: string; itemCode: string; unit: string; itemId: number };
   isOpen: boolean;
   onClose: () => void;
   onUpdate: (quantity: number, remark: string) => void;
@@ -99,8 +64,8 @@ function QuantityUpdateModal({ item, isOpen, onClose, onUpdate }: QuantityUpdate
       return;
     }
 
-    if (qty > item.availableQuantity) {
-      setError(`Cannot exceed available stock (${item.availableQuantity})`);
+    if (qty > item.quantityAvailable) {
+      setError(`Cannot exceed available stock (${item.quantityAvailable})`);
       return;
     }
 
@@ -108,6 +73,11 @@ function QuantityUpdateModal({ item, isOpen, onClose, onUpdate }: QuantityUpdate
   };
 
   if (!isOpen) return null;
+
+  const formatDate = (dateStr: string) => {
+    if (!dateStr) return "-";
+    return new Date(dateStr).toLocaleDateString("en-IN");
+  };
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
@@ -127,7 +97,7 @@ function QuantityUpdateModal({ item, isOpen, onClose, onUpdate }: QuantityUpdate
         <div className="space-y-1 p-2 bg-gray-50 rounded text-sm">
           <div className="flex justify-between">
             <span className="text-gray-600">Available:</span>
-            <span className="font-semibold text-gray-900">{item.availableQuantity} {item.unit}</span>
+            <span className="font-semibold text-gray-900">{item.quantityAvailable} {item.unit}</span>
           </div>
           <div className="flex justify-between">
             <span className="text-gray-600">Batch:</span>
@@ -151,12 +121,12 @@ function QuantityUpdateModal({ item, isOpen, onClose, onUpdate }: QuantityUpdate
               onChange={(e) => setQuantity(e.target.value)}
               placeholder="Enter qty"
               min="0"
-              max={item.availableQuantity}
+              max={item.quantityAvailable}
               className="flex-1 px-2 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
             />
             <span className="text-gray-600 font-medium text-sm">{item.unit}</span>
           </div>
-          <p className="text-xs text-gray-500 mt-0.5">Max: {item.availableQuantity}</p>
+          <p className="text-xs text-gray-500 mt-0.5">Max: {item.quantityAvailable}</p>
         </div>
 
         {/* Remark Input */}
@@ -201,307 +171,416 @@ function QuantityUpdateModal({ item, isOpen, onClose, onUpdate }: QuantityUpdate
   );
 }
 
-/* ═══════════════════════════════════════════════════════════
-   MAIN PAGE
-══════════════════════════════════════════════════════════════ */
 export default function StockTransactionsPage() {
-  const [transactions, setTransactions] = useState<StockTransaction[]>([]);
-  const [search, setSearch] = useState("");
-  const [filterAlert, setFilterAlert] = useState("all");
-  const [currentPage, setCurrentPage] = useState(1);
-  const [selectedItem, setSelectedItem] = useState<StockTransaction | null>(null);
-  const [showModal, setShowModal] = useState(false);
-  const [successMsg, setSuccessMsg] = useState("");
+  const [stocks, setStocks] = useState<GroupedLabStock[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [successMsg, setSuccessMsg] = useState("");
+  const [search, setSearch] = useState("");
+  const [filterAlert, setFilterAlert] = useState("all"); // all, expiring, lowstock
+  const [pagination, setPagination] = useState<PaginationInfo>({
+    page: 1,
+    limit: 10,
+    total: 0,
+    totalPages: 1,
+  });
+  const [expandedItems, setExpandedItems] = useState<Set<number>>(new Set());
+  const [selectedBatch, setSelectedBatch] = useState<(BatchDetail & { itemName: string; itemCode: string; unit: string; itemId: number }) | null>(null);
+  const [showUpdateModal, setShowUpdateModal] = useState(false);
 
-  const ITEMS_PER_PAGE = 15;
-
-  const fetchData = async () => {
+  // Fetch grouped lab stocks
+  const fetchLabStocks = async (page = 1) => {
     try {
       setLoading(true);
-      const res = await inventoryAPI.labStocks.getAll(1, 100);
-      const stocks = res.data?.data || [];
-      const mapped = stocks.map((s: any) => ({
-        id: s.id,
-        itemId: s.itemId,
-        itemName: s.item?.itemName || "-",
-        itemCode: s.item?.itemCode || "-",
-        unit: s.item?.unit || "Box",
-        availableQuantity: s.quantityAvailable || s.availableQuantity || 0,
-        minimumStockLevel: s.minimumStockLevel || 0,
-        expiryDate: s.expiryDate,
-        batchNo: s.batchNo,
-        supplier: "Internal",
-        remarks: ""
-      }));
-      setTransactions(mapped);
-    } catch (err) {
-      console.error("Failed to fetch lab stocks", err);
+      setError("");
+      const response = await inventoryAPI.labStocks.getAllGrouped(page, pagination.limit, search);
+      
+      if (response.data.success) {
+        setStocks(response.data.data);
+        setPagination(response.data.pagination);
+      }
+    } catch (err: any) {
+      console.error("Error fetching lab stocks:", err);
+      setError(err.response?.data?.message || "Failed to fetch lab stocks");
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchData();
-  }, [currentPage]);
+    fetchLabStocks(1);
+  }, [search]);
 
-  // Filter transactions
-  const filteredTransactions = transactions.filter((tx) => {
-    const matchesSearch =
-      tx.itemName.toLowerCase().includes(search.toLowerCase()) ||
-      tx.itemCode.toLowerCase().includes(search.toLowerCase());
+  const toggleExpand = (itemId: number) => {
+    const newExpanded = new Set(expandedItems);
+    if (newExpanded.has(itemId)) {
+      newExpanded.delete(itemId);
+    } else {
+      newExpanded.add(itemId);
+    }
+    setExpandedItems(newExpanded);
+  };
 
-    if (!matchesSearch) return false;
-
-    const alertType = getAlertType(tx.availableQuantity, tx.minimumStockLevel, tx.expiryDate);
-
-    if (filterAlert === "all") return true;
-    if (filterAlert === "critical") return alertType === "expired" || (alertType === "minimum" && tx.availableQuantity === 0);
-    if (filterAlert === "expiring") return alertType === "expiring" || alertType === "expired";
-    if (filterAlert === "lowstock") return alertType === "minimum";
-
-    return true;
-  });
-
-  const totalPages = Math.ceil(filteredTransactions.length / ITEMS_PER_PAGE);
-  const paginatedTransactions = filteredTransactions.slice(
-    (currentPage - 1) * ITEMS_PER_PAGE,
-    currentPage * ITEMS_PER_PAGE
-  );
-
-  const handleItemClick = (item: StockTransaction) => {
-    setSelectedItem(item);
-    setShowModal(true);
+  const handleBatchUpdate = (batch: BatchDetail, item: GroupedLabStock) => {
+    setSelectedBatch({
+      ...batch,
+      itemName: item.itemName,
+      itemCode: item.itemCode,
+      unit: item.unit,
+      itemId: item.itemId,
+    });
+    setShowUpdateModal(true);
   };
 
   const handleQuantityUpdate = async (quantity: number, remark: string) => {
-    if (!selectedItem) return;
+    if (!selectedBatch) return;
 
     try {
       await inventoryAPI.transactions.create({
-        itemId: selectedItem.itemId,
-        batchNo: selectedItem.batchNo,
+        itemId: selectedBatch.itemId,
+        batchNo: selectedBatch.batchNo,
         quantity: quantity,
         transactionType: "OUT",
-        reason: remark || "Manual adjustment"
+        reason: remark || "Manual stock removal"
       });
-      
-      const newQuantity = selectedItem.availableQuantity - quantity;
-      
-      // Update the transactions state immediately for UI responsiveness
-      setTransactions((prev) =>
-        prev.map((tx) =>
-          tx.id === selectedItem.id
-            ? { ...tx, availableQuantity: newQuantity, remarks: remark || tx.remarks }
-            : tx
-        )
-      );
 
-      setSuccessMsg(`Updated ${selectedItem.itemName}. New qty: ${newQuantity} ${selectedItem.unit}`);
-      
-      // Re-fetch data after a short delay to ensure database is updated
-      setTimeout(() => {
-        fetchData();
-      }, 500);
-      
+      setSuccessMsg(`Removed ${quantity} ${selectedBatch.unit} from ${selectedBatch.batchNo}`);
       setTimeout(() => setSuccessMsg(""), 3000);
-      setShowModal(false);
-      setSelectedItem(null);
-    } catch (err) {
-      console.error("Failed to update stock", err);
-      alert("Failed to update stock.");
+      
+      setShowUpdateModal(false);
+      setSelectedBatch(null);
+      
+      // Refresh data
+      fetchLabStocks(pagination.page);
+    } catch (err: any) {
+      console.error("Failed to update stock:", err);
+      setError(err.response?.data?.message || "Failed to update stock");
+      setTimeout(() => setError(""), 3000);
     }
   };
 
-  const criticalItems = transactions.filter(
-    (tx) => getAlertType(tx.availableQuantity, tx.minimumStockLevel, tx.expiryDate) === "expired" ||
-      (getAlertType(tx.availableQuantity, tx.minimumStockLevel, tx.expiryDate) === "minimum" && tx.availableQuantity === 0)
-  ).length;
+  const getAlertIcon = (status: string) => {
+    switch (status) {
+      case "EXPIRED":
+        return <div title="Expired"><AlertCircle size={18} className="text-red-600" /></div>;
+      case "EXPIRING":
+        return <div title="Expiring Soon"><AlertTriangle size={18} className="text-orange-600" /></div>;
+      case "LOW_STOCK":
+        return <div title="Low Stock"><AlertTriangle size={18} className="text-yellow-600" /></div>;
+      default:
+        return <div title="OK"><CheckCircle size={18} className="text-green-600" /></div>;
+    }
+  };
 
-  const expiringItems = transactions.filter(
-    (tx) => getAlertType(tx.availableQuantity, tx.minimumStockLevel, tx.expiryDate) === "expiring" ||
-      getAlertType(tx.availableQuantity, tx.minimumStockLevel, tx.expiryDate) === "expired"
-  ).length;
+  const getAlertColor = (status: string) => {
+    switch (status) {
+      case "EXPIRED":
+        return "bg-red-50 border-red-200";
+      case "EXPIRING":
+        return "bg-orange-50 border-orange-200";
+      case "LOW_STOCK":
+        return "bg-yellow-50 border-yellow-200";
+      default:
+        return "bg-green-50 border-green-200";
+    }
+  };
 
-  const lowStockItems = transactions.filter(
-    (tx) => getAlertType(tx.availableQuantity, tx.minimumStockLevel, tx.expiryDate) === "minimum"
-  ).length;
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString("en-IN", { year: "numeric", month: "short", day: "numeric" });
+  };
+
+  const daysUntilExpiry = (expiryDate: string) => {
+    const days = Math.floor((new Date(expiryDate).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
+    return days;
+  };
+
+  // Filter stocks based on alert status
+  const filteredStocks = stocks.filter((item) => {
+    if (filterAlert === "all") return true;
+    if (filterAlert === "expiring") return item.alertStatus === "EXPIRING" || item.alertStatus === "EXPIRED";
+    if (filterAlert === "lowstock") return item.alertStatus === "LOW_STOCK";
+    return true;
+  });
 
   return (
-    <div className="min-h-screen bg-gray-50 p-4">
+    <div className="min-h-screen ">
       {/* Success Message */}
       {successMsg && (
-        <div className="mb-3 p-3 bg-green-50 border border-green-200 rounded-lg flex gap-2 items-center">
-          <Check size={18} className="text-green-600 flex-shrink-0" />
-          <span className="text-sm text-green-800 font-medium">{successMsg}</span>
+        <div className="mb-4 bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg flex items-center gap-2">
+          <CheckCircle size={18} />
+          {successMsg}
         </div>
       )}
 
+
       {/* Search and Filters */}
-      <div className="bg-white rounded border border-gray-300 p-3 mb-4 space-y-3">
-        {/* Search */}
-        <div className="relative">
-          <Search size={16} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-          <input
-            type="text"
-            placeholder="Search item name or code..."
-            value={search}
-            onChange={(e) => {
-              setSearch(e.target.value);
-              setCurrentPage(1);
+      <div className="bg-white rounded-lg shadow p-4 mb-6 space-y-3">
+        <div className="flex gap-3 flex-wrap items-center">
+          <div className="flex-1 relative min-w-64">
+            <Search size={18} className="absolute left-3 top-3 text-gray-400" />
+            <input
+              type="text"
+              placeholder="Search item name or code..."
+              value={search}
+              onChange={(e) => {
+                setSearch(e.target.value);
+              }}
+              className="w-full pl-8 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+            />
+          </div>
+          <button
+            onClick={() => {
+              setSearch("");
+              setFilterAlert("all");
+              fetchLabStocks(1);
             }}
-            className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
-          />
+            className="px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition flex items-center gap-2"
+          >
+            <RotateCcw size={16} /> Reset
+          </button>
         </div>
 
         {/* Filter Buttons */}
         <div className="flex gap-2 flex-wrap">
-          {["all", "critical", "expiring", "lowstock"].map((filter) => (
+          {[
+            { value: "all", label: "All" },
+            { value: "expiring", label: "Expiring" },
+            { value: "lowstock", label: "Low Stock" },
+          ].map((filter) => (
             <button
-              key={filter}
-              onClick={() => {
-                setFilterAlert(filter);
-                setCurrentPage(1);
-              }}
-              className={`px-3 py-1 text-xs font-medium rounded transition ${
-                filterAlert === filter
-                  ? "bg-blue-600 text-white"
+              key={filter.value}
+              onClick={() => setFilterAlert(filter.value)}
+              className={`px-3 py-1.5 text-xs sm:text-sm font-medium rounded transition ${
+                filterAlert === filter.value
+                  ? "bg-orange-500 text-white"
                   : "bg-gray-100 text-gray-700 hover:bg-gray-200"
               }`}
             >
-              {filter === "all" && "All"}
-              {filter === "critical" && "Critical"}
-              {filter === "expiring" && "Expiring"}
-              {filter === "lowstock" && "Low Stock"}
+              {filter.label}
             </button>
           ))}
         </div>
       </div>
 
-      {/* Stock Table */}
-      <div className="bg-white rounded border border-gray-300 overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="bg-slate-900 text-white">
-              <tr className="border-b border-gray-300">
-                <th className="px-3 py-2 text-left text-xs font-semibold">Item Name</th>
-                <th className="px-3 py-2 text-left text-xs font-semibold">Code</th>
-                <th className="px-3 py-2 text-left text-xs font-semibold">Batch No</th>
-                <th className="px-3 py-2 text-center text-xs font-semibold">Qty</th>
-                <th className="px-3 py-2 text-left text-xs font-semibold">Expiry</th>
-                <th className="px-3 py-2 text-center text-xs font-semibold">Alert</th>
-                <th className="px-3 py-2 text-center text-xs font-semibold">Action</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-300">
-              {paginatedTransactions.length > 0 ? (
-                paginatedTransactions.map((tx) => {
-                  const alertType = getAlertType(tx.availableQuantity, tx.minimumStockLevel, tx.expiryDate);
-                  const alertMessage = getAlertMessage(alertType, tx.availableQuantity, tx.minimumStockLevel, tx.expiryDate);
-
-                  // Tooltip content
-                  const getTooltip = () => {
-                    if (alertType === "expired") return "Expired";
-                    if (alertType === "expiring") {
-                      const diff = Math.floor((new Date(tx.expiryDate).getTime() - Date.now()) / 86400000);
-                      return `Expires in ${diff} days`;
-                    }
-                    if (alertType === "minimum") return `Low Stock: ${tx.availableQuantity}/${tx.minimumStockLevel}`;
-                    return "In Stock";
-                  };
-
-                  return (
-                    <tr key={tx.id} className="hover:bg-gray-50 transition h-10">
-                      <td className="px-3 py-1.5">
-                        <p className="font-semibold text-gray-900 cursor-pointer hover:text-blue-600 text-sm" onClick={() => handleItemClick(tx)}>
-                          {tx.itemName}
-                        </p>
-                      </td>
-                      <td className="px-3 py-1.5 text-xs text-gray-700">{tx.itemCode}</td>
-                      <td className="px-3 py-1.5 text-xs text-gray-700">{tx.batchNo}</td>
-                      <td className="px-3 py-1.5 text-center">
-                        <span className="text-xs font-semibold text-gray-900">{tx.availableQuantity}</span>
-                      </td>
-                      <td className="px-3 py-1.5 text-xs text-gray-700">{formatDate(tx.expiryDate)}</td>
-                      <td className="px-3 py-1.5 text-center">
-                        <div className="relative group inline-flex">
-                          {alertType === "expired" && (
-                            <AlertTriangle size={18} className="text-red-600 cursor-help" />
-                          )}
-                          {alertType === "expiring" && (
-                            <AlertTriangle size={18} className="text-yellow-600 cursor-help" />
-                          )}
-                          {alertType === "minimum" && (
-                            <div className="text-orange-600 cursor-help font-bold text-lg">↓</div>
-                          )}
-                          {alertType === "none" && (
-                            <div className="text-green-600 text-xs font-semibold">OK</div>
-                          )}
-                          
-                          {/* Tooltip */}
-                          <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 bg-gray-800 text-white text-xs rounded whitespace-nowrap pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity z-10">
-                            {getTooltip()}
-                            <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-l-transparent border-r-transparent border-t-gray-800"></div>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-3 py-1.5 text-center">
-                        <button
-                          onClick={() => handleItemClick(tx)}
-                          className="inline-flex items-center px-2 py-1 text-xs rounded bg-blue-100 text-blue-600 hover:bg-blue-200 transition font-medium"
-                        >
-                          Update
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })
-              ) : (
-                <tr>
-                  <td colSpan={7} className="px-3 py-6 text-center text-gray-500">
-                    <p className="text-sm">No stock transactions found</p>
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {/* Pagination */}
-      {totalPages > 1 && (
-        <div className="flex items-center justify-between bg-white rounded border border-gray-300 p-3 mt-4">
-          <p className="text-xs text-gray-600">
-            Page {currentPage} of {totalPages} • {filteredTransactions.length} items
-          </p>
-          <div className="flex gap-2">
-            <button
-              onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
-              disabled={currentPage === 1}
-              className="p-1.5 hover:bg-gray-100 rounded disabled:opacity-50 disabled:cursor-not-allowed transition"
-            >
-              <ChevronLeft size={16} />
-            </button>
-            <button
-              onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
-              disabled={currentPage === totalPages}
-              className="p-1.5 hover:bg-gray-100 rounded disabled:opacity-50 disabled:cursor-not-allowed transition"
-            >
-              <ChevronRight size={16} />
-            </button>
-          </div>
+      {/* Error Message */}
+      {error && (
+        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-6 flex items-center gap-2">
+          <AlertCircle size={18} />
+          {error}
         </div>
       )}
 
+      {/* Table */}
+      <div className="bg-white rounded-lg shadow overflow-hidden">
+        {/* Pagination Info */}
+        <div className="border-b bg-gray-50 px-6 py-3 flex justify-between items-center text-sm">
+          <span className="text-gray-600">
+            Page {pagination.page} of {pagination.totalPages} (Total: {pagination.total} items)
+          </span>
+        </div>
+
+        {/* Main Table */}
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm border-collapse">
+            <thead className="bg-slate-900 text-white sticky top-0">
+              <tr>
+                <th className="px-4 py-3 text-left font-semibold w-8"></th>
+                <th className="px-4 py-3 text-left font-semibold">Item Name</th>
+                <th className="px-4 py-3 text-left font-semibold">Item Code</th>
+                <th className="px-4 py-3 text-center font-semibold">Total Quantity</th>
+                <th className="px-4 py-3 text-center font-semibold">Total Batches</th>
+                <th className="px-4 py-3 text-center font-semibold">Nearest Expiry</th>
+                <th className="px-4 py-3 text-center font-semibold">Alert</th>
+              </tr>
+            </thead>
+            {loading ? (
+              <tbody>
+                <tr>
+                  <td colSpan={7} className="px-6 py-8 text-center text-gray-500">
+                    Loading lab stock data...
+                  </td>
+                </tr>
+              </tbody>
+            ) : filteredStocks.length === 0 ? (
+              <tbody>
+                <tr>
+                  <td colSpan={7} className="px-6 py-8 text-center text-gray-500">
+                    {stocks.length === 0 ? "No items found in lab stock" : "No items match the selected filter"}
+                  </td>
+                </tr>
+              </tbody>
+            ) : (
+              filteredStocks.map((item) => (
+                <tbody key={item.itemId}>
+                  {/* Main Row */}
+                  <tr
+                    className={`border-b hover:bg-gray-50 transition cursor-pointer ${
+                      expandedItems.has(item.itemId) ? getAlertColor(item.alertStatus) : ""
+                    }`}
+                    onClick={() => toggleExpand(item.itemId)}
+                  >
+                    <td className="px-4 py-3 text-center">
+                      {expandedItems.has(item.itemId) ? (
+                        <ChevronDown size={18} className="text-orange-600" />
+                      ) : (
+                        <ChevronRight size={18} className="text-gray-400" />
+                      )}
+                    </td>
+                    <td className="px-4 py-3 font-medium text-gray-800">{item.itemName}</td>
+                    <td className="px-4 py-3 text-gray-600 font-mono text-xs">{item.itemCode}</td>
+                    <td className="px-4 py-3 text-center">
+                      <span className="inline-block bg-blue-100 text-blue-800 px-3 py-1 rounded font-semibold">
+                        {item.totalQuantity}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-center text-gray-700 font-semibold">{item.totalBatches}</td>
+                    <td className="px-4 py-3 text-center text-gray-700">
+                      {formatDate(item.nearestExpiryDate)}
+                      <div className="text-xs text-gray-500">
+                        {daysUntilExpiry(item.nearestExpiryDate) >= 0
+                          ? `${daysUntilExpiry(item.nearestExpiryDate)} days`
+                          : "Expired"}
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 text-center">{getAlertIcon(item.alertStatus)}</td>
+                  </tr>
+
+                  {/* Nested Batches Table */}
+                  {expandedItems.has(item.itemId) && (
+                    <tr>
+                      <td colSpan={7} className="px-0 py-0 bg-gray-50">
+                        <div className="p-4 bg-gray-50">
+                          <h4 className="text-sm font-semibold text-gray-700 mb-3">
+                            Batch Details - {item.itemName}
+                          </h4>
+                          <div className="overflow-x-auto">
+                            <table className="w-full text-xs border-collapse bg-white rounded border border-gray-200">
+                              <thead className="bg-gray-200">
+                                <tr>
+                                  <th className="px-3 py-2 text-left font-semibold text-gray-700">Batch Number</th>
+                                  <th className="px-3 py-2 text-center font-semibold text-gray-700">Qty Available</th>
+                                  <th className="px-3 py-2 text-center font-semibold text-gray-700">Expiry Date</th>
+                                  <th className="px-3 py-2 text-center font-semibold text-gray-700">Days to Expiry</th>
+                                  <th className="px-3 py-2 text-center font-semibold text-gray-700">Last Updated</th>
+                                  <th className="px-3 py-2 text-center font-semibold text-gray-700">Action</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {item.batches.length === 0 ? (
+                                  <tr>
+                                    <td colSpan={6} className="px-3 py-3 text-center text-gray-500">
+                                      No batches available
+                                    </td>
+                                  </tr>
+                                ) : (
+                                  item.batches.map((batch, idx) => {
+                                    const daysLeft = daysUntilExpiry(batch.expiryDate);
+                                    return (
+                                      <tr key={idx} className="border-b hover:bg-orange-50">
+                                        <td className="px-3 py-2 font-mono text-gray-700">{batch.batchNo}</td>
+                                        <td className="px-3 py-2 text-center">
+                                          <span className="inline-block bg-blue-100 text-blue-800 px-2 py-1 rounded font-semibold">
+                                            {batch.quantityAvailable}
+                                          </span>
+                                        </td>
+                                        <td className="px-3 py-2 text-center text-gray-700">
+                                          {formatDate(batch.expiryDate)}
+                                        </td>
+                                        <td className={`px-3 py-2 text-center font-semibold ${
+                                          daysLeft < 0
+                                            ? "text-red-600"
+                                            : daysLeft < 30
+                                            ? "text-orange-600"
+                                            : "text-green-600"
+                                        }`}>
+                                          {daysLeft >= 0 ? `${daysLeft} days` : "Expired"}
+                                        </td>
+                                        <td className="px-3 py-2 text-center text-gray-600 text-xs">
+                                          {new Date(batch.lastStockUpdate).toLocaleDateString("en-IN")}
+                                        </td>
+                                        <td className="px-3 py-2 text-center">
+                                          <button
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              handleBatchUpdate(batch, item);
+                                            }}
+                                            className="text-orange-600 hover:text-orange-800 font-semibold text-xs bg-orange-50 hover:bg-orange-100 px-2 py-1 rounded transition"
+                                          >
+                                            Update
+                                          </button>
+                                        </td>
+                                      </tr>
+                                    );
+                                  })
+                                )}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              ))
+            )}
+          </table>
+        </div>
+
+        {/* Pagination Controls */}
+        {pagination.totalPages > 1 && (
+          <div className="border-t bg-gray-50 px-6 py-3 flex items-center justify-between">
+            <button
+              onClick={() => fetchLabStocks(pagination.page - 1)}
+              disabled={pagination.page === 1}
+              className={`px-4 py-2 rounded font-semibold transition ${
+                pagination.page === 1
+                  ? "bg-gray-200 text-gray-400 cursor-not-allowed"
+                  : "bg-orange-500 text-white hover:bg-orange-600"
+              }`}
+            >
+              ← Previous
+            </button>
+
+            <div className="flex gap-2">
+              {Array.from({ length: pagination.totalPages }, (_, i) => i + 1).map((page) => (
+                <button
+                  key={page}
+                  onClick={() => fetchLabStocks(page)}
+                  className={`w-8 h-8 rounded font-semibold transition ${
+                    pagination.page === page
+                      ? "bg-orange-500 text-white"
+                      : "bg-white border border-gray-300 hover:bg-gray-100"
+                  }`}
+                >
+                  {page}
+                </button>
+              ))}
+            </div>
+
+            <button
+              onClick={() => fetchLabStocks(pagination.page + 1)}
+              disabled={pagination.page === pagination.totalPages}
+              className={`px-4 py-2 rounded font-semibold transition ${
+                pagination.page === pagination.totalPages
+                  ? "bg-gray-200 text-gray-400 cursor-not-allowed"
+                  : "bg-orange-500 text-white hover:bg-orange-600"
+              }`}
+            >
+              Next →
+            </button>
+          </div>
+        )}
+      </div>
+
       {/* Quantity Update Modal */}
-      {selectedItem && (
+      {selectedBatch && (
         <QuantityUpdateModal
-          item={selectedItem}
-          isOpen={showModal}
+          item={selectedBatch}
+          isOpen={showUpdateModal}
           onClose={() => {
-            setShowModal(false);
-            setSelectedItem(null);
+            setShowUpdateModal(false);
+            setSelectedBatch(null);
           }}
           onUpdate={handleQuantityUpdate}
         />

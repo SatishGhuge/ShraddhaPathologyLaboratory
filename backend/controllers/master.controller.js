@@ -651,7 +651,7 @@ export const createTest = async (req, res) => {
       testCode,
       departmentId,
       sampleTypeId,
-      machineName,
+      machineId,
       group,
       reportHeader,
       preparationTime,
@@ -692,16 +692,17 @@ export const createTest = async (req, res) => {
 
     console.log('📊 Processing categories:', categories?.length || 0);
     
-    // 🔍 DEBUG: Log boolean field conversions for CREATE
-    const attachFileValue = attachFile ? (typeof attachFile === 'boolean' ? attachFile : (attachFile === 'Yes' || attachFile === 'true' ? true : false)) : false;
-    const profileTestValue = profileTest ? (typeof profileTest === 'boolean' ? profileTest : (profileTest === 'Yes' || profileTest === 'true' ? true : false)) : false;
-    
-    console.log('%c═══ CREATE TEST - BOOLEAN CONVERSIONS ═══', 'color: #FFD700; font-weight: bold');
-    console.log('attachFile received:', attachFile, `Type: ${typeof attachFile}`);
-    console.log('attachFile storing in DB:', attachFileValue);
-    console.log('profileTest received:', profileTest, `Type: ${typeof profileTest}`);
-    console.log('profileTest storing in DB:', profileTestValue);
-    console.log('sampleTypeId:', sampleTypeId);
+    // Helper function for boolean field conversion
+    const convertToBoolean = (value) => {
+      if (value === undefined || value === null) return false;
+      if (typeof value === 'boolean') return value;
+      if (typeof value === 'number') return value ? true : false;
+      if (typeof value === 'string') return (value === 'Yes' || value === 'true' || value === '1');
+      return false;
+    };
+
+    const attachFileValue = convertToBoolean(attachFile);
+    const profileTestValue = convertToBoolean(profileTest);
 
     // Create test first
     const test = await prisma.test.create({
@@ -711,7 +712,7 @@ export const createTest = async (req, res) => {
         testCode,
         departmentId: parseInt(departmentId),
         sampleTypeId: sampleTypeId ? parseInt(sampleTypeId) : null,
-        machineId: machineName ? parseInt(machineName) : null,
+        machineId: machineId ? parseInt(machineId) : null,
         group,
         reportHeader,
         preparationTime,
@@ -864,7 +865,7 @@ export const updateTest = async (req, res) => {
       testCode,
       departmentId,
       sampleTypeId,
-      machineName,
+      machineId,
       group,
       reportHeader,
       preparationTime,
@@ -921,9 +922,7 @@ export const updateTest = async (req, res) => {
     if (shortName !== undefined) updateData.shortName = shortName || undefined;
     if (testCode !== undefined) updateData.testCode = testCode || null;
     if (departmentId !== undefined) updateData.department = departmentId ? { connect: { id: parseInt(departmentId) } } : undefined;
-    // ⚠️ NOTE: sampleTypeId handled separately via raw SQL due to Prisma client cache issue
-    // if (sampleTypeId !== undefined) updateData.sampleTypeId = sampleTypeId ? parseInt(sampleTypeId) : null;
-    if (machineName !== undefined) updateData.machine = machineName ? { connect: { id: parseInt(machineName) } } : undefined;
+    if (machineId !== undefined) updateData.machine = machineId ? { connect: { id: parseInt(machineId) } } : { disconnect: true };
     if (group !== undefined) updateData.group = group || null;
     if (reportHeader !== undefined) updateData.reportHeader = reportHeader || null;
     if (preparationTime !== undefined) updateData.preparationTime = preparationTime || null;
@@ -933,40 +932,7 @@ export const updateTest = async (req, res) => {
     if (interpretationLabel !== undefined) updateData.interpretationLabel = interpretationLabel || null;
     if (interpretation !== undefined) updateData.interpretation = interpretation || null;
     if (outsourceLab !== undefined) updateData.outsourceLab = outsourceLab || null;
-    // Convert boolean fields properly (handle both true/false and string values)
-    if (attachFile !== undefined) {
-      let attachFileValue = false;
-      if (typeof attachFile === 'boolean') {
-        attachFileValue = attachFile;
-      } else if (typeof attachFile === 'number') {
-        attachFileValue = attachFile ? true : false;
-      } else if (typeof attachFile === 'string') {
-        attachFileValue = (attachFile === 'Yes' || attachFile === 'true' || attachFile === '1') ? true : false;
-      }
-      updateData.attachFile = attachFileValue;
-      console.log('🔧 Processing attachFile:', { 
-        received: attachFile, 
-        receivedType: typeof attachFile, 
-        storing: attachFileValue 
-      });
-    }
     if (imageSize !== undefined) updateData.imageSize = imageSize || null;
-    if (profileTest !== undefined) {
-      let profileTestValue = false;
-      if (typeof profileTest === 'boolean') {
-        profileTestValue = profileTest;
-      } else if (typeof profileTest === 'number') {
-        profileTestValue = profileTest ? true : false;
-      } else if (typeof profileTest === 'string') {
-        profileTestValue = (profileTest === 'Yes' || profileTest === 'true' || profileTest === '1') ? true : false;
-      }
-      updateData.profileTest = profileTestValue;
-      console.log('🔧 Processing profileTest:', { 
-        received: profileTest, 
-        receivedType: typeof profileTest, 
-        storing: profileTestValue 
-      });
-    }
     if (isHeader !== undefined) updateData.isHeader = isHeader;
     if (showTestName !== undefined) updateData.showTestName = showTestName;
     if (isNABL !== undefined) updateData.isNABL = isNABL;
@@ -975,17 +941,40 @@ export const updateTest = async (req, res) => {
     if (isDeleted !== undefined) updateData.isDeleted = isDeleted;
     if (req.body.linkedTestIds !== undefined) updateData.linkedTestIds = JSON.stringify(req.body.linkedTestIds || []);
 
+    // Helper function for boolean field conversion
+    const convertToBoolean = (value) => {
+      if (value === undefined || value === null) return false;
+      if (typeof value === 'boolean') return value;
+      if (typeof value === 'number') return value ? true : false;
+      if (typeof value === 'string') return (value === 'Yes' || value === 'true' || value === '1');
+      return false;
+    };
+
+    // Apply boolean conversions
+    if (attachFile !== undefined) {
+      updateData.attachFile = convertToBoolean(attachFile);
+    }
+    if (profileTest !== undefined) {
+      updateData.profileTest = convertToBoolean(profileTest);
+    }
+
+    // Handle sampleTypeId separately using relation syntax
+    const testId = parseInt(id);
+    if (sampleTypeId !== undefined) {
+      console.log('📌 Updating sampleTypeId:', sampleTypeId);
+      updateData.sample_type = sampleTypeId ? { connect: { id: parseInt(sampleTypeId) } } : { disconnect: true };
+    }
+
+    // Handle machineId separately using relation syntax
+    if (machineId !== undefined) {
+      console.log('📌 Updating machineId:', machineId);
+      updateData.machine = machineId ? { connect: { id: parseInt(machineId) } } : { disconnect: true };
+    }
+
     // Remove undefined values from updateData
     Object.keys(updateData).forEach(key => updateData[key] === undefined && delete updateData[key]);
 
     console.log('📝 Update data being sent:', updateData);
-
-    // Handle sampleTypeId separately via raw SQL (Prisma client cache issue workaround)
-    const testId = parseInt(id);
-    if (sampleTypeId !== undefined) {
-      console.log('📌 Updating sampleTypeId via raw SQL:', sampleTypeId);
-      await prisma.$executeRaw`UPDATE tests SET sampleTypeId = ${sampleTypeId ? parseInt(sampleTypeId) : null} WHERE id = ${testId}`;
-    }
 
     const test = await prisma.test.update({
       where: { id: testId },

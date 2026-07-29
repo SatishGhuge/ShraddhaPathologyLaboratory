@@ -146,6 +146,12 @@ const PatientResult = () => {
   const [barcodePatientInfo, setBarcodePatientInfo] = useState<any>(null);
   const [selectedBarcodes, setSelectedBarcodes] = useState<Set<number>>(new Set());
 
+  
+  // 🔧 PART 2: State for outsourced tests
+  const [isOutsourced, setIsOutsourced] = useState(false);
+  const [outsourcedTo, setOutsourcedTo] = useState<string | null>(null);
+  const [outsourcingReport, setOutsourcingReport] = useState<any>(null);
+
   const calculateAge = (dob: any) => {
     if (!dob) return null;
     const today = new Date();
@@ -499,6 +505,37 @@ const PatientResult = () => {
         console.log('   Has Interpretation:', !!data.patientTest.test?.interpretation);
         console.log('   Interpretation Length:', data.patientTest.test?.interpretation?.length || 0);
         console.log('   Interpretation Preview:', data.patientTest.test?.interpretation?.substring(0, 100) || '(empty)');
+        
+        
+        // 🔧 PART 2: Check if test is outsourced
+        if (data.patientTest?.isOutsourced) {
+          console.log(`⚠️ Test is outsourced to: ${data.patientTest.outsourcedTo}`);
+          setIsOutsourced(true);
+          setOutsourcedTo(data.patientTest.outsourcedTo);
+          
+          // Fetch outsourcing report if available
+          try {
+            const reportResponse = await fetch(`${API_BASE_URL}/results/outsourcing/${patientTestId}`);
+            if (reportResponse.ok) {
+              const reportData = await reportResponse.json();
+              if (reportData?.success && reportData?.data) {
+                setOutsourcingReport(reportData.data);
+                console.log('✅ Outsourcing report fetched:', reportData.data);
+              }
+            }
+          } catch (reportError) {
+            console.warn('⚠️ Could not fetch outsourcing report:', reportError);
+          }
+          
+          // Return early - don't load parameters for outsourced tests
+          setParameters([]);
+          setGroupedParameters({});
+          setResults({});
+          return;
+        }
+        
+        setIsOutsourced(false);
+        setOutsourcedTo(null);
         
         setParameters(data.parameters);
         setGroupedParameters(data.groupedParameters);
@@ -1037,6 +1074,56 @@ const PatientResult = () => {
           <span><b>STATUS:</b> <span className="font-semibold text-blue-700">{patientData.status}</span></span>
         </div>
 
+        {/* 🔧 PART 2: Handle Outsourced Tests - Show import UI instead of parameter entry */}
+        {isOutsourced && (
+          <div className="mt-4 bg-yellow-50 border-2 border-yellow-500 rounded-lg p-6 text-center">
+            <div className="text-2xl mb-2">⚠️ OUTSOURCED TEST</div>
+            <p className="text-lg font-semibold text-gray-800 mb-4">
+              This test has been outsourced to: <span className="text-yellow-700 font-bold">{outsourcedTo}</span>
+            </p>
+            <p className="text-gray-600 mb-6">
+              Instead of entering parameters manually, you need to import the report from the outsourcing lab.
+            </p>
+            
+            {/* Show report summary if available */}
+            {outsourcingReport && (
+              <div className="bg-white p-4 rounded border border-gray-300 mb-6 text-left">
+                <p className="font-semibold mb-2">📋 Imported Report Details:</p>
+                <p className="text-sm text-gray-700 mb-1">
+                  <b>Lab:</b> {outsourcingReport.outsourcingLab?.labName}
+                </p>
+                <p className="text-sm text-gray-700 mb-1">
+                  <b>Imported At:</b> {new Date(outsourcingReport.importedAt).toLocaleString('en-GB')}
+                </p>
+                {outsourcingReport.reportFileUrl && (
+                  <p className="text-sm text-gray-700">
+                    <b>Report File:</b> <a href={outsourcingReport.reportFileUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">View</a>
+                  </p>
+                )}
+              </div>
+            )}
+            
+            {/* Action Buttons */}
+            <div className="flex gap-4 justify-center flex-wrap">
+              <button
+                onClick={() => router.push(`/result/outsourcing-import/${patientTestId}`)}
+                className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-semibold"
+              >
+                📥 Import Report
+              </button>
+              <button
+                onClick={() => router.back()}
+                className="bg-gray-500 hover:bg-gray-600 text-white px-6 py-2 rounded-lg font-semibold"
+              >
+                ← Back
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Normal parameter entry form - only show if NOT outsourced */}
+        {!isOutsourced && (
+        <>
         {/* For Multiple Tests */}
         {allTestsData.length > 0 ? (
           <div className="space-y-8">
@@ -1576,6 +1663,8 @@ const PatientResult = () => {
               </div>
             </div>
           </div>
+        )}
+        </>
         )}
       </div>
 

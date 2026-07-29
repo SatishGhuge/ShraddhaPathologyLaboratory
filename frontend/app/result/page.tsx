@@ -822,12 +822,19 @@ export default function Result() {
       }
 
       // Build combined tests array — each with its own name, parameters, interpretation
-      const combinedTests = responses.map(r => ({
-        name: r.patientTest.test.name,
-        interpretation: r.patientTest.test.interpretation,
-        groupedParameters: r.groupedParameters,
-        parameters: r.parameters
-      }));
+      // 🔧 PART 3: Include outsourcing data for each test (NO database fetch)
+      const combinedTests = responses.map((r) => {
+        return {
+          name: r.patientTest.test.name,
+          interpretation: r.patientTest.test.interpretation,
+          groupedParameters: r.groupedParameters,
+          parameters: r.parameters,
+          // 🔧 PART 3: Include outsourcing flag and report data
+          isOutsourced: r.patientTest.isOutsourced || false,
+          outsourcedTo: r.patientTest.outsourcedTo || null,
+          outsourcingReport: r.outsourcingReport || null  // Include outsourcing report from response
+        };
+      });
 
       setReportData({
         patient: first.patientTest.patient,
@@ -839,7 +846,10 @@ export default function Result() {
         groupedParameters: first.groupedParameters,
         // Combined multi-test data
         combinedTests,
-        signature
+        signature,
+        // 🔧 PART 3: Include first test's outsourcing info for single test case
+        isOutsourced: first.patientTest.isOutsourced || false,
+        outsourcedTo: first.patientTest.outsourcedTo || null
       });
       setReportWithHeader(option === "With Header");
       setShowReportModal(true);
@@ -1389,7 +1399,11 @@ export default function Result() {
         interpretation: r.patientTest.test.interpretation,
         signature: r.patientTest.test.signature || signature,
         groupedParameters: r.groupedParameters,
-        parameters: r.parameters
+        parameters: r.parameters,
+        // Include outsourcing data if available
+        isOutsourced: r.patientTest.isOutsourced || false,
+        outsourcedTo: r.patientTest.outsourcedTo || null,
+        outsourcingReport: r.outsourcingReport || null
       }));
 
       // Build results object mapping parameter IDs to their values
@@ -1418,6 +1432,9 @@ export default function Result() {
         signature,
         letterhead: letterheadDB,
         letterHeadBase64,
+        // 🔧 PART 3: Include first test's outsourcing info
+        isOutsourced: first.patientTest.isOutsourced || false,
+        outsourcedTo: first.patientTest.outsourcedTo || null,
         printOption: option,
         results: resultsMap,
         referralDoctor: first.patientTest.referralDoctor
@@ -1604,7 +1621,63 @@ export default function Result() {
       
       const testStatus = statusMap[test.result_status] || test.result_status;
 
-      // Only allow opening result entry page for Received or Rectified stages
+      // Allow viewing report for outsourced tests at ANY stage
+      // Or for normal tests in Received or Rectified stages
+      if (test.isOutsourced) {
+        // Outsourced tests can be viewed at any stage
+        console.log('✅ Outsourced test - allowing view at stage:', testStatus);
+        // Load and show report
+        try {
+          const testData = await getPatientTestById(test.test_id);
+          
+          if (!testData || !testData.patientTest) {
+            alert('Error loading test data');
+            return;
+          }
+
+          console.log('📋 testData received:', {
+            hasOutsourcingReport: !!testData.outsourcingReport,
+            outsourcingReport: testData.outsourcingReport
+          });
+
+          // Fetch letterhead
+          const letterHeadResponse = await fetch(LetterHead);
+          const letterHeadBlob = await letterHeadResponse.blob();
+          const letterHeadBase64 = await new Promise<string>((resolve) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(reader.result as string);
+            reader.readAsDataURL(letterHeadBlob);
+          });
+
+          setReportData({
+            patient: testData.patientTest.patient,
+            visitDate: testData.patientTest.visitDate,
+            visitId: testData.patientTest.visitId,
+            signature: null,
+            letterHeadBase64,
+            isOutsourced: test.isOutsourced,
+            outsourcedTo: test.outsourcedTo,
+            outsourcingReport: testData.outsourcingReport,  // Use directly from testData
+            combinedTests: [{
+              test: testData.patientTest.test,
+              patientTest: testData.patientTest,
+              groupedParameters: testData.groupedParameters,
+              parameters: testData.parameters,
+              isOutsourced: test.isOutsourced,
+              outsourcedTo: test.outsourcedTo,
+              outsourcingReport: testData.outsourcingReport  // Use directly from testData
+            }]
+          });
+          setReportWithHeader(true);
+          setShowReportModal(true);
+        } catch (err) {
+          console.error('Error loading outsourced report:', err);
+          alert('Error loading report');
+        }
+        return;
+      }
+
+      // Only allow opening result entry page for normal tests in Received or Rectified stages
       if (testStatus === 'Received' || testStatus === 'Rectified') {
         router.push(`/result/patientresult/${test.test_id}`);
       } else {
@@ -1631,6 +1704,14 @@ export default function Result() {
       const status = test.result_status || test.status;
       
       console.log('🔍 Parameter click - Current status:', status);
+      console.log('🔍 Is Outsourced:', test.isOutsourced);
+      
+      // 🔧 NEW: Check if test is outsourced
+      if (test.isOutsourced) {
+        console.log('✅ Test is outsourced - redirecting to import page');
+        router.push(`/result/outsourcing-import/${test.test_id}`);
+        return;
+      }
       
       // Determine which modal to show based on current status
       if (status === 'Validation') {
@@ -2811,7 +2892,19 @@ export default function Result() {
                                   role="button"
                                   title={test.result_status === 'Validation' ? 'Press Enter to edit this value' : 'Read-only in this stage'}
                                 >
-                                  {test.result_status === 'Entered' || test.result_status === 'Validation' || test.result_status === 'Authorized' || test.result_status === 'Delivered' 
+                                  {test.isOutsourced ? (
+                                    <span 
+                                      className="inline-flex items-center gap-1 bg-yellow-100 text-yellow-800 px-2 py-1 rounded text-[10px] font-semibold cursor-pointer hover:bg-yellow-200 transition-colors"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        router.push(`/result/outsourcing-import/${test.test_id}`);
+                                      }}
+                                      title="Click to import outsourcing report"
+                                    >
+                                      <span>⚠️</span>
+                                      <span>OUTSOURCING</span>
+                                    </span>
+                                  ) : test.result_status === 'Entered' || test.result_status === 'Validation' || test.result_status === 'Authorized' || test.result_status === 'Delivered' 
                                     ? (test.result || '-') 
                                     : '-'}
                                 </span>
@@ -3817,7 +3910,7 @@ export default function Result() {
                     } catch (e) { console.warn('Could not load letterhead', e); }
 
                     // Build combined tests array in selected order
-                    const combinedTests = responses.map(r => ({
+                    const selectedCombinedTests = responses.map(r => ({
                       name: r.patientTest.test.name,
                       interpretation: r.patientTest.test.interpretation,
                       groupedParameters: r.groupedParameters,
@@ -3832,7 +3925,7 @@ export default function Result() {
                       test: first.patientTest.test,
                       parameters: first.parameters,
                       groupedParameters: first.groupedParameters,
-                      combinedTests,
+                      combinedTests: selectedCombinedTests,
                       signature,
                       letterHeadBase64,
                       printOption: 'nobreak'

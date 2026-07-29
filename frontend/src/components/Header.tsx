@@ -53,6 +53,7 @@ const allModules: NavModule[] = [
       { label: "Organization", path: "/master/organization" },
       { label: "Specimen Type", path: "/master/specimen-type" },
       { label: "Units", path: "/master/units" },
+      { label: "Outsourcing", path: "/master/outsourcing" },
     ],
   },
   {
@@ -75,6 +76,7 @@ const allModules: NavModule[] = [
     items: [
       { label: "Letterhead", path: "/config/letterhead" },
       { label: "Signature", path: "/config/signature" },
+      { label: "Machines", path: "/config/machines" },
     ],
   },
   {
@@ -191,6 +193,7 @@ const Header = () => {
                 if (item.path.includes("userlist")) return accessible.masters.userlist;
                 if (item.path.includes("charges")) return accessible.masters.charges;
                 if (item.path.includes("organization")) return accessible.masters.organization;
+                if (item.path.includes("outsourcing")) return (accessible.masters as any)?.outsourcing !== false;
                 return false;
               })
             };
@@ -219,6 +222,7 @@ const Header = () => {
               items: module.items.filter(item => {
                 if (item.label === "Letterhead") return accessible.configuration.letterhead;
                 if (item.label === "Signature") return accessible.configuration.signature;
+                if (item.label === "Machines") return accessible.configuration.machines;
                 return false;
               })
             };

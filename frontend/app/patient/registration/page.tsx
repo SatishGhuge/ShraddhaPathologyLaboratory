@@ -474,7 +474,7 @@ export default function PatientRegistration() {
   const fetchDepartmentsData = async () => {
     try {
       setLoading(true);
-      console.log('🔄 Fetching departments, tests, and packages...');
+      console.log('🔄 Fetching departments, tests, packages...');
       
       const [deptsResponse, testsResponse, packagesResponse] = await Promise.all([
         fetch(`${API_BASE_URL}/master/departments`).then(r => r.json()),
@@ -486,7 +486,7 @@ export default function PatientRegistration() {
       console.log('Raw tests response:', testsResponse);
       console.log('Raw packages response:', packagesResponse);
 
-      // Extract data from responses (handle both success flag and direct data)
+      // Extract data from responses
       const depts = deptsResponse.data || (Array.isArray(deptsResponse) ? deptsResponse : deptsResponse?.success ? deptsResponse.data : []);
       const tests = testsResponse.data || (Array.isArray(testsResponse) ? testsResponse : testsResponse?.success ? testsResponse.data : []);
       const packages = packagesResponse.data || (Array.isArray(packagesResponse) ? packagesResponse : packagesResponse?.success ? packagesResponse.data : []);
@@ -515,8 +515,14 @@ export default function PatientRegistration() {
               sample: test.sample_type?.Sample_Type || "N/A",
               b2cCharge: test.charges?.[0]?.b2cCharge || 0,
               b2bCharge: test.charges?.[0]?.b2bCharge || 0,
-              department: deptMap[test.departmentId].name
+              department: deptMap[test.departmentId].name,
+              isOutsourced: test.isOutsourced || false,  // 🔧 Use Test.isOutsourced flag directly
+              outsourcedTo: null // Not needed anymore
             });
+            
+            if (test.isOutsourced) {
+              console.log(`⚠️ Test ${test.name} is marked as outsourced`);
+            }
           }
         });
 
@@ -1485,7 +1491,9 @@ export default function PatientRegistration() {
         department: item.department || "General",
         sample: item.sample || "N/A",
         charge: businessType === "B2C" ? item.b2cCharge : item.b2bCharge,
-        packageName: item.fromPackage || null
+        packageName: item.fromPackage || null,
+        isOutsourced: item.isOutsourced || false,
+        outsourcedTo: item.outsourcedTo || null
       }));
       
       // Prepare patient data for backend with all fields
@@ -1690,9 +1698,12 @@ export default function PatientRegistration() {
     const testWithCharges = {
       ...test,
       b2cCharge: orgCharge?.b2cCharge ?? test.b2cCharge,
-      b2bCharge: orgCharge?.b2bCharge ?? test.b2bCharge
+      b2bCharge: orgCharge?.b2bCharge ?? test.b2bCharge,
+      // 🔧 PART 1: Preserve outsourcing info when adding test
+      isOutsourced: test.isOutsourced || false,
+      outsourcedTo: test.outsourcedTo || null
     };
-    console.log(`➕ Adding test: ${test.name} (ID: ${test.id}, key: "${key}") with charges B2C=${testWithCharges.b2cCharge}, B2B=${testWithCharges.b2bCharge}`);
+    console.log(`➕ Adding test: ${test.name} (ID: ${test.id}, key: "${key}") with charges B2C=${testWithCharges.b2cCharge}, B2B=${testWithCharges.b2bCharge}${testWithCharges.isOutsourced ? `, OUTSOURCED to ${testWithCharges.outsourcedTo}` : ''}`);
     
     if (!selectedTests.find((t) => t.name === test.name))
       setSelectedTests([...selectedTests, testWithCharges]);
@@ -2600,7 +2611,12 @@ export default function PatientRegistration() {
                           }
                         }}
                       />
-                      {t.name}
+                      <span>{t.name}</span>
+                      {t.isOutsourced && (
+                        <span title="Outsourced test" className="text-orange-500 font-bold text-lg leading-none">
+                          ▲
+                        </span>
+                      )}
                     </div>
                     <div className="col-span-3 text-center flex items-center justify-center gap-1">
                       <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" style={{ transform: 'rotate(45deg)', flexShrink: 0 }}>
@@ -2650,6 +2666,11 @@ export default function PatientRegistration() {
                 <div className="col-span-5">
                   <div className="flex items-center gap-2">
                     <span className="truncate">{t.name}</span>
+                    {t.isOutsourced && (
+                      <span title="Outsourced test" className="text-orange-500 font-bold text-lg leading-none flex-shrink-0">
+                        ▲
+                      </span>
+                    )}
                   </div>
                 </div>
                 <div className="col-span-3 text-center flex items-center justify-center gap-1">
@@ -3168,13 +3189,31 @@ export default function PatientRegistration() {
                         <tr key={idx} className={`border-b ${t.fromPackage ? 'bg-white' : ''}`}>
                           <td className="p-2">{idx + 1}</td>
                           <td className="p-2">
-                            {t.name}
+                            <div className="flex items-center gap-2">
+                              <span>{t.name}</span>
+                              {t.isOutsourced && (
+                                <>
+                                  <span title="Outsourced test" className="text-orange-500 font-bold text-lg leading-none">
+                                    ▲
+                                  </span>
+                                  <span title={`Outsourced to: ${t.outsourcedTo}`} className="bg-yellow-400 text-yellow-900 text-xs px-2 py-0.5 rounded font-semibold whitespace-nowrap">
+                                    ⚠️ Outsourcing
+                                  </span>
+                                </>
+                              )}
+                            </div>
                             {t.fromPackage && (
                               <div className="text-xs text-gray-400 mt-0.5">{t.fromPackage}</div>
                             )}
+                            {/* Show outsourced lab name below test if outsourced */}
+                            {t.isOutsourced && (
+                              <div className="text-xs text-yellow-700 mt-1">Lab: {t.outsourcedTo}</div>
+                            )}
                           </td>
                           <td className="p-2 text-center">
-                            {t.fromPackage ? (
+                            {t.isOutsourced ? (
+                              <span className="bg-yellow-500 text-white text-xs px-2 py-1 rounded font-semibold">⚠️ OUTSOURCE</span>
+                            ) : t.fromPackage ? (
                               <span className="bg-orange-500 text-white text-xs px-2 py-1 rounded font-semibold">PKG</span>
                             ) : (
                               <span className="text-gray-600">Test</span>

@@ -133,7 +133,9 @@ export const createPatient = async (req, res) => {
           paidAmount: perTestPaid,
           balanceAmount: perTestBalance,
           paymentMode,
-          businessType
+          businessType,
+          isOutsourced: test.isOutsourced || false,
+          outsourcedTo: test.outsourcedTo || null
         })) || []
       });
 
@@ -218,7 +220,9 @@ export const createPatient = async (req, res) => {
               paidAmount: perTestPaid,
               balanceAmount: perTestBalance,
               paymentMode,
-              businessType
+              businessType,
+              isOutsourced: test.isOutsourced || false,
+              outsourcedTo: test.outsourcedTo || null
             })) || []
           }
         },
@@ -430,7 +434,9 @@ export const registerPatientWithEmail = async (req, res) => {
           balanceAmount: perTestBalance,
           paymentMode,
           businessType,
-          status: 'Registered'
+          status: 'Registered',
+          isOutsourced: test.isOutsourced || false,
+          outsourcedTo: test.outsourcedTo || null
         }))
       });
 
@@ -975,6 +981,8 @@ export const addTestToVisit = async (req, res) => {
         discountAmount: existingTest.discountAmount || 0,
         discountPercent: existingTest.discountPercent || 0,
         discountRemark: existingTest.discountRemark || '',
+        isOutsourced: existingTest.isOutsourced || false,
+        outsourcedTo: existingTest.outsourcedTo || null
       }
     });
 

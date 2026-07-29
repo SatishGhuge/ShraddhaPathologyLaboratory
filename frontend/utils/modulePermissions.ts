@@ -30,6 +30,7 @@ export const defaultModuleAllocation = {
   configuration: {
     letterhead: false,
     signature: false,
+    machines: false,
   },
   help: {
     userManual: false,
@@ -106,6 +107,7 @@ export const getAccessibleModules = (moduleAllocation: any) => {
       hasAccess: allocation.configuration.letterhead || allocation.configuration.signature,
       letterhead: allocation.configuration.letterhead,
       signature: allocation.configuration.signature,
+      machines: allocation.configuration.machines,
     },
     help: {
       hasAccess: allocation.help.userManual || allocation.help.ultraviewer || allocation.help.anydesk,
