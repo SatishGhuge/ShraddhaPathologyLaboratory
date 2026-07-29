@@ -3,7 +3,6 @@
 import { useState, useEffect } from "react";
 import { Users, RotateCcw, ChevronLeft, ChevronRight, Edit2, Trash2, Plus } from "lucide-react";
 import SupplierMasterModal from "@/src/components/SupplierMasterModal";
-import PageHeader from "@/src/components/BreadCrumb";
 import inventoryAPI from "@/lib/api/inventory.api";
 
 interface Supplier {
@@ -25,6 +24,7 @@ export default function SupplierPage() {
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [pagination, setPagination] = useState<any>(null);
 
   const [search, setSearch] = useState("");
   const [filterStatus, setFilterStatus] = useState("All");
@@ -47,6 +47,7 @@ export default function SupplierPage() {
       setError("");
       const response = await inventoryAPI.suppliers.getAll(currentPage, ITEMS_PER_PAGE);
       setSuppliers(response.data.data || []);
+      setPagination(response.data.pagination || null);
     } catch (err: any) {
       setError(err.response?.data?.message || "Failed to fetch suppliers");
       console.error("Fetch error:", err);
@@ -106,9 +107,6 @@ export default function SupplierPage() {
   return (
     <>
       <div className="min-h-screen bg-white p-6">
-        {/* Page Header */}
-        <PageHeader title="Supplier" icon={Users} path="Inventory" />
-
         {/* Error Message */}
         {error && (
           <div className="mb-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
@@ -165,123 +163,185 @@ export default function SupplierPage() {
           </button>
         </div>
 
-        {/* Table */}
-        <div className="overflow-x-auto bg-white rounded shadow-md">
-          <table className="w-full text-sm border-collapse">
-            <thead className="bg-slate-900 text-white">
-              <tr>
-                <th className="border border-gray-300 px-3 py-2 text-left font-semibold">
-                  Supplier Name
-                </th>
-                <th className="border border-gray-300 px-3 py-2 text-left font-semibold">
-                  GST Number
-                </th>
-                <th className="border border-gray-300 px-3 py-2 text-left font-semibold">
-                  Email
-                </th>
-                <th className="border border-gray-300 px-3 py-2 text-center font-semibold">
-                  Phone
-                </th>
-                <th className="border border-gray-300 px-3 py-2 text-left font-semibold">
-                  City
-                </th>
-                
-                <th className="border border-gray-300 px-3 py-2 text-center font-semibold">
-                  Action
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {loading ? (
+        {/* Table with Pagination */}
+        <div className="bg-white rounded shadow-md overflow-hidden flex flex-col">
+          {/* Pagination Header */}
+          {pagination && (
+            <div className="border-b p-3 bg-gray-50 flex justify-between items-center text-xs sm:text-sm">
+              <span className="text-sm font-semibold text-gray-700">
+                Page {pagination?.page || 1} of {pagination?.totalPages || 1} 
+                {pagination?.total && ` (Total: ${pagination.total})`}
+              </span>
+            </div>
+          )}
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm border-collapse">
+              <thead className="bg-slate-900 text-white">
                 <tr>
-                  <td colSpan={7} className="text-center py-4 text-gray-500 border border-gray-300">
-                    Loading suppliers...
-                  </td>
+                  <th className="border border-gray-300 px-3 py-2 text-left font-semibold">
+                    Id
+                  </th>
+                  <th className="border border-gray-300 px-3 py-2 text-left font-semibold">
+                    Supplier Name
+                  </th>
+                  <th className="border border-gray-300 px-3 py-2 text-left font-semibold">
+                    GST Number
+                  </th>
+                  <th className="border border-gray-300 px-3 py-2 text-left font-semibold">
+                    Email
+                  </th>
+                  <th className="border border-gray-300 px-3 py-2 text-center font-semibold">
+                    Phone
+                  </th>
+                  <th className="border border-gray-300 px-3 py-2 text-left font-semibold">
+                    City
+                  </th>
+                  
+                  <th className="border border-gray-300 px-3 py-2 text-center font-semibold">
+                    Action
+                  </th>
                 </tr>
-              ) : suppliers.length > 0 ? (
-                suppliers
-                  .filter((supplier) => {
-                    const matchesSearch =
-                      supplier.supplierName.toLowerCase().includes(search.toLowerCase()) ||
-                      supplier.gstNumber?.toLowerCase().includes(search.toLowerCase()) ||
-                      supplier.city?.toLowerCase().includes(search.toLowerCase()) ||
-                      supplier.phone?.includes(search) ||
-                      supplier.email?.toLowerCase().includes(search.toLowerCase());
-                    
-                    const matchesInactiveFilter = showInactive 
-                      ? supplier.isActive === false 
-                      : supplier.isActive === true;
-                    
-                    return matchesSearch && matchesInactiveFilter;
-                  })
-                  .map((supplier) => (
-                  <tr key={supplier.id} className="hover:bg-gray-50 border-b border-gray-200">
-                    <td className="border border-gray-300 px-3 py-2 font-semibold text-gray-900">
-                      {supplier.supplierName}
-                    </td>
-                    <td className="border border-gray-300 px-3 py-2 text-gray-600 text-xs font-mono">
-                      {supplier.gstNumber || "-"}
-                    </td>
-                    <td className="border border-gray-300 px-3 py-2 text-gray-600 text-xs">
-                      {supplier.email || "-"}
-                    </td>
-                    <td className="border border-gray-300 px-3 py-2 text-center text-gray-600 text-sm">
-                      {supplier.phone || "-"}
-                    </td>
-                    <td className="border border-gray-300 px-3 py-2 text-gray-600">
-                      {supplier.city || "-"}
-                    </td>
-                    {/* <td className="border border-gray-300 px-3 py-2 text-center">
-                      <span
-                        className={`px-2 py-1 rounded text-xs font-semibold ${
-                          supplier.isActive
-                            ? "bg-green-100 text-green-800"
-                            : "bg-gray-100 text-gray-800"
-                        }`}
-                      >
-                        {supplier.isActive ? "Active" : "Inactive"}
-                      </span>
-                    </td> */}
-                    <td className="border border-gray-300 px-3 py-2">
-                      <div className="flex justify-center gap-1 flex-wrap">
-                        <button
-                          onClick={() => handleToggleActive(supplier.id)}
-                          className={`px-2 py-1 rounded text-xs font-semibold transition-colors ${
-                            supplier.isActive
-                              ? "bg-green-500 hover:bg-green-600 text-white"
-                              : "bg-gray-400 hover:bg-gray-500 text-white"
-                          }`}
-                        >
-                          {supplier.isActive ? "Active" : "Inactive"}
-                        </button>
-                        <button
-                          onClick={() => {
-                            setEditingSupplier(supplier);
-                            setShowModal(true);
-                          }}
-                          className="bg-blue-600 text-white px-2 py-1 rounded text-xs hover:bg-blue-700 transition-colors flex items-center gap-1"
-                        >
-                          <Edit2 size={12} /> Edit
-                        </button>
-                        <button
-                          onClick={() => handleDelete(supplier.id)}
-                          className="bg-red-500 text-white px-2 py-1 rounded text-xs hover:bg-red-600 transition-colors flex items-center gap-1"
-                        >
-                          <Trash2 size={12} /> Delete
-                        </button>
-                      </div>
+              </thead>
+              <tbody>
+                {loading ? (
+                  <tr>
+                    <td colSpan={7} className="text-center py-4 text-gray-500 border border-gray-300">
+                      Loading suppliers...
                     </td>
                   </tr>
-                ))
-              ) : (
-                <tr>
-                  <td colSpan={7} className="text-center py-4 text-gray-500 border border-gray-300">
-                    No suppliers found
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+                ) : suppliers.length > 0 ? (
+                  suppliers
+                    .filter((supplier) => {
+                      const matchesSearch =
+                        supplier.supplierName.toLowerCase().includes(search.toLowerCase()) ||
+                        supplier.gstNumber?.toLowerCase().includes(search.toLowerCase()) ||
+                        supplier.city?.toLowerCase().includes(search.toLowerCase()) ||
+                        supplier.phone?.includes(search) ||
+                        supplier.email?.toLowerCase().includes(search.toLowerCase());
+                      
+                      const matchesInactiveFilter = showInactive 
+                        ? supplier.isActive === false 
+                        : supplier.isActive === true;
+                      
+                      return matchesSearch && matchesInactiveFilter;
+                    })
+                    .map((supplier, index) => (
+                    <tr key={supplier.id} className="hover:bg-gray-50 border-b border-gray-200">
+                      <td className="border border-gray-300 px-3 py-2 font-semibold text-gray-900">
+                        {((pagination?.page || 1) - 1) * ITEMS_PER_PAGE + index + 1}
+                      </td>
+                      <td className="border border-gray-300 px-3 py-2 font-semibold text-gray-900">
+                        {supplier.supplierName}
+                      </td>
+                      <td className="border border-gray-300 px-3 py-2 text-gray-600 text-xs font-mono">
+                        {supplier.gstNumber || "-"}
+                      </td>
+                      <td className="border border-gray-300 px-3 py-2 text-gray-600 text-xs">
+                        {supplier.email || "-"}
+                      </td>
+                      <td className="border border-gray-300 px-3 py-2 text-center text-gray-600 text-sm">
+                        {supplier.phone || "-"}
+                      </td>
+                      <td className="border border-gray-300 px-3 py-2 text-gray-600">
+                        {supplier.city || "-"}
+                      </td>
+                      
+                      <td className="border border-gray-300 px-3 py-2">
+                        <div className="flex justify-center gap-1 flex-wrap">
+                          <button
+                            onClick={() => handleToggleActive(supplier.id)}
+                            className={`px-2 py-1 rounded text-xs font-semibold transition-colors ${
+                              supplier.isActive
+                                ? "bg-green-500 hover:bg-green-600 text-white"
+                                : "bg-gray-400 hover:bg-gray-500 text-white"
+                            }`}
+                          >
+                            {supplier.isActive ? "Active" : "Inactive"}
+                          </button>
+                          <button
+                            onClick={() => {
+                              setEditingSupplier(supplier);
+                              setShowModal(true);
+                            }}
+                            className="bg-blue-600 text-white px-2 py-1 rounded text-xs hover:bg-blue-700 transition-colors flex items-center gap-1"
+                          >
+                            <Edit2 size={12} /> Edit
+                          </button>
+                          <button
+                            onClick={() => handleDelete(supplier.id)}
+                            className="bg-red-500 text-white px-2 py-1 rounded text-xs hover:bg-red-600 transition-colors flex items-center gap-1"
+                          >
+                            <Trash2 size={12} /> Delete
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={7} className="text-center py-4 text-gray-500 border border-gray-300">
+                      No suppliers found
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Pagination Controls */}
+          {pagination && pagination.totalPages > 1 && (
+            <div className="border-t p-3 bg-gray-50 flex items-center justify-between text-xs sm:text-sm">
+              <button
+                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+                className={`px-3 py-1 rounded ${currentPage === 1 ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-orange-500 text-white hover:bg-orange-600'}`}
+              >
+                ← Previous
+              </button>
+
+              <div className="flex items-center gap-1">
+                {(() => {
+                  const pages = [];
+                  const totalPages = pagination.totalPages;
+                  
+                  if (totalPages <= 5) {
+                    for (let i = 1; i <= totalPages; i++) pages.push(i);
+                  } else {
+                    if (currentPage <= 3) {
+                      pages.push(1, 2, 3, 4, '...', totalPages);
+                    } else if (currentPage >= totalPages - 2) {
+                      pages.push(1, '...', totalPages - 3, totalPages - 2, totalPages - 1, totalPages);
+                    } else {
+                      pages.push(1, '...', currentPage - 1, currentPage, currentPage + 1, '...', totalPages);
+                    }
+                  }
+
+                  return pages.map((page, idx) => (
+                    page === '...' ? (
+                      <span key={idx} className="px-2">...</span>
+                    ) : (
+                      <button
+                        key={idx}
+                        onClick={() => setCurrentPage(page as number)}
+                        className={`w-7 h-7 rounded ${currentPage === page ? 'bg-orange-500 text-white font-bold' : 'bg-white border hover:bg-gray-100'}`}
+                      >
+                        {page}
+                      </button>
+                    )
+                  ));
+                })()}
+              </div>
+
+              <button
+                onClick={() => setCurrentPage(p => Math.min(pagination.totalPages, p + 1))}
+                disabled={currentPage === pagination.totalPages}
+                className={`px-3 py-1 rounded ${currentPage === pagination.totalPages ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-orange-500 text-white hover:bg-orange-600'}`}
+              >
+                Next →
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
