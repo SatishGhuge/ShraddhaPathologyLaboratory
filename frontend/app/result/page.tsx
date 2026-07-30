@@ -1426,7 +1426,8 @@ export default function Result() {
             resultsMap[param.id] = {
               numericValue: param.existingResult.numericValue,
               textValue: param.existingResult.textValue,
-              isAbnormal: param.existingResult.isAbnormal
+              isAbnormal: param.existingResult.isAbnormal,
+              isHighlighted: param.existingResult.isHighlighted || false
             };
           }
         });
