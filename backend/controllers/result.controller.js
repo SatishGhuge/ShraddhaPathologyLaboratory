@@ -134,82 +134,24 @@ export const getPatientTests = async (req, res) => {
     const patientTests = await prisma.patientTest.findMany({
       where: whereCondition,
       include: {
-        patient: {
-          select: {
-            patientId: true,
-            title: true,
-            firstName: true,
-            lastName: true,
-            age: true,
-            gender: true,
-            mobile: true,
-            email: true
-          }
-        },
+        patient: true,
         test: {
           include: {
-            sample_type: {
-              select: {
-                id: true,
-                Sample_Type: true,
-                Sample_Color: true
-              }
-            },
+            sample_type: true,
             categories: {
               include: {
                 testParameter: {
-                  select: {
-                    id: true,
-                    parameterName: true,
-                    testMethod: true,
-                    displayRangeText: true,
-                    rangeText: true,
-                    type: true,
-                    isDescriptive: true,
-                    ageRanges: true,
-                    rangeType: true,
-                    maleLowValue: true,
-                    maleHighValue: true,
-                    femaleHighValue: true,
-                    femaleLowValue: true,
-                    maleActive: true,
-                    femaleActive: true,
-                    childLowValue: true,
-                    childHighValue: true,
-                    childActive: true,
-                    unit: {
-                      select: {
-                        symbol: true
-                      }
-                    }
+                  include: {
+                    unit: true
                   }
                 }
               }
             }
           }
         },
-        testResults: {
-          select: {
-            id: true,
-            testParameterId: true,
-            numericValue: true,
-            textValue: true,
-            selectedOption: true
-          }
-        },
-        department: {
-          select: {
-            id: true,
-            name: true
-          }
-        },
-        organization: {
-          select: {
-            id: true,
-            name: true,
-            code: true
-          }
-        }
+        testResults: true,
+        department: true,
+        organization: true
       },
       skip,
       take: limit,
@@ -335,45 +277,15 @@ export const getPatientTestById = async (req, res) => {
     const patientTest = await prisma.patientTest.findUnique({
       where: { id: parseInt(id) },
       include: {
-        patient: {
-          select: {
-            patientId: true,
-            title: true,
-            firstName: true,
-            lastName: true,
-            age: true,
-            gender: true,
-            dob: true,
-            email: true,
-            mobile: true
-          }
-        },
+        patient: true,
         test: {
-          select: {
-            id: true,
-            name: true,
-            shortName: true,
-            interpretation: true,
-            attachFile: true,
-            imageSize: true,
-            sampleTypeId: true,
-            sample_type: {
-              select: {
-                id: true,
-                Sample_Type: true,
-                Sample_Color: true
-              }
-            }
+          include: {
+            sample_type: true
           }
         },
         testResults: {
           include: {
-            testParameter: {
-              select: {
-                id: true,
-                parameterName: true
-              }
-            }
+            testParameter: true
           }
         }
       }
@@ -1048,13 +960,14 @@ export const updateTestResult = async (req, res) => {
     if (parameterResults && Array.isArray(parameterResults) && parameterResults.length > 0) {
       console.log('  🔄 Processing parameterResults...');
       for (const paramResult of parameterResults) {
-        const { parameterId, numericValue, textValue } = paramResult;
+        const { parameterId, numericValue, textValue, isHighlighted } = paramResult;
         
         console.log(`  📝 Upserting TestResult:
           patientTestId: ${id}
           parameterId: ${parameterId}
           numericValue: ${numericValue}
-          textValue: ${textValue}`);
+          textValue: ${textValue}
+          isHighlighted: ${isHighlighted}`);
         
         if (!parameterId) {
           console.error(`  ❌ SKIPPED: parameterId is null or undefined!`);
@@ -1073,6 +986,7 @@ export const updateTestResult = async (req, res) => {
             update: {
               numericValue: numericValue || undefined,
               textValue: textValue || undefined,
+              isHighlighted: isHighlighted || false,
               verifiedAt: new Date()
             },
             create: {
@@ -1080,6 +994,7 @@ export const updateTestResult = async (req, res) => {
               testParameterId: parseInt(parameterId),
               numericValue: numericValue || undefined,
               textValue: textValue || undefined,
+              isHighlighted: isHighlighted || false,
               enteredAt: new Date(),
               verifiedAt: new Date()
             }
@@ -1088,7 +1003,8 @@ export const updateTestResult = async (req, res) => {
           console.log(`  ✅ TestResult upserted for parameterId=${parameterId}:`, {
             id: testResult.id,
             numericValue: testResult.numericValue,
-            textValue: testResult.textValue
+            textValue: testResult.textValue,
+            isHighlighted: testResult.isHighlighted
           });
         } catch (upsertError) {
           console.error(`  ❌ Upsert error for parameterId=${parameterId}:`, upsertError.message);
@@ -1324,7 +1240,8 @@ export const saveTestResults = async (req, res) => {
         testCategoryId,
         numericValue,
         textValue,
-        selectedOption
+        selectedOption,
+        isHighlighted
       } = result;
 
       // Validate required field
@@ -1395,9 +1312,10 @@ export const saveTestResults = async (req, res) => {
             }
           },
           update: {
-            numericValue: numericValue !== null ? parseFloat(numericValue) : null,
+            numericValue: numericValue !== null ? String(numericValue) : null,
             textValue: textValue || null,
             selectedOption: selectedOption || null,
+            isHighlighted: isHighlighted || false,
             enteredBy: enteredBy,
             enteredAt: new Date(),
             testCategoryId: testCategoryId ? parseInt(testCategoryId) : null
@@ -1406,9 +1324,10 @@ export const saveTestResults = async (req, res) => {
             patientTestId: parseInt(patientTestId),
             testParameterId: parseInt(testParameterId),
             testCategoryId: testCategoryId ? parseInt(testCategoryId) : null,
-            numericValue: numericValue !== null ? parseFloat(numericValue) : null,
+            numericValue: numericValue !== null ? String(numericValue) : null,
             textValue: textValue || null,
             selectedOption: selectedOption || null,
+            isHighlighted: isHighlighted || false,
             enteredBy: enteredBy,
             enteredAt: new Date()
           },
@@ -1556,32 +1475,14 @@ export const sendReport = async (req, res) => {
       where: { id: { in: testIds.map(Number) } },
       include: {
         patient: true,
-        test: {
-          select: {
-            id: true, name: true, interpretation: true
-          }
-        },
+        test: true,
         testResults: {
           include: { 
-            testParameter: { 
-              select: { 
-                id: true,
-                parameterName: true,
-                maleLowValue: true,
-                maleHighValue: true,
-                femaleLowValue: true,
-                femaleHighValue: true,
-                childLowValue: true,
-                childHighValue: true,
-                rangeText: true,
-                displayRangeText: true,
-                unit: {
-                  select: {
-                    symbol: true
-                  }
-                }
-              } 
-            } 
+            testParameter: {
+              include: {
+                unit: true
+              }
+            }
           }
         }
       }
@@ -1909,6 +1810,7 @@ export const saveTestResultWithTemplate = async (req, res) => {
           update: {
             numericValue: numericValue || undefined,
             textValue: textValue || undefined,
+            isHighlighted: isHighlighted || false,
             verifiedAt: new Date()
           },
           create: {
@@ -1916,6 +1818,7 @@ export const saveTestResultWithTemplate = async (req, res) => {
             testParameterId: parseInt(parameterId),
             numericValue: numericValue || undefined,
             textValue: textValue || undefined,
+            isHighlighted: isHighlighted || false,
             enteredAt: new Date(),
             verifiedAt: new Date()
           }

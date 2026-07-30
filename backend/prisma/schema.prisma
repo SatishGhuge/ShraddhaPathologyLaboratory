@@ -675,9 +675,10 @@ model TestResult {
   patientTestId   Int
   testParameterId Int
   testCategoryId  Int?
-  numericValue    Float?
+  numericValue    String?       // Store numeric value with optional symbols: "<7.5", ">140", "7.5", etc.
   textValue       String?
   selectedOption  String?
+  isHighlighted   Boolean       @default(false) // Checkbox to highlight/bold this value in reports
   enteredBy       String?
   verifiedBy      String?
   enteredAt       DateTime      @default(now())

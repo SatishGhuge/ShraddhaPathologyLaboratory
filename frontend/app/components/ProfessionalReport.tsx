@@ -58,7 +58,7 @@ export interface ProfessionalReportProps {
   letterhead?: LetterheadDB;
   letterHeadBase64?: string;   // fallback single image
   printOption?: 'pagebreak' | 'nobreak';
-  results?: Record<string, { numericValue?: any; textValue?: string; isAbnormal?: any }>;
+  results?: Record<string, { numericValue?: any; textValue?: string; isAbnormal?: any; isHighlighted?: boolean }>;
   referralDoctor?: string;
 }
 
@@ -462,6 +462,7 @@ const ProfessionalReport = React.forwardRef<HTMLDivElement, ProfessionalReportPr
                   const p = row.param!;
                   const nv = results[p.id]?.numericValue;
                   const tv = results[p.id]?.textValue;
+                  const isHighlighted = results[p.id]?.isHighlighted || false;
                   const isabn =
                     results[p.id]?.isAbnormal === true ||
                     results[p.id]?.isAbnormal === 1 ||
@@ -500,8 +501,8 @@ const ProfessionalReport = React.forwardRef<HTMLDivElement, ProfessionalReportPr
                         style={{
                           padding: '2px 4px',
                           textAlign: 'right',
-                          fontWeight: isabn ? 'bold' : 'normal',
-                          color: isabn ? '#c0392b' : 'inherit',
+                          fontWeight: isabn || isHighlighted ? 'bold' : 'normal',
+                          color: isHighlighted ? '#c0392b' : (isabn ? '#c0392b' : 'inherit'),
                           fontSize: '9px',
                         }}
                       >
@@ -513,7 +514,7 @@ const ProfessionalReport = React.forwardRef<HTMLDivElement, ProfessionalReportPr
                         ) : (
                           <>
                             {val}
-                            {isabn && val !== '-' ? ' *' : ''}
+                            {(isabn || isHighlighted) && val !== '-' ? ' *' : ''}
                           </>
                         )}
                       </td>

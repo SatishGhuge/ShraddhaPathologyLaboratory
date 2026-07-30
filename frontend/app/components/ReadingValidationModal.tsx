@@ -617,6 +617,7 @@ const ReadingValidationModal = ({
                   <th className="border p-1.5 text-center w-60">Value</th>
                   <th className="border p-1.5 text-center w-12">Units</th>
                   <th className="border p-1.5 text-center w-32">Biological Range</th>
+                  <th className="border p-1.5 text-center w-12">Highlight</th>
                 </tr>
               </thead>
               <tbody>
@@ -624,7 +625,7 @@ const ReadingValidationModal = ({
                   <Fragment key={categoryName}>
                     {categoryName !== 'NO_CATEGORY_HEADER' && categoryParams[0]?.showCategoryHeader && (
                       <tr className="bg-gray-200 font-semibold">
-                        <td colSpan={6} className="p-1">
+                        <td colSpan={5} className="p-1">
                           {categoryName.toUpperCase()}
                         </td>
                       </tr>
@@ -801,6 +802,13 @@ const ReadingValidationModal = ({
                           </td>
                           <td className="border p-1.5 text-center text-gray-600 text-xs max-w-xs truncate" title={rangeStr}>
                             {truncatedRange}
+                          </td>
+                          <td className="border p-1.5 text-center">
+                            {results[param.id]?.isHighlighted ? (
+                              <span className="text-green-600 font-bold text-lg" title="This value is highlighted">✓</span>
+                            ) : (
+                              <span className="text-gray-300 text-lg">-</span>
+                            )}
                           </td>
                         </tr>
                       );
