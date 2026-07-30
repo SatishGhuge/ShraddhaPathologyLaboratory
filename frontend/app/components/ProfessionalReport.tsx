@@ -33,10 +33,9 @@ import DOMPurify from 'dompurify';
 interface PatientInfo {
   title?: string;
   firstName?: string;
-  lastName?: string;
-  age?: number;
+  lastName?: string;  age?: number | string;  // Can be number or formatted string like "1 month 3 days"
   gender?: string;
-  dob?: string;
+  dob?: string;  // Birthday date for babies
 }
 
 interface LetterheadDB {

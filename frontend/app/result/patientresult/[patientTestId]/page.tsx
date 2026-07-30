@@ -171,28 +171,69 @@ const PatientResult = () => {
     }
   };
 
+  // Helper function to extract numeric age from formatted age string
+  // Converts "1 month 3 days" to { years: 0, months: 1, days: 3 }
+  // Or just "30" to { years: 30, months: 0, days: 0 }
+  const parseFormattedAge = (ageValue: any) => {
+    if (!ageValue) return { years: 0, months: 0, days: 0 };
+    
+    // If it's a number or numeric string, return it as years
+    const numericAge = parseInt(ageValue);
+    if (!isNaN(numericAge)) {
+      return { years: numericAge, months: 0, days: 0 };
+    }
+    
+    // If it's a formatted string like "1 month 3 days"
+    if (typeof ageValue === 'string') {
+      const result = { years: 0, months: 0, days: 0 };
+      
+      // Extract months: "X month(s)"
+      const monthMatch = ageValue.match(/(\d+)\s+months?/i);
+      if (monthMatch) result.months = parseInt(monthMatch[1]);
+      
+      // Extract days: "X day(s)"
+      const dayMatch = ageValue.match(/(\d+)\s+days?/i);
+      if (dayMatch) result.days = parseInt(dayMatch[1]);
+      
+      return result;
+    }
+    
+    return { years: 0, months: 0, days: 0 };
+  };
+
   const getAgeAppropriateRange = (parameter, patientAge, patientGender, patientDob) => {
     if (!parameter) return '';
     if (parameter.type === 'Text' || parameter.isDescriptive)
       return parameter.textContent || parameter.normalRange || '';
-    const age = patientDob ? calculateAge(patientDob) : patientAge;
-    const gender = patientGender?.toLowerCase();
-    let exactAgeInDays = 0, exactAgeInMonths = 0, exactAgeInYears = age || 0;
+    
+    // Calculate exact age from DOB if available, otherwise use stored age
+    let exactAgeInDays = 0, exactAgeInMonths = 0, exactAgeInYears = 0;
+    
     if (patientDob) {
+      // DOB is always preferred for accurate age calculation
       const birthDate = new Date(patientDob);
       const currentDate = new Date();
       const ageInMs = currentDate.getTime() - birthDate.getTime();
       exactAgeInDays = Math.floor(ageInMs / (1000 * 60 * 60 * 24));
       exactAgeInMonths = Math.floor(exactAgeInDays / 30.44);
       exactAgeInYears = Math.floor(exactAgeInDays / 365.25);
+    } else if (patientAge) {
+      // Fallback: parse stored age (could be numeric or formatted string for babies)
+      const parsed = parseFormattedAge(patientAge);
+      exactAgeInYears = parsed.years;
+      exactAgeInMonths = parsed.months;
+      exactAgeInDays = parsed.days;
     }
+    
+    const gender = patientGender?.toLowerCase();
     if (parameter.ageRanges) {
       try {
         const ageRanges = JSON.parse(parameter.ageRanges);
         for (const range of ageRanges) {
           if (!range.enabled) continue;
           const rangeGender = range.gender?.toLowerCase();
-          if (rangeGender && rangeGender !== gender) continue;
+          // Skip if gender doesn't match, unless it's 'both' (which applies to all)
+          if (rangeGender && rangeGender !== 'both' && rangeGender !== gender) continue;
           let ageMatches = false;
           if (range.label?.includes('Less Than') && range.value != null)
             ageMatches = getAgeInUnit(exactAgeInYears, exactAgeInMonths, exactAgeInDays, range.timeUnit) < range.value;

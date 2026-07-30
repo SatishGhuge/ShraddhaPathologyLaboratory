@@ -571,8 +571,11 @@ const AddTest = () => {
       });
     } else {
       setFormData(prev => {
-        // Convert test name to uppercase
-        const finalValue = name === 'name' ? value.toUpperCase() : value;
+        // Convert test name and short name to uppercase
+        let finalValue = value;
+        if (name === 'name' || name === 'shortName') {
+          finalValue = value.toUpperCase();
+        }
         const updated = { ...prev, [name]: finalValue };
         
         // If department changed, auto-populate fields from the selected department
@@ -1224,10 +1227,10 @@ const AddTest = () => {
                 {/* ========== RIGHT COLUMN ========== */}
                 <div className="space-y-3 sm:space-y-4">
 
-                  <Radio 
+                  <Checkbox 
                     label="Profile Test" 
                     name="profileTest" 
-                    value={formData.profileTest}
+                    checked={formData.profileTest}
                     onChange={handleChange}
                     disabled={isViewMode} 
                   />

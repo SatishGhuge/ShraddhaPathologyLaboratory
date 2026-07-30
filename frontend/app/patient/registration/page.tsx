@@ -256,6 +256,66 @@ const numberToWords = (n: any) => {
   return n.toString();
 };
 
+// Calculate formatted age for babies < 1 year (e.g., "1 month 3 days")
+const calculateBabyAgeFormatted = (dobString: string): { formattedAge: string; years: number; months: number; days: number } | null => {
+  if (!dobString) return null;
+  
+  try {
+    const birthDate = new Date(dobString);
+    const today = new Date();
+    
+    // Calculate exact age in years first
+    let years = today.getFullYear() - birthDate.getFullYear();
+    const monthDiff = today.getMonth() - birthDate.getMonth();
+    const dayDiff = today.getDate() - birthDate.getDate();
+    
+    if (monthDiff < 0 || (monthDiff === 0 && dayDiff < 0)) {
+      years--;
+    }
+    
+    // If baby is < 1 year, calculate months and days
+    if (years < 1) {
+      let months = today.getMonth() - birthDate.getMonth();
+      let days = today.getDate() - birthDate.getDate();
+      
+      if (days < 0) {
+        months--;
+        // Get days in previous month
+        const prevMonth = new Date(today.getFullYear(), today.getMonth(), 0);
+        days += prevMonth.getDate();
+      }
+      
+      if (months < 0) {
+        months += 12;
+      }
+      
+      // Format the age string: "1 month 3 days", "5 days", "2 months"
+      const parts = [];
+      if (months > 0) {
+        parts.push(`${months} month${months === 1 ? '' : 's'}`);
+      }
+      if (days > 0 || parts.length === 0) {
+        parts.push(`${days} day${days === 1 ? '' : 's'}`);
+      }
+      
+      const formattedAge = parts.join(' ');
+      
+      return {
+        formattedAge,
+        years: 0,
+        months,
+        days
+      };
+    }
+    
+    // For babies >= 1 year, return null (use numeric age)
+    return null;
+  } catch (e) {
+    console.warn('Error calculating baby age:', e);
+    return null;
+  }
+};
+
 /* ------------------ COMPONENT ------------------ */
 
 export default function PatientRegistration() {
@@ -280,6 +340,7 @@ export default function PatientRegistration() {
   const [showPatientSelectionModal, setShowPatientSelectionModal] = useState(false); // Show patient selection
   const [dob, setDob] = useState(rebookingData?.visitDate?.split(' ')[0] || "");
   const [age, setAge] = useState(rebookingData?.age || "");
+  const [babyAgeFormatted, setBabyAgeFormatted] = useState<string>(""); // "1 month 3 days" format for babies < 1 year
   const [mobile, setMobile] = useState(rebookingData?.mobile || "");
   const [email, setEmail] = useState(rebookingData?.email || "");
   const [address, setAddress] = useState(rebookingData?.address || "");
@@ -306,7 +367,7 @@ export default function PatientRegistration() {
   const [navigateToResult, setNavigateToResult] = useState(false);
   const [showDoctorList, setShowDoctorList] = useState(false);
   const [showBillModal, setShowBillModal] = useState(false);
-  const [gender, setGender] = useState(rebookingData?.gender || "");
+  const [gender, setGender] = useState(rebookingData?.gender || "Male");
   const [refDoctor, setRefDoctor] = useState(rebookingData?.referralDoctor || "");
   const [frequentTests, setFrequentTests] = useState<any[]>([]);
   const [filterFrequent, setFilterFrequent] = useState(false);
@@ -668,6 +729,7 @@ export default function PatientRegistration() {
         if (data.title) setTitle(data.title);
         if (data.dob) setDob(data.dob);
         if (data.age) setAge(data.age);
+        if (data.babyAgeFormatted) setBabyAgeFormatted(data.babyAgeFormatted);
         if (data.mobile) setMobile(data.mobile);
         if (data.email) setEmail(data.email);
         if (data.address) setAddress(data.address);
@@ -720,7 +782,7 @@ export default function PatientRegistration() {
           return;
         }
         const dataToSave = {
-          firstName, lastName, title, dob, age, mobile, email, address, location, locationSearch,
+          firstName, lastName, title, dob, age, babyAgeFormatted, mobile, email, address, location, locationSearch,
           gender, remarks, visitType, reportMode,
           sampleBarcodeNo, refDoctor, isManualRefDoctor, manualRefDoctorName,
           selectedOrganization, selectedOrganizationCode, organizationSearch,
@@ -736,7 +798,7 @@ export default function PatientRegistration() {
 
     return () => clearTimeout(timeoutId);
   }, [
-    firstName, lastName, title, dob, age, mobile, email, address, location, locationSearch, gender, remarks,
+    firstName, lastName, title, dob, age, babyAgeFormatted, mobile, email, address, location, locationSearch, gender, remarks,
     visitType, reportMode, sampleBarcodeNo,
     refDoctor, isManualRefDoctor, manualRefDoctorName, selectedTests,
     selectedOrganization, organizationSearch,
@@ -766,12 +828,13 @@ export default function PatientRegistration() {
     setTitle("MR");
     setDob("");
     setAge("");
+    setBabyAgeFormatted("");
     setMobile("");
     setEmail("");
     setAddress("");
     setLocation("");
     setLocationSearch("");  // ✨ FIX: Also clear location search
-    setGender("");
+    setGender("Male");
     setRemarks("");
     setCreatedBy(loggedUser);
     setVisitType("");
@@ -822,13 +885,35 @@ export default function PatientRegistration() {
 
   const handleDobChange = (value: any) => {
     setDob(value);
-    if (!value) return setAge("");
+    if (!value) {
+      setAge("");
+      setBabyAgeFormatted("");
+      return;
+    }
+    
     const birthDate = new Date(value);
     const today = new Date();
-    let a = today.getFullYear() - birthDate.getFullYear();
+    
+    // Calculate years first
+    let years = today.getFullYear() - birthDate.getFullYear();
     const m = today.getMonth() - birthDate.getMonth();
-    if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) a--;
-    setAge(a >= 0 ? a : "");
+    if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) years--;
+    
+    // If baby is less than 1 year old, calculate months and days and display formatted
+    if (years < 1) {
+      const ageData = calculateBabyAgeFormatted(value);
+      if (ageData) {
+        // For babies < 1 year, display formatted age "1 month 3 days"
+        setAge(0); // Store 0 for numeric age
+        setBabyAgeFormatted(ageData.formattedAge); // Display formatted
+        console.log(`🍼 Baby age: ${ageData.formattedAge}`);
+      }
+      return;
+    }
+    
+    // For children >= 1 year, use numeric age
+    setAge(years >= 0 ? years : "");
+    setBabyAgeFormatted(""); // Clear formatted age for older children
   };
 
   const handleMobileChange = async (value) => {
@@ -1389,7 +1474,8 @@ export default function PatientRegistration() {
     if (!title) missingFields.push("Title");
     if (!firstName) missingFields.push("First Name");
     if (!lastName) missingFields.push("Last Name");
-    if (!age) missingFields.push("Age");
+    // Age can be 0 for babies (< 1 year), so check for null/undefined/empty string, not falsy
+    if (age === "" || age === null || age === undefined) missingFields.push("Age");
     if (!gender) missingFields.push("Gender");
     // Mobile, Email, Address, and Location are now optional ✅
     
@@ -1421,7 +1507,8 @@ export default function PatientRegistration() {
         firstName: firstName,
         lastName: lastName || null,
         dob: dob || null,
-        age: parseInt(age) || null,
+        // For babies < 1 year, send formatted age string; for others, send numeric age
+        age: babyAgeFormatted ? babyAgeFormatted : (age !== "" && age !== null && age !== undefined ? parseInt(age) : null),
         gender: gender,
         mobile: mobile,
         email: email || null,
@@ -1503,7 +1590,8 @@ export default function PatientRegistration() {
         firstName: firstName,
         lastName: lastName || null,
         dob: dob || null,  // DOB is optional
-        age: parseInt(age) || null,
+        // For babies < 1 year, send formatted age string; for others, send numeric age
+        age: babyAgeFormatted ? babyAgeFormatted : (age !== "" && age !== null && age !== undefined ? parseInt(age) : null),
         gender: gender,
         mobile: mobile,
         email: email || null,
@@ -2080,11 +2168,13 @@ export default function PatientRegistration() {
               <input 
                 className={input} 
                 placeholder="Age *" 
-                value={age} 
+                value={babyAgeFormatted || age} 
                 onChange={(e) => setAge(e.target.value)}
-                type="number"
-                min="0"
-                max="150"
+                type={babyAgeFormatted ? "text" : "number"}
+                min={babyAgeFormatted ? undefined : "0"}
+                max={babyAgeFormatted ? undefined : "150"}
+                readOnly={babyAgeFormatted ? true : false}
+                title={babyAgeFormatted ? "Baby age calculated from DOB" : "Enter age in years"}
                 required 
               />
               <InlineSelect

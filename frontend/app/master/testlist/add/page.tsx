@@ -602,8 +602,11 @@ const AddTest = () => {
       });
     } else {
       setFormData(prev => {
-        // Convert test name to uppercase
-        const finalValue = name === 'name' ? value.toUpperCase() : value;
+        // Convert test name and short name to uppercase
+        let finalValue = value;
+        if (name === 'name' || name === 'shortName') {
+          finalValue = value.toUpperCase();
+        }
         const updated = { ...prev, [name]: finalValue };
         
         // If department changed, auto-populate the group field from the selected department
