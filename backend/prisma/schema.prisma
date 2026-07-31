@@ -139,7 +139,7 @@ model Patient {
   firstName         String?
   lastName          String?
   dob               DateTime?
-  age               Int?
+  age               String?  @db.VarChar(50)
   gender            String?
   mobile            String?
   email             String?

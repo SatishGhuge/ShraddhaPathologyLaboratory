@@ -896,8 +896,20 @@ export default function PatientRegistration() {
     
     // Calculate years first
     let years = today.getFullYear() - birthDate.getFullYear();
-    const m = today.getMonth() - birthDate.getMonth();
-    if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) years--;
+    let months = today.getMonth() - birthDate.getMonth();
+    let days = today.getDate() - birthDate.getDate();
+    
+    // Adjust for negative months or days
+    if (months < 0 || (months === 0 && days < 0)) {
+      years--;
+      months += 12;
+    }
+    
+    if (days < 0) {
+      months--;
+      const prevMonth = new Date(today.getFullYear(), today.getMonth(), 0);
+      days += prevMonth.getDate();
+    }
     
     // If baby is less than 1 year old, calculate months and days and display formatted
     if (years < 1) {
@@ -911,9 +923,24 @@ export default function PatientRegistration() {
       return;
     }
     
-    // For children >= 1 year, use numeric age
-    setAge(years >= 0 ? years : "");
-    setBabyAgeFormatted(""); // Clear formatted age for older children
+    // For children 1-12 years old, show format "11Y 4M 6D" with spaces
+    if (years >= 1 && years <= 12) {
+      const formattedAge = `${years}Y ${months}M ${days}D`;
+      setAge(formattedAge); // Store formatted age string
+      setBabyAgeFormatted(""); // Clear baby age
+      console.log(`👧 Child age (1-12 years): ${formattedAge}`);
+      return;
+    }
+    
+    // For adults > 12 years, use decimal format "12.1"
+    if (years > 12) {
+      // Calculate decimal: decimal = years + (months / 12)
+      const decimalAge = (years + months / 12).toFixed(1);
+      setAge(decimalAge); // Store decimal age
+      setBabyAgeFormatted(""); // Clear baby age
+      console.log(`👨 Adult age (>12 years): ${decimalAge}`);
+      return;
+    }
   };
 
   const handleMobileChange = async (value) => {
@@ -1507,8 +1534,11 @@ export default function PatientRegistration() {
         firstName: firstName,
         lastName: lastName || null,
         dob: dob || null,
-        // For babies < 1 year, send formatted age string; for others, send numeric age
-        age: babyAgeFormatted ? babyAgeFormatted : (age !== "" && age !== null && age !== undefined ? parseInt(age) : null),
+        // Send age as-is (already formatted by handleDobChange)
+        // For babies < 1 year: "12D" or "3M12D"
+        // For children 1-12: "11Y3M12D"
+        // For adults > 12: "12.1"
+        age: age !== "" && age !== null && age !== undefined ? age : null,
         gender: gender,
         mobile: mobile,
         email: email || null,
@@ -1590,8 +1620,11 @@ export default function PatientRegistration() {
         firstName: firstName,
         lastName: lastName || null,
         dob: dob || null,  // DOB is optional
-        // For babies < 1 year, send formatted age string; for others, send numeric age
-        age: babyAgeFormatted ? babyAgeFormatted : (age !== "" && age !== null && age !== undefined ? parseInt(age) : null),
+        // Send age as-is (already formatted by handleDobChange)
+        // For babies < 1 year: "12D" or "3M12D"
+        // For children 1-12: "11Y3M12D"
+        // For adults > 12: "12.1"
+        age: age !== "" && age !== null && age !== undefined ? age : null,
         gender: gender,
         mobile: mobile,
         email: email || null,
@@ -2170,11 +2203,11 @@ export default function PatientRegistration() {
                 placeholder="Age *" 
                 value={babyAgeFormatted || age} 
                 onChange={(e) => setAge(e.target.value)}
-                type={babyAgeFormatted ? "text" : "number"}
-                min={babyAgeFormatted ? undefined : "0"}
-                max={babyAgeFormatted ? undefined : "150"}
-                readOnly={babyAgeFormatted ? true : false}
-                title={babyAgeFormatted ? "Baby age calculated from DOB" : "Enter age in years"}
+                type={babyAgeFormatted || (age && (age.includes('Y') || age.includes('M') || age.includes('D'))) ? "text" : "number"}
+                min={babyAgeFormatted || (age && (age.includes('Y') || age.includes('M') || age.includes('D'))) ? undefined : "0"}
+                max={babyAgeFormatted || (age && (age.includes('Y') || age.includes('M') || age.includes('D'))) ? undefined : "150"}
+                readOnly={babyAgeFormatted || (age && (age.includes('Y') || age.includes('M') || age.includes('D'))) ? true : false}
+                title={babyAgeFormatted ? "Baby age calculated from DOB (months/days)" : (age && (age.includes('Y') || age.includes('M') || age.includes('D'))) ? "Age calculated from DOB (Y-M-D format)" : "Enter age in years"}
                 required 
               />
               <InlineSelect

@@ -2,6 +2,7 @@ import prisma from '../config/database.js';
 import { validationResult } from 'express-validator';
 import { getPaginationParams, buildPaginatedResponse } from '../utils/pagination.js';
 import { generatePatientId, generateVisitId } from '../utils/idGenerator.js';
+import { formatAge, calculateExactAge, getAgeForRangeMatching } from '../utils/ageCalculator.js';
 import crypto from 'crypto';
 import bcryptjs from 'bcryptjs';
 import { emailService } from '../services/notification.service.js';
@@ -186,7 +187,8 @@ export const createPatient = async (req, res) => {
           firstName,
           lastName,
           dob: dob ? new Date(dob) : null,
-          age: age ? parseInt(age) : null,
+          // Format age: calculate from DOB if provided, otherwise use manual input
+          age: dob ? formatAge(age, dob) : formatAge(age),
           gender,
           mobile,
           email,
@@ -721,7 +723,8 @@ export const updatePatient = async (req, res) => {
         firstName: firstName || undefined,
         lastName:  lastName  !== undefined ? lastName  : undefined,
         dob:       dob       ? new Date(dob) : null,
-        age:       age       ? parseInt(age) : undefined,
+        // Format age: calculate from DOB if provided, otherwise use manual input
+        age:       dob ? formatAge(age, dob) : (age ? formatAge(age) : undefined),
         gender:    gender    || undefined,
         mobile:    mobile    !== undefined ? mobile  : undefined,
         email:     email     !== undefined ? email   : undefined,

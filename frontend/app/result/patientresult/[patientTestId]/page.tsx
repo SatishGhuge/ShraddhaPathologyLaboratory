@@ -1120,14 +1120,14 @@ const PatientResult = () => {
   return (
     <>
       <Header />
-      <div className="p-4 bg-gray-100 min-h-screen mt-16">
+      <div className="p-4 bg-gray-100 min-h-screen mt-2">
 
         {/* Patient Header */}
         <div className="bg-yellow-100 border p-2 text-sm flex justify-between flex-wrap">
           <span><b>NAME:</b> {patientData.patient.title} {patientData.patient.firstName} {patientData.patient.lastName}</span>
           <span><b>P_ID:</b> {patientData.patient.patientId}</span>
           <span><b>V_ID:</b> {patientData.visitId}</span>
-          <span><b>AGE/GENDER:</b> {patientData.patient.age} Yrs / {patientData.patient.gender}</span>
+          <span><b>AGE/GENDER:</b> {patientData.patient.age} / {patientData.patient.gender}</span>
           <span><b>REFERRAL DR:</b> {patientData.referralDoctor || 'SELF'}</span>
           <span><b>REG. DATE & TIME:</b> {new Date(patientData.visitDate).toLocaleDateString('en-GB')} {patientData.visitTime}</span>
           <span><b>STATUS:</b> <span className="font-semibold text-blue-700">{patientData.status}</span></span>

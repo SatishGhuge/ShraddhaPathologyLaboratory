@@ -1450,8 +1450,9 @@ export default function Result() {
         });
       });
 
-      // Set report data for direct print (do NOT open modal)
-      setReportData({
+      // ✅ DIRECT PRINT - trigger print immediately with report data
+      setLoading(false);
+      await directPrintReport({
         patient: first.patientTest.patient,
         visitId: first.patientTest.visitId,
         visitDate: first.patientTest.visitDate,
@@ -1462,54 +1463,27 @@ export default function Result() {
         signature,
         letterhead: letterheadDB,
         letterHeadBase64,
-        // 🔧 PART 3: Include first test's outsourcing info
-        isOutsourced: first.patientTest.isOutsourced || false,
-        outsourcedTo: first.patientTest.outsourcedTo || null,
         printOption: option,
         results: resultsMap,
         referralDoctor: first.patientTest.referralDoctor
       });
-      
-      setReportWithHeader(true);
-      // ❌ NO modal - trigger print immediately after a small delay to allow render
-      setShowPrintOptionsModal(false);
-      
-      // Trigger print after rendering completes (increased delay for state updates)
-      setTimeout(() => {
-        directPrintReport({
-          patient: first.patientTest.patient,
-          visitId: first.patientTest.visitId,
-          visitDate: first.patientTest.visitDate,
-          test: first.patientTest.test,
-          parameters: first.parameters,
-          groupedParameters: first.groupedParameters,
-          combinedTests,
-          signature,
-          letterhead: letterheadDB,
-          letterHeadBase64,
-          printOption: option,
-          results: resultsMap,
-          referralDoctor: first.patientTest.referralDoctor
-        });
-      }, 200);
     } catch (err) {
       console.error('Error loading report:', err);
       alert('Error loading report: ' + err.message);
-    } finally {
       setLoading(false);
     }
   };
 
-  // Direct print report - renders ProfessionalReport in hidden div and triggers browser print
+  // Direct Print Report - Opens browser print dialog without modal
   const directPrintReport = (reportProps: any) => {
     const printContainer = document.createElement('div');
-    printContainer.id = 'print-report-container';
+    printContainer.id = 'print-report-container-' + Date.now();
     printContainer.style.position = 'fixed';
     printContainer.style.left = '0';
     printContainer.style.top = '0';
     printContainer.style.width = '100%';
     printContainer.style.height = '100%';
-    printContainer.style.zIndex = '9999';
+    printContainer.style.zIndex = '-9999';
     printContainer.style.visibility = 'hidden';
     
     document.body.appendChild(printContainer);
