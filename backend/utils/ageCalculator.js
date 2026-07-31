@@ -70,7 +70,7 @@ export const formatAge = (ageInput, dobString = null) => {
       
       const { years, months, days } = ageData;
       
-      // < 1 year: "12D" or "3M12D"
+      // < 1 year: "12D" or "3M12D" (skip 0M if months is 0)
       if (years === 0) {
         if (months === 0) {
           return `${days}D`;
@@ -79,9 +79,16 @@ export const formatAge = (ageInput, dobString = null) => {
         }
       }
       
-      // 1-12 years: "11Y 4M 6D" (with spaces between units)
+      // 1-12 years: "11Y 4M 6D" (skip 0M or 0D if they are 0)
       if (years < 12) {
-        return `${years}Y ${months}M ${days}D`;
+        let result = `${years}Y`;
+        if (months > 0) {
+          result += ` ${months}M`;
+        }
+        if (days > 0) {
+          result += ` ${days}D`;
+        }
+        return result;
       }
       
       // > 12 years: decimal format "12.1"

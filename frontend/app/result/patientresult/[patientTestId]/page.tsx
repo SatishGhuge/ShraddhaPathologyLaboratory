@@ -152,6 +152,9 @@ const PatientResult = () => {
   const [outsourcedTo, setOutsourcedTo] = useState<string | null>(null);
   const [outsourcingReport, setOutsourcingReport] = useState<any>(null);
 
+  // ✅ State for tracking which auto-calculated fields are in edit mode
+  const [editingFormulaFields, setEditingFormulaFields] = useState<Set<number>>(new Set());
+
   const calculateAge = (dob: any) => {
     if (!dob) return null;
     const today = new Date();
@@ -513,6 +516,15 @@ const PatientResult = () => {
     } catch { return null; }
   }, []);
 
+  // ✅ NEW: Helper function to round numeric value based on decimal places
+  const roundToDecimal = (value, decimalPlaces = 2) => {
+    if (value === null || value === undefined || value === '') return '';
+    const numValue = parseFloat(String(value));
+    if (isNaN(numValue)) return value;
+    const multiplier = Math.pow(10, decimalPlaces);
+    return (Math.round(numValue * multiplier) / multiplier).toFixed(decimalPlaces);
+  };
+
   // Detect if multiple tests or single test
   useEffect(() => {
     if (testIdsParam) {
@@ -726,7 +738,12 @@ const PatientResult = () => {
       (allParams || parameters).forEach(param => {
         if (param.hasFormula && param.formula) {
           const calculated = evaluateFormula(param.formula, allParams || parameters, updated);
-          if (calculated !== null) updated[param.id] = { ...updated[param.id], numericValue: calculated };
+          // ✅ Apply decimal rounding ONLY to auto-calculated formula results
+          if (calculated !== null) {
+            const decimalPlaces = param.decimal || 2;
+            const roundedCalculated = parseFloat(roundToDecimal(calculated, decimalPlaces));
+            updated[param.id] = { ...updated[param.id], numericValue: roundedCalculated };
+          }
         }
       });
       return updated;
@@ -1377,7 +1394,62 @@ const PatientResult = () => {
                               <div className="flex items-center gap-2">
                                 {isFormula ? (
                                   <div className="flex items-center gap-1">
-                                    <input type="text" readOnly value={results[param.id]?.numericValue ?? ''} className={`${inputClass} bg-green-50 border-green-400 cursor-not-allowed`} title={`Auto-calculated: ${param.formula}`} />
+                                    {editingFormulaFields.has(param.id) ? (
+                                      // Edit mode - show editable input with save/cancel buttons
+                                      <div className="flex items-center ">
+                                        <input 
+                                          type="text" 
+                                          value={results[param.id]?.numericValue ?? ''} 
+                                          onChange={(e) => handleResultChange(param.id, 'numericValue', e.target.value === '' ? null : e.target.value, parameters)}
+                                          className={`${inputClass} px-2 py-1 w-24 rounded`}
+                                          autoFocus
+                                        />
+                                        <button
+                                          onClick={() => setEditingFormulaFields(prev => {
+                                            const newSet = new Set(prev);
+                                            newSet.delete(param.id);
+                                            return newSet;
+                                          })}
+                                          className="text-xs green-600 text-green px-2 py-1 rounded hover:green-900"
+                                          title="Save"
+                                        >
+                                          ✓
+                                        </button>
+                                        <button
+                                          onClick={() => setEditingFormulaFields(prev => {
+                                            const newSet = new Set(prev);
+                                            newSet.delete(param.id);
+                                            return newSet;
+                                          })}
+                                          className="text-xs text-red px-2 py-1 rounded hover:red-900"
+                                          title="Cancel"
+                                        >
+                                          ✕
+                                        </button>
+                                      </div>
+                                    ) : (
+                                      // View mode - show read-only with edit icon
+                                      <div className="flex items-center gap-1">
+                                        <input 
+                                          type="text" 
+                                          readOnly 
+                                          value={results[param.id]?.numericValue ?? ''} 
+                                          className={`${inputClass} bg-green-50 border-green-400 cursor-not-allowed`} 
+                                          title={`Auto-calculated: ${param.formula}`} 
+                                        />
+                                        <button
+                                          onClick={() => setEditingFormulaFields(prev => {
+                                            const newSet = new Set(prev);
+                                            newSet.add(param.id);
+                                            return newSet;
+                                          })}
+                                          className="text-s text-blue px-2 py-2 rounded hover:blue-900"
+                                          title="Edit calculated value"
+                                        >
+                                          ✎
+                                        </button>
+                                      </div>
+                                    )}
                                     <span className="text-xs text-green-700 italic">auto</span>
                                   </div>
                                 ) : param.type === 'Numeric' ? (
@@ -1434,7 +1506,7 @@ const PatientResult = () => {
                                 return unitValue;
                               })()}
                             </td>
-                            <td className="border p-2">{param.type === 'Text' || param.isDescriptive ? stripHtmlTags(param.normalRange || '') : stripHtmlTags(getAgeAppropriateRange(param, patientData.patient.age, patientData.patient.gender, patientData.patient.dob) || '')}</td>
+                            <td className="border p-2">{param.type === 'Text' || param.isDescriptive ? stripHtmlTags(param.normalRange || '') : stripHtmlTags(getAgeAppropriateRange(param, patientData.patient.age, patientData.patient.gender?.toLowerCase(), patientData.patient.dob) || param.displayRangeText || param.rangeText || param.normalRange || '-')}</td>
                             <td className="border p-2 text-center" style={{width: '40px'}}>
                               <input 
                                 type="checkbox" 

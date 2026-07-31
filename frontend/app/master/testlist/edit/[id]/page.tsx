@@ -2108,11 +2108,12 @@ const AddTest = () => {
 
                         {/* Inline Formula Display — shown when hasFormula=true and formula is saved */}
                         {parameter.hasFormula && parameter.formula && (
-                          <div className="flex items-center gap-1 text-xs">
-                            <span className="font-mono text-gray-900">
-                              {parameter.parameterName ? `${parameter.parameterName} = ` : 'Formula = '}
+                          <div className="mb-2">
+                            <div className="font-mono text-sm text-gray-900 break-all">
+                              <span className="font-semibold">Formula: </span>
+                              {parameter.parameterName ? `${parameter.parameterName} = ` : ''}
                               {displayFormula(parameter.formula)}
-                            </span>
+                            </div>
                           </div>
                         )}
 
@@ -2142,17 +2143,6 @@ const AddTest = () => {
                           />
                           <span className="text-xs sm:text-sm">Is NABL</span>
                         </label>
-                        
-                        {/* Parameter Code - Only in Edit Mode */}
-                        {isEditMode && (
-                          <input 
-                            className="px-2 py-1.5 sm:py-1 border border-gray-300 rounded text-xs sm:text-sm w-full sm:w-32" 
-                            placeholder="Parameter Code" 
-                            value={parameter.parameterCode || ""}
-                            onChange={(e) => handleParameterChange(categoryIndex, paramIndex, 'parameterCode', e.target.value)}
-                            disabled={isViewMode} 
-                          />
-                        )}
                         
                         {/* Formula Checkbox - Only in Edit Mode */}
                         {isEditMode && (

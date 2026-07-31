@@ -361,6 +361,7 @@ export const getPatientTestById = async (req, res) => {
             childActive: true,
             hasFormula: true,
             formula: true,
+            decimal: true,
             unit: {
               select: {
                 symbol: true
@@ -452,16 +453,15 @@ export const getPatientTestById = async (req, res) => {
           isMandatory: category.testParameter.isMandatory,
           categoryName: categoryName,
           categoryId: category.id,
-          // Use unique category identifier: if no name, create a unique key from categoryId so categories without names don't collapse together
           categoryUniqueId: hasManualCategoryName ? categoryName : `__NO_NAME_${category.id}__`,
           sortOrder: category.testParameter.parameterSortOrder || 999,
           categorySortOrder: category.sortOrder || 999,
           showCategoryHeader: hasManualCategoryName,
           
           // 🔴 SEPARATE both methods
-          categoryTestMethod: category.testMethod || null,  // Method from category
-          parameterTestMethod: category.testParameter.testMethod || null,  // Method from parameter
-          testMethod: category.testMethod || category.testParameter.testMethod || '', // Fallback (for backward compatibility)
+          categoryTestMethod: category.testMethod || null,
+          parameterTestMethod: category.testParameter.testMethod || null,
+          testMethod: category.testMethod || category.testParameter.testMethod || '',
           
           // Log for debugging
           _debug_testMethod: {
@@ -496,9 +496,10 @@ export const getPatientTestById = async (req, res) => {
           // Text content for text-type parameters
           textContent: category.testParameter.textContent,
           
-          // Formula fields
+          // Formula fields - INCLUDE BOTH
           hasFormula: category.testParameter.hasFormula,
           formula: category.testParameter.formula,
+          decimal: category.testParameter.decimal || 2,
           
           // Get appropriate range based on patient demographics from database
           normalRange: getNormalRange(category.testParameter, patientTest.patient),
@@ -556,6 +557,7 @@ export const getPatientTestById = async (req, res) => {
           childActive: true,
           hasFormula: true,
           formula: true,
+          decimal: true,
           unit: {
             select: {
               symbol: true
@@ -590,16 +592,16 @@ export const getPatientTestById = async (req, res) => {
           isDescriptive: param.isDescriptive,
           isMultipleOptions: param.isMultipleOptions,
           isMandatory: param.isMandatory,
-          categoryName: 'NO_CATEGORY_HEADER', // No header for direct parameters
+          categoryName: 'NO_CATEGORY_HEADER',
           categoryId: null,
           sortOrder: param.parameterSortOrder || 999,
-          categorySortOrder: 999, // High value for direct parameters (no category sort)
-          showCategoryHeader: false, // Don't show header for direct parameters
+          categorySortOrder: 999,
+          showCategoryHeader: false,
           
           // 🔴 For direct parameters: no category method, only parameter method
-          categoryTestMethod: null,  // No category for direct parameters
-          parameterTestMethod: param.testMethod || null,  // Method from parameter
-          testMethod: param.testMethod || '',  // Fallback (for backward compatibility)
+          categoryTestMethod: null,
+          parameterTestMethod: param.testMethod || null,
+          testMethod: param.testMethod || '',
           
           // Range type and display text from database
           rangeType: param.rangeType,
@@ -627,9 +629,10 @@ export const getPatientTestById = async (req, res) => {
           // Text content for text-type parameters
           textContent: param.textContent,
           
-          // Formula fields
+          // Formula fields - INCLUDE BOTH
           hasFormula: param.hasFormula,
           formula: param.formula,
+          decimal: param.decimal || 2,
           
           // Get appropriate range based on patient demographics from database
           normalRange: getNormalRange(param, patientTest.patient),

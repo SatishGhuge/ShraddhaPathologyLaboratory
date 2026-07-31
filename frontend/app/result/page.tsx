@@ -393,6 +393,7 @@ export default function Result() {
         } catch (e) {
           console.warn('Failed to parse saved filters:', e);
         }
+
       }
     }
     // Default filters if none saved
@@ -1306,28 +1307,11 @@ export default function Result() {
     }
   };
 
-  // Print — loads report data, opens modal with Professional Report Component
+  // Print — loads report data and opens browser print dialog directly (skip modal)
   const handlePrintPreview = async () => {
     if (selectedTests.size === 0) { alert('Please select a test to print'); return; }
     
-    // If multiple tests selected from same patient/visit, show print options modal
-    if (selectedTests.size > 1) {
-      // Verify all selected tests are from same patient and visit
-      const testIds = Array.from(selectedTests);
-      const responses = await Promise.all(testIds.map(id => getPatientTestById(id)));
-      
-      const firstTest = responses[0];
-      const samePatient = responses.every(r => r.patientTest.patientId === firstTest.patientTest.patientId);
-      const sameVisit = responses.every(r => r.patientTest.visitId === firstTest.patientTest.visitId);
-      
-      if (samePatient && sameVisit) {
-        // Show print options modal
-        setShowPrintOptionsModal(true);
-        return;
-      }
-    }
-    
-    // Single test or tests from different patient/visit - proceed with default print
+    // ✅ SIMPLIFIED: Always use pagebreak option and go directly to print (skip all modals)
     await proceedWithPrint('pagebreak');
   };
 
@@ -2921,12 +2905,11 @@ export default function Result() {
                                 {test.parameter_count === 1 ? (test.unit || '-') : '-'}
                               </span>
                             </td>
-
                             {/* Column 10: Ref. Interval */}
                             <td className="px-1 sm:px-2 py-0.5 sm:py-1 text-[11px] border border-gray-300">
                               <span className="text-gray-700">
                                 {test.parameter_count === 1 
-                                  ? getAgeAppropriateRange(test.ref_interval_data, patient)
+                                  ? getAgeAppropriateRange(test.ref_interval_data, patient.age, patient.gender?.toLowerCase(), patient.dob)
                                   : '-'}
                               </span>
                             </td>
