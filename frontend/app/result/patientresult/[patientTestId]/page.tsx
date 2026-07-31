@@ -949,6 +949,17 @@ const PatientResult = () => {
       );
 
       alert('All results saved successfully!');
+      
+      // Save comments if provided
+      if (showComment && comments.trim()) {
+        try {
+          await updatePatientComments(allTestsData[0].patientTest.id, comments);
+          console.log('✅ Comments saved successfully');
+        } catch (error) {
+          console.error('⚠️ Error saving comments:', error);
+        }
+      }
+      
       router.push('/result');
     } catch (error) {
       console.error('Error saving results:', error);
@@ -1333,6 +1344,30 @@ const PatientResult = () => {
                           })}
                         </React.Fragment>
                       ))}
+                      {/* Comment Row */}
+                      <tr className="bg-gray-100 border-t-2 border-gray-400">
+                        <td colSpan={5} className="border p-3">
+                          <div className="flex items-center gap-3">
+                            <input 
+                              type="checkbox" 
+                              id="show-comment-single"
+                              checked={showComment}
+                              onChange={(e) => setShowComment(e.target.checked)}
+                              className="w-5 h-5 accent-blue-600 cursor-pointer flex-shrink-0"
+                              title="Check to add comments"
+                            />
+                            <label htmlFor="show-comment-single" className="text-sm font-semibold text-gray-700 cursor-pointer flex-shrink-0">Comment:</label>
+                            {showComment && (
+                              <textarea
+                                value={comments}
+                                onChange={(e) => setComments(e.target.value)}
+                                placeholder="Enter comments or notes to be printed on the report before interpretation..."
+                                className="flex-1 border border-gray-300 rounded px-2 py-1 text-xs font-normal h-12 resize-none"
+                              />
+                            )}
+                          </div>
+                        </td>
+                      </tr>
                     </tbody>
                   </table>
                 </div>
@@ -1523,6 +1558,30 @@ const PatientResult = () => {
                       })}
                     </React.Fragment>
                   ))}
+                  {/* Comment Row */}
+                  <tr className="bg-gray-100 border-t-2 border-gray-400">
+                    <td colSpan={6} className="border p-3">
+                      <div className="flex items-center gap-3">
+                        <input 
+                          type="checkbox" 
+                          id="show-comment-table"
+                          checked={showComment}
+                          onChange={(e) => setShowComment(e.target.checked)}
+                          className="w-5 h-5 accent-blue-600 cursor-pointer flex-shrink-0"
+                          title="Check to add comments"
+                        />
+                        <label htmlFor="show-comment-table" className="text-sm font-semibold text-gray-700 cursor-pointer flex-shrink-0">Comment:</label>
+                        {showComment && (
+                          <textarea
+                            value={comments}
+                            onChange={(e) => setComments(e.target.value)}
+                            placeholder="Enter comments or notes to be printed on the report before interpretation..."
+                            className="flex-1 border border-gray-300 rounded px-2 py-1 text-xs font-normal h-12 resize-none"
+                          />
+                        )}
+                      </div>
+                    </td>
+                  </tr>
                 </tbody>
               </table>
             </div>

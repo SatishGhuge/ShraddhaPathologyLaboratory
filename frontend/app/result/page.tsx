@@ -1449,7 +1449,8 @@ export default function Result() {
         letterHeadBase64,
         printOption: option,
         results: resultsMap,
-        referralDoctor: first.patientTest.referralDoctor
+        referralDoctor: first.patientTest.referralDoctor,
+        comments: first.patientTest.comments  // ✅ Add comments
       });
     } catch (err) {
       console.error('Error loading report:', err);
@@ -1490,6 +1491,7 @@ export default function Result() {
         printOption={reportProps.printOption}
         results={reportProps.results}
         referralDoctor={reportProps.referralDoctor}
+        comments={reportProps.comments}
       />
     );
 
@@ -2909,7 +2911,7 @@ export default function Result() {
                             <td className="px-1 sm:px-2 py-0.5 sm:py-1 text-[11px] border border-gray-300">
                               <span className="text-gray-700">
                                 {test.parameter_count === 1 
-                                  ? getAgeAppropriateRange(test.ref_interval_data, patient.age, patient.gender?.toLowerCase(), patient.dob)
+                                  ? getAgeAppropriateRange(test.ref_interval_data, patient)
                                   : '-'}
                               </span>
                             </td>

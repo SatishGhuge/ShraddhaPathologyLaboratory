@@ -684,6 +684,7 @@ export const getPatientTestById = async (req, res) => {
         parameters: allParameters,
         groupedParameters,
         outsourcingReport,  // Include outsourcing data
+        comments: patientTest.comments,  // ✅ Explicitly include comments
         debug: { totalExistingResults, totalParameters: allParameters.length }
       }
     });

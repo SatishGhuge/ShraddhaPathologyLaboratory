@@ -60,6 +60,7 @@ export interface ProfessionalReportProps {
   printOption?: 'pagebreak' | 'nobreak';
   results?: Record<string, { numericValue?: any; textValue?: string; isAbnormal?: any; isHighlighted?: boolean }>;
   referralDoctor?: string;
+  comments?: string;  // ✅ Add comments field
 }
 
 interface RowItem {
@@ -545,22 +546,42 @@ const ProfessionalReport = React.forwardRef<HTMLDivElement, ProfessionalReportPr
               </tbody>
             </table>
 
+            {/* ── Comments (last page only) ────────────────────────── */}
+            {isLast && props.comments && (
+              <div
+                style={{
+                  marginTop: '5mm',
+                  marginBottom: '2mm',
+                  fontSize: '9px',
+                  flexShrink: 0,
+                  borderBottom: '1px solid #333',
+                  paddingBottom: '1mm',
+                }}
+              >
+                <span style={{ fontWeight: 'bold', color: '#333' }}>Comments: </span>
+                <span
+                  dangerouslySetInnerHTML={{ __html: safe(props.comments) }}
+                  style={{ color: '#222', display: 'inline' }}
+                />
+              </div>
+            )}
+
             {/* ── Interpretation (last page only) ────────────────────── */}
             {isLast && testData.interpretation && (
               <div
                 style={{
-                  marginTop: '3mm',
+                  marginTop: '4mm',
+                  marginBottom: '2mm',
                   fontSize: '9px',
-                  lineHeight: '1.6',
-                  borderTop: '1px solid #aaa',
-                  paddingTop: '2mm',
                   flexShrink: 0,
+                  borderBottom: '1px solid #333',
+                  paddingBottom: '1mm',
                 }}
               >
-                <b style={{ display: 'block', marginBottom: '1mm' }}>Interpretation:</b>
-                <div
+                <span style={{ fontWeight: 'bold', color: '#333' }}>Interpretation: </span>
+                <span
                   dangerouslySetInnerHTML={{ __html: safe(testData.interpretation) }}
-                  style={{ whiteSpace: 'pre-wrap' }}
+                  style={{ color: '#222', display: 'inline' }}
                 />
               </div>
             )}
