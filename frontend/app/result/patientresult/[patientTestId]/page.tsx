@@ -1209,7 +1209,7 @@ const PatientResult = () => {
                                         value={results[paramKey]?.numericValue || ''}
                                         onChange={(e) => handleResultChange(paramKey, 'numericValue', e.target.value, testData.parameters)}
                                         disabled={isFormula}
-                                        className={`${inputClass} ${results[paramKey]?.isHighlighted ? 'text-red-700 border-2 border-red-500' : ''}`}
+                                        className={`${results[paramKey]?.isHighlighted ? 'border-2 border-red-500 bg-red-50' : inputClass} px-2 py-1 w-24 rounded`}
                                       />
                                     ) : param.isDescriptive ? (
                                       <div className="border border-gray-300 rounded min-h-[150px]">
@@ -1340,7 +1340,7 @@ const PatientResult = () => {
                                     <span className="text-xs text-green-700 italic">auto</span>
                                   </div>
                                 ) : param.type === 'Numeric' ? (
-                                  <input type="text" value={results[param.id]?.numericValue ?? ''} onChange={(e) => handleResultChange(param.id, 'numericValue', e.target.value === '' ? null : e.target.value, parameters)} className={`${inputClass} ${results[param.id]?.isHighlighted ? 'text-red-700 border-2 border-red-500' : ''}`} placeholder="e.g., 7.5, <7.5 or >140" />
+                                  <input type="text" value={results[param.id]?.numericValue ?? ''} onChange={(e) => handleResultChange(param.id, 'numericValue', e.target.value === '' ? null : e.target.value, parameters)} className={`${results[param.id]?.isHighlighted ? 'border-2 border-red-500 bg-red-50' : inputClass} px-2 py-1 w-24 rounded`} placeholder="e.g., 7.5, <7.5 or >140" />
                                 ) : param.isDescriptive ? (
                                   <div className="border border-gray-300 rounded min-h-[150px]">
                                     <CKEditor
