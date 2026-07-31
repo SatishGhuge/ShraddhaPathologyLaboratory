@@ -179,6 +179,7 @@ const AuthenticateModal = ({
             textValue: (textVal && typeof textVal === 'string' && textVal.trim() !== '') ? textVal : '',
             selectedOption: (optionVal && typeof optionVal === 'string' && optionVal.trim() !== '') ? optionVal : '',
             isAbnormal: param.existingResult.isAbnormal || false,
+            isHighlighted: param.existingResult.isHighlighted || false,
             referenceRange: param.existingResult.referenceRange || param.normalRange
           };
         } else {
@@ -188,6 +189,7 @@ const AuthenticateModal = ({
             textValue: '',
             selectedOption: '',
             isAbnormal: false,
+            isHighlighted: false,
             referenceRange: param.normalRange
           };
         }
@@ -319,6 +321,43 @@ const AuthenticateModal = ({
       setAuthenticating(true);
       setError(null);
 
+      // First, save any updated isHighlighted values
+      const resultsData = parameters
+        .map((param) => {
+          // For descriptive params, only use textValue (not __input__)
+          const textVal = results[param.id]?.textValue || null;
+          
+          return {
+            testParameterId: param.id,
+            testCategoryId: param.categoryId,
+            numericValue: results[param.id]?.numericValue || null,
+            textValue: textVal,
+            selectedOption: results[param.id]?.selectedOption || null,
+            isAbnormal: results[param.id]?.isAbnormal || false,
+            isHighlighted: results[param.id]?.isHighlighted || false,
+            referenceRange: results[param.id]?.referenceRange || param.normalRange
+          };
+        })
+        .filter((r) => {
+          const hasNumeric = r.numericValue !== null && r.numericValue !== undefined && r.numericValue !== '';
+          const hasText = r.textValue && typeof r.textValue === 'string' && r.textValue.trim() !== '';
+          const hasOption =
+            r.selectedOption && typeof r.selectedOption === 'string' && r.selectedOption.trim() !== '';
+          return hasNumeric || hasText || hasOption;
+        });
+
+      // Save updated results
+      const saveResponse = await fetch(`${API_BASE_URL}/results/${patientData.id}/results`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ results: resultsData, verifiedBy: 'current_user' })
+      });
+
+      const saveData = await saveResponse.json();
+      if (!saveData.success) {
+        throw new Error(saveData.message || 'Failed to save readings');
+      }
+
       // Transition to Authenticated phase
       const statusResponse = await fetch(`${API_BASE_URL}/results/${patientData.id}/status`, {
         method: 'PUT',
@@ -411,6 +450,7 @@ const AuthenticateModal = ({
                   <th className="border p-1.5 text-center w-60">Value</th>
                   <th className="border p-1.5 text-center w-12">Units</th>
                   <th className="border p-1.5 text-center w-32">Biological Range</th>
+                  <th className="border p-1.5 text-center w-12">Highlight</th>
                 </tr>
               </thead>
               <tbody>
@@ -431,7 +471,7 @@ const AuthenticateModal = ({
                         : 'border border-gray-300 px-2 py-1 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-xs';
 
                       return (
-                        <tr key={param.id} className={outOfRange ? 'bg-red-50' : 'bg-white hover:bg-gray-50'} style={{height: '28px'}}>
+                        <tr key={param.id} className={(outOfRange || results[param.id]?.isHighlighted) ? 'bg-red-50' : 'bg-white hover:bg-gray-50'} style={{height: '28px'}}>
                           <td className="border p-1.5">
                             <span className="font-medium text-gray-900 text-xs">{param.parameterName}</span>
                             {param.isMandatory && <span className="text-red-500 ml-1">*</span>}
@@ -440,13 +480,12 @@ const AuthenticateModal = ({
                             {param.type === 'Numeric' ? (
                               <div className="relative">
                                 <input
-                                  type="number"
-                                  step="0.01"
+                                  type="text"
                                   value={results[param.id]?.numericValue ?? ''}
                                   onChange={(e) => {
                                     const newResults = { ...results };
                                     if (!newResults[param.id]) newResults[param.id] = {};
-                                    newResults[param.id].numericValue = e.target.value === '' ? null : parseFloat(e.target.value);
+                                    newResults[param.id].numericValue = e.target.value === '' ? null : e.target.value;
                                     setResults(newResults);
                                   }}
                                   className="w-full text-center bg-transparent text-xs border-none focus:outline-none focus:ring-0 placeholder-gray-400"
@@ -559,6 +598,20 @@ const AuthenticateModal = ({
                           </td>
                           <td className="border p-1.5 text-center text-gray-600 text-xs max-w-xs truncate" title={rangeStr}>
                             {rangeStr && rangeStr.length > 35 ? rangeStr.substring(0, 35) + '...' : rangeStr}
+                          </td>
+                          <td className="border p-1.5 text-center">
+                            <input
+                              type="checkbox"
+                              checked={results[param.id]?.isHighlighted || false}
+                              onChange={(e) => {
+                                const newResults = { ...results };
+                                if (!newResults[param.id]) newResults[param.id] = {};
+                                newResults[param.id].isHighlighted = e.target.checked;
+                                setResults(newResults);
+                              }}
+                              className="w-4 h-4 cursor-pointer"
+                              title="Highlight this value"
+                            />
                           </td>
                         </tr>
                       );

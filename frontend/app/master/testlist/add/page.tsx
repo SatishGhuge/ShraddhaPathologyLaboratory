@@ -49,7 +49,6 @@ const AddTest = () => {
     profileTest: false,
     reportHeader: "",
     sampleTypeId: "",
-    machineId: "",
     isHeader: true,
     showTestName: true,
     outsourceLab: "",
@@ -72,6 +71,7 @@ const AddTest = () => {
   const [tests, setTests] = useState<any[]>([]);
   const [selectedTestToAdd, setSelectedTestToAdd] = useState("");
   const [selectedTestsToAdd, setSelectedTestsToAdd] = useState<any[]>([]);
+  const [selectedMachines, setSelectedMachines] = useState<any[]>([]); // Multi-machine selection
   const [pendingTestIds, setPendingTestIds] = useState<number[]>([]);
   const [showPreview, setShowPreview] = useState(false);
   const [showSampleTypeDropdown, setShowSampleTypeDropdown] = useState(false);
@@ -357,7 +357,6 @@ const AddTest = () => {
               profileTest: Boolean(testData.profileTest),
               reportHeader: testData.reportHeader || "",
               sampleTypeId: testData.sampleTypeId ? testData.sampleTypeId.toString() : "",
-              machineId: testData.machineId ? testData.machineId.toString() : "",
               isHeader: testData.isHeader !== undefined ? testData.isHeader : true,
               showTestName: testData.showTestName !== undefined ? testData.showTestName : true,
               outsourceLab: testData.outsourceLab || "",
@@ -531,6 +530,15 @@ const AddTest = () => {
                 // Store the IDs to resolve later when tests are loaded
                 setPendingTestIds(linkedIds);
               }
+            }
+
+            // Load assigned machines if present (edit mode)
+            if (testData.testMachines && testData.testMachines.length > 0) {
+              const machineData = testData.testMachines.map(tm => ({
+                id: tm.machine.id,
+                name: tm.machine.name
+              }));
+              setSelectedMachines(machineData);
             }
 
             setDataLoaded(true);
@@ -918,7 +926,7 @@ const AddTest = () => {
         testCode: formData.testCode || null,
         departmentId: formData.department ? parseInt(formData.department) : null,
         sampleTypeId: formData.sampleTypeId ? parseInt(formData.sampleTypeId) : null,
-        machineId: formData.machineId ? parseInt(formData.machineId) : null,
+        machineIds: selectedMachines.map(m => m.id), // Send as array of machine IDs
         group: formData.group || null,
         reportHeader: formData.reportHeader || null,
         preparationTime: formData.preparationTime || null,
@@ -1404,15 +1412,51 @@ const AddTest = () => {
                       </div>
                     )}
                   </div>
-                  <Select 
-                    label="Machine" 
-                    name="machineId"
-                    value={formData.machineId}
-                    onChange={handleChange}
-                    options={machines.map(m => ({ value: m.id.toString(), label: m.name }))}
-                    disabled={isViewMode}
-                    required={false}
-                  />
+                  {/* Machine Assignment - Multi-machine selection */}
+                  <div>
+                    <label className="font-semibold text-gray-700 text-xs sm:text-sm block mb-1">Machines</label>
+                    {/* Combined tag + select box */}
+                    <div className="flex flex-wrap items-center gap-1 px-2 py-1 border border-gray-300 rounded bg-white min-h-[32px] focus-within:ring-2 focus-within:ring-orange-600">
+                      {/* Tags inside the box */}
+                      {selectedMachines.map(m => (
+                        <span key={m.id} className="flex items-center gap-0.5 bg-blue-200 text-blue-900 text-xs px-1.5 py-0.5 rounded-full whitespace-nowrap">
+                          {m.name}
+                          {!isViewMode && (
+                            <button
+                              type="button"
+                              onClick={() => setSelectedMachines(prev => prev.filter(x => x.id !== m.id))}
+                              className="text-blue-600 hover:text-red-500 font-bold leading-none ml-0.5 text-sm"
+                            >×</button>
+                          )}
+                        </span>
+                      ))}
+                      {/* Inline select — grows to fill remaining space */}
+                      {!isViewMode && (
+                        <select
+                          value=""
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            if (!val) return;
+                            const id = parseInt(val);
+                            if (!selectedMachines.find(m => m.id === id)) {
+                              const machine = machines.find(m => m.id === id);
+                              if (machine) {
+                                setSelectedMachines(prev => [...prev, { id: machine.id, name: machine.name }]);
+                              }
+                            }
+                          }}
+                          className="flex-1 min-w-[120px] bg-transparent border-none outline-none text-xs text-gray-500 cursor-pointer"
+                        >
+                          <option value="">{selectedMachines.length === 0 ? '-- Select machine(s) --' : '+ Add more...'}</option>
+                          {Array.isArray(machines) && machines
+                            .filter(m => !selectedMachines.find(s => s.id === m.id))
+                            .map(machine => (
+                              <option key={machine.id} value={machine.id}>{machine.name}</option>
+                            ))}
+                        </select>
+                      )}
+                    </div>
+                  </div>
 
                   <Checkbox 
                     label="Is Header" 
