@@ -410,7 +410,6 @@ model Test {
   testCategory           TestCategory?       @relation("PrimaryTestCategory", fields: [testCategoryId], references: [id])
   testParameter          TestParameter?      @relation("PrimaryTestParameter", fields: [testParameterId], references: [id])
   sample_type            sample_type?        @relation(fields: [sampleTypeId], references: [id])
-  machine                Machine?            @relation("MachineTests", fields: [machineId], references: [id], onDelete: SetNull)
   outsourcingLabTests    OutsourcingLabTest[] @relation("OutsourcingTests")
 
 
