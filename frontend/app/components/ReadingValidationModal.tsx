@@ -190,13 +190,15 @@ const ReadingValidationModal = ({
             textValue: (textVal && typeof textVal === 'string' && textVal.trim() !== '') ? textVal : '',
             selectedOption: (optionVal && typeof optionVal === 'string' && optionVal.trim() !== '') ? optionVal : '',
             isAbnormal: param.existingResult.isAbnormal || false,
+            isHighlighted: param.existingResult.isHighlighted || false,
             referenceRange: param.existingResult.referenceRange || param.normalRange
           };
           
           console.log(`  → Init for param ${param.id}:`, {
             numericValue: initialResults[param.id].numericValue,
             textValue: initialResults[param.id].textValue,
-            selectedOption: initialResults[param.id].selectedOption
+            selectedOption: initialResults[param.id].selectedOption,
+            isHighlighted: initialResults[param.id].isHighlighted
           });
         } else {
           initialResults[param.id] = {
@@ -204,6 +206,7 @@ const ReadingValidationModal = ({
             textValue: '',
             selectedOption: '',
             isAbnormal: false,
+            isHighlighted: false,
             referenceRange: param.normalRange
           };
         }
@@ -449,6 +452,7 @@ const ReadingValidationModal = ({
             textValue: textVal,
             selectedOption: results[param.id]?.selectedOption || null,
             isAbnormal: results[param.id]?.isAbnormal || false,
+            isHighlighted: results[param.id]?.isHighlighted || false,
             referenceRange: results[param.id]?.referenceRange || param.normalRange
           };
         })
@@ -642,7 +646,7 @@ const ReadingValidationModal = ({
                         : 'border border-gray-300 px-2 py-1 rounded focus:outline-none focus:ring-2 focus:ring-cyan-500 text-xs';
 
                       return (
-                        <tr key={param.id} className={outOfRange ? 'bg-red-50' : 'bg-white hover:bg-gray-50'} style={{height: '28px'}}>
+                        <tr key={param.id} className={(outOfRange || results[param.id]?.isHighlighted) ? 'bg-red-50' : 'bg-white hover:bg-gray-50'} style={{height: '28px'}}>
                           <td className="border p-1.5">
                             <span className="font-medium text-gray-900 text-xs">
                               {(() => {
@@ -664,14 +668,13 @@ const ReadingValidationModal = ({
                               <div className="relative">
                                 <input
                                   ref={(el) => { if (el) inputRefs.current[param.id] = el; }}
-                                  type="number"
-                                  step="0.01"
+                                  type="text"
                                   value={results[param.id]?.numericValue ?? ''}
                                   onChange={(e) =>
                                     handleResultChange(
                                       param.id,
                                       'numericValue',
-                                      e.target.value === '' ? null : parseFloat(e.target.value)
+                                      e.target.value === '' ? null : e.target.value
                                     )
                                   }
                                   onFocus={() => setFocusedInputId(param.id)}
@@ -804,11 +807,18 @@ const ReadingValidationModal = ({
                             {truncatedRange}
                           </td>
                           <td className="border p-1.5 text-center">
-                            {results[param.id]?.isHighlighted ? (
-                              <span className="text-green-600 font-bold text-lg" title="This value is highlighted">✓</span>
-                            ) : (
-                              <span className="text-gray-300 text-lg">-</span>
-                            )}
+                            <input
+                              type="checkbox"
+                              checked={results[param.id]?.isHighlighted || false}
+                              onChange={(e) => {
+                                const newResults = { ...results };
+                                if (!newResults[param.id]) newResults[param.id] = {};
+                                newResults[param.id].isHighlighted = e.target.checked;
+                                setResults(newResults);
+                              }}
+                              className="w-4 h-4 cursor-pointer"
+                              title="Highlight this value"
+                            />
                           </td>
                         </tr>
                       );
