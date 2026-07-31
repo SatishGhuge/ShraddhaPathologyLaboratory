@@ -8,7 +8,7 @@ set DB_PORT=3306
 set DB_USER=root
 set DB_PASSWORD=LocalLabPass123!
 set DB_NAME=lab_agent_db
-set VPS_TAILSCALE_URL=http://localhost:3000
+set VPS_TAILSCALE_URL=http://localhost:3351
 
 echo.
 echo ======================================================================

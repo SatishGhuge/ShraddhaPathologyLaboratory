@@ -374,7 +374,6 @@ model Test {
   testParameterId        Int?
   testCategoryId         Int?
   sampleTypeId           Int?
-  machineId              Int?              // Foreign key to Machine table (optional)
   group                  String?
   reportHeader           String?
   preparationTime        String?
@@ -406,6 +405,7 @@ model Test {
   charges                TestCharge[]
   ownedParameters        TestParameter[]    @relation("ParameterOwner")
   templates              TestTemplate[]
+  testMachines           TestMachine[]
   department             Department          @relation(fields: [departmentId], references: [id], onDelete: Cascade)
   testCategory           TestCategory?       @relation("PrimaryTestCategory", fields: [testCategoryId], references: [id])
   testParameter          TestParameter?      @relation("PrimaryTestParameter", fields: [testParameterId], references: [id])
@@ -700,9 +700,24 @@ model Machine {
   isActive  Boolean   @default(true)
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
-  tests     Test[]    @relation("MachineTests")
+  testMachines TestMachine[]
 
   @@map("machines")
+}
+
+model TestMachine {
+  id        Int       @id @default(autoincrement())
+  testId    Int
+  machineId Int
+  createdAt DateTime  @default(now())
+  
+  test      Test      @relation(fields: [testId], references: [id], onDelete: Cascade)
+  machine   Machine   @relation(fields: [machineId], references: [id], onDelete: Cascade)
+
+  @@unique([testId, machineId])
+  @@index([testId])
+  @@index([machineId])
+  @@map("test_machines")
 }
 
 model PaymentTransaction {
