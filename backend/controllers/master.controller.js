@@ -1004,8 +1004,6 @@ export const updateTest = async (req, res) => {
       updateData.profileTest = convertToBoolean(profileTest);
     }
 
-    // Handle sampleTypeId separately using relation syntax
-    const testId = parseInt(id);
     if (sampleTypeId !== undefined) {
       console.log('📌 Updating sampleTypeId:', sampleTypeId);
       updateData.sample_type = sampleTypeId ? { connect: { id: parseInt(sampleTypeId) } } : { disconnect: true };
