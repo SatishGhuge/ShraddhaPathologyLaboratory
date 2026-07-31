@@ -43,7 +43,7 @@ export const queryWorklist = async (req, res) => {
     const machine = await prisma.machine.findFirst({
       where: {
         name: {
-          contains: normalizedAnalyzer
+          contains: normalizedAnalyzer.toLowerCase()
         }
       }
     });

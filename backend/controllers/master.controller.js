@@ -592,7 +592,7 @@ export const getTestById = async (req, res) => {
       departmentId: test.departmentId,
       sampleTypeId: test.sampleTypeId,
       sample_type: test.sample_type,
-      machineId: test.machineId,
+      machineIds: test.testMachines?.map(tm => tm.machineId) || [],
       group: test.group,
       reportHeader: test.reportHeader,
       preparationTime: test.preparationTime,
@@ -1007,12 +1007,6 @@ export const updateTest = async (req, res) => {
     if (sampleTypeId !== undefined) {
       console.log('📌 Updating sampleTypeId:', sampleTypeId);
       updateData.sample_type = sampleTypeId ? { connect: { id: parseInt(sampleTypeId) } } : { disconnect: true };
-    }
-
-    // Handle machineId separately using relation syntax
-    if (machineId !== undefined) {
-      console.log('📌 Updating machineId:', machineId);
-      updateData.machine = machineId ? { connect: { id: parseInt(machineId) } } : { disconnect: true };
     }
 
     // Remove undefined values from updateData
