@@ -421,7 +421,6 @@ model Test {
   @@index([isOutsourced])
   @@index([name])
   @@index([sampleTypeId], map: "tests_sampleTypeId_fkey")
-  @@index([machineId], map: "tests_machineId_fkey")
   @@map("tests")
 }
 
