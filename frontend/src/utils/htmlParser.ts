@@ -24,15 +24,19 @@ export const parseHtmlText = (str: string): string | HtmlPart[] => {
   
   // First, decode HTML entities: &lt; → <, &gt; → >
   // This handles both actual tags and encoded tags
+  // Important: Decode &amp; LAST to avoid double-decoding
   text = text
     .replace(/&lt;/g, '<')
     .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
     .replace(/&amp;/g, '&');
   
   const parts: HtmlPart[] = [];
   let lastIndex = 0;
   // Match: <b>, </b>, <i>, </i>, <u>, </u>, <strong>, </strong>, <em>, </em>
-  const regex = /<(\/?)(?:b|strong|i|em|u)>/g;
+  // Made more flexible with optional whitespace
+  const regex = /<\s*(\/)?\s*(?:b|strong|i|em|u)\s*>/gi;
   let match;
   let isBold = false;
   let isItalic = false;
@@ -54,11 +58,11 @@ export const parseHtmlText = (str: string): string | HtmlPart[] => {
     const fullMatch = match[0];
     const isClosing = match[1] === '/';
     
-    if (fullMatch.includes('b') || fullMatch.includes('strong')) {
+    if (fullMatch.toLowerCase().includes('b') || fullMatch.toLowerCase().includes('strong')) {
       isBold = !isClosing;
-    } else if (fullMatch.includes('i') || fullMatch.includes('em')) {
+    } else if (fullMatch.toLowerCase().includes('i') || fullMatch.toLowerCase().includes('em')) {
       isItalic = !isClosing;
-    } else if (fullMatch.includes('u')) {
+    } else if (fullMatch.toLowerCase().includes('u')) {
       isUnderline = !isClosing;
     }
 
@@ -104,11 +108,13 @@ export const stripHtmlTags = (str: string): string => {
   text = text
     .replace(/&lt;/g, '<')
     .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
     .replace(/&amp;/g, '&');
   
-  // Then remove all HTML tags
+  // Then remove all HTML tags (case-insensitive with flexible whitespace)
   return text
-    .replace(/<[^>]*>/g, "")
+    .replace(/<\s*(\/)?\s*(?:b|strong|i|em|u)\s*>/gi, "")
     .trim();
 };
 

@@ -256,6 +256,66 @@ const numberToWords = (n: any) => {
   return n.toString();
 };
 
+// Calculate formatted age for babies < 1 year (e.g., "1 month 3 days")
+const calculateBabyAgeFormatted = (dobString: string): { formattedAge: string; years: number; months: number; days: number } | null => {
+  if (!dobString) return null;
+  
+  try {
+    const birthDate = new Date(dobString);
+    const today = new Date();
+    
+    // Calculate exact age in years first
+    let years = today.getFullYear() - birthDate.getFullYear();
+    const monthDiff = today.getMonth() - birthDate.getMonth();
+    const dayDiff = today.getDate() - birthDate.getDate();
+    
+    if (monthDiff < 0 || (monthDiff === 0 && dayDiff < 0)) {
+      years--;
+    }
+    
+    // If baby is < 1 year, calculate months and days
+    if (years < 1) {
+      let months = today.getMonth() - birthDate.getMonth();
+      let days = today.getDate() - birthDate.getDate();
+      
+      if (days < 0) {
+        months--;
+        // Get days in previous month
+        const prevMonth = new Date(today.getFullYear(), today.getMonth(), 0);
+        days += prevMonth.getDate();
+      }
+      
+      if (months < 0) {
+        months += 12;
+      }
+      
+      // Format the age string: "1 month 3 days", "5 days", "2 months"
+      const parts = [];
+      if (months > 0) {
+        parts.push(`${months} month${months === 1 ? '' : 's'}`);
+      }
+      if (days > 0 || parts.length === 0) {
+        parts.push(`${days} day${days === 1 ? '' : 's'}`);
+      }
+      
+      const formattedAge = parts.join(' ');
+      
+      return {
+        formattedAge,
+        years: 0,
+        months,
+        days
+      };
+    }
+    
+    // For babies >= 1 year, return null (use numeric age)
+    return null;
+  } catch (e) {
+    console.warn('Error calculating baby age:', e);
+    return null;
+  }
+};
+
 /* ------------------ COMPONENT ------------------ */
 
 export default function PatientRegistration() {
@@ -280,6 +340,7 @@ export default function PatientRegistration() {
   const [showPatientSelectionModal, setShowPatientSelectionModal] = useState(false); // Show patient selection
   const [dob, setDob] = useState(rebookingData?.visitDate?.split(' ')[0] || "");
   const [age, setAge] = useState(rebookingData?.age || "");
+  const [babyAgeFormatted, setBabyAgeFormatted] = useState<string>(""); // "1 month 3 days" format for babies < 1 year
   const [mobile, setMobile] = useState(rebookingData?.mobile || "");
   const [email, setEmail] = useState(rebookingData?.email || "");
   const [address, setAddress] = useState(rebookingData?.address || "");
@@ -306,7 +367,7 @@ export default function PatientRegistration() {
   const [navigateToResult, setNavigateToResult] = useState(false);
   const [showDoctorList, setShowDoctorList] = useState(false);
   const [showBillModal, setShowBillModal] = useState(false);
-  const [gender, setGender] = useState(rebookingData?.gender || "");
+  const [gender, setGender] = useState(rebookingData?.gender || "Male");
   const [refDoctor, setRefDoctor] = useState(rebookingData?.referralDoctor || "");
   const [frequentTests, setFrequentTests] = useState<any[]>([]);
   const [filterFrequent, setFilterFrequent] = useState(false);
@@ -474,7 +535,7 @@ export default function PatientRegistration() {
   const fetchDepartmentsData = async () => {
     try {
       setLoading(true);
-      console.log('🔄 Fetching departments, tests, and packages...');
+      console.log('🔄 Fetching departments, tests, packages...');
       
       const [deptsResponse, testsResponse, packagesResponse] = await Promise.all([
         fetch(`${API_BASE_URL}/master/departments`).then(r => r.json()),
@@ -486,7 +547,7 @@ export default function PatientRegistration() {
       console.log('Raw tests response:', testsResponse);
       console.log('Raw packages response:', packagesResponse);
 
-      // Extract data from responses (handle both success flag and direct data)
+      // Extract data from responses
       const depts = deptsResponse.data || (Array.isArray(deptsResponse) ? deptsResponse : deptsResponse?.success ? deptsResponse.data : []);
       const tests = testsResponse.data || (Array.isArray(testsResponse) ? testsResponse : testsResponse?.success ? testsResponse.data : []);
       const packages = packagesResponse.data || (Array.isArray(packagesResponse) ? packagesResponse : packagesResponse?.success ? packagesResponse.data : []);
@@ -515,8 +576,14 @@ export default function PatientRegistration() {
               sample: test.sample_type?.Sample_Type || "N/A",
               b2cCharge: test.charges?.[0]?.b2cCharge || 0,
               b2bCharge: test.charges?.[0]?.b2bCharge || 0,
-              department: deptMap[test.departmentId].name
+              department: deptMap[test.departmentId].name,
+              isOutsourced: test.isOutsourced || false,  // 🔧 Use Test.isOutsourced flag directly
+              outsourcedTo: null // Not needed anymore
             });
+            
+            if (test.isOutsourced) {
+              console.log(`⚠️ Test ${test.name} is marked as outsourced`);
+            }
           }
         });
 
@@ -662,6 +729,7 @@ export default function PatientRegistration() {
         if (data.title) setTitle(data.title);
         if (data.dob) setDob(data.dob);
         if (data.age) setAge(data.age);
+        if (data.babyAgeFormatted) setBabyAgeFormatted(data.babyAgeFormatted);
         if (data.mobile) setMobile(data.mobile);
         if (data.email) setEmail(data.email);
         if (data.address) setAddress(data.address);
@@ -714,7 +782,7 @@ export default function PatientRegistration() {
           return;
         }
         const dataToSave = {
-          firstName, lastName, title, dob, age, mobile, email, address, location, locationSearch,
+          firstName, lastName, title, dob, age, babyAgeFormatted, mobile, email, address, location, locationSearch,
           gender, remarks, visitType, reportMode,
           sampleBarcodeNo, refDoctor, isManualRefDoctor, manualRefDoctorName,
           selectedOrganization, selectedOrganizationCode, organizationSearch,
@@ -730,7 +798,7 @@ export default function PatientRegistration() {
 
     return () => clearTimeout(timeoutId);
   }, [
-    firstName, lastName, title, dob, age, mobile, email, address, location, locationSearch, gender, remarks,
+    firstName, lastName, title, dob, age, babyAgeFormatted, mobile, email, address, location, locationSearch, gender, remarks,
     visitType, reportMode, sampleBarcodeNo,
     refDoctor, isManualRefDoctor, manualRefDoctorName, selectedTests,
     selectedOrganization, organizationSearch,
@@ -760,12 +828,13 @@ export default function PatientRegistration() {
     setTitle("MR");
     setDob("");
     setAge("");
+    setBabyAgeFormatted("");
     setMobile("");
     setEmail("");
     setAddress("");
     setLocation("");
     setLocationSearch("");  // ✨ FIX: Also clear location search
-    setGender("");
+    setGender("Male");
     setRemarks("");
     setCreatedBy(loggedUser);
     setVisitType("");
@@ -816,13 +885,62 @@ export default function PatientRegistration() {
 
   const handleDobChange = (value: any) => {
     setDob(value);
-    if (!value) return setAge("");
+    if (!value) {
+      setAge("");
+      setBabyAgeFormatted("");
+      return;
+    }
+    
     const birthDate = new Date(value);
     const today = new Date();
-    let a = today.getFullYear() - birthDate.getFullYear();
-    const m = today.getMonth() - birthDate.getMonth();
-    if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) a--;
-    setAge(a >= 0 ? a : "");
+    
+    // Calculate years first
+    let years = today.getFullYear() - birthDate.getFullYear();
+    let months = today.getMonth() - birthDate.getMonth();
+    let days = today.getDate() - birthDate.getDate();
+    
+    // Adjust for negative months or days
+    if (months < 0 || (months === 0 && days < 0)) {
+      years--;
+      months += 12;
+    }
+    
+    if (days < 0) {
+      months--;
+      const prevMonth = new Date(today.getFullYear(), today.getMonth(), 0);
+      days += prevMonth.getDate();
+    }
+    
+    // If baby is less than 1 year old, calculate months and days and display formatted
+    if (years < 1) {
+      const ageData = calculateBabyAgeFormatted(value);
+      if (ageData) {
+        // For babies < 1 year, display formatted age "1 month 3 days"
+        setAge(0); // Store 0 for numeric age
+        setBabyAgeFormatted(ageData.formattedAge); // Display formatted
+        console.log(`🍼 Baby age: ${ageData.formattedAge}`);
+      }
+      return;
+    }
+    
+    // For children 1-12 years old, show format "11Y 4M 6D" with spaces
+    if (years >= 1 && years <= 12) {
+      const formattedAge = `${years}Y ${months}M ${days}D`;
+      setAge(formattedAge); // Store formatted age string
+      setBabyAgeFormatted(""); // Clear baby age
+      console.log(`👧 Child age (1-12 years): ${formattedAge}`);
+      return;
+    }
+    
+    // For adults > 12 years, use decimal format "12.1"
+    if (years > 12) {
+      // Calculate decimal: decimal = years + (months / 12)
+      const decimalAge = (years + months / 12).toFixed(1);
+      setAge(decimalAge); // Store decimal age
+      setBabyAgeFormatted(""); // Clear baby age
+      console.log(`👨 Adult age (>12 years): ${decimalAge}`);
+      return;
+    }
   };
 
   const handleMobileChange = async (value) => {
@@ -1383,7 +1501,8 @@ export default function PatientRegistration() {
     if (!title) missingFields.push("Title");
     if (!firstName) missingFields.push("First Name");
     if (!lastName) missingFields.push("Last Name");
-    if (!age) missingFields.push("Age");
+    // Age can be 0 for babies (< 1 year), so check for null/undefined/empty string, not falsy
+    if (age === "" || age === null || age === undefined) missingFields.push("Age");
     if (!gender) missingFields.push("Gender");
     // Mobile, Email, Address, and Location are now optional ✅
     
@@ -1415,7 +1534,11 @@ export default function PatientRegistration() {
         firstName: firstName,
         lastName: lastName || null,
         dob: dob || null,
-        age: parseInt(age) || null,
+        // Send age as-is (already formatted by handleDobChange)
+        // For babies < 1 year: "12D" or "3M12D"
+        // For children 1-12: "11Y3M12D"
+        // For adults > 12: "12.1"
+        age: age !== "" && age !== null && age !== undefined ? age : null,
         gender: gender,
         mobile: mobile,
         email: email || null,
@@ -1497,7 +1620,11 @@ export default function PatientRegistration() {
         firstName: firstName,
         lastName: lastName || null,
         dob: dob || null,  // DOB is optional
-        age: parseInt(age) || null,
+        // Send age as-is (already formatted by handleDobChange)
+        // For babies < 1 year: "12D" or "3M12D"
+        // For children 1-12: "11Y3M12D"
+        // For adults > 12: "12.1"
+        age: age !== "" && age !== null && age !== undefined ? age : null,
         gender: gender,
         mobile: mobile,
         email: email || null,
@@ -1690,9 +1817,12 @@ export default function PatientRegistration() {
     const testWithCharges = {
       ...test,
       b2cCharge: orgCharge?.b2cCharge ?? test.b2cCharge,
-      b2bCharge: orgCharge?.b2bCharge ?? test.b2bCharge
+      b2bCharge: orgCharge?.b2bCharge ?? test.b2bCharge,
+      // 🔧 PART 1: Preserve outsourcing info when adding test
+      isOutsourced: test.isOutsourced || false,
+      outsourcedTo: test.outsourcedTo || null
     };
-    console.log(`➕ Adding test: ${test.name} (ID: ${test.id}, key: "${key}") with charges B2C=${testWithCharges.b2cCharge}, B2B=${testWithCharges.b2bCharge}`);
+    console.log(`➕ Adding test: ${test.name} (ID: ${test.id}, key: "${key}") with charges B2C=${testWithCharges.b2cCharge}, B2B=${testWithCharges.b2bCharge}${testWithCharges.isOutsourced ? `, OUTSOURCED to ${testWithCharges.outsourcedTo}` : ''}`);
     
     if (!selectedTests.find((t) => t.name === test.name))
       setSelectedTests([...selectedTests, testWithCharges]);
@@ -2071,11 +2201,13 @@ export default function PatientRegistration() {
               <input 
                 className={input} 
                 placeholder="Age *" 
-                value={age} 
+                value={babyAgeFormatted || age} 
                 onChange={(e) => setAge(e.target.value)}
-                type="number"
-                min="0"
-                max="150"
+                type={babyAgeFormatted || (age && (age.includes('Y') || age.includes('M') || age.includes('D'))) ? "text" : "number"}
+                min={babyAgeFormatted || (age && (age.includes('Y') || age.includes('M') || age.includes('D'))) ? undefined : "0"}
+                max={babyAgeFormatted || (age && (age.includes('Y') || age.includes('M') || age.includes('D'))) ? undefined : "150"}
+                readOnly={babyAgeFormatted || (age && (age.includes('Y') || age.includes('M') || age.includes('D'))) ? true : false}
+                title={babyAgeFormatted ? "Baby age calculated from DOB (months/days)" : (age && (age.includes('Y') || age.includes('M') || age.includes('D'))) ? "Age calculated from DOB (Y-M-D format)" : "Enter age in years"}
                 required 
               />
               <InlineSelect
@@ -2600,7 +2732,12 @@ export default function PatientRegistration() {
                           }
                         }}
                       />
-                      {t.name}
+                      <span>{t.name}</span>
+                      {t.isOutsourced && (
+                        <span title="Outsourced test" className="text-orange-500 font-bold text-lg leading-none">
+                          ▲
+                        </span>
+                      )}
                     </div>
                     <div className="col-span-3 text-center flex items-center justify-center gap-1">
                       <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" style={{ transform: 'rotate(45deg)', flexShrink: 0 }}>
@@ -2650,6 +2787,11 @@ export default function PatientRegistration() {
                 <div className="col-span-5">
                   <div className="flex items-center gap-2">
                     <span className="truncate">{t.name}</span>
+                    {t.isOutsourced && (
+                      <span title="Outsourced test" className="text-orange-500 font-bold text-lg leading-none flex-shrink-0">
+                        ▲
+                      </span>
+                    )}
                   </div>
                 </div>
                 <div className="col-span-3 text-center flex items-center justify-center gap-1">
@@ -3168,13 +3310,31 @@ export default function PatientRegistration() {
                         <tr key={idx} className={`border-b ${t.fromPackage ? 'bg-white' : ''}`}>
                           <td className="p-2">{idx + 1}</td>
                           <td className="p-2">
-                            {t.name}
+                            <div className="flex items-center gap-2">
+                              <span>{t.name}</span>
+                              {t.isOutsourced && (
+                                <>
+                                  <span title="Outsourced test" className="text-orange-500 font-bold text-lg leading-none">
+                                    ▲
+                                  </span>
+                                  <span title={`Outsourced to: ${t.outsourcedTo}`} className="bg-yellow-400 text-yellow-900 text-xs px-2 py-0.5 rounded font-semibold whitespace-nowrap">
+                                    ⚠️ Outsourcing
+                                  </span>
+                                </>
+                              )}
+                            </div>
                             {t.fromPackage && (
                               <div className="text-xs text-gray-400 mt-0.5">{t.fromPackage}</div>
                             )}
+                            {/* Show outsourced lab name below test if outsourced */}
+                            {t.isOutsourced && (
+                              <div className="text-xs text-yellow-700 mt-1">Lab: {t.outsourcedTo}</div>
+                            )}
                           </td>
                           <td className="p-2 text-center">
-                            {t.fromPackage ? (
+                            {t.isOutsourced ? (
+                              <span className="bg-yellow-500 text-white text-xs px-2 py-1 rounded font-semibold">⚠️ OUTSOURCE</span>
+                            ) : t.fromPackage ? (
                               <span className="bg-orange-500 text-white text-xs px-2 py-1 rounded font-semibold">PKG</span>
                             ) : (
                               <span className="text-gray-600">Test</span>

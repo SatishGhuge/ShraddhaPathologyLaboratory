@@ -45,6 +45,15 @@ export const getPatientTests = async (req, res) => {
     // Build where condition for filtering
     const andConditions = [];
 
+    // 🔴 DEBUG: Log all incoming filters
+    console.log('🔴 Result Controller - getPatientTests Filters:');
+    console.log('   department:', department);
+    console.log('   organization:', organization);
+    console.log('   status:', status);
+    console.log('   testName:', testName);
+    console.log('   fromDate:', fromDate);
+    console.log('   toDate:', toDate);
+
     // Filter by status
     if (status && status !== 'All') {
       andConditions.push({ status });
@@ -77,13 +86,13 @@ export const getPatientTests = async (req, res) => {
       });
     }
 
-    // Filter by department
+    // Filter by department - use case-insensitive comparison
     if (department && department !== '') {
+      console.log(`🔴 Applying department filter: "${department}"`);
+      // Use contains for case-insensitive matching (MySQL default is case-insensitive)
       andConditions.push({ 
         department: { 
-          name: { 
-            contains: department.toLowerCase()
-          } 
+          name: department  // Direct equality - MySQL is case-insensitive by default
         } 
       });
     }
@@ -110,86 +119,39 @@ export const getPatientTests = async (req, res) => {
 
     const whereCondition = andConditions.length > 0 ? { AND: andConditions } : {};
 
+    // 🔴 DEBUG: Log the where condition
+    console.log('🔴 WHERE condition:', JSON.stringify(whereCondition, null, 2));
+
     // Get total count for pagination
     const total = await prisma.patientTest.count({
       where: whereCondition
     });
 
+    // 🔴 DEBUG: Log total count
+    console.log(`🔴 Total records found: ${total}`);
+
     // Get paginated data
     const patientTests = await prisma.patientTest.findMany({
       where: whereCondition,
       include: {
-        patient: {
-          select: {
-            patientId: true,
-            title: true,
-            firstName: true,
-            lastName: true,
-            age: true,
-            gender: true,
-            mobile: true,
-            email: true
-          }
-        },
+        patient: true,
         test: {
           include: {
-            sample_type: {
-              select: {
-                id: true,
-                Sample_Type: true,
-                Sample_Color: true
-              }
-            },
+            sample_type: true,
             categories: {
               include: {
                 testParameter: {
-                  select: {
-                    id: true,
-                    parameterName: true,
-                    testMethod: true,
-                    displayRangeText: true,
-                    rangeText: true,
-                    type: true,
-                    isDescriptive: true,
-                    ageRanges: true,
-                    rangeType: true,
-                    maleLowValue: true,
-                    maleHighValue: true,
-                    femaleHighValue: true,
-                    femaleLowValue: true,
-                    maleActive: true,
-                    femaleActive: true,
-                    childLowValue: true,
-                    childHighValue: true,
-                    childActive: true
+                  include: {
+                    unit: true
                   }
                 }
               }
             }
           }
         },
-        testResults: {
-          select: {
-            id: true,
-            testParameterId: true,
-            numericValue: true,
-            textValue: true,
-            selectedOption: true
-          }
-        },
-        department: {
-          select: {
-            id: true,
-            name: true
-          }
-        },
-        organization: {
-          select: {
-            id: true,
-            name: true,
-            code: true
-          }
-        }
+        testResults: true,
+        department: true,
+        organization: true
       },
       skip,
       take: limit,
@@ -237,6 +199,8 @@ export const getPatientTests = async (req, res) => {
         result_status: normalizeStatus(patientTest.status),
         status: patientTest.status,
         barcode_status: patientTest.barcode_status || 'Unprinted',
+        isOutsourced: patientTest.test?.isOutsourced || false,
+        outsourcedTo: patientTest.outsourcedTo || null,
         approved_date: patientTest.visitDate ? (() => {
           const d = patientTest.visitDate;
           const datePart = d.toLocaleDateString('en-GB'); // DD/MM/YYYY
@@ -265,6 +229,10 @@ export const getPatientTests = async (req, res) => {
         parameter_id: patientTest.test.categories?.length === 1 ? (patientTest.test.categories?.[0]?.testParameter?.id || null) : null,
         // Add method name for reports (only for single parameter tests)
         method_name: patientTest.test.categories?.length === 1 ? (patientTest.test.categories?.[0]?.testParameter?.testMethod || '') : '',
+        // ✅ GET UNIT from the parameter object (which now includes unit data)
+        unit: patientTest.test.categories?.length === 1 && patientTest.test.categories?.[0]?.testParameter 
+          ? (patientTest.test.categories[0].testParameter.unit?.symbol || '') 
+          : '',
         // For ref_interval, include full parameter data so frontend can calculate based on patient demographics
         ref_interval_data: patientTest.test.categories?.length === 1 ? (patientTest.test.categories?.[0]?.testParameter || null) : null,
         // For result, get the numeric or text value from the first test result if single parameter
@@ -309,45 +277,15 @@ export const getPatientTestById = async (req, res) => {
     const patientTest = await prisma.patientTest.findUnique({
       where: { id: parseInt(id) },
       include: {
-        patient: {
-          select: {
-            patientId: true,
-            title: true,
-            firstName: true,
-            lastName: true,
-            age: true,
-            gender: true,
-            dob: true,
-            email: true,
-            mobile: true
-          }
-        },
+        patient: true,
         test: {
-          select: {
-            id: true,
-            name: true,
-            shortName: true,
-            interpretation: true,
-            attachFile: true,
-            imageSize: true,
-            sampleTypeId: true,
-            sample_type: {
-              select: {
-                id: true,
-                Sample_Type: true,
-                Sample_Color: true
-              }
-            }
+          include: {
+            sample_type: true
           }
         },
         testResults: {
           include: {
-            testParameter: {
-              select: {
-                id: true,
-                parameterName: true
-              }
-            }
+            testParameter: true
           }
         }
       }
@@ -571,11 +509,13 @@ export const getPatientTestById = async (req, res) => {
 
         allParameters.push(parameter);
 
-        // Group by category name
-        if (!groupedParameters[categoryName]) {
-          groupedParameters[categoryName] = [];
+        // Group by UNIQUE category identifier (not just category name)
+        // This ensures categories without names still get their own group
+        const groupKey = parameter.categoryUniqueId || parameter.categoryName || 'NO_CATEGORY_HEADER';
+        if (!groupedParameters[groupKey]) {
+          groupedParameters[groupKey] = [];
         }
-        groupedParameters[categoryName].push(parameter);
+        groupedParameters[groupKey].push(parameter);
       }
     });
 
@@ -700,17 +640,39 @@ export const getPatientTestById = async (req, res) => {
 
         allParameters.push(parameter);
 
-        // Group by test name
-        const categoryName = 'NO_CATEGORY_HEADER';
-        if (!groupedParameters[categoryName]) {
-          groupedParameters[categoryName] = [];
+        // Group by UNIQUE category identifier
+        // For direct parameters, use the unique ID to avoid collapsing them together
+        const groupKey = parameter.categoryUniqueId || parameter.categoryName || 'NO_CATEGORY_HEADER';
+        if (!groupedParameters[groupKey]) {
+          groupedParameters[groupKey] = [];
         }
-        groupedParameters[categoryName].push(parameter);
+        groupedParameters[groupKey].push(parameter);
       });
     }
 
     console.log(`Processed ${allParameters.length} parameters in ${Object.keys(groupedParameters).length} categories`);
     console.log(`📤 RETURNING: ${totalExistingResults} parameters have existing saved results`);
+
+    // 🔧 Fetch outsourcing report data if this is an outsourced test
+    let outsourcingReport = null;
+    if (patientTest.test?.isOutsourced) {
+      outsourcingReport = await prisma.outsourcingReport.findUnique({
+        where: { patientTestId: patientTest.id },
+        include: {
+          outsourcingLab: {
+            select: {
+              id: true,
+              labName: true,
+              code: true
+            }
+          }
+        }
+      });
+      console.log('✅ Fetched outsourcing report:', outsourcingReport ? 'Found' : 'Not found');
+      if (outsourcingReport?.extractedData) {
+        console.log('📋 Extracted data stored:', outsourcingReport.extractedData);
+      }
+    }
 
     res.json({
       success: true,
@@ -718,6 +680,7 @@ export const getPatientTestById = async (req, res) => {
         patientTest,
         parameters: allParameters,
         groupedParameters,
+        outsourcingReport,  // Include outsourcing data
         debug: { totalExistingResults, totalParameters: allParameters.length }
       }
     });
@@ -769,9 +732,9 @@ function getNormalRange(parameter, patient) {
       for (const range of ageRanges) {
         if (!range.enabled) continue;
         
-        // Check gender match - if range has gender specified, it must match patient gender
+        // Check gender match - if range has gender specified, it must match patient gender or be 'both'
         const rangeGender = range.gender?.toLowerCase();
-        if (rangeGender && rangeGender !== patientGender) continue;
+        if (rangeGender && rangeGender !== 'both' && rangeGender !== patientGender) continue;
         
         let ageMatches = false;
         
@@ -818,6 +781,22 @@ function getNormalRange(parameter, patient) {
       if (patientGender === 'male' && parameter.maleActive && 
           parameter.maleLowValue !== null && parameter.maleHighValue !== null) {
         return `${parameter.maleLowValue} - ${parameter.maleHighValue}`;
+      }
+      
+      // If gender doesn't match M/F and no specific range found, try to use any default value from normalRanges
+      if (!['male', 'female'].includes(patientGender)) {
+        if (parameter.normalRanges) {
+          try {
+            const normalRanges = JSON.parse(parameter.normalRanges);
+            for (const range of normalRanges) {
+              if (range.defaultValue) {
+                return range.defaultValue;
+              }
+            }
+          } catch (error) {
+            console.warn('Error parsing normal ranges:', error);
+          }
+        }
       }
     }
   }
@@ -981,13 +960,14 @@ export const updateTestResult = async (req, res) => {
     if (parameterResults && Array.isArray(parameterResults) && parameterResults.length > 0) {
       console.log('  🔄 Processing parameterResults...');
       for (const paramResult of parameterResults) {
-        const { parameterId, numericValue, textValue } = paramResult;
+        const { parameterId, numericValue, textValue, isHighlighted } = paramResult;
         
         console.log(`  📝 Upserting TestResult:
           patientTestId: ${id}
           parameterId: ${parameterId}
           numericValue: ${numericValue}
-          textValue: ${textValue}`);
+          textValue: ${textValue}
+          isHighlighted: ${isHighlighted}`);
         
         if (!parameterId) {
           console.error(`  ❌ SKIPPED: parameterId is null or undefined!`);
@@ -1006,6 +986,7 @@ export const updateTestResult = async (req, res) => {
             update: {
               numericValue: numericValue || undefined,
               textValue: textValue || undefined,
+              isHighlighted: isHighlighted || false,
               verifiedAt: new Date()
             },
             create: {
@@ -1013,6 +994,7 @@ export const updateTestResult = async (req, res) => {
               testParameterId: parseInt(parameterId),
               numericValue: numericValue || undefined,
               textValue: textValue || undefined,
+              isHighlighted: isHighlighted || false,
               enteredAt: new Date(),
               verifiedAt: new Date()
             }
@@ -1021,7 +1003,8 @@ export const updateTestResult = async (req, res) => {
           console.log(`  ✅ TestResult upserted for parameterId=${parameterId}:`, {
             id: testResult.id,
             numericValue: testResult.numericValue,
-            textValue: testResult.textValue
+            textValue: testResult.textValue,
+            isHighlighted: testResult.isHighlighted
           });
         } catch (upsertError) {
           console.error(`  ❌ Upsert error for parameterId=${parameterId}:`, upsertError.message);
@@ -1257,7 +1240,8 @@ export const saveTestResults = async (req, res) => {
         testCategoryId,
         numericValue,
         textValue,
-        selectedOption
+        selectedOption,
+        isHighlighted
       } = result;
 
       // Validate required field
@@ -1328,9 +1312,10 @@ export const saveTestResults = async (req, res) => {
             }
           },
           update: {
-            numericValue: numericValue !== null ? parseFloat(numericValue) : null,
+            numericValue: numericValue !== null ? String(numericValue) : null,
             textValue: textValue || null,
             selectedOption: selectedOption || null,
+            isHighlighted: isHighlighted || false,
             enteredBy: enteredBy,
             enteredAt: new Date(),
             testCategoryId: testCategoryId ? parseInt(testCategoryId) : null
@@ -1339,9 +1324,10 @@ export const saveTestResults = async (req, res) => {
             patientTestId: parseInt(patientTestId),
             testParameterId: parseInt(testParameterId),
             testCategoryId: testCategoryId ? parseInt(testCategoryId) : null,
-            numericValue: numericValue !== null ? parseFloat(numericValue) : null,
+            numericValue: numericValue !== null ? String(numericValue) : null,
             textValue: textValue || null,
             selectedOption: selectedOption || null,
+            isHighlighted: isHighlighted || false,
             enteredBy: enteredBy,
             enteredAt: new Date()
           },
@@ -1489,32 +1475,14 @@ export const sendReport = async (req, res) => {
       where: { id: { in: testIds.map(Number) } },
       include: {
         patient: true,
-        test: {
-          select: {
-            id: true, name: true, interpretation: true
-          }
-        },
+        test: true,
         testResults: {
           include: { 
-            testParameter: { 
-              select: { 
-                id: true,
-                parameterName: true,
-                maleLowValue: true,
-                maleHighValue: true,
-                femaleLowValue: true,
-                femaleHighValue: true,
-                childLowValue: true,
-                childHighValue: true,
-                rangeText: true,
-                displayRangeText: true,
-                unit: {
-                  select: {
-                    symbol: true
-                  }
-                }
-              } 
-            } 
+            testParameter: {
+              include: {
+                unit: true
+              }
+            }
           }
         }
       }
@@ -1842,6 +1810,7 @@ export const saveTestResultWithTemplate = async (req, res) => {
           update: {
             numericValue: numericValue || undefined,
             textValue: textValue || undefined,
+            isHighlighted: isHighlighted || false,
             verifiedAt: new Date()
           },
           create: {
@@ -1849,6 +1818,7 @@ export const saveTestResultWithTemplate = async (req, res) => {
             testParameterId: parseInt(parameterId),
             numericValue: numericValue || undefined,
             textValue: textValue || undefined,
+            isHighlighted: isHighlighted || false,
             enteredAt: new Date(),
             verifiedAt: new Date()
           }

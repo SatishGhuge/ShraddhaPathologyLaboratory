@@ -17,8 +17,17 @@ const storage = multer.diskStorage({
 });
 
 const fileFilter = (req, file, cb) => {
-  const allowed = ['image/jpeg', 'image/png', 'image/gif', 'application/pdf'];
-  allowed.includes(file.mimetype) ? cb(null, true) : cb(new Error('Only images and PDFs allowed'));
+  const allowed = [
+    'image/jpeg', 
+    'image/png', 
+    'image/gif', 
+    'application/pdf',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', // .xlsx
+    'application/vnd.ms-excel' // .xls
+  ];
+  allowed.includes(file.mimetype) 
+    ? cb(null, true) 
+    : cb(new Error('Only images, PDFs, and Excel files allowed'));
 };
 
 export const upload = multer({ storage, fileFilter, limits: { fileSize: 10 * 1024 * 1024 } }); // 10MB

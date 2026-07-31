@@ -2,6 +2,7 @@
 
 import { useRouter, useSearchParams } from "next/navigation";
 import React, { useState, useEffect, useRef } from "react";
+import ReactDOM from "react-dom/client";
 import {
   RefreshCcw,
   Download,
@@ -17,6 +18,7 @@ import {
   FileCheck,
 } from "lucide-react";
 import BarcodeModal, { generateBarcodeLabels } from "@/app/components/BarcodeModal";
+import ProfessionalReport from "@/app/components/ProfessionalReport";
 import API_BASE_URL from "@/src/api/config";
 
 import { FaWhatsapp } from "react-icons/fa";
@@ -36,8 +38,16 @@ import {
 import { getOrganizations } from "@/src/api/master";
 import ReadingValidationModal from "@/app/components/ReadingValidationModal";
 import AuthenticateModal from "@/app/components/AuthenticateModal";
-import ProfessionalResultReport from "@/src/components/ProfessionalResultReport";
 const LetterHead = "/LetterHead.jpeg";
+
+// ── Type definition for Letterhead from DB ──
+interface LetterheadDB {
+  id?: number;
+  letterheadName?: string;
+  headerImage?: string;   // base64 data-URI
+  footerImage?: string;   // base64 data-URI
+  fullPageImage?: string; // full-page letterhead image (new)
+}
 
 /* ── Per-test row with ALL date fields inside Edit Details modal ── */
 function PerTestDateRow({ test, onSave, onStatusChange, rowBg }: { test: any; onSave: (testId: string, data: any) => void; onStatusChange: (testId: string, status: string) => void; rowBg: string }) {
@@ -239,7 +249,7 @@ export default function Result() {
   const router = useRouter();
   const searchParams = useSearchParams();
   
-  const queryStatus = searchParams.get('status') || 'All';
+  const queryStatus = (searchParams?.get('status') || 'All') as string;
   const [selectedStatus, setSelectedStatus] = useState(queryStatus);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
@@ -398,6 +408,9 @@ export default function Result() {
 
   // Organizations state
   const [organizations, setOrganizations] = useState<any[]>([]);
+  
+  // Departments state
+  const [departments, setDepartments] = useState<any[]>([]);
 
   // Letterhead state
   const [letterheadBase64, setLetterheadBase64] = useState<string>('');
@@ -478,7 +491,8 @@ export default function Result() {
         for (const range of ageRanges) {
           if (!range.enabled) continue;
           const rangeGender = range.gender?.toLowerCase();
-          if (rangeGender && rangeGender !== patientGender) continue;
+          // Skip if gender doesn't match, unless it's 'both' (which applies to all)
+          if (rangeGender && rangeGender !== 'both' && rangeGender !== patientGender) continue;
           
           let ageMatches = false;
           if (range.label?.includes('Between') && range.from != null && range.to != null) {
@@ -494,22 +508,49 @@ export default function Result() {
       }
     }
     
-    // Fallback to gender and age-based ranges
+    // ✅ IMPROVED: Fallback to gender and age-based ranges
+    // Don't require Active flag - just check if values exist
     if (parameterData.rangeType === 'BySex' || parameterData.rangeType === 'ByGenderAndAge') {
-      if (exactAgeInYears < 18 && parameterData.childActive && parameterData.childLowValue != null && parameterData.childHighValue != null) {
+      if (exactAgeInYears < 18 && parameterData.childLowValue != null && parameterData.childHighValue != null) {
         return `${parameterData.childLowValue} - ${parameterData.childHighValue}`;
       }
       if (exactAgeInYears >= 18) {
-        if (patientGender === 'F' && parameterData.femaleActive && parameterData.femaleLowValue != null && parameterData.femaleHighValue != null) {
+        if (patientGender === 'female' && parameterData.femaleLowValue != null && parameterData.femaleHighValue != null) {
           return `${parameterData.femaleLowValue} - ${parameterData.femaleHighValue}`;
         }
-        if (patientGender === 'M' && parameterData.maleActive && parameterData.maleLowValue != null && parameterData.maleHighValue != null) {
+        if (patientGender === 'male' && parameterData.maleLowValue != null && parameterData.maleHighValue != null) {
           return `${parameterData.maleLowValue} - ${parameterData.maleHighValue}`;
+        }
+        // If gender doesn't match M/F and no specific range found, try to use any default value from normalRanges
+        if (!['m', 'f'].includes(patientGender)) {
+          if (parameterData.normalRanges) {
+            try {
+              const normalRanges = JSON.parse(parameterData.normalRanges);
+              for (const range of normalRanges) {
+                if (range.defaultValue) {
+                  return range.defaultValue;
+                }
+              }
+            } catch (e) {
+              console.warn('Error parsing normal ranges:', e);
+            }
+          }
         }
       }
     }
     
-    // Final fallback to display range text
+    // Final fallback: return numeric ranges if available (for any range type)
+    if (patientGender === 'female' && parameterData.femaleLowValue != null && parameterData.femaleHighValue != null) {
+      return `${parameterData.femaleLowValue} - ${parameterData.femaleHighValue}`;
+    }
+    if (patientGender === 'male' && parameterData.maleLowValue != null && parameterData.maleHighValue != null) {
+      return `${parameterData.maleLowValue} - ${parameterData.maleHighValue}`;
+    }
+    if (parameterData.childLowValue != null && parameterData.childHighValue != null) {
+      return `${parameterData.childLowValue} - ${parameterData.childHighValue}`;
+    }
+    
+    // Last resort: return display text or range text
     return parameterData.displayRangeText || parameterData.rangeText || '-';
   };
 
@@ -530,7 +571,8 @@ export default function Result() {
         for (const range of ageRanges) {
           if (!range.enabled) continue;
           const rangeGender = range.gender?.toLowerCase();
-          if (rangeGender && rangeGender !== patientGender) continue;
+          // Skip if gender doesn't match, unless it's 'both' (which applies to all)
+          if (rangeGender && rangeGender !== 'both' && rangeGender !== patientGender) continue;
           
           let ageMatches = false;
           if (range.label?.includes('Between') && range.from != null && range.to != null) {
@@ -603,16 +645,16 @@ export default function Result() {
       return;
     }
 
-    let targetPatient = null;
+    let targetPatient: any = null;
     for (const patient of sortedAndFilteredResults) {
-      if (patient.patient_uid === barcodeLockedPatientUid && patient.visit_id === barcodeLockedVisitId) {
+      if ((patient as any).patient_uid === barcodeLockedPatientUid && (patient as any).visit_id === barcodeLockedVisitId) {
         targetPatient = patient;
         break;
       }
     }
     if (!targetPatient) return;
 
-    const selectedTestsList = targetPatient.tests.filter(t => barcodeSelectedTests.has(t.test_id));
+    const selectedTestsList = (targetPatient as any).tests.filter((t: any) => barcodeSelectedTests.has(t.test_id));
     const now = new Date();
     const dateStr = now.toLocaleDateString('en-GB');
     const timeStr = now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: true }).toUpperCase();
@@ -625,22 +667,22 @@ export default function Result() {
     const specimenBarcodeStatuses = {}; // Track ALL barcode statuses for each specimen group
     
     selectedTestsList.forEach(t => {
-      const key = t.specimen_type || 'Unknown';
+      const key = (t as any).specimen_type || 'Unknown';
       if (!specimenGroups[key]) {
         specimenGroups[key] = [];
         specimenTestIds[key] = [];
         specimenTestStatuses[key] = []; // Store array of all test statuses
         specimenBarcodeStatuses[key] = []; // Store array of all barcode statuses
       }
-      specimenGroups[key].push(t.test_short_name || t.test_name);
-      specimenTestIds[key].push(t.test_id);
-      specimenTestStatuses[key].push(t.status || 'Registered'); // Store each test's status
-      specimenBarcodeStatuses[key].push(t.barcode_status || 'Unprinted'); // Store each barcode's status
+      specimenGroups[key].push((t as any).test_short_name || (t as any).test_name);
+      specimenTestIds[key].push((t as any).test_id);
+      specimenTestStatuses[key].push((t as any).status || 'Registered'); // Store each test's status
+      specimenBarcodeStatuses[key].push((t as any).barcode_status || 'Unprinted'); // Store each barcode's status
     });
 
     // Build labels — barcode value = visitId for first specimen, visitId-2, visitId-3 ...
     const specimenEntries = Object.entries(specimenGroups);
-    const labels = specimenEntries.map(([specimen, shortNames], idx) => {
+    const labels = specimenEntries.map(([specimen, shortNames]: any, idx: number) => {
       const statuses = specimenTestStatuses[specimen] || [];
       const barcodeStatuses = specimenBarcodeStatuses[specimen] || [];
       
@@ -661,7 +703,7 @@ export default function Result() {
       }
       
       return {
-        barcodeValue: `${targetPatient.visit_id}-${idx + 1}`,
+        barcodeValue: `${(targetPatient as any).visit_id}-${idx + 1}`,
         specimen,
         shortNamesStr: (shortNames as any[]).join(' / '),
         dateStr,
@@ -672,23 +714,23 @@ export default function Result() {
       };
     });
 
-    const genderInitial = targetPatient.gender ? targetPatient.gender.charAt(0).toUpperCase() : '';
-    const age = targetPatient.age || '';
+    const genderInitial = (targetPatient as any).gender ? (targetPatient as any).gender.charAt(0).toUpperCase() : '';
+    const age = (targetPatient as any).age || '';
 
     setBarcodePatientInfo({
-      patientName: targetPatient.patient_name || '',
-      visitId: targetPatient.visit_id || '',
+      patientName: (targetPatient as any).patient_name || '',
+      visitId: (targetPatient as any).visit_id || '',
       age,
-      gender: targetPatient.gender || '',
+      gender: (targetPatient as any).gender || '',
       // Pre-formatted age/gender string: "F/27 Yrs" or "M/45 Yrs"
       ageGender: genderInitial && age ? `${genderInitial}/${age} Yrs` : genderInitial || (age ? `${age} Yrs` : ''),
-      organizationCode: targetPatient.organizationCode || '', // ✅ Include organization code
+      organizationCode: (targetPatient as any).organizationCode || '', // ✅ Include organization code
     });
     
     // Add organizationCode to each label
     const labelsWithOrgCode = labels.map(label => ({
       ...label,
-      organizationCode: targetPatient.organizationCode || '', // ✅ Add org code to barcode labels
+      organizationCode: (targetPatient as any).organizationCode || '', // ✅ Add org code to barcode labels
     }));
     
     setBarcodeLabels(labelsWithOrgCode);
@@ -809,12 +851,19 @@ export default function Result() {
       }
 
       // Build combined tests array — each with its own name, parameters, interpretation
-      const combinedTests = responses.map(r => ({
-        name: r.patientTest.test.name,
-        interpretation: r.patientTest.test.interpretation,
-        groupedParameters: r.groupedParameters,
-        parameters: r.parameters
-      }));
+      // 🔧 PART 3: Include outsourcing data for each test (NO database fetch)
+      const combinedTests = responses.map((r) => {
+        return {
+          name: r.patientTest.test.name,
+          interpretation: r.patientTest.test.interpretation,
+          groupedParameters: r.groupedParameters,
+          parameters: r.parameters,
+          // 🔧 PART 3: Include outsourcing flag and report data
+          isOutsourced: r.patientTest.isOutsourced || false,
+          outsourcedTo: r.patientTest.outsourcedTo || null,
+          outsourcingReport: r.outsourcingReport || null  // Include outsourcing report from response
+        };
+      });
 
       setReportData({
         patient: first.patientTest.patient,
@@ -826,7 +875,10 @@ export default function Result() {
         groupedParameters: first.groupedParameters,
         // Combined multi-test data
         combinedTests,
-        signature
+        signature,
+        // 🔧 PART 3: Include first test's outsourcing info for single test case
+        isOutsourced: first.patientTest.isOutsourced || false,
+        outsourcedTo: first.patientTest.outsourcedTo || null
       });
       setReportWithHeader(option === "With Header");
       setShowReportModal(true);
@@ -1080,7 +1132,7 @@ export default function Result() {
         || (uploadedFiles[Array.from(selectedTests)[0] as string]?.serverPath);
       if (attachmentPath && !attachmentPath.endsWith('.pdf')) {
         try {
-          const baseUrl = process.env.NEXT_PUBLIC_API_URL.replace('/api', '');
+          const baseUrl = (process.env.NEXT_PUBLIC_API_URL || '').replace('/api', '');
           const src = attachmentPath.startsWith('http') ? attachmentPath : `${baseUrl}${attachmentPath}`;
           const attachBase64 = await toBase64(src) as string;
           pdf.addPage();
@@ -1108,10 +1160,10 @@ export default function Result() {
       if (!patient.email) { alert('No email address saved for this patient.'); return; }
 
       // Build results payload matching what the backend email function expects
-      const allResults = [];
-      responses.forEach(r => {
+      const allResults: any[] = [];
+      responses.forEach((r: any) => {
         allResults.push({ isHeader: true, testName: r.patientTest.test.name });
-        r.parameters.forEach(p => {
+        r.parameters.forEach((p: any) => {
           const er = p.existingResult;
           if (!er) return;
           allResults.push({
@@ -1279,7 +1331,7 @@ export default function Result() {
     await proceedWithPrint('pagebreak');
   };
 
-  // Proceed with printing based on selected option
+  // Proceed with printing based on selected option - DIRECT PRINT PREVIEW (no modal)
   const proceedWithPrint = async (option: 'pagebreak' | 'nobreak') => {
     if (selectedTests.size === 0) { alert('Please select a test to print'); return; }
     
@@ -1312,24 +1364,28 @@ export default function Result() {
       return;
     }
     
-    // Page break option - proceed with print
+    // Page break option - proceed with DIRECT print preview
     try {
       setLoading(true);
       const testIds = Array.from(selectedTests);
       const responses = await Promise.all(testIds.map(id => getPatientTestById(id)));
       const first = responses[0];
 
+      // Debug: Log the parameters received
+      console.log('📋 Parameters received from API:', first.parameters);
+      console.log('📋 Full response:', first);
+
       // Fetch signature
       let signature = first.patientTest.test?.signature || null;
       if (!signature) {
         try {
-          const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || '/api';
+          const API_BASE_URL_LOCAL = process.env.NEXT_PUBLIC_API_URL || '/api';
           const testSpeciality = first.patientTest.test?.speciality || 'Regular';
-          const sigRes = await fetch(`${API_BASE_URL}/signatures/by-specialty/${encodeURIComponent(testSpeciality)}`);
+          const sigRes = await fetch(`${API_BASE_URL_LOCAL}/signatures/by-specialty/${encodeURIComponent(testSpeciality)}`);
           const sigData = await sigRes.json();
           if (sigData.success && sigData.data) signature = sigData.data;
           else {
-            const allRes = await fetch(`${API_BASE_URL}/signatures`);
+            const allRes = await fetch(`${API_BASE_URL_LOCAL}/signatures`);
             const allData = await allRes.json();
             if (allData.success && allData.data.length > 0) {
               const active = allData.data.filter(s => s.isActive);
@@ -1339,28 +1395,64 @@ export default function Result() {
         } catch (e) { console.warn('Could not fetch signature', e); }
       }
 
-      // Convert LetterHead to base64
+      // Fetch letterhead with full-page background image from DB (NEW APPROACH)
+      let letterheadDB: LetterheadDB | null = null;
       let letterHeadBase64 = '';
       try {
-        const imgRes = await fetch(LetterHead);
-        const blob = await imgRes.blob();
-        letterHeadBase64 = await new Promise<string>(resolve => {
-          const reader = new FileReader();
-          reader.onloadend = () => resolve(reader.result as string);
-          reader.readAsDataURL(blob);
-        });
-      } catch (e) { console.warn('Could not load letterhead', e); }
+        const lhRes = await fetch('/api/letterhead/active');
+        const lhData = await lhRes.json();
+        if (lhData.success && lhData.data?.length > 0) {
+          letterheadDB = lhData.data[0];
+          console.log('✅ Letterhead loaded from DB:', letterheadDB);
+        }
+      } catch (e) {
+        console.warn('Could not fetch letterhead from DB', e);
+      }
 
-      // Build combined tests array
+      // Fallback: Convert static LetterHead to base64 if DB letterhead not available
+      if (!letterheadDB) {
+        try {
+          const imgRes = await fetch(LetterHead);
+          const blob = await imgRes.blob();
+          letterHeadBase64 = await new Promise<string>(resolve => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(reader.result as string);
+            reader.readAsDataURL(blob);
+          });
+        } catch (e) { console.warn('Could not load static letterhead', e); }
+      }
+
+      // Build combined tests array with results data
       const combinedTests = responses.map(r => ({
         name: r.patientTest.test.name,
         interpretation: r.patientTest.test.interpretation,
+        signature: r.patientTest.test.signature || signature,
         groupedParameters: r.groupedParameters,
-        parameters: r.parameters
+        parameters: r.parameters,
+        // Include outsourcing data if available
+        isOutsourced: r.patientTest.isOutsourced || false,
+        outsourcedTo: r.patientTest.outsourcedTo || null,
+        outsourcingReport: r.outsourcingReport || null
       }));
 
-      // Set report data and open modal
-      setReportData({
+      // Build results object mapping parameter IDs to their values
+      const resultsMap: any = {};
+      responses.forEach(r => {
+        r.parameters.forEach((param: any) => {
+          if (param.existingResult) {
+            resultsMap[param.id] = {
+              numericValue: param.existingResult.numericValue,
+              textValue: param.existingResult.textValue,
+              isAbnormal: param.existingResult.isAbnormal,
+              isHighlighted: param.existingResult.isHighlighted || false
+            };
+          }
+        });
+      });
+
+      // ✅ DIRECT PRINT - trigger print immediately with report data
+      setLoading(false);
+      await directPrintReport({
         patient: first.patientTest.patient,
         visitId: first.patientTest.visitId,
         visitDate: first.patientTest.visitDate,
@@ -1369,32 +1461,75 @@ export default function Result() {
         groupedParameters: first.groupedParameters,
         combinedTests,
         signature,
+        letterhead: letterheadDB,
         letterHeadBase64,
-        printOption: option
+        printOption: option,
+        results: resultsMap,
+        referralDoctor: first.patientTest.referralDoctor
       });
-      setReportWithHeader(true);
-      setShowReportModal(true);
-      setShowPrintOptionsModal(false);
     } catch (err) {
       console.error('Error loading report:', err);
       alert('Error loading report: ' + err.message);
-    } finally {
       setLoading(false);
     }
   };
 
-  // Handle print from modal
-  const handlePrint = () => {
-    window.print();
+  // Direct Print Report - Opens browser print dialog without modal
+  const directPrintReport = (reportProps: any) => {
+    const printContainer = document.createElement('div');
+    printContainer.id = 'print-report-container-' + Date.now();
+    printContainer.style.position = 'fixed';
+    printContainer.style.left = '0';
+    printContainer.style.top = '0';
+    printContainer.style.width = '100%';
+    printContainer.style.height = '100%';
+    printContainer.style.zIndex = '-9999';
+    printContainer.style.visibility = 'hidden';
+    
+    document.body.appendChild(printContainer);
+
+    // Render the report in the hidden container using React
+    const root = ReactDOM.createRoot(printContainer);
+    
+    root.render(
+      <ProfessionalReport
+        patient={reportProps.patient}
+        visitId={reportProps.visitId}
+        visitDate={reportProps.visitDate}
+        test={reportProps.test}
+        parameters={reportProps.parameters}
+        groupedParameters={reportProps.groupedParameters}
+        combinedTests={reportProps.combinedTests}
+        signature={reportProps.signature}
+        letterhead={reportProps.letterhead}
+        letterHeadBase64={reportProps.letterHeadBase64}
+        printOption={reportProps.printOption}
+        results={reportProps.results}
+        referralDoctor={reportProps.referralDoctor}
+      />
+    );
+
+    // Wait for render and DOM update, then print
+    // Use requestAnimationFrame to ensure render is complete, then add buffer
+    requestAnimationFrame(() => {
+      setTimeout(() => {
+        window.print();
+        // Clean up after print dialog closes
+        setTimeout(() => {
+          root.unmount();
+          document.body.removeChild(printContainer);
+        }, 500);
+      }, 800);
+    });
   };
 
   // Open upload modal for a patient
-  const handleUploadClick = (patient, specificTest = null) => {
+  const handleUploadClick = (patient: any, specificTest: any = null) => {
     setUploadPatient(patient);
     // If opened from a specific test icon — pre-select ONLY that test
     // If opened from patient level — all unchecked
-    const initial = {};
-    patient.tests.forEach(t => {
+    const initial: any = {};
+    patient.tests.forEach((t: any) => {
       initial[t.test_id] = specificTest ? t.test_id === specificTest.test_id : false;
     });
     setUploadSelectedTests(initial);
@@ -1490,7 +1625,63 @@ export default function Result() {
       
       const testStatus = statusMap[test.result_status] || test.result_status;
 
-      // Only allow opening result entry page for Received or Rectified stages
+      // Allow viewing report for outsourced tests at ANY stage
+      // Or for normal tests in Received or Rectified stages
+      if (test.isOutsourced) {
+        // Outsourced tests can be viewed at any stage
+        console.log('✅ Outsourced test - allowing view at stage:', testStatus);
+        // Load and show report
+        try {
+          const testData = await getPatientTestById(test.test_id);
+          
+          if (!testData || !testData.patientTest) {
+            alert('Error loading test data');
+            return;
+          }
+
+          console.log('📋 testData received:', {
+            hasOutsourcingReport: !!testData.outsourcingReport,
+            outsourcingReport: testData.outsourcingReport
+          });
+
+          // Fetch letterhead
+          const letterHeadResponse = await fetch(LetterHead);
+          const letterHeadBlob = await letterHeadResponse.blob();
+          const letterHeadBase64 = await new Promise<string>((resolve) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(reader.result as string);
+            reader.readAsDataURL(letterHeadBlob);
+          });
+
+          setReportData({
+            patient: testData.patientTest.patient,
+            visitDate: testData.patientTest.visitDate,
+            visitId: testData.patientTest.visitId,
+            signature: null,
+            letterHeadBase64,
+            isOutsourced: test.isOutsourced,
+            outsourcedTo: test.outsourcedTo,
+            outsourcingReport: testData.outsourcingReport,  // Use directly from testData
+            combinedTests: [{
+              test: testData.patientTest.test,
+              patientTest: testData.patientTest,
+              groupedParameters: testData.groupedParameters,
+              parameters: testData.parameters,
+              isOutsourced: test.isOutsourced,
+              outsourcedTo: test.outsourcedTo,
+              outsourcingReport: testData.outsourcingReport  // Use directly from testData
+            }]
+          });
+          setReportWithHeader(true);
+          setShowReportModal(true);
+        } catch (err) {
+          console.error('Error loading outsourced report:', err);
+          alert('Error loading report');
+        }
+        return;
+      }
+
+      // Only allow opening result entry page for normal tests in Received or Rectified stages
       if (testStatus === 'Received' || testStatus === 'Rectified') {
         router.push(`/result/patientresult/${test.test_id}`);
       } else {
@@ -1517,6 +1708,14 @@ export default function Result() {
       const status = test.result_status || test.status;
       
       console.log('🔍 Parameter click - Current status:', status);
+      console.log('🔍 Is Outsourced:', test.isOutsourced);
+      
+      // 🔧 NEW: Check if test is outsourced
+      if (test.isOutsourced) {
+        console.log('✅ Test is outsourced - redirecting to import page');
+        router.push(`/result/outsourcing-import/${test.test_id}`);
+        return;
+      }
       
       // Determine which modal to show based on current status
       if (status === 'Validation') {
@@ -1752,6 +1951,30 @@ export default function Result() {
     fetchOrganizations();
   }, []);
 
+  // Fetch departments on component mount
+  useEffect(() => {
+    const fetchDepartments = async () => {
+      try {
+        const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || '/api';
+        const res = await fetch(`${API_BASE_URL}/master/departments`);
+        const data = await res.json();
+        
+        // 🔴 DEBUG: Log departments response
+        console.log(`🔴 Frontend - Departments API Response:`, data);
+        console.log(`🔴 Frontend - Departments Status:`, data.success);
+        console.log(`🔴 Frontend - Departments Data:`, data.data);
+        
+        if (data.success && Array.isArray(data.data)) {
+          console.log(`✅ Loaded ${data.data.length} departments:`, data.data.map(d => d.name));
+          setDepartments(data.data);
+        }
+      } catch (err) {
+        console.error('Error fetching departments:', err);
+      }
+    };
+    fetchDepartments();
+  }, []);
+
   // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: any) => {
@@ -1851,6 +2074,17 @@ export default function Result() {
       [key]: value
     }));
   };
+
+  // Listen for filter changes and refetch data (IMPORTANT: includes department, organization, testName filters)
+  useEffect(() => {
+    // Save filters to localStorage
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('resultPageFilters', JSON.stringify(filters));
+    }
+    
+    // Fetch results with new filters
+    fetchResults();
+  }, [filters]);
 
   // Handle search
   const handleSearch = () => {
@@ -2079,13 +2313,13 @@ export default function Result() {
       setLoading(true);
       
       // Get selected test IDs and their new statuses
-      const updates = [];
-      Object.keys(settingsFormData.selectedTests).forEach(testId => {
-        if (settingsFormData.selectedTests[testId]) {
+      const updates: any[] = [];
+      Object.keys(settingsFormData.selectedTests).forEach((testId: string) => {
+        if ((settingsFormData.selectedTests as any)[testId]) {
           updates.push({
             id: parseInt(testId),
-            status: settingsFormData.testStatuses[testId],
-            remarks: settingsFormData.testRemarks[testId]
+            status: (settingsFormData.testStatuses as any)[testId],
+            remarks: (settingsFormData.testRemarks as any)[testId]
           });
         }
       });
@@ -2265,9 +2499,9 @@ export default function Result() {
                   className="h-8 rounded border border-gray-300 px-2 text-xs focus:outline-none focus:ring-1 focus:ring-cyan-600"
                 >
                   <option value="">All Dept</option>
-                  <option value="Haematology">Haematology</option>
-                  <option value="Biochemistry">Biochemistry</option>
-                  <option value="Microbiology">Microbiology</option>
+                  {departments.map(dept => (
+                    <option key={dept.id} value={dept.name}>{dept.name}</option>
+                  ))}
                 </select>
                 
                 <select 
@@ -2662,7 +2896,19 @@ export default function Result() {
                                   role="button"
                                   title={test.result_status === 'Validation' ? 'Press Enter to edit this value' : 'Read-only in this stage'}
                                 >
-                                  {test.result_status === 'Entered' || test.result_status === 'Validation' || test.result_status === 'Authorized' || test.result_status === 'Delivered' 
+                                  {test.isOutsourced ? (
+                                    <span 
+                                      className="inline-flex items-center gap-1 bg-yellow-100 text-yellow-800 px-2 py-1 rounded text-[10px] font-semibold cursor-pointer hover:bg-yellow-200 transition-colors"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        router.push(`/result/outsourcing-import/${test.test_id}`);
+                                      }}
+                                      title="Click to import outsourcing report"
+                                    >
+                                      <span>⚠️</span>
+                                      <span>OUTSOURCING</span>
+                                    </span>
+                                  ) : test.result_status === 'Entered' || test.result_status === 'Validation' || test.result_status === 'Authorized' || test.result_status === 'Delivered' 
                                     ? (test.result || '-') 
                                     : '-'}
                                 </span>
@@ -3218,105 +3464,8 @@ export default function Result() {
         </div>
       )}
 
-      {/* Report Modal - Using Professional Report Component */}
-      {showReportModal && reportData && (
-        <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-5xl max-h-[95vh] flex flex-col">
-
-            {/* Modal Toolbar - hidden on print */}
-            <div className="flex items-center justify-between px-4 py-3 border-b no-print flex-shrink-0">
-              <h2 className="text-base font-semibold text-gray-900">Professional Report - {reportData.test?.name}</h2>
-              <div className="flex gap-2">
-                <button
-                  onClick={handlePrint}
-                  className="bg-blue-600 text-white px-4 py-1.5 rounded text-sm hover:bg-blue-700"
-                >
-                  🖨️ Print
-                </button>
-                <button
-                  onClick={() => setShowReportModal(false)}
-                  className="text-gray-400 hover:text-gray-700 text-2xl font-bold leading-none px-1"
-                >
-                  ×
-                </button>
-              </div>
-            </div>
-
-            {/* Scrollable preview area */}
-            <div className="overflow-y-auto flex-1 bg-gray-100 p-6">
-
-              {/* Print styles */}
-              <style>{`
-                @media print {
-                  * { visibility: hidden; }
-                  .report-page,
-                  .report-page * {
-                    visibility: visible !important;
-                  }
-                  body {
-                    margin: 0;
-                    padding: 0;
-                    background: white;
-                  }
-                  .report-page {
-                    position: absolute !important;
-                    left: 0;
-                    top: 0;
-                    width: 100%;
-                    margin: 0 !important;
-                    padding: 0 !important;
-                    box-shadow: none !important;
-                    page-break-after: always;
-                    page-break-inside: avoid;
-                    overflow: visible !important;
-                    background: white !important;
-                    border-radius: 0 !important;
-                  }
-                  .report-page:last-child {
-                    page-break-after: avoid;
-                  }
-                  .no-print {
-                    display: none !important;
-                    visibility: hidden !important;
-                  }
-                  @page {
-                    size: A4;
-                    margin: 0;
-                  }
-                }
-              `}</style>
-
-              {/* Render Professional Report Component */}
-              {(reportData.combinedTests || [reportData]).map((testData, idx) => (
-                <div
-                  key={idx}
-                  className="report-page"
-                  id={idx === 0 ? 'report-print-page' : undefined}
-                  style={{
-                    backgroundColor: '#fff',
-                    boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-                    padding: '0',
-                    marginBottom: '16px',
-                    borderRadius: '4px',
-                  }}
-                >
-                  <ProfessionalResultReport
-                    patient={reportData.patient}
-                    visitDate={reportData.visitDate}
-                    visitId={reportData.visitId}
-                    test={testData.test || testData}
-                    groupedParameters={testData.groupedParameters || reportData.groupedParameters}
-                    parameters={testData.parameters || reportData.parameters}
-                    signature={reportData.signature}
-                    withHeader={reportWithHeader}
-                    letterHeadBase64={reportData.letterHeadBase64}
-                  />
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Report Modal - REMOVED - Direct print preview now used instead */}
+      {/* showReportModal is no longer used - directPrintReport handles printing directly */}
 
       {/* Upload File Modal */}
       {showUploadModal && uploadPatient && (
@@ -3368,7 +3517,7 @@ export default function Result() {
               <div className="mb-5">
                 <input
                   type="file"
-                  onChange={(e) => setUploadFile(e.target.files[0] || null)}
+                  onChange={(e) => setUploadFile((e.target.files?.[0]) || null)}
                   className="text-sm text-gray-600 file:mr-2 file:py-1 file:px-3 file:border file:border-gray-300 file:rounded file:text-xs file:bg-white file:text-gray-700 hover:file:bg-gray-50"
                 />
               </div>
@@ -3563,6 +3712,10 @@ export default function Result() {
           
           // Print only the selected barcodes
           const printArea = document.getElementById('barcode-print-area');
+          if (!printArea) {
+            console.error('Barcode print area not found');
+            return;
+          }
           const allLabels = printArea.querySelectorAll('[data-barcode-index]');
           
           // Create a new container with only selected labels
@@ -3577,6 +3730,10 @@ export default function Result() {
             .join('');
           
           const win = window.open('', '_blank');
+          if (!win) {
+            console.error('Could not open print window');
+            return;
+          }
           win.document.write(`<!DOCTYPE html><html><head><title>Barcode Labels</title>
             <style>
               * { margin:0; padding:0; box-sizing:border-box; }
@@ -3765,7 +3922,7 @@ export default function Result() {
                     } catch (e) { console.warn('Could not load letterhead', e); }
 
                     // Build combined tests array in selected order
-                    const combinedTests = responses.map(r => ({
+                    const selectedCombinedTests = responses.map(r => ({
                       name: r.patientTest.test.name,
                       interpretation: r.patientTest.test.interpretation,
                       groupedParameters: r.groupedParameters,
@@ -3780,7 +3937,7 @@ export default function Result() {
                       test: first.patientTest.test,
                       parameters: first.parameters,
                       groupedParameters: first.groupedParameters,
-                      combinedTests,
+                      combinedTests: selectedCombinedTests,
                       signature,
                       letterHeadBase64,
                       printOption: 'nobreak'

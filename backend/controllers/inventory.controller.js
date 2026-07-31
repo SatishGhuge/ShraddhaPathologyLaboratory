@@ -221,20 +221,15 @@ export const getBatchesByItem = async (req, res) => {
     
     console.log(`[getBatchesByItem] Fetching batches for itemId: ${itemId}`);
 
-    // Fetch batches from stock_entry_items table
-    const batches = await prisma.stockEntryItem.findMany({
+    // Fetch batches from lab_stocks table (real-time available quantities)
+    const batches = await prisma.labStock.findMany({
       where: { itemId: parseInt(itemId) },
       select: {
         id: true,
         batchNo: true,
-        quantity: true,
+        quantityAvailable: true,
         expiryDate: true,
-        stockEntry: {
-          select: {
-            invoiceNo: true,
-            invoiceDate: true
-          }
-        }
+        lastStockUpdate: true
       },
       orderBy: { expiryDate: 'asc' }
     });
@@ -245,10 +240,9 @@ export const getBatchesByItem = async (req, res) => {
     const formattedBatches = batches.map(batch => ({
       id: batch.id,
       batchNo: batch.batchNo,
-      availableQuantity: batch.quantity,
+      availableQuantity: batch.quantityAvailable,
       expiryDate: batch.expiryDate,
-      invoiceNo: batch.stockEntry?.invoiceNo,
-      invoiceDate: batch.stockEntry?.invoiceDate
+      lastStockUpdate: batch.lastStockUpdate
     }));
 
     res.json({
@@ -367,6 +361,7 @@ export const createSupplier = async (req, res) => {
       });
     }
 
+    // Check for duplicate supplier name
     const existingSupplier = await prisma.supplier.findUnique({
       where: { supplierName }
     });
@@ -374,8 +369,34 @@ export const createSupplier = async (req, res) => {
     if (existingSupplier) {
       return res.status(400).json({
         success: false,
-        message: 'Supplier already exists'
+        message: 'Supplier with this name already exists'
       });
+    }
+
+    // Check for duplicate GST number if provided
+    if (gstNumber) {
+      const gstExists = await prisma.supplier.findUnique({
+        where: { gstNumber }
+      });
+      if (gstExists) {
+        return res.status(400).json({
+          success: false,
+          message: 'GST Number already exists. Please use a unique GST Number.'
+        });
+      }
+    }
+
+    // Check for duplicate phone if provided
+    if (phone) {
+      const phoneExists = await prisma.supplier.findUnique({
+        where: { phone }
+      });
+      if (phoneExists) {
+        return res.status(400).json({
+          success: false,
+          message: 'Phone number already exists. Please use a unique phone number.'
+        });
+      }
     }
 
     const newSupplier = await prisma.supplier.create({
@@ -389,6 +410,30 @@ export const createSupplier = async (req, res) => {
     });
   } catch (error) {
     console.error('Create supplier error:', error);
+    
+    // Handle Prisma unique constraint errors
+    if (error.code === 'P2002') {
+      const field = error.meta?.target?.[0];
+      if (field === 'gstNumber') {
+        return res.status(400).json({
+          success: false,
+          message: 'GST Number already exists. Please use a unique GST Number.'
+        });
+      }
+      if (field === 'phone') {
+        return res.status(400).json({
+          success: false,
+          message: 'Phone number already exists. Please use a unique phone number.'
+        });
+      }
+      if (field === 'supplierName') {
+        return res.status(400).json({
+          success: false,
+          message: 'Supplier with this name already exists.'
+        });
+      }
+    }
+    
     res.status(500).json({
       success: false,
       message: 'Failed to create supplier'
@@ -454,6 +499,44 @@ export const updateSupplier = async (req, res) => {
     const { id } = req.params;
     const { email, phone, address, city, state, pinCode, gstNumber, isActive } = req.body;
 
+    // Get the current supplier to compare
+    const currentSupplier = await prisma.supplier.findUnique({
+      where: { id: parseInt(id) }
+    });
+
+    if (!currentSupplier) {
+      return res.status(404).json({
+        success: false,
+        message: 'Supplier not found'
+      });
+    }
+
+    // Check for duplicate GST number if it's being changed
+    if (gstNumber && gstNumber !== currentSupplier.gstNumber) {
+      const gstExists = await prisma.supplier.findUnique({
+        where: { gstNumber }
+      });
+      if (gstExists) {
+        return res.status(400).json({
+          success: false,
+          message: 'GST Number already exists. Please use a unique GST Number.'
+        });
+      }
+    }
+
+    // Check for duplicate phone if it's being changed
+    if (phone && phone !== currentSupplier.phone) {
+      const phoneExists = await prisma.supplier.findUnique({
+        where: { phone }
+      });
+      if (phoneExists) {
+        return res.status(400).json({
+          success: false,
+          message: 'Phone number already exists. Please use a unique phone number.'
+        });
+      }
+    }
+
     const supplier = await prisma.supplier.update({
       where: { id: parseInt(id) },
       data: { email, phone, address, city, state, pinCode, gstNumber, isActive }
@@ -466,6 +549,24 @@ export const updateSupplier = async (req, res) => {
     });
   } catch (error) {
     console.error('Update supplier error:', error);
+    
+    // Handle Prisma unique constraint errors
+    if (error.code === 'P2002') {
+      const field = error.meta?.target?.[0];
+      if (field === 'gstNumber') {
+        return res.status(400).json({
+          success: false,
+          message: 'GST Number already exists. Please use a unique GST Number.'
+        });
+      }
+      if (field === 'phone') {
+        return res.status(400).json({
+          success: false,
+          message: 'Phone number already exists. Please use a unique phone number.'
+        });
+      }
+    }
+    
     res.status(500).json({
       success: false,
       message: 'Failed to update supplier'
@@ -876,6 +977,158 @@ export const deleteStockEntry = async (req, res) => {
   }
 };
 
+// Update Stock Entry
+export const updateStockEntry = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { supplierId, invoiceNo, invoiceDate, items, remarks } = req.body;
+
+    if (!supplierId || !invoiceNo || !items || items.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Supplier ID, invoice number, and at least one item are required'
+      });
+    }
+
+    // Check if stock entry exists
+    const stockEntry = await prisma.stockEntry.findUnique({
+      where: { id: parseInt(id) },
+      include: { items: true }
+    });
+
+    if (!stockEntry) {
+      return res.status(404).json({
+        success: false,
+        message: 'Stock entry not found'
+      });
+    }
+
+    // Fetch supplier to check state for IGST determination
+    const supplier = await prisma.supplier.findUnique({
+      where: { id: parseInt(supplierId) }
+    });
+
+    if (!supplier) {
+      return res.status(404).json({
+        success: false,
+        message: 'Supplier not found'
+      });
+    }
+
+    // Determine if supplier is from outside Maharashtra for IGST calculation
+    const isOutOfMaharashtra = supplier.state && 
+      supplier.state.toLowerCase().trim() !== 'maharashtra';
+
+    let totalBasicAmount = 0;
+    let totalCGST = 0;
+    let totalSGST = 0;
+    let totalIGST = 0;
+    let calculatedIGSTPercent = 0;
+
+    // Process items with automatic IGST/CGST+SGST calculation
+    const itemsData = await Promise.all(items.map(async (item) => {
+      const basicAmount = item.quantity * item.pricePerUnit;
+      
+      let cgstAmount = 0;
+      let sgstAmount = 0;
+      let igstAmount = 0;
+      let finalIGSTPercent = 0;
+
+      if (isOutOfMaharashtra) {
+        // For out-of-state suppliers: Use IGST only
+        const inventoryItem = await prisma.inventoryItem.findUnique({
+          where: { id: parseInt(item.itemId) },
+          include: { hsnCode: true }
+        });
+
+        if (inventoryItem && inventoryItem.hsnCode) {
+          finalIGSTPercent = inventoryItem.hsnCode.gstRate;
+          igstAmount = (basicAmount * finalIGSTPercent) / 100;
+          calculatedIGSTPercent = finalIGSTPercent;
+        } else {
+          igstAmount = 0;
+        }
+      } else {
+        // For Maharashtra suppliers: Use CGST + SGST
+        cgstAmount = (basicAmount * item.cgstPercent) / 100;
+        sgstAmount = (basicAmount * item.sgstPercent) / 100;
+        igstAmount = 0;
+      }
+
+      const totalAmount = basicAmount + cgstAmount + sgstAmount + igstAmount;
+
+      totalBasicAmount += basicAmount;
+      totalCGST += cgstAmount;
+      totalSGST += sgstAmount;
+      totalIGST += igstAmount;
+
+      return {
+        ...item,
+        basicAmount,
+        cgstAmount,
+        sgstAmount,
+        igstAmount,
+        totalAmount,
+        finalIGSTPercent
+      };
+    }));
+
+    const grandTotal = totalBasicAmount + totalCGST + totalSGST + totalIGST;
+
+    // Delete old items
+    await prisma.stockEntryItem.deleteMany({
+      where: { stockEntryId: parseInt(id) }
+    });
+
+    // Update stock entry
+    const updatedEntry = await prisma.stockEntry.update({
+      where: { id: parseInt(id) },
+      data: {
+        supplierId: parseInt(supplierId),
+        invoiceNo,
+        invoiceDate: new Date(invoiceDate),
+        totalBasicAmount,
+        totalCGST,
+        totalSGST,
+        totalIGST,
+        grandTotal,
+        remarks,
+        updatedAt: new Date(),
+        items: {
+          create: itemsData.map(item => ({
+            itemId: parseInt(item.itemId),
+            batchNo: item.batchNo,
+            expiryDate: new Date(item.expiryDate),
+            quantity: parseInt(item.quantity),
+            pricePerUnit: parseFloat(item.pricePerUnit),
+            basicAmount: item.basicAmount,
+            cgstPercent: item.cgstPercent,
+            cgstAmount: item.cgstAmount,
+            sgstPercent: item.sgstPercent,
+            sgstAmount: item.sgstAmount,
+            igstPercent: item.finalIGSTPercent,
+            igstAmount: item.igstAmount,
+            totalAmount: item.totalAmount
+          }))
+        }
+      },
+      include: { items: true }
+    });
+
+    res.json({
+      success: true,
+      message: 'Stock entry updated successfully',
+      data: updatedEntry
+    });
+  } catch (error) {
+    console.error('Update stock entry error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to update stock entry: ' + error.message
+    });
+  }
+};
+
 // ========== LAB STOCK MANAGEMENT ==========
 
 export const getLabStocks = async (req, res) => {
@@ -895,6 +1148,112 @@ export const getLabStocks = async (req, res) => {
     res.json(buildPaginatedResponse(data, total, page, limit, 'Lab stocks fetched successfully'));
   } catch (error) {
     console.error('Get lab stocks error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch lab stocks'
+    });
+  }
+};
+
+// Get Lab Stock Grouped by Item
+export const getLabStocksGroupedByItem = async (req, res) => {
+  try {
+    const { page = 1, limit = 10, search = '' } = req.query;
+    const pageNum = parseInt(page);
+    const limitNum = parseInt(limit);
+    const skip = (pageNum - 1) * limitNum;
+
+    // Get all lab stocks with item details
+    const allStocks = await prisma.labStock.findMany({
+      include: { item: { include: { hsnCode: true } } },
+      orderBy: { createdAt: 'desc' }
+    });
+
+    // Group by itemId and calculate summaries
+    const groupedData = new Map();
+
+    allStocks.forEach((stock) => {
+      const itemId = stock.itemId;
+      
+      if (!groupedData.has(itemId)) {
+        groupedData.set(itemId, {
+          itemId: stock.itemId,
+          itemName: stock.item.itemName,
+          itemCode: stock.item.itemCode,
+          unit: stock.item.unit,
+          hsnCode: stock.item.hsnCode,
+          totalQuantity: 0,
+          totalBatches: 0,
+          nearestExpiryDate: null,
+          batches: [],
+          alertStatus: 'OK'
+        });
+      }
+
+      const itemGroup = groupedData.get(itemId);
+      itemGroup.totalQuantity += stock.quantityAvailable;
+      itemGroup.totalBatches += 1;
+      itemGroup.batches.push({
+        batchNo: stock.batchNo,
+        quantityAvailable: stock.quantityAvailable,
+        expiryDate: stock.expiryDate,
+        lastStockUpdate: stock.lastStockUpdate,
+        id: stock.id
+      });
+
+      // Calculate nearest expiry date
+      if (!itemGroup.nearestExpiryDate || new Date(stock.expiryDate) < new Date(itemGroup.nearestExpiryDate)) {
+        itemGroup.nearestExpiryDate = stock.expiryDate;
+      }
+
+      // Determine alert status
+      const daysUntilExpiry = Math.floor((new Date(stock.expiryDate) - new Date()) / (1000 * 60 * 60 * 24));
+      if (daysUntilExpiry < 0) {
+        itemGroup.alertStatus = 'EXPIRED';
+      } else if (daysUntilExpiry < 30) {
+        itemGroup.alertStatus = 'EXPIRING';
+      } else if (stock.quantityAvailable < 10) {
+        itemGroup.alertStatus = 'LOW_STOCK';
+      }
+    });
+
+    // Convert map to array
+    let groupedArray = Array.from(groupedData.values());
+
+    // Apply search filter
+    if (search) {
+      const searchLower = search.toLowerCase();
+      groupedArray = groupedArray.filter(
+        (item) =>
+          item.itemName.toLowerCase().includes(searchLower) ||
+          item.itemCode.toLowerCase().includes(searchLower)
+      );
+    }
+
+    // Get total count after filtering
+    const total = groupedArray.length;
+
+    // Apply pagination
+    const paginatedData = groupedArray.slice(skip, skip + limitNum);
+
+    // Sort batches by expiry date within each item
+    paginatedData.forEach((item) => {
+      item.batches.sort((a, b) => new Date(a.expiryDate) - new Date(b.expiryDate));
+    });
+
+    res.json({
+      success: true,
+      message: 'Lab stocks grouped by item fetched successfully',
+      data: paginatedData,
+      pagination: {
+        page: pageNum,
+        limit: limitNum,
+        total,
+        totalPages: Math.ceil(total / limitNum)
+      }
+    });
+  } catch (error) {
+    console.error('Get lab stocks grouped error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to fetch lab stocks'
@@ -1121,21 +1480,20 @@ export const createLabToOrgTransfer = async (req, res) => {
       });
     }
 
-    // Generate unique transferId with pattern: TRF + YYMM + 0001
+    // Generate unique transferId with pattern: T + YY + 0001
     const now = new Date();
     const year = String(now.getFullYear()).slice(-2);
-    const month = String(now.getMonth() + 1).padStart(2, '0');
-    const yearMonthPrefix = `TRF${year}${month}`;
+    const yearPrefix = `T${year}`;
 
-    // Get the count of transfers created in this year-month
-    const countInMonth = await prisma.labToOrgTransfer.count({
+    // Get the count of transfers created in this year
+    const countInYear = await prisma.labToOrgTransfer.count({
       where: {
-        transferId: { startsWith: yearMonthPrefix }
+        transferId: { startsWith: yearPrefix }
       }
     });
 
-    const sequence = String(countInMonth + 1).padStart(4, '0');
-    let transferId = `${yearMonthPrefix}${sequence}`;
+    const sequence = String(countInYear + 1).padStart(4, '0');
+    let transferId = `${yearPrefix}${sequence}`;
     
     // Verify uniqueness with retry logic
     let retryCount = 0;
@@ -1149,8 +1507,8 @@ export const createLabToOrgTransfer = async (req, res) => {
       }
       
       retryCount++;
-      const newSequence = String(countInMonth + 1 + retryCount).padStart(4, '0');
-      transferId = `${yearMonthPrefix}${newSequence}`;
+      const newSequence = String(countInYear + 1 + retryCount).padStart(4, '0');
+      transferId = `${yearPrefix}${newSequence}`;
     }
 
     console.log('[createLabToOrgTransfer] Generated transferId:', transferId);
