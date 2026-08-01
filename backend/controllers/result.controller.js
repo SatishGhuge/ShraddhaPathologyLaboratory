@@ -2,6 +2,7 @@ import prisma from '../config/database.js';
 import { sendResultNotificationEmail } from '../utils/email.js';
 import { sendWhatsAppMessage, buildResultMessage } from '../utils/whatsapp.js';
 import { getPaginationParams, buildPaginatedResponse } from '../utils/pagination.js';
+import { formatAgeFromComponents } from '../utils/ageCalculator.js';
 import { 
   transitionToReceivedOnBarcodePrint, 
   transitionToEnteredOnResultSave,
@@ -227,10 +228,8 @@ export const getPatientTests = async (req, res) => {
         console.log(`   ageDays: ${patientTest.patient.ageDays} (type: ${typeof patientTest.patient.ageDays})`);
         console.log(`   dob: ${patientTest.patient.dob}`);
         
-        let formattedAge = '';
-        if (ageYears > 0) formattedAge += `${ageYears}Y`;
-        if (ageMonths > 0) formattedAge += (formattedAge ? ' ' : '') + `${ageMonths}M`;
-        if (ageDays > 0) formattedAge += (formattedAge ? ' ' : '') + `${ageDays}D`;
+        // Use the formatAgeFromComponents helper function
+        const formattedAge = formatAgeFromComponents(ageYears, ageMonths, ageDays);
 
         groupedResults[key] = {
           // Patient basic info
@@ -238,7 +237,7 @@ export const getPatientTests = async (req, res) => {
           patient_uid: patientTest.patient.patientId,
           
           // Age fields (multiple formats)
-          age: formattedAge || '',
+          age: formattedAge,
           ageYears: ageYears,
           ageMonths: ageMonths,
           ageDays: ageDays,
