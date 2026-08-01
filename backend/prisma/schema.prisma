@@ -139,7 +139,9 @@ model Patient {
   firstName         String?
   lastName          String?
   dob               DateTime?
-  age               Int?
+  ageYears          Int?     @db.Int       // Renamed from 'age' - stores years component
+  ageMonths         Int?     @default(0)   // Months component (0-11)
+  ageDays           Int?     @default(0)   // Days component (0-30)
   gender            String?
   mobile            String?
   email             String?
@@ -306,7 +308,6 @@ model PatientTest {
   lastStatusUpdateAt DateTime?
   barcode_status     String              @default("Unprinted")
   comments           String?             @db.Text
-  isOutsourced       Boolean             @default(false)
   outsourcedTo       String?
   homeVisitTracking  HomeVisitTracking?
   outsourcingReport  OutsourcingReport?
@@ -328,7 +329,6 @@ model PatientTest {
   @@index([patientId, visitId])
   @@index([patientId], map: "patient_tests_patientId_fkey")
   @@index([packageId], map: "patient_tests_packageId_fkey")
-  @@index([isOutsourced])
   @@map("patient_tests")
 }
 
@@ -376,7 +376,6 @@ model Test {
   testParameterId        Int?
   testCategoryId         Int?
   sampleTypeId           Int?
-  machineId              Int?              // Foreign key to Machine table (optional)
   group                  String?
   reportHeader           String?
   preparationTime        String?
@@ -408,11 +407,11 @@ model Test {
   charges                TestCharge[]
   ownedParameters        TestParameter[]    @relation("ParameterOwner")
   templates              TestTemplate[]
+  testMachines           TestMachine[]
   department             Department          @relation(fields: [departmentId], references: [id], onDelete: Cascade)
   testCategory           TestCategory?       @relation("PrimaryTestCategory", fields: [testCategoryId], references: [id])
   testParameter          TestParameter?      @relation("PrimaryTestParameter", fields: [testParameterId], references: [id])
   sample_type            sample_type?        @relation(fields: [sampleTypeId], references: [id])
-  machine                Machine?            @relation("MachineTests", fields: [machineId], references: [id], onDelete: SetNull)
   outsourcingLabTests    OutsourcingLabTest[] @relation("OutsourcingTests")
 
 
@@ -424,7 +423,6 @@ model Test {
   @@index([isOutsourced])
   @@index([name])
   @@index([sampleTypeId], map: "tests_sampleTypeId_fkey")
-  @@index([machineId], map: "tests_machineId_fkey")
   @@map("tests")
 }
 
@@ -677,9 +675,10 @@ model TestResult {
   patientTestId   Int
   testParameterId Int
   testCategoryId  Int?
-  numericValue    Float?
+  numericValue    String?       // Store numeric value with optional symbols: "<7.5", ">140", "7.5", etc.
   textValue       String?
   selectedOption  String?
+  isHighlighted   Boolean       @default(false) // Checkbox to highlight/bold this value in reports
   enteredBy       String?
   verifiedBy      String?
   enteredAt       DateTime      @default(now())
@@ -701,9 +700,24 @@ model Machine {
   isActive  Boolean   @default(true)
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
-  tests     Test[]    @relation("MachineTests")
+  testMachines TestMachine[]
 
   @@map("machines")
+}
+
+model TestMachine {
+  id        Int       @id @default(autoincrement())
+  testId    Int
+  machineId Int
+  createdAt DateTime  @default(now())
+  
+  test      Test      @relation(fields: [testId], references: [id], onDelete: Cascade)
+  machine   Machine   @relation(fields: [machineId], references: [id], onDelete: Cascade)
+
+  @@unique([testId, machineId])
+  @@index([testId])
+  @@index([machineId])
+  @@map("test_machines")
 }
 
 model PaymentTransaction {

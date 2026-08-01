@@ -40,13 +40,20 @@ function processAgeRangesWithGender(ageRanges, parameterName = '') {
   }
   
   const processedRanges = ageRanges.map(range => {
-    // Auto-assign gender based on label
+    // Auto-assign gender based on label and gender dropdown selection
     let gender = range.gender;
     if (range.label && range.enabled) {
-      if (range.label.includes('Male') && !range.label.includes('Female')) {
+      // Check for explicit gender selection in the dropdown
+      if (range.gender === 'Both') {
+        // "Both" means it applies to all genders - keep it as "both"
+        gender = 'both';
+      } else if (range.label.includes('Male') && !range.label.includes('Female')) {
         gender = 'Male';
-      } else if (range.label.includes('Female')) {
+      } else if (range.label.includes('Female') && !range.label.includes('Male')) {
         gender = 'Female';
+      } else if (range.label.includes('Both') || (range.label.includes('Male') && range.label.includes('Female'))) {
+        // If label explicitly says "Both", set gender to "both"
+        gender = 'both';
       }
     }
     
@@ -381,6 +388,11 @@ export const getTestById = async (req, res) => {
             }
           },
           orderBy: { categoryName: 'asc' }
+        },
+        testMachines: {
+          include: {
+            machine: true
+          }
         }
       }
     });
@@ -587,7 +599,7 @@ export const getTestById = async (req, res) => {
       departmentId: test.departmentId,
       sampleTypeId: test.sampleTypeId,
       sample_type: test.sample_type,
-      machineId: test.machineId,
+      machineIds: test.testMachines?.map(tm => tm.machineId) || [],
       group: test.group,
       reportHeader: test.reportHeader,
       preparationTime: test.preparationTime,
@@ -651,7 +663,7 @@ export const createTest = async (req, res) => {
       testCode,
       departmentId,
       sampleTypeId,
-      machineId,
+      machineIds, // Changed from machineId to machineIds (array)
       group,
       reportHeader,
       preparationTime,
@@ -712,7 +724,6 @@ export const createTest = async (req, res) => {
         testCode,
         departmentId: parseInt(departmentId),
         sampleTypeId: sampleTypeId ? parseInt(sampleTypeId) : null,
-        machineId: machineId ? parseInt(machineId) : null,
         group,
         reportHeader,
         preparationTime,
@@ -733,6 +744,19 @@ export const createTest = async (req, res) => {
     });
 
     console.log('✅ Test created with ID:', test.id);
+
+    // Link machines to test if machineIds provided
+    if (machineIds && Array.isArray(machineIds) && machineIds.length > 0) {
+      for (const machineId of machineIds) {
+        await prisma.testMachine.create({
+          data: {
+            testId: test.id,
+            machineId: parseInt(machineId)
+          }
+        });
+      }
+      console.log(`✅ Linked ${machineIds.length} machine(s) to test`);
+    }
 
     // Now create TestParameters and TestCategories
     if (categories && categories.length > 0) {
@@ -810,7 +834,7 @@ export const createTest = async (req, res) => {
       }
     }
 
-    // Fetch complete test with categories and parameters
+    // Fetch complete test with categories, parameters, and machines
     const completeTest = await prisma.test.findUnique({
       where: { id: test.id },
       include: {
@@ -822,6 +846,11 @@ export const createTest = async (req, res) => {
             testParameter: true
           },
           orderBy: { categoryName: 'asc' }
+        },
+        testMachines: {
+          include: {
+            machine: true
+          }
         }
       }
     });
@@ -865,7 +894,7 @@ export const updateTest = async (req, res) => {
       testCode,
       departmentId,
       sampleTypeId,
-      machineId,
+      machineIds, // Changed from machineId to machineIds (array)
       group,
       reportHeader,
       preparationTime,
@@ -887,16 +916,19 @@ export const updateTest = async (req, res) => {
       categories
     } = req.body;
 
+    // Parse test ID once at the beginning
+    const testId = parseInt(id);
+
     // Check if test exists - use raw query to avoid Prisma type coercion issues
     let existingTest;
     try {
       existingTest = await prisma.test.findUnique({
-        where: { id: parseInt(id) }
+        where: { id: testId }
       });
     } catch (err) {
       // If type conversion error, try raw SQL to fetch
       console.log('⚠️ Type conversion error, using raw SQL:', err.message);
-      const result = await prisma.$queryRaw`SELECT id FROM tests WHERE id = ${parseInt(id)}`;
+      const result = await prisma.$queryRaw`SELECT id FROM tests WHERE id = ${testId}`;
       if (!result || result.length === 0) {
         return res.status(404).json({
           success: false,
@@ -922,7 +954,27 @@ export const updateTest = async (req, res) => {
     if (shortName !== undefined) updateData.shortName = shortName || undefined;
     if (testCode !== undefined) updateData.testCode = testCode || null;
     if (departmentId !== undefined) updateData.department = departmentId ? { connect: { id: parseInt(departmentId) } } : undefined;
-    if (machineId !== undefined) updateData.machine = machineId ? { connect: { id: parseInt(machineId) } } : { disconnect: true };
+    if (machineIds !== undefined) {
+      // Delete existing machine associations
+      await prisma.testMachine.deleteMany({
+        where: { testId: testId }
+      });
+      
+      // Create new machine associations if machineIds provided
+      if (Array.isArray(machineIds) && machineIds.length > 0) {
+        for (const machineId of machineIds) {
+          await prisma.testMachine.create({
+            data: {
+              testId: testId,
+              machineId: parseInt(machineId)
+            }
+          });
+        }
+        console.log(`✅ Updated ${machineIds.length} machine(s) for test`);
+      } else {
+        console.log('✅ Removed all machine associations from test');
+      }
+    }
     if (group !== undefined) updateData.group = group || null;
     if (reportHeader !== undefined) updateData.reportHeader = reportHeader || null;
     if (preparationTime !== undefined) updateData.preparationTime = preparationTime || null;
@@ -933,6 +985,7 @@ export const updateTest = async (req, res) => {
     if (interpretation !== undefined) updateData.interpretation = interpretation || null;
     if (outsourceLab !== undefined) updateData.outsourceLab = outsourceLab || null;
     if (imageSize !== undefined) updateData.imageSize = imageSize || null;
+    if (sampleTypeId !== undefined) updateData.sample_type = sampleTypeId ? { connect: { id: parseInt(sampleTypeId) } } : { disconnect: true };
     if (isHeader !== undefined) updateData.isHeader = isHeader;
     if (showTestName !== undefined) updateData.showTestName = showTestName;
     if (isNABL !== undefined) updateData.isNABL = isNABL;
@@ -958,17 +1011,9 @@ export const updateTest = async (req, res) => {
       updateData.profileTest = convertToBoolean(profileTest);
     }
 
-    // Handle sampleTypeId separately using relation syntax
-    const testId = parseInt(id);
     if (sampleTypeId !== undefined) {
       console.log('📌 Updating sampleTypeId:', sampleTypeId);
       updateData.sample_type = sampleTypeId ? { connect: { id: parseInt(sampleTypeId) } } : { disconnect: true };
-    }
-
-    // Handle machineId separately using relation syntax
-    if (machineId !== undefined) {
-      console.log('📌 Updating machineId:', machineId);
-      updateData.machine = machineId ? { connect: { id: parseInt(machineId) } } : { disconnect: true };
     }
 
     // Remove undefined values from updateData
@@ -983,11 +1028,11 @@ export const updateTest = async (req, res) => {
 
     // Handle categories update if provided
     if (categories && categories.length > 0) {
-      console.log('🗑️ Deleting existing categories for test ID:', id);
+      console.log('🗑️ Deleting existing categories for test ID:', testId);
       
       // Delete existing categories and their parameters
       await prisma.testCategory.deleteMany({
-        where: { testId: parseInt(id) }
+        where: { testId: testId }
       });
       
       console.log('📊 Processing new categories:', categories.length);
@@ -1002,7 +1047,7 @@ export const updateTest = async (req, res) => {
             // Create TestParameter
             const testParameter = await prisma.testParameter.create({
               data: {
-                testId: parseInt(id), // ✅ Link parameter to test (using id from updateTest)
+                testId: testId, // ✅ Link parameter to test
                 parameterName: param.parameterName || 'Unnamed',
                 machineCode: param.machineCode || null,
                 multiplyBy: param.multiplyBy || null,
@@ -1067,9 +1112,9 @@ export const updateTest = async (req, res) => {
       }
     }
 
-    // Fetch updated test with categories and parameters
+    // Fetch updated test with categories, parameters, and machines
     const updatedTest = await prisma.test.findUnique({
-      where: { id: parseInt(id) },
+      where: { id: testId },
       include: {
         department: {
           select: { id: true, name: true }
@@ -1079,6 +1124,11 @@ export const updateTest = async (req, res) => {
             testParameter: true
           },
           orderBy: { categoryName: 'asc' }
+        },
+        testMachines: {
+          include: {
+            machine: true
+          }
         }
       }
     });
@@ -3521,6 +3571,14 @@ export const updateParameterMaster = async (req, res) => {
       rangeValues: updateData.rangeValues && updateData.rangeValues.length > 0 ? JSON.stringify(updateData.rangeValues) : null
     };
 
+    // 🔴 DEBUG: Log what's being saved
+    console.log(`\n🔴 UPDATE PARAMETER: ${updateData.parameterName}`);
+    console.log(`   ageRanges count: ${updateData.ageRanges?.length || 0}`);
+    if (updateData.ageRanges && updateData.ageRanges.length > 0) {
+      console.log(`   ageRanges data:`, JSON.stringify(updateData.ageRanges, null, 2));
+    }
+    console.log(`   Will be saved as JSON: ${processedData.ageRanges ? 'YES' : 'NO'}`);
+
     const parameter = await prisma.parameterMaster.update({
       where: { id: parseInt(id) },
       data: processedData,
@@ -3533,6 +3591,22 @@ export const updateParameterMaster = async (req, res) => {
         }
       }
     });
+
+    // 🔴 DEBUG: Confirm what was saved
+    console.log(`\n✅ PARAMETER SAVED TO DATABASE:`);
+    console.log(`   ID: ${parameter.id}, Name: ${parameter.parameterName}`);
+    console.log(`   ageRanges saved: ${parameter.ageRanges ? 'YES' : 'NO'}`);
+    if (parameter.ageRanges) {
+      try {
+        const parsed = JSON.parse(parameter.ageRanges);
+        console.log(`   ageRanges count: ${parsed.length}`);
+        parsed.forEach((range, idx) => {
+          console.log(`     Range ${idx}: label="${range.label}", gender="${range.gender}", enabled=${range.enabled}, from=${range.from}, to=${range.to}, ll=${range.ll}, ul=${range.ul}`);
+        });
+      } catch (e) {
+        console.log(`   Error parsing ageRanges: ${e.message}`);
+      }
+    }
 
     res.json({
       success: true,

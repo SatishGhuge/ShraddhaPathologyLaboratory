@@ -25,7 +25,7 @@ const SuggestionInput = ({ value, onChange, options, isAbnormal }) => {
   const tags = value ? value.split(',').map(t => t.trim()).filter(Boolean) : [];
 
   useEffect(() => {
-    const handler = (e: any) => { if (ref.current && (e.target instanceof Node) && !ref.current.contains(e.target)) setShow(false); };
+    const handler = (e: any) => { if (ref.current && !(ref.current as HTMLElement).contains(e.target as Node)) setShow(false); };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, []);
@@ -87,8 +87,8 @@ const SuggestionInput = ({ value, onChange, options, isAbnormal }) => {
 const PatientResult = () => {
   const params = useParams();
   const searchParams = useSearchParams();
-  const patientTestId = params && (Array.isArray(params.patientTestId) ? params.patientTestId[0] : params.patientTestId);
-  const testIdsParam = searchParams ? searchParams.get('testIds') : null; // For multiple tests
+  const patientTestId = Array.isArray(params?.patientTestId) ? params.patientTestId[0] : (params?.patientTestId as string);
+  const testIdsParam = searchParams?.get('testIds') || null; // For multiple tests
   
   const router = useRouter();
 
@@ -138,6 +138,9 @@ const PatientResult = () => {
   const [attachedFileUrl, setAttachedFileUrl] = useState<any>(null);
   const [showComment, setShowComment] = useState(false);
   const [comments, setComments] = useState('');
+  const [commentHistory, setCommentHistory] = useState<string[]>([]);
+  const [showCommentDropdown, setShowCommentDropdown] = useState(false);
+  const [commentFocused, setCommentFocused] = useState(false);
   const [defaultSignature, setDefaultSignature] = useState<any>(null);
 
   // BarcodeModal state
@@ -152,6 +155,9 @@ const PatientResult = () => {
   const [outsourcedTo, setOutsourcedTo] = useState<string | null>(null);
   const [outsourcingReport, setOutsourcingReport] = useState<any>(null);
 
+  // ✅ State for tracking which auto-calculated fields are in edit mode
+  const [editingFormulaFields, setEditingFormulaFields] = useState<Set<number>>(new Set());
+
   const calculateAge = (dob: any) => {
     if (!dob) return null;
     const today = new Date();
@@ -160,6 +166,37 @@ const PatientResult = () => {
     const monthDiff = today.getMonth() - birthDate.getMonth();
     if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) age--;
     return age;
+  };
+
+  // ✅ Format age from Int fields into human-readable string with different formats based on age
+  const formatAgeFromFields = (ageYears?: number, ageMonths?: number, ageDays?: number): string => {
+    const years = ageYears ?? 0;
+    const months = ageMonths ?? 0;
+    const days = ageDays ?? 0;
+    
+    // If all are 0 or null, return dash
+    if (years === 0 && months === 0 && days === 0) return '-';
+    
+    // Under 1 year: show only months and days (e.g., "3M 12D")
+    if (years === 0) {
+      let result = '';
+      if (months > 0) result += `${months}M`;
+      if (days > 0) result += (result ? ' ' : '') + `${days}D`;
+      return result.trim() || '-';
+    }
+    
+    // 1 to 12 years: show years, months, and days (e.g., "4Y 3M 15D")
+    if (years < 12) {
+      let result = '';
+      if (years > 0) result += `${years}Y`;
+      if (months > 0) result += (result ? ' ' : '') + `${months}M`;
+      if (days > 0) result += (result ? ' ' : '') + `${days}D`;
+      return result.trim() || '-';
+    }
+    
+    // 12 years and above: show as decimal (e.g., "12.6")
+    const decimalAge = (years + months / 12).toFixed(1);
+    return decimalAge;
   };
 
   const getAgeInUnit = (years, months, days, timeUnit) => {
@@ -171,28 +208,66 @@ const PatientResult = () => {
     }
   };
 
-  const getAgeAppropriateRange = (parameter, patientAge, patientGender, patientDob) => {
+  // Helper function to extract numeric age from formatted age string
+  // Converts "1 month 3 days" to { years: 0, months: 1, days: 3 }
+  // Or just "30" to { years: 30, months: 0, days: 0 }
+  const parseFormattedAge = (ageValue: any) => {
+    if (!ageValue) return { years: 0, months: 0, days: 0 };
+    
+    // If it's a number or numeric string, return it as years
+    const numericAge = parseInt(ageValue);
+    if (!isNaN(numericAge)) {
+      return { years: numericAge, months: 0, days: 0 };
+    }
+    
+    // If it's a formatted string like "1 month 3 days"
+    if (typeof ageValue === 'string') {
+      const result = { years: 0, months: 0, days: 0 };
+      
+      // Extract months: "X month(s)"
+      const monthMatch = ageValue.match(/(\d+)\s+months?/i);
+      if (monthMatch) result.months = parseInt(monthMatch[1]);
+      
+      // Extract days: "X day(s)"
+      const dayMatch = ageValue.match(/(\d+)\s+days?/i);
+      if (dayMatch) result.days = parseInt(dayMatch[1]);
+      
+      return result;
+    }
+    
+    return { years: 0, months: 0, days: 0 };
+  };
+
+  const getAgeAppropriateRange = (parameter, ageYears, ageMonths, ageDays, patientGender) => {
     if (!parameter) return '';
     if (parameter.type === 'Text' || parameter.isDescriptive)
       return parameter.textContent || parameter.normalRange || '';
-    const age = patientDob ? calculateAge(patientDob) : patientAge;
+    
+    // Use the new Int age fields directly - they're already calculated and accurate
+    const exactAgeInYears = ageYears ?? 0;
+    const exactAgeInMonths = ageMonths ?? 0;
+    const exactAgeInDays = ageDays ?? 0;
+    
     const gender = patientGender?.toLowerCase();
-    let exactAgeInDays = 0, exactAgeInMonths = 0, exactAgeInYears = age || 0;
-    if (patientDob) {
-      const birthDate = new Date(patientDob);
-      const currentDate = new Date();
-      const ageInMs = currentDate.getTime() - birthDate.getTime();
-      exactAgeInDays = Math.floor(ageInMs / (1000 * 60 * 60 * 24));
-      exactAgeInMonths = Math.floor(exactAgeInDays / 30.44);
-      exactAgeInYears = Math.floor(exactAgeInDays / 365.25);
-    }
+    
+    // 🔴 DEBUG: Log ALL parameters being checked
+    console.log(`🔍 getAgeAppropriateRange DEBUG:`);
+    console.log(`   Parameter: ${parameter.parameterName}`);
+    console.log(`   Patient Age: ${exactAgeInYears}Y ${exactAgeInMonths}M ${exactAgeInDays}D`);
+    console.log(`   Patient Gender: ${gender}`);
+    console.log(`   Range Type: ${parameter.rangeType}`);
+    console.log(`   Age Ranges JSON: ${parameter.ageRanges}`);
+    
+    // ✅ Check complex age ranges first
     if (parameter.ageRanges) {
       try {
         const ageRanges = JSON.parse(parameter.ageRanges);
+        console.log(`   ✅ Parsed ageRanges:`, ageRanges);
         for (const range of ageRanges) {
           if (!range.enabled) continue;
           const rangeGender = range.gender?.toLowerCase();
-          if (rangeGender && rangeGender !== gender) continue;
+          // Skip if gender doesn't match, unless it's 'both' (which applies to all)
+          if (rangeGender && rangeGender !== 'both' && rangeGender !== gender) continue;
           let ageMatches = false;
           if (range.label?.includes('Less Than') && range.value != null)
             ageMatches = getAgeInUnit(exactAgeInYears, exactAgeInMonths, exactAgeInDays, range.timeUnit) < range.value;
@@ -203,22 +278,75 @@ const PatientResult = () => {
             ageMatches = v >= range.from && v <= range.to;
           } else if (range.label?.includes('Equal To') && range.value != null)
             ageMatches = getAgeInUnit(exactAgeInYears, exactAgeInMonths, exactAgeInDays, range.timeUnit) === range.value;
-          if (ageMatches && range.ll != null && range.ul != null) return `${range.ll} - ${range.ul}`;
+          
+          if (ageMatches && range.ll != null && range.ul != null) {
+            console.log(`✅ Matched age range: ${range.label} (${range.ll} - ${range.ul})`);
+            return `${range.ll} - ${range.ul}`;
+          }
         }
       } catch (e) { console.warn('Error parsing age ranges:', e); }
     }
+    
+    // ✅ Check gender and age-based ranges (BySex/ByGenderAndAge)
+    console.log(`   Checking BySex/ByGenderAndAge...`);
+    console.log(`   childActive: ${parameter.childActive}, childLowValue: ${parameter.childLowValue}, childHighValue: ${parameter.childHighValue}`);
+    console.log(`   femaleActive: ${parameter.femaleActive}, femaleLowValue: ${parameter.femaleLowValue}, femaleHighValue: ${parameter.femaleHighValue}`);
+    console.log(`   maleActive: ${parameter.maleActive}, maleLowValue: ${parameter.maleLowValue}, maleHighValue: ${parameter.maleHighValue}`);
+    
     if (parameter.rangeType === 'BySex' || parameter.rangeType === 'ByGenderAndAge') {
-      if (exactAgeInYears < 18 && parameter.childActive && parameter.childLowValue != null && parameter.childHighValue != null)
+      // Child range (age < 18) - highest priority for children
+      if (exactAgeInYears < 18 && parameter.childActive && parameter.childLowValue != null && parameter.childHighValue != null) {
+        console.log(`✅ Applied CHILD range: ${parameter.childLowValue} - ${parameter.childHighValue}`);
         return `${parameter.childLowValue} - ${parameter.childHighValue}`;
+      }
+      
+      // Adult ranges (age >= 18) - match by gender
       if (exactAgeInYears >= 18) {
-        if (gender === 'female' && parameter.femaleActive && parameter.femaleLowValue != null && parameter.femaleHighValue != null)
+        // Check patient's actual gender
+        if (gender === 'female' && parameter.femaleActive && parameter.femaleLowValue != null && parameter.femaleHighValue != null) {
+          console.log(`✅ Applied FEMALE range (gender match): ${parameter.femaleLowValue} - ${parameter.femaleHighValue}`);
           return `${parameter.femaleLowValue} - ${parameter.femaleHighValue}`;
-        if (gender === 'male' && parameter.maleActive && parameter.maleLowValue != null && parameter.maleHighValue != null)
+        }
+        if (gender === 'male' && parameter.maleActive && parameter.maleLowValue != null && parameter.maleHighValue != null) {
+          console.log(`✅ Applied MALE range (gender match): ${parameter.maleLowValue} - ${parameter.maleHighValue}`);
           return `${parameter.maleLowValue} - ${parameter.maleHighValue}`;
+        }
+        
+        // If gender doesn't match male/female, try both with priority to male
+        if (!['male', 'female'].includes(gender)) {
+          console.log(`⚠️ Gender is "${gender}" (not male/female), checking both ranges...`);
+          if (parameter.maleActive && parameter.maleLowValue != null && parameter.maleHighValue != null) {
+            console.log(`✅ Applied MALE range (fallback for non-standard gender): ${parameter.maleLowValue} - ${parameter.maleHighValue}`);
+            return `${parameter.maleLowValue} - ${parameter.maleHighValue}`;
+          }
+          if (parameter.femaleActive && parameter.femaleLowValue != null && parameter.femaleHighValue != null) {
+            console.log(`✅ Applied FEMALE range (fallback for non-standard gender): ${parameter.femaleLowValue} - ${parameter.femaleHighValue}`);
+            return `${parameter.femaleLowValue} - ${parameter.femaleHighValue}`;
+          }
+        }
       }
     }
-    if (parameter.maleLowValue != null && parameter.maleHighValue != null)
+    
+    // Fallback to any available range (in case rangeType is not BySex/ByGenderAndAge or conditions above didn't match)
+    console.log(`   Checking final fallback ranges...`);
+    
+    // Try gender-specific ranges first regardless of rangeType
+    if (gender === 'female' && parameter.femaleLowValue != null && parameter.femaleHighValue != null) {
+      console.log(`✅ Using FEMALE range (final fallback): ${parameter.femaleLowValue} - ${parameter.femaleHighValue}`);
+      return `${parameter.femaleLowValue} - ${parameter.femaleHighValue}`;
+    }
+    if (gender === 'male' && parameter.maleLowValue != null && parameter.maleHighValue != null) {
+      console.log(`✅ Using MALE range (final fallback): ${parameter.maleLowValue} - ${parameter.maleHighValue}`);
       return `${parameter.maleLowValue} - ${parameter.maleHighValue}`;
+    }
+    
+    // If no gender-specific range, try child range
+    if (parameter.childLowValue != null && parameter.childHighValue != null) {
+      console.log(`✅ Using CHILD range (final fallback): ${parameter.childLowValue} - ${parameter.childHighValue}`);
+      return `${parameter.childLowValue} - ${parameter.childHighValue}`;
+    }
+    
+    console.log(`❌ No matching range found, returning empty`);
     return parameter.displayRangeText || parameter.rangeText || parameter.normalRange || '';
   };
 
@@ -231,7 +359,7 @@ const PatientResult = () => {
 
   const isValueOutOfRange = (param: any, numericValue: any) => {
     if (param.type !== 'Numeric' || numericValue === null || numericValue === undefined || numericValue === '') return false;
-    const rangeStr = getAgeAppropriateRange(param, patientData?.patient?.age, patientData?.patient?.gender, patientData?.patient?.dob);
+    const rangeStr = getAgeAppropriateRange(param, patientData?.patient?.ageYears, patientData?.patient?.ageMonths, patientData?.patient?.ageDays, patientData?.patient?.gender);
     const range = parseRange(rangeStr);
     if (!range) return false;
     return parseFloat(numericValue) < range.low || parseFloat(numericValue) > range.high;
@@ -239,7 +367,7 @@ const PatientResult = () => {
 
   const getRangeIndicator = (param: any, numericValue: any) => {
     if (param.type !== 'Numeric' || numericValue === null || numericValue === undefined || numericValue === '') return null;
-    const rangeStr = getAgeAppropriateRange(param, patientData?.patient?.age, patientData?.patient?.gender, patientData?.patient?.dob);
+    const rangeStr = getAgeAppropriateRange(param, patientData?.patient?.ageYears, patientData?.patient?.ageMonths, patientData?.patient?.ageDays, patientData?.patient?.gender);
     const range = parseRange(rangeStr);
     if (!range) return null;
     const value = parseFloat(numericValue);
@@ -415,7 +543,7 @@ const PatientResult = () => {
       const hasRange = Object.values(paramGrouped).some((categoryParams: any) =>
         (categoryParams as any[]).some(param => {
           if (param.type === 'Text' || param.isDescriptive) return false; // Don't show for text/descriptive
-          const rangeStr = getAgeAppropriateRange(param, patientData?.patient?.age, patientData?.patient?.gender, patientData?.patient?.dob);
+          const rangeStr = getAgeAppropriateRange(param, patientData?.patient?.ageYears, patientData?.patient?.ageMonths, patientData?.patient?.ageDays, patientData?.patient?.gender);
           // Only return true if range has actual content
           return rangeStr && rangeStr.trim() !== '' && rangeStr !== '-' && rangeStr !== param.normalRange?.trim?.();
         })
@@ -472,6 +600,91 @@ const PatientResult = () => {
     } catch { return null; }
   }, []);
 
+  // ✅ NEW: Helper function to round numeric value based on decimal places
+  const roundToDecimal = (value, decimalPlaces = 2) => {
+    if (value === null || value === undefined || value === '') return '';
+    const numValue = parseFloat(String(value));
+    if (isNaN(numValue)) return value;
+    const multiplier = Math.pow(10, decimalPlaces);
+    return (Math.round(numValue * multiplier) / multiplier).toFixed(decimalPlaces);
+  };
+
+  // ✅ Fetch comment history for a patient
+  const fetchCommentHistory = async (patientId?: string) => {
+    try {
+      // Fetch global comment history (system-wide)
+      const url = `${API_BASE_URL}/results/history/comments`;
+      
+      console.log('🔄 Fetching global comment history from:', url);
+      const response = await fetch(url);
+      
+      if (!response.ok) {
+        console.error('❌ API response not ok:', response.status, response.statusText);
+        return;
+      }
+      
+      const data = await response.json();
+      
+      console.log('📥 Comment history response:', data);
+      
+      if (data.success && Array.isArray(data.data)) {
+        setCommentHistory(data.data || []);
+        console.log('✅ Comment history fetched, count:', data.data.length, 'items:', data.data);
+      } else {
+        console.warn('⚠️ Invalid response structure:', data);
+        setCommentHistory([]);
+      }
+    } catch (error) {
+      console.error('❌ Could not fetch comment history:', error);
+      setCommentHistory([]);
+    }
+  };
+
+  // ✅ Handle comment change and save immediately
+  const handleCommentChange = async (newComments: string) => {
+    setComments(newComments);
+    
+    // Save to database immediately if user is typing and there's content
+    if (patientData?.id && newComments.trim()) {
+      try {
+        await updatePatientComments(patientData.id, newComments);
+        console.log('✅ Comments auto-saved:', newComments);
+        
+        // Fetch comment history to show the new comment options
+        await fetchCommentHistory();
+      } catch (error) {
+        console.error('⚠️ Error auto-saving comments:', error);
+      }
+    }
+  };
+
+  // ✅ Handle comment checkbox toggle
+  const handleCommentCheckbox = (checked: boolean) => {
+    setShowComment(checked);
+    
+    if (!checked) {
+      // If unchecking, clear comments from database and local state
+      setComments('');
+      if (patientData?.id) {
+        updatePatientComments(patientData.id, '').catch(error => {
+          console.error('⚠️ Error clearing comments:', error);
+        });
+      }
+    }
+  };
+
+  // ✅ Load existing comments when patient data loads
+  useEffect(() => {
+    if (patientData?.comments) {
+      setComments(patientData.comments);
+      setShowComment(true);  // ✅ Auto-check the comment checkbox if comments exist
+      console.log('✅ Loaded existing comments:', patientData.comments);
+    } else {
+      setComments('');
+      setShowComment(false);  // ✅ Uncheck if no comments
+    }
+  }, [patientData?.id]);
+
   // Detect if multiple tests or single test
   useEffect(() => {
     if (testIdsParam) {
@@ -480,6 +693,10 @@ const PatientResult = () => {
     } else {
       setMultipleTestIds([]);
     }
+    
+    // Fetch global comment history on page load
+    console.log('🔄 Page load - fetching global comment history');
+    fetchCommentHistory();
   }, [testIdsParam]);
 
   // Load data based on single or multiple tests
@@ -503,6 +720,14 @@ const PatientResult = () => {
       }
       const data = await getPatientTestById(patientTestId);
       if (data) {
+        console.log(`\n🔴 FRONTEND: getPatientTestById response received`);
+        console.log(`   data.patientTest exists: ${!!data.patientTest}`);
+        console.log(`   data.patientTest.patient exists: ${!!data.patientTest?.patient}`);
+        console.log(`   data.patientTest.patient.ageYears: ${data.patientTest?.patient?.ageYears}`);
+        console.log(`   data.patientTest.patient.ageMonths: ${data.patientTest?.patient?.ageMonths}`);
+        console.log(`   data.patientTest.patient.ageDays: ${data.patientTest?.patient?.ageDays}`);
+        console.log(`   data.patientTest.patient.gender: ${data.patientTest?.patient?.gender}`);
+        
         setPatientData(data.patientTest);
         
         // DEBUG: Log interpretation from backend
@@ -562,10 +787,13 @@ const PatientResult = () => {
               textValue: param.existingResult.textValue,
               selectedOption: param.existingResult.selectedOption,
               isAbnormal: param.existingResult.isAbnormal,
-              referenceRange: param.existingResult.referenceRange
+              referenceRange: param.existingResult.referenceRange,
+              isHighlighted: param.existingResult.isHighlighted || false
             };
           } else {
-            initialResults[param.id] = { numericValue: null, textValue: param.textContent || '', selectedOption: '', isAbnormal: false, referenceRange: param.normalRange };
+            // Don't use "Parameter" placeholder as initial value - it's just metadata
+            const defaultTextValue = (param.textContent && param.textContent !== 'Parameter') ? param.textContent : '';
+            initialResults[param.id] = { numericValue: null, textValue: defaultTextValue, selectedOption: '', isAbnormal: false, referenceRange: param.normalRange, isHighlighted: false };
           }
         });
         setResults(initialResults);
@@ -612,10 +840,13 @@ const PatientResult = () => {
                 textValue: param.existingResult.textValue,
                 selectedOption: param.existingResult.selectedOption,
                 isAbnormal: param.existingResult.isAbnormal,
-                referenceRange: param.existingResult.referenceRange
+                referenceRange: param.existingResult.referenceRange,
+                isHighlighted: param.existingResult.isHighlighted || false
               };
             } else {
-              initialResults[paramKey] = { numericValue: null, textValue: param.textContent || '', selectedOption: '', isAbnormal: false, referenceRange: param.normalRange };
+              // Don't use "Parameter" placeholder as initial value - it's just metadata
+              const defaultTextValue = (param.textContent && param.textContent !== 'Parameter') ? param.textContent : '';
+              initialResults[paramKey] = { numericValue: null, textValue: defaultTextValue, selectedOption: '', isAbnormal: false, referenceRange: param.normalRange, isHighlighted: false };
             }
           });
         }
@@ -689,7 +920,12 @@ const PatientResult = () => {
       (allParams || parameters).forEach(param => {
         if (param.hasFormula && param.formula) {
           const calculated = evaluateFormula(param.formula, allParams || parameters, updated);
-          if (calculated !== null) updated[param.id] = { ...updated[param.id], numericValue: calculated };
+          // ✅ Apply decimal rounding ONLY to auto-calculated formula results
+          if (calculated !== null) {
+            const decimalPlaces = param.decimal || 2;
+            const roundedCalculated = parseFloat(roundToDecimal(calculated, decimalPlaces));
+            updated[param.id] = { ...updated[param.id], numericValue: roundedCalculated };
+          }
         }
       });
       return updated;
@@ -698,6 +934,17 @@ const PatientResult = () => {
 
   const handleAbnormalChange = (parameterId: any) => {
     setResults(prev => ({ ...prev, [parameterId]: { ...prev[parameterId], isAbnormal: !prev[parameterId]?.isAbnormal } }));
+  };
+
+  const handleHighlightChange = (parameterId: any) => {
+    setResults(prev => ({
+      ...prev,
+      [parameterId]: {
+        ...prev[parameterId],
+        isHighlighted: !prev[parameterId]?.isHighlighted,
+        isAbnormal: !prev[parameterId]?.isHighlighted // When highlight is toggled ON, set isAbnormal to true; when OFF, set to false
+      }
+    }));
   };
 
   // Handle template selection - populate editor with template values
@@ -851,11 +1098,12 @@ const PatientResult = () => {
               textValue: results[paramKey]?.textValue || null,
               selectedOption: results[paramKey]?.selectedOption || null,
               isAbnormal: results[paramKey]?.isAbnormal || false,
+              isHighlighted: results[paramKey]?.isHighlighted || false,
               referenceRange: results[paramKey]?.referenceRange || param.normalRange
             };
           }).filter(r => {
             const hasNumeric = r.numericValue !== null && r.numericValue !== undefined && r.numericValue !== '';
-            const hasText = r.textValue && typeof r.textValue === 'string' && r.textValue.trim() !== '';
+            const hasText = r.textValue && typeof r.textValue === 'string' && r.textValue.trim() !== '' && r.textValue.trim() !== 'Parameter';
             const hasOption = r.selectedOption && typeof r.selectedOption === 'string' && r.selectedOption.trim() !== '';
             return hasNumeric || hasText || hasOption;
           });
@@ -883,6 +1131,7 @@ const PatientResult = () => {
       );
 
       alert('All results saved successfully!');
+      
       router.push('/result');
     } catch (error) {
       console.error('Error saving results:', error);
@@ -913,10 +1162,11 @@ const PatientResult = () => {
         textValue: results[param.id]?.textValue || null,
         selectedOption: results[param.id]?.selectedOption || null,
         isAbnormal: results[param.id]?.isAbnormal || false,
+        isHighlighted: results[param.id]?.isHighlighted || false,
         referenceRange: results[param.id]?.referenceRange || param.normalRange
       })).filter(r => {
         const hasNumeric = r.numericValue !== null && r.numericValue !== undefined && r.numericValue !== '';
-        const hasText = r.textValue && typeof r.textValue === 'string' && r.textValue.trim() !== '';
+        const hasText = r.textValue && typeof r.textValue === 'string' && r.textValue.trim() !== '' && r.textValue.trim() !== 'Parameter';
         const hasOption = r.selectedOption && typeof r.selectedOption === 'string' && r.selectedOption.trim() !== '';
         return hasNumeric || hasText || hasOption;
       });
@@ -928,17 +1178,6 @@ const PatientResult = () => {
       });
       const data = await response.json();
       if (data.success) {
-        // Save comments if provided
-        if (showComment && comments.trim()) {
-          try {
-            await updatePatientComments(patientData.id, comments);
-            console.log('✅ Comments saved successfully');
-          } catch (error) {
-            console.error('⚠️ Error saving comments:', error);
-            alert('Results saved, but failed to save comments');
-          }
-        }
-        
         // Auto-transition to Entered status when first result is saved
         try {
           const transitionResponse = await fetch(`${API_BASE_URL}/results/${patientData.id}/auto-transition/result-saved`, {
@@ -985,10 +1224,11 @@ const PatientResult = () => {
         textValue: results[param.id]?.textValue || null,
         selectedOption: results[param.id]?.selectedOption || null,
         isAbnormal: results[param.id]?.isAbnormal || false,
+        isHighlighted: results[param.id]?.isHighlighted || false,
         referenceRange: results[param.id]?.referenceRange || param.normalRange
       })).filter(r => {
         const hasNumeric = r.numericValue !== null && r.numericValue !== undefined && r.numericValue !== '';
-        const hasText = r.textValue && typeof r.textValue === 'string' && r.textValue.trim() !== '';
+        const hasText = r.textValue && typeof r.textValue === 'string' && r.textValue.trim() !== '' && r.textValue.trim() !== 'Parameter';
         const hasOption = r.selectedOption && typeof r.selectedOption === 'string' && r.selectedOption.trim() !== '';
         return hasNumeric || hasText || hasOption;
       });
@@ -1043,43 +1283,23 @@ const PatientResult = () => {
       return clone.outerHTML;
     }).join('');
     const printWindow = window.open('', '_blank', 'width=900,height=700');
-    if (!printWindow) {
-      console.error('Failed to open print window');
-      return;
+    if (printWindow) {
+      printWindow.document.write(`
+        <!DOCTYPE html><html><head><title>Report</title><style>
+          * { margin:0; padding:0; box-sizing:border-box; }
+          body { font-family:Arial,sans-serif; font-size:11px; }
+          @page { size:A4; margin:0; }
+          #pr-report-page, .pr-attachment-page {
+            width:210mm; min-height:297mm; position:relative;
+            overflow:hidden; page-break-after:always; background:#fff;
+          }
+          #pr-report-page:last-child, .pr-attachment-page:last-child { page-break-after:avoid; }
+        </style></head><body>${pagesHtml}</body></html>
+      `);
+      printWindow.document.close();
+      printWindow.focus();
+      setTimeout(() => { printWindow.print(); printWindow.close(); }, 500);
     }
-    printWindow.document.write(`
-      <!DOCTYPE html><html><head><title>Report</title><style>
-        * { margin:0; padding:0; box-sizing:border-box; }
-        body { font-family:Arial,sans-serif; font-size:11px; }
-        @page { size:A4; margin:0; }
-        html,
-body{
-    width:210mm;
-    margin:0;
-    padding:0;
-    font-family:Arial,sans-serif;
-    font-size:11px;
-    background:white;
-}
-
-        #pr-report-page,
-    .pr-attachment-page {
-    width:210mm;
-    min-height:297mm;
-    position:relative;
-    overflow:visible;
-    background:#fff;
-    page-break-after:auto;
-    break-inside:avoid;
-    margin:0;
-    box-shadow:none;
-}
-        #pr-report-page:last-child, .pr-attachment-page:last-child { page-break-after:avoid; }
-      </style></head><body>${pagesHtml}</body></html>
-    `);
-    printWindow.document.close();
-    printWindow.focus();
-    setTimeout(() => { printWindow.print(); printWindow.close(); }, 500);
   };
 
   if (loading) return (<><Header /><div className="p-4 bg-gray-100 min-h-screen"><div className="text-center"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2"></div>Loading...</div></div></>);
@@ -1089,14 +1309,14 @@ body{
   return (
     <>
       <Header />
-      <div className="p-4 bg-gray-100 min-h-screen mt-16">
+      <div className="p-4 bg-gray-100 min-h-screen mt-2">
 
         {/* Patient Header */}
         <div className="bg-yellow-100 border p-2 text-sm flex justify-between flex-wrap">
           <span><b>NAME:</b> {patientData.patient.title} {patientData.patient.firstName} {patientData.patient.lastName}</span>
           <span><b>P_ID:</b> {patientData.patient.patientId}</span>
           <span><b>V_ID:</b> {patientData.visitId}</span>
-          <span><b>AGE/GENDER:</b> {patientData.patient.age} Yrs / {patientData.patient.gender}</span>
+          <span><b>AGE/GENDER:</b> {formatAgeFromFields(patientData.patient.ageYears, patientData.patient.ageMonths, patientData.patient.ageDays)} / {patientData.patient.gender}</span>
           <span><b>REFERRAL DR:</b> {patientData.referralDoctor || 'SELF'}</span>
           <span><b>REG. DATE & TIME:</b> {new Date(patientData.visitDate).toLocaleDateString('en-GB')} {patientData.visitTime}</span>
           <span><b>STATUS:</b> <span className="font-semibold text-blue-700">{patientData.status}</span></span>
@@ -1163,13 +1383,13 @@ body{
                     <span>{testIdx + 1}. {testData.patientTest.test.name}</span>
                     {/* Template dropdown - only show if templates exist */}
                     {(() => {
-                      const templates = getTemplates(testData.patientTest.testId);
-                      return templates?.templates && templates.templates.length > 0 && (
+                      const tpl = getTemplates(testData.patientTest.testId);
+                      return tpl?.templates && tpl.templates.length > 0 && (
                         <InlineTemplateSelector
                           testId={testData.patientTest.testId}
                           testName={testData.patientTest.test.name}
-                          templates={templates.templates || []}
-                          isLoadingTemplates={templates.loading || false}
+                          templates={tpl.templates}
+                          isLoadingTemplates={tpl?.loading || false}
                           onTemplateSelect={(template) => {
                             handleTemplateSelect(template, testData.patientTest.testId, false);
                           }}
@@ -1188,6 +1408,7 @@ body{
                         <th className="border p-2 text-left">OBSERVED VALUE</th>
                         <th className="border p-2 text-left">UNITS</th>
                         <th className="border p-2 text-left">NORMAL RANGE</th>
+                        <th className="border p-2 text-center" style={{width: '40px'}}>HIGHLIGHT</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -1196,7 +1417,11 @@ body{
                         .map(([categoryKey, categoryParams]: [string, any]) => (
                         <React.Fragment key={categoryKey}>
                           {categoryKey !== 'NO_CATEGORY_HEADER' && !categoryKey.startsWith('__NO_NAME_') && categoryParams[0]?.showCategoryHeader && (
-                            <tr className="bg-gray-200 font-semibold"><td colSpan={4} className="p-2">{stripHtmlTags(categoryParams[0]?.categoryName || '').toUpperCase()}</td></tr>
+                            <tr className="bg-gray-200 font-semibold">
+                              <td className="p-2">{stripHtmlTags(categoryParams[0]?.categoryName || '').toUpperCase()}</td>
+                              <td className="p-2 text-center">Parameter</td>
+                              <td colSpan={3}></td>
+                            </tr>
                           )}
                           {(categoryParams as any[]).sort((a, b) => (a.sortOrder ?? 999) - (b.sortOrder ?? 999)).map((param) => {
                             const paramKey = `${multipleTestIds[testIdx]}_${param.id}`;
@@ -1214,11 +1439,11 @@ body{
                                   <div className="flex items-center gap-2">
                                     {param.type === 'Numeric' ? (
                                       <input
-                                        type="number"
+                                        type="text"
                                         value={results[paramKey]?.numericValue || ''}
                                         onChange={(e) => handleResultChange(paramKey, 'numericValue', e.target.value, testData.parameters)}
                                         disabled={isFormula}
-                                        className={inputClass}
+                                        className={`${results[paramKey]?.isHighlighted ? 'border-2 border-red-500 bg-red-50' : inputClass} px-2 py-1 w-24 rounded`}
                                       />
                                     ) : param.isDescriptive ? (
                                       <div className="border border-gray-300 rounded min-h-[150px]">
@@ -1267,12 +1492,71 @@ body{
                                   </div>
                                 </td>
                                 <td className="border p-2 text-xs">{param.units || '-'}</td>
-                                <td className="border p-2 text-xs">{getAgeAppropriateRange(param, patientData.patient?.age, patientData.patient?.gender, patientData.patient?.dob)}</td>
+                                <td className="border p-2 text-xs">{stripHtmlTags(param.normalRange || param.displayRangeText || param.rangeText || '-')}</td>
+                                <td className="border p-2 text-center" style={{width: '40px'}}>
+                                  <input 
+                                    type="checkbox" 
+                                    checked={results[paramKey]?.isHighlighted || false}
+                                    onChange={() => {
+                                      handleHighlightChange(paramKey);
+                                    }}
+                                    className="w-5 h-5 accent-blue-600 cursor-pointer"
+                                    title="Check to highlight this value bold in report"
+                                  />
+                                </td>
                               </tr>
                             );
                           })}
                         </React.Fragment>
                       ))}
+                      {/* Comment Row */}
+                      <tr className="bg-gray-100 border-t-2 border-gray-400">
+                        <td colSpan={5} className="border p-3">
+                          <div className="flex items-center gap-3">
+                            <input 
+                              type="checkbox" 
+                              id="show-comment-single"
+                              checked={showComment}
+                              onChange={(e) => handleCommentCheckbox(e.target.checked)}
+                              className="w-5 h-5 accent-blue-600 cursor-pointer flex-shrink-0"
+                              title="Check to add comments"
+                            />
+                            <label htmlFor="show-comment-single" className="text-sm font-semibold text-gray-700 cursor-pointer flex-shrink-0">Comment:</label>
+                            {showComment && (
+                              <div className="flex-1 relative">
+                                <textarea
+                                  value={comments}
+                                  onChange={(e) => handleCommentChange(e.target.value)}
+                                  onFocus={() => setCommentFocused(true)}
+                                  onBlur={() => setTimeout(() => setCommentFocused(false), 200)}
+                                  placeholder="Type comment here..."
+                                  className="w-full border border-gray-300 rounded px-2 py-1 text-xs font-normal h-12 resize-none"
+                                />
+                                {commentHistory.length > 0 && commentFocused && (
+                                  <div className="absolute top-12 left-0 right-0 bg-white border border-gray-300 rounded shadow-lg p-2 max-h-40 overflow-y-auto z-50">
+                                    <div className="space-y-1">
+                                      {commentHistory.map((hist, idx) => (
+                                        <button
+                                          key={idx}
+                                          type="button"
+                                          onMouseDown={(e) => e.preventDefault()}
+                                          onClick={() => {
+                                            const newComments = comments.trim() ? `${comments}, ${hist}` : hist;
+                                            handleCommentChange(newComments);
+                                          }}
+                                          className="w-full text-left px-2 py-1.5 text-xs bg-gray-50 hover:bg-blue-500 hover:text-white text-gray-800 rounded cursor-pointer transition-colors"
+                                        >
+                                          {hist}
+                                        </button>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
                     </tbody>
                   </table>
                 </div>
@@ -1287,13 +1571,13 @@ body{
                 <span>{patientData.test.name}</span>
                 {/* Template dropdown - only show if templates exist */}
                 {(() => {
-                  const templates = getTemplates(patientData.testId);
-                  return templates?.templates && templates.templates.length > 0 && (
+                  const tpl = getTemplates(patientData.testId);
+                  return tpl?.templates && tpl.templates.length > 0 && (
                     <InlineTemplateSelector
                       testId={patientData.testId}
                       testName={patientData.test.name}
-                      templates={templates.templates || []}
-                      isLoadingTemplates={templates.loading || false}
+                      templates={tpl.templates}
+                      isLoadingTemplates={tpl?.loading || false}
                       onTemplateSelect={(template) => {
                         handleTemplateSelect(template, patientData.testId, true);
                       }}
@@ -1312,6 +1596,7 @@ body{
                     <th className="border p-2 text-left">OBSERVED VALUE</th>
                     <th className="border p-2 text-left">UNITS</th>
                     <th className="border p-2 text-left">NORMAL RANGE</th>
+                    <th className="border p-2 text-center" style={{width: '40px'}}>HIGHLIGHT</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1320,7 +1605,11 @@ body{
                     .map(([categoryKey, categoryParams]: [string, any]) => (
                     <React.Fragment key={categoryKey}>
                       {categoryKey !== 'NO_CATEGORY_HEADER' && !categoryKey.startsWith('__NO_NAME_') && categoryParams[0]?.showCategoryHeader && (
-                        <tr className="bg-gray-200 font-semibold"><td colSpan={4} className="p-2">{renderStyledText((categoryParams[0]?.categoryName || '').toUpperCase(), true)}</td></tr>
+                        <tr className="bg-gray-200 font-semibold">
+                          <td className="p-2">{renderStyledText((categoryParams[0]?.categoryName || '').toUpperCase(), true)}</td>
+                          <td className="p-2 text-center">Parameter</td>
+                          <td colSpan={3}></td>
+                        </tr>
                       )}
                       {(categoryParams as any[]).sort((a, b) => (a.sortOrder ?? 999) - (b.sortOrder ?? 999)).map((param) => {
                         const outOfRange = isValueOutOfRange(param, results[param.id]?.numericValue);
@@ -1333,11 +1622,66 @@ body{
                               <div className="flex items-center gap-2">
                                 {isFormula ? (
                                   <div className="flex items-center gap-1">
-                                    <input type="text" readOnly value={results[param.id]?.numericValue ?? ''} className={`${inputClass} bg-green-50 border-green-400 cursor-not-allowed`} title={`Auto-calculated: ${param.formula}`} />
+                                    {editingFormulaFields.has(param.id) ? (
+                                      // Edit mode - show editable input with save/cancel buttons
+                                      <div className="flex items-center ">
+                                        <input 
+                                          type="text" 
+                                          value={results[param.id]?.numericValue ?? ''} 
+                                          onChange={(e) => handleResultChange(param.id, 'numericValue', e.target.value === '' ? null : e.target.value, parameters)}
+                                          className={`${inputClass} px-2 py-1 w-24 rounded`}
+                                          autoFocus
+                                        />
+                                        <button
+                                          onClick={() => setEditingFormulaFields(prev => {
+                                            const newSet = new Set(prev);
+                                            newSet.delete(param.id);
+                                            return newSet;
+                                          })}
+                                          className="text-xs green-600 text-green px-2 py-1 rounded hover:green-900"
+                                          title="Save"
+                                        >
+                                          ✓
+                                        </button>
+                                        <button
+                                          onClick={() => setEditingFormulaFields(prev => {
+                                            const newSet = new Set(prev);
+                                            newSet.delete(param.id);
+                                            return newSet;
+                                          })}
+                                          className="text-xs text-red px-2 py-1 rounded hover:red-900"
+                                          title="Cancel"
+                                        >
+                                          ✕
+                                        </button>
+                                      </div>
+                                    ) : (
+                                      // View mode - show read-only with edit icon
+                                      <div className="flex items-center gap-1">
+                                        <input 
+                                          type="text" 
+                                          readOnly 
+                                          value={results[param.id]?.numericValue ?? ''} 
+                                          className={`${inputClass} bg-green-50 border-green-400 cursor-not-allowed`} 
+                                          title={`Auto-calculated: ${param.formula}`} 
+                                        />
+                                        <button
+                                          onClick={() => setEditingFormulaFields(prev => {
+                                            const newSet = new Set(prev);
+                                            newSet.add(param.id);
+                                            return newSet;
+                                          })}
+                                          className="text-s text-blue px-2 py-2 rounded hover:blue-900"
+                                          title="Edit calculated value"
+                                        >
+                                          ✎
+                                        </button>
+                                      </div>
+                                    )}
                                     <span className="text-xs text-green-700 italic">auto</span>
                                   </div>
                                 ) : param.type === 'Numeric' ? (
-                                  <input type="number" step="0.01" value={results[param.id]?.numericValue ?? ''} onChange={(e) => handleResultChange(param.id, 'numericValue', e.target.value === '' ? null : parseFloat(e.target.value), parameters)} className={inputClass} />
+                                  <input type="text" value={results[param.id]?.numericValue ?? ''} onChange={(e) => handleResultChange(param.id, 'numericValue', e.target.value === '' ? null : e.target.value, parameters)} className={`${results[param.id]?.isHighlighted ? 'border-2 border-red-500 bg-red-50' : inputClass} px-2 py-1 w-24 rounded`} placeholder="e.g., 7.5, <7.5 or >140" />
                                 ) : param.isDescriptive ? (
                                   <div className="border border-gray-300 rounded min-h-[150px]">
                                     <CKEditor
@@ -1390,12 +1734,71 @@ body{
                                 return unitValue;
                               })()}
                             </td>
-                            <td className="border p-2">{param.type === 'Text' || param.isDescriptive ? stripHtmlTags(param.normalRange || '') : stripHtmlTags(getAgeAppropriateRange(param, patientData.patient.age, patientData.patient.gender, patientData.patient.dob) || '')}</td>
+                            <td className="border p-2">{stripHtmlTags(param.normalRange || param.displayRangeText || param.rangeText || '-')}</td>
+                            <td className="border p-2 text-center" style={{width: '40px'}}>
+                              <input 
+                                type="checkbox" 
+                                checked={results[param.id]?.isHighlighted || false}
+                                onChange={() => {
+                                  handleHighlightChange(param.id);
+                                }}
+                                className="w-5 h-5 accent-blue-600 cursor-pointer"
+                                title="Check to highlight this value bold in report"
+                              />
+                            </td>
                           </tr>
                         );
                       })}
                     </React.Fragment>
                   ))}
+                  {/* Comment Row */}
+                  <tr className="bg-gray-100 border-t-2 border-gray-400">
+                    <td colSpan={6} className="border p-3">
+                      <div className="flex items-center gap-3">
+                        <input 
+                          type="checkbox" 
+                          id="show-comment-table"
+                          checked={showComment}
+                          onChange={(e) => handleCommentCheckbox(e.target.checked)}
+                          className="w-5 h-5 accent-blue-600 cursor-pointer flex-shrink-0"
+                          title="Check to add comments"
+                        />
+                        <label htmlFor="show-comment-table" className="text-sm font-semibold text-gray-700 cursor-pointer flex-shrink-0">Comment:</label>
+                        {showComment && (
+                          <div className="flex-1 relative">
+                            <textarea
+                              value={comments}
+                              onChange={(e) => handleCommentChange(e.target.value)}
+                              onFocus={() => setCommentFocused(true)}
+                              onBlur={() => setTimeout(() => setCommentFocused(false), 200)}
+                              placeholder="Type comment or select from history"
+                              className="w-full border border-gray-300 rounded px-2 py-1 text-xs font-normal h-12 resize-none"
+                            />
+                            {commentHistory.length > 0 && commentFocused && (
+                              <div className="absolute top-12 left-0 right-0 bg-white border border-gray-300 rounded shadow-lg p-2 max-h-40 overflow-y-auto z-50">
+                                <div className="space-y-1">
+                                  {commentHistory.map((hist, idx) => (
+                                    <button
+                                      key={idx}
+                                      type="button"
+                                      onMouseDown={(e) => e.preventDefault()}
+                                      onClick={() => {
+                                        const newComments = comments.trim() ? `${comments}, ${hist}` : hist;
+                                        handleCommentChange(newComments);
+                                      }}
+                                      className="w-full text-left px-2 py-1.5 text-xs bg-gray-50 hover:bg-blue-500 hover:text-white text-gray-800 rounded cursor-pointer transition-colors"
+                                    >
+                                      {hist}
+                                    </button>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
                 </tbody>
               </table>
             </div>
@@ -1410,7 +1813,7 @@ body{
                   type="checkbox"
                   id="show-comment"
                   checked={showComment}
-                  onChange={(e) => setShowComment(e.target.checked)}
+                  onChange={(e) => handleCommentCheckbox(e.target.checked)}
                   className="w-4 h-4"
                 />
                 <label htmlFor="show-comment" className="text-sm text-gray-700 cursor-pointer">Add Comments/Notes</label>
@@ -1418,14 +1821,35 @@ body{
               
               {/* Comments Text Area - Show when checkbox is checked */}
               {showComment && (
-                <div className="mb-3">
+                <div className="mb-3 relative">
                   <textarea
                     value={comments}
-                    onChange={(e) => setComments(e.target.value)}
-                    placeholder="Enter comments or notes to be printed on the report..."
-                    className="w-full border border-gray-300 rounded px-3 py-2 text-sm font-normal"
-                    rows={4}
+                    onChange={(e) => handleCommentChange(e.target.value)}
+                    onFocus={() => setCommentFocused(true)}
+                    onBlur={() => setTimeout(() => setCommentFocused(false), 200)}
+                    placeholder="Type comment here or select from history below"
+                    className="w-full border border-gray-300 rounded px-3 py-2 text-sm font-normal h-20 resize-none"
                   />
+                  {commentHistory.length > 0 && commentFocused && (
+                    <div className="absolute top-20 left-0 right-0 bg-white border border-gray-300 rounded shadow-lg p-2 max-h-48 overflow-y-auto z-50">
+                      <div className="space-y-1">
+                        {commentHistory.map((hist, idx) => (
+                          <button
+                            key={idx}
+                            type="button"
+                            onMouseDown={(e) => e.preventDefault()}
+                            onClick={() => {
+                              const newComments = comments.trim() ? `${comments}, ${hist}` : hist;
+                              handleCommentChange(newComments);
+                            }}
+                            className="w-full text-left px-2 py-1.5 text-sm bg-gray-50 hover:bg-blue-500 hover:text-white text-gray-800 rounded cursor-pointer transition-colors"
+                          >
+                            {hist}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
               
@@ -1535,8 +1959,8 @@ body{
                     <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '4mm', fontSize: '11px' }}>
                       <tbody>
                         <tr>
-                          <td style={{ padding: '2px 4px', width: '50%' }}>Patient Name : <b>{[patientData.patient.title, patientData.patient.firstName, patientData.patient.lastName].filter(Boolean).join(' ').toUpperCase()}</b></td>
-                          <td style={{ padding: '2px 4px', width: '50%' }}>Age : {patientData.patient.age ?? '-'} {patientData.patient.age ? 'years' : ''} ({patientData.patient.gender ?? '-'})</td>
+                          <td style={{ padding: '2px 4px', width: '50%' }}><strong>Patient:</strong> {patientData.patient.title} {patientData.patient.firstName} {patientData.patient.lastName}</td>
+                          <td style={{ padding: '2px 4px', width: '50%' }}><strong>Age / Gender:</strong> {formatAgeFromFields(patientData.patient.ageYears, patientData.patient.ageMonths, patientData.patient.ageDays)} Yrs / {patientData.patient.gender}</td>
                         </tr>
                         <tr>
                           <td style={{ padding: '2px 4px' }}>Referral : {patientData.patient.referralDoctor || '-'}</td>
@@ -1575,7 +1999,7 @@ body{
                             const numVal = results[param.id]?.numericValue;
                             const textVal = results[param.id]?.textValue;
                             const hasNumeric = numVal !== null && numVal !== undefined && numVal !== '';
-                            const hasText = textVal && textVal.trim() !== '';
+                            const hasText = textVal && textVal.trim() !== '' && textVal.trim() !== 'Parameter'; // Exclude placeholder text
                             return hasNumeric || hasText;
                           });
 
@@ -1585,7 +2009,12 @@ body{
                           return (
                             <React.Fragment key={categoryName}>
                               {categoryName !== 'NO_CATEGORY_HEADER' && categoryParams[0]?.showCategoryHeader && (
-                                <tr><td colSpan={shouldShowUnitsColumn() || shouldShowReferenceRangeColumn() ? (shouldShowUnitsColumn() && shouldShowReferenceRangeColumn() ? 4 : 3) : 2} style={{ padding: '4px 6px', fontWeight: 'bold', borderBottom: 'none', textDecoration: 'underline' }}>{stripHtmlTags(categoryName || '').toUpperCase()}</td></tr>
+                                <tr>
+                                  <td style={{ padding: '4px 6px', fontWeight: 'bold', borderBottom: 'none', textDecoration: 'underline' }}>{stripHtmlTags(categoryName || '').toUpperCase()}</td>
+                                  <td style={{ padding: '4px 6px', fontWeight: 'bold', borderBottom: 'none', textDecoration: 'underline', textAlign: 'center' }}>Parameter</td>
+                                  {shouldShowUnitsColumn() && <td style={{ padding: '4px 6px', fontWeight: 'bold', borderBottom: 'none' }}>-</td>}
+                                  {shouldShowReferenceRangeColumn() && <td style={{ padding: '4px 6px', fontWeight: 'bold', borderBottom: 'none' }}>-</td>}
+                                </tr>
                               )}
                               {paramsWithValues.map((param) => {
                                 const numVal = results[param.id]?.numericValue;
@@ -1599,11 +2028,15 @@ body{
                                 } else if (textVal) {
                                   // If it's a comma/comma-separated list, show only first value
                                   const firstValue = textVal.split(',')[0].trim();
-                                  displayValue = firstValue || '-';
+                                  // Don't display if the value is just the placeholder text "Parameter"
+                                  displayValue = (firstValue && firstValue !== 'Parameter') ? firstValue : '-';
                                 }
                                 
-                                // Get reference range - only numeric value for numeric params
-                                const rangeStr = shouldShowReferenceRangeColumn() ? getAgeAppropriateRange(param, patientData.patient.age, patientData.patient.gender, patientData.patient.dob) : '';
+                                // Skip showing this row if there's no real value
+                                if (displayValue === '-') return null;
+                                
+                                // Get reference range - only for numeric params
+                                const rangeStr = shouldShowReferenceRangeColumn() ? getAgeAppropriateRange(param, patientData.patient.ageYears, patientData.patient.ageMonths, patientData.patient.ageDays, patientData.patient.gender) : '';
                                 
                                 return (
                                   <tr key={param.id}>

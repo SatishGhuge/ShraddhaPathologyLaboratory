@@ -49,7 +49,6 @@ const AddTest = () => {
     profileTest: false,
     reportHeader: "",
     sampleTypeId: "",
-    machineId: "",
     isHeader: true,
     showTestName: true,
     outsourceLab: "",
@@ -72,6 +71,7 @@ const AddTest = () => {
   const [tests, setTests] = useState<any[]>([]);
   const [selectedTestToAdd, setSelectedTestToAdd] = useState("");
   const [selectedTestsToAdd, setSelectedTestsToAdd] = useState<any[]>([]);
+  const [selectedMachines, setSelectedMachines] = useState<any[]>([]); // Multi-machine selection
   const [pendingTestIds, setPendingTestIds] = useState<number[]>([]);
   const [showPreview, setShowPreview] = useState(false);
   const [showSampleTypeDropdown, setShowSampleTypeDropdown] = useState(false);
@@ -198,7 +198,7 @@ const AddTest = () => {
       isMultipleOptions: false,
       textContent: "",
       normalRanges: [
-        { gender: "Male", ll: "", ul: "", default: "", isActive: true },
+        { gender: "Male", ll: "", ul: "", default: "", isActive: false },
         { gender: "Female", ll: "", ul: "", default: "", isActive: false },
         { gender: "Child", ll: "", ul: "", default: "", isActive: false }
       ],
@@ -357,7 +357,6 @@ const AddTest = () => {
               profileTest: Boolean(testData.profileTest),
               reportHeader: testData.reportHeader || "",
               sampleTypeId: testData.sampleTypeId ? testData.sampleTypeId.toString() : "",
-              machineId: testData.machineId ? testData.machineId.toString() : "",
               isHeader: testData.isHeader !== undefined ? testData.isHeader : true,
               showTestName: testData.showTestName !== undefined ? testData.showTestName : true,
               outsourceLab: testData.outsourceLab || "",
@@ -452,7 +451,7 @@ const AddTest = () => {
                                 isActive: range.isActive !== undefined ? range.isActive : true
                               }))
                             : [
-                                { gender: "Male", ll: "", ul: "", default: "", isActive: true },
+                                { gender: "Male", ll: "", ul: "", default: "", isActive: false },
                                 { gender: "Female", ll: "", ul: "", default: "", isActive: false },
                                 { gender: "Child", ll: "", ul: "", default: "", isActive: false }
                               ],
@@ -506,7 +505,7 @@ const AddTest = () => {
                         units: "",
                         displayRangeText: "",
                         normalRanges: [
-                          { gender: "Male", ll: "", ul: "", default: "", isActive: true },
+                          { gender: "Male", ll: "", ul: "", default: "", isActive: false },
                           { gender: "Female", ll: "", ul: "", default: "", isActive: false },
                           { gender: "Child", ll: "", ul: "", default: "", isActive: false }
                         ]
@@ -531,6 +530,15 @@ const AddTest = () => {
                 // Store the IDs to resolve later when tests are loaded
                 setPendingTestIds(linkedIds);
               }
+            }
+
+            // Load assigned machines if present (edit mode)
+            if (testData.testMachines && testData.testMachines.length > 0) {
+              const machineData = testData.testMachines.map(tm => ({
+                id: tm.machine.id,
+                name: tm.machine.name
+              }));
+              setSelectedMachines(machineData);
             }
 
             setDataLoaded(true);
@@ -602,8 +610,11 @@ const AddTest = () => {
       });
     } else {
       setFormData(prev => {
-        // Convert test name to uppercase
-        const finalValue = name === 'name' ? value.toUpperCase() : value;
+        // Convert test name and short name to uppercase
+        let finalValue = value;
+        if (name === 'name' || name === 'shortName') {
+          finalValue = value.toUpperCase();
+        }
         const updated = { ...prev, [name]: finalValue };
         
         // If department changed, auto-populate the group field from the selected department
@@ -661,7 +672,7 @@ const AddTest = () => {
         isMultipleOptions: false,
         textContent: "",
         normalRanges: [
-          { gender: "Male", ll: "", ul: "", default: "", isActive: true },
+          { gender: "Male", ll: "", ul: "", default: "", isActive: false },
           { gender: "Female", ll: "", ul: "", default: "", isActive: false },
           { gender: "Child", ll: "", ul: "", default: "", isActive: false }
         ]
@@ -735,7 +746,7 @@ const AddTest = () => {
       isMultipleOptions: false,
       textContent: "",
       normalRanges: [
-        { gender: "Male", ll: "", ul: "", default: "", isActive: true },
+        { gender: "Male", ll: "", ul: "", default: "", isActive: false },
         { gender: "Female", ll: "", ul: "", default: "", isActive: false },
         { gender: "Child", ll: "", ul: "", default: "", isActive: false }
       ],
@@ -780,7 +791,7 @@ const AddTest = () => {
         unitId: "",
         displayRangeText: "",
         normalRanges: [
-          { gender: "Male", ll: "", ul: "", default: "", isActive: true },
+          { gender: "Male", ll: "", ul: "", default: "", isActive: false },
           { gender: "Female", ll: "", ul: "", default: "", isActive: false },
           { gender: "Child", ll: "", ul: "", default: "", isActive: false }
         ],
@@ -915,7 +926,7 @@ const AddTest = () => {
         testCode: formData.testCode || null,
         departmentId: formData.department ? parseInt(formData.department) : null,
         sampleTypeId: formData.sampleTypeId ? parseInt(formData.sampleTypeId) : null,
-        machineId: formData.machineId ? parseInt(formData.machineId) : null,
+        machineIds: selectedMachines.map(m => m.id), // Send as array of machine IDs
         group: formData.group || null,
         reportHeader: formData.reportHeader || null,
         preparationTime: formData.preparationTime || null,
@@ -1401,15 +1412,51 @@ const AddTest = () => {
                       </div>
                     )}
                   </div>
-                  <Select 
-                    label="Machine" 
-                    name="machineId"
-                    value={formData.machineId}
-                    onChange={handleChange}
-                    options={machines.map(m => ({ value: m.id.toString(), label: m.name }))}
-                    disabled={isViewMode}
-                    required={false}
-                  />
+                  {/* Machine Assignment - Multi-machine selection */}
+                  <div>
+                    <label className="font-semibold text-gray-700 text-xs sm:text-sm block mb-1">Machines</label>
+                    {/* Combined tag + select box */}
+                    <div className="flex flex-wrap items-center gap-1 px-2 py-1 border border-gray-300 rounded bg-white min-h-[32px] focus-within:ring-2 focus-within:ring-orange-600">
+                      {/* Tags inside the box */}
+                      {selectedMachines.map(m => (
+                        <span key={m.id} className="flex items-center gap-0.5 bg-blue-200 text-blue-900 text-xs px-1.5 py-0.5 rounded-full whitespace-nowrap">
+                          {m.name}
+                          {!isViewMode && (
+                            <button
+                              type="button"
+                              onClick={() => setSelectedMachines(prev => prev.filter(x => x.id !== m.id))}
+                              className="text-blue-600 hover:text-red-500 font-bold leading-none ml-0.5 text-sm"
+                            >×</button>
+                          )}
+                        </span>
+                      ))}
+                      {/* Inline select — grows to fill remaining space */}
+                      {!isViewMode && (
+                        <select
+                          value=""
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            if (!val) return;
+                            const id = parseInt(val);
+                            if (!selectedMachines.find(m => m.id === id)) {
+                              const machine = machines.find(m => m.id === id);
+                              if (machine) {
+                                setSelectedMachines(prev => [...prev, { id: machine.id, name: machine.name }]);
+                              }
+                            }
+                          }}
+                          className="flex-1 min-w-[120px] bg-transparent border-none outline-none text-xs text-gray-500 cursor-pointer"
+                        >
+                          <option value="">{selectedMachines.length === 0 ? '-- Select machine(s) --' : '+ Add more...'}</option>
+                          {Array.isArray(machines) && machines
+                            .filter(m => !selectedMachines.find(s => s.id === m.id))
+                            .map(machine => (
+                              <option key={machine.id} value={machine.id}>{machine.name}</option>
+                            ))}
+                        </select>
+                      )}
+                    </div>
+                  </div>
 
                   <Checkbox 
                     label="Is Header" 
@@ -2062,97 +2109,97 @@ const AddTest = () => {
                           />
                           <span className="text-xs sm:text-sm">Is Descriptive</span>
                         </label>
-                        {category.isCategory && (
-                          <div>
-                            <input 
-                              id={`param-method-${categoryIndex}-${paramIndex}`}
-                              className="px-2 py-1.5 sm:py-1 border border-gray-300 rounded text-xs sm:text-sm w-full sm:w-32" 
-                              placeholder="Parameter Test Method" 
-                              value={parameter.testMethod || ""}
-                              onChange={(e) => handleParameterChange(categoryIndex, paramIndex, 'testMethod', e.target.value)}
-                              disabled={isViewMode} 
-                            />
-                            {!isViewMode && (
-                              <div className="flex gap-1 mt-1">
-                                {/* Bold Button */}
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    const input = document.getElementById(`param-method-${categoryIndex}-${paramIndex}`) as HTMLInputElement;
-                                    const start = input.selectionStart || 0;
-                                    const end = input.selectionEnd || 0;
-                                    const selectedText = input.value.substring(start, end);
-                                    if (selectedText) {
-                                      const newValue = input.value.substring(0, start) + `<b>${selectedText}</b>` + input.value.substring(end);
-                                      handleParameterChange(categoryIndex, paramIndex, 'testMethod', newValue);
-                                    }
-                                  }}
-                                  className="px-2 py-1 bg-white border border-gray-300 rounded text-xs font-bold hover:bg-gray-100"
-                                  title="Bold"
-                                >
-                                  B
-                                </button>
-                                {/* Italic Button */}
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    const input = document.getElementById(`param-method-${categoryIndex}-${paramIndex}`) as HTMLInputElement;
-                                    const start = input.selectionStart || 0;
-                                    const end = input.selectionEnd || 0;
-                                    const selectedText = input.value.substring(start, end);
-                                    if (selectedText) {
-                                      const newValue = input.value.substring(0, start) + `<i>${selectedText}</i>` + input.value.substring(end);
-                                      handleParameterChange(categoryIndex, paramIndex, 'testMethod', newValue);
-                                    }
-                                  }}
-                                  className="px-2 py-1 bg-white border border-gray-300 rounded text-xs italic hover:bg-gray-100"
-                                  title="Italic"
-                                >
-                                  I
-                                </button>
-                                {/* Underline Button */}
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    const input = document.getElementById(`param-method-${categoryIndex}-${paramIndex}`) as HTMLInputElement;
-                                    const start = input.selectionStart || 0;
-                                    const end = input.selectionEnd || 0;
-                                    const selectedText = input.value.substring(start, end);
-                                    if (selectedText) {
-                                      const newValue = input.value.substring(0, start) + `<u>${selectedText}</u>` + input.value.substring(end);
-                                      handleParameterChange(categoryIndex, paramIndex, 'testMethod', newValue);
-                                    }
-                                  }}
-                                  className="px-2 py-1 bg-white border border-gray-300 rounded text-xs underline hover:bg-gray-100"
-                                  title="Underline"
-                                >
-                                  U
-                                </button>
-                                {/* Remove Formatting Button */}
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    const currentValue = parameter.testMethod || "";
-                                    const cleanValue = currentValue.replace(/<\/?[biu]>/gi, '');
-                                    handleParameterChange(categoryIndex, paramIndex, 'testMethod', cleanValue);
-                                  }}
-                                  className="px-2 py-1 bg-red-50 border border-red-300 rounded text-xs text-red-600 font-bold hover:bg-red-100"
-                                  title="Remove Formatting"
-                                >
-                                  X
-                                </button>
-                              </div>
-                            )}
-                          </div>
-                        )}
+                        <div>
+                          <input 
+                            id={`param-method-${categoryIndex}-${paramIndex}`}
+                            className="px-2 py-1.5 sm:py-1 border border-gray-300 rounded text-xs sm:text-sm w-full sm:w-32" 
+                            placeholder="Parameter Test Method" 
+                            value={parameter.testMethod || ""}
+                            onChange={(e) => handleParameterChange(categoryIndex, paramIndex, 'testMethod', e.target.value.toUpperCase())}
+                            disabled={isViewMode}
+                            style={{ textTransform: 'uppercase' }}
+                          />
+                          {!isViewMode && (
+                            <div className="flex gap-1 mt-1">
+                              {/* Bold Button */}
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const input = document.getElementById(`param-method-${categoryIndex}-${paramIndex}`) as HTMLInputElement;
+                                  const start = input.selectionStart || 0;
+                                  const end = input.selectionEnd || 0;
+                                  const selectedText = input.value.substring(start, end);
+                                  if (selectedText) {
+                                    const newValue = input.value.substring(0, start) + `<b>${selectedText}</b>` + input.value.substring(end);
+                                    handleParameterChange(categoryIndex, paramIndex, 'testMethod', newValue);
+                                  }
+                                }}
+                                className="px-2 py-1 bg-white border border-gray-300 rounded text-xs font-bold hover:bg-gray-100"
+                                title="Bold"
+                              >
+                                B
+                              </button>
+                              {/* Italic Button */}
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const input = document.getElementById(`param-method-${categoryIndex}-${paramIndex}`) as HTMLInputElement;
+                                  const start = input.selectionStart || 0;
+                                  const end = input.selectionEnd || 0;
+                                  const selectedText = input.value.substring(start, end);
+                                  if (selectedText) {
+                                    const newValue = input.value.substring(0, start) + `<i>${selectedText}</i>` + input.value.substring(end);
+                                    handleParameterChange(categoryIndex, paramIndex, 'testMethod', newValue);
+                                  }
+                                }}
+                                className="px-2 py-1 bg-white border border-gray-300 rounded text-xs italic hover:bg-gray-100"
+                                title="Italic"
+                              >
+                                I
+                              </button>
+                              {/* Underline Button */}
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const input = document.getElementById(`param-method-${categoryIndex}-${paramIndex}`) as HTMLInputElement;
+                                  const start = input.selectionStart || 0;
+                                  const end = input.selectionEnd || 0;
+                                  const selectedText = input.value.substring(start, end);
+                                  if (selectedText) {
+                                    const newValue = input.value.substring(0, start) + `<u>${selectedText}</u>` + input.value.substring(end);
+                                    handleParameterChange(categoryIndex, paramIndex, 'testMethod', newValue);
+                                  }
+                                }}
+                                className="px-2 py-1 bg-white border border-gray-300 rounded text-xs underline hover:bg-gray-100"
+                                title="Underline"
+                              >
+                                U
+                              </button>
+                              {/* Remove Formatting Button */}
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const currentValue = parameter.testMethod || "";
+                                  const cleanValue = currentValue.replace(/<\/?[biu]>/gi, '');
+                                  handleParameterChange(categoryIndex, paramIndex, 'testMethod', cleanValue);
+                                }}
+                                className="px-2 py-1 bg-red-50 border border-red-300 rounded text-xs text-red-600 font-bold hover:bg-red-100"
+                                title="Remove Formatting"
+                              >
+                                X
+                              </button>
+                            </div>
+                          )}
+                        </div>
 
                         {/* Inline Formula Display — shown when hasFormula=true and formula is saved */}
                         {parameter.hasFormula && parameter.formula && (
-                          <div className="flex items-center gap-1 text-xs">
-                            <span className="font-mono text-gray-900">
-                              {parameter.parameterName ? `${parameter.parameterName} = ` : 'Formula = '}
+                          <div className="mb-2">
+                            <div className="font-mono text-sm text-gray-900 break-all">
+                              <span className="font-semibold">Formula: </span>
+                              {parameter.parameterName ? `${parameter.parameterName} = ` : ''}
                               {displayFormula(parameter.formula)}
-                            </span>
+                            </div>
                           </div>
                         )}
 
@@ -2184,17 +2231,6 @@ const AddTest = () => {
                           />
                           <span className="text-xs sm:text-sm">Is NABL</span>
                         </label>
-                        
-                        {/* Parameter Code - Only in Edit Mode */}
-                        {isEditMode && (
-                          <input 
-                            className="px-2 py-1.5 sm:py-1 border border-gray-300 rounded text-xs sm:text-sm w-full sm:w-32" 
-                            placeholder="Parameter Code" 
-                            value={parameter.parameterCode || ""}
-                            onChange={(e) => handleParameterChange(categoryIndex, paramIndex, 'parameterCode', e.target.value)}
-                            disabled={isViewMode} 
-                          />
-                        )}
                         
                         {/* Formula Checkbox - Only in Edit Mode */}
                         {isEditMode && (
@@ -2574,31 +2610,23 @@ const AddTest = () => {
                               {(parameter.ageRanges || []).map((ageRange, ageIndex) => (
                                 <tr key={ageIndex} className="bg-white">
                                   <td className="border border-gray-300 px-2 py-1">
-                                    <div className="flex items-center gap-1">
-                                      <input 
-                                        type="checkbox" 
-                                        className="w-3 h-3" 
-                                        checked={ageRange.isActive || false}
-                                        onChange={(e) => handleAgeRangeChange(categoryIndex, paramIndex, ageIndex, 'isActive', e.target.checked)}
-                                        disabled={isViewMode} 
-                                      />
-                                      {ageRange.label.includes("Between") ? (
-                                        <div className="flex items-center gap-1">
-                                          <span className="text-xs sm:text-sm">Between</span>
-                                          <select 
-                                            className="px-1 py-0.5 border border-gray-300 rounded text-xs" 
-                                            value={(ageRange as any).gender || "Male"}
-                                            onChange={(e) => handleAgeRangeChange(categoryIndex, paramIndex, ageIndex, 'gender', e.target.value)}
-                                            disabled={isViewMode}
-                                          >
-                                            <option value="Male">Male</option>
-                                            <option value="Female">Female</option>
-                                          </select>
-                                        </div>
-                                      ) : (
-                                        <span className="text-xs sm:text-sm">{ageRange.label}</span>
-                                      )}
-                                    </div>
+                                    {ageRange.label.includes("Between") ? (
+                                      <div className="flex items-center gap-1">
+                                        <span className="text-xs sm:text-sm">Between</span>
+                                        <select 
+                                          className="px-1 py-0.5 border border-gray-300 rounded text-xs" 
+                                          value={(ageRange as any).gender || "Male"}
+                                          onChange={(e) => handleAgeRangeChange(categoryIndex, paramIndex, ageIndex, 'gender', e.target.value)}
+                                          disabled={isViewMode}
+                                        >
+                                          <option value="Male">Male</option>
+                                          <option value="Female">Female</option>
+                                          <option value="Both">Both</option>
+                                        </select>
+                                      </div>
+                                    ) : (
+                                      <span className="text-xs sm:text-sm">{ageRange.label}</span>
+                                    )}
                                   </td>
                                   <td className="border border-gray-300 p-1">
                                     {ageRange.label.includes("Between") ? (
@@ -2716,16 +2744,7 @@ const AddTest = () => {
                                 {(parameter.rangeValues || []).map((rangeValue, rangeIndex) => (
                                   <tr key={rangeIndex} className="bg-white">
                                     <td className="border border-gray-300 px-2 py-1">
-                                      <label className="flex items-center gap-1">
-                                        <input 
-                                          type="checkbox" 
-                                          className="w-3 h-3" 
-                                          checked={rangeValue.isActive || false}
-                                          onChange={(e) => handleRangeValueChange(categoryIndex, paramIndex, rangeIndex, 'isActive', e.target.checked)}
-                                          disabled={isViewMode} 
-                                        />
-                                        <span className="text-xs sm:text-sm">{rangeValue.label}</span>
-                                      </label>
+                                      <span className="text-xs sm:text-sm">{rangeValue.label}</span>
                                     </td>
                                     <td className="border border-gray-300 p-1">
                                       <input 
@@ -2801,16 +2820,7 @@ const AddTest = () => {
                               {(parameter.normalRanges || []).map((range, rangeIndex) => (
                                 <tr key={rangeIndex} className="bg-white">
                                   <td className="border border-gray-300 px-2 py-1">
-                                    <label className="flex items-center gap-1">
-                                      <input 
-                                        type="checkbox" 
-                                        className="w-3 h-3" 
-                                        checked={range.isActive || false}
-                                        onChange={(e) => handleNormalRangeChange(categoryIndex, paramIndex, rangeIndex, 'isActive', e.target.checked)}
-                                        disabled={isViewMode} 
-                                      />
-                                      <span className="text-xs sm:text-sm">{range.gender}</span>
-                                    </label>
+                                    <span className="text-xs sm:text-sm">{range.gender}</span>
                                   </td>
                                   <td className="border border-gray-300 p-1">
                                     <input 

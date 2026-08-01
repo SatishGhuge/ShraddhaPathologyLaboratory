@@ -1,6 +1,6 @@
-import net from 'net';
-import mysql from 'mysql2/promise';
-import axios from 'axios';
+const net = require('net');
+const mysql = require('mysql2/promise');
+const axios = require('axios');
 
 // ============================================================================
 // CONFIGURATION
@@ -12,13 +12,13 @@ const CONFIG = {
     host: '0.0.0.0'
   },
   vps: {
-    baseUrl: process.env.VPS_TAILSCALE_URL || 'http://localhost:3000'
+    baseUrl: process.env.VPS_TAILSCALE_URL || 'http://localhost:3351'
   },
   database: {
     host: process.env.DB_HOST || 'localhost',
     port: parseInt(process.env.DB_PORT || '3306'),
     user: process.env.DB_USER || 'root',
-    password: process.env.DB_PASSWORD || 'LocalLabPass123!',
+    password: process.env.DB_PASSWORD || 'root',
     database: process.env.DB_NAME || 'lab_agent_db',
     waitForConnections: true,
     connectionLimit: 10,
@@ -95,10 +95,13 @@ const ASTMFrame = {
 
 const ASTMParser = {
   /**
-   * Parse ASTM transmission and identify frame type
+   * Parse ASTM frame content (already cleaned of STX/ETX/checksum)
+   * Input example: "H|\^&|||Sysmex^XN-350|||||||P|1|20260729183000"
+   * Input example: "Q|1|202607290001|5"
    */
-  parse(rawText) {
-    const lines = rawText.split(/\r?\n|\r/);
+  parse(frameContent) {
+    console.log(`[ASTM PARSER] Input: "${frameContent}"`);
+    
     let frameType = null;
     let visitId = null;
     let sampleId = null;
@@ -106,50 +109,56 @@ const ASTMParser = {
     let analyzer = null;
     let parameters = {};
 
-    for (const line of lines) {
-      // Header frame: H|\\^&\|^Machine^Model^SerialNo
-      if (line.startsWith('H|')) {
-        const parts = line.split('\\');
-        if (parts.length > 1) {
-          // Extract machine^model from header
-          // Format: H|delimiter|machine^model^serial or similar
-          const headerFields = parts[1].split('|');
-          if (headerFields.length >= 2) {
-            analyzer = headerFields[1]?.trim() || null;
-          }
-        }
-      }
+    // Split by pipe separator
+    const parts = frameContent.split('|');
+    console.log(`[ASTM PARSER] Split into ${parts.length} parts: [${parts.map((p, i) => `${i}:"${p}"`).join(', ')}]`);
 
+    const recordType = parts[0];
+    console.log(`[ASTM PARSER] Record type: ${recordType}`);
+
+    // Handle different frame types
+    if (recordType === 'H') {
+      // Header frame: H|\\^&|||Sysmex^XN-350|||||||P|1|20260729183000
+      frameType = 'HEADER';
+      
+      // parts[0] = "H"
+      // parts[1] = field separator "\\^&"
+      // parts[2] = reserved
+      // parts[3] = reserved
+      // parts[4] = instrument identifier (e.g., "Sysmex^XN-350")
+      if (parts[4]) {
+        analyzer = parts[4].trim();
+        console.log(`[ASTM PARSER] Extracted analyzer from parts[4]: ${analyzer}`);
+      }
+    } 
+    else if (recordType === 'Q') {
       // Query frame: Q|1|visitId|sampleId
-      if (line.startsWith('Q|')) {
-        frameType = 'QUERY';
-        const parts = line.split('|');
-        visitId = parts[2]?.trim() || null;
-        sampleId = parts[3]?.trim() || null;
-        break;
-      }
-
+      // parts[0] = "Q"
+      // parts[1] = sequence number (1)
+      // parts[2] = visitId
+      // parts[3] = sampleId
+      frameType = 'QUERY';
+      visitId = parts[2]?.trim() || null;
+      sampleId = parts[3]?.trim() || null;
+      console.log(`[ASTM PARSER] Query frame: visitId=${visitId}, sampleId=${sampleId}`);
+    } 
+    else if (recordType === 'R') {
       // Result frame: R|seq|testCode|paramCode|value|unit|status
-      if (line.startsWith('R|')) {
-        frameType = 'RESULT';
-        const parts = line.split('|');
-        if (parts.length >= 5) {
-          testCode = parts[2]?.trim() || '';
-          const paramCode = parts[3]?.trim() || '';
-          const value = parts[4]?.trim() || '';
-
-          // Store as testCode_paramCode for clarity
-          const key = `${testCode}_${paramCode}`;
-          parameters[key] = value;
-        }
+      frameType = 'RESULT';
+      if (parts.length >= 5) {
+        testCode = parts[2]?.trim() || '';
+        const paramCode = parts[3]?.trim() || '';
+        const value = parts[4]?.trim() || '';
+        const key = `${testCode}_${paramCode}`;
+        parameters[key] = value;
       }
-
-      if (line.startsWith('L|')) {
-        if (!frameType) frameType = 'TERMINATOR';
-      }
+    } 
+    else if (recordType === 'L') {
+      // Terminator frame: L|1|N
+      frameType = 'TERMINATOR';
     }
 
-    return {
+    const result = {
       frameType: frameType || 'UNKNOWN',
       visitId,
       sampleId,
@@ -158,6 +167,9 @@ const ASTMParser = {
       timestamp: new Date().toISOString(),
       parameters
     };
+    
+    console.log(`[ASTM PARSER] Result:`, result);
+    return result;
   }
 };
 
@@ -340,6 +352,7 @@ const QueryHandler = {
     try {
       if (!visitId || !sampleId) {
         console.error(`[QUERY ERROR] Missing visitId or sampleId`);
+        console.log(`[DEBUG] visitId: ${visitId}, sampleId: ${sampleId}`);
         socket.write(Buffer.from([ASTM.NAK]));
         return;
       }
@@ -350,13 +363,17 @@ const QueryHandler = {
         return;
       }
 
+      console.log(`[QUERY HANDLER] Fetching order data for: visitId=${visitId}, sampleId=${sampleId}, analyzer=${analyzer}`);
       const orderData = await CloudAPI.fetchOrder(visitId, sampleId, analyzer);
+      console.log(`[QUERY HANDLER] ✓ Got order data:`, orderData);
 
       if (!orderData.patientTests || !Array.isArray(orderData.patientTests)) {
+        console.error(`[QUERY ERROR] Invalid response - no patientTests array`);
         throw new Error('Backend response missing patientTests array');
       }
 
       if (orderData.patientTests.length === 0) {
+        console.error(`[QUERY ERROR] No patient tests found`);
         socket.write(Buffer.from([ASTM.NAK]));
         return;
       }
@@ -365,6 +382,8 @@ const QueryHandler = {
         .map(t => t.testCode)
         .filter(code => code)
         .join('^');
+
+      console.log(`[QUERY HANDLER] ✓ Extracted machine test codes (shortNames): ${testCodes}`);
 
       if (!testCodes) {
         console.error(`[QUERY] Could not extract test codes from response`);
@@ -380,6 +399,7 @@ const QueryHandler = {
         testCodes: testCodes
       });
 
+      console.log(`[QUERY HANDLER] ✓ Sending ORDER frame to machine`);
       socket.write(orderFrame);
       socket.write(Buffer.from([ASTM.ACK]));
 
@@ -389,6 +409,7 @@ const QueryHandler = {
 
     } catch (err) {
       console.error(`[QUERY ERROR] Failed to process query: ${err.message}`);
+      console.error(`[QUERY ERROR] Stack:`, err.stack);
       socket.write(Buffer.from([ASTM.NAK]));
     }
   }
@@ -459,26 +480,96 @@ function createTcpServer() {
   return net.createServer(socket => {
     console.log(`[TCP] Connected: ${socket.remoteAddress}`);
     let buffer = '';
+    let machineAnalyzer = null; // Store analyzer from HEADER frame
+    let currentVisitId = null; // Store visitId from QUERY frame
+    let currentSampleId = null; // Store sampleId from QUERY frame
+    let accumulatedResults = {}; // Accumulate RESULT frames
 
     socket.on('data', async data => {
       if (data.length === 1 && data[0] === ASTM.ENQ) {
+        console.log('[TCP] Received ENQ, sending ACK');
         socket.write(Buffer.from([ASTM.ACK]));
         return;
       }
 
+      // Add to buffer
       buffer += data.toString('utf8');
+      console.log(`[TCP RAW] Received (${data.length} bytes): ${data.toString('hex')}`);
+      console.log(`[TCP BUFFER] Total buffer length: ${buffer.length}, content: "${buffer}"`);
+      
       socket.write(Buffer.from([ASTM.ACK]));
 
-      if (data.includes('L|1|N') || data.includes('\x04')) {
-        const parsed = ASTMParser.parse(buffer);
-
-        if (parsed.frameType === 'QUERY') {
-          await QueryHandler.handle(parsed.visitId, parsed.sampleId, parsed.analyzer, socket);
-        } else if (parsed.frameType === 'RESULT' || parsed.frameType === 'UNKNOWN') {
-          await ResultHandler.handle(parsed.visitId, parsed.sampleId, buffer, parsed);
+      // Process frames one by one (each frame starts with STX and ends with ETX+checksum)
+      while (buffer.includes(String.fromCharCode(ASTM.STX))) {
+        const stxIndex = buffer.indexOf(String.fromCharCode(ASTM.STX));
+        const etxIndex = buffer.indexOf(String.fromCharCode(ASTM.ETX), stxIndex);
+        
+        if (etxIndex === -1) {
+          console.log(`[TCP FRAME] Incomplete frame, waiting for more data...`);
+          break;
         }
 
-        buffer = '';
+        // Extract the frame from STX to ETX (inclusive) plus 2 more chars for checksum
+        const frameEnd = Math.min(etxIndex + 3, buffer.length); // ETX + 2 checksum hex chars
+        const rawFrame = buffer.substring(stxIndex, frameEnd);
+        console.log(`[TCP FRAME] Raw frame (with STX/ETX): "${rawFrame}" (hex: ${Buffer.from(rawFrame).toString('hex')})`);
+
+        // Clean frame content: remove STX, ETX, checksum
+        let frameContent = rawFrame.substring(1); // Remove STX
+        
+        const innerEtxIndex = frameContent.indexOf(String.fromCharCode(ASTM.ETX));
+        if (innerEtxIndex !== -1) {
+          frameContent = frameContent.substring(0, innerEtxIndex);
+        }
+        
+        console.log(`[TCP FRAME] Cleaned frame content: "${frameContent}"`);
+
+        // Parse the frame
+        const parsed = ASTMParser.parse(frameContent);
+        console.log(`[TCP FRAME] Parsed: frameType=${parsed.frameType}, visitId=${parsed.visitId}, sampleId=${parsed.sampleId}, analyzer=${parsed.analyzer}`);
+
+        // Store analyzer from HEADER frame
+        if (parsed.frameType === 'HEADER' && parsed.analyzer) {
+          machineAnalyzer = parsed.analyzer;
+          console.log(`[TCP] Stored analyzer for this connection: ${machineAnalyzer}`);
+        }
+
+        // Handle QUERY frames immediately (use stored analyzer if not in frame)
+        if (parsed.frameType === 'QUERY' && parsed.visitId && parsed.sampleId) {
+          const analyzer = parsed.analyzer || machineAnalyzer;
+          currentVisitId = parsed.visitId;
+          currentSampleId = parsed.sampleId;
+          accumulatedResults = {}; // Reset accumulated results for new query
+          console.log(`[QUERY] ✓ Processing query: visitId=${parsed.visitId}, sampleId=${parsed.sampleId}, analyzer=${analyzer}`);
+          await QueryHandler.handle(parsed.visitId, parsed.sampleId, analyzer, socket);
+        }
+
+        // Accumulate RESULT frames
+        if (parsed.frameType === 'RESULT') {
+          console.log(`[RESULT FRAME] Accumulated: ${JSON.stringify(parsed.parameters)}`);
+          // Merge parameters into accumulated results
+          accumulatedResults = { ...accumulatedResults, ...parsed.parameters };
+        }
+
+        // Handle TERMINATOR frame - process all accumulated results
+        if (parsed.frameType === 'TERMINATOR') {
+          console.log(`[TERMINATOR] Received, processing ${Object.keys(accumulatedResults).length} accumulated parameters`);
+          if (currentVisitId && currentSampleId && Object.keys(accumulatedResults).length > 0) {
+            console.log(`[RESULT] Processing all results for ${currentVisitId}/${currentSampleId}`);
+            await ResultHandler.handle(currentVisitId, currentSampleId, frameContent, { 
+              frameType: 'RESULT',
+              parameters: accumulatedResults,
+              timestamp: new Date().toISOString()
+            });
+          } else {
+            console.log(`[TERMINATOR] Skipping - missing visitId/sampleId or no results accumulated`);
+          }
+          accumulatedResults = {};
+        }
+
+        // Remove processed frame from buffer
+        buffer = buffer.substring(frameEnd);
+        console.log(`[TCP BUFFER] Remaining buffer (${buffer.length} bytes): "${buffer}"`);
       }
     });
 

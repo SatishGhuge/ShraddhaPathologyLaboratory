@@ -2,9 +2,33 @@ import prisma from '../config/database.js';
 import { validationResult } from 'express-validator';
 import { getPaginationParams, buildPaginatedResponse } from '../utils/pagination.js';
 import { generatePatientId, generateVisitId } from '../utils/idGenerator.js';
+import { formatAge, calculateExactAge, getAgeForRangeMatching } from '../utils/ageCalculator.js';
 import crypto from 'crypto';
 import bcryptjs from 'bcryptjs';
 import { emailService } from '../services/notification.service.js';
+
+// ✅ Helper: Calculate and save age fields from DOB
+async function calculateAndSaveAgeFields(patientId, dob) {
+  if (!dob) return;
+  
+  try {
+    const ageData = calculateExactAge(dob);
+    if (!ageData) return;
+    
+    await prisma.patient.update({
+      where: { patientId },
+      data: {
+        ageYears: ageData.years,
+        ageMonths: ageData.months,
+        ageDays: ageData.days
+      }
+    });
+    
+    console.log(`✅ Updated age fields for ${patientId}: ${ageData.years}Y ${ageData.months}M ${ageData.days}D`);
+  } catch (error) {
+    console.error(`Error calculating age fields for ${patientId}:`, error);
+  }
+}
 
 // Create new patient with tests OR add tests to existing patient
 export const createPatient = async (req, res) => {
@@ -133,9 +157,7 @@ export const createPatient = async (req, res) => {
           paidAmount: perTestPaid,
           balanceAmount: perTestBalance,
           paymentMode,
-          businessType,
-          isOutsourced: test.isOutsourced || false,
-          outsourcedTo: test.outsourcedTo || null
+          businessType
         })) || []
       });
 
@@ -188,7 +210,10 @@ export const createPatient = async (req, res) => {
           firstName,
           lastName,
           dob: dob ? new Date(dob) : null,
-          age: age ? parseInt(age) : null,
+          // ✅ If manually entered age, save it (will be overridden by DOB calculation if DOB exists)
+          ageYears: (age && !dob) ? parseInt(age) : null,
+          ageMonths: (age && !dob) ? 0 : null,
+          ageDays: (age && !dob) ? 0 : null,
           gender,
           mobile,
           email,
@@ -220,9 +245,7 @@ export const createPatient = async (req, res) => {
               paidAmount: perTestPaid,
               balanceAmount: perTestBalance,
               paymentMode,
-              businessType,
-              isOutsourced: test.isOutsourced || false,
-              outsourcedTo: test.outsourcedTo || null
+              businessType
             })) || []
           }
         },
@@ -235,6 +258,13 @@ export const createPatient = async (req, res) => {
           }
         }
       });
+
+      // ✅ Calculate and save age fields from DOB (takes priority over manual age)
+      if (dob) {
+        await calculateAndSaveAgeFields(patient.patientId, dob);
+      } else if (age) {
+        console.log(`✅ Manually entered age: ${age} years → ageYears=${age}, ageMonths=0, ageDays=0`);
+      }
 
       // Create payment transaction if payment was made during registration
       if(paymentMode && perTestPaid > 0){
@@ -718,20 +748,38 @@ export const updatePatient = async (req, res) => {
     const existing = await prisma.patient.findUnique({ where: { patientId } });
     if (!existing) return res.status(404).json({ success: false, message: 'Patient not found' });
 
+    // Prepare update data
+    const updateData = {
+      title:     title     || undefined,
+      firstName: firstName || undefined,
+      lastName:  lastName  !== undefined ? lastName  : undefined,
+      dob:       dob       ? new Date(dob) : null,
+      gender:    gender    || undefined,
+      mobile:    mobile    !== undefined ? mobile  : undefined,
+      email:     email     !== undefined ? email   : undefined,
+      address:   address   !== undefined ? address : undefined,
+    };
+
+    // ✅ If age is manually provided (as a single number), save it
+    if (age !== undefined && age !== null && age !== '') {
+      const ageNum = parseInt(age);
+      if (!isNaN(ageNum)) {
+        updateData.ageYears = ageNum;
+        updateData.ageMonths = 0;
+        updateData.ageDays = 0;
+        console.log(`✅ Manually entered age: ${ageNum} years → ageYears=${ageNum}, ageMonths=0, ageDays=0`);
+      }
+    }
+
     const updated = await prisma.patient.update({
       where: { patientId },
-      data: {
-        title:     title     || undefined,
-        firstName: firstName || undefined,
-        lastName:  lastName  !== undefined ? lastName  : undefined,
-        dob:       dob       ? new Date(dob) : null,
-        age:       age       ? parseInt(age) : undefined,
-        gender:    gender    || undefined,
-        mobile:    mobile    !== undefined ? mobile  : undefined,
-        email:     email     !== undefined ? email   : undefined,
-        address:   address   !== undefined ? address : undefined,
-      }
+      data: updateData
     });
+
+    // ✅ Calculate and save age fields if DOB was updated (takes precedence over manual age)
+    if (dob) {
+      await calculateAndSaveAgeFields(patientId, dob);
+    }
 
     res.json({ success: true, message: 'Patient updated successfully', data: updated });
   } catch (error) {

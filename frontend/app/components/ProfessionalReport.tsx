@@ -17,10 +17,9 @@ import API_BASE_URL from "@/src/api/config";
 interface PatientInfo {
   title?: string;
   firstName?: string;
-  lastName?: string;
-  age?: number;
+  lastName?: string;  age?: number | string;  // Can be number or formatted string like "1 month 3 days"
   gender?: string;
-  dob?: string;
+  dob?: string;  // Birthday date for babies
 }
 
 interface LetterheadDB {
@@ -43,8 +42,9 @@ export interface ProfessionalReportProps {
   letterhead?: LetterheadDB;
   letterHeadBase64?: string;
   printOption?: 'pagebreak' | 'nobreak';
-  results?: Record<string, { numericValue?: any; textValue?: string; isAbnormal?: any }>;
+  results?: Record<string, { numericValue?: any; textValue?: string; isAbnormal?: any; isHighlighted?: boolean }>;
   referralDoctor?: string;
+  comments?: string;  // ✅ Add comments field
   onReady?: () => void;
 }
 
@@ -126,7 +126,9 @@ function buildContentBlocks(
         const visible = (catParams as any[]).filter(p => {
           const nv = results[p.id]?.numericValue;
           const tv = results[p.id]?.textValue;
-          return (nv != null && nv !== '') || tv?.trim();
+          // Exclude parameters that only have placeholder text "Parameter"
+          const hasValidText = tv?.trim() && tv.trim() !== 'Parameter';
+          return (nv != null && nv !== '') || hasValidText;
         });
         if (!visible.length) return;
         if (catName !== 'NO_CATEGORY_HEADER' && catParams[0]?.showCategoryHeader)
@@ -247,8 +249,12 @@ const ProfessionalReport = React.forwardRef<HTMLDivElement, ProfessionalReportPr
       let dead = false;
       (async () => {
         try {
+          // Use letterhead passed as prop first
           if (letterhead?.fullPageImage || letterhead?.headerImage) {
-            if (!dead) setLh(letterhead);
+            if (!dead) {
+              setLh(letterhead);
+              setReady(true);
+            }
             return;
           }
           const r = await fetch(`${API_BASE_URL}/letterhead/active`);
@@ -465,9 +471,14 @@ const ProfessionalReport = React.forwardRef<HTMLDivElement, ProfessionalReportPr
           case 'category':
             tableRows.push(
               <tr key={`c-${bi}`}>
-                <td colSpan={colCount} style={{ padding: '4px 4px 2px 2mm', fontWeight: 'bold', fontSize: '10px', textDecoration: 'underline', backgroundColor: 'transparent', borderBottom: 'none' }}>
+                <td style={{ padding: '4px 4px 2px 2mm', fontWeight: 'bold', fontSize: '10px', textDecoration: 'underline', backgroundColor: 'transparent', borderBottom: 'none' }}>
                   {strip(block.catName).toUpperCase()}
                 </td>
+                <td style={{ padding: '4px 4px 2px 2mm', fontWeight: 'bold', fontSize: '10px', textDecoration: 'underline', backgroundColor: 'transparent', borderBottom: 'none', textAlign: 'center' }}>
+                  Parameter
+                </td>
+                {showUnits && <td style={{ padding: '4px 4px 2px 2mm', fontWeight: 'bold', fontSize: '10px', borderBottom: 'none' }}>-</td>}
+                {showRange && <td style={{ padding: '4px 4px 2px 2mm', fontWeight: 'bold', fontSize: '10px', borderBottom: 'none' }}>-</td>}
               </tr>
             );
             break;

@@ -12,6 +12,53 @@ import {
   STAGE_METADATA
 } from '../utils/statusWorkflow.js';
 
+/**
+ * Calculate and update age fields (ageYears, ageMonths, ageDays) for a patient based on DOB
+ * This simplifies age-based normal range matching
+ */
+const calculateAndUpdateAgeFields = async (patientId, dob) => {
+  if (!dob) return null;
+  
+  try {
+    const birthDate = new Date(dob);
+    const today = new Date();
+    
+    let years = today.getFullYear() - birthDate.getFullYear();
+    let months = today.getMonth() - birthDate.getMonth();
+    let days = today.getDate() - birthDate.getDate();
+    
+    // Adjust for negative days
+    if (days < 0) {
+      months--;
+      const lastMonth = new Date(today.getFullYear(), today.getMonth(), 0);
+      days += lastMonth.getDate();
+    }
+    
+    // Adjust for negative months
+    if (months < 0) {
+      years--;
+      months += 12;
+    }
+    
+    console.log(`✅ Calculated age for patient ${patientId}: ${years}Y ${months}M ${days}D`);
+    
+    // Update the patient record with calculated age fields (Int fields only)
+    await prisma.patient.update({
+      where: { patientId },
+      data: {
+        ageYears: years,
+        ageMonths: months,
+        ageDays: days
+      }
+    });
+    
+    return { years, months, days };
+  } catch (error) {
+    console.error('Error calculating age fields:', error);
+    return null;
+  }
+};
+
 /* ===============================================
  * SHRADDHA PATHOLOGY LABORATORY - RESULT CONTROLLER
  * ===============================================
@@ -134,77 +181,24 @@ export const getPatientTests = async (req, res) => {
     const patientTests = await prisma.patientTest.findMany({
       where: whereCondition,
       include: {
-        patient: {
-          select: {
-            patientId: true,
-            title: true,
-            firstName: true,
-            lastName: true,
-            age: true,
-            gender: true,
-            mobile: true,
-            email: true
-          }
-        },
+        patient: true,
         test: {
           include: {
-            sample_type: {
-              select: {
-                id: true,
-                Sample_Type: true,
-                Sample_Color: true
-              }
-            },
+            sample_type: true,
             categories: {
               include: {
                 testParameter: {
-                  select: {
-                    id: true,
-                    parameterName: true,
-                    testMethod: true,
-                    displayRangeText: true,
-                    rangeText: true,
-                    type: true,
-                    isDescriptive: true,
-                    ageRanges: true,
-                    rangeType: true,
-                    maleLowValue: true,
-                    maleHighValue: true,
-                    femaleHighValue: true,
-                    femaleLowValue: true,
-                    maleActive: true,
-                    femaleActive: true,
-                    childLowValue: true,
-                    childHighValue: true,
-                    childActive: true
+                  include: {
+                    unit: true
                   }
                 }
               }
             }
           }
         },
-        testResults: {
-          select: {
-            id: true,
-            testParameterId: true,
-            numericValue: true,
-            textValue: true,
-            selectedOption: true
-          }
-        },
-        department: {
-          select: {
-            id: true,
-            name: true
-          }
-        },
-        organization: {
-          select: {
-            id: true,
-            name: true,
-            code: true
-          }
-        }
+        testResults: true,
+        department: true,
+        organization: true
       },
       skip,
       take: limit,
@@ -221,20 +215,65 @@ export const getPatientTests = async (req, res) => {
       const key = `${patientTest.patientId}_${patientTest.visitId}`;
       
       if (!groupedResults[key]) {
+        // Format age from components (years, months, days)
+        const ageYears = patientTest.patient.ageYears || 0;
+        const ageMonths = patientTest.patient.ageMonths || 0;
+        const ageDays = patientTest.patient.ageDays || 0;
+        
+        // 🔴 DEBUG: Log age values being sent
+        console.log(`🔴 DEBUG Age - Patient: ${patientTest.patient.firstName} ${patientTest.patient.lastName}`);
+        console.log(`   ageYears: ${patientTest.patient.ageYears} (type: ${typeof patientTest.patient.ageYears})`);
+        console.log(`   ageMonths: ${patientTest.patient.ageMonths} (type: ${typeof patientTest.patient.ageMonths})`);
+        console.log(`   ageDays: ${patientTest.patient.ageDays} (type: ${typeof patientTest.patient.ageDays})`);
+        console.log(`   dob: ${patientTest.patient.dob}`);
+        
+        let formattedAge = '';
+        if (ageYears > 0) formattedAge += `${ageYears}Y`;
+        if (ageMonths > 0) formattedAge += (formattedAge ? ' ' : '') + `${ageMonths}M`;
+        if (ageDays > 0) formattedAge += (formattedAge ? ' ' : '') + `${ageDays}D`;
+
         groupedResults[key] = {
+          // Patient basic info
           patient_name: `${patientTest.patient.title || ''} ${patientTest.patient.firstName || ''} ${patientTest.patient.lastName || ''}`.trim(),
-          age: patientTest.patient.age?.toString() || '',
-          gender: patientTest.patient.gender || '',
-          corporate: patientTest.businessType || 'Walk-in',
           patient_uid: patientTest.patient.patientId,
+          
+          // Age fields (multiple formats)
+          age: formattedAge || '',
+          ageYears: ageYears,
+          ageMonths: ageMonths,
+          ageDays: ageDays,
+          dob: patientTest.patient.dob,
+          
+          // Demographics
+          gender: patientTest.patient.gender || '',
+          mobile: patientTest.patient.mobile || '',
+          email: patientTest.patient.email || '',
+          address: patientTest.patient.address || '',
+          location: patientTest.patient.location || '',
+          
+          // Registration & visit details
+          registration_date: patientTest.createdAt,
           visit_id: patientTest.visitId,
           lab_no: patientTest.visitId, // Keep for backward compatibility
-          mobile: patientTest.patient.mobile,
-          email: patientTest.patient.email,
+          corporate: patientTest.businessType || 'Walk-in',
+          
+          // Financial info
           balance_amount: patientTest.balanceAmount || 0,
-          organizationCode: patientTest.organization?.code || patientTest.organizationId || '', // ✅ Get organization code from relationship
-          organization_name: patientTest.organization?.name || '', // ✅ Get organization name from relationship
-          patient_history: patientTest.patient_history || '', // ✅ Get patient history from first test in the group
+          paid_amount: patientTest.paidAmount || 0,
+          total_amount: patientTest.totalAmount || 0,
+          
+          // Organization details
+          organizationCode: patientTest.organization?.code || patientTest.organizationId || '',
+          organization_name: patientTest.organization?.name || '',
+          organization_location: patientTest.organization?.location || '',
+          
+          // Test report settings
+          report_mode: patientTest.reportMode || 'By hand',
+          referral_doctor: patientTest.referralDoctor || 'SELF',
+          
+          // Patient notes
+          patient_history: patientTest.patient_history || '',
+          
           tests: []
         };
       }
@@ -252,7 +291,7 @@ export const getPatientTests = async (req, res) => {
         result_status: normalizeStatus(patientTest.status),
         status: patientTest.status,
         barcode_status: patientTest.barcode_status || 'Unprinted',
-        isOutsourced: patientTest.isOutsourced || false,
+        isOutsourced: patientTest.test?.isOutsourced || false,
         outsourcedTo: patientTest.outsourcedTo || null,
         approved_date: patientTest.visitDate ? (() => {
           const d = patientTest.visitDate;
@@ -282,6 +321,10 @@ export const getPatientTests = async (req, res) => {
         parameter_id: patientTest.test.categories?.length === 1 ? (patientTest.test.categories?.[0]?.testParameter?.id || null) : null,
         // Add method name for reports (only for single parameter tests)
         method_name: patientTest.test.categories?.length === 1 ? (patientTest.test.categories?.[0]?.testParameter?.testMethod || '') : '',
+        // ✅ GET UNIT from the parameter object (which now includes unit data)
+        unit: patientTest.test.categories?.length === 1 && patientTest.test.categories?.[0]?.testParameter 
+          ? (patientTest.test.categories[0].testParameter.unit?.symbol || '') 
+          : '',
         // For ref_interval, include full parameter data so frontend can calculate based on patient demographics
         ref_interval_data: patientTest.test.categories?.length === 1 ? (patientTest.test.categories?.[0]?.testParameter || null) : null,
         // For result, get the numeric or text value from the first test result if single parameter
@@ -326,45 +369,15 @@ export const getPatientTestById = async (req, res) => {
     const patientTest = await prisma.patientTest.findUnique({
       where: { id: parseInt(id) },
       include: {
-        patient: {
-          select: {
-            patientId: true,
-            title: true,
-            firstName: true,
-            lastName: true,
-            age: true,
-            gender: true,
-            dob: true,
-            email: true,
-            mobile: true
-          }
-        },
+        patient: true,
         test: {
-          select: {
-            id: true,
-            name: true,
-            shortName: true,
-            interpretation: true,
-            attachFile: true,
-            imageSize: true,
-            sampleTypeId: true,
-            sample_type: {
-              select: {
-                id: true,
-                Sample_Type: true,
-                Sample_Color: true
-              }
-            }
+          include: {
+            sample_type: true
           }
         },
         testResults: {
           include: {
-            testParameter: {
-              select: {
-                id: true,
-                parameterName: true
-              }
-            }
+            testParameter: true
           }
         }
       }
@@ -380,6 +393,16 @@ export const getPatientTestById = async (req, res) => {
 
     console.log('Found patient test:', patientTest.id, 'for patient:', patientTest.patient.firstName);
     console.log('Total testResults in database:', patientTest.testResults?.length || 0);
+    
+    // ✅ Calculate and update age fields if DOB is available
+    if (patientTest.patient.dob) {
+      await calculateAndUpdateAgeFields(patientTest.patient.patientId, patientTest.patient.dob);
+      // Refresh patient data to get updated age fields
+      patientTest.patient = await prisma.patient.findUnique({
+        where: { patientId: patientTest.patient.patientId }
+      });
+    }
+    
     console.log('Test Results Details:', JSON.stringify(patientTest.testResults, null, 2));
     
     // Log which parameters exist in testResults
@@ -440,6 +463,7 @@ export const getPatientTestById = async (req, res) => {
             childActive: true,
             hasFormula: true,
             formula: true,
+            decimal: true,
             unit: {
               select: {
                 symbol: true
@@ -531,16 +555,15 @@ export const getPatientTestById = async (req, res) => {
           isMandatory: category.testParameter.isMandatory,
           categoryName: categoryName,
           categoryId: category.id,
-          // Use unique category identifier: if no name, create a unique key from categoryId so categories without names don't collapse together
           categoryUniqueId: hasManualCategoryName ? categoryName : `__NO_NAME_${category.id}__`,
           sortOrder: category.testParameter.parameterSortOrder || 999,
           categorySortOrder: category.sortOrder || 999,
           showCategoryHeader: hasManualCategoryName,
           
           // 🔴 SEPARATE both methods
-          categoryTestMethod: category.testMethod || null,  // Method from category
-          parameterTestMethod: category.testParameter.testMethod || null,  // Method from parameter
-          testMethod: category.testMethod || category.testParameter.testMethod || '', // Fallback (for backward compatibility)
+          categoryTestMethod: category.testMethod || null,
+          parameterTestMethod: category.testParameter.testMethod || null,
+          testMethod: category.testMethod || category.testParameter.testMethod || '',
           
           // Log for debugging
           _debug_testMethod: {
@@ -575,9 +598,10 @@ export const getPatientTestById = async (req, res) => {
           // Text content for text-type parameters
           textContent: category.testParameter.textContent,
           
-          // Formula fields
+          // Formula fields - INCLUDE BOTH
           hasFormula: category.testParameter.hasFormula,
           formula: category.testParameter.formula,
+          decimal: category.testParameter.decimal || 2,
           
           // Get appropriate range based on patient demographics from database
           normalRange: getNormalRange(category.testParameter, patientTest.patient),
@@ -635,6 +659,7 @@ export const getPatientTestById = async (req, res) => {
           childActive: true,
           hasFormula: true,
           formula: true,
+          decimal: true,
           unit: {
             select: {
               symbol: true
@@ -669,16 +694,16 @@ export const getPatientTestById = async (req, res) => {
           isDescriptive: param.isDescriptive,
           isMultipleOptions: param.isMultipleOptions,
           isMandatory: param.isMandatory,
-          categoryName: 'NO_CATEGORY_HEADER', // No header for direct parameters
+          categoryName: 'NO_CATEGORY_HEADER',
           categoryId: null,
           sortOrder: param.parameterSortOrder || 999,
-          categorySortOrder: 999, // High value for direct parameters (no category sort)
-          showCategoryHeader: false, // Don't show header for direct parameters
+          categorySortOrder: 999,
+          showCategoryHeader: false,
           
           // 🔴 For direct parameters: no category method, only parameter method
-          categoryTestMethod: null,  // No category for direct parameters
-          parameterTestMethod: param.testMethod || null,  // Method from parameter
-          testMethod: param.testMethod || '',  // Fallback (for backward compatibility)
+          categoryTestMethod: null,
+          parameterTestMethod: param.testMethod || null,
+          testMethod: param.testMethod || '',
           
           // Range type and display text from database
           rangeType: param.rangeType,
@@ -706,9 +731,10 @@ export const getPatientTestById = async (req, res) => {
           // Text content for text-type parameters
           textContent: param.textContent,
           
-          // Formula fields
+          // Formula fields - INCLUDE BOTH
           hasFormula: param.hasFormula,
           formula: param.formula,
+          decimal: param.decimal || 2,
           
           // Get appropriate range based on patient demographics from database
           normalRange: getNormalRange(param, patientTest.patient),
@@ -734,7 +760,7 @@ export const getPatientTestById = async (req, res) => {
 
     // 🔧 Fetch outsourcing report data if this is an outsourced test
     let outsourcingReport = null;
-    if (patientTest.isOutsourced) {
+    if (patientTest.test?.isOutsourced) {
       outsourcingReport = await prisma.outsourcingReport.findUnique({
         where: { patientTestId: patientTest.id },
         include: {
@@ -753,6 +779,16 @@ export const getPatientTestById = async (req, res) => {
       }
     }
 
+    // 🔴 DEBUG: Log what we're sending back
+    console.log(`\n📤 SENDING RESPONSE for PatientTest ID: ${patientTest.id}`);
+    console.log(`   patientTest.patient exists: ${!!patientTest.patient}`);
+    console.log(`   patientTest.patient.ageYears: ${patientTest.patient?.ageYears}`);
+    console.log(`   patientTest.patient.ageMonths: ${patientTest.patient?.ageMonths}`);
+    console.log(`   patientTest.patient.ageDays: ${patientTest.patient?.ageDays}`);
+    console.log(`   patientTest.patient.gender: ${patientTest.patient?.gender}`);
+    console.log(`   parameters count: ${allParameters.length}`);
+    console.log(`   Total with ageRanges: ${allParameters.filter(p => p.ageRanges).length}`);
+
     res.json({
       success: true,
       data: {
@@ -760,6 +796,7 @@ export const getPatientTestById = async (req, res) => {
         parameters: allParameters,
         groupedParameters,
         outsourcingReport,  // Include outsourcing data
+        comments: patientTest.comments,  // ✅ Explicitly include comments
         debug: { totalExistingResults, totalParameters: allParameters.length }
       }
     });
@@ -786,14 +823,14 @@ function getNormalRange(parameter, patient) {
   }
 
   const patientGender = patient.gender?.toLowerCase();
-  const patientAge = patient.age || 0;
   
-  // Calculate exact age from DOB if available
-  let exactAgeInDays = 0;
-  let exactAgeInMonths = 0;
-  let exactAgeInYears = patientAge;
+  // ✅ Use new Int age fields if available (more efficient than DOB calculation)
+  let exactAgeInDays = patient.ageDays ?? 0;
+  let exactAgeInMonths = patient.ageMonths ?? 0;
+  let exactAgeInYears = patient.ageYears ?? 0;
   
-  if (patient.dob) {
+  // Fallback to DOB calculation if Int fields are not available (backward compatibility)
+  if (exactAgeInYears === 0 && exactAgeInMonths === 0 && exactAgeInDays === 0 && patient.dob) {
     const birthDate = new Date(patient.dob);
     const currentDate = new Date();
     const ageInMs = currentDate - birthDate;
@@ -802,41 +839,90 @@ function getNormalRange(parameter, patient) {
     exactAgeInYears = Math.floor(exactAgeInDays / 365.25);
   }
 
+  // 🔴 DEBUG: Log parameter and patient info
+  debugAgeRanges(parameter, patient);
+
   // Handle complex age ranges from database (for numeric parameters)
   if (parameter.ageRanges) {
     try {
       const ageRanges = JSON.parse(parameter.ageRanges);
+      console.log(`\n   🔍 CHECKING ${ageRanges.length} AGE RANGES:`);
       
       // Find matching range based on patient gender and age
       for (const range of ageRanges) {
-        if (!range.enabled) continue;
+        console.log(`\n   📋 Range: "${range.label}"`);
         
-        // Check gender match - if range has gender specified, it must match patient gender
+        if (!range.enabled) {
+          console.log(`      ❌ DISABLED - skipping`);
+          continue;
+        }
+        
+        // Check gender match - if range has gender specified, it must match patient gender or be 'both'
         const rangeGender = range.gender?.toLowerCase();
-        if (rangeGender && rangeGender !== patientGender) continue;
+        console.log(`      Gender Check: range="${rangeGender}", patient="${patientGender}"`);
+        
+        if (rangeGender && rangeGender !== 'both' && rangeGender !== patientGender) {
+          console.log(`      ❌ GENDER MISMATCH - skipping`);
+          continue;
+        }
+        console.log(`      ✅ GENDER OK`);
         
         let ageMatches = false;
         
         // Handle different range types with time units
         if (range.label?.includes('Less Than') && range.value !== null && range.value !== undefined) {
           const ageToCheck = getAgeInUnit(exactAgeInYears, exactAgeInMonths, exactAgeInDays, range.timeUnit);
+          // -1 indicates patient is too old for this unit (e.g., months for an 8-year-old)
+          if (ageToCheck === -1) {
+            console.log(`      Age Check: "Less Than" - patient too old for ${range.timeUnit} ranges`);
+            continue;
+          }
           ageMatches = ageToCheck < range.value;
+          console.log(`      Age Check: "Less Than" - ageToCheck(${range.timeUnit})=${ageToCheck} < ${range.value} = ${ageMatches}`);
         } else if (range.label?.includes('More Than') && range.value !== null && range.value !== undefined) {
           const ageToCheck = getAgeInUnit(exactAgeInYears, exactAgeInMonths, exactAgeInDays, range.timeUnit);
+          // -1 indicates patient is too old for this unit
+          if (ageToCheck === -1) {
+            console.log(`      Age Check: "More Than" - patient too old for ${range.timeUnit} ranges`);
+            continue;
+          }
           ageMatches = ageToCheck > range.value;
+          console.log(`      Age Check: "More Than" - ageToCheck(${range.timeUnit})=${ageToCheck} > ${range.value} = ${ageMatches}`);
         } else if (range.label?.includes('Between') && range.from !== null && range.to !== null) {
           const ageToCheck = getAgeInUnit(exactAgeInYears, exactAgeInMonths, exactAgeInDays, range.timeUnit);
+          // -1 indicates patient is too old for this unit
+          if (ageToCheck === -1) {
+            console.log(`      Age Check: "Between" - patient too old for ${range.timeUnit} ranges`);
+            continue;
+          }
           ageMatches = ageToCheck >= range.from && ageToCheck <= range.to;
+          console.log(`      Age Check: "Between" - ageToCheck(${range.timeUnit})=${ageToCheck} in [${range.from}, ${range.to}] = ${ageMatches}`);
         } else if (range.label?.includes('Equal To') && range.value !== null && range.value !== undefined) {
           const ageToCheck = getAgeInUnit(exactAgeInYears, exactAgeInMonths, exactAgeInDays, range.timeUnit);
+          // -1 indicates patient is too old for this unit
+          if (ageToCheck === -1) {
+            console.log(`      Age Check: "Equal To" - patient too old for ${range.timeUnit} ranges`);
+            continue;
+          }
           ageMatches = ageToCheck === range.value;
+          console.log(`      Age Check: "Equal To" - ageToCheck(${range.timeUnit})=${ageToCheck} === ${range.value} = ${ageMatches}`);
         }
         
+        // Check if range has valid LL and UL
+        const hasValidRange = range.ll !== null && range.ul !== null;
+        console.log(`      Range Values: LL=${range.ll}, UL=${range.ul}, valid=${hasValidRange}`);
+        
         // Return range if age and gender conditions match
-        if (ageMatches && range.ll !== null && range.ul !== null) {
+        if (ageMatches && hasValidRange) {
+          console.log(`      ✅✅✅ MATCH FOUND! RETURNING: ${range.ll} - ${range.ul}`);
           return `${range.ll} - ${range.ul}`;
         }
+        
+        if (ageMatches && !hasValidRange) {
+          console.log(`      ⚠️ Age matched but NO valid range values (LL/UL null)`);
+        }
       }
+      console.log(`\n   ❌ NO AGE RANGE MATCHED - continuing to fallback`);
     } catch (error) {
       console.error('Error parsing age ranges:', error);
     }
@@ -847,6 +933,7 @@ function getNormalRange(parameter, patient) {
     // Child ranges (typically < 18 years) - check if child range is active and available
     if (exactAgeInYears < 18 && parameter.childActive && 
         parameter.childLowValue !== null && parameter.childHighValue !== null) {
+      console.log(`   ✅ Using CHILD range: ${parameter.childLowValue} - ${parameter.childHighValue}`);
       return `${parameter.childLowValue} - ${parameter.childHighValue}`;
     }
     
@@ -854,37 +941,117 @@ function getNormalRange(parameter, patient) {
     if (exactAgeInYears >= 18) {
       if (patientGender === 'female' && parameter.femaleActive && 
           parameter.femaleLowValue !== null && parameter.femaleHighValue !== null) {
+        console.log(`   ✅ Using FEMALE range (gender match): ${parameter.femaleLowValue} - ${parameter.femaleHighValue}`);
         return `${parameter.femaleLowValue} - ${parameter.femaleHighValue}`;
       }
       
       if (patientGender === 'male' && parameter.maleActive && 
           parameter.maleLowValue !== null && parameter.maleHighValue !== null) {
+        console.log(`   ✅ Using MALE range (gender match): ${parameter.maleLowValue} - ${parameter.maleHighValue}`);
         return `${parameter.maleLowValue} - ${parameter.maleHighValue}`;
+      }
+      
+      // If gender doesn't match male/female, try both with priority to male
+      if (!['male', 'female'].includes(patientGender)) {
+        console.log(`   ⚠️ Gender is "${patientGender}" (not male/female), checking both ranges...`);
+        if (parameter.maleActive && parameter.maleLowValue !== null && parameter.maleHighValue !== null) {
+          console.log(`   ✅ Using MALE range (fallback for non-standard gender): ${parameter.maleLowValue} - ${parameter.maleHighValue}`);
+          return `${parameter.maleLowValue} - ${parameter.maleHighValue}`;
+        }
+        if (parameter.femaleActive && parameter.femaleLowValue !== null && parameter.femaleHighValue !== null) {
+          console.log(`   ✅ Using FEMALE range (fallback for non-standard gender): ${parameter.femaleLowValue} - ${parameter.femaleHighValue}`);
+          return `${parameter.femaleLowValue} - ${parameter.femaleHighValue}`;
+        }
       }
     }
   }
 
-  // Final fallback - use male range as default if available
-  if (parameter.maleLowValue !== null && parameter.maleHighValue !== null) {
+  // Final fallback: try any available range regardless of rangeType or active status
+  console.log(`   Checking final fallback ranges...`);
+  
+  // Try gender-specific ranges first regardless of rangeType
+  if (patientGender === 'female' && parameter.femaleLowValue !== null && parameter.femaleHighValue !== null) {
+    console.log(`   ✅ Using FEMALE range (final fallback): ${parameter.femaleLowValue} - ${parameter.femaleHighValue}`);
+    return `${parameter.femaleLowValue} - ${parameter.femaleHighValue}`;
+  }
+  if (patientGender === 'male' && parameter.maleLowValue !== null && parameter.maleHighValue !== null) {
+    console.log(`   ✅ Using MALE range (final fallback): ${parameter.maleLowValue} - ${parameter.maleHighValue}`);
     return `${parameter.maleLowValue} - ${parameter.maleHighValue}`;
   }
   
+  // If no gender-specific range, try child range
+  if (parameter.childLowValue !== null && parameter.childHighValue !== null) {
+    console.log(`   ✅ Using CHILD range (final fallback): ${parameter.childLowValue} - ${parameter.childHighValue}`);
+    return `${parameter.childLowValue} - ${parameter.childHighValue}`;
+  }
+  
   // Last resort - return display text or empty
+  console.log(`   ❌ No matching range found, returning empty`);
   return parameter.displayRangeText || parameter.rangeText || '';
 }
 
 // Helper function to get age in specific time unit
+// ✅ IMPORTANT: This function returns the age component appropriate for the timeUnit
+// 
+// Logic:
+// - Year(s): Always return years (completed years, ignoring months/days)
+// - Month(s): Return months ONLY if years=0 (patient must be <1 year old for month ranges)
+// - Day(s): Return days ONLY if years=0 AND months=0 (patient must be <1 month old for day ranges)
+// 
+// This ensures:
+// - 23Y 0M 0D matches "Year(s)" ranges (e.g., "Between 18-65 Years")
+// - 0Y 6M 0D matches "Month(s)" ranges (e.g., "Between 1-3 Months")
+// - 8Y 3M 5D does NOT match "Month(s)" ranges (years > 0)
 function getAgeInUnit(years, months, days, timeUnit) {
   switch (timeUnit) {
     case 'Day(s)':
-      return days;
+      // Only return days if patient is <1 month old (prevents 65Y 2D from matching "1-3 Days")
+      if (years === 0 && months === 0) {
+        return days;
+      }
+      // Return -1 to indicate this patient is too old for day-based ranges
+      return -1;
+      
     case 'Month(s)':
-      return months;
+      // Only return months if patient is <1 year old (prevents 65Y 2M from matching "1-3 Months")
+      if (years === 0) {
+        return months;
+      }
+      // Return -1 to indicate this patient is too old for month-based ranges
+      return -1;
+      
     case 'Year(s)':
+      // Always return completed years (ignore months/days for year-based ranges)
       return years;
+      
     default:
       return years;
   }
+}
+
+// 🔴 DEBUG: Helper function to check ageRanges data
+function debugAgeRanges(parameter, patient) {
+  console.log(`\n🔴 DEBUG getNormalRange - Parameter: ${parameter.parameterName}`);
+  console.log(`   Patient Age: ${patient.ageYears}Y ${patient.ageMonths}M ${patient.ageDays}D`);
+  console.log(`   Patient Gender: ${patient.gender}`);
+  console.log(`   Has ageRanges: ${!!parameter.ageRanges}`);
+  
+  if (parameter.ageRanges) {
+    try {
+      const ageRanges = JSON.parse(parameter.ageRanges);
+      console.log(`   ageRanges Count: ${ageRanges.length}`);
+      ageRanges.forEach((range, idx) => {
+        console.log(`     Range ${idx}: label="${range.label}", gender="${range.gender}", enabled=${range.enabled}, timeUnit="${range.timeUnit}", value=${range.value}, from=${range.from}, to=${range.to}, ll=${range.ll}, ul=${range.ul}`);
+      });
+    } catch (err) {
+      console.log(`   ⚠️  Error parsing ageRanges: ${err.message}`);
+    }
+  }
+  
+  console.log(`   rangeType: ${parameter.rangeType}`);
+  console.log(`   childActive: ${parameter.childActive}, childLowValue: ${parameter.childLowValue}, childHighValue: ${parameter.childHighValue}`);
+  console.log(`   femaleActive: ${parameter.femaleActive}, femaleLowValue: ${parameter.femaleLowValue}, femaleHighValue: ${parameter.femaleHighValue}`);
+  console.log(`   maleActive: ${parameter.maleActive}, maleLowValue: ${parameter.maleLowValue}, maleHighValue: ${parameter.maleHighValue}`);
 }
 
 // Update test status
@@ -1023,13 +1190,14 @@ export const updateTestResult = async (req, res) => {
     if (parameterResults && Array.isArray(parameterResults) && parameterResults.length > 0) {
       console.log('  🔄 Processing parameterResults...');
       for (const paramResult of parameterResults) {
-        const { parameterId, numericValue, textValue } = paramResult;
+        const { parameterId, numericValue, textValue, isHighlighted } = paramResult;
         
         console.log(`  📝 Upserting TestResult:
           patientTestId: ${id}
           parameterId: ${parameterId}
           numericValue: ${numericValue}
-          textValue: ${textValue}`);
+          textValue: ${textValue}
+          isHighlighted: ${isHighlighted}`);
         
         if (!parameterId) {
           console.error(`  ❌ SKIPPED: parameterId is null or undefined!`);
@@ -1048,6 +1216,7 @@ export const updateTestResult = async (req, res) => {
             update: {
               numericValue: numericValue || undefined,
               textValue: textValue || undefined,
+              isHighlighted: isHighlighted || false,
               verifiedAt: new Date()
             },
             create: {
@@ -1055,6 +1224,7 @@ export const updateTestResult = async (req, res) => {
               testParameterId: parseInt(parameterId),
               numericValue: numericValue || undefined,
               textValue: textValue || undefined,
+              isHighlighted: isHighlighted || false,
               enteredAt: new Date(),
               verifiedAt: new Date()
             }
@@ -1063,7 +1233,8 @@ export const updateTestResult = async (req, res) => {
           console.log(`  ✅ TestResult upserted for parameterId=${parameterId}:`, {
             id: testResult.id,
             numericValue: testResult.numericValue,
-            textValue: testResult.textValue
+            textValue: testResult.textValue,
+            isHighlighted: testResult.isHighlighted
           });
         } catch (upsertError) {
           console.error(`  ❌ Upsert error for parameterId=${parameterId}:`, upsertError.message);
@@ -1299,7 +1470,8 @@ export const saveTestResults = async (req, res) => {
         testCategoryId,
         numericValue,
         textValue,
-        selectedOption
+        selectedOption,
+        isHighlighted
       } = result;
 
       // Validate required field
@@ -1329,13 +1501,13 @@ export const saveTestResults = async (req, res) => {
       let isPanic = false;
 
       if (numericValue !== null && numericValue !== undefined) {
-        const age = patientTest.patient.age || 0;
+        const ageYears = patientTest.patient.ageYears || 0;
         const gender = patientTest.patient.gender?.toLowerCase();
         
         let lowValue, highValue;
         
         // Get appropriate range
-        if (age < 18 && parameter.childActive && parameter.childLowValue !== null) {
+        if (ageYears < 18 && parameter.childActive && parameter.childLowValue !== null) {
           lowValue = parameter.childLowValue;
           highValue = parameter.childHighValue;
         } else if (gender === 'female' && parameter.femaleActive && parameter.femaleLowValue !== null) {
@@ -1370,9 +1542,10 @@ export const saveTestResults = async (req, res) => {
             }
           },
           update: {
-            numericValue: numericValue !== null ? parseFloat(numericValue) : null,
+            numericValue: numericValue !== null ? String(numericValue) : null,
             textValue: textValue || null,
             selectedOption: selectedOption || null,
+            isHighlighted: isHighlighted || false,
             enteredBy: enteredBy,
             enteredAt: new Date(),
             testCategoryId: testCategoryId ? parseInt(testCategoryId) : null
@@ -1381,9 +1554,10 @@ export const saveTestResults = async (req, res) => {
             patientTestId: parseInt(patientTestId),
             testParameterId: parseInt(testParameterId),
             testCategoryId: testCategoryId ? parseInt(testCategoryId) : null,
-            numericValue: numericValue !== null ? parseFloat(numericValue) : null,
+            numericValue: numericValue !== null ? String(numericValue) : null,
             textValue: textValue || null,
             selectedOption: selectedOption || null,
+            isHighlighted: isHighlighted || false,
             enteredBy: enteredBy,
             enteredAt: new Date()
           },
@@ -1531,32 +1705,14 @@ export const sendReport = async (req, res) => {
       where: { id: { in: testIds.map(Number) } },
       include: {
         patient: true,
-        test: {
-          select: {
-            id: true, name: true, interpretation: true
-          }
-        },
+        test: true,
         testResults: {
           include: { 
-            testParameter: { 
-              select: { 
-                id: true,
-                parameterName: true,
-                maleLowValue: true,
-                maleHighValue: true,
-                femaleLowValue: true,
-                femaleHighValue: true,
-                childLowValue: true,
-                childHighValue: true,
-                rangeText: true,
-                displayRangeText: true,
-                unit: {
-                  select: {
-                    symbol: true
-                  }
-                }
-              } 
-            } 
+            testParameter: {
+              include: {
+                unit: true
+              }
+            }
           }
         }
       }
@@ -1884,6 +2040,7 @@ export const saveTestResultWithTemplate = async (req, res) => {
           update: {
             numericValue: numericValue || undefined,
             textValue: textValue || undefined,
+            isHighlighted: isHighlighted || false,
             verifiedAt: new Date()
           },
           create: {
@@ -1891,6 +2048,7 @@ export const saveTestResultWithTemplate = async (req, res) => {
             testParameterId: parseInt(parameterId),
             numericValue: numericValue || undefined,
             textValue: textValue || undefined,
+            isHighlighted: isHighlighted || false,
             enteredAt: new Date(),
             verifiedAt: new Date()
           }
@@ -1981,11 +2139,19 @@ export const updatePatientComments = async (req, res) => {
       });
     }
 
+    // Normalize comments: split by comma, trim, and rejoin with consistent format (comma + space)
+    let normalizedComments = comments;
+    if (comments && comments.trim()) {
+      const parts = comments.split(',').map(c => c.trim()).filter(c => c.length > 0);
+      normalizedComments = parts.join(', ');  // Join with comma + space
+      console.log(`✅ Normalized comments: ${normalizedComments}`);
+    }
+
     // Update the PatientTest record with comments
     const updatedPatientTest = await prisma.patientTest.update({
       where: { id: parseInt(id) },
       data: {
-        comments: comments || null
+        comments: normalizedComments || null
       },
       include: {
         patient: {
@@ -2017,6 +2183,56 @@ export const updatePatientComments = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Failed to update comments: ' + error.message
+    });
+  }
+};
+
+// Get comment history for a test/patient
+// Returns all unique comments split by comma for dropdown suggestions
+// Fetches from ALL patients for system-wide comment history
+export const getCommentHistory = async (req, res) => {
+  try {
+    const { patientId } = req.params;
+
+    console.log(`📋 Fetching GLOBAL comment history (system-wide, not just for patient: ${patientId})`);
+
+    // Fetch ALL patient tests with comments (from ALL patients in the system)
+    const allPatientTests = await prisma.patientTest.findMany({
+      where: {
+        comments: {
+          not: null
+        }
+      },
+      select: {
+        comments: true
+      }
+    });
+
+    // Extract and split all comments by comma
+    const allComments = new Set();
+    
+    allPatientTests.forEach(test => {
+      if (test.comments && test.comments.trim()) {
+        // Split by comma, trim each part, and filter empty strings
+        const parts = test.comments.split(',').map(c => c.trim()).filter(c => c.length > 0);
+        parts.forEach(part => allComments.add(part));
+      }
+    });
+
+    const commentHistory = Array.from(allComments).sort();
+
+    console.log(`✅ Found ${commentHistory.length} unique comments from all patients:`, commentHistory);
+
+    res.json({
+      success: true,
+      data: commentHistory
+    });
+
+  } catch (error) {
+    console.error('Get comment history error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch comment history: ' + error.message
     });
   }
 };

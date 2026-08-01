@@ -249,7 +249,7 @@ export default function Result() {
   const router = useRouter();
   const searchParams = useSearchParams();
   
-  const queryStatus = searchParams?.get('status') || 'All';
+  const queryStatus = (searchParams?.get('status') || 'All') as string;
   const [selectedStatus, setSelectedStatus] = useState(queryStatus);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
@@ -393,6 +393,7 @@ export default function Result() {
         } catch (e) {
           console.warn('Failed to parse saved filters:', e);
         }
+
       }
     }
     // Default filters if none saved
@@ -478,51 +479,147 @@ export default function Result() {
   const getAgeAppropriateRange = (parameterData: any, patient: any) => {
     if (!parameterData) return '-';
     
-    const patientAge = patient.age || 0;
+    // 🔴 DEBUG: Log when this function is called
+    console.log(`🔴 Frontend getAgeAppropriateRange called for:`, {
+      parameterName: parameterData.parameterName,
+      patientName: patient.patient_name,
+      patientAge: `${patient.ageYears}Y ${patient.ageMonths}M ${patient.ageDays}D`,
+      gender: patient.gender
+    });
+    
+    // ✅ Use new Int age fields
+    const patientAgeYears = patient.ageYears ?? 0;
+    const patientAgeMonths = patient.ageMonths ?? 0;
+    const patientAgeDays = patient.ageDays ?? 0;
     const patientGender = patient.gender?.toLowerCase();
-    const patientDob = null; // We don't have DOB in result page, only age
     
-    let exactAgeInYears = patientAge;
+    let exactAgeInYears = patientAgeYears;
     
-    // Handle complex age ranges
+    // Helper to get age in specific time unit (matching backend logic)
+    const getAgeInUnit = (years, months, days, timeUnit) => {
+      switch (timeUnit) {
+        case 'Day(s)':
+          return days;
+        case 'Month(s)':
+          return months;
+        case 'Year(s)':
+          return years;
+        default:
+          return years;
+      }
+    };
+    
     if (parameterData.ageRanges) {
       try {
         const ageRanges = JSON.parse(parameterData.ageRanges);
+        console.log(`   ageRanges found: ${ageRanges.length} ranges`);
+        
         for (const range of ageRanges) {
-          if (!range.enabled) continue;
+          console.log(`\n   📋 Range: "${range.label}"`);
+          
+          if (!range.enabled) {
+            console.log(`      ❌ DISABLED - skipping`);
+            continue;
+          }
+          
           const rangeGender = range.gender?.toLowerCase();
-          if (rangeGender && rangeGender !== patientGender) continue;
+          console.log(`      Gender Check: range="${rangeGender}", patient="${patientGender}"`);
+          
+          // Skip if gender doesn't match, unless it's 'both' (which applies to all)
+          if (rangeGender && rangeGender !== 'both' && rangeGender !== patientGender) {
+            console.log(`      ❌ GENDER MISMATCH - skipping`);
+            continue;
+          }
+          console.log(`      ✅ GENDER OK`);
           
           let ageMatches = false;
+          
+          // Handle different range types with time units (matching backend logic)
           if (range.label?.includes('Between') && range.from != null && range.to != null) {
-            ageMatches = exactAgeInYears >= range.from && exactAgeInYears <= range.to;
+            const ageToCheck = getAgeInUnit(exactAgeInYears, patientAgeMonths, patientAgeDays, range.timeUnit);
+            ageMatches = ageToCheck >= range.from && ageToCheck <= range.to;
+            console.log(`      Age Check: "Between" - ageToCheck(${range.timeUnit})=${ageToCheck} in [${range.from}, ${range.to}] = ${ageMatches}`);
+          } else if (range.label?.includes('Less Than') && range.value != null) {
+            const ageToCheck = getAgeInUnit(exactAgeInYears, patientAgeMonths, patientAgeDays, range.timeUnit);
+            ageMatches = ageToCheck < range.value;
+            console.log(`      Age Check: "Less Than" - ageToCheck(${range.timeUnit})=${ageToCheck} < ${range.value} = ${ageMatches}`);
+          } else if (range.label?.includes('More Than') && range.value != null) {
+            const ageToCheck = getAgeInUnit(exactAgeInYears, patientAgeMonths, patientAgeDays, range.timeUnit);
+            ageMatches = ageToCheck > range.value;
+            console.log(`      Age Check: "More Than" - ageToCheck(${range.timeUnit})=${ageToCheck} > ${range.value} = ${ageMatches}`);
+          } else if (range.label?.includes('Equal To') && range.value != null) {
+            const ageToCheck = getAgeInUnit(exactAgeInYears, patientAgeMonths, patientAgeDays, range.timeUnit);
+            ageMatches = ageToCheck === range.value;
+            console.log(`      Age Check: "Equal To" - ageToCheck(${range.timeUnit})=${ageToCheck} === ${range.value} = ${ageMatches}`);
           }
           
-          if (ageMatches && range.ll != null && range.ul != null) {
+          // Check if range has valid LL and UL
+          const hasValidRange = range.ll != null && range.ul != null;
+          console.log(`      Range Values: LL=${range.ll}, UL=${range.ul}, valid=${hasValidRange}`);
+          
+          if (ageMatches && hasValidRange) {
+            console.log(`      ✅✅✅ MATCH FOUND! RETURNING: ${range.ll} - ${range.ul}`);
             return `${range.ll} - ${range.ul}`;
           }
+          
+          if (ageMatches && !hasValidRange) {
+            console.log(`      ⚠️ Age matched but NO valid range values (LL/UL null)`);
+          }
         }
+        console.log(`\n   ❌ NO AGE RANGE MATCHED - continuing to fallback`);
       } catch (e) {
         console.warn('Error parsing age ranges:', e);
       }
     }
     
-    // Fallback to gender and age-based ranges
+    // ✅ IMPROVED: Fallback to gender and age-based ranges
+    // Don't require Active flag - just check if values exist
     if (parameterData.rangeType === 'BySex' || parameterData.rangeType === 'ByGenderAndAge') {
-      if (exactAgeInYears < 18 && parameterData.childActive && parameterData.childLowValue != null && parameterData.childHighValue != null) {
+      if (exactAgeInYears < 18 && parameterData.childLowValue != null && parameterData.childHighValue != null) {
+        console.log(`   ✅ Using CHILD range: ${parameterData.childLowValue} - ${parameterData.childHighValue}`);
         return `${parameterData.childLowValue} - ${parameterData.childHighValue}`;
       }
       if (exactAgeInYears >= 18) {
-        if (patientGender === 'F' && parameterData.femaleActive && parameterData.femaleLowValue != null && parameterData.femaleHighValue != null) {
+        // ALWAYS use matching gender range if available - ignore 'active' flag
+        if (patientGender === 'female' && parameterData.femaleLowValue != null && parameterData.femaleHighValue != null) {
+          console.log(`   ✅ Using FEMALE range (gender match, ignoring Active flag): ${parameterData.femaleLowValue} - ${parameterData.femaleHighValue}`);
           return `${parameterData.femaleLowValue} - ${parameterData.femaleHighValue}`;
         }
-        if (patientGender === 'M' && parameterData.maleActive && parameterData.maleLowValue != null && parameterData.maleHighValue != null) {
+        if (patientGender === 'male' && parameterData.maleLowValue != null && parameterData.maleHighValue != null) {
+          console.log(`   ✅ Using MALE range (gender match, ignoring Active flag): ${parameterData.maleLowValue} - ${parameterData.maleHighValue}`);
           return `${parameterData.maleLowValue} - ${parameterData.maleHighValue}`;
+        }
+        // If gender doesn't match M/F, try both
+        if (!['male', 'female'].includes(patientGender)) {
+          console.log(`⚠️ Gender is "${patientGender}", trying both ranges...`);
+          if (parameterData.maleLowValue != null && parameterData.maleHighValue != null) {
+            console.log(`   ✅ Using MALE range (fallback): ${parameterData.maleLowValue} - ${parameterData.maleHighValue}`);
+            return `${parameterData.maleLowValue} - ${parameterData.maleHighValue}`;
+          }
+          if (parameterData.femaleLowValue != null && parameterData.femaleHighValue != null) {
+            console.log(`   ✅ Using FEMALE range (fallback): ${parameterData.femaleLowValue} - ${parameterData.femaleHighValue}`);
+            return `${parameterData.femaleLowValue} - ${parameterData.femaleHighValue}`;
+          }
         }
       }
     }
     
-    // Final fallback to display range text
+    // Final fallback: return numeric ranges if available (for any range type)
+    if (patientGender === 'female' && parameterData.femaleLowValue != null && parameterData.femaleHighValue != null) {
+      console.log(`   ✅ Using FALLBACK FEMALE range: ${parameterData.femaleLowValue} - ${parameterData.femaleHighValue}`);
+      return `${parameterData.femaleLowValue} - ${parameterData.femaleHighValue}`;
+    }
+    if (patientGender === 'male' && parameterData.maleLowValue != null && parameterData.maleHighValue != null) {
+      console.log(`   ✅ Using FALLBACK MALE range: ${parameterData.maleLowValue} - ${parameterData.maleHighValue}`);
+      return `${parameterData.maleLowValue} - ${parameterData.maleHighValue}`;
+    }
+    if (parameterData.childLowValue != null && parameterData.childHighValue != null) {
+      console.log(`   ✅ Using FALLBACK CHILD range: ${parameterData.childLowValue} - ${parameterData.childHighValue}`);
+      return `${parameterData.childLowValue} - ${parameterData.childHighValue}`;
+    }
+    
+    // Last resort: return display text or range text
+    console.log(`   ⚠️  No range found, using displayRangeText or empty`);
     return parameterData.displayRangeText || parameterData.rangeText || '-';
   };
 
@@ -543,7 +640,8 @@ export default function Result() {
         for (const range of ageRanges) {
           if (!range.enabled) continue;
           const rangeGender = range.gender?.toLowerCase();
-          if (rangeGender && rangeGender !== patientGender) continue;
+          // Skip if gender doesn't match, unless it's 'both' (which applies to all)
+          if (rangeGender && rangeGender !== 'both' && rangeGender !== patientGender) continue;
           
           let ageMatches = false;
           if (range.label?.includes('Between') && range.from != null && range.to != null) {
@@ -618,14 +716,14 @@ export default function Result() {
 
     let targetPatient: any = null;
     for (const patient of sortedAndFilteredResults) {
-      if (patient.patient_uid === barcodeLockedPatientUid && patient.visit_id === barcodeLockedVisitId) {
+      if ((patient as any).patient_uid === barcodeLockedPatientUid && (patient as any).visit_id === barcodeLockedVisitId) {
         targetPatient = patient;
         break;
       }
     }
     if (!targetPatient) return;
 
-    const selectedTestsList = targetPatient.tests.filter(t => barcodeSelectedTests.has(t.test_id));
+    const selectedTestsList = (targetPatient as any).tests.filter((t: any) => barcodeSelectedTests.has(t.test_id));
     const now = new Date();
     const dateStr = now.toLocaleDateString('en-GB');
     const timeStr = now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: true }).toUpperCase();
@@ -638,22 +736,22 @@ export default function Result() {
     const specimenBarcodeStatuses = {}; // Track ALL barcode statuses for each specimen group
     
     selectedTestsList.forEach(t => {
-      const key = t.specimen_type || 'Unknown';
+      const key = (t as any).specimen_type || 'Unknown';
       if (!specimenGroups[key]) {
         specimenGroups[key] = [];
         specimenTestIds[key] = [];
         specimenTestStatuses[key] = []; // Store array of all test statuses
         specimenBarcodeStatuses[key] = []; // Store array of all barcode statuses
       }
-      specimenGroups[key].push(t.test_short_name || t.test_name);
-      specimenTestIds[key].push(t.test_id);
-      specimenTestStatuses[key].push(t.status || 'Registered'); // Store each test's status
-      specimenBarcodeStatuses[key].push(t.barcode_status || 'Unprinted'); // Store each barcode's status
+      specimenGroups[key].push((t as any).test_short_name || (t as any).test_name);
+      specimenTestIds[key].push((t as any).test_id);
+      specimenTestStatuses[key].push((t as any).status || 'Registered'); // Store each test's status
+      specimenBarcodeStatuses[key].push((t as any).barcode_status || 'Unprinted'); // Store each barcode's status
     });
 
     // Build labels — barcode value = visitId for first specimen, visitId-2, visitId-3 ...
     const specimenEntries = Object.entries(specimenGroups);
-    const labels = specimenEntries.map(([specimen, shortNames], idx) => {
+    const labels = specimenEntries.map(([specimen, shortNames]: any, idx: number) => {
       const statuses = specimenTestStatuses[specimen] || [];
       const barcodeStatuses = specimenBarcodeStatuses[specimen] || [];
       
@@ -674,7 +772,7 @@ export default function Result() {
       }
       
       return {
-        barcodeValue: `${targetPatient.visit_id}-${idx + 1}`,
+        barcodeValue: `${(targetPatient as any).visit_id}-${idx + 1}`,
         specimen,
         shortNamesStr: (shortNames as any[]).join(' / '),
         dateStr,
@@ -685,23 +783,23 @@ export default function Result() {
       };
     });
 
-    const genderInitial = targetPatient.gender ? targetPatient.gender.charAt(0).toUpperCase() : '';
-    const age = targetPatient.age || '';
+    const genderInitial = (targetPatient as any).gender ? (targetPatient as any).gender.charAt(0).toUpperCase() : '';
+    const age = (targetPatient as any).age || '';
 
     setBarcodePatientInfo({
-      patientName: targetPatient.patient_name || '',
-      visitId: targetPatient.visit_id || '',
+      patientName: (targetPatient as any).patient_name || '',
+      visitId: (targetPatient as any).visit_id || '',
       age,
-      gender: targetPatient.gender || '',
+      gender: (targetPatient as any).gender || '',
       // Pre-formatted age/gender string: "F/27 Yrs" or "M/45 Yrs"
       ageGender: genderInitial && age ? `${genderInitial}/${age} Yrs` : genderInitial || (age ? `${age} Yrs` : ''),
-      organizationCode: targetPatient.organizationCode || '', // ✅ Include organization code
+      organizationCode: (targetPatient as any).organizationCode || '', // ✅ Include organization code
     });
     
     // Add organizationCode to each label
     const labelsWithOrgCode = labels.map(label => ({
       ...label,
-      organizationCode: targetPatient.organizationCode || '', // ✅ Add org code to barcode labels
+      organizationCode: (targetPatient as any).organizationCode || '', // ✅ Add org code to barcode labels
     }));
     
     setBarcodeLabels(labelsWithOrgCode);
@@ -1103,7 +1201,7 @@ export default function Result() {
         || (uploadedFiles[Array.from(selectedTests)[0] as string]?.serverPath);
       if (attachmentPath && !attachmentPath.endsWith('.pdf')) {
         try {
-          const baseUrl = (process.env.NEXT_PUBLIC_API_URL || '/api').replace('/api', '');
+          const baseUrl = (process.env.NEXT_PUBLIC_API_URL || '').replace('/api', '');
           const src = attachmentPath.startsWith('http') ? attachmentPath : `${baseUrl}${attachmentPath}`;
           const attachBase64 = await toBase64(src) as string;
           pdf.addPage();
@@ -1134,7 +1232,7 @@ export default function Result() {
       const allResults: any[] = [];
       responses.forEach(r => {
         allResults.push({ isHeader: true, testName: r.patientTest.test.name });
-        r.parameters.forEach(p => {
+        r.parameters.forEach((p: any) => {
           const er = p.existingResult;
           if (!er) return;
           allResults.push({
@@ -1277,7 +1375,7 @@ export default function Result() {
     }
   };
 
-  // Print — loads report data, opens modal with Professional Report Component
+  // Print — loads report data and opens browser print dialog directly (skip modal)
   const handlePrintPreview = async () => {
     if (selectedTests.size === 0) { alert('Please select a test to print'); return; }
     
@@ -1384,14 +1482,16 @@ export default function Result() {
             resultsMap[param.id] = {
               numericValue: param.existingResult.numericValue,
               textValue: param.existingResult.textValue,
-              isAbnormal: param.existingResult.isAbnormal
+              isAbnormal: param.existingResult.isAbnormal,
+              isHighlighted: param.existingResult.isHighlighted || false
             };
           }
         });
       });
 
-      // Set report data for direct print (do NOT open modal)
-      setReportData({
+      // ✅ DIRECT PRINT - trigger print immediately with report data
+      setLoading(false);
+      await directPrintReport({
         patient: first.patientTest.patient,
         visitId: first.patientTest.visitId,
         visitDate: first.patientTest.visitDate,
@@ -1402,9 +1502,6 @@ export default function Result() {
         signature,
         letterhead: letterheadDB,
         letterHeadBase64,
-        // 🔧 PART 3: Include first test's outsourcing info
-        isOutsourced: first.patientTest.isOutsourced || false,
-        outsourcedTo: first.patientTest.outsourcedTo || null,
         printOption: option,
         results: resultsMap,
         referralDoctor: first.patientTest.referralDoctor
@@ -1434,7 +1531,6 @@ export default function Result() {
     } catch (err) {
       console.error('Error loading report:', err);
       alert('Error loading report: ' + err.message);
-    } finally {
       setLoading(false);
     }
   };
@@ -1442,7 +1538,7 @@ export default function Result() {
   // Direct print report - renders ProfessionalReport off-screen, then prints via a clean popup window
   const directPrintReport = (reportProps: any) => {
     const printContainer = document.createElement('div');
-    printContainer.id = 'print-report-container';
+    printContainer.id = 'print-report-container-' + Date.now();
     printContainer.style.position = 'fixed';
     printContainer.style.left = '-9999px';
     printContainer.style.top = '0';
@@ -2342,8 +2438,8 @@ export default function Result() {
         if (settingsFormData.selectedTests[testId]) {
           updates.push({
             id: parseInt(testId),
-            status: settingsFormData.testStatuses[testId],
-            remarks: settingsFormData.testRemarks[testId]
+            status: (settingsFormData.testStatuses as any)[testId],
+            remarks: (settingsFormData.testRemarks as any)[testId]
           });
         }
       });
@@ -2777,7 +2873,26 @@ export default function Result() {
                             {/* Column 5: Age (show only on first test row) */}
                             <td className="px-1 sm:px-2 py-0.5 sm:py-1 text-[11px] font-medium border border-gray-300 text-center">
                               {testIndex === 0 && (
-                                <span className="font-semibold text-gray-900">{patient.age || '-'} Y</span>
+                                <span className="font-semibold text-gray-900">
+                                  {(() => {
+                                    if (patient.ageYears !== undefined && patient.ageMonths !== undefined && patient.ageDays !== undefined) {
+                                      // Under 1 year: show only months and days
+                                      if (patient.ageYears === 0) {
+                                        return `${patient.ageMonths}M ${patient.ageDays}D`;
+                                      }
+                                      // 1 to 12 years: show years, months, and days
+                                      else if (patient.ageYears < 12) {
+                                        return `${patient.ageYears}Y ${patient.ageMonths}M ${patient.ageDays}D`;
+                                      }
+                                      // 12 years and above: show as decimal (years.months)
+                                      else {
+                                        const decimalAge = (patient.ageYears + patient.ageMonths / 12).toFixed(1);
+                                        return decimalAge;
+                                      }
+                                    }
+                                    return patient.age || '-';
+                                  })()}
+                                </span>
                               )}
                             </td>
 
@@ -2945,7 +3060,6 @@ export default function Result() {
                                 {test.parameter_count === 1 ? (test.unit || '-') : '-'}
                               </span>
                             </td>
-
                             {/* Column 10: Ref. Interval */}
                             <td className="px-1 sm:px-2 py-0.5 sm:py-1 text-[11px] border border-gray-300">
                               <span className="text-gray-700">
@@ -3754,6 +3868,10 @@ export default function Result() {
             .join('');
           
           const win = window.open('', '_blank');
+          if (!win) {
+            console.error('Could not open print window');
+            return;
+          }
           if (!win) {
             alert('Please allow pop-ups to print barcodes');
             return;

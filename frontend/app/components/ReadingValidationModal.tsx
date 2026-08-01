@@ -190,13 +190,15 @@ const ReadingValidationModal = ({
             textValue: (textVal && typeof textVal === 'string' && textVal.trim() !== '') ? textVal : '',
             selectedOption: (optionVal && typeof optionVal === 'string' && optionVal.trim() !== '') ? optionVal : '',
             isAbnormal: param.existingResult.isAbnormal || false,
+            isHighlighted: param.existingResult.isHighlighted || false,
             referenceRange: param.existingResult.referenceRange || param.normalRange
           };
           
           console.log(`  → Init for param ${param.id}:`, {
             numericValue: initialResults[param.id].numericValue,
             textValue: initialResults[param.id].textValue,
-            selectedOption: initialResults[param.id].selectedOption
+            selectedOption: initialResults[param.id].selectedOption,
+            isHighlighted: initialResults[param.id].isHighlighted
           });
         } else {
           initialResults[param.id] = {
@@ -204,6 +206,7 @@ const ReadingValidationModal = ({
             textValue: '',
             selectedOption: '',
             isAbnormal: false,
+            isHighlighted: false,
             referenceRange: param.normalRange
           };
         }
@@ -270,20 +273,11 @@ const ReadingValidationModal = ({
 
     if (!patientData) return parameter.normalRange || '';
 
-    const age = patientData.patient.age;
+    // ✅ Use Int age fields directly
+    const exactAgeInYears = patientData.patient.ageYears ?? 0;
+    const exactAgeInMonths = patientData.patient.ageMonths ?? 0;
+    const exactAgeInDays = patientData.patient.ageDays ?? 0;
     const gender = patientData.patient.gender?.toLowerCase();
-    let exactAgeInDays = 0,
-      exactAgeInMonths = 0,
-      exactAgeInYears = age || 0;
-
-    if (patientData.patient.dob) {
-      const birthDate = new Date(patientData.patient.dob);
-      const currentDate = new Date();
-      const ageInMs = currentDate.getTime() - birthDate.getTime();
-      exactAgeInDays = Math.floor(ageInMs / (1000 * 60 * 60 * 24));
-      exactAgeInMonths = Math.floor(exactAgeInDays / 30.44);
-      exactAgeInYears = Math.floor(exactAgeInDays / 365.25);
-    }
 
     // Check age ranges first
     if (parameter.ageRanges) {
@@ -449,6 +443,7 @@ const ReadingValidationModal = ({
             textValue: textVal,
             selectedOption: results[param.id]?.selectedOption || null,
             isAbnormal: results[param.id]?.isAbnormal || false,
+            isHighlighted: results[param.id]?.isHighlighted || false,
             referenceRange: results[param.id]?.referenceRange || param.normalRange
           };
         })
@@ -583,7 +578,10 @@ const ReadingValidationModal = ({
             <div>
               <span className="font-semibold text-gray-700">Age/Gender:</span>
               <span className="ml-2 text-gray-900">
-                {patientData.patient.age} Yrs / {patientData.patient.gender}
+                {(() => {
+                  const formatted = `${patientData.patient.ageYears ?? 0}Y ${patientData.patient.ageMonths ?? 0}M ${patientData.patient.ageDays ?? 0}D`.replace(/0[YMD]\s*/g, '').trim();
+                  return formatted || '-';
+                })()} Yrs / {patientData.patient.gender}
               </span>
             </div>
             <div>
@@ -617,6 +615,7 @@ const ReadingValidationModal = ({
                   <th className="border p-1.5 text-center w-60">Value</th>
                   <th className="border p-1.5 text-center w-12">Units</th>
                   <th className="border p-1.5 text-center w-32">Biological Range</th>
+                  <th className="border p-1.5 text-center w-12">Highlight</th>
                 </tr>
               </thead>
               <tbody>
@@ -624,7 +623,7 @@ const ReadingValidationModal = ({
                   <Fragment key={categoryName}>
                     {categoryName !== 'NO_CATEGORY_HEADER' && categoryParams[0]?.showCategoryHeader && (
                       <tr className="bg-gray-200 font-semibold">
-                        <td colSpan={6} className="p-1">
+                        <td colSpan={5} className="p-1">
                           {categoryName.toUpperCase()}
                         </td>
                       </tr>
@@ -641,7 +640,7 @@ const ReadingValidationModal = ({
                         : 'border border-gray-300 px-2 py-1 rounded focus:outline-none focus:ring-2 focus:ring-cyan-500 text-xs';
 
                       return (
-                        <tr key={param.id} className={outOfRange ? 'bg-red-50' : 'bg-white hover:bg-gray-50'} style={{height: '28px'}}>
+                        <tr key={param.id} className={(outOfRange || results[param.id]?.isHighlighted) ? 'bg-red-50' : 'bg-white hover:bg-gray-50'} style={{height: '28px'}}>
                           <td className="border p-1.5">
                             <span className="font-medium text-gray-900 text-xs">
                               {(() => {
@@ -663,14 +662,13 @@ const ReadingValidationModal = ({
                               <div className="relative">
                                 <input
                                   ref={(el) => { if (el) inputRefs.current[param.id] = el; }}
-                                  type="number"
-                                  step="0.01"
+                                  type="text"
                                   value={results[param.id]?.numericValue ?? ''}
                                   onChange={(e) =>
                                     handleResultChange(
                                       param.id,
                                       'numericValue',
-                                      e.target.value === '' ? null : parseFloat(e.target.value)
+                                      e.target.value === '' ? null : e.target.value
                                     )
                                   }
                                   onFocus={() => setFocusedInputId(param.id)}
@@ -801,6 +799,20 @@ const ReadingValidationModal = ({
                           </td>
                           <td className="border p-1.5 text-center text-gray-600 text-xs max-w-xs truncate" title={rangeStr}>
                             {truncatedRange}
+                          </td>
+                          <td className="border p-1.5 text-center">
+                            <input
+                              type="checkbox"
+                              checked={results[param.id]?.isHighlighted || false}
+                              onChange={(e) => {
+                                const newResults = { ...results };
+                                if (!newResults[param.id]) newResults[param.id] = {};
+                                newResults[param.id].isHighlighted = e.target.checked;
+                                setResults(newResults);
+                              }}
+                              className="w-4 h-4 cursor-pointer"
+                              title="Highlight this value"
+                            />
                           </td>
                         </tr>
                       );
