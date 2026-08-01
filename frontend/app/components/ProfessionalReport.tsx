@@ -356,7 +356,10 @@ const ProfessionalReport = React.forwardRef<HTMLDivElement, ProfessionalReportPr
                       {[patient.title, patient.firstName, patient.lastName].filter(Boolean).join(' ')}
                     </td>
                     <td style={PATIENT_TD}>
-                      <b>Age:</b> {patient.age ?? '-'} Yrs ({patient.gender ?? '-'})
+                      <b>Age:</b> {(() => {
+                        const formatted = `${patient.ageYears ?? 0}Y ${patient.ageMonths ?? 0}M ${patient.ageDays ?? 0}D`.replace(/0[YMD]\s*/g, '').trim();
+                        return formatted || '-';
+                      })()} Yrs ({patient.gender ?? '-'})
                     </td>
                   </tr>
                   <tr>
