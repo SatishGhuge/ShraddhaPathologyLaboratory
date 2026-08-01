@@ -19,13 +19,13 @@ const LetterHead = "/LetterHead.jpeg";
 const SuggestionInput = ({ value, onChange, options, isAbnormal }) => {
   const [show, setShow] = useState(false);
   const [inputVal, setInputVal] = useState('');
-  const ref = useRef(null);
+  const ref = useRef<HTMLDivElement>(null);
 
   // Parse current value into tags array
   const tags = value ? value.split(',').map(t => t.trim()).filter(Boolean) : [];
 
   useEffect(() => {
-    const handler = (e: any) => { if (ref.current && !ref.current.contains(e.target)) setShow(false); };
+    const handler = (e: any) => { if (ref.current && (e.target instanceof Node) && !ref.current.contains(e.target)) setShow(false); };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, []);
@@ -87,8 +87,8 @@ const SuggestionInput = ({ value, onChange, options, isAbnormal }) => {
 const PatientResult = () => {
   const params = useParams();
   const searchParams = useSearchParams();
-  const patientTestId = Array.isArray(params.patientTestId) ? params.patientTestId[0] : params.patientTestId;
-  const testIdsParam = searchParams.get('testIds'); // For multiple tests
+  const patientTestId = params && (Array.isArray(params.patientTestId) ? params.patientTestId[0] : params.patientTestId);
+  const testIdsParam = searchParams ? searchParams.get('testIds') : null; // For multiple tests
   
   const router = useRouter();
 
@@ -495,6 +495,12 @@ const PatientResult = () => {
   const fetchPatientTestData = async () => {
     try {
       setLoading(true);
+      // patientTestId can be null, so ensure it's a valid string before calling
+      if (!patientTestId || typeof patientTestId !== 'string') {
+        setError('Invalid test ID');
+        setLoading(false);
+        return;
+      }
       const data = await getPatientTestById(patientTestId);
       if (data) {
         setPatientData(data.patientTest);
@@ -734,7 +740,7 @@ const PatientResult = () => {
         // param object structure: { id, name, value }
         // value can be numeric, text, or HTML content
         const paramId = param.id;
-        let numericValue = null;
+        let numericValue: number | null = null;
         let textValue = '';
 
         // Check if value is numeric
@@ -1037,15 +1043,37 @@ const PatientResult = () => {
       return clone.outerHTML;
     }).join('');
     const printWindow = window.open('', '_blank', 'width=900,height=700');
+    if (!printWindow) {
+      console.error('Failed to open print window');
+      return;
+    }
     printWindow.document.write(`
       <!DOCTYPE html><html><head><title>Report</title><style>
         * { margin:0; padding:0; box-sizing:border-box; }
         body { font-family:Arial,sans-serif; font-size:11px; }
         @page { size:A4; margin:0; }
-        #pr-report-page, .pr-attachment-page {
-          width:210mm; min-height:297mm; position:relative;
-          overflow:hidden; page-break-after:always; background:#fff;
-        }
+        html,
+body{
+    width:210mm;
+    margin:0;
+    padding:0;
+    font-family:Arial,sans-serif;
+    font-size:11px;
+    background:white;
+}
+
+        #pr-report-page,
+    .pr-attachment-page {
+    width:210mm;
+    min-height:297mm;
+    position:relative;
+    overflow:visible;
+    background:#fff;
+    page-break-after:auto;
+    break-inside:avoid;
+    margin:0;
+    box-shadow:none;
+}
         #pr-report-page:last-child, .pr-attachment-page:last-child { page-break-after:avoid; }
       </style></head><body>${pagesHtml}</body></html>
     `);
@@ -1134,17 +1162,20 @@ const PatientResult = () => {
                   <div className="flex items-center gap-2">
                     <span>{testIdx + 1}. {testData.patientTest.test.name}</span>
                     {/* Template dropdown - only show if templates exist */}
-                    {getTemplates(testData.patientTest.testId).templates && getTemplates(testData.patientTest.testId).templates.length > 0 && (
-                      <InlineTemplateSelector
-                        testId={testData.patientTest.testId}
-                        testName={testData.patientTest.test.name}
-                        templates={getTemplates(testData.patientTest.testId).templates}
-                        isLoadingTemplates={getTemplates(testData.patientTest.testId).loading}
-                        onTemplateSelect={(template) => {
-                          handleTemplateSelect(template, testData.patientTest.testId, false);
-                        }}
-                      />
-                    )}
+                    {(() => {
+                      const templates = getTemplates(testData.patientTest.testId);
+                      return templates?.templates && templates.templates.length > 0 && (
+                        <InlineTemplateSelector
+                          testId={testData.patientTest.testId}
+                          testName={testData.patientTest.test.name}
+                          templates={templates.templates || []}
+                          isLoadingTemplates={templates.loading || false}
+                          onTemplateSelect={(template) => {
+                            handleTemplateSelect(template, testData.patientTest.testId, false);
+                          }}
+                        />
+                      );
+                    })()}
                   </div>
                 </div>
 
@@ -1255,17 +1286,20 @@ const PatientResult = () => {
               <div className="flex items-center gap-2">
                 <span>{patientData.test.name}</span>
                 {/* Template dropdown - only show if templates exist */}
-                {getTemplates(patientData.testId).templates && getTemplates(patientData.testId).templates.length > 0 && (
-                  <InlineTemplateSelector
-                    testId={patientData.testId}
-                    testName={patientData.test.name}
-                    templates={getTemplates(patientData.testId).templates}
-                    isLoadingTemplates={getTemplates(patientData.testId).loading}
-                    onTemplateSelect={(template) => {
-                      handleTemplateSelect(template, patientData.testId, true);
-                    }}
-                  />
-                )}
+                {(() => {
+                  const templates = getTemplates(patientData.testId);
+                  return templates?.templates && templates.templates.length > 0 && (
+                    <InlineTemplateSelector
+                      testId={patientData.testId}
+                      testName={patientData.test.name}
+                      templates={templates.templates || []}
+                      isLoadingTemplates={templates.loading || false}
+                      onTemplateSelect={(template) => {
+                        handleTemplateSelect(template, patientData.testId, true);
+                      }}
+                    />
+                  );
+                })()}
               </div>
             </div>
 
@@ -1400,7 +1434,7 @@ const PatientResult = () => {
                   type="file"
                   accept="image/*,.pdf"
                   onChange={(e) => {
-                    const file = e.target.files[0] || null;
+                    const file = e.target.files?.[0] || null;
                     setAttachedFile(file);
                     if (file) setAttachedFileUrl(URL.createObjectURL(file));
                     else setAttachedFileUrl(null);
@@ -1466,6 +1500,8 @@ const PatientResult = () => {
                       position: absolute !important;
                       top: 0 !important; left: 0 !important;
                       width: 210mm !important;
+                      height: 296mm !important;
+                      overflow: hidden !important;
                       margin: 0 !important; padding: 0 !important;
                       box-shadow: none !important;
                     }
@@ -1484,27 +1520,35 @@ const PatientResult = () => {
                   #pr-report-page h1, #pr-report-page h2, #pr-report-page h3, #pr-report-page h4, #pr-report-page h5, #pr-report-page h6 { margin: 4px 0 !important; font-weight: bold !important; display: block !important; }
                 `}</style>
 
-                <div id="pr-report-page" style={{ width: '210mm', height: '297mm', margin: '16px auto', position: 'relative', backgroundColor: '#fff', boxShadow: '0 2px 16px rgba(0,0,0,0.18)', fontFamily: 'Arial, sans-serif', fontSize: '11px', overflow: 'hidden' }}>
+                <div id="pr-report-page" style={{ width: '210mm', height: '296mm', margin: '16px auto', position: 'relative', backgroundColor: '#fff', boxShadow: '0 2px 16px rgba(0,0,0,0.18)', fontFamily: 'Arial, sans-serif', fontSize: '11px', overflow: 'hidden' }}>
                   {reportWithHeader && (
                     <img src={LetterHead} alt="" style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', objectFit: 'fill', zIndex: 0, pointerEvents: 'none' }} />
                   )}
-                  <div style={{ position: 'relative', zIndex: 1, height: '100%', display: 'flex', flexDirection: 'column', paddingTop: reportWithHeader ? '38mm' : '12mm', paddingBottom: reportWithHeader ? '36mm' : '12mm', paddingLeft: '14mm', paddingRight: '14mm', boxSizing: 'border-box' }}>
+                  <div style={{ position: 'relative', zIndex: 1, display: 'flex', flexDirection: 'column', paddingTop: reportWithHeader ? '12mm' : '12mm', paddingBottom: reportWithHeader ? '12mm' : '12mm', paddingLeft: '14mm', paddingRight: '14mm', boxSizing: 'border-box' }}>
 
                     {/* Report Title */}
-                    <div style={{ textAlign: 'center', marginBottom: '6mm', borderBottom: '1.5px solid #333', paddingBottom: '3mm' }}>
-                      <strong style={{ fontSize: '13px', letterSpacing: '1px' }}>{patientData.test.name.toUpperCase()} REPORT</strong>
+                    <div style={{ textAlign: 'center', marginBottom: '2mm', paddingBottom: '1mm' }}>
+                      <strong style={{ fontSize: '13px', textDecoration: 'underline' }}>{patientData.test.name.toUpperCase()}</strong>
                     </div>
 
                     {/* Patient Info */}
                     <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '4mm', fontSize: '11px' }}>
                       <tbody>
                         <tr>
-                          <td style={{ padding: '2px 4px', width: '50%' }}><strong>Patient:</strong> {patientData.patient.title} {patientData.patient.firstName} {patientData.patient.lastName}</td>
-                          <td style={{ padding: '2px 4px', width: '50%' }}><strong>Age / Gender:</strong> {patientData.patient.age} Yrs / {patientData.patient.gender}</td>
+                          <td style={{ padding: '2px 4px', width: '50%' }}>Patient Name : <b>{[patientData.patient.title, patientData.patient.firstName, patientData.patient.lastName].filter(Boolean).join(' ').toUpperCase()}</b></td>
+                          <td style={{ padding: '2px 4px', width: '50%' }}>Age : {patientData.patient.age ?? '-'} {patientData.patient.age ? 'years' : ''} ({patientData.patient.gender ?? '-'})</td>
                         </tr>
                         <tr>
-                          <td style={{ padding: '2px 4px' }}><strong>Lab No:</strong> {patientData.visitId}</td>
-                          <td style={{ padding: '2px 4px' }}><strong>Date:</strong> {new Date(patientData.visitDate).toLocaleDateString('en-GB')}</td>
+                          <td style={{ padding: '2px 4px' }}>Referral : {patientData.patient.referralDoctor || '-'}</td>
+                          <td style={{ padding: '2px 4px' }}>Org Name : {patientData.patient.title ? '1500' : 'Shraddha Pathology Laboratory'}</td>
+                        </tr>
+                        <tr>
+                          <td style={{ padding: '2px 4px' }}>Sample Date : {patientData.visitDate ? new Date(patientData.visitDate).toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }).replace('am', 'a.m.').replace('pm', 'p.m.') : '-'}</td>
+                          <td style={{ padding: '2px 4px' }}>Reg. ID : {patientData.visitId || '-'}</td>
+                        </tr>
+                        <tr>
+                          <td style={{ padding: '2px 4px' }}>Report Date : {new Date().toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }).replace('am', 'a.m.').replace('pm', 'p.m.')}</td>
+                          <td style={{ padding: '2px 4px' }}>Sample ID : {patientData.visitId || '-'}</td>
                         </tr>
                       </tbody>
                     </table>
@@ -1512,21 +1556,19 @@ const PatientResult = () => {
                     {/* Results — no borders, no row lines */}
                     <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '4mm', fontSize: '11px' }}>
                       <thead>
-                        <tr>
-                          <th style={{ borderBottom: '1.5px solid #333', padding: '4px 6px', textAlign: 'left', width: shouldShowUnitsColumn() || shouldShowReferenceRangeColumn() ? '30%' : '50%' }}>Test Description</th>
-                          <th style={{ borderBottom: '1.5px solid #333', padding: '4px 6px 4px 20px', textAlign: 'left', width: shouldShowUnitsColumn() || shouldShowReferenceRangeColumn() ? '28%' : '50%' }}>Result</th>
+                        <tr style={{ borderBottom: '1px solid #000' }}>
+                          <th style={{ borderBottom: 'none', padding: '4px 6px', textAlign: 'left', width: shouldShowUnitsColumn() || shouldShowReferenceRangeColumn() ? '30%' : '50%' }}>Test Description</th>
+                          <th style={{ borderBottom: 'none', padding: '4px 6px', textAlign: 'left', width: shouldShowUnitsColumn() || shouldShowReferenceRangeColumn() ? '28%' : '50%' }}>Value(s)</th>
                           {shouldShowUnitsColumn() && (
-                            <th style={{ borderBottom: '1.5px solid #333', padding: '4px 6px', textAlign: 'left', width: '12%' }}>Unit</th>
+                            <th style={{ borderBottom: 'none', padding: '4px 6px', textAlign: 'center', width: '12%' }}>Unit</th>
                           )}
                           {shouldShowReferenceRangeColumn() && (
-                            <th style={{ borderBottom: '1.5px solid #333', padding: '4px 6px', textAlign: 'left', width: '30%' }}>Biological Reference Range</th>
+                            <th style={{ borderBottom: 'none', padding: '4px 6px', textAlign: 'left', width: '30%' }}>Reference Range</th>
                           )}
                         </tr>
                       </thead>
                       <tbody>
-                        <tr>
-                          <td colSpan={shouldShowUnitsColumn() || shouldShowReferenceRangeColumn() ? (shouldShowUnitsColumn() && shouldShowReferenceRangeColumn() ? 4 : 3) : 2} style={{ padding: '4px 6px', fontWeight: 'bold', borderBottom: '1px solid #ccc' }}>{patientData.test.name}</td>
-                        </tr>
+                        {/* Test name already rendered above the table */}
                         {Object.entries(groupedParameters).map(([categoryName, categoryParams]: [string, any]) => {
                           // Filter parameters: only show those with values
                           const paramsWithValues = (categoryParams as any[]).filter(param => {
@@ -1543,7 +1585,7 @@ const PatientResult = () => {
                           return (
                             <React.Fragment key={categoryName}>
                               {categoryName !== 'NO_CATEGORY_HEADER' && categoryParams[0]?.showCategoryHeader && (
-                                <tr><td colSpan={shouldShowUnitsColumn() || shouldShowReferenceRangeColumn() ? (shouldShowUnitsColumn() && shouldShowReferenceRangeColumn() ? 4 : 3) : 2} style={{ padding: '4px 6px', fontWeight: 'bold', borderBottom: '1px solid #ddd' }}>{stripHtmlTags(categoryName || '').toUpperCase()}</td></tr>
+                                <tr><td colSpan={shouldShowUnitsColumn() || shouldShowReferenceRangeColumn() ? (shouldShowUnitsColumn() && shouldShowReferenceRangeColumn() ? 4 : 3) : 2} style={{ padding: '4px 6px', fontWeight: 'bold', borderBottom: 'none', textDecoration: 'underline' }}>{stripHtmlTags(categoryName || '').toUpperCase()}</td></tr>
                               )}
                               {paramsWithValues.map((param) => {
                                 const numVal = results[param.id]?.numericValue;
@@ -1565,10 +1607,17 @@ const PatientResult = () => {
                                 
                                 return (
                                   <tr key={param.id}>
-                                    <td style={{ padding: '3px 6px', width: shouldShowUnitsColumn() || shouldShowReferenceRangeColumn() ? '30%' : '50%', fontWeight: isAbn ? 'bold' : 'normal' }}>{stripHtmlTags(param.parameterName || '')}</td>
-                                    <td style={{ padding: '3px 6px 3px 20px', width: shouldShowUnitsColumn() || shouldShowReferenceRangeColumn() ? '28%' : '50%', fontWeight: isAbn ? '900' : 'normal', color: isAbn ? '#b91c1c' : 'inherit', fontSize: '11px', whiteSpace: 'normal', wordWrap: 'break-word', textAlign: 'right' }}>
+                                    <td style={{ padding: '3px 6px', width: shouldShowUnitsColumn() || shouldShowReferenceRangeColumn() ? '30%' : '50%', fontWeight: isAbn ? 'bold' : 'normal' }}>
+                                      {stripHtmlTags(param.parameterName || '').toUpperCase()}
+                                      {param.parameterTestMethod && (
+                                        <div style={{ fontSize: '8px', color: '#000', fontWeight: 'normal', marginTop: '1px' }}>
+                                          METHOD: {param.parameterTestMethod}
+                                        </div>
+                                      )}
+                                    </td>
+                                    <td style={{ padding: '3px 6px', width: shouldShowUnitsColumn() || shouldShowReferenceRangeColumn() ? '28%' : '50%', fontWeight: 'bold', color: isAbn ? '#b91c1c' : 'inherit', fontSize: '11px', whiteSpace: 'normal', wordWrap: 'break-word', textAlign: 'left' }}>
                                       {param.isDescriptive && displayValue !== '-' && hasHtmlTags(displayValue) ? (
-                                        <div dangerouslySetInnerHTML={{ __html: sanitizeHtml(displayValue) }} style={{ margin: 0, whiteSpace: 'normal' }} />
+                                        <div dangerouslySetInnerHTML={{ __html: sanitizeHtml(displayValue) }} style={{ margin: 0, whiteSpace: 'normal', fontWeight: 'normal' }} />
                                       ) : (
                                         <>{displayValue}{isAbn && ' *'}</>
                                       )}
@@ -1637,6 +1686,7 @@ const PatientResult = () => {
                       );
                     })()}
 
+                    {/* Footer text removed */}
                     {!reportWithHeader && (
                       <div style={{ marginTop: (patientData.test.signature || defaultSignature) ? '4mm' : 'auto', borderTop: '1px solid #ccc', paddingTop: '3mm', fontSize: '10px', color: '#666', display: 'flex', justifyContent: 'space-between' }}>
                         <span>Report generated on: {new Date().toLocaleString('en-GB')}</span>
@@ -1648,7 +1698,7 @@ const PatientResult = () => {
 
                 {/* Attachment page — local preview OR server-stored file */}
                 {(attachedFileUrl || patientData.attachmentPath) && (() => {
-                  const src = attachedFileUrl || `${process.env.NEXT_PUBLIC_API_URL.replace('/api','')}${patientData.attachmentPath}`;
+                  const src = attachedFileUrl || `${(process.env.NEXT_PUBLIC_API_URL || '').replace('/api','')}${patientData.attachmentPath}`;
                   const isPdf = attachedFile?.type === 'application/pdf' || patientData.attachmentPath?.endsWith('.pdf');
                   return (
                     <div className="pr-attachment-page" style={{ width: '210mm', height: '297mm', margin: '16px auto', position: 'relative', backgroundColor: '#fff', boxShadow: '0 2px 16px rgba(0,0,0,0.18)', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>

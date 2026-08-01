@@ -249,7 +249,7 @@ export default function Result() {
   const router = useRouter();
   const searchParams = useSearchParams();
   
-  const queryStatus = searchParams.get('status') || 'All';
+  const queryStatus = searchParams?.get('status') || 'All';
   const [selectedStatus, setSelectedStatus] = useState(queryStatus);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
@@ -345,7 +345,7 @@ export default function Result() {
 
   // State for print options modal (Page Break vs No Page Break)
   const [showPrintOptionsModal, setShowPrintOptionsModal] = useState(false);
-  const [printOption, setPrintOption] = useState<'pagebreak' | 'nobreak'>('pagebreak');
+  const [printOption, setPrintOption] = useState<'pagebreak' | 'nobreak'>('nobreak');
 
   // State for test selection modal (for No Page Break option)
   const [showTestSelectionModal, setShowTestSelectionModal] = useState(false);
@@ -616,7 +616,7 @@ export default function Result() {
       return;
     }
 
-    let targetPatient = null;
+    let targetPatient: any = null;
     for (const patient of sortedAndFilteredResults) {
       if (patient.patient_uid === barcodeLockedPatientUid && patient.visit_id === barcodeLockedVisitId) {
         targetPatient = patient;
@@ -1103,7 +1103,7 @@ export default function Result() {
         || (uploadedFiles[Array.from(selectedTests)[0] as string]?.serverPath);
       if (attachmentPath && !attachmentPath.endsWith('.pdf')) {
         try {
-          const baseUrl = process.env.NEXT_PUBLIC_API_URL.replace('/api', '');
+          const baseUrl = (process.env.NEXT_PUBLIC_API_URL || '/api').replace('/api', '');
           const src = attachmentPath.startsWith('http') ? attachmentPath : `${baseUrl}${attachmentPath}`;
           const attachBase64 = await toBase64(src) as string;
           pdf.addPage();
@@ -1126,12 +1126,12 @@ export default function Result() {
       const testIds = Array.from(selectedTests);
       const responses = await Promise.all(testIds.map(id => getPatientTestById(id)));
       const first = responses[0];
-      const patient = first.patientTest.patient;
+      const patient: any = first.patientTest.patient;
 
       if (!patient.email) { alert('No email address saved for this patient.'); return; }
 
       // Build results payload matching what the backend email function expects
-      const allResults = [];
+      const allResults: any[] = [];
       responses.forEach(r => {
         allResults.push({ isHeader: true, testName: r.patientTest.test.name });
         r.parameters.forEach(p => {
@@ -1162,9 +1162,9 @@ export default function Result() {
   };
 
   // Build WhatsApp document-style message matching the Download report layout
-  const buildWhatsAppMessage = (responses: any) => {
+  const buildWhatsAppMessage = (responses: any[]) => {
     const first = responses[0];
-    const patient = first.patientTest.patient;
+    const patient: any = first.patientTest.patient;
     const name = `${patient.title || ''} ${patient.firstName || ''} ${patient.lastName || ''}`.trim();
     const visitId = first.patientTest.visitId;
     const visitDate = first.patientTest.visitDate
@@ -1298,44 +1298,14 @@ export default function Result() {
       }
     }
     
-    // Single test or tests from different patient/visit - proceed with default print
-    await proceedWithPrint('pagebreak');
+    // Single test or tests from different patient/visit - proceed with combined print
+    await proceedWithPrint('nobreak');
   };
 
   // Proceed with printing based on selected option - DIRECT PRINT PREVIEW (no modal)
   const proceedWithPrint = async (option: 'pagebreak' | 'nobreak') => {
     if (selectedTests.size === 0) { alert('Please select a test to print'); return; }
-    
-    // If no page break selected, show test selection modal first
-    if (option === 'nobreak') {
-      try {
-        setLoading(true);
-        const testIds = Array.from(selectedTests);
-        const responses = await Promise.all(testIds.map(id => getPatientTestById(id)));
-        
-        // Prepare test data for selection modal
-        const testsForSelection = responses.map((r, idx) => ({
-          testId: r.patientTest.id.toString(),
-          testName: r.patientTest.test.name,
-          shortName: r.patientTest.test.shortName,
-          selected: true,
-          order: idx
-        }));
-        
-        setTestSelectionData(testsForSelection);
-        setTestSelectionOrder(testIds);
-        setShowTestSelectionModal(true);
-        setShowPrintOptionsModal(false);
-      } catch (err) {
-        console.error('Error preparing test selection:', err);
-        alert('Error: ' + err.message);
-      } finally {
-        setLoading(false);
-      }
-      return;
-    }
-    
-    // Page break option - proceed with DIRECT print preview
+
     try {
       setLoading(true);
       const testIds = Array.from(selectedTests);
@@ -1370,7 +1340,7 @@ export default function Result() {
       let letterheadDB: LetterheadDB | null = null;
       let letterHeadBase64 = '';
       try {
-        const lhRes = await fetch('/api/letterhead/active');
+        const lhRes = await fetch(`${API_BASE_URL}/letterhead/active`);
         const lhData = await lhRes.json();
         if (lhData.success && lhData.data?.length > 0) {
           letterheadDB = lhData.data[0];
@@ -1444,24 +1414,23 @@ export default function Result() {
       // ❌ NO modal - trigger print immediately after a small delay to allow render
       setShowPrintOptionsModal(false);
       
-      // Trigger print after rendering completes
-      setTimeout(() => {
-        directPrintReport({
-          patient: first.patientTest.patient,
-          visitId: first.patientTest.visitId,
-          visitDate: first.patientTest.visitDate,
-          test: first.patientTest.test,
-          parameters: first.parameters,
-          groupedParameters: first.groupedParameters,
-          combinedTests,
-          signature,
-          letterhead: letterheadDB,
-          letterHeadBase64,
-          printOption: option,
-          results: resultsMap,
-          referralDoctor: first.patientTest.referralDoctor
-        });
-      }, 100);
+      // Trigger print after rendering completes (onReady inside directPrintReport)
+      setShowPrintOptionsModal(false);
+      directPrintReport({
+        patient: first.patientTest.patient,
+        visitId: first.patientTest.visitId,
+        visitDate: first.patientTest.visitDate,
+        test: first.patientTest.test,
+        parameters: first.parameters,
+        groupedParameters: first.groupedParameters,
+        combinedTests,
+        signature,
+        letterhead: letterheadDB,
+        letterHeadBase64,
+        printOption: option,
+        results: resultsMap,
+        referralDoctor: first.patientTest.referralDoctor
+      });
     } catch (err) {
       console.error('Error loading report:', err);
       alert('Error loading report: ' + err.message);
@@ -1470,23 +1439,94 @@ export default function Result() {
     }
   };
 
-  // Direct print report - renders ProfessionalReport in hidden div and triggers browser print
+  // Direct print report - renders ProfessionalReport off-screen, then prints via a clean popup window
   const directPrintReport = (reportProps: any) => {
     const printContainer = document.createElement('div');
     printContainer.id = 'print-report-container';
     printContainer.style.position = 'fixed';
-    printContainer.style.left = '0';
+    printContainer.style.left = '-9999px';
     printContainer.style.top = '0';
-    printContainer.style.width = '100%';
-    printContainer.style.height = '100%';
-    printContainer.style.zIndex = '9999';
-    printContainer.style.visibility = 'hidden';
-    
+    printContainer.style.width = '210mm';
+    printContainer.style.overflow = 'visible';
+    printContainer.style.pointerEvents = 'none';
+
     document.body.appendChild(printContainer);
 
-    // Render the report in the hidden container using React
     const root = ReactDOM.createRoot(printContainer);
-    
+    let printed = false;
+
+    const cleanup = () => {
+      root.unmount();
+      if (printContainer.parentNode) {
+        document.body.removeChild(printContainer);
+      }
+    };
+
+    const doPrint = () => {
+      if (printed) return;
+      printed = true;
+
+      const reportEl = printContainer.querySelector('.professional-report');
+      if (!reportEl) {
+        alert('Failed to render report for printing');
+        cleanup();
+        return;
+      }
+
+      const pageEls = reportEl.querySelectorAll('.report-page');
+      const pagesHtml = Array.from(pageEls).map(p => (p as HTMLElement).outerHTML).join('');
+
+      const printWindow = window.open('', '_blank', 'width=900,height=700');
+      if (!printWindow) {
+        alert('Please allow pop-ups to print the report');
+        cleanup();
+        return;
+      }
+
+      printWindow.document.write(`<!DOCTYPE html><html><head><title>Report</title><style>
+        * { margin:0; padding:0; box-sizing:border-box; }
+        body { font-family:Arial,Helvetica,sans-serif; font-size:10px; background:white; }
+        @page { size:A4 portrait; margin:0; }
+        .report-page {
+          position:relative; width:210mm; height:297mm;
+          background:#fff; overflow:hidden;
+          page-break-after:avoid; break-after:avoid;
+        }
+        .report-page--continued {
+          page-break-before:always; break-before:page;
+        }
+      </style></head><body>${pagesHtml}</body></html>`);
+      printWindow.document.close();
+      printWindow.focus();
+
+      const triggerPrint = () => {
+        setTimeout(() => {
+          printWindow.print();
+          printWindow.close();
+          cleanup();
+        }, 150);
+      };
+
+      const imgs = printWindow.document.querySelectorAll('img');
+      if (imgs.length === 0) {
+        triggerPrint();
+        return;
+      }
+
+      let loaded = 0;
+      const check = () => {
+        loaded++;
+        if (loaded >= imgs.length) triggerPrint();
+      };
+      imgs.forEach(img => {
+        if (img.complete) check();
+        else {
+          img.onload = check;
+          img.onerror = check;
+        }
+      });
+    };
+
     root.render(
       <ProfessionalReport
         patient={reportProps.patient}
@@ -1502,26 +1542,17 @@ export default function Result() {
         printOption={reportProps.printOption}
         results={reportProps.results}
         referralDoctor={reportProps.referralDoctor}
+        onReady={doPrint}
       />
     );
-
-    // Wait for render, then print
-    setTimeout(() => {
-      window.print();
-      // Clean up after print
-      setTimeout(() => {
-        root.unmount();
-        document.body.removeChild(printContainer);
-      }, 100);
-    }, 500);
   };
 
-  // Open upload modal for a patient
-  const handleUploadClick = (patient, specificTest = null) => {
+  // Handle upload modal for a patient
+  const handleUploadClick = (patient: any, specificTest: any = null) => {
     setUploadPatient(patient);
     // If opened from a specific test icon — pre-select ONLY that test
     // If opened from patient level — all unchecked
-    const initial = {};
+    const initial: any = {};
     patient.tests.forEach(t => {
       initial[t.test_id] = specificTest ? t.test_id === specificTest.test_id : false;
     });
@@ -1537,7 +1568,7 @@ export default function Result() {
     setUploading(true);
     try {
       const objectUrl = URL.createObjectURL(uploadFile);
-      const newUploads = {};
+      const newUploads: any = {};
 
       // Upload to backend for each selected test
       for (const id of selectedIds) {
@@ -1554,7 +1585,7 @@ export default function Result() {
       setUploadedFiles(prev => ({ ...prev, ...newUploads }));
       alert('File uploaded and saved successfully!');
       setShowUploadModal(false);
-    } catch (err) {
+    } catch (err: any) {
       alert('Upload failed: ' + err.message);
     } finally {
       setUploading(false);
@@ -2306,7 +2337,7 @@ export default function Result() {
       setLoading(true);
       
       // Get selected test IDs and their new statuses
-      const updates = [];
+      const updates: any[] = [];
       Object.keys(settingsFormData.selectedTests).forEach(testId => {
         if (settingsFormData.selectedTests[testId]) {
           updates.push({
@@ -2337,7 +2368,7 @@ export default function Result() {
       
       alert('Status updated successfully!');
       
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error updating test statuses:', err);
       setError(err.message);
     } finally {
@@ -3510,7 +3541,7 @@ export default function Result() {
               <div className="mb-5">
                 <input
                   type="file"
-                  onChange={(e) => setUploadFile(e.target.files[0] || null)}
+                  onChange={(e) => setUploadFile(e.target.files?.[0] || null)}
                   className="text-sm text-gray-600 file:mr-2 file:py-1 file:px-3 file:border file:border-gray-300 file:rounded file:text-xs file:bg-white file:text-gray-700 hover:file:bg-gray-50"
                 />
               </div>
@@ -3705,6 +3736,10 @@ export default function Result() {
           
           // Print only the selected barcodes
           const printArea = document.getElementById('barcode-print-area');
+          if (!printArea) {
+            alert('Error: Could not find barcode print area');
+            return;
+          }
           const allLabels = printArea.querySelectorAll('[data-barcode-index]');
           
           // Create a new container with only selected labels
@@ -3719,6 +3754,10 @@ export default function Result() {
             .join('');
           
           const win = window.open('', '_blank');
+          if (!win) {
+            alert('Please allow pop-ups to print barcodes');
+            return;
+          }
           win.document.write(`<!DOCTYPE html><html><head><title>Barcode Labels</title>
             <style>
               * { margin:0; padding:0; box-sizing:border-box; }
