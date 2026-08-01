@@ -67,6 +67,145 @@ function processAgeRangesWithGender(ageRanges, parameterName = '') {
   return JSON.stringify(processedRanges);
 }
 
+// Helper function to reconstruct categories from TestCategory records
+function reconstructCategories(categoriesData) {
+  if (!categoriesData || categoriesData.length === 0) {
+    return [];
+  }
+
+  // Group by categoryId to create category structure
+  // Use combination of categoryId + categoryName + parameterName for unique key since categoryName can be empty
+  const categoriesMap = new Map();
+
+  categoriesData.forEach((cat) => {
+    // Create a unique key that works even when categoryName is empty
+    const categoryKey = cat.categoryId || `${cat.categoryName || 'unnamed'}_${cat.testParameterId}`;
+
+    if (!categoriesMap.has(categoryKey)) {
+      categoriesMap.set(categoryKey, {
+        categoryId: cat.categoryId,
+        name: cat.categoryName || '(unnamed)',  // Display empty as "(unnamed)" but store null internally
+        isCategory: cat.isCategory,
+        testMethod: cat.testMethod,
+        sortOrder: cat.sortOrder,
+        parameters: []
+      });
+    }
+
+    // Add the parameter for this category
+    if (cat.testParameter) {
+      const param = cat.testParameter;
+      const parameter = {
+        id: param.id,
+        parameterName: param.parameterName,
+        parameterCode: param.parameterCode,
+        machineCode: param.machineCode,
+        multiplyBy: param.multiplyBy,
+        decimal: param.decimal,
+        sortOrder: param.parameterSortOrder,
+        isDescriptive: param.isDescriptive,
+        lowPanic: param.lowPanic,
+        highPanic: param.highPanic,
+        isNABL: param.isNABL,
+        hasFormula: param.hasFormula,
+        formula: param.formula,
+        type: param.type,
+        isMandatory: param.isMandatory,
+        rangeType: param.rangeType,
+        unitId: param.unitId,
+        unit: param.unit,
+        displayRangeText: param.displayRangeText,
+        rangeText: param.rangeText,
+        textContent: param.textContent,
+        isMultipleOptions: param.isMultipleOptions,
+        testMethod: param.testMethod,
+        normalRanges: [
+          {
+            gender: 'Male',
+            lowValue: param.maleLowValue,
+            highValue: param.maleHighValue,
+            defaultValue: param.maleDefaultValue,
+            isActive: param.maleActive
+          },
+          {
+            gender: 'Female',
+            lowValue: param.femaleLowValue,
+            highValue: param.femaleHighValue,
+            defaultValue: param.femaleDefaultValue,
+            isActive: param.femaleActive
+          },
+          {
+            gender: 'Child',
+            lowValue: param.childLowValue,
+            highValue: param.childHighValue,
+            defaultValue: param.childDefaultValue,
+            isActive: param.childActive
+          }
+        ],
+        ageRanges: (() => {
+          try {
+            return param.ageRanges ? JSON.parse(param.ageRanges) : [];
+          } catch (e) {
+            console.warn('Failed to parse ageRanges:', param.ageRanges);
+            return [];
+          }
+        })(),
+        rangeValues: (() => {
+          try {
+            return param.rangeValues ? JSON.parse(param.rangeValues) : [];
+          } catch (e) {
+            console.warn('Failed to parse rangeValues:', param.rangeValues);
+            return [];
+          }
+        })()
+      };
+
+      categoriesMap.get(categoryKey).parameters.push(parameter);
+    }
+  });
+
+  // Convert map to array
+  const categoriesArray = Array.from(categoriesMap.values());
+
+  // Ensure categories without parameters have at least one empty parameter
+  categoriesArray.forEach(category => {
+    if (category.parameters.length === 0) {
+      category.parameters.push({
+        parameterName: "",
+        machineCode: "",
+        multiplyBy: "",
+        decimal: 2,
+        sortOrder: "",
+        isDescriptive: false,
+        lowPanic: "",
+        highPanic: "",
+        isNABL: false,
+        parameterCode: "",
+        hasFormula: false,
+        formula: "",
+        type: "Numeric",
+        isMandatory: false,
+        rangeType: "BySex",
+        unitId: "",
+        unit: null,
+        displayRangeText: "",
+        rangeText: "",
+        textContent: "",
+        isMultipleOptions: false,
+        normalRanges: [
+          { gender: "Male", lowValue: "", highValue: "", defaultValue: "", isActive: true },
+          { gender: "Female", lowValue: "", highValue: "", defaultValue: "", isActive: false },
+          { gender: "Child", lowValue: "", highValue: "", defaultValue: "", isActive: false }
+        ],
+        ageRanges: [],
+        rangeValues: []
+      });
+    }
+  });
+
+  return categoriesArray;
+}
+
 /* ===============================================
  * SHRADDHA PATHOLOGY LABORATORY - MASTER CONTROLLER
  * ===============================================
@@ -1197,6 +1336,31 @@ export const getTests = async (req, res) => {
               effectiveTo: true,
               isActive: true
             }
+          },
+          categories: {
+            include: {
+              testParameter: {
+                include: {
+                  unit: {
+                    select: {
+                      id: true,
+                      symbol: true
+                    }
+                  }
+                }
+              }
+            },
+            orderBy: { categoryName: 'asc' }
+          },
+          testMachines: {
+            include: {
+              machine: {
+                select: {
+                  id: true,
+                  name: true
+                }
+              }
+            }
           }
         },
         orderBy: { name: 'asc' },
@@ -1208,7 +1372,8 @@ export const getTests = async (req, res) => {
       tests = tests.map(t => ({
         ...t,
         attachFile: t.attachFile ? true : false,
-        profileTest: t.profileTest ? true : false
+        profileTest: t.profileTest ? true : false,
+        categories: reconstructCategories(t.categories)
       }));
     } catch (err) {
       // If type conversion error, fetch with raw SQL and convert

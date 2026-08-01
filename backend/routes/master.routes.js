@@ -35,8 +35,7 @@ import {
 
 // For file upload handling
 import multer from 'multer';
-import { upload } from '../utils/upload.js';
-const memoryUpload = multer({ storage: multer.memoryStorage() });
+import { upload, excelUpload } from '../utils/upload.js';
 
 const router = express.Router();
 
@@ -71,7 +70,7 @@ router.delete('/organizations/:id', deleteOrganization);
 // Test routes — specific paths before parameterized
 router.get('/tests', getTests);
 router.get('/tests/export', exportTests);  // ✅ Export before /:id
-router.post('/tests/import', upload.single('file'), importTests);  // ✅ Import with file upload
+router.post('/tests/import', excelUpload.single('file'), importTests);  // ✅ Import with Excel memory upload
 router.get('/tests/:id', getTestById);
 router.post('/tests', createTest);
 router.put('/tests/:id', updateTest);
