@@ -2,7 +2,7 @@ import prisma from '../config/database.js';
 import { validationResult } from 'express-validator';
 import { getPaginationParams, buildPaginatedResponse } from '../utils/pagination.js';
 import { generatePatientId, generateVisitId } from '../utils/idGenerator.js';
-import { formatAge, calculateExactAge, getAgeForRangeMatching } from '../utils/ageCalculator.js';
+import { formatAge, calculateExactAge, getAgeForRangeMatching, formatAgeFromComponents } from '../utils/ageCalculator.js';
 import crypto from 'crypto';
 import bcryptjs from 'bcryptjs';
 import { emailService } from '../services/notification.service.js';
@@ -563,7 +563,21 @@ export const getAllPatients = async (req, res) => {
       take: limit
     });
 
-    res.json(buildPaginatedResponse(patients, total, page, limit));
+    // 🔴 DEBUG: Format age for each patient
+    const patientsWithFormattedAge = patients.map(patient => ({
+      ...patient,
+      age: formatAgeFromComponents(patient.ageYears, patient.ageMonths, patient.ageDays)
+    }));
+
+    console.log('✅ getAllPatients - Sample patient with formatted age:', {
+      patientId: patientsWithFormattedAge[0]?.patientId,
+      ageYears: patientsWithFormattedAge[0]?.ageYears,
+      ageMonths: patientsWithFormattedAge[0]?.ageMonths,
+      ageDays: patientsWithFormattedAge[0]?.ageDays,
+      age: patientsWithFormattedAge[0]?.age
+    });
+
+    res.json(buildPaginatedResponse(patientsWithFormattedAge, total, page, limit));
 
   } catch (error) {
     console.error('Get patients error:', error);
@@ -695,7 +709,21 @@ export const searchPatient = async (req, res) => {
       return res.json(buildPaginatedResponse([], total, page, limit));
     }
 
-    res.json(buildPaginatedResponse(patients, total, page, limit));
+    // 🔴 DEBUG: Format age for each patient
+    const patientsWithFormattedAge = patients.map(patient => ({
+      ...patient,
+      age: formatAgeFromComponents(patient.ageYears, patient.ageMonths, patient.ageDays)
+    }));
+
+    console.log('✅ searchPatient - Sample patient with formatted age:', {
+      patientId: patientsWithFormattedAge[0]?.patientId,
+      ageYears: patientsWithFormattedAge[0]?.ageYears,
+      ageMonths: patientsWithFormattedAge[0]?.ageMonths,
+      ageDays: patientsWithFormattedAge[0]?.ageDays,
+      age: patientsWithFormattedAge[0]?.age
+    });
+
+    res.json(buildPaginatedResponse(patientsWithFormattedAge, total, page, limit));
 
   } catch (error) {
     console.error('Search patient error:', error);

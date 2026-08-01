@@ -307,6 +307,56 @@ export const getAgeForRangeMatching = (ageStr, dobString = null) => {
 };
 
 /**
+ * Format age from components (ageYears, ageMonths, ageDays) to display string
+ * This is used when age is stored as individual components in the database
+ * 
+ * Rules:
+ * - < 1 year: "3M 12D" (months and days, NO years)
+ * - 1-12 years: "4Y 3M 15D" (all three components, skip 0 values)
+ * - 12+ years: "12.6" (decimal format - years.months)
+ */
+export const formatAgeFromComponents = (ageYears = 0, ageMonths = 0, ageDays = 0) => {
+  try {
+    const years = parseInt(ageYears) || 0;
+    const months = parseInt(ageMonths) || 0;
+    const days = parseInt(ageDays) || 0;
+
+    // < 1 year: "3M 12D" (months and days only, skip 0M if months is 0)
+    if (years === 0) {
+      if (months === 0 && days === 0) {
+        return '0D'; // Edge case: newborn
+      }
+      if (months === 0) {
+        return `${days}D`;
+      }
+      if (days === 0) {
+        return `${months}M`;
+      }
+      return `${months}M ${days}D`;
+    }
+
+    // 1-12 years: "4Y 3M 15D" (include all non-zero components, or include zero values)
+    if (years < 12) {
+      let result = `${years}Y`;
+      if (months > 0 || days > 0) {
+        result += ` ${months}M`;
+        if (days > 0) {
+          result += ` ${days}D`;
+        }
+      }
+      return result;
+    }
+
+    // 12+ years: decimal format "12.6" (years.months)
+    const decimalAge = years + (months / 12);
+    return decimalAge.toFixed(1);
+  } catch (error) {
+    console.error('Error formatting age from components:', error);
+    return '0D';
+  }
+};
+
+/**
  * Format age for display in UI/Reports
  * Shows formatted age with tooltip info
  */
@@ -368,6 +418,7 @@ export const formatAgeForDisplay = (ageStr, dobString = null) => {
 export default {
   calculateExactAge,
   formatAge,
+  formatAgeFromComponents,
   isValidAgeFormat,
   parseFormattedAge,
   getAgeInDays,
