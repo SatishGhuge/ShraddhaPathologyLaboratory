@@ -1067,7 +1067,7 @@ export default function PatientRegistration() {
     setFirstName(patient.firstName || "");
     setLastName(patient.lastName || "");
     setDob(patient.dob ? patient.dob.split('T')[0] : "");
-    setAge(patient.age?.toString() || "");
+    // Age is now calculated from DOB - no need to load age field
     setGender(patient.gender || "");
     setMobile(patient.mobile || "");
     setEmail(patient.email || "");
@@ -3032,7 +3032,10 @@ export default function PatientRegistration() {
                           </div>
                           <div className="flex items-center gap-1">
                             <span className="text-gray-500">Age:</span>
-                            <span className="font-semibold text-gray-800">{patient.age || 'N/A'}</span>
+                            <span className="font-semibold text-gray-800">{(() => {
+                              const formatted = `${patient.ageYears ?? 0}Y ${patient.ageMonths ?? 0}M ${patient.ageDays ?? 0}D`.replace(/0[YMD]\s*/g, '').trim();
+                              return formatted || 'N/A';
+                            })()}</span>
                           </div>
                           <div className="flex items-center gap-1 truncate">
                             <span className="text-gray-500">Email:</span>

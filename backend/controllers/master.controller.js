@@ -40,13 +40,20 @@ function processAgeRangesWithGender(ageRanges, parameterName = '') {
   }
   
   const processedRanges = ageRanges.map(range => {
-    // Auto-assign gender based on label
+    // Auto-assign gender based on label and gender dropdown selection
     let gender = range.gender;
     if (range.label && range.enabled) {
-      if (range.label.includes('Male') && !range.label.includes('Female')) {
+      // Check for explicit gender selection in the dropdown
+      if (range.gender === 'Both') {
+        // "Both" means it applies to all genders - keep it as "both"
+        gender = 'both';
+      } else if (range.label.includes('Male') && !range.label.includes('Female')) {
         gender = 'Male';
-      } else if (range.label.includes('Female')) {
+      } else if (range.label.includes('Female') && !range.label.includes('Male')) {
         gender = 'Female';
+      } else if (range.label.includes('Both') || (range.label.includes('Male') && range.label.includes('Female'))) {
+        // If label explicitly says "Both", set gender to "both"
+        gender = 'both';
       }
     }
     
@@ -3564,6 +3571,14 @@ export const updateParameterMaster = async (req, res) => {
       rangeValues: updateData.rangeValues && updateData.rangeValues.length > 0 ? JSON.stringify(updateData.rangeValues) : null
     };
 
+    // 🔴 DEBUG: Log what's being saved
+    console.log(`\n🔴 UPDATE PARAMETER: ${updateData.parameterName}`);
+    console.log(`   ageRanges count: ${updateData.ageRanges?.length || 0}`);
+    if (updateData.ageRanges && updateData.ageRanges.length > 0) {
+      console.log(`   ageRanges data:`, JSON.stringify(updateData.ageRanges, null, 2));
+    }
+    console.log(`   Will be saved as JSON: ${processedData.ageRanges ? 'YES' : 'NO'}`);
+
     const parameter = await prisma.parameterMaster.update({
       where: { id: parseInt(id) },
       data: processedData,
@@ -3576,6 +3591,22 @@ export const updateParameterMaster = async (req, res) => {
         }
       }
     });
+
+    // 🔴 DEBUG: Confirm what was saved
+    console.log(`\n✅ PARAMETER SAVED TO DATABASE:`);
+    console.log(`   ID: ${parameter.id}, Name: ${parameter.parameterName}`);
+    console.log(`   ageRanges saved: ${parameter.ageRanges ? 'YES' : 'NO'}`);
+    if (parameter.ageRanges) {
+      try {
+        const parsed = JSON.parse(parameter.ageRanges);
+        console.log(`   ageRanges count: ${parsed.length}`);
+        parsed.forEach((range, idx) => {
+          console.log(`     Range ${idx}: label="${range.label}", gender="${range.gender}", enabled=${range.enabled}, from=${range.from}, to=${range.to}, ll=${range.ll}, ul=${range.ul}`);
+        });
+      } catch (e) {
+        console.log(`   Error parsing ageRanges: ${e.message}`);
+      }
+    }
 
     res.json({
       success: true,

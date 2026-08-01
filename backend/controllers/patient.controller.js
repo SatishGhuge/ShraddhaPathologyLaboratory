@@ -7,6 +7,29 @@ import crypto from 'crypto';
 import bcryptjs from 'bcryptjs';
 import { emailService } from '../services/notification.service.js';
 
+// ✅ Helper: Calculate and save age fields from DOB
+async function calculateAndSaveAgeFields(patientId, dob) {
+  if (!dob) return;
+  
+  try {
+    const ageData = calculateExactAge(dob);
+    if (!ageData) return;
+    
+    await prisma.patient.update({
+      where: { patientId },
+      data: {
+        ageYears: ageData.years,
+        ageMonths: ageData.months,
+        ageDays: ageData.days
+      }
+    });
+    
+    console.log(`✅ Updated age fields for ${patientId}: ${ageData.years}Y ${ageData.months}M ${ageData.days}D`);
+  } catch (error) {
+    console.error(`Error calculating age fields for ${patientId}:`, error);
+  }
+}
+
 // Create new patient with tests OR add tests to existing patient
 export const createPatient = async (req, res) => {
   try {
@@ -187,8 +210,8 @@ export const createPatient = async (req, res) => {
           firstName,
           lastName,
           dob: dob ? new Date(dob) : null,
-          // Format age: calculate from DOB if provided, otherwise use manual input
-          age: dob ? formatAge(age, dob) : formatAge(age),
+          // Age is now stored as separate Int fields (ageYears, ageMonths, ageDays)
+          // Calculated by calculateAndUpdateAgeFields() when test result is fetched
           gender,
           mobile,
           email,
@@ -233,6 +256,11 @@ export const createPatient = async (req, res) => {
           }
         }
       });
+
+      // ✅ Calculate and save age fields from DOB
+      if (dob) {
+        await calculateAndSaveAgeFields(patient.patientId, dob);
+      }
 
       // Create payment transaction if payment was made during registration
       if(paymentMode && perTestPaid > 0){
@@ -723,14 +751,19 @@ export const updatePatient = async (req, res) => {
         firstName: firstName || undefined,
         lastName:  lastName  !== undefined ? lastName  : undefined,
         dob:       dob       ? new Date(dob) : null,
-        // Format age: calculate from DOB if provided, otherwise use manual input
-        age:       dob ? formatAge(age, dob) : (age ? formatAge(age) : undefined),
+        // Age is now stored as separate Int fields (ageYears, ageMonths, ageDays)
+        // No longer writing to age field - it's managed by calculateAndUpdateAgeFields()
         gender:    gender    || undefined,
         mobile:    mobile    !== undefined ? mobile  : undefined,
         email:     email     !== undefined ? email   : undefined,
         address:   address   !== undefined ? address : undefined,
       }
     });
+
+    // ✅ Calculate and save age fields if DOB was updated
+    if (dob) {
+      await calculateAndSaveAgeFields(patientId, dob);
+    }
 
     res.json({ success: true, message: 'Patient updated successfully', data: updated });
   } catch (error) {

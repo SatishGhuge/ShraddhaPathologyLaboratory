@@ -273,20 +273,11 @@ const ReadingValidationModal = ({
 
     if (!patientData) return parameter.normalRange || '';
 
-    const age = patientData.patient.age;
+    // ✅ Use Int age fields directly
+    const exactAgeInYears = patientData.patient.ageYears ?? 0;
+    const exactAgeInMonths = patientData.patient.ageMonths ?? 0;
+    const exactAgeInDays = patientData.patient.ageDays ?? 0;
     const gender = patientData.patient.gender?.toLowerCase();
-    let exactAgeInDays = 0,
-      exactAgeInMonths = 0,
-      exactAgeInYears = age || 0;
-
-    if (patientData.patient.dob) {
-      const birthDate = new Date(patientData.patient.dob);
-      const currentDate = new Date();
-      const ageInMs = currentDate.getTime() - birthDate.getTime();
-      exactAgeInDays = Math.floor(ageInMs / (1000 * 60 * 60 * 24));
-      exactAgeInMonths = Math.floor(exactAgeInDays / 30.44);
-      exactAgeInYears = Math.floor(exactAgeInDays / 365.25);
-    }
 
     // Check age ranges first
     if (parameter.ageRanges) {
@@ -587,7 +578,10 @@ const ReadingValidationModal = ({
             <div>
               <span className="font-semibold text-gray-700">Age/Gender:</span>
               <span className="ml-2 text-gray-900">
-                {patientData.patient.age} Yrs / {patientData.patient.gender}
+                {(() => {
+                  const formatted = `${patientData.patient.ageYears ?? 0}Y ${patientData.patient.ageMonths ?? 0}M ${patientData.patient.ageDays ?? 0}D`.replace(/0[YMD]\s*/g, '').trim();
+                  return formatted || '-';
+                })()} Yrs / {patientData.patient.gender}
               </span>
             </div>
             <div>

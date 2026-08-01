@@ -139,7 +139,9 @@ model Patient {
   firstName         String?
   lastName          String?
   dob               DateTime?
-  age               String?  @db.VarChar(50)
+  ageYears          Int?     @db.Int       // Renamed from 'age' - stores years component
+  ageMonths         Int?     @default(0)   // Months component (0-11)
+  ageDays           Int?     @default(0)   // Days component (0-30)
   gender            String?
   mobile            String?
   email             String?
