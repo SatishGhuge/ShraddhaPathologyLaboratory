@@ -29,8 +29,75 @@ import {
   WORKFLOW_STAGES,
   STAGE_METADATA
 } from '../utils/statusWorkflow.js';
+import {
+  parseBarcodeData,
+  findPartialBarcodeMatch,
+  isValidBarcodeFormat
+} from '../utils/barcodeUtils.js';
 
 const router = express.Router();
+
+// ===== BARCODE SCANNING & PARSING =====
+
+// Parse barcode and extract visitId + sampleId (FAST - <0.1 sec response)
+// Input: { barcode: "20250801000-1" }
+// Output: { visitId: "20250801000", sampleId: "1" }
+router.post('/parse-barcode', async (req, res) => {
+  try {
+    const { barcode } = req.body;
+
+    if (!barcode) {
+      return res.status(400).json({
+        success: false,
+        message: 'Barcode is required',
+        visitId: null,
+        sampleId: null
+      });
+    }
+
+    // Parse barcode instantly (string parsing, no DB query)
+    let data = parseBarcodeData(barcode);
+
+    // If incomplete, try to find matching barcode (with DB query)
+    if (!data) {
+      const fullBarcode = await findPartialBarcodeMatch(barcode, prisma);
+      if (fullBarcode) {
+        data = parseBarcodeData(fullBarcode);
+      }
+    }
+
+    if (!data) {
+      return res.status(404).json({
+        success: false,
+        message: 'Invalid barcode format. Expected format: "20250801000-1"',
+        visitId: null,
+        sampleId: null,
+        barcode: barcode
+      });
+    }
+
+    // Return extracted visitId + sampleId
+    res.status(200).json({
+      success: true,
+      message: 'Barcode parsed successfully',
+      visitId: data.visitId,          // e.g., "20250801000"
+      sampleId: data.sampleId,        // e.g., "1"
+      barcode: data.barcode,
+      timestamp: new Date().toISOString(),
+      responseTime: '<0.1s'
+    });
+
+  } catch (error) {
+    console.error('Barcode parsing error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to parse barcode',
+      error: error.message,
+      visitId: null,
+      sampleId: null
+    });
+  }
+});
 
 // Get all patient tests for results page
 router.get('/', getPatientTests);

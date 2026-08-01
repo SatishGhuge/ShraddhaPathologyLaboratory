@@ -435,6 +435,75 @@ export default function Result() {
     
     loadLetterhead();
   }, []);
+
+  // Barcode Scanner - Capture barcode input from hardware scanner
+  React.useEffect(() => {
+    let barcodeBuffer = '';
+    let barcodeTimeout: any;
+
+    const handleBarcodeInput = async (e: KeyboardEvent) => {
+      // Skip if typing in input field
+      const target = e.target as HTMLElement;
+      if (
+        target.tagName === 'INPUT' ||
+        target.tagName === 'TEXTAREA' ||
+        target.contentEditable === 'true'
+      ) {
+        return;
+      }
+
+      if (e.key === 'Enter' && barcodeBuffer.length > 0) {
+        // Barcode complete
+        const barcode = barcodeBuffer.trim();
+        barcodeBuffer = '';
+        clearTimeout(barcodeTimeout);
+
+        try {
+          // Parse barcode via API
+          const response = await fetch(`${API_BASE_URL}/result/parse-barcode`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ barcode })
+          });
+
+          const data = await response.json();
+
+          if (data.success) {
+            console.log('✅ Barcode scanned:', {
+              visitId: data.visitId,
+              sampleId: data.sampleId,
+              barcode: data.barcode
+            });
+            // Barcode processed successfully
+            // No UI notification - silent operation
+          } else {
+            console.error('❌ Barcode error:', data.message);
+          }
+        } catch (error) {
+          console.error('❌ Barcode scan error:', error);
+        }
+      } else if (e.key.length === 1) {
+        // Accumulate barcode characters
+        barcodeBuffer += e.key;
+
+        // Reset timeout
+        clearTimeout(barcodeTimeout);
+        barcodeTimeout = setTimeout(() => {
+          if (barcodeBuffer.length > 5) {
+            // Only process if buffer has reasonable length
+            barcodeBuffer = '';
+          }
+        }, 100);
+      }
+    };
+
+    window.addEventListener('keydown', handleBarcodeInput);
+
+    return () => {
+      window.removeEventListener('keydown', handleBarcodeInput);
+      clearTimeout(barcodeTimeout);
+    };
+  }, []);
   
   const [settingsFormData, setSettingsFormData] = useState({
     selectedTests: {},
