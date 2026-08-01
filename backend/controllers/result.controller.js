@@ -872,18 +872,38 @@ function getNormalRange(parameter, patient) {
         // Handle different range types with time units
         if (range.label?.includes('Less Than') && range.value !== null && range.value !== undefined) {
           const ageToCheck = getAgeInUnit(exactAgeInYears, exactAgeInMonths, exactAgeInDays, range.timeUnit);
+          // -1 indicates patient is too old for this unit (e.g., months for an 8-year-old)
+          if (ageToCheck === -1) {
+            console.log(`      Age Check: "Less Than" - patient too old for ${range.timeUnit} ranges`);
+            continue;
+          }
           ageMatches = ageToCheck < range.value;
           console.log(`      Age Check: "Less Than" - ageToCheck(${range.timeUnit})=${ageToCheck} < ${range.value} = ${ageMatches}`);
         } else if (range.label?.includes('More Than') && range.value !== null && range.value !== undefined) {
           const ageToCheck = getAgeInUnit(exactAgeInYears, exactAgeInMonths, exactAgeInDays, range.timeUnit);
+          // -1 indicates patient is too old for this unit
+          if (ageToCheck === -1) {
+            console.log(`      Age Check: "More Than" - patient too old for ${range.timeUnit} ranges`);
+            continue;
+          }
           ageMatches = ageToCheck > range.value;
           console.log(`      Age Check: "More Than" - ageToCheck(${range.timeUnit})=${ageToCheck} > ${range.value} = ${ageMatches}`);
         } else if (range.label?.includes('Between') && range.from !== null && range.to !== null) {
           const ageToCheck = getAgeInUnit(exactAgeInYears, exactAgeInMonths, exactAgeInDays, range.timeUnit);
+          // -1 indicates patient is too old for this unit
+          if (ageToCheck === -1) {
+            console.log(`      Age Check: "Between" - patient too old for ${range.timeUnit} ranges`);
+            continue;
+          }
           ageMatches = ageToCheck >= range.from && ageToCheck <= range.to;
           console.log(`      Age Check: "Between" - ageToCheck(${range.timeUnit})=${ageToCheck} in [${range.from}, ${range.to}] = ${ageMatches}`);
         } else if (range.label?.includes('Equal To') && range.value !== null && range.value !== undefined) {
           const ageToCheck = getAgeInUnit(exactAgeInYears, exactAgeInMonths, exactAgeInDays, range.timeUnit);
+          // -1 indicates patient is too old for this unit
+          if (ageToCheck === -1) {
+            console.log(`      Age Check: "Equal To" - patient too old for ${range.timeUnit} ranges`);
+            continue;
+          }
           ageMatches = ageToCheck === range.value;
           console.log(`      Age Check: "Equal To" - ageToCheck(${range.timeUnit})=${ageToCheck} === ${range.value} = ${ageMatches}`);
         }
@@ -971,14 +991,39 @@ function getNormalRange(parameter, patient) {
 }
 
 // Helper function to get age in specific time unit
+// ✅ IMPORTANT: This function returns the age component appropriate for the timeUnit
+// 
+// Logic:
+// - Year(s): Always return years (completed years, ignoring months/days)
+// - Month(s): Return months ONLY if years=0 (patient must be <1 year old for month ranges)
+// - Day(s): Return days ONLY if years=0 AND months=0 (patient must be <1 month old for day ranges)
+// 
+// This ensures:
+// - 23Y 0M 0D matches "Year(s)" ranges (e.g., "Between 18-65 Years")
+// - 0Y 6M 0D matches "Month(s)" ranges (e.g., "Between 1-3 Months")
+// - 8Y 3M 5D does NOT match "Month(s)" ranges (years > 0)
 function getAgeInUnit(years, months, days, timeUnit) {
   switch (timeUnit) {
     case 'Day(s)':
-      return days;
+      // Only return days if patient is <1 month old (prevents 65Y 2D from matching "1-3 Days")
+      if (years === 0 && months === 0) {
+        return days;
+      }
+      // Return -1 to indicate this patient is too old for day-based ranges
+      return -1;
+      
     case 'Month(s)':
-      return months;
+      // Only return months if patient is <1 year old (prevents 65Y 2M from matching "1-3 Months")
+      if (years === 0) {
+        return months;
+      }
+      // Return -1 to indicate this patient is too old for month-based ranges
+      return -1;
+      
     case 'Year(s)':
+      // Always return completed years (ignore months/days for year-based ranges)
       return years;
+      
     default:
       return years;
   }
