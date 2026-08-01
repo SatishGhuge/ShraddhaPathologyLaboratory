@@ -1913,11 +1913,19 @@ export const updatePatientComments = async (req, res) => {
       });
     }
 
+    // Normalize comments: split by comma, trim, and rejoin with consistent format (comma + space)
+    let normalizedComments = comments;
+    if (comments && comments.trim()) {
+      const parts = comments.split(',').map(c => c.trim()).filter(c => c.length > 0);
+      normalizedComments = parts.join(', ');  // Join with comma + space
+      console.log(`✅ Normalized comments: ${normalizedComments}`);
+    }
+
     // Update the PatientTest record with comments
     const updatedPatientTest = await prisma.patientTest.update({
       where: { id: parseInt(id) },
       data: {
-        comments: comments || null
+        comments: normalizedComments || null
       },
       include: {
         patient: {
@@ -1949,6 +1957,56 @@ export const updatePatientComments = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Failed to update comments: ' + error.message
+    });
+  }
+};
+
+// Get comment history for a test/patient
+// Returns all unique comments split by comma for dropdown suggestions
+// Fetches from ALL patients for system-wide comment history
+export const getCommentHistory = async (req, res) => {
+  try {
+    const { patientId } = req.params;
+
+    console.log(`📋 Fetching GLOBAL comment history (system-wide, not just for patient: ${patientId})`);
+
+    // Fetch ALL patient tests with comments (from ALL patients in the system)
+    const allPatientTests = await prisma.patientTest.findMany({
+      where: {
+        comments: {
+          not: null
+        }
+      },
+      select: {
+        comments: true
+      }
+    });
+
+    // Extract and split all comments by comma
+    const allComments = new Set();
+    
+    allPatientTests.forEach(test => {
+      if (test.comments && test.comments.trim()) {
+        // Split by comma, trim each part, and filter empty strings
+        const parts = test.comments.split(',').map(c => c.trim()).filter(c => c.length > 0);
+        parts.forEach(part => allComments.add(part));
+      }
+    });
+
+    const commentHistory = Array.from(allComments).sort();
+
+    console.log(`✅ Found ${commentHistory.length} unique comments from all patients:`, commentHistory);
+
+    res.json({
+      success: true,
+      data: commentHistory
+    });
+
+  } catch (error) {
+    console.error('Get comment history error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch comment history: ' + error.message
     });
   }
 };

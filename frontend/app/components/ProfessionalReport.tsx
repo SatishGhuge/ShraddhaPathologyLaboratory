@@ -560,9 +560,10 @@ const ProfessionalReport = React.forwardRef<HTMLDivElement, ProfessionalReportPr
               >
                 <span style={{ fontWeight: 'bold', color: '#333' }}>Comments: </span>
                 <span
-                  dangerouslySetInnerHTML={{ __html: safe(props.comments) }}
                   style={{ color: '#222', display: 'inline' }}
-                />
+                >
+                  {props.comments}
+                </span>
               </div>
             )}
 

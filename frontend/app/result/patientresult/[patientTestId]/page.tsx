@@ -138,6 +138,9 @@ const PatientResult = () => {
   const [attachedFileUrl, setAttachedFileUrl] = useState<any>(null);
   const [showComment, setShowComment] = useState(false);
   const [comments, setComments] = useState('');
+  const [commentHistory, setCommentHistory] = useState<string[]>([]);
+  const [showCommentDropdown, setShowCommentDropdown] = useState(false);
+  const [commentFocused, setCommentFocused] = useState(false);
   const [defaultSignature, setDefaultSignature] = useState<any>(null);
 
   // BarcodeModal state
@@ -525,6 +528,82 @@ const PatientResult = () => {
     return (Math.round(numValue * multiplier) / multiplier).toFixed(decimalPlaces);
   };
 
+  // ✅ Fetch comment history for a patient
+  const fetchCommentHistory = async (patientId?: string) => {
+    try {
+      // Fetch global comment history (system-wide)
+      const url = `${API_BASE_URL}/results/history/comments`;
+      
+      console.log('🔄 Fetching global comment history from:', url);
+      const response = await fetch(url);
+      
+      if (!response.ok) {
+        console.error('❌ API response not ok:', response.status, response.statusText);
+        return;
+      }
+      
+      const data = await response.json();
+      
+      console.log('📥 Comment history response:', data);
+      
+      if (data.success && Array.isArray(data.data)) {
+        setCommentHistory(data.data || []);
+        console.log('✅ Comment history fetched, count:', data.data.length, 'items:', data.data);
+      } else {
+        console.warn('⚠️ Invalid response structure:', data);
+        setCommentHistory([]);
+      }
+    } catch (error) {
+      console.error('❌ Could not fetch comment history:', error);
+      setCommentHistory([]);
+    }
+  };
+
+  // ✅ Handle comment change and save immediately
+  const handleCommentChange = async (newComments: string) => {
+    setComments(newComments);
+    
+    // Save to database immediately if user is typing and there's content
+    if (patientData?.id && newComments.trim()) {
+      try {
+        await updatePatientComments(patientData.id, newComments);
+        console.log('✅ Comments auto-saved:', newComments);
+        
+        // Fetch comment history to show the new comment options
+        await fetchCommentHistory();
+      } catch (error) {
+        console.error('⚠️ Error auto-saving comments:', error);
+      }
+    }
+  };
+
+  // ✅ Handle comment checkbox toggle
+  const handleCommentCheckbox = (checked: boolean) => {
+    setShowComment(checked);
+    
+    if (!checked) {
+      // If unchecking, clear comments from database and local state
+      setComments('');
+      if (patientData?.id) {
+        updatePatientComments(patientData.id, '').catch(error => {
+          console.error('⚠️ Error clearing comments:', error);
+        });
+      }
+    }
+  };
+
+  // ✅ Load existing comments when patient data loads
+  useEffect(() => {
+    if (patientData?.comments) {
+      setComments(patientData.comments);
+      setShowComment(true);  // ✅ Auto-check the comment checkbox if comments exist
+      console.log('✅ Loaded existing comments:', patientData.comments);
+    } else {
+      setComments('');
+      setShowComment(false);  // ✅ Uncheck if no comments
+    }
+  }, [patientData?.id]);
+
   // Detect if multiple tests or single test
   useEffect(() => {
     if (testIdsParam) {
@@ -533,6 +612,10 @@ const PatientResult = () => {
     } else {
       setMultipleTestIds([]);
     }
+    
+    // Fetch global comment history on page load
+    console.log('🔄 Page load - fetching global comment history');
+    fetchCommentHistory();
   }, [testIdsParam]);
 
   // Load data based on single or multiple tests
@@ -950,16 +1033,6 @@ const PatientResult = () => {
 
       alert('All results saved successfully!');
       
-      // Save comments if provided
-      if (showComment && comments.trim()) {
-        try {
-          await updatePatientComments(allTestsData[0].patientTest.id, comments);
-          console.log('✅ Comments saved successfully');
-        } catch (error) {
-          console.error('⚠️ Error saving comments:', error);
-        }
-      }
-      
       router.push('/result');
     } catch (error) {
       console.error('Error saving results:', error);
@@ -1006,17 +1079,6 @@ const PatientResult = () => {
       });
       const data = await response.json();
       if (data.success) {
-        // Save comments if provided
-        if (showComment && comments.trim()) {
-          try {
-            await updatePatientComments(patientData.id, comments);
-            console.log('✅ Comments saved successfully');
-          } catch (error) {
-            console.error('⚠️ Error saving comments:', error);
-            alert('Results saved, but failed to save comments');
-          }
-        }
-        
         // Auto-transition to Entered status when first result is saved
         try {
           const transitionResponse = await fetch(`${API_BASE_URL}/results/${patientData.id}/auto-transition/result-saved`, {
@@ -1352,18 +1414,42 @@ const PatientResult = () => {
                               type="checkbox" 
                               id="show-comment-single"
                               checked={showComment}
-                              onChange={(e) => setShowComment(e.target.checked)}
+                              onChange={(e) => handleCommentCheckbox(e.target.checked)}
                               className="w-5 h-5 accent-blue-600 cursor-pointer flex-shrink-0"
                               title="Check to add comments"
                             />
                             <label htmlFor="show-comment-single" className="text-sm font-semibold text-gray-700 cursor-pointer flex-shrink-0">Comment:</label>
                             {showComment && (
-                              <textarea
-                                value={comments}
-                                onChange={(e) => setComments(e.target.value)}
-                                placeholder="Enter comments or notes to be printed on the report before interpretation..."
-                                className="flex-1 border border-gray-300 rounded px-2 py-1 text-xs font-normal h-12 resize-none"
-                              />
+                              <div className="flex-1 relative">
+                                <textarea
+                                  value={comments}
+                                  onChange={(e) => handleCommentChange(e.target.value)}
+                                  onFocus={() => setCommentFocused(true)}
+                                  onBlur={() => setTimeout(() => setCommentFocused(false), 200)}
+                                  placeholder="Type comment here..."
+                                  className="w-full border border-gray-300 rounded px-2 py-1 text-xs font-normal h-12 resize-none"
+                                />
+                                {commentHistory.length > 0 && commentFocused && (
+                                  <div className="absolute top-12 left-0 right-0 bg-white border border-gray-300 rounded shadow-lg p-2 max-h-40 overflow-y-auto z-50">
+                                    <div className="space-y-1">
+                                      {commentHistory.map((hist, idx) => (
+                                        <button
+                                          key={idx}
+                                          type="button"
+                                          onMouseDown={(e) => e.preventDefault()}
+                                          onClick={() => {
+                                            const newComments = comments.trim() ? `${comments}, ${hist}` : hist;
+                                            handleCommentChange(newComments);
+                                          }}
+                                          className="w-full text-left px-2 py-1.5 text-xs bg-gray-50 hover:bg-blue-500 hover:text-white text-gray-800 rounded cursor-pointer transition-colors"
+                                        >
+                                          {hist}
+                                        </button>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
                             )}
                           </div>
                         </td>
@@ -1566,18 +1652,42 @@ const PatientResult = () => {
                           type="checkbox" 
                           id="show-comment-table"
                           checked={showComment}
-                          onChange={(e) => setShowComment(e.target.checked)}
+                          onChange={(e) => handleCommentCheckbox(e.target.checked)}
                           className="w-5 h-5 accent-blue-600 cursor-pointer flex-shrink-0"
                           title="Check to add comments"
                         />
                         <label htmlFor="show-comment-table" className="text-sm font-semibold text-gray-700 cursor-pointer flex-shrink-0">Comment:</label>
                         {showComment && (
-                          <textarea
-                            value={comments}
-                            onChange={(e) => setComments(e.target.value)}
-                            placeholder="Enter comments or notes to be printed on the report before interpretation..."
-                            className="flex-1 border border-gray-300 rounded px-2 py-1 text-xs font-normal h-12 resize-none"
-                          />
+                          <div className="flex-1 relative">
+                            <textarea
+                              value={comments}
+                              onChange={(e) => handleCommentChange(e.target.value)}
+                              onFocus={() => setCommentFocused(true)}
+                              onBlur={() => setTimeout(() => setCommentFocused(false), 200)}
+                              placeholder="Type comment or select from history"
+                              className="w-full border border-gray-300 rounded px-2 py-1 text-xs font-normal h-12 resize-none"
+                            />
+                            {commentHistory.length > 0 && commentFocused && (
+                              <div className="absolute top-12 left-0 right-0 bg-white border border-gray-300 rounded shadow-lg p-2 max-h-40 overflow-y-auto z-50">
+                                <div className="space-y-1">
+                                  {commentHistory.map((hist, idx) => (
+                                    <button
+                                      key={idx}
+                                      type="button"
+                                      onMouseDown={(e) => e.preventDefault()}
+                                      onClick={() => {
+                                        const newComments = comments.trim() ? `${comments}, ${hist}` : hist;
+                                        handleCommentChange(newComments);
+                                      }}
+                                      className="w-full text-left px-2 py-1.5 text-xs bg-gray-50 hover:bg-blue-500 hover:text-white text-gray-800 rounded cursor-pointer transition-colors"
+                                    >
+                                      {hist}
+                                    </button>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                          </div>
                         )}
                       </div>
                     </td>
@@ -1596,7 +1706,7 @@ const PatientResult = () => {
                   type="checkbox"
                   id="show-comment"
                   checked={showComment}
-                  onChange={(e) => setShowComment(e.target.checked)}
+                  onChange={(e) => handleCommentCheckbox(e.target.checked)}
                   className="w-4 h-4"
                 />
                 <label htmlFor="show-comment" className="text-sm text-gray-700 cursor-pointer">Add Comments/Notes</label>
@@ -1604,14 +1714,35 @@ const PatientResult = () => {
               
               {/* Comments Text Area - Show when checkbox is checked */}
               {showComment && (
-                <div className="mb-3">
+                <div className="mb-3 relative">
                   <textarea
                     value={comments}
-                    onChange={(e) => setComments(e.target.value)}
-                    placeholder="Enter comments or notes to be printed on the report..."
-                    className="w-full border border-gray-300 rounded px-3 py-2 text-sm font-normal"
-                    rows={4}
+                    onChange={(e) => handleCommentChange(e.target.value)}
+                    onFocus={() => setCommentFocused(true)}
+                    onBlur={() => setTimeout(() => setCommentFocused(false), 200)}
+                    placeholder="Type comment here or select from history below"
+                    className="w-full border border-gray-300 rounded px-3 py-2 text-sm font-normal h-20 resize-none"
                   />
+                  {commentHistory.length > 0 && commentFocused && (
+                    <div className="absolute top-20 left-0 right-0 bg-white border border-gray-300 rounded shadow-lg p-2 max-h-48 overflow-y-auto z-50">
+                      <div className="space-y-1">
+                        {commentHistory.map((hist, idx) => (
+                          <button
+                            key={idx}
+                            type="button"
+                            onMouseDown={(e) => e.preventDefault()}
+                            onClick={() => {
+                              const newComments = comments.trim() ? `${comments}, ${hist}` : hist;
+                              handleCommentChange(newComments);
+                            }}
+                            className="w-full text-left px-2 py-1.5 text-sm bg-gray-50 hover:bg-blue-500 hover:text-white text-gray-800 rounded cursor-pointer transition-colors"
+                          >
+                            {hist}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
               
