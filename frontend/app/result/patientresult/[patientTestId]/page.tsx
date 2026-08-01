@@ -15,14 +15,15 @@ import ClassicEditor from '@ckeditor/ckeditor5-build-classic';
 import { parseHtmlText, stripHtmlTags, HtmlPart } from '@/src/utils/htmlParser';
 const LetterHead = "/LetterHead.jpeg";
 
-// Autocomplete text input with suggestion dropdown and multi-select tags
+// Plain text area with suggestion dropdown and formatting support
+// Text can be edited directly, formatted with Ctrl+B for bold
+// Shows [bold text] with visual formatting in report
+// Ctrl+B to make selected text bold
 const SuggestionInput = ({ value, onChange, options, isAbnormal }) => {
   const [show, setShow] = useState(false);
-  const [inputVal, setInputVal] = useState('');
+  const [searchInput, setSearchInput] = useState('');
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const ref = useRef(null);
-
-  // Parse current value into tags array
-  const tags = value ? value.split(',').map(t => t.trim()).filter(Boolean) : [];
 
   useEffect(() => {
     const handler = (e: any) => { if (ref.current && !(ref.current as HTMLElement).contains(e.target as Node)) setShow(false); };
@@ -30,55 +31,103 @@ const SuggestionInput = ({ value, onChange, options, isAbnormal }) => {
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
-  const filtered = inputVal
-    ? options.filter(o => o.toLowerCase().includes(inputVal.toLowerCase()) && !tags.includes(o))
-    : options.filter(o => !tags.includes(o));
+  // Filter options based on search input
+  const filtered = searchInput
+    ? options.filter(o => o.toLowerCase().includes(searchInput.toLowerCase()) && !value?.includes(o))
+    : options.filter(o => !value?.includes(o));
 
-  const addTag = (opt: any) => {
-    const newTags = [...tags, opt];
-    onChange(newTags.join(', '));
-    setInputVal('');
+  // Handle selecting option from dropdown
+  const addOption = (opt: any) => {
+    const currentValue = value ? value.trim() : '';
+    const newValue = currentValue ? `${currentValue}, ${opt}` : opt;
+    onChange(newValue);
+    setSearchInput('');
     setShow(false);
+    textareaRef.current?.focus();
   };
 
-  const removeTag = (tag: any) => {
-    const newTags = tags.filter(t => t !== tag);
-    onChange(newTags.join(', '));
+  // Handle input change
+  const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const newValue = e.target.value;
+    onChange(newValue);
+    setSearchInput(newValue.split(',').pop()?.trim() || '');
+    if (newValue) setShow(true);
+  };
+
+  // Handle Ctrl+B for bold formatting
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if ((e.ctrlKey || e.metaKey) && e.key === 'b') {
+      e.preventDefault();
+      
+      const textarea = textareaRef.current;
+      if (!textarea) return;
+
+      const start = textarea.selectionStart || 0;
+      const end = textarea.selectionEnd || 0;
+      
+      if (start === end) return; // No text selected
+
+      const selectedText = value?.substring(start, end) || '';
+      const beforeText = value?.substring(0, start) || '';
+      const afterText = value?.substring(end) || '';
+      
+      // Wrap with <b> tags for actual bold in report
+      const formattedText = beforeText + `<b>${selectedText}</b>` + afterText;
+      onChange(formattedText);
+
+      // Restore cursor position after state update
+      setTimeout(() => {
+        if (textareaRef.current) {
+          textareaRef.current.selectionStart = start + 3; // +3 for "<b>"
+          textareaRef.current.selectionEnd = start + 3 + selectedText.length;
+          textareaRef.current.focus();
+        }
+      }, 0);
+    }
   };
 
   return (
-    <div ref={ref} className="relative">
-      <div
-        className={`flex flex-wrap gap-1 items-center border rounded px-2 py-1 min-w-[200px] max-w-xs cursor-text ${isAbnormal ? "border-red-500 bg-red-50" : "border-gray-300 bg-white"}`}
-        onClick={() => { setShow(true); }}
-      >
-        {tags.map(tag => (
-          <span key={tag} className="flex items-center gap-1 bg-primary-100 text-primary-800 text-xs px-2 py-0.5 rounded-full">
-            {tag}
-            <button type="button" onMouseDown={(e) => { e.stopPropagation(); removeTag(tag); }} className="text-primary-600 hover:text-red-500 font-bold leading-none">×</button>
-          </span>
-        ))}
-        <input
-          type="text"
-          value={inputVal}
-          onChange={(e) => { setInputVal(e.target.value); setShow(true); }}
-          onFocus={() => setShow(true)}
-          className="outline-none text-sm flex-1 min-w-[60px] bg-transparent"
-          placeholder={tags.length === 0 ? "Type or select..." : ""}
+    <div ref={ref} className="relative w-full">
+      <div className={`border rounded px-3 py-2 w-full ${isAbnormal ? "border-red-500 bg-red-50" : "border-gray-300 bg-white"}`}>
+        <textarea
+          ref={textareaRef}
+          value={value || ''}
+          onChange={handleInputChange}
+          onKeyDown={handleKeyDown}
+          onFocus={() => searchInput && setShow(true)}
+          placeholder="Type values or select from options... (Ctrl+B for bold)"
+          className="outline-none text-xs w-full bg-transparent text-black resize-vertical font-sans border-none"
+          style={{
+            fontSize: '12px',
+            lineHeight: '1.6',
+            fontFamily: 'Arial, sans-serif',
+            minHeight: '100px',
+            maxHeight: '300px'
+          }}
+          title="Ctrl+B to bold selected text | Type to add values | Backspace to clear"
         />
       </div>
+
+      {/* Dropdown with option suggestions */}
       {show && filtered.length > 0 && (
-        <ul className="absolute z-50 left-0 top-full mt-0.5 bg-white border border-gray-300 rounded shadow-lg max-h-48 overflow-y-auto w-64 text-sm">
+        <ul className="absolute z-50 left-0 top-full mt-1 bg-white border border-gray-300 rounded shadow-lg max-h-48 overflow-y-auto w-full text-sm">
           {filtered.map(opt => (
             <li
               key={opt}
-              onMouseDown={() => addTag(opt)}
-              className="px-3 py-1.5 cursor-pointer hover:bg-primary-50 hover:text-primary-800"
+              onMouseDown={() => addOption(opt)}
+              className="px-3 py-2 cursor-pointer hover:bg-blue-50 hover:text-blue-800 border-b last:border-b-0 transition-colors text-xs"
             >
               {opt}
             </li>
           ))}
         </ul>
+      )}
+
+      {/* Formatting hint */}
+      {value && (
+        <div className="text-xs text-gray-500 mt-1" style={{ fontSize: '11px' }}>
+          💡 Tip: Select text and press Ctrl+B to make it <strong>bold</strong> (shows as &lt;b&gt;text&lt;/b&gt; in editor)
+        </div>
       )}
     </div>
   );
