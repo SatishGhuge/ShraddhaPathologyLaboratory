@@ -421,8 +421,9 @@ const AddTest = () => {
                   parentId: category.parentId || null,
                   parameters: category.parameters && category.parameters.length > 0 
                     ? category.parameters.map(param => {
-                        console.log('🔍 Parameter:', param.parameterName, 'ageRanges:', param.ageRanges);
+                        console.log('🔍 Parameter:', param.parameterName, 'ID:', param.id, 'ageRanges:', param.ageRanges);
                         return {
+                          id: param.id,  // ✅ CRITICAL FIX: Include parameter ID from API response
                           parameterName: param.parameterName || "",
                           machineCode: param.machineCode || "",
                           decimal: param.decimal !== undefined && param.decimal !== "" ? param.decimal : "",
@@ -948,6 +949,7 @@ const AddTest = () => {
         parameters: category.parameters ? category.parameters.filter(param => 
           param.parameterName
         ).map(param => ({
+          id: param.id ? parseInt(param.id) : undefined,  // ✅ CRITICAL FIX: Include parameter ID for updates to preserve IDs
           parameterName: param.parameterName,
           machineCode: param.machineCode || null,
           multiplyBy: param.multiplyBy || null,
@@ -1009,6 +1011,16 @@ const AddTest = () => {
       };
 
       console.log("📤 Sending test data to API:", completeTestData);
+      
+      // 🔍 DEBUG: Log parameter IDs being sent
+      console.log('%c═══ PARAMETER IDs BEING SENT ═══', 'color: #ff00ff; font-weight: bold');
+      completeTestData.categories.forEach((cat, catIdx) => {
+        console.log(`Category ${catIdx}: ${cat.name}`);
+        cat.parameters.forEach((param, paramIdx) => {
+          console.log(`  Param ${paramIdx}: "${param.parameterName}" - ID: ${param.id} (type: ${typeof param.id}, is undefined: ${param.id === undefined})`);
+        });
+      });
+      
       console.log("📋 Test table data:", testData);
       console.log("📂 Category table data:", categoryData);
       

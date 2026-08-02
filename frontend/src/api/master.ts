@@ -66,7 +66,21 @@ export const getTests = async (page: number = 1, limit: number = 20): Promise<an
     pagination: r.pagination || { page, limit, total: 0, totalPages: 0, hasMore: false }
   };
 };
-export const getTestById = async (id: string): Promise<any | null> => { const r = await apiCall(`/master/tests/${id}`, { method: 'GET' }); return r.data || null; };
+export const getTestById = async (id: string): Promise<any | null> => { 
+  console.log('🔵 getTestById called with ID:', id);
+  const r = await apiCall(`/master/tests/${id}`, { method: 'GET' }); 
+  console.log('🔵 API Response:', r);
+  console.log('🔵 Extracted data:', r.data);
+  if (r.data && r.data.categories) {
+    console.log('🔵 Categories found:', r.data.categories.length, 'categories');
+    if (r.data.categories.length > 0) {
+      console.log('🔵 First category:', r.data.categories[0]);
+    }
+  } else {
+    console.log('🔵 ⚠️ No categories or data in response');
+  }
+  return r.data || null; 
+};
 export const createTest = async (d: ApiData): Promise<any> => { const r = await apiCall('/master/tests', { method: 'POST', body: JSON.stringify(d) }); return r.data || r; };
 export const updateTest = async (id: string, d: ApiData): Promise<any> => { const r = await apiCall(`/master/tests/${id}`, { method: 'PUT', body: JSON.stringify(d) }); return r.data || r; };
 export const deleteTest = async (id: string): Promise<ApiResponse> => apiCall(`/master/tests/${id}`, { method: 'DELETE' });

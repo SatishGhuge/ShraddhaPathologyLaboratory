@@ -404,8 +404,12 @@ const AddTest = () => {
             // Set categories if they exist
             if (testData.categories && testData.categories.length > 0) {
               console.log('📂 Categories received:', testData.categories);
-              setCategories(testData.categories.map(category => {
-                console.log('📋 Processing category:', category.name, 'with', category.parameters?.length || 0, 'parameters');
+              console.log('🔴 DEBUG: testData.categories exists?', !!testData.categories);
+              console.log('🔴 DEBUG: testData.categories length:', testData.categories.length);
+              console.log('🔴 DEBUG: categories type:', Array.isArray(testData.categories) ? 'Array' : typeof testData.categories);
+              setCategories(testData.categories.map((category, catIdx) => {
+                console.log(`📋 Processing category ${catIdx}:`, category.name, 'with', category.parameters?.length || 0, 'parameters');
+                console.log(`   Category full data:`, JSON.stringify(category, null, 2));
                 return {
                   categoryId: category.categoryId || crypto.randomUUID(), // ✅ Add fallback for existing tests
                   name: category.name || "",
@@ -419,8 +423,9 @@ const AddTest = () => {
                   parentId: category.parentId || null,
                   parameters: category.parameters && category.parameters.length > 0 
                     ? category.parameters.map(param => {
-                        console.log('🔍 Parameter:', param.parameterName, 'ageRanges:', param.ageRanges);
+                        console.log('🔍 Parameter:', param.parameterName, 'ID:', param.id, 'ageRanges:', param.ageRanges);
                         return {
+                          id: param.id,  // ✅ CRITICAL FIX: Include parameter ID from API response
                           parameterName: param.parameterName || "",
                           machineCode: param.machineCode || "",
                           decimal: param.decimal !== undefined && param.decimal !== "" ? param.decimal : "",
@@ -965,6 +970,7 @@ const AddTest = () => {
         parameters: category.parameters ? category.parameters.filter(param => 
           param.parameterName
         ).map(param => ({
+          id: param.id ? parseInt(param.id) : undefined,  // ✅ Ensure ID is a number, not string
           parameterName: param.parameterName,
           machineCode: param.machineCode || null,
           multiplyBy: param.multiplyBy || null,
@@ -1025,6 +1031,15 @@ const AddTest = () => {
       };
 
       console.log("📤 Sending test data to API:", completeTestData);
+      
+      // 🔍 DEBUG: Log parameter IDs being sent
+      console.log('%c═══ PARAMETER IDs BEING SENT ═══', 'color: #ff00ff; font-weight: bold');
+      completeTestData.categories.forEach((cat, catIdx) => {
+        console.log(`Category ${catIdx}: ${cat.name}`);
+        cat.parameters.forEach((param, paramIdx) => {
+          console.log(`  Param ${paramIdx}: "${param.parameterName}" - ID: ${param.id} (type: ${typeof param.id}, is undefined: ${param.id === undefined})`);
+        });
+      });
       
       // 🔍 DEBUG: Log checkbox values being sent
       console.log('%c═══ CHECKBOX VALUES BEING SENT ═══', 'color: #00ff00; font-weight: bold');
