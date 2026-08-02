@@ -580,6 +580,7 @@ export const getTestById = async (req, res) => {
       if (cat.testParameter) {
         const param = cat.testParameter;
         const parameter = {
+          id: param.id,  // ✅ CRITICAL: Include parameter ID for updates
           parameterName: param.parameterName,
           machineCode: param.machineCode,
           multiplyBy: param.multiplyBy,
@@ -1166,89 +1167,182 @@ export const updateTest = async (req, res) => {
     });
 
     // Handle categories update if provided
+    // 🔄 BEHAVIOR: UPDATE existing parameters/categories, CREATE new ones
     if (categories && categories.length > 0) {
-      console.log('🗑️ Deleting existing categories for test ID:', testId);
-      
-      // Delete existing categories and their parameters
-      await prisma.testCategory.deleteMany({
-        where: { testId: testId }
+      console.log('📋 Processing categories update for test ID:', testId);
+      console.log('📥 RECEIVED CATEGORIES:');
+      categories.forEach((cat, catIdx) => {
+        console.log(`  Category ${catIdx}: ${cat.name}`);
+        if (cat.parameters) {
+          cat.parameters.forEach((param, paramIdx) => {
+            console.log(`    Param ${paramIdx}: "${param.parameterName}" - ID: ${param.id} (type: ${typeof param.id})`);
+          });
+        }
       });
-      
-      console.log('📊 Processing new categories:', categories.length);
 
-      // Create new TestParameters and TestCategories
+      // Helper function to prepare parameter data
+      const prepareParameterData = (param) => ({
+        parameterName: param.parameterName || 'Unnamed',
+        machineCode: param.machineCode || null,
+        multiplyBy: param.multiplyBy || null,
+        decimal: param.decimal ? parseInt(param.decimal) : null,
+        parameterSortOrder: param.sortOrder ? parseInt(param.sortOrder) : null,
+        isDescriptive: param.isDescriptive || false,
+        lowPanic: param.lowPanic ? parseFloat(param.lowPanic) : null,
+        highPanic: param.highPanic ? parseFloat(param.highPanic) : null,
+        isNABL: param.isNABL || false,
+        parameterCode: param.parameterCode || null,
+        hasFormula: param.hasFormula || false,
+        formula: param.formula || null,
+        type: param.type || 'Numeric',
+        isMandatory: param.isMandatory || false,
+        rangeType: param.rangeType || 'BySex',
+        unitId: param.unitId ? parseInt(param.unitId) : null,
+        displayRangeText: param.displayRangeText || null,
+        rangeText: param.rangeText || null,
+        textContent: param.textContent || null,
+        isMultipleOptions: param.isMultipleOptions || false,
+        testMethod: param.testMethod || null,
+        maleLowValue: param.normalRanges?.find(r => r.gender === 'Male')?.lowValue ? 
+          parseFloat(param.normalRanges.find(r => r.gender === 'Male').lowValue) : null,
+        maleHighValue: param.normalRanges?.find(r => r.gender === 'Male')?.highValue ? 
+          parseFloat(param.normalRanges.find(r => r.gender === 'Male').highValue) : null,
+        maleDefaultValue: param.normalRanges?.find(r => r.gender === 'Male')?.defaultValue || null,
+        maleActive: param.normalRanges?.find(r => r.gender === 'Male')?.isActive || false,
+        femaleLowValue: param.normalRanges?.find(r => r.gender === 'Female')?.lowValue ? 
+          parseFloat(param.normalRanges.find(r => r.gender === 'Female').lowValue) : null,
+        femaleHighValue: param.normalRanges?.find(r => r.gender === 'Female')?.highValue ? 
+          parseFloat(param.normalRanges.find(r => r.gender === 'Female').highValue) : null,
+        femaleDefaultValue: param.normalRanges?.find(r => r.gender === 'Female')?.defaultValue || null,
+        femaleActive: param.normalRanges?.find(r => r.gender === 'Female')?.isActive || false,
+        childLowValue: param.normalRanges?.find(r => r.gender === 'Child')?.lowValue ? 
+          parseFloat(param.normalRanges.find(r => r.gender === 'Child').lowValue) : null,
+        childHighValue: param.normalRanges?.find(r => r.gender === 'Child')?.highValue ? 
+          parseFloat(param.normalRanges.find(r => r.gender === 'Child').highValue) : null,
+        childDefaultValue: param.normalRanges?.find(r => r.gender === 'Child')?.defaultValue || null,
+        childActive: param.normalRanges?.find(r => r.gender === 'Child')?.isActive || false,
+        ageRanges: processAgeRangesWithGender(param.ageRanges, param.parameterName),
+        rangeValues: param.rangeValues && param.rangeValues.length > 0 ? JSON.stringify(param.rangeValues) : null,
+        isActive: true
+      });
+
+      // Collect all incoming parameter IDs to keep
+      const incomingParamIds = [];
+      
+      // Process each category
       for (const category of categories) {
         if (category.parameters && category.parameters.length > 0) {
           for (const param of category.parameters) {
-            console.log(`📋 Creating parameter:`, param.parameterName);
-            console.log(`🔍 Parameter testMethod value:`, param.testMethod);
+            console.log(`📝 Processing parameter: ${param.parameterName}`);
+            console.log(`   Raw ID value from request: ${param.id}`);
+            console.log(`   Parsed ID: ${param.id ? parseInt(param.id) : 'null/undefined'} (original type: ${typeof param.id})`);
             
-            // Create TestParameter
-            const testParameter = await prisma.testParameter.create({
-              data: {
-                testId: testId, // ✅ Link parameter to test
-                parameterName: param.parameterName || 'Unnamed',
-                machineCode: param.machineCode || null,
-                multiplyBy: param.multiplyBy || null,
-                decimal: param.decimal ? parseInt(param.decimal) : null,
-                parameterSortOrder: param.sortOrder ? parseInt(param.sortOrder) : null,
-                isDescriptive: param.isDescriptive || false,
-                lowPanic: param.lowPanic ? parseFloat(param.lowPanic) : null,
-                highPanic: param.highPanic ? parseFloat(param.highPanic) : null,
-                isNABL: param.isNABL || false,
-                parameterCode: param.parameterCode || null,
-                hasFormula: param.hasFormula || false,
-                formula: param.formula || null,
-                type: param.type || 'Numeric',
-                isMandatory: param.isMandatory || false,
-                rangeType: param.rangeType || 'BySex',
-                unitId: param.unitId ? parseInt(param.unitId) : null,
-                displayRangeText: param.displayRangeText || null,
-                rangeText: param.rangeText || null,
-                textContent: param.textContent || null,
-                isMultipleOptions: param.isMultipleOptions || false,
-                testMethod: param.testMethod || null,
-                maleLowValue: param.normalRanges?.find(r => r.gender === 'Male')?.lowValue ? 
-                  parseFloat(param.normalRanges.find(r => r.gender === 'Male').lowValue) : null,
-                maleHighValue: param.normalRanges?.find(r => r.gender === 'Male')?.highValue ? 
-                  parseFloat(param.normalRanges.find(r => r.gender === 'Male').highValue) : null,
-                maleDefaultValue: param.normalRanges?.find(r => r.gender === 'Male')?.defaultValue || null,
-                maleActive: param.normalRanges?.find(r => r.gender === 'Male')?.isActive || false,
-                femaleLowValue: param.normalRanges?.find(r => r.gender === 'Female')?.lowValue ? 
-                  parseFloat(param.normalRanges.find(r => r.gender === 'Female').lowValue) : null,
-                femaleHighValue: param.normalRanges?.find(r => r.gender === 'Female')?.highValue ? 
-                  parseFloat(param.normalRanges.find(r => r.gender === 'Female').highValue) : null,
-                femaleDefaultValue: param.normalRanges?.find(r => r.gender === 'Female')?.defaultValue || null,
-                femaleActive: param.normalRanges?.find(r => r.gender === 'Female')?.isActive || false,
-                childLowValue: param.normalRanges?.find(r => r.gender === 'Child')?.lowValue ? 
-                  parseFloat(param.normalRanges.find(r => r.gender === 'Child').lowValue) : null,
-                childHighValue: param.normalRanges?.find(r => r.gender === 'Child')?.highValue ? 
-                  parseFloat(param.normalRanges.find(r => r.gender === 'Child').highValue) : null,
-                childDefaultValue: param.normalRanges?.find(r => r.gender === 'Child')?.defaultValue || null,
-                childActive: param.normalRanges?.find(r => r.gender === 'Child')?.isActive || false,
-                ageRanges: processAgeRangesWithGender(param.ageRanges, param.parameterName),
-                rangeValues: param.rangeValues && param.rangeValues.length > 0 ? JSON.stringify(param.rangeValues) : null,
-                isActive: true
+            // ✅ CRITICAL: Parse ID as integer to handle string or number
+            const parsedId = param.id ? parseInt(param.id) : null;
+            console.log(`   Will ${parsedId ? 'UPDATE' : 'CREATE'} this parameter`);
+
+            let testParameter;
+
+            if (parsedId) {
+              // ✅ EXISTING PARAMETER - UPDATE IT (keep same ID)
+              console.log(`   ↻ Updating existing parameter ID: ${parsedId}`);
+              testParameter = await prisma.testParameter.update({
+                where: { id: parsedId },
+                data: prepareParameterData(param)
+              });
+              incomingParamIds.push(parsedId);
+              console.log(`   ✅ Parameter updated successfully with SAME ID: ${parsedId}`);
+            } else {
+              // ✅ NEW PARAMETER - CREATE IT (new ID generated)
+              console.log(`   ➕ Creating new parameter (no ID provided)`);
+              testParameter = await prisma.testParameter.create({
+                data: {
+                  testId: testId,
+                  ...prepareParameterData(param)
+                }
+              });
+              incomingParamIds.push(testParameter.id);
+              console.log(`   ✅ NEW parameter created with NEW ID: ${testParameter.id}`);
+            }
+
+            // Update or create TestCategory
+            const existingCategory = await prisma.testCategory.findFirst({
+              where: {
+                testId: testId,
+                testParameterId: testParameter.id
               }
             });
 
-            // Create TestCategory linking to TestParameter
-            await prisma.testCategory.create({
-              data: {
-                testId: parseInt(id),
-                testParameterId: testParameter.id,
-                categoryId: category.categoryId, // ✅ Use unique category ID
-                categoryName: category.name ?? "",
-                isCategory: category.isCategory || false,
-                testMethod: category.testMethod || null,
-                sortOrder: category.sortOrder ? parseInt(category.sortOrder) : null
-              }
-            });
-
-            console.log(`✅ Created parameter and category link`);
+            if (existingCategory) {
+              // ✅ UPDATE EXISTING CATEGORY (keep same ID)
+              console.log(`   ↻ Updating existing category ID: ${existingCategory.id}`);
+              await prisma.testCategory.update({
+                where: { id: existingCategory.id },
+                data: {
+                  categoryId: category.categoryId,
+                  categoryName: category.name ?? "",
+                  isCategory: category.isCategory || false,
+                  testMethod: category.testMethod || null,
+                  sortOrder: category.sortOrder ? parseInt(category.sortOrder) : null
+                }
+              });
+              console.log(`   ✅ Category updated successfully with SAME ID: ${existingCategory.id}`);
+            } else {
+              // ✅ CREATE NEW CATEGORY LINK (new ID generated)
+              console.log(`   ➕ Creating new category link`);
+              const newCat = await prisma.testCategory.create({
+                data: {
+                  testId: testId,
+                  testParameterId: testParameter.id,
+                  categoryId: category.categoryId,
+                  categoryName: category.name ?? "",
+                  isCategory: category.isCategory || false,
+                  testMethod: category.testMethod || null,
+                  sortOrder: category.sortOrder ? parseInt(category.sortOrder) : null
+                }
+              });
+              console.log(`   ✅ NEW category link created with NEW ID: ${newCat.id}`);
+            }
           }
         }
       }
+
+      // ✅ DELETE PARAMETERS NOT IN INCOMING LIST
+      console.log(`🗑️ Cleaning up deleted parameters...`);
+      console.log(`📋 Incoming parameter IDs to keep: [${incomingParamIds.join(', ')}]`);
+      
+      const deletedParams = await prisma.testParameter.findMany({
+        where: {
+          testId: testId,
+          id: { notIn: incomingParamIds }
+        }
+      });
+
+      console.log(`🗑️ Found ${deletedParams.length} parameters NOT in incoming list - these will be deleted`);
+
+      for (const param of deletedParams) {
+        console.log(`   🗑️ Deleting parameter ID: ${param.id} (${param.parameterName})`);
+
+        // 1. Delete TestResults linked to this parameter
+        const deletedResults = await prisma.testResult.deleteMany({
+          where: { testParameterId: param.id }
+        });
+        console.log(`      ├─ Deleted ${deletedResults.count} test result(s)`);
+
+        // 2. Delete TestCategories linked to this parameter
+        const deletedCategories = await prisma.testCategory.deleteMany({
+          where: { testParameterId: param.id }
+        });
+        console.log(`      ├─ Deleted ${deletedCategories.count} category link(s)`);
+
+        // 3. Delete the parameter itself
+        await prisma.testParameter.delete({
+          where: { id: param.id }
+        });
+        console.log(`      └─ Parameter deleted from database`);
+      }
+
+      console.log(`✅ Categories processing complete. Deleted ${deletedParams.length} orphaned parameter(s)`);
     }
 
     // Fetch updated test with categories, parameters, and machines
@@ -5536,6 +5630,67 @@ export const importTests = async (req, res) => {
       message: 'Failed to import tests',
       error: error.message,
       data: { errors: [error.message] }
+    });
+  }
+};
+
+
+// ✅ DELETE PARAMETER FROM TEST - Properly removes from TestParameter, TestCategory, and TestResult
+export const deleteTestParameter = async (req, res) => {
+  try {
+    const { parameterId } = req.params;
+    const paramId = parseInt(parameterId);
+
+    console.log(`🗑️ DELETE PARAMETER REQUEST for ID: ${paramId}`);
+
+    // Check if parameter exists
+    const existingParameter = await prisma.testParameter.findUnique({
+      where: { id: paramId }
+    });
+
+    if (!existingParameter) {
+      return res.status(404).json({
+        success: false,
+        message: 'Parameter not found'
+      });
+    }
+
+    console.log(`📋 Parameter found: ${existingParameter.parameterName}`);
+
+    // 1. Delete TestResults linked to this parameter
+    const deletedResults = await prisma.testResult.deleteMany({
+      where: { testParameterId: paramId }
+    });
+    console.log(`   ✅ Deleted ${deletedResults.count} test result(s) linked to this parameter`);
+
+    // 2. Delete TestCategories linked to this parameter
+    const deletedCategories = await prisma.testCategory.deleteMany({
+      where: { testParameterId: paramId }
+    });
+    console.log(`   ✅ Deleted ${deletedCategories.count} category link(s) for this parameter`);
+
+    // 3. Delete the parameter itself
+    await prisma.testParameter.delete({
+      where: { id: paramId }
+    });
+    console.log(`   ✅ Parameter deleted from database`);
+
+    res.json({
+      success: true,
+      message: 'Parameter deleted successfully from database, categories, and test results',
+      data: {
+        deletedParameterId: paramId,
+        parameterName: existingParameter.parameterName,
+        testResultsDeleted: deletedResults.count,
+        categoriesDeleted: deletedCategories.count
+      }
+    });
+  } catch (error) {
+    console.error('❌ Delete parameter error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to delete parameter',
+      error: error.message
     });
   }
 };
