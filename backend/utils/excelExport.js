@@ -18,7 +18,16 @@ export const exportTestsToExcel = async () => {
             unit: { select: { id: true, symbol: true } }
           }
         },
-        categories: true
+        categories: {
+          include: {
+            testParameter: { select: { id: true, parameterName: true } }
+          }
+        },
+        testMachines: {
+          include: {
+            machine: { select: { id: true, name: true } }
+          }
+        }
       },
       orderBy: { name: 'asc' }
     });
@@ -35,7 +44,7 @@ export const exportTestsToExcel = async () => {
       { header: 'Test Code', key: 'testCode', width: 15 },
       { header: 'Department', key: 'department', width: 20 },
       { header: 'Sample Type', key: 'sampleType', width: 15 },
-      { header: 'Machine Name', key: 'machineName', width: 15 },
+      { header: 'Machine Names', key: 'machineNames', width: 25 },
       { header: 'Group', key: 'group', width: 15 },
       { header: 'Report Header', key: 'reportHeader', width: 20 },
       { header: 'Preparation Type', key: 'preparationType', width: 15 },
@@ -56,13 +65,16 @@ export const exportTestsToExcel = async () => {
 
     // Add test rows
     tests.forEach(test => {
+      // Get all machine names for this test (comma-separated)
+      const machineNames = test.testMachines?.map(tm => tm.machine.name).join(', ') || '';
+      
       testsSheet.addRow({
         name: test.name,
         shortName: test.shortName || '',
         testCode: test.testCode || '',
         department: test.department?.name || '',
         sampleType: test.sample_type?.Sample_Type || '',
-        machineName: test.machineName || '',
+        machineNames: machineNames,
         group: test.group || '',
         reportHeader: test.reportHeader || '',
         preparationType: test.preparationType || '',
@@ -111,6 +123,8 @@ export const exportTestsToExcel = async () => {
       { header: 'Female High', key: 'femaleHighValue', width: 12 },
       { header: 'Child Low', key: 'childLowValue', width: 12 },
       { header: 'Child High', key: 'childHighValue', width: 12 },
+      { header: 'Age Ranges (JSON)', key: 'ageRanges', width: 40 },
+      { header: 'Range Values (JSON)', key: 'rangeValues', width: 40 },
       { header: 'Is NABL', key: 'isNABL', width: 10 },
       { header: 'Is Active', key: 'isActive', width: 10 },
       { header: 'Sort Order', key: 'parameterSortOrder', width: 12 }
@@ -140,6 +154,8 @@ export const exportTestsToExcel = async () => {
           femaleHighValue: param.femaleHighValue || '',
           childLowValue: param.childLowValue || '',
           childHighValue: param.childHighValue || '',
+          ageRanges: param.ageRanges || '',
+          rangeValues: param.rangeValues || '',
           isNABL: param.isNABL ? 'Yes' : 'No',
           isActive: param.isActive ? 'Yes' : 'No',
           parameterSortOrder: param.parameterSortOrder || ''
@@ -157,6 +173,7 @@ export const exportTestsToExcel = async () => {
     
     categoriesSheet.columns = [
       { header: 'Test Name', key: 'testName', width: 25 },
+      { header: 'Parameter Name', key: 'parameterName', width: 25 },
       { header: 'Category Name', key: 'categoryName', width: 25 },
       { header: 'Category Code', key: 'categoryId', width: 15 },
       { header: 'Is Category', key: 'isCategory', width: 12 },
@@ -169,7 +186,8 @@ export const exportTestsToExcel = async () => {
       test.categories?.forEach(cat => {
         categoriesSheet.addRow({
           testName: test.name,
-          categoryName: cat.categoryName || '',
+          parameterName: cat.testParameter?.parameterName || '',
+          categoryName: cat.categoryName || '',  // Can be empty/null - that's valid
           categoryId: cat.categoryId || '',
           isCategory: cat.isCategory ? 'Yes' : 'No',
           testMethod: cat.testMethod || '',
