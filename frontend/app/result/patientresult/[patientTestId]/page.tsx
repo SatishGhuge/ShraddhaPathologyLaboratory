@@ -19,7 +19,7 @@ const LetterHead = "/LetterHead.jpeg";
 // Text can be edited directly, formatted with Ctrl+B for bold
 // Shows [bold text] with visual formatting in report
 // Ctrl+B to make selected text bold
-const SuggestionInput = ({ value, onChange, options, isAbnormal }) => {
+const SuggestionInput = ({ value, onChange, options, isAbnormal, panicInfo }) => {
   const [show, setShow] = useState(false);
   const [searchInput, setSearchInput] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -51,7 +51,8 @@ const SuggestionInput = ({ value, onChange, options, isAbnormal }) => {
     const newValue = e.target.value;
     onChange(newValue);
     setSearchInput(newValue.split(',').pop()?.trim() || '');
-    if (newValue) setShow(true);
+    // Show suggestions if there's any input
+    setShow(true);
   };
 
   // Handle Ctrl+B for bold formatting
@@ -94,7 +95,7 @@ const SuggestionInput = ({ value, onChange, options, isAbnormal }) => {
           value={value || ''}
           onChange={handleInputChange}
           onKeyDown={handleKeyDown}
-          onFocus={() => searchInput && setShow(true)}
+          onFocus={() => setShow(true)}
           placeholder="Type values or select from options... (Ctrl+B for bold)"
           className="outline-none text-xs w-full bg-transparent text-black resize-vertical font-sans border-none"
           style={{
@@ -127,6 +128,20 @@ const SuggestionInput = ({ value, onChange, options, isAbnormal }) => {
       {value && (
         <div className="text-xs text-gray-500 mt-1" style={{ fontSize: '11px' }}>
           💡 Tip: Select text and press Ctrl+B to make it <strong>bold</strong> (shows as &lt;b&gt;text&lt;/b&gt; in editor)
+        </div>
+      )}
+
+      {/* Display panic range alert if abnormal */}
+      {isAbnormal && panicInfo && (
+        <div className="mt-2 p-2 bg-red-100 border border-red-400 rounded text-xs text-red-800">
+          <strong>⚠️ OUT OF PANIC RANGE:</strong>
+          <div>Value: <strong>{panicInfo.value}</strong></div>
+          <div>Low Panic: <strong>{panicInfo.lowPanic}</strong> | High Panic: <strong>{panicInfo.highPanic}</strong></div>
+          <div className="mt-1 text-red-700">
+            {panicInfo.value < panicInfo.lowPanic 
+              ? `🔴 ${panicInfo.value} is BELOW Low Panic (${panicInfo.lowPanic})` 
+              : `🔴 ${panicInfo.value} is ABOVE High Panic (${panicInfo.highPanic})`}
+          </div>
         </div>
       )}
     </div>
@@ -956,6 +971,29 @@ const PatientResult = () => {
   const handleResultChange = (parameterId, field, value, allParams) => {
     setResults(prev => {
       const updated = { ...prev, [parameterId]: { ...prev[parameterId], [field]: value } };
+      
+      // Find the parameter to check for panic ranges
+      const parameter = (allParams || parameters).find(p => p.id === parameterId);
+      
+      // ✅ NEW: Check if text value contains numeric and has panic ranges
+      if (field === 'textValue' && parameter) {
+        // Extract first numeric value from the text
+        const numericMatch = value?.match(/^[\d.]+/);
+        // ✅ Check for BOTH isDescriptive AND type === 'Text' with panic ranges
+        const isTextType = parameter.type === 'Text' || parameter.isDescriptive;
+        const hasPanicRanges = parameter.lowPanic !== null && parameter.highPanic !== null && parameter.lowPanic !== undefined && parameter.highPanic !== undefined;
+        
+        if (numericMatch && isTextType && hasPanicRanges) {
+          const numericValue = parseFloat(numericMatch[0]);
+          if (!isNaN(numericValue)) {
+            // Check against panic ranges
+            const isAbnormal = numericValue < parameter.lowPanic || numericValue > parameter.highPanic;
+            updated[parameterId] = { ...updated[parameterId], isAbnormal: isAbnormal };
+            console.log(`🔴 PANIC RANGE CHECK: Parameter "${parameter.parameterName}" (Type: ${parameter.type}, Descriptive: ${parameter.isDescriptive}) - Value: ${numericValue}, Low Panic: ${parameter.lowPanic}, High Panic: ${parameter.highPanic}, Abnormal: ${isAbnormal}`);
+          }
+        }
+      }
+      
       (allParams || parameters).forEach(param => {
         if (param.hasFormula && param.formula) {
           const calculated = evaluateFormula(param.formula, allParams || parameters, updated);
@@ -1734,6 +1772,23 @@ const PatientResult = () => {
                                       }}
                                     />
                                   </div>
+                                ) : param.type === 'Text' ? (
+                                  (() => {
+                                    const rawRange = param.rangeText || param.displayRangeText || '';
+                                    const options = rawRange
+                                      ? rawRange.split(/[,|]/).map(o => o.trim()).filter(Boolean)
+                                      : [];
+                                    return options.length > 0 ? (
+                                      <SuggestionInput
+                                        value={results[param.id]?.textValue ?? (param.textContent || '')}
+                                        onChange={(val) => handleResultChange(param.id, 'textValue', val, parameters)}
+                                        options={options}
+                                        isAbnormal={results[param.id]?.isAbnormal}
+                                      />
+                                    ) : (
+                                      <input type="text" value={results[param.id]?.textValue || ''} onChange={(e) => handleResultChange(param.id, 'textValue', e.target.value, parameters)} className={`border px-2 py-1 w-32 rounded ${results[param.id]?.isAbnormal ? "border-red-500 bg-red-50" : "border-gray-300"}`} />
+                                    );
+                                  })()
                                 ) : (
                                   (() => {
                                     const rawRange = param.rangeText || param.displayRangeText || '';
