@@ -364,7 +364,7 @@ export default function Result() {
       Registered: 0,
       Received: 0,
       Entered: 0,
-      Validation: 0,
+      Validated: 0,
       Authorized: 0,
       Delivered: 0,
       Rectified: 0
@@ -1659,7 +1659,7 @@ export default function Result() {
         // Find first test with single parameter in editable stage
         const firstEditableTest = results.find(
           test => test.parameter_count === 1 && 
-                  (test.result_status === 'Entered' || test.result_status === 'Validation')
+                  (test.result_status === 'Entered' || test.result_status === 'Validated')
         );
         
         if (firstEditableTest && inlineInputRefs.current[firstEditableTest.test_id]) {
@@ -1677,7 +1677,7 @@ export default function Result() {
       const statusMap = {
         'Provisional': 'Entered',
         'Authenticated': 'Authorized',
-        'Validated': 'Validation'
+        'Validated': 'Validated'
       };
       
       const testStatus = statusMap[test.result_status] || test.result_status;
@@ -1775,8 +1775,8 @@ export default function Result() {
       }
       
       // Determine which modal to show based on current status
-      if (status === 'Validation') {
-        // Status is Validation → Show Authenticate modal (next stage is Authorized)
+      if (status === 'Validated') {
+        // Status is Validated → Show Authenticate modal (next stage is Authorized)
         console.log('✅ Opening Authenticate modal for next stage');
         setAuthenticateData({
           patientTest: testData.patientTest,
@@ -1842,7 +1842,7 @@ export default function Result() {
       // Tab or Shift+Tab to navigate to next/previous result field
       e.preventDefault();
       const currentEditingTests = results.filter(t => 
-        t.parameter_count === 1 && (t.result_status === 'Entered' || t.result_status === 'Validation')
+        t.parameter_count === 1 && (t.result_status === 'Entered' || t.result_status === 'Validated')
       );
       const currentIndex = currentEditingTests.findIndex(t => t.test_id === test.test_id);
       
@@ -1867,7 +1867,7 @@ export default function Result() {
       // Down arrow to move to next result field
       e.preventDefault();
       const currentEditingTests = results.filter(t => 
-        t.parameter_count === 1 && (t.result_status === 'Entered' || t.result_status === 'Validation')
+        t.parameter_count === 1 && (t.result_status === 'Entered' || t.result_status === 'Validated')
       );
       const currentIndex = currentEditingTests.findIndex(t => t.test_id === test.test_id);
       
@@ -1883,7 +1883,7 @@ export default function Result() {
       // Up arrow to move to previous result field
       e.preventDefault();
       const currentEditingTests = results.filter(t => 
-        t.parameter_count === 1 && (t.result_status === 'Entered' || t.result_status === 'Validation')
+        t.parameter_count === 1 && (t.result_status === 'Entered' || t.result_status === 'Validated')
       );
       const currentIndex = currentEditingTests.findIndex(t => t.test_id === test.test_id);
       
@@ -2225,7 +2225,7 @@ export default function Result() {
           const statusMap = {
             'Provisional': 'Entered',
             'Authenticated': 'Authorized',
-            'Validated': 'Validation'
+            'Validated': 'Validated'
           };
           
           const testStatus = statusMap[test.result_status] || test.result_status;
@@ -2270,7 +2270,7 @@ export default function Result() {
     const statusMap = {
       'Provisional': 'Entered',
       'Authenticated': 'Authorized',
-      'Validated': 'Validation'
+      'Validated': 'Validated'
     };
     
     const displayStatus = statusMap[pascalStatus] || pascalStatus;
@@ -2282,7 +2282,7 @@ export default function Result() {
         return "bg-orange-100 text-orange-800";
       case "Entered":
         return "bg-purple-100 text-purple-800";
-      case "Validation":
+      case "Validated":
         return "bg-yellow-100 text-yellow-800";
       case "Authorized":
         return "bg-blue-100 text-blue-800";
@@ -2479,13 +2479,13 @@ export default function Result() {
                   </h3>
                 </div>
                 <div 
-                  onClick={() => setSelectedStatus("Validation")}
+                  onClick={() => setSelectedStatus("Validated")}
                   className={`rounded-lg p-1 text-center cursor-pointer hover:shadow-md transition-shadow ${
-                    selectedStatus === "Validation" ? "bg-yellow-200 ring-2 ring-yellow-600" : "bg-yellow-100"
+                    selectedStatus === "Validated" ? "bg-yellow-200 ring-2 ring-yellow-600" : "bg-yellow-100"
                   }`}
                 >
                   <h3 className="text-yellow-800 font-semibold text-[11px]">
-                    Validation ({statistics.byStatus.Validation})
+                    Validated ({statistics.byStatus.Validated})
                   </h3>
                 </div>
                 <div 
@@ -2925,8 +2925,8 @@ export default function Result() {
                                 >
                                   Parameter
                                 </span>
-                              ) : test.parameter_count === 1 && (test.result_status === 'Entered' || test.result_status === 'Validation') ? (
-                                // Single parameter in Entered or Validation stage - show inline input with black text
+                              ) : test.parameter_count === 1 && (test.result_status === 'Entered' || test.result_status === 'Validated') ? (
+                                // Single parameter in Entered or Validated stage - show inline input with black text
                                 <input
                                   ref={(el) => {
                                     if (el) inlineInputRefs.current[test.test_id] = el;
@@ -2970,7 +2970,7 @@ export default function Result() {
                                   }}
                                   tabIndex={0}
                                   role="button"
-                                  title={test.result_status === 'Validation' ? 'Press Enter to edit this value' : 'Read-only in this stage'}
+                                  title={test.result_status === 'Validated' ? 'Press Enter to edit this value' : 'Read-only in this stage'}
                                 >
                                   {test.isOutsourced ? (
                                     <span 
@@ -2984,7 +2984,7 @@ export default function Result() {
                                       <span>⚠️</span>
                                       <span>OUTSOURCING</span>
                                     </span>
-                                  ) : test.result_status === 'Entered' || test.result_status === 'Validation' || test.result_status === 'Authorized' || test.result_status === 'Delivered' 
+                                  ) : test.result_status === 'Entered' || test.result_status === 'Validated' || test.result_status === 'Authorized' || test.result_status === 'Delivered' 
                                     ? (test.result || '-') 
                                     : '-'}
                                 </span>
@@ -3247,9 +3247,9 @@ export default function Result() {
                     }
                     try {
                       for (const testId of testsToValidate) {
-                        await updateTestStatus(testId.toString(), { status: 'Validation' });
+                        await updateTestStatus(testId.toString(), { status: 'Validated' });
                       }
-                      alert(`${testsToValidate.length} test(s) moved to Validation stage`);
+                      alert(`${testsToValidate.length} test(s) moved to Validated stage`);
                       fetchResults();
                       setSelectedTests(new Set());
                     } catch (err) {
@@ -3500,7 +3500,7 @@ export default function Result() {
                                 <option value="Registered">Registered</option>
                                 <option value="Received">Received</option>
                                 <option value="Entered">Entered</option>
-                                <option value="Validation">Validation</option>
+                                <option value="Validation">Validated</option>
                                 <option value="Authorized">Authorized</option>
                                 <option value="Delivered">Delivered</option>
                                 <option value="Rectified">Rectified</option>
