@@ -286,6 +286,7 @@ export const getPatientTests = async (req, res) => {
         image_size: patientTest.test.imageSize,
         attachment_path: patientTest.attachmentPath || null,
         specimen_type: patientTest.test.sample_type?.Sample_Type || patientTest.sample || "N/A",
+        sampleTypeId: patientTest.test.sampleTypeId || 1,  // ✅ ADD SAMPLE TYPE ID FOR BARCODE
         ref_by: patientTest.referralDoctor || 'SELF',
         result_status: normalizeStatus(patientTest.status),
         status: patientTest.status,

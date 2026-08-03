@@ -3,23 +3,12 @@
 import { useRouter, useSearchParams } from "next/navigation";
 import React, { useState, useEffect, useRef } from "react";
 import ReactDOM from "react-dom/client";
-import {
-  RefreshCcw,
-  Download,
-  Printer,
-  Mail,
-  Search,
-  FileText,
-  Calendar,
-  Settings,
-  Barcode,
-  ChevronDown,
-  Upload,
-  FileCheck,
-} from "lucide-react";
+import { RefreshCcw, Download, Printer, Mail, Search, FileText, Calendar, Settings, Barcode, ChevronDown, Upload, FileCheck } from "lucide-react";
+import JsBarcode from "jsbarcode";
 import BarcodeModal, { generateBarcodeLabels } from "@/app/components/BarcodeModal";
 import ProfessionalReport from "@/app/components/ProfessionalReport";
 import API_BASE_URL from "@/src/api/config";
+import { generateCompactBarcodePrintHtml } from "@/app/utils/barcodePrintUtils";
 
 import { FaWhatsapp } from "react-icons/fa";
 import html2pdf from "html2pdf.js";
@@ -436,7 +425,7 @@ export default function Result() {
     loadLetterhead();
   }, []);
 
-  // Barcode Scanner - Capture barcode input from hardware scanner
+  // Barcode Scanner - Capture barcode input from hardware scanner (works globally on this page)
   React.useEffect(() => {
     let barcodeBuffer = '';
     let barcodeTimeout: any;
@@ -458,6 +447,8 @@ export default function Result() {
         barcodeBuffer = '';
         clearTimeout(barcodeTimeout);
 
+        console.log('📱 Barcode detected:', barcode);
+
         try {
           // Parse barcode via API
           const response = await fetch(`${API_BASE_URL}/result/parse-barcode`, {
@@ -469,28 +460,26 @@ export default function Result() {
           const data = await response.json();
 
           if (data.success) {
-            console.log('✅ Barcode scanned:', {
+            console.log('✅ Barcode parsed successfully:', {
               visitId: data.visitId,
               sampleId: data.sampleId,
               barcode: data.barcode
             });
             // Barcode processed successfully
-            // No UI notification - silent operation
           } else {
-            console.error('❌ Barcode error:', data.message);
+            console.error('❌ Barcode parsing failed:', data.message);
           }
         } catch (error) {
-          console.error('❌ Barcode scan error:', error);
+          console.error('❌ Barcode API error:', error);
         }
-      } else if (e.key.length === 1) {
-        // Accumulate barcode characters
+      } else if (e.key.length === 1 && e.key.match(/[0-9\-]/)) {
+        // Accumulate barcode characters (only numbers and dash)
         barcodeBuffer += e.key;
 
         // Reset timeout
         clearTimeout(barcodeTimeout);
         barcodeTimeout = setTimeout(() => {
           if (barcodeBuffer.length > 5) {
-            // Only process if buffer has reasonable length
             barcodeBuffer = '';
           }
         }, 100);
@@ -793,64 +782,15 @@ export default function Result() {
     if (!targetPatient) return;
 
     const selectedTestsList = (targetPatient as any).tests.filter((t: any) => barcodeSelectedTests.has(t.test_id));
-    const now = new Date();
-    const dateStr = now.toLocaleDateString('en-GB');
-    const timeStr = now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: true }).toUpperCase();
-
-    // Group by specimen type — one label per unique specimen
-    // Multiple tests with same specimen → one barcode, short names joined with " / "
-    const specimenGroups = {};
-    const specimenTestIds = {};
-    const specimenTestStatuses = {}; // Track ALL test statuses for each specimen group
-    const specimenBarcodeStatuses = {}; // Track ALL barcode statuses for each specimen group
     
-    selectedTestsList.forEach(t => {
-      const key = (t as any).specimen_type || 'Unknown';
-      if (!specimenGroups[key]) {
-        specimenGroups[key] = [];
-        specimenTestIds[key] = [];
-        specimenTestStatuses[key] = []; // Store array of all test statuses
-        specimenBarcodeStatuses[key] = []; // Store array of all barcode statuses
-      }
-      specimenGroups[key].push((t as any).test_short_name || (t as any).test_name);
-      specimenTestIds[key].push((t as any).test_id);
-      specimenTestStatuses[key].push((t as any).status || 'Registered'); // Store each test's status
-      specimenBarcodeStatuses[key].push((t as any).barcode_status || 'Unprinted'); // Store each barcode's status
-    });
+    // ✅ USE CENTRALIZED FUNCTION FOR CONSISTENT BARCODE GENERATION EVERYWHERE
+    const labels = generateBarcodeLabels(
+      selectedTestsList,
+      (targetPatient as any).visit_id,
+      (targetPatient as any).organizationCode || ''
+    );
 
-    // Build labels — barcode value = visitId for first specimen, visitId-2, visitId-3 ...
-    const specimenEntries = Object.entries(specimenGroups);
-    const labels = specimenEntries.map(([specimen, shortNames]: any, idx: number) => {
-      const statuses = specimenTestStatuses[specimen] || [];
-      const barcodeStatuses = specimenBarcodeStatuses[specimen] || [];
-      
-      // Determine final status: if ANY test is "Received", use "Received"
-      // Otherwise, if ANY barcode is "Printed", use "Printed"
-      // Otherwise use "Registered" (no test received yet)
-      let finalSampleStatus = 'Registered';
-      let finalBarcodeStatus = 'Unprinted';
-      
-      // Check if any test has been received
-      if (statuses.includes('Received')) {
-        finalSampleStatus = 'Received';
-      }
-      
-      // Check if any barcode has been printed
-      if (barcodeStatuses.includes('Printed')) {
-        finalBarcodeStatus = 'Printed';
-      }
-      
-      return {
-        barcodeValue: `${(targetPatient as any).visit_id}-${idx + 1}`,
-        specimen,
-        shortNamesStr: (shortNames as any[]).join(' / '),
-        dateStr,
-        timeStr,
-        testIds: specimenTestIds[specimen] || [],
-        sampleStatus: finalSampleStatus,
-        barcode_status: finalBarcodeStatus,
-      };
-    });
+    console.log('✅ Generated barcode labels using centralized function:', labels);
 
     const genderInitial = (targetPatient as any).gender ? (targetPatient as any).gender.charAt(0).toUpperCase() : '';
     const age = (targetPatient as any).age || '';
@@ -865,15 +805,9 @@ export default function Result() {
       organizationCode: (targetPatient as any).organizationCode || '', // ✅ Include organization code
     });
     
-    // Add organizationCode to each label
-    const labelsWithOrgCode = labels.map(label => ({
-      ...label,
-      organizationCode: (targetPatient as any).organizationCode || '', // ✅ Add org code to barcode labels
-    }));
-    
-    setBarcodeLabels(labelsWithOrgCode);
-    // Initialize NO barcodes as selected (user must manually select them)
-    setSelectedBarcodeIndices(new Set());
+    setBarcodeLabels(labels);
+    // ✅ Initialize ALL barcodes as selected by default
+    setSelectedBarcodeIndices(new Set(labels.map((_, idx) => idx)));
     setShowBarcodeModal(true);
   };
 
@@ -3808,86 +3742,120 @@ export default function Result() {
             }, 100);
           }
         }}
-        onPrintAndUpdate={async () => {
-          let successCount = 0;
+      onPrintAndUpdate={async () => {
+        let successCount = 0;
+        
+        try {
+          // Only process selected barcodes - collect test IDs from selected barcode labels
+          const selectedTestIds = new Set<number>();
           
-          try {
-            // Only process selected barcodes - collect test IDs from selected barcode labels
-            const selectedTestIds = new Set<number>();
-            
-            for (const idx of selectedBarcodeIndices) {
-              if (idx < barcodeLabels.length) {
-                const label = barcodeLabels[idx];
-                if (label.testIds && Array.isArray(label.testIds)) {
-                  label.testIds.forEach((id: number) => selectedTestIds.add(id));
-                }
+          for (const idx of selectedBarcodeIndices) {
+            if (idx < barcodeLabels.length) {
+              const label = barcodeLabels[idx];
+              if (label.testIds && Array.isArray(label.testIds)) {
+                label.testIds.forEach((id: number) => selectedTestIds.add(id));
               }
             }
-            
-            console.log('📝 Selected Test IDs:', Array.from(selectedTestIds));
-            console.log(`🖨️ Printing ${selectedBarcodeIndices.size}/${barcodeLabels.length} barcodes`);
-            
-            // Update status for selected tests
-            for (const testId of selectedTestIds) {
-              console.log(`🔄 Transitioning test ${testId} to Received status...`);
+          }
+          
+          console.log('📝 Selected Test IDs:', Array.from(selectedTestIds));
+          console.log(`🖨️ Printing ${selectedBarcodeIndices.size}/${barcodeLabels.length} barcodes`);
+          
+          // Update status for selected tests
+          for (const testId of selectedTestIds) {
+            console.log(`🔄 Transitioning test ${testId} to Received status...`);
+            try {
+              const response = await fetch(`${API_BASE_URL}/results/${testId}/auto-transition/barcode-printed`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ changedBy: 'search_booking' })
+              });
+              const data = await response.json();
+              if (data.success) {
+                console.log(`✅ Test ${testId} transitioned to Received`);
+                successCount++;
+              } else {
+                console.error(`❌ Test ${testId} failed:`, data.message);
+              }
+            } catch (error) {
+              console.error(`❌ Test ${testId} error:`, error);
+            }
+          }
+        } catch (error) {
+          console.error('⚠️ Status transition failed:', error);
+        }
+        
+        // Now print the barcodes after status update using generateCompactBarcodePrintHtml
+        setTimeout(() => {
+          console.log('📄 Status updated, now printing barcodes with proper format...');
+          
+          // Filter only selected barcodes
+          const selectedBarcodeLabels = Array.from(selectedBarcodeIndices)
+            .map(idx => barcodeLabels[idx])
+            .filter(label => label !== undefined);
+          
+          if (selectedBarcodeLabels.length === 0) {
+            console.error('No selected barcodes to print');
+            return;
+          }
+          
+          // Generate print HTML using the same function as Print Only button
+          const printHtml = generateCompactBarcodePrintHtml(
+            selectedBarcodeLabels.map(label => ({
+              barcodeValue: label.barcodeValue,
+              specimen: label.specimen,
+              shortNamesStr: label.shortNamesStr,
+              dateStr: label.dateStr,
+              timeStr: label.timeStr,
+              organizationCode: label.organizationCode
+            })),
+            {
+              patientName: barcodePatientInfo.patientName,
+              gender: barcodePatientInfo.gender,
+              age: barcodePatientInfo.age,
+              visitId: barcodePatientInfo.visitId
+            },
+            (value: string) => {
               try {
-                const response = await fetch(`${API_BASE_URL}/results/${testId}/auto-transition/barcode-printed`, {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ changedBy: 'result_page' })
+                const svgElement = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+                svgElement.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+                
+                JsBarcode(svgElement, value, {
+                  format: 'CODE128',
+                  width: 2,
+                  height: 40,
+                  margin: 0,
+                  lineColor: '#000000',
+                  displayValue: false,
+                  background: '#ffffff'
                 });
-                const data = await response.json();
-                if (data.success) {
-                  console.log(`✅ Test ${testId} transitioned to Received`);
-                  successCount++;
-                } else {
-                  console.error(`❌ Test ${testId} failed:`, data.message);
-                }
+                
+                return svgElement.innerHTML;
               } catch (error) {
-                console.error(`❌ Test ${testId} error:`, error);
+                console.error('❌ Barcode generation error:', error);
+                return '';
               }
             }
-          } catch (error) {
-            console.error('⚠️ Status transition failed:', error);
-          }
+          );
           
-          // Print only the selected barcodes
-          const printArea = document.getElementById('barcode-print-area');
-          if (!printArea) {
-            console.error('Barcode print area not found');
-            return;
-          }
-          const allLabels = printArea.querySelectorAll('[data-barcode-index]');
+          // Use iframe to print with proper formatting
+          const iframe = document.createElement('iframe');
+          iframe.style.display = 'none';
+          document.body.appendChild(iframe);
           
-          // Create a new container with only selected labels
-          const selectedLabelsHtml = Array.from(allLabels)
-            .map((label, idx) => {
-              if (selectedBarcodeIndices.has(idx)) {
-                return (label as HTMLElement).outerHTML;
-              }
-              return '';
-            })
-            .filter(html => html.length > 0)
-            .join('');
-          
-          const win = window.open('', '_blank');
-          if (!win) {
-            console.error('Could not open print window');
-            return;
+          if (iframe.contentDocument) {
+            iframe.contentDocument.open();
+            iframe.contentDocument.write(printHtml);
+            iframe.contentDocument.close();
+            
+            setTimeout(() => {
+              iframe.contentWindow?.print();
+              // Remove iframe after printing
+              setTimeout(() => {
+                document.body.removeChild(iframe);
+              }, 500);
+            }, 300);
           }
-          win.document.write(`<!DOCTYPE html><html><head><title>Barcode Labels</title>
-            <style>
-              * { margin:0; padding:0; box-sizing:border-box; }
-              body { font-family: Arial, sans-serif; background: white; padding: 8mm; }
-              .labels-wrap { display: flex; flex-wrap: wrap; gap: 6mm; justify-content: flex-start; }
-              .label { width: 58mm; border: 2px solid; padding: 3px; page-break-inside: avoid; }
-              @page { size: A4; margin: 8mm; }
-              @media print { body { padding: 0; } .labels-wrap { gap: 4mm; } }
-            </style>
-          </head><body><div class="labels-wrap">${selectedLabelsHtml}</div></body></html>`);
-          win.document.close();
-          win.focus();
-          win.print();
           
           setShowBarcodeModal(false);
           setBarcodeSelectedTests(new Set());
@@ -3902,7 +3870,8 @@ export default function Result() {
               fetchResults();
             }, 800);
           }
-        }}
+        }, 500);
+      }}
         barcodeLabels={barcodeLabels}
         barcodePatientInfo={barcodePatientInfo}
         selectedBarcodes={selectedBarcodeIndices}

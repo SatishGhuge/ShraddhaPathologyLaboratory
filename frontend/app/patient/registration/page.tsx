@@ -5,7 +5,9 @@ import { useRouter } from "next/navigation";
 import BarcodeModal, { generateBarcodeLabels, getSampleTypeId, getSampleTypeName, getTestName } from "@/app/components/BarcodeModal";
 import ReferralDoctorModal from "@/src/components/ReferralDoctorModal";
 import API_BASE_URL from "@/src/api/config";
+import JsBarcode from "jsbarcode";
 import {RefreshCcw,Star,X,Calendar,UserPlus,ChevronDown,Printer,Download,} from "lucide-react";
+import { generateCompactBarcodePrintHtml } from "@/app/utils/barcodePrintUtils";
 import { createPatient, searchPatient } from "@/src/api/patient";
 import { getDoctors, createDoctor, getSpecimenTypes, getOrganizations, getTestCharges } from "@/src/api/master";
 import { searchLocations } from "@/src/data/maharashtraLocations";
@@ -35,7 +37,7 @@ function InlineDatePicker({ value, onChange, placeholder = "DD-MM-YYYY", maxDate
   const [showMonthYear, setShowMonthYear] = useState(false);
   const [inputText, setInputText] = useState(dpToDisplay(value));
   const [inputError, setInputError] = useState(false);
-  const ref = useRef(null);
+  const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => { setInputText(dpToDisplay(value)); setInputError(false); }, [value]);
   useEffect(() => {
@@ -60,15 +62,15 @@ function InlineDatePicker({ value, onChange, placeholder = "DD-MM-YYYY", maxDate
     setInputText(fmt);
     if (digits.length === 8) {
       const internal = dpToInternal(digits);
-      if (internal) { setInputError(false); onChange(internal); }
+      if (internal) { setInputError(false); onChange?.(internal); }
       else setInputError(true);
-    } else if (digits.length === 0) { setInputError(false); onChange(""); }
+    } else if (digits.length === 0) { setInputError(false); onChange?.(""); }
     else setInputError(false);
   };
 
   const handleDayClick = (day: any) => {
     const mm = String(viewMonth+1).padStart(2,"0"), dd = String(day).padStart(2,"0");
-    onChange(`${viewYear}-${mm}-${dd}`); setOpen(false);
+    onChange?.(`${viewYear}-${mm}-${dd}`); setOpen(false);
   };
   const prevMonth = () => { if (viewMonth===0){setViewMonth(11);setViewYear(y=>y-1);}else setViewMonth(m=>m-1); };
   const nextMonth = () => { if (viewMonth===11){setViewMonth(0);setViewYear(y=>y+1);}else setViewMonth(m=>m+1); };
@@ -93,7 +95,7 @@ function InlineDatePicker({ value, onChange, placeholder = "DD-MM-YYYY", maxDate
       <div className={`h-8 rounded border flex items-center bg-white overflow-hidden
         ${inputError ? "border-red-400 ring-1 ring-red-400" : "border-slate-300 focus-within:ring-1 focus-within:ring-orange-500 focus-within:border-gray-300"}`}>
         <input type="text" value={inputText} onChange={handleInputChange}
-          onBlur={() => { const d=inputText.replace(/\D/g,""); if(d.length>0&&d.length<8) setInputError(true); else if(d.length===0){setInputError(false);onChange("");} }}
+          onBlur={() => { const d=inputText.replace(/\D/g,""); if(d.length>0&&d.length<8) setInputError(true); else if(d.length===0){setInputError(false);onChange?.("");} }}
           placeholder={placeholder} maxLength={10}
           className="flex-1 min-w-0 px-2 outline-none bg-transparent text-gray-800 placeholder-gray-400 text-xs h-full" />
         <button type="button" tabIndex={-1} onClick={() => setOpen(o=>!o)}
@@ -169,7 +171,7 @@ function InlineDatePicker({ value, onChange, placeholder = "DD-MM-YYYY", maxDate
 /* ------------------ INLINE CUSTOM SELECT ------------------ */
 function InlineSelect({ value, onChange, options, placeholder = "Select", className = "" }: { value?: any; onChange?: (value: any) => void; options: any[]; placeholder?: string; className?: string }) {
   const [open, setOpen] = useState(false);
-  const ref = useRef(null);
+  const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const h = (e: any) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
     document.addEventListener("mousedown", h);
@@ -191,7 +193,7 @@ function InlineSelect({ value, onChange, options, placeholder = "Select", classN
               const val = opt.value ?? opt, lbl = opt.label ?? opt;
               const isSel = val === value;
               return (
-                <div key={i} onClick={() => { onChange(val); setOpen(false); }}
+                <div key={i} onClick={() => { onChange?.(val); setOpen(false); }}
                   className={`px-4 py-2.5 text-xs cursor-pointer transition-colors
                     ${isSel ? "bg-white text-gray-700 font-semibold" : "text-gray-700 hover:bg-gray-50"}
                     ${i < options.length-1 ? "border-b border-gray-100" : ""}`}>
@@ -290,7 +292,7 @@ const calculateBabyAgeFormatted = (dobString: string): { formattedAge: string; y
       }
       
       // Format the age string: "1 month 3 days", "5 days", "2 months"
-      const parts = [];
+      const parts: string[] = [];
       if (months > 0) {
         parts.push(`${months} month${months === 1 ? '' : 's'}`);
       }
@@ -316,17 +318,32 @@ const calculateBabyAgeFormatted = (dobString: string): { formattedAge: string; y
   }
 };
 
+/* ------------------ TYPE DEFINITIONS ------------------ */
+interface RebookingData {
+  firstName?: string;
+  lastName?: string;
+  visitDate?: string;
+  age?: string | number;
+  mobile?: string;
+  email?: string;
+  address?: string;
+  location?: string;
+  remark?: string;
+  gender?: string;
+  referralDoctor?: string;
+}
+
 /* ------------------ COMPONENT ------------------ */
 
 export default function PatientRegistration() {
-  const mobileInputRef = useRef(null);
-  const doctorDropdownRef = useRef(null);
+  const mobileInputRef = useRef<HTMLInputElement>(null);
+  const doctorDropdownRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
-  const rebookingData = null; // location.state is not available in Next.js App Router
+  const rebookingData: RebookingData | null = null; // location.state is not available in Next.js App Router
   const hideHeader = false; // Check if header should be hidden
 
-  const [firstName, setFirstName] = useState(rebookingData?.firstName || "");
-  const [lastName, setLastName] = useState(rebookingData?.lastName || "");
+  const [firstName, setFirstName] = useState((rebookingData as RebookingData | null)?.firstName || "");
+  const [lastName, setLastName] = useState((rebookingData as RebookingData | null)?.lastName || "");
   const [title, setTitle] = useState("MR");
   const [createdBy, setCreatedBy] = useState(() => {
     try {
@@ -338,19 +355,19 @@ export default function PatientRegistration() {
   const [existingPatientId, setExistingPatientId] = useState<any>(null); // Track existing patient
   const [foundPatients, setFoundPatients] = useState<any[]>([]); // Store all found patients
   const [showPatientSelectionModal, setShowPatientSelectionModal] = useState(false); // Show patient selection
-  const [dob, setDob] = useState(rebookingData?.visitDate?.split(' ')[0] || "");
-  const [age, setAge] = useState(rebookingData?.age || "");
+  const [dob, setDob] = useState((rebookingData as RebookingData | null)?.visitDate?.split(' ')[0] || "");
+  const [age, setAge] = useState(String((rebookingData as RebookingData | null)?.age || ""));
   const [babyAgeFormatted, setBabyAgeFormatted] = useState<string>(""); // "1 month 3 days" format for babies < 1 year
-  const [mobile, setMobile] = useState(rebookingData?.mobile || "");
-  const [email, setEmail] = useState(rebookingData?.email || "");
-  const [address, setAddress] = useState(rebookingData?.address || "");
-  const [location, setLocation] = useState(rebookingData?.location || "");
+  const [mobile, setMobile] = useState((rebookingData as RebookingData | null)?.mobile || "");
+  const [email, setEmail] = useState((rebookingData as RebookingData | null)?.email || "");
+  const [address, setAddress] = useState((rebookingData as RebookingData | null)?.address || "");
+  const [location, setLocation] = useState((rebookingData as RebookingData | null)?.location || "");
   const [locationSearch, setLocationSearch] = useState("");
   const [locationSuggestions, setLocationSuggestions] = useState<any[]>([]);
   const [showLocationDropdown, setShowLocationDropdown] = useState(false);
-  const locationDropdownRef = useRef(null);
+  const locationDropdownRef = useRef<HTMLDivElement>(null);
 
-  const [remarks, setRemarks] = useState(rebookingData?.remark || "");
+  const [remarks, setRemarks] = useState((rebookingData as RebookingData | null)?.remark || "");
   const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
   const [time, setTime] = useState(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
 
@@ -367,8 +384,8 @@ export default function PatientRegistration() {
   const [navigateToResult, setNavigateToResult] = useState(false);
   const [showDoctorList, setShowDoctorList] = useState(false);
   const [showBillModal, setShowBillModal] = useState(false);
-  const [gender, setGender] = useState(rebookingData?.gender || "Male");
-  const [refDoctor, setRefDoctor] = useState(rebookingData?.referralDoctor || "");
+  const [gender, setGender] = useState((rebookingData as RebookingData | null)?.gender || "Male");
+  const [refDoctor, setRefDoctor] = useState((rebookingData as RebookingData | null)?.referralDoctor || "");
   const [frequentTests, setFrequentTests] = useState<any[]>([]);
   const [filterFrequent, setFilterFrequent] = useState(false);
   const [selectedPackage, setSelectedPackage] = useState<any>(null);
@@ -403,7 +420,7 @@ export default function PatientRegistration() {
   const [lastRegisteredVisitId, setLastRegisteredVisitId] = useState<string | null>(null);
   
   const [showSimilarPatientsDropdown, setShowSimilarPatientsDropdown] = useState(false);
-  const [newPackage, setNewPackage] = useState({ name: "", tests: [], b2cCharge: 0, b2bCharge: 0 });
+  const [newPackage, setNewPackage] = useState<{ name: string; tests: string[]; b2cCharge: number; b2bCharge: number }>({ name: "", tests: [], b2cCharge: 0, b2bCharge: 0 });
 
   /* --- Referral Doctor Checkbox Logic --- */
   const [isManualRefDoctor, setIsManualRefDoctor] = useState(false);
@@ -420,7 +437,7 @@ export default function PatientRegistration() {
   const [organizationCharges, setOrganizationCharges] = useState<any>({});
   const [organizationSearch, setOrganizationSearch] = useState<string>("");
   const [showOrgDropdown, setShowOrgDropdown] = useState(false);
-  const organizationDropdownRef = useRef(null);
+  const organizationDropdownRef = useRef<HTMLDivElement>(null);
   const [loading, setLoading] = useState(false);
 
   // Fetch departments with tests and packages from API
@@ -728,7 +745,7 @@ export default function PatientRegistration() {
         if (data.lastName) setLastName(data.lastName);
         if (data.title) setTitle(data.title);
         if (data.dob) setDob(data.dob);
-        if (data.age) setAge(data.age);
+        if (data.age) setAge(String(data.age));
         if (data.babyAgeFormatted) setBabyAgeFormatted(data.babyAgeFormatted);
         if (data.mobile) setMobile(data.mobile);
         if (data.email) setEmail(data.email);
@@ -916,7 +933,7 @@ export default function PatientRegistration() {
       const ageData = calculateBabyAgeFormatted(value);
       if (ageData) {
         // For babies < 1 year, display formatted age "1 month 3 days"
-        setAge(0); // Store 0 for numeric age
+        setAge("0"); // Store 0 for numeric age
         setBabyAgeFormatted(ageData.formattedAge); // Display formatted
         console.log(`🍼 Baby age: ${ageData.formattedAge}`);
       }
@@ -950,7 +967,7 @@ export default function PatientRegistration() {
 
     if (value.length >= 3) {
       try {
-        const response = await searchPatient(value, null);
+        const response = await searchPatient(value, undefined);
         const patients = response?.data || [];
         if (patients.length > 0) {
           setFoundPatients(patients);
@@ -986,7 +1003,7 @@ export default function PatientRegistration() {
     // Auto-fill if email is valid
     if (value && value.includes('@') && value.includes('.')) {
       try {
-        const response = await searchPatient(null, value);
+        const response = await searchPatient(undefined, value);
         const patients = response?.data || [];
         
         if (patients && patients.length > 0) {
@@ -1200,6 +1217,10 @@ export default function PatientRegistration() {
     
     // Create print window with receipt format
     const win = window.open('', '_blank');
+    if (!win) {
+      console.error('Could not open print window');
+      return;
+    }
     const now = new Date();
     const dateStr = now.toLocaleDateString('en-GB');
     const timeStr = now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: true });
@@ -1352,6 +1373,10 @@ export default function PatientRegistration() {
     
     // Create print window WITHOUT header
     const win = window.open('', '_blank');
+    if (!win) {
+      console.error('Could not open print window');
+      return;
+    }
     const now = new Date();
     const dateStr = now.toLocaleDateString('en-GB');
     const timeStr = now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: true });
@@ -1497,7 +1522,7 @@ export default function PatientRegistration() {
 
   const handleRegister = () => {
     // Validate ALL Patient Identity fields as mandatory (Mobile & Email are now optional)
-    const missingFields = [];
+    const missingFields: string[] = [];
     if (!title) missingFields.push("Title");
     if (!firstName) missingFields.push("First Name");
     if (!lastName) missingFields.push("Last Name");
@@ -2907,6 +2932,10 @@ export default function PatientRegistration() {
                 <button
                   onClick={() => {
                     const printWindow = window.open('', '_blank');
+                    if (!printWindow) {
+                      console.error('Could not open print window');
+                      return;
+                    }
                     const billDiv = document.getElementById('bill-modal-content');
                     if (billDiv) {
                       printWindow.document.write(`
@@ -3477,37 +3506,90 @@ export default function PatientRegistration() {
             console.error('⚠️ Status transition failed:', error);
           }
           
-          // Trigger iframe print
-          const iframe = document.getElementById('barcode-print-frame') as HTMLIFrameElement;
-          if (iframe && iframe.contentWindow) {
-            setTimeout(() => {
-              iframe.contentWindow?.print();
-            }, 100);
-          }
-          
-          // Update barcode labels to show 'Printed' status for printed barcodes
-          const updatedLabels = barcodeLabels.map((label, idx) => {
-            if (selectedBarcodeIndices.has(idx)) {
-              return {
-                ...label,
-                barcode_status: 'Printed' // Mark as printed for visual update
-              };
+          // Now print the barcodes after status update using generateCompactBarcodePrintHtml
+          setTimeout(() => {
+            console.log('📄 Status updated, now printing barcodes with proper format...');
+            
+            // Filter only selected barcodes
+            const selectedBarcodeLabels = Array.from(selectedBarcodeIndices)
+              .map(idx => barcodeLabels[idx])
+              .filter(label => label !== undefined);
+            
+            if (selectedBarcodeLabels.length === 0) {
+              console.error('No selected barcodes to print');
+              return;
             }
-            return label;
-          });
-          setBarcodeLabels(updatedLabels);
-          
-          setShowBarcodeModal(false);
-          setBarcodeSelectedTests(new Set());
-          setBarcodeLockedPatientUid(null);
-          setBarcodeLockedVisitId(null);
-          setSelectedBarcodeIndices(new Set());
-          
-          if (successCount > 0) {
-            setTimeout(() => {
-              alert(`✅ ${successCount} test(s) marked as Received and ${selectedBarcodeIndices.size} barcode(s) printed!`);
-            }, 800);
-          }
+            
+            // Generate print HTML using the same function as Print Only button
+            const printHtml = generateCompactBarcodePrintHtml(
+              selectedBarcodeLabels.map(label => ({
+                barcodeValue: label.barcodeValue,
+                specimen: label.specimen,
+                shortNamesStr: label.shortNamesStr,
+                dateStr: label.dateStr,
+                timeStr: label.timeStr,
+                organizationCode: label.organizationCode
+              })),
+              {
+                patientName: barcodePatientInfo.patientName,
+                gender: barcodePatientInfo.gender,
+                age: barcodePatientInfo.age,
+                visitId: barcodePatientInfo.visitId
+              },
+              (value: string) => {
+                try {
+                  const svgElement = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+                  svgElement.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+                  
+                  JsBarcode(svgElement, value, {
+                    format: 'CODE128',
+                    width: 2,
+                    height: 40,
+                    margin: 0,
+                    lineColor: '#000000',
+                    displayValue: false,
+                    background: '#ffffff'
+                  });
+                  
+                  return svgElement.innerHTML;
+                } catch (error) {
+                  console.error('❌ Barcode generation error:', error);
+                  return '';
+                }
+              }
+            );
+            
+            // Use iframe to print with proper formatting
+            const iframe = document.createElement('iframe');
+            iframe.style.display = 'none';
+            document.body.appendChild(iframe);
+            
+            if (iframe.contentDocument) {
+              iframe.contentDocument.open();
+              iframe.contentDocument.write(printHtml);
+              iframe.contentDocument.close();
+              
+              setTimeout(() => {
+                iframe.contentWindow?.print();
+                // Remove iframe after printing
+                setTimeout(() => {
+                  document.body.removeChild(iframe);
+                }, 500);
+              }, 300);
+            }
+            
+            setShowBarcodeModal(false);
+            setBarcodeSelectedTests(new Set());
+            setBarcodeLockedPatientUid(null);
+            setBarcodeLockedVisitId(null);
+            setSelectedBarcodeIndices(new Set());
+            
+            if (successCount > 0) {
+              setTimeout(() => {
+                alert(`✅ ${successCount} test(s) marked as Received and ${selectedBarcodeIndices.size} barcode(s) printed!`);
+              }, 800);
+            }
+          }, 500);
         }}
         barcodeLabels={barcodeLabels}
         barcodePatientInfo={barcodePatientInfo}
