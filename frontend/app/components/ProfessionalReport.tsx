@@ -54,6 +54,7 @@ type ContentBlock =
   | { kind: 'thead' }
   | { kind: 'category'; catName: string }
   | { kind: 'param'; param: any }
+  | { kind: 'comments'; text: string }  // ✅ NEW: Comments as table row
   | { kind: 'test-gap' }
   | { kind: 'interpretation'; testData: any }
   | { kind: 'signature' }
@@ -95,6 +96,7 @@ function blockHeight(block: ContentBlock): number {
     case 'thead': return THEAD_MM;
     case 'category': return ROW_CAT_MM;
     case 'param': return ROW_PARAM_MM;
+    case 'comments': return ROW_PARAM_MM;  // ✅ Same height as param row
     case 'interpretation': return INTERP_MM;
     case 'signature': return SIG_MM;
     case 'test-gap': return TEST_GAP_MM;
@@ -106,8 +108,12 @@ function buildContentBlocks(
   testsToRender: any[],
   results: Record<string, any>,
   printOption: 'pagebreak' | 'nobreak',
+  comments?: string  // ✅ Add comments parameter
 ): ContentBlock[] {
   const blocks: ContentBlock[] = [{ kind: 'patient' }];
+  
+  // ✅ Debug: Log comments at start of build
+  console.log('📦 buildContentBlocks - Comments input:', { comments, hasComments: !!comments });
 
   testsToRender.forEach((testItem, idx) => {
     if (printOption === 'pagebreak' && idx > 0) {
@@ -137,12 +143,21 @@ function buildContentBlocks(
       }
     );
 
+    // ✅ Add comments as table row right after parameters
+    if (comments && comments.trim()) {
+      console.log('✅ Adding comments block:', comments);
+      blocks.push({ kind: 'comments', text: comments });
+    } else {
+      console.log('⚠️ No comments to add - comments is empty or not provided');
+    }
+
     if (testItem.interpretation) {
       blocks.push({ kind: 'interpretation', testData: testItem });
     }
   });
 
   blocks.push({ kind: 'signature' });
+  console.log('📦 buildContentBlocks - Total blocks:', blocks.length, 'including comments block:', blocks.some(b => b.kind === 'comments'));
   return blocks;
 }
 
@@ -236,6 +251,7 @@ const ProfessionalReport = React.forwardRef<HTMLDivElement, ProfessionalReportPr
       printOption = 'nobreak',
       results = {},
       referralDoctor = '',
+      comments = '',  // ✅ Extract comments from props
       onReady,
     } = props;
 
@@ -244,6 +260,17 @@ const ProfessionalReport = React.forwardRef<HTMLDivElement, ProfessionalReportPr
     const [pages, setPages] = useState<ReportPage[]>([]);
     const reportRef = React.useRef<HTMLDivElement>(null);
     const onReadyCalled = React.useRef(false);
+
+    // ✅ Debug logging for data flow
+    useEffect(() => {
+      console.log('🔍 ProfessionalReport received:', {
+        commentsLength: comments?.length,
+        commentsExists: !!comments,
+        commentsValue: comments,
+        resultsKeys: Object.keys(results || {}).length,
+        firstResult: Object.entries(results || {}).slice(0, 1)
+      });
+    }, [results, comments]);
 
     useEffect(() => {
       let dead = false;
@@ -310,9 +337,9 @@ const ProfessionalReport = React.forwardRef<HTMLDivElement, ProfessionalReportPr
         : [{ name: test?.name, interpretation: test?.interpretation,
              signature: test?.signature, groupedParameters }];
 
-      const blocks = buildContentBlocks(testsToRender, results, printOption);
+      const blocks = buildContentBlocks(testsToRender, results, printOption, comments);
       setPages(paginateBlocks(blocks));
-    }, [test, groupedParameters, combinedTests, results, printOption]);
+    }, [test, groupedParameters, combinedTests, results, printOption, comments]);
 
     useEffect(() => {
       if (!ready || pages.length === 0 || !onReady || onReadyCalled.current) return;
@@ -343,18 +370,30 @@ const ProfessionalReport = React.forwardRef<HTMLDivElement, ProfessionalReportPr
     const renderParamRow = (p: any, key: string) => {
       const nv = results[p.id]?.numericValue;
       const tv = results[p.id]?.textValue;
+      const isHighlighted = results[p.id]?.isHighlighted === true;
       const isabn =
         results[p.id]?.isAbnormal === true ||
         results[p.id]?.isAbnormal === 1 ||
         abnormal(p, nv);
 
+      // ✅ Prioritize textValue from TestResult table if present
       let val = '-';
-      if (p.type === 'Numeric') val = nv != null ? String(nv) : '-';
-      else if (tv) val = tv.split(',')[0].trim() || '-';
+      if (tv && tv.trim() && tv.trim() !== 'Parameter') {
+        // TextValue is available - use it
+        val = tv;
+      } else if (p.type === 'Numeric' && nv != null) {
+        // No textValue, use numericValue for numeric types
+        val = String(nv);
+      }
 
       return (
         <tr key={key} style={{ borderBottom: 'none' }}>
-          <td style={{ padding: '2px 4px 2px 2mm', fontWeight: isabn ? 'bold' : 'normal', fontSize: '10px' }}>
+          <td style={{ 
+            padding: '2px 4px 2px 2mm', 
+            fontWeight: isabn || isHighlighted ? 'bold' : 'normal',
+            textDecoration: isHighlighted ? 'underline' : 'none',
+            fontSize: '10px' 
+          }}>
             {strip(p.parameterName ?? '').toUpperCase()}
             {p.parameterTestMethod && (
               <div style={{ fontSize: '7.5px', color: '#000', fontWeight: 'normal', marginTop: '1px' }}>
@@ -362,11 +401,17 @@ const ProfessionalReport = React.forwardRef<HTMLDivElement, ProfessionalReportPr
               </div>
             )}
           </td>
-          <td style={{ padding: '2px 4px', textAlign: 'left', fontWeight: 'bold', color: isabn ? '#c0392b' : 'inherit', fontSize: '10px' }}>
+          <td style={{ 
+            padding: '2px 4px', 
+            textAlign: 'left', 
+            fontWeight: isabn || isHighlighted ? 'bold' : 'normal',
+            color: isHighlighted ? '#c0392b' : (isabn ? '#c0392b' : 'inherit'),
+            fontSize: '10px' 
+          }}>
             {p.isDescriptive && val !== '-' && hasHtml(val) ? (
               <div dangerouslySetInnerHTML={{ __html: safe(val) }} style={{ whiteSpace: 'normal', textAlign: 'left', fontWeight: 'normal' }} />
             ) : (
-              <>{val}{isabn && val !== '-' ? ' *' : ''}</>
+              <>{val}{(isabn || isHighlighted) && val !== '-' ? ' *' : ''}</>
             )}
           </td>
           {showUnits && (
@@ -469,22 +514,26 @@ const ProfessionalReport = React.forwardRef<HTMLDivElement, ProfessionalReportPr
             break;
 
           case 'category':
-            tableRows.push(
-              <tr key={`c-${bi}`}>
-                <td style={{ padding: '4px 4px 2px 2mm', fontWeight: 'bold', fontSize: '10px', textDecoration: 'underline', backgroundColor: 'transparent', borderBottom: 'none' }}>
-                  {strip(block.catName).toUpperCase()}
-                </td>
-                <td style={{ padding: '4px 4px 2px 2mm', fontWeight: 'bold', fontSize: '10px', textDecoration: 'underline', backgroundColor: 'transparent', borderBottom: 'none', textAlign: 'center' }}>
-                  Parameter
-                </td>
-                {showUnits && <td style={{ padding: '4px 4px 2px 2mm', fontWeight: 'bold', fontSize: '10px', borderBottom: 'none' }}>-</td>}
-                {showRange && <td style={{ padding: '4px 4px 2px 2mm', fontWeight: 'bold', fontSize: '10px', borderBottom: 'none' }}>-</td>}
-              </tr>
-            );
+            // ✅ Don't render category as a separate row - it's just visual grouping
+            // Parameters will be rendered directly after this
             break;
 
           case 'param':
             tableRows.push(renderParamRow(block.param, `p-${bi}`));
+            break;
+
+          case 'comments':
+            // ✅ Render comments as a table row within the results table
+            tableRows.push(
+              <tr key={`comments-${bi}`} style={{ borderTop: '1px solid #000', borderBottom: 'none' }}>
+                <td style={{ padding: '2px 4px 2px 2mm', fontWeight: 'bold', fontSize: '10px', color: '#333' }}>
+                  COMMENTS
+                </td>
+                <td colSpan={showUnits || showRange ? 2 : 1} style={{ padding: '2px 4px', fontSize: '9px', color: '#555', whiteSpace: 'pre-wrap' }}>
+                  {strip(block.text)}
+                </td>
+              </tr>
+            );
             break;
 
           case 'interpretation':

@@ -1558,6 +1558,16 @@ export default function Result() {
         });
       });
 
+      console.log('🔍 DEBUG: Report Data:', {
+        comments: first.comments,
+        commentsLength: first.comments?.length,
+        commentsExists: !!first.comments,
+        resultsMap: resultsMap,
+        paramCount: first.parameters.length
+      });
+      console.log('🔍 Sample results:', Object.entries(resultsMap).slice(0, 3));
+      console.log('✅ Passing comments to directPrintReport:', first.comments);
+
       // ✅ DIRECT PRINT - trigger print immediately with report data
       setLoading(false);
       await directPrintReport({
@@ -1573,7 +1583,8 @@ export default function Result() {
         letterHeadBase64,
         printOption: option,
         results: resultsMap,
-        referralDoctor: first.patientTest.referralDoctor
+        referralDoctor: first.patientTest.referralDoctor,
+        comments: first.comments  // ✅ Access comments directly from response
       });
       
       setReportWithHeader(true);
@@ -1595,7 +1606,8 @@ export default function Result() {
         letterHeadBase64,
         printOption: option,
         results: resultsMap,
-        referralDoctor: first.patientTest.referralDoctor
+        referralDoctor: first.patientTest.referralDoctor,
+        comments: first.comments  // ✅ Access comments directly from response
       });
     } catch (err) {
       console.error('Error loading report:', err);
@@ -1633,7 +1645,8 @@ export default function Result() {
 
       const reportEl = printContainer.querySelector('.professional-report');
       if (!reportEl) {
-        alert('Failed to render report for printing');
+        // Silently fail if report failed to render
+        console.error('Failed to render report for printing');
         cleanup();
         return;
       }
@@ -1643,7 +1656,7 @@ export default function Result() {
 
       const printWindow = window.open('', '_blank', 'width=900,height=700');
       if (!printWindow) {
-        alert('Please allow pop-ups to print the report');
+        // Silently fail if pop-ups are blocked - don't show alert
         cleanup();
         return;
       }
@@ -1707,6 +1720,7 @@ export default function Result() {
         printOption={reportProps.printOption}
         results={reportProps.results}
         referralDoctor={reportProps.referralDoctor}
+        comments={reportProps.comments}  // ✅ ADD COMMENTS PROP
         onReady={doPrint}
       />
     );
@@ -3938,11 +3952,7 @@ export default function Result() {
           
           const win = window.open('', '_blank');
           if (!win) {
-            console.error('Could not open print window');
-            return;
-          }
-          if (!win) {
-            alert('Please allow pop-ups to print barcodes');
+            console.error('Could not open print window - pop-ups may be blocked');
             return;
           }
           win.document.write(`<!DOCTYPE html><html><head><title>Barcode Labels</title>
