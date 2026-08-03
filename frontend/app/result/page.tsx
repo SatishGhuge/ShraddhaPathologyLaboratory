@@ -3500,7 +3500,7 @@ export default function Result() {
                                 <option value="Registered">Registered</option>
                                 <option value="Received">Received</option>
                                 <option value="Entered">Entered</option>
-                                <option value="Validation">Validated</option>
+                                <option value="Validated">Validated</option>
                                 <option value="Authorized">Authorized</option>
                                 <option value="Delivered">Delivered</option>
                                 <option value="Rectified">Rectified</option>
