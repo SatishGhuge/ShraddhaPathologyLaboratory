@@ -776,6 +776,12 @@ const PatientResult = () => {
   const fetchPatientTestData = async () => {
     try {
       setLoading(true);
+      // patientTestId can be null, so ensure it's a valid string before calling
+      if (!patientTestId || typeof patientTestId !== 'string') {
+        setError('Invalid test ID');
+        setLoading(false);
+        return;
+      }
       const data = await getPatientTestById(patientTestId);
       if (data) {
         console.log(`\n🔴 FRONTEND: getPatientTestById response received`);
@@ -849,7 +855,9 @@ const PatientResult = () => {
               isHighlighted: param.existingResult.isHighlighted || false
             };
           } else {
-            initialResults[param.id] = { numericValue: null, textValue: param.textContent || '', selectedOption: '', isAbnormal: false, referenceRange: param.normalRange, isHighlighted: false };
+            // Don't use "Parameter" placeholder as initial value - it's just metadata
+            const defaultTextValue = (param.textContent && param.textContent !== 'Parameter') ? param.textContent : '';
+            initialResults[param.id] = { numericValue: null, textValue: defaultTextValue, selectedOption: '', isAbnormal: false, referenceRange: param.normalRange, isHighlighted: false };
           }
         });
         setResults(initialResults);
@@ -900,7 +908,9 @@ const PatientResult = () => {
                 isHighlighted: param.existingResult.isHighlighted || false
               };
             } else {
-              initialResults[paramKey] = { numericValue: null, textValue: param.textContent || '', selectedOption: '', isAbnormal: false, referenceRange: param.normalRange, isHighlighted: false };
+              // Don't use "Parameter" placeholder as initial value - it's just metadata
+              const defaultTextValue = (param.textContent && param.textContent !== 'Parameter') ? param.textContent : '';
+              initialResults[paramKey] = { numericValue: null, textValue: defaultTextValue, selectedOption: '', isAbnormal: false, referenceRange: param.normalRange, isHighlighted: false };
             }
           });
         }
@@ -1180,7 +1190,7 @@ const PatientResult = () => {
             };
           }).filter(r => {
             const hasNumeric = r.numericValue !== null && r.numericValue !== undefined && r.numericValue !== '';
-            const hasText = r.textValue && typeof r.textValue === 'string' && r.textValue.trim() !== '';
+            const hasText = r.textValue && typeof r.textValue === 'string' && r.textValue.trim() !== '' && r.textValue.trim() !== 'Parameter';
             const hasOption = r.selectedOption && typeof r.selectedOption === 'string' && r.selectedOption.trim() !== '';
             return hasNumeric || hasText || hasOption;
           });
@@ -1243,7 +1253,7 @@ const PatientResult = () => {
         referenceRange: results[param.id]?.referenceRange || param.normalRange
       })).filter(r => {
         const hasNumeric = r.numericValue !== null && r.numericValue !== undefined && r.numericValue !== '';
-        const hasText = r.textValue && typeof r.textValue === 'string' && r.textValue.trim() !== '';
+        const hasText = r.textValue && typeof r.textValue === 'string' && r.textValue.trim() !== '' && r.textValue.trim() !== 'Parameter';
         const hasOption = r.selectedOption && typeof r.selectedOption === 'string' && r.selectedOption.trim() !== '';
         return hasNumeric || hasText || hasOption;
       });
@@ -1305,7 +1315,7 @@ const PatientResult = () => {
         referenceRange: results[param.id]?.referenceRange || param.normalRange
       })).filter(r => {
         const hasNumeric = r.numericValue !== null && r.numericValue !== undefined && r.numericValue !== '';
-        const hasText = r.textValue && typeof r.textValue === 'string' && r.textValue.trim() !== '';
+        const hasText = r.textValue && typeof r.textValue === 'string' && r.textValue.trim() !== '' && r.textValue.trim() !== 'Parameter';
         const hasOption = r.selectedOption && typeof r.selectedOption === 'string' && r.selectedOption.trim() !== '';
         return hasNumeric || hasText || hasOption;
       });
@@ -1494,7 +1504,11 @@ const PatientResult = () => {
                         .map(([categoryKey, categoryParams]: [string, any]) => (
                         <React.Fragment key={categoryKey}>
                           {categoryKey !== 'NO_CATEGORY_HEADER' && !categoryKey.startsWith('__NO_NAME_') && categoryParams[0]?.showCategoryHeader && (
-                            <tr className="bg-gray-200 font-semibold"><td colSpan={5} className="p-2">{stripHtmlTags(categoryParams[0]?.categoryName || '').toUpperCase()}</td></tr>
+                            <tr className="bg-gray-200 font-semibold">
+                              <td className="p-2">{stripHtmlTags(categoryParams[0]?.categoryName || '').toUpperCase()}</td>
+                              <td className="p-2 text-center">Parameter</td>
+                              <td colSpan={3}></td>
+                            </tr>
                           )}
                           {(categoryParams as any[]).sort((a, b) => (a.sortOrder ?? 999) - (b.sortOrder ?? 999)).map((param) => {
                             const paramKey = `${multipleTestIds[testIdx]}_${param.id}`;
@@ -1679,7 +1693,11 @@ const PatientResult = () => {
                     .map(([categoryKey, categoryParams]: [string, any]) => (
                     <React.Fragment key={categoryKey}>
                       {categoryKey !== 'NO_CATEGORY_HEADER' && !categoryKey.startsWith('__NO_NAME_') && categoryParams[0]?.showCategoryHeader && (
-                        <tr className="bg-gray-200 font-semibold"><td colSpan={5} className="p-2">{renderStyledText((categoryParams[0]?.categoryName || '').toUpperCase(), true)}</td></tr>
+                        <tr className="bg-gray-200 font-semibold">
+                          <td className="p-2">{renderStyledText((categoryParams[0]?.categoryName || '').toUpperCase(), true)}</td>
+                          <td className="p-2 text-center">Parameter</td>
+                          <td colSpan={3}></td>
+                        </tr>
                       )}
                       {(categoryParams as any[]).sort((a, b) => (a.sortOrder ?? 999) - (b.sortOrder ?? 999)).map((param) => {
                         const outOfRange = isValueOutOfRange(param, results[param.id]?.numericValue);
@@ -2013,6 +2031,8 @@ const PatientResult = () => {
                       position: absolute !important;
                       top: 0 !important; left: 0 !important;
                       width: 210mm !important;
+                      height: 296mm !important;
+                      overflow: hidden !important;
                       margin: 0 !important; padding: 0 !important;
                       box-shadow: none !important;
                     }
@@ -2031,15 +2051,15 @@ const PatientResult = () => {
                   #pr-report-page h1, #pr-report-page h2, #pr-report-page h3, #pr-report-page h4, #pr-report-page h5, #pr-report-page h6 { margin: 4px 0 !important; font-weight: bold !important; display: block !important; }
                 `}</style>
 
-                <div id="pr-report-page" style={{ width: '210mm', height: '297mm', margin: '16px auto', position: 'relative', backgroundColor: '#fff', boxShadow: '0 2px 16px rgba(0,0,0,0.18)', fontFamily: 'Arial, sans-serif', fontSize: '11px', overflow: 'hidden' }}>
+                <div id="pr-report-page" style={{ width: '210mm', height: '296mm', margin: '16px auto', position: 'relative', backgroundColor: '#fff', boxShadow: '0 2px 16px rgba(0,0,0,0.18)', fontFamily: 'Arial, sans-serif', fontSize: '11px', overflow: 'hidden' }}>
                   {reportWithHeader && (
                     <img src={LetterHead} alt="" style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', objectFit: 'fill', zIndex: 0, pointerEvents: 'none' }} />
                   )}
-                  <div style={{ position: 'relative', zIndex: 1, height: '100%', display: 'flex', flexDirection: 'column', paddingTop: reportWithHeader ? '38mm' : '12mm', paddingBottom: reportWithHeader ? '36mm' : '12mm', paddingLeft: '14mm', paddingRight: '14mm', boxSizing: 'border-box' }}>
+                  <div style={{ position: 'relative', zIndex: 1, display: 'flex', flexDirection: 'column', paddingTop: reportWithHeader ? '12mm' : '12mm', paddingBottom: reportWithHeader ? '12mm' : '12mm', paddingLeft: '14mm', paddingRight: '14mm', boxSizing: 'border-box' }}>
 
                     {/* Report Title */}
-                    <div style={{ textAlign: 'center', marginBottom: '6mm', borderBottom: '1.5px solid #333', paddingBottom: '3mm' }}>
-                      <strong style={{ fontSize: '13px', letterSpacing: '1px' }}>{patientData.test.name.toUpperCase()} REPORT</strong>
+                    <div style={{ textAlign: 'center', marginBottom: '2mm', paddingBottom: '1mm' }}>
+                      <strong style={{ fontSize: '13px', textDecoration: 'underline' }}>{patientData.test.name.toUpperCase()}</strong>
                     </div>
 
                     {/* Patient Info */}
@@ -2050,8 +2070,16 @@ const PatientResult = () => {
                           <td style={{ padding: '2px 4px', width: '50%' }}><strong>Age / Gender:</strong> {formatAgeFromFields(patientData.patient.ageYears, patientData.patient.ageMonths, patientData.patient.ageDays)} Yrs / {patientData.patient.gender}</td>
                         </tr>
                         <tr>
-                          <td style={{ padding: '2px 4px' }}><strong>Lab No:</strong> {patientData.visitId}</td>
-                          <td style={{ padding: '2px 4px' }}><strong>Date:</strong> {new Date(patientData.visitDate).toLocaleDateString('en-GB')}</td>
+                          <td style={{ padding: '2px 4px' }}>Referral : {patientData.patient.referralDoctor || '-'}</td>
+                          <td style={{ padding: '2px 4px' }}>Org Name : {patientData.patient.title ? '1500' : 'Shraddha Pathology Laboratory'}</td>
+                        </tr>
+                        <tr>
+                          <td style={{ padding: '2px 4px' }}>Sample Date : {patientData.visitDate ? new Date(patientData.visitDate).toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }).replace('am', 'a.m.').replace('pm', 'p.m.') : '-'}</td>
+                          <td style={{ padding: '2px 4px' }}>Reg. ID : {patientData.visitId || '-'}</td>
+                        </tr>
+                        <tr>
+                          <td style={{ padding: '2px 4px' }}>Report Date : {new Date().toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }).replace('am', 'a.m.').replace('pm', 'p.m.')}</td>
+                          <td style={{ padding: '2px 4px' }}>Sample ID : {patientData.visitId || '-'}</td>
                         </tr>
                       </tbody>
                     </table>
@@ -2059,28 +2087,26 @@ const PatientResult = () => {
                     {/* Results — no borders, no row lines */}
                     <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '4mm', fontSize: '11px' }}>
                       <thead>
-                        <tr>
-                          <th style={{ borderBottom: '1.5px solid #333', padding: '4px 6px', textAlign: 'left', width: shouldShowUnitsColumn() || shouldShowReferenceRangeColumn() ? '30%' : '50%' }}>Test Description</th>
-                          <th style={{ borderBottom: '1.5px solid #333', padding: '4px 6px 4px 20px', textAlign: 'left', width: shouldShowUnitsColumn() || shouldShowReferenceRangeColumn() ? '28%' : '50%' }}>Result</th>
+                        <tr style={{ borderBottom: '1px solid #000' }}>
+                          <th style={{ borderBottom: 'none', padding: '4px 6px', textAlign: 'left', width: shouldShowUnitsColumn() || shouldShowReferenceRangeColumn() ? '30%' : '50%' }}>Test Description</th>
+                          <th style={{ borderBottom: 'none', padding: '4px 6px', textAlign: 'left', width: shouldShowUnitsColumn() || shouldShowReferenceRangeColumn() ? '28%' : '50%' }}>Value(s)</th>
                           {shouldShowUnitsColumn() && (
-                            <th style={{ borderBottom: '1.5px solid #333', padding: '4px 6px', textAlign: 'left', width: '12%' }}>Unit</th>
+                            <th style={{ borderBottom: 'none', padding: '4px 6px', textAlign: 'center', width: '12%' }}>Unit</th>
                           )}
                           {shouldShowReferenceRangeColumn() && (
-                            <th style={{ borderBottom: '1.5px solid #333', padding: '4px 6px', textAlign: 'left', width: '30%' }}>Biological Reference Range</th>
+                            <th style={{ borderBottom: 'none', padding: '4px 6px', textAlign: 'left', width: '30%' }}>Reference Range</th>
                           )}
                         </tr>
                       </thead>
                       <tbody>
-                        <tr>
-                          <td colSpan={shouldShowUnitsColumn() || shouldShowReferenceRangeColumn() ? (shouldShowUnitsColumn() && shouldShowReferenceRangeColumn() ? 4 : 3) : 2} style={{ padding: '4px 6px', fontWeight: 'bold', borderBottom: '1px solid #ccc' }}>{patientData.test.name}</td>
-                        </tr>
+                        {/* Test name already rendered above the table */}
                         {Object.entries(groupedParameters).map(([categoryName, categoryParams]: [string, any]) => {
                           // Filter parameters: only show those with values
                           const paramsWithValues = (categoryParams as any[]).filter(param => {
                             const numVal = results[param.id]?.numericValue;
                             const textVal = results[param.id]?.textValue;
                             const hasNumeric = numVal !== null && numVal !== undefined && numVal !== '';
-                            const hasText = textVal && textVal.trim() !== '';
+                            const hasText = textVal && textVal.trim() !== '' && textVal.trim() !== 'Parameter'; // Exclude placeholder text
                             return hasNumeric || hasText;
                           });
 
@@ -2090,7 +2116,12 @@ const PatientResult = () => {
                           return (
                             <React.Fragment key={categoryName}>
                               {categoryName !== 'NO_CATEGORY_HEADER' && categoryParams[0]?.showCategoryHeader && (
-                                <tr><td colSpan={shouldShowUnitsColumn() || shouldShowReferenceRangeColumn() ? (shouldShowUnitsColumn() && shouldShowReferenceRangeColumn() ? 4 : 3) : 2} style={{ padding: '4px 6px', fontWeight: 'bold', borderBottom: '1px solid #ddd' }}>{stripHtmlTags(categoryName || '').toUpperCase()}</td></tr>
+                                <tr>
+                                  <td style={{ padding: '4px 6px', fontWeight: 'bold', borderBottom: 'none', textDecoration: 'underline' }}>{stripHtmlTags(categoryName || '').toUpperCase()}</td>
+                                  <td style={{ padding: '4px 6px', fontWeight: 'bold', borderBottom: 'none', textDecoration: 'underline', textAlign: 'center' }}>Parameter</td>
+                                  {shouldShowUnitsColumn() && <td style={{ padding: '4px 6px', fontWeight: 'bold', borderBottom: 'none' }}>-</td>}
+                                  {shouldShowReferenceRangeColumn() && <td style={{ padding: '4px 6px', fontWeight: 'bold', borderBottom: 'none' }}>-</td>}
+                                </tr>
                               )}
                               {paramsWithValues.map((param) => {
                                 const numVal = results[param.id]?.numericValue;
@@ -2104,18 +2135,29 @@ const PatientResult = () => {
                                 } else if (textVal) {
                                   // If it's a comma/comma-separated list, show only first value
                                   const firstValue = textVal.split(',')[0].trim();
-                                  displayValue = firstValue || '-';
+                                  // Don't display if the value is just the placeholder text "Parameter"
+                                  displayValue = (firstValue && firstValue !== 'Parameter') ? firstValue : '-';
                                 }
                                 
-                                // Get reference range - only numeric value for numeric params
+                                // Skip showing this row if there's no real value
+                                if (displayValue === '-') return null;
+                                
+                                // Get reference range - only for numeric params
                                 const rangeStr = shouldShowReferenceRangeColumn() ? getAgeAppropriateRange(param, patientData.patient.ageYears, patientData.patient.ageMonths, patientData.patient.ageDays, patientData.patient.gender) : '';
                                 
                                 return (
                                   <tr key={param.id}>
-                                    <td style={{ padding: '3px 6px', width: shouldShowUnitsColumn() || shouldShowReferenceRangeColumn() ? '30%' : '50%', fontWeight: isAbn ? 'bold' : 'normal' }}>{stripHtmlTags(param.parameterName || '')}</td>
-                                    <td style={{ padding: '3px 6px 3px 20px', width: shouldShowUnitsColumn() || shouldShowReferenceRangeColumn() ? '28%' : '50%', fontWeight: isAbn ? '900' : 'normal', color: isAbn ? '#b91c1c' : 'inherit', fontSize: '11px', whiteSpace: 'normal', wordWrap: 'break-word', textAlign: 'right' }}>
+                                    <td style={{ padding: '3px 6px', width: shouldShowUnitsColumn() || shouldShowReferenceRangeColumn() ? '30%' : '50%', fontWeight: isAbn ? 'bold' : 'normal' }}>
+                                      {stripHtmlTags(param.parameterName || '').toUpperCase()}
+                                      {param.parameterTestMethod && (
+                                        <div style={{ fontSize: '8px', color: '#000', fontWeight: 'normal', marginTop: '1px' }}>
+                                          METHOD: {param.parameterTestMethod}
+                                        </div>
+                                      )}
+                                    </td>
+                                    <td style={{ padding: '3px 6px', width: shouldShowUnitsColumn() || shouldShowReferenceRangeColumn() ? '28%' : '50%', fontWeight: 'bold', color: isAbn ? '#b91c1c' : 'inherit', fontSize: '11px', whiteSpace: 'normal', wordWrap: 'break-word', textAlign: 'left' }}>
                                       {param.isDescriptive && displayValue !== '-' && hasHtmlTags(displayValue) ? (
-                                        <div dangerouslySetInnerHTML={{ __html: sanitizeHtml(displayValue) }} style={{ margin: 0, whiteSpace: 'normal' }} />
+                                        <div dangerouslySetInnerHTML={{ __html: sanitizeHtml(displayValue) }} style={{ margin: 0, whiteSpace: 'normal', fontWeight: 'normal' }} />
                                       ) : (
                                         <>{displayValue}{isAbn && ' *'}</>
                                       )}
@@ -2184,6 +2226,7 @@ const PatientResult = () => {
                       );
                     })()}
 
+                    {/* Footer text removed */}
                     {!reportWithHeader && (
                       <div style={{ marginTop: (patientData.test.signature || defaultSignature) ? '4mm' : 'auto', borderTop: '1px solid #ccc', paddingTop: '3mm', fontSize: '10px', color: '#666', display: 'flex', justifyContent: 'space-between' }}>
                         <span>Report generated on: {new Date().toLocaleString('en-GB')}</span>
