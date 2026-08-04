@@ -464,6 +464,8 @@ export const getPatientTestById = async (req, res) => {
             hasFormula: true,
             formula: true,
             decimal: true,
+            lowPanic: true,
+            highPanic: true,
             unit: {
               select: {
                 symbol: true
@@ -577,6 +579,10 @@ export const getPatientTestById = async (req, res) => {
           displayRangeText: category.testParameter.displayRangeText,
           rangeText: category.testParameter.rangeText,
           
+          // ✅ PANIC RANGES - CRITICAL FOR TEXT TYPE HIGHLIGHTING
+          lowPanic: category.testParameter.lowPanic,
+          highPanic: category.testParameter.highPanic,
+          
           // Complex age ranges from database
           ageRanges: category.testParameter.ageRanges,
           rangeValues: category.testParameter.rangeValues,
@@ -660,6 +666,9 @@ export const getPatientTestById = async (req, res) => {
           hasFormula: true,
           formula: true,
           decimal: true,
+          // ✅ PANIC RANGES - CRITICAL FOR TEXT TYPE HIGHLIGHTING
+          lowPanic: true,
+          highPanic: true,
           unit: {
             select: {
               symbol: true
@@ -709,6 +718,10 @@ export const getPatientTestById = async (req, res) => {
           rangeType: param.rangeType,
           displayRangeText: param.displayRangeText,
           rangeText: param.rangeText,
+          
+          // ✅ PANIC RANGES - CRITICAL FOR TEXT TYPE HIGHLIGHTING
+          lowPanic: param.lowPanic,
+          highPanic: param.highPanic,
           
           // Complex age ranges from database
           ageRanges: param.ageRanges,
