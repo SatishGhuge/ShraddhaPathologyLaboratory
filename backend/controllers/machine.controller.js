@@ -265,13 +265,14 @@ export const submitResults = async (req, res) => {
           for (const [paramCode, value] of Object.entries(parameters)) {
             console.log(`[MACHINE API RESULTS] Looking for parameter: ${paramCode}`);
             
-            // Find the test parameter by parameterCode or machineCode
+            // Find the test parameter by parameterCode, machineCode, OR parameterName
             let testParam = await prisma.testParameter.findFirst({
               where: {
                 testId: patientTest.testId,
                 OR: [
                   { parameterCode: paramCode },
-                  { machineCode: paramCode }
+                  { machineCode: paramCode },
+                  { parameterName: paramCode }  // ✅ Add parameterName matching
                 ]
               }
             });
@@ -282,7 +283,8 @@ export const submitResults = async (req, res) => {
                 where: {
                   OR: [
                     { parameterCode: paramCode },
-                    { machineCode: paramCode }
+                    { machineCode: paramCode },
+                    { parameterName: paramCode }  // ✅ Add parameterName matching
                   ]
                 }
               });
@@ -311,13 +313,13 @@ export const submitResults = async (req, res) => {
               create: {
                 patientTestId: patientTest.id,
                 testParameterId: testParam.id,
-                numericValue: isNaN(value) ? null : parseFloat(value),
+                numericValue: value,
                 textValue: value,
                 enteredBy: 'MACHINE',
                 enteredAt: new Date()
               },
               update: {
-                numericValue: isNaN(value) ? null : parseFloat(value),
+                numericValue: value,
                 textValue: value,
                 enteredAt: new Date()
               }

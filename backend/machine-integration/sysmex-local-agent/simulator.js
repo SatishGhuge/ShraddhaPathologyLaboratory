@@ -1,4 +1,5 @@
 const net = require('net');
+const http = require('http');
 
 // ============================================================================
 // ASTM PROTOCOL CONSTANTS
@@ -19,11 +20,12 @@ const ASTM = {
 const CONFIG = {
   host: 'localhost',
   port: 5100,
-  machineId: 'Roche',
-  machineModel: 'Cobas',
-  visitId: '202607310001',
-  sampleId: '5',  // Just the number, not the full barcode
-  timestamp: '20260731183000'
+  machineId: 'Sysmex',
+  machineModel: 'XN-350',
+  visitId: '202608040001',           // RAJ BHUTE patient barcode visitId
+  sampleId: '1',                     // Whole Blood-EDTA sample type
+  timestamp: '20260803180000',
+  backendUrl: 'http://localhost:3351'  // Backend API URL
 };
 
 // ============================================================================
@@ -95,6 +97,7 @@ class MachineSimulator {
     this.socket = null;
     this.connected = false;
     this.testCodes = [];
+    this.testDetails = [];
     this.orderReceived = false;
   }
 
@@ -192,10 +195,11 @@ class MachineSimulator {
   async run() {
     try {
       log('═'.repeat(100), 'START');
-      log(`REAL MACHINE SIMULATOR - GETS TEST CODES FROM BACKEND`, 'START');
+      log(`🏥 REAL MACHINE SIMULATOR - DYNAMIC TEST FETCHING FROM BACKEND`, 'START');
       log('═'.repeat(100), 'START');
       log(`Machine: ${CONFIG.machineId} ${CONFIG.machineModel}`, 'CONFIG');
       log(`Sample Barcode: ${CONFIG.visitId}-${CONFIG.sampleId}`, 'CONFIG');
+      log(`Backend: ${CONFIG.backendUrl}`, 'CONFIG');
       log('', 'CONFIG');
 
       // Step 1: Send Header
@@ -224,11 +228,26 @@ class MachineSimulator {
         throw new Error('No test codes from agent');
       }
 
-      // Step 4: Send REAL Results based on actual test codes from backend
-      log(`STEP 4: ✓ Running tests for ${this.testCodes.length} actual test(s)`, 'STEP');
-      log('Generating results based on real backend test codes...', 'ACTION');
+      // Step 4: Fetch full test details (parameters, categories) from backend
+      log(`STEP 4: 📥 Fetching detailed test parameters for ${this.testCodes.length} test(s)...`, 'STEP');
+      const testDetails = await this.fetchTestDataFromBackend();
       
-      const allResults = this.generateResultsForTests(this.testCodes);
+      if (testDetails.length === 0) {
+        log('⚠️  ERROR: Could not fetch test details from backend', 'ERROR');
+        throw new Error('Test details fetch failed');
+      }
+
+      // Step 5: Generate REAL results based on database parameters
+      log(`STEP 5: 🧪 Generating results based on actual database parameters...`, 'STEP');
+      const allResults = this.generateResultsForTests(testDetails);
+      
+      if (allResults.length === 0) {
+        log('⚠️  ERROR: No results generated', 'ERROR');
+        throw new Error('Result generation failed');
+      }
+
+      // Step 6: Send Results
+      log(`STEP 6: 📤 Sending ${allResults.length} result(s) to agent...`, 'STEP');
       
       for (const r of allResults) {
         const resultFrame = ASTMBuilder.result(r.test, r.param, r.value, r.unit);
@@ -236,12 +255,12 @@ class MachineSimulator {
         await this.sendFrame(resultFrame, `Real Result - ${r.test}/${r.param}`);
       }
 
-      // Step 5: Send Terminator
-      log('STEP 5: 🏁 Transmission complete', 'STEP');
+      // Step 7: Send Terminator
+      log('STEP 7: 🏁 Transmission complete', 'STEP');
       const terminatorFrame = ASTMBuilder.terminator();
       await this.sendFrame(terminatorFrame, 'Terminator - End of transmission');
 
-      log('✓ SUCCESS! Real data from backend processed completely.', 'SUCCESS');
+      log('✅ SUCCESS! Real data from backend processed completely.', 'SUCCESS');
 
     } catch (err) {
       log(`❌ Simulation failed: ${err.message}`, 'ERROR');
@@ -252,93 +271,260 @@ class MachineSimulator {
     }
   }
 
-  // Generate realistic results for ACTUAL test codes from backend (shortNames like CBC, PLT, etc.)
-  generateResultsForTests(testCodes) {
-    const resultMap = {
-      'CBC': [
-        { param: 'WBC', value: '7.5', unit: '10^3/uL' },
-        { param: 'RBC', value: '5.2', unit: '10^6/uL' },
-        { param: 'HGB', value: '15.5', unit: 'g/dL' }
-      ],
-      'HGB': [
-        { param: 'HCT', value: '46.5', unit: '%' },
-        { param: 'MCV', value: '89.2', unit: 'fL' },
-        { param: 'MCH', value: '29.8', unit: 'pg' }
-      ],
-      'BG': [
-        { param: 'MCHC', value: '33.5', unit: 'g/dL' },
-        { param: 'PLT', value: '250', unit: '10^3/uL' }
-      ],
-      'PLT': [
-        { param: 'RET', value: '1.2', unit: '%' }
-      ],
-      'PT': [
-        { param: 'PT_INR', value: '1.1', unit: 'INR' }
-      ],
-      'APTT': [
-        { param: 'APTT_SEC', value: '28.5', unit: 'sec' }
-      ],
-      'RET': [
-        { param: 'RET_PERCENT', value: '1.5', unit: '%' }
-      ],
-      'GLU': [
-        { param: 'GLUCOSE', value: '95', unit: 'mg/dL' }
-      ],
-      'GLU_RDM': [
-        { param: 'GLUCOSE', value: '105', unit: 'mg/dL' }
-      ],
-      'RFT': [
-        { param: 'BUN', value: '18', unit: 'mg/dL' },
-        { param: 'CREATININE', value: '0.95', unit: 'mg/dL' },
-        { param: 'NA', value: '140', unit: 'mmol/L' }
-      ],
-      'LFT': [
-        { param: 'ALT', value: '35', unit: 'U/L' },
-        { param: 'AST', value: '32', unit: 'U/L' },
-        { param: 'ALP', value: '68', unit: 'U/L' }
-      ],
-      'LIPID': [
-        { param: 'TOTAL_CHOL', value: '180', unit: 'mg/dL' },
-        { param: 'LDL', value: '110', unit: 'mg/dL' },
-        { param: 'HDL', value: '45', unit: 'mg/dL' }
-      ],
-      'ELEC': [
-        { param: 'K', value: '4.2', unit: 'mmol/L' },
-        { param: 'CL', value: '105', unit: 'mmol/L' }
-      ],
-      'TSH': [
-        { param: 'TSH', value: '2.1', unit: 'mIU/L' }
-      ],
-      'BCULTURE': [
-        { param: 'GROWTH', value: 'No Growth', unit: '' }
-      ],
-      'UCULTURE': [
-        { param: 'GROWTH', value: 'No Growth', unit: '' }
-      ],
-      'SCULTURE': [
-        { param: 'GROWTH', value: 'No Growth', unit: '' }
-      ],
-      'WCULTURE': [
-        { param: 'GROWTH', value: 'No Growth', unit: '' }
-      ]
+  // Fetch test data from backend API - gets real parameters and categories
+  async fetchTestDataFromBackend() {
+    return new Promise((resolve, reject) => {
+      log('📡 Fetching test parameters from backend API...', 'API');
+      
+      const query = new URLSearchParams({
+        visitId: CONFIG.visitId,
+        sampleId: CONFIG.sampleId,
+        analyzer: `${CONFIG.machineId}^${CONFIG.machineModel}`
+      });
+
+      const url = `${CONFIG.backendUrl}/api/machine/v1/query?${query.toString()}`;
+      log(`Request: GET ${url}`, 'API');
+
+      http.get(url, (res) => {
+        let data = '';
+
+        res.on('data', (chunk) => {
+          data += chunk;
+        });
+
+        res.on('end', async () => {
+          try {
+            const response = JSON.parse(data);
+            
+            if (response.success && response.data.patientTests && response.data.patientTests.length > 0) {
+              log(`✓ Retrieved ${response.data.patientTests.length} test(s) from backend`, 'API_SUCCESS');
+              
+              // Extract test codes using actual API response structure
+              const patientTests = response.data.patientTests;
+              this.testCodes = patientTests.map(pt => pt.testCode); // testCode, not shortName
+              log(`✓ Test codes: ${this.testCodes.join(', ')}`, 'TESTCODE');
+
+              // Need to fetch test ID from master API first
+              // Use testCode to find the test ID
+              const testIdPromises = patientTests.map(pt => 
+                this.findTestIdByCode(pt.testCode)
+              );
+
+              try {
+                const testIds = await Promise.all(testIdPromises);
+                
+                // Now fetch full details for each test
+                const testDetailPromises = testIds.map((testId, idx) => 
+                  this.fetchTestDetails(testId, patientTests[idx].testCode)
+                );
+
+                const testDetailsArray = await Promise.all(testDetailPromises);
+                
+                const testDetails = patientTests.map((pt, idx) => ({
+                  shortName: pt.testCode,      // testCode is the machine code
+                  name: pt.testName,           // testName from API
+                  id: testIds[idx],            // testId fetched separately
+                  ...testDetailsArray[idx]
+                }));
+
+                log(`✓ Fetched details for ${testDetails.length} test(s)`, 'API_SUCCESS');
+                resolve(testDetails);
+              } catch (e) {
+                log(`Error fetching test details: ${e.message}`, 'ERROR');
+                reject(e);
+              }
+            } else {
+              log('⚠️ No tests found in response or empty patientTests', 'WARNING');
+              resolve([]);
+            }
+          } catch (e) {
+            log(`Error parsing response: ${e.message}`, 'ERROR');
+            reject(e);
+          }
+        });
+      }).on('error', (err) => {
+        log(`API request failed: ${err.message}`, 'ERROR');
+        reject(err);
+      });
+    });
+  }
+
+  // Find test ID by testCode (HMG, CBC, etc.)
+  async findTestIdByCode(testCode) {
+    return new Promise((resolve, reject) => {
+      const url = `${CONFIG.backendUrl}/api/master/tests`;
+      log(`  📥 Finding test ID for code "${testCode}": GET ${url}`, 'API_FIND');
+
+      http.get(url, (res) => {
+        let data = '';
+
+        res.on('data', (chunk) => {
+          data += chunk;
+        });
+
+        res.on('end', () => {
+          try {
+            const response = JSON.parse(data);
+            
+            if (response.success && response.data) {
+              // Find test with matching shortName or testCode
+              const tests = Array.isArray(response.data) ? response.data : response.data.data || [];
+              const matchingTest = tests.find(t => 
+                t.shortName === testCode || t.testCode === testCode
+              );
+
+              if (matchingTest) {
+                log(`    ✓ Found test ID ${matchingTest.id} for code "${testCode}"`, 'API_FIND');
+                resolve(matchingTest.id);
+              } else {
+                log(`    ❌ Test with code "${testCode}" not found`, 'ERROR');
+                reject(new Error(`Test not found for code: ${testCode}`));
+              }
+            } else {
+              reject(new Error('Invalid response from tests API'));
+            }
+          } catch (e) {
+            log(`Error parsing test list: ${e.message}`, 'ERROR');
+            reject(e);
+          }
+        });
+      }).on('error', (err) => {
+        log(`Test list request failed: ${err.message}`, 'ERROR');
+        reject(err);
+      });
+    });
+  }
+
+  // Fetch individual test details with all parameters and categories
+  async fetchTestDetails(testId, testCode) {
+    return new Promise((resolve, reject) => {
+      const url = `${CONFIG.backendUrl}/api/master/tests/${testId}`;
+      log(`  📥 Fetching test details for "${testCode}" (ID ${testId}): GET ${url}`, 'API_DETAIL');
+
+      http.get(url, (res) => {
+        let data = '';
+
+        res.on('data', (chunk) => {
+          data += chunk;
+        });
+
+        res.on('end', () => {
+          try {
+            const response = JSON.parse(data);
+            
+            if (response.success && response.data) {
+              const test = response.data;
+              const categories = test.categories || [];
+              const parameters = [];
+
+              // Extract all parameters from categories
+              for (const category of categories) {
+                if (category.parameters && Array.isArray(category.parameters)) {
+                  for (const param of category.parameters) {
+                    parameters.push({
+                      parameterName: param.parameterName,
+                      machineCode: param.machineCode || param.parameterName,
+                      type: param.type,
+                      unitId: param.unitId,
+                      unit: param.unit?.symbol || 'N/A',
+                      maleLowValue: param.normalRanges?.find(r => r.gender === 'Male')?.lowValue,
+                      maleHighValue: param.normalRanges?.find(r => r.gender === 'Male')?.highValue,
+                      femaleLowValue: param.normalRanges?.find(r => r.gender === 'Female')?.lowValue,
+                      femaleHighValue: param.normalRanges?.find(r => r.gender === 'Female')?.highValue,
+                      childLowValue: param.normalRanges?.find(r => r.gender === 'Child')?.lowValue,
+                      childHighValue: param.normalRanges?.find(r => r.gender === 'Child')?.highValue,
+                      categoryName: category.name
+                    });
+                    
+                    log(`    ✓ Parameter: ${param.parameterName} (${param.unit?.symbol || 'N/A'})`, 'PARAM');
+                  }
+                }
+              }
+
+              log(`  ✓ Total ${parameters.length} parameter(s) for "${testCode}"`, 'API_DETAIL');
+              resolve({
+                categories: categories,
+                parameters: parameters
+              });
+            } else {
+              resolve({ categories: [], parameters: [] });
+            }
+          } catch (e) {
+            log(`Error parsing test details: ${e.message}`, 'ERROR');
+            resolve({ categories: [], parameters: [] });
+          }
+        });
+      }).on('error', (err) => {
+        log(`Test detail request failed: ${err.message}`, 'ERROR');
+        resolve({ categories: [], parameters: [] });
+      });
+    });
+  }
+
+  // Generate realistic results based on actual test parameters from database
+  generateResultsForTests(testDetails) {
+    const results = [];
+    
+    if (!testDetails || testDetails.length === 0) {
+      log('⚠️  No test details available for result generation', 'WARNING');
+      return results;
+    }
+
+    // Realistic value generator based on parameter ranges
+    const generateValue = (param) => {
+      if (param.type === 'Numeric') {
+        // Try male range first, then female, then default
+        let low = param.maleLowValue;
+        let high = param.maleHighValue;
+        
+        if (low === null || low === undefined) {
+          low = param.femaleLowValue;
+          high = param.femaleHighValue;
+        }
+        
+        if (low === null || low === undefined) {
+          low = param.childLowValue;
+          high = param.childHighValue;
+        }
+
+        // If still no range, use default range
+        if (low === null || low === undefined) {
+          low = 0;
+          high = 100;
+        }
+
+        // Generate random value within range
+        const value = (Math.random() * (high - low) + low).toFixed(2);
+        return { value: value, unit: param.unit || '' };
+      } else {
+        // For descriptive/text parameters
+        return { value: 'Normal', unit: '' };
+      }
     };
 
-    const results = [];
-    for (const testCode of testCodes) {
-      const testResults = resultMap[testCode];
-      if (testResults) {
-        for (const res of testResults) {
+    // Generate results for each test
+    for (const testDetail of testDetails) {
+      if (testDetail.parameters && testDetail.parameters.length > 0) {
+        log(`🧪 Generating results for ${testDetail.name} (${testDetail.shortName}):`, 'RESULT_GEN');
+        
+        for (const param of testDetail.parameters) {
+          const { value, unit } = generateValue(param);
+          
           results.push({
-            test: testCode,
-            param: res.param,
-            value: res.value,
-            unit: res.unit
+            test: testDetail.shortName,
+            param: param.parameterName,
+            value: value,
+            unit: unit,
+            machineCode: param.machineCode
           });
+
+          log(`   → ${testDetail.shortName}/${param.parameterName} = ${value} ${unit}`, 'RESULT');
         }
       } else {
-        log(`  ⚠️  No result template for shortName: ${testCode}`, 'WARNING');
+        log(`   ⚠️  No parameters for ${testDetail.shortName}`, 'WARNING');
       }
     }
+
     return results;
   }
 }

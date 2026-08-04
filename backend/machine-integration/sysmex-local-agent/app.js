@@ -178,51 +178,217 @@ const ASTMParser = {
 // ============================================================================
 
 const Database = {
-  async saveResult(visitId, sampleId, rawAstm, parsedData) {
+  // ✅ NEW: Calculate checksum for duplicate detection
+  calculateChecksum(data) {
+    const str = JSON.stringify(data);
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) {
+      const char = str.charCodeAt(i);
+      hash = ((hash << 5) - hash) + char;
+      hash = hash & hash; // Convert to 32bit integer
+    }
+    return Math.abs(hash).toString(16);
+  },
+
+  // ✅ UPDATED: Store complete payload with visitId/sampleId/machine info
+  async saveResult(visitId, sampleId, machineId, machineModel, rawAstm, parsedData) {
     try {
+      // ✅ Validate critical data before storing
+      if (!visitId || !sampleId || !parsedData || !parsedData.parameters) {
+        throw new Error('Missing required result data: visitId, sampleId, or parameters');
+      }
+
+      console.log(`[DB] 📥 Received parsedData.parameters:`, JSON.stringify(parsedData.parameters));
+
+      // ✅ Build results array from parameters
+      const results = [];
+      const testMap = {};
+
+      for (const [key, value] of Object.entries(parsedData.parameters || {})) {
+        console.log(`[DB] Processing key="${key}", value="${value}"`);
+        const [testCode, paramCode] = key.split('_');
+        
+        console.log(`[DB] Split result: testCode="${testCode}", paramCode="${paramCode}"`);
+        
+        if (!testCode || !paramCode) {
+          console.log(`[DB] ⚠️ Skipping - missing testCode or paramCode`);
+          continue;
+        }
+
+        if (!testMap[testCode]) {
+          testMap[testCode] = {
+            testCode: testCode,
+            parameters: {}
+          };
+        }
+
+        testMap[testCode].parameters[paramCode] = value;
+      }
+
+      console.log(`[DB] ✅ Built testMap:`, JSON.stringify(testMap));
+
+      for (const [testCode, data] of Object.entries(testMap)) {
+        results.push({
+          testCode: data.testCode,
+          parameters: data.parameters
+        });
+      }
+
+      console.log(`[DB] ✅ Final results array:`, JSON.stringify(results));
+
+      // ✅ Build COMPLETE payload NOW (not later during sync)
+      const completePayload = {
+        visitId: visitId,
+        sampleId: sampleId,
+        results: results,  // ✅ NOW HAS RESULTS ARRAY
+        timestamp: new Date().toISOString(),
+        checksum: this.calculateChecksum(parsedData),
+        source: 'MACHINE',
+        machineId: machineId,
+        machineModel: machineModel
+      };
+
+      // ✅ Store with machine name for multi-machine tracking
+      const machineName = `${machineId}^${machineModel}`;
+
       const query = `
-        INSERT INTO pending_results (sample_id, raw_astm, data_json, status)
-        VALUES (?, ?, ?, 'PENDING')
+        INSERT INTO pending_results 
+        (sample_id, visit_id, machine_name, raw_astm, data_json, status, retry_count)
+        VALUES (?, ?, ?, ?, ?, 'PENDING', 0)
       `;
-      const [result] = await dbPool.execute(query, [sampleId, rawAstm, JSON.stringify(parsedData)]);
+
+      const [result] = await dbPool.execute(query, [
+        sampleId,
+        visitId,
+        machineName,
+        rawAstm,
+        JSON.stringify(completePayload)
+      ]);
+
+      console.log(`[DB SUCCESS] Result stored: id=${result.insertId}, visitId=${visitId}, sampleId=${sampleId}, machine=${machineName}`);
       return result.insertId;
     } catch (err) {
-      console.error(`[DB ERROR] ${err.message}`);
+      console.error(`[DB ERROR] Failed to save result: ${err.message}`);
       throw err;
     }
   },
 
+  // ✅ UPDATED: Mark as synced with timestamp
   async markSynced(recordId) {
     try {
-      await dbPool.execute(
-        `UPDATE pending_results SET status = 'SYNCED', synced_at = NOW() WHERE id = ?`,
+      const [result] = await dbPool.execute(
+        `UPDATE pending_results 
+         SET status = 'SYNCED', synced_at = NOW(), retry_count = 0, error_message = NULL
+         WHERE id = ?`,
         [recordId]
       );
+      console.log(`[DB] Result ${recordId} marked as SYNCED`);
+      return result.affectedRows > 0;
     } catch (err) {
-      console.error(`[DB ERROR] ${err.message}`);
+      console.error(`[DB ERROR] Failed to mark synced: ${err.message}`);
+      return false;
     }
   },
 
-  async markOfflineQueued(recordId) {
+  // ✅ UPDATED: Mark as offline queued with error tracking
+  async markOfflineQueued(recordId, errorMessage = null) {
     try {
-      await dbPool.execute(
-        `UPDATE pending_results SET status = 'OFFLINE_QUEUED' WHERE id = ?`,
-        [recordId]
+      const [result] = await dbPool.execute(
+        `UPDATE pending_results 
+         SET status = 'OFFLINE_QUEUED', 
+             retry_count = retry_count + 1,
+             last_retry_at = NOW(),
+             error_message = ?
+         WHERE id = ?`,
+        [errorMessage, recordId]
       );
+      console.log(`[DB] Result ${recordId} marked as OFFLINE_QUEUED (attempt ${recordId} recorded), error: ${errorMessage}`);
+      return result.affectedRows > 0;
     } catch (err) {
-      console.error(`[DB ERROR] ${err.message}`);
+      console.error(`[DB ERROR] Failed to mark offline queued: ${err.message}`);
+      return false;
     }
   },
 
+  // ✅ NEW: Mark as permanently failed after max retries
+  async markFailed(recordId, errorMessage) {
+    try {
+      const [result] = await dbPool.execute(
+        `UPDATE pending_results 
+         SET status = 'FAILED', error_message = ?
+         WHERE id = ?`,
+        [errorMessage, recordId]
+      );
+      console.error(`[DB] Result ${recordId} marked as FAILED: ${errorMessage}`);
+      return result.affectedRows > 0;
+    } catch (err) {
+      console.error(`[DB ERROR] Failed to mark failed: ${err.message}`);
+      return false;
+    }
+  },
+
+  // ✅ UPDATED: Smart retry - fetch every 30 seconds, no backoff delays
   async getPendingOffline() {
     try {
+      // Get ALL offline records regardless of retry count
+      // Retry every 30 seconds until max 10 retries
       const [rows] = await dbPool.execute(
-        `SELECT id, data_json FROM pending_results WHERE status = 'OFFLINE_QUEUED' ORDER BY id ASC LIMIT ?`,
+        `SELECT 
+           id, 
+           data_json, 
+           retry_count, 
+           sample_id,
+           visit_id,
+           machine_name
+         FROM pending_results 
+         WHERE status = 'OFFLINE_QUEUED' 
+         AND retry_count < 10
+         ORDER BY retry_count ASC, id ASC
+         LIMIT ?`,
         [CONFIG.retry.batchSize]
+      );
+
+      console.log(`[DB] Found ${rows.length} offline records to retry`);
+      return rows;
+    } catch (err) {
+      console.error(`[DB ERROR] Failed to get pending offline records: ${err.message}`);
+      return [];
+    }
+  },
+
+  // ✅ NEW: Get failed records for monitoring
+  async getFailedRecords(limit = 100) {
+    try {
+      const [rows] = await dbPool.execute(
+        `SELECT id, sample_id, visit_id, machine_name, retry_count, error_message, created_at
+         FROM pending_results 
+         WHERE status = 'FAILED'
+         ORDER BY id DESC
+         LIMIT ?`,
+        [limit]
       );
       return rows;
     } catch (err) {
-      console.error(`[DB ERROR] ${err.message}`);
+      console.error(`[DB ERROR] Failed to get failed records: ${err.message}`);
+      return [];
+    }
+  },
+
+  // ✅ NEW: Get sync statistics
+  async getStats() {
+    try {
+      const [stats] = await dbPool.execute(
+        `SELECT 
+           status,
+           COUNT(*) as count,
+           AVG(retry_count) as avg_retries,
+           MAX(retry_count) as max_retries
+         FROM pending_results
+         GROUP BY status`
+      );
+      return stats;
+    } catch (err) {
+      console.error(`[DB ERROR] Failed to get stats: ${err.message}`);
       return [];
     }
   }
@@ -313,6 +479,29 @@ const CloudAPI = {
       }
       throw err;
     }
+  },
+
+  // ✅ NEW: Check if VPS is reachable before attempting sync
+  async checkVpsHealth() {
+    try {
+      const url = `${CONFIG.vps.baseUrl}/api/health`;
+      const response = await axios.get(url, { timeout: 3000 });
+      
+      if (response.status === 200) {
+        console.log(`[VPS HEALTH] ✓ VPS is reachable`);
+        return true;
+      }
+      return false;
+    } catch (err) {
+      if (err.code === 'ECONNREFUSED') {
+        console.warn(`[VPS HEALTH] ✗ VPS unreachable - ${CONFIG.vps.baseUrl}`);
+      } else if (err.code === 'ECONNABORTED') {
+        console.warn(`[VPS HEALTH] ✗ VPS timeout (>3s) - ${CONFIG.vps.baseUrl}`);
+      } else {
+        console.warn(`[VPS HEALTH] ✗ VPS check failed: ${err.message}`);
+      }
+      return false;
+    }
   }
 };
 
@@ -323,23 +512,82 @@ const CloudAPI = {
 const ResultSync = {
   async sync(recordId, payload) {
     try {
+      // ✅ NEW: Check if VPS is reachable BEFORE trying to sync
+      const isVpsReachable = await CloudAPI.checkVpsHealth();
+      
+      if (!isVpsReachable) {
+        console.warn(`[SYNC] VPS not reachable - will retry later`);
+        // Don't mark as offline queued - just return silently
+        // This prevents incrementing retry_count for network issues
+        return;
+      }
+
       await CloudAPI.sendResult(payload);
       await Database.markSynced(recordId);
     } catch (err) {
-      await Database.markOfflineQueued(recordId);
+      await Database.markOfflineQueued(recordId, err.message);
     }
   },
 
+  // ✅ UPDATED: Check VPS health before retrying
   async retryOfflineRecords() {
+    // ✅ NEW: Check VPS health first - if down, skip entire retry cycle
+    const isVpsReachable = await CloudAPI.checkVpsHealth();
+    
+    if (!isVpsReachable) {
+      console.warn(`[RETRY WORKER] VPS unreachable - skipping retry cycle, will try again in 30s`);
+      return;  // Exit without processing any records - no retry_count increment
+    }
+
     const records = await Database.getPendingOffline();
-    if (records.length === 0) return;
+    
+    if (records.length === 0) {
+      return;
+    }
+
+    console.log(`[RETRY WORKER] Starting retry for ${records.length} offline record(s)`);
 
     for (const record of records) {
-      const payload = typeof record.data_json === 'string' 
-        ? JSON.parse(record.data_json) 
-        : record.data_json;
-      await this.sync(record.id, payload);
+      try {
+        const payload = typeof record.data_json === 'string' 
+          ? JSON.parse(record.data_json) 
+          : record.data_json;
+
+        // ✅ Validate payload has required fields
+        if (!payload.visitId || !payload.sampleId) {
+          console.error(`[RETRY ERROR] Record ${record.id}: Missing visitId or sampleId in payload`);
+          await Database.markFailed(
+            record.id,
+            'Payload missing visitId or sampleId'
+          );
+          continue;
+        }
+
+        console.log(`[RETRY] Attempting sync for record ${record.id} (visitId=${payload.visitId}, attempt=${record.retry_count + 1}/10)`);
+        
+        await this.sync(record.id, payload);
+        
+      } catch (err) {
+        console.error(`[RETRY ERROR] Record ${record.id}: ${err.message}`);
+        
+        // ✅ Get updated retry count from database
+        const [checkRecord] = await dbPool.execute(
+          `SELECT retry_count FROM pending_results WHERE id = ?`,
+          [record.id]
+        );
+
+        if (checkRecord && checkRecord[0] && checkRecord[0].retry_count >= 10) {
+          // ✅ Max retries reached - mark as failed
+          await Database.markFailed(record.id, `Max retries exceeded: ${err.message}`);
+          console.error(`[ALERT] Record ${record.id} permanently failed after 10 retries`);
+        } else {
+          // ✅ Mark for retry with error message
+          await Database.markOfflineQueued(record.id, err.message);
+        }
+      }
     }
+
+    console.log(`[RETRY WORKER] Retry batch completed`);
   }
 };
 
@@ -420,14 +668,15 @@ const QueryHandler = {
 // ============================================================================
 
 const ResultHandler = {
-  async handle(visitId, sampleId, rawAstm, parsedData) {
+  async handle(visitId, sampleId, rawAstm, parsedData, machineId, machineModel) {
     try {
       if (!visitId || !sampleId) {
         console.error(`[RESULT ERROR] Missing visitId or sampleId`);
         return;
       }
 
-      const recordId = await Database.saveResult(visitId, sampleId, rawAstm, parsedData);
+      // ✅ Pass machine info to saveResult
+      const recordId = await Database.saveResult(visitId, sampleId, machineId, machineModel, rawAstm, parsedData);
       const payload = this.buildPayload(visitId, sampleId, parsedData);
       await ResultSync.sync(recordId, payload);
     } catch (err) {
@@ -555,12 +804,14 @@ function createTcpServer() {
         if (parsed.frameType === 'TERMINATOR') {
           console.log(`[TERMINATOR] Received, processing ${Object.keys(accumulatedResults).length} accumulated parameters`);
           if (currentVisitId && currentSampleId && Object.keys(accumulatedResults).length > 0) {
-            console.log(`[RESULT] Processing all results for ${currentVisitId}/${currentSampleId}`);
+            console.log(`[RESULT] Processing all results for ${currentVisitId}/${currentSampleId} from machine: ${machineAnalyzer}`);
+            // ✅ Extract machineId and machineModel from analyzer string (e.g., "Sysmex^XN-350")
+            const [machineId, machineModel] = machineAnalyzer ? machineAnalyzer.split('^') : ['Unknown', 'Unknown'];
             await ResultHandler.handle(currentVisitId, currentSampleId, frameContent, { 
               frameType: 'RESULT',
               parameters: accumulatedResults,
               timestamp: new Date().toISOString()
-            });
+            }, machineId, machineModel);
           } else {
             console.log(`[TERMINATOR] Skipping - missing visitId/sampleId or no results accumulated`);
           }
@@ -623,14 +874,38 @@ async function startup() {
   const retryWorker = setInterval(() => ResultSync.retryOfflineRecords(), CONFIG.retry.intervalMs);
   console.log(`[WORKER] ✓ Retry job scheduled every ${CONFIG.retry.intervalMs}ms\n`);
 
-  // Health check function
+  // ✅ UPDATED: Enhanced health check with stats and failed record alerts
   async function healthCheck() {
     try {
-      const [rows] = await dbPool.execute('SELECT COUNT(*) as count FROM pending_results WHERE status = ?', ['OFFLINE_QUEUED']);
-      const pendingCount = rows[0]?.count || 0;
-      if (pendingCount > 0) {
-        console.log(`[HEALTH] Warning: ${pendingCount} offline records pending sync`);
+      // Get overall statistics
+      const stats = await Database.getStats();
+      
+      if (stats && stats.length > 0) {
+        console.log(`[HEALTH] ═══════════════════════════════════════`);
+        for (const stat of stats) {
+          console.log(`[HEALTH] ${stat.status}: ${stat.count} record(s) (avg retries: ${Math.round(stat.avg_retries || 0)}, max: ${stat.max_retries || 0})`);
+        }
+        console.log(`[HEALTH] ═══════════════════════════════════════`);
       }
+
+      // Check for permanently failed records
+      const failedRecords = await Database.getFailedRecords(5);
+      if (failedRecords && failedRecords.length > 0) {
+        console.error(`[HEALTH] ⚠️ ALERT: ${failedRecords.length} permanently failed record(s) - manual intervention needed!`);
+        for (const record of failedRecords.slice(0, 3)) {
+          console.error(`[HEALTH]   • Record ${record.id}: visitId=${record.visit_id}, retries=${record.retry_count}, error: ${record.error_message}`);
+        }
+      }
+
+      // Check for records stuck in retry loop
+      const [stuckRecords] = await dbPool.execute(
+        `SELECT COUNT(*) as count FROM pending_results 
+         WHERE status = 'OFFLINE_QUEUED' AND retry_count > 5`
+      );
+      if (stuckRecords && stuckRecords[0] && stuckRecords[0].count > 0) {
+        console.warn(`[HEALTH] ⚠️ WARNING: ${stuckRecords[0].count} record(s) in high-retry loop (>5 attempts)`);
+      }
+
     } catch (err) {
       console.error(`[HEALTH] Database check failed: ${err.message}`);
     }
