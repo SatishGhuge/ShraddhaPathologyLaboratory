@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, Fragment } from 'react';
+import { useState, useEffect, useCallback, Fragment, useRef } from 'react';
 import { X, AlertCircle } from 'lucide-react';
 import API_BASE_URL from '@/src/api/config';
 
@@ -123,6 +123,9 @@ interface PatientData {
   status: string;
   patient: {
     age: number;
+    ageYears?: number;
+    ageMonths?: number;
+    ageDays?: number;
     gender: string;
     dob?: string;
     title?: string;
@@ -152,6 +155,58 @@ const AuthenticateModal = ({
   const [results, setResults] = useState<any>({});
   const [error, setError] = useState<string | null>(null);
   const [authenticating, setAuthenticating] = useState(false);
+  const [comments, setComments] = useState<string>('');
+  const [showComments, setShowComments] = useState(false);
+  const [commentHistory, setCommentHistory] = useState<string[]>([]);
+  const [showCommentDropdown, setShowCommentDropdown] = useState(false);
+  const [commentFocused, setCommentFocused] = useState(false);
+  const commentInputRef = useRef<HTMLInputElement>(null);
+
+  // Fetch existing comments and comment history for the test
+  useEffect(() => {
+    if (isOpen && patientData?.id) {
+      // Check if comments already exist in patientData
+      // The patientTest object from API should include comments field
+      try {
+        // Try to get comments from patientData first (if available from API response)
+        if ((patientData as any)?.comments) {
+          setComments((patientData as any).comments);
+          setShowComments(true);
+        } else {
+          // Fallback: fetch comments if not in patientData
+          const fetchComments = async () => {
+            try {
+              const response = await fetch(`${API_BASE_URL}/results/${patientData.id}`);
+              const data = await response.json();
+              if (data.success && data.data?.comments) {
+                setComments(data.data.comments);
+                setShowComments(true);
+              }
+            } catch (error) {
+              console.warn('Error fetching comments:', error);
+            }
+          };
+          fetchComments();
+        }
+
+        // Fetch comment history for dropdown suggestions
+        const fetchCommentHistory = async () => {
+          try {
+            const response = await fetch(`${API_BASE_URL}/results/history/comments`);
+            const data = await response.json();
+            if (data.success && Array.isArray(data.data)) {
+              setCommentHistory(data.data);
+            }
+          } catch (error) {
+            console.warn('Error fetching comment history:', error);
+          }
+        };
+        fetchCommentHistory();
+      } catch (error) {
+        console.warn('Error loading comments:', error);
+      }
+    }
+  }, [isOpen, patientData?.id]);
 
   // Initialize results from existing data (read-only for authentication)
   useEffect(() => {
@@ -302,6 +357,43 @@ const AuthenticateModal = ({
     const low = parseFloat(match[1]);
     const high = parseFloat(match[2]);
     return parseFloat(numericValue) < low || parseFloat(numericValue) > high;
+  };
+
+  // Handle comment change and save immediately
+  const handleCommentChange = async (newComments: string) => {
+    setComments(newComments);
+
+    if (patientData?.id && newComments.trim()) {
+      try {
+        await fetch(`${API_BASE_URL}/results/${patientData.id}/comments`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ comments: newComments })
+        });
+        console.log('✅ Comments auto-saved:', newComments);
+      } catch (error) {
+        console.error('⚠️ Error auto-saving comments:', error);
+      }
+    }
+  };
+
+  // Handle comment checkbox change
+  const handleCommentCheckbox = (checked: boolean) => {
+    setShowComments(checked);
+
+    if (!checked) {
+      // Clear comments from database and local state
+      setComments('');
+      if (patientData?.id) {
+        fetch(`${API_BASE_URL}/results/${patientData.id}/comments`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ comments: '' })
+        }).catch(error => {
+          console.error('⚠️ Error clearing comments:', error);
+        });
+      }
+    }
   };
 
   // Handle authenticate and transition to Authenticated phase
@@ -614,6 +706,59 @@ const AuthenticateModal = ({
                 ))}
               </tbody>
             </table>
+          </div>
+        </div>
+
+        {/* Comments Section */}
+        <div className="border-t p-3 bg-blue-50">
+          <div className="flex items-center gap-3">
+            <input
+              type="checkbox"
+              id="show-comments-authenticate"
+              checked={showComments}
+              onChange={(e) => handleCommentCheckbox(e.target.checked)}
+              className="w-4 h-4 accent-blue-600 cursor-pointer"
+              title="Check to add comments"
+            />
+            <label htmlFor="show-comments-authenticate" className="text-sm font-semibold text-gray-700 cursor-pointer">
+              Add Comments
+            </label>
+
+            {showComments && (
+              <div className="flex-1 relative">
+                <input
+                  ref={commentInputRef}
+                  type="text"
+                  value={comments}
+                  onChange={(e) => handleCommentChange(e.target.value)}
+                  onFocus={() => setCommentFocused(true)}
+                  onBlur={() => setTimeout(() => setCommentFocused(false), 200)}
+                  placeholder="Type comment or select from dropdown..."
+                  className="w-full border border-gray-300 rounded px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                
+                {/* Dropdown with comment history suggestions */}
+                {commentHistory.length > 0 && commentFocused && (
+                  <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-300 rounded shadow-lg max-h-40 overflow-y-auto z-50">
+                    {commentHistory.map((hist, idx) => (
+                      <button
+                        key={idx}
+                        type="button"
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={() => {
+                          const newComments = comments.trim() ? `${comments}, ${hist}` : hist;
+                          handleCommentChange(newComments);
+                          commentInputRef.current?.focus();
+                        }}
+                        className="w-full text-left px-2 py-1.5 text-xs bg-white hover:bg-blue-500 hover:text-white text-gray-800 border-b last:border-b-0 transition-colors"
+                      >
+                        {hist}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
 
