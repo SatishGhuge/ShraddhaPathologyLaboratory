@@ -1,9 +1,10 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Barcode } from 'lucide-react';
 import JsBarcode from 'jsbarcode';
 import { generateCompactBarcodePrintHtml } from '../utils/barcodePrintUtils';
+import API_BASE_URL from '@/src/api/config';
 
 interface BarcodeLabel {
   barcodeValue: string;
@@ -41,22 +42,30 @@ interface BarcodeModalProps {
 }
 
 export const getSampleTypeId = (test: any): string | number => {
+  // Priority order to find the NUMERIC sample type ID:
+  // 1. Direct test.sampleTypeId (from Test model)
+  // 2. Nested in test.test.sampleTypeId
+  // 3. From patientTest relationship
+  // 4. Fallback to '1' for unknown samples
   return (
     test?.sampleTypeId ||
     test?.test?.sampleTypeId ||
     test?.patientTest?.test?.sampleTypeId ||
-    'unknown'
+    test?.patientTest?.sampleTypeId ||
+    1  // ✅ Default to 1 if no sample type ID found
   );
 };
 
 export const getSampleTypeName = (test: any): string => {
   return (
     test?.sampleTypeName ||
+    test?.specimen_type ||  // ✅ Result page tests use specimen_type directly as name
     test?.sample ||
     test?.sample_type?.Sample_Type ||
     test?.specimen_type?.Sample_Type ||
     test?.test?.sample_type?.Sample_Type ||
     test?.patientTest?.specimen_type?.Sample_Type ||
+    test?.test?.name ||  // Fallback to test name
     'Unknown'
   );
 };
@@ -64,9 +73,11 @@ export const getSampleTypeName = (test: any): string => {
 export const getTestName = (test: any): string => {
   return (
     test?.shortName ||
+    test?.test_short_name ||  // ✅ Result page tests use test_short_name
     test?.test?.shortName ||
     test?.patientTest?.test?.shortName ||
     test?.name ||
+    test?.test_name ||  // ✅ Result page tests use test_name
     test?.test?.name ||
     'Test'
   );
@@ -81,9 +92,11 @@ export const generateBarcodeLabels = (
   const dateStr = now.toLocaleDateString('en-GB');
   const timeStr = now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: true }).toUpperCase();
 
+  // ✅ Group by sampleTypeId (actual sample ID from test data)
   const specimenGroups: any = {};
 
   tests.forEach((test) => {
+    // Get actual sample ID from test - this is the real sample type ID
     const sampleTypeId = getSampleTypeId(test);
     const key = sampleTypeId;
 
@@ -103,11 +116,12 @@ export const generateBarcodeLabels = (
     specimenGroups[key].testNames.push(getTestName(test));
     specimenGroups[key].statuses.push(test.status || test.patientTest?.status || 'Registered');
     specimenGroups[key].barcodeStatuses.push(test.barcode_status || test.patientTest?.barcode_status || 'Unprinted');
-    specimenGroups[key].testIds.push(test.id || test.patientTest?.id || test.testId);
+    specimenGroups[key].testIds.push(test.id || test.test_id || test.patientTest?.id || test.testId);
   });
 
+  // ✅ USE ACTUAL SAMPLE ID (not sequential) FOR BARCODE
   const labels: BarcodeLabel[] = Object.entries(specimenGroups).map(([sampleTypeId, groupData]: any) => {
-    const barcodeValue = `${visitId}-${sampleTypeId}`;
+    const barcodeValue = `${visitId}-${sampleTypeId}`;  // ✅ Use actual sampleTypeId from test
     console.log('✅ Generated barcode value:', barcodeValue, 'Type:', typeof barcodeValue, 'Length:', barcodeValue.length);
 
     let finalSampleStatus = 'Registered';
@@ -130,7 +144,7 @@ export const generateBarcodeLabels = (
       organizationCode,
       barcode_status: finalBarcodeStatus,
       sampleStatus: finalSampleStatus,
-      sampleTypeId
+      sampleTypeId: groupData.sampleTypeId
     };
   });
 
@@ -319,6 +333,88 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({
   selectedBarcodes = new Set(),
   onBarcodeToggle
 }) => {
+  // Barcode scanning state
+  const [scannedBarcodes, setScannedBarcodes] = useState<any[]>([]);
+  const barcodeBufferRef = useRef('');
+  const barcodeTimeoutRef = useRef<any>(null);
+  const modalRef = useRef<HTMLDivElement>(null);
+
+  // Barcode Scanner - Capture barcode input when modal is open
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleBarcodeInput = async (e: KeyboardEvent) => {
+      // Only capture if modal is visible
+      if (!isOpen) return;
+
+      if (e.key === 'Enter' && barcodeBufferRef.current.length > 0) {
+        // Barcode complete
+        const barcode = barcodeBufferRef.current.trim();
+        barcodeBufferRef.current = '';
+        clearTimeout(barcodeTimeoutRef.current);
+
+        console.log('📱 Barcode detected from modal:', barcode);
+
+        try {
+          // Parse barcode via API
+          const response = await fetch(`${API_BASE_URL}/result/parse-barcode`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ barcode })
+          });
+
+          const data = await response.json();
+
+          if (data.success) {
+            console.log('✅ Barcode parsed successfully from modal:', {
+              visitId: data.visitId,
+              sampleId: data.sampleId,
+              barcode: data.barcode
+            });
+
+            // Add to scanned list for visual feedback
+            setScannedBarcodes(prev => [
+              ...prev,
+              {
+                visitId: data.visitId,
+                sampleId: data.sampleId,
+                barcode: data.barcode,
+                timestamp: new Date().toLocaleTimeString()
+              }
+            ]);
+
+            // Auto-clear scanned info after 2 seconds
+            setTimeout(() => {
+              setScannedBarcodes(prev => prev.slice(1));
+            }, 2000);
+          } else {
+            console.error('❌ Barcode parsing failed:', data.message);
+          }
+        } catch (error) {
+          console.error('❌ Barcode API error:', error);
+        }
+      } else if (e.key.length === 1 && e.key.match(/[0-9\-]/)) {
+        // Accumulate barcode characters (only numbers and dash)
+        barcodeBufferRef.current += e.key;
+
+        // Reset timeout
+        clearTimeout(barcodeTimeoutRef.current);
+        barcodeTimeoutRef.current = setTimeout(() => {
+          if (barcodeBufferRef.current.length > 5) {
+            barcodeBufferRef.current = '';
+          }
+        }, 100);
+      }
+    };
+
+    window.addEventListener('keydown', handleBarcodeInput);
+
+    return () => {
+      window.removeEventListener('keydown', handleBarcodeInput);
+      clearTimeout(barcodeTimeoutRef.current);
+    };
+  }, [isOpen]);
+
   if (!isOpen || !barcodePatientInfo) return null;
 
   const selectedCount = selectedBarcodes ? selectedBarcodes.size : 0;
@@ -361,7 +457,7 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({
     <>
       <iframe id="barcode-print-frame" style={{ display: 'none' }} />
 
-      <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4">
+      <div ref={modalRef} className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4">
         <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] flex flex-col">
           <div className="flex items-center justify-between px-5 py-3 border-b bg-cyan-600 rounded-t-lg">
             <h2 className="text-sm font-semibold text-white flex items-center gap-2">
@@ -401,7 +497,18 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({
             </div>
           </div>
 
-          <div className="overflow-y-auto flex-1 p-4 bg-white">
+          {/* Scanned Barcode Display */}
+          {scannedBarcodes.length > 0 && (
+            <div className="px-4 py-2 bg-cyan-50 border-b border-cyan-200">
+              {scannedBarcodes.map((scan, idx) => (
+                <div key={idx} className="text-xs text-cyan-900 font-medium">
+                  ✅ Barcode Scanned: Visit ID: <span className="font-bold">{scan.visitId}</span> | Sample ID: <span className="font-bold">{scan.sampleId}</span> @ {scan.timestamp}
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div className="overflow-y-auto flex-1 p-4 bg-white" id="barcode-print-area">
             <div style={{
               display: 'grid',
               gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',

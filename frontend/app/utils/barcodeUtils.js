@@ -45,7 +45,7 @@ export const parseBarcodeData = (barcode) => {
     }
 
     // CASE 2: Partial barcode (only digits, no dash)
-    // Expected format: 11 digits for visitId, then 1-2 digits for sampleId
+    // Expected format: 11-12 digits for visitId, then 1-2 digits for sampleId
     // Total: 12-14 digits expected
     // If we have at least 11 digits, try to extract visitId + sampleId
     if (/^\d+$/.test(barcode) && barcode.length >= 11) {
@@ -75,38 +75,6 @@ export const parseBarcodeData = (barcode) => {
     return null;
   } catch (error) {
     console.error('Error parsing barcode:', error);
-    return null;
-  }
-};
-
-/**
- * Handle partial/incomplete barcode scans (sensitivity feature)
- * If barcode is incomplete, try to find matching complete barcode
- * @param {string} partialBarcode - Partial barcode value
- * @param {Object} prisma - Prisma client
- * @returns {string|null} - Full barcode if found
- */
-export const findPartialBarcodeMatch = async (partialBarcode, prisma) => {
-  try {
-    if (!partialBarcode || partialBarcode.length < 5) {
-      return null;
-    }
-
-    // Search for barcodes starting with partial input
-    const test = await prisma.patientTest.findFirst({
-      where: {
-        sampleBarcodeNo: {
-          startsWith: partialBarcode
-        }
-      },
-      select: {
-        sampleBarcodeNo: true
-      }
-    });
-
-    return test ? test.sampleBarcodeNo : null;
-  } catch (error) {
-    console.error('Error finding partial barcode match:', error);
     return null;
   }
 };

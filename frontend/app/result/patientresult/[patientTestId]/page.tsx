@@ -1546,6 +1546,7 @@ const PatientResult = () => {
                                           onChange={(val) => handleResultChange(paramKey, 'textValue', val, testData.parameters)}
                                           options={options}
                                           isAbnormal={results[paramKey]?.isAbnormal || false}
+                                          panicInfo={testData.parameters.find(p => p.id === paramKey)?.panicInfo}
                                         />
                                       ) : (
                                         <input
@@ -1789,6 +1790,7 @@ const PatientResult = () => {
                                         onChange={(val) => handleResultChange(param.id, 'textValue', val, parameters)}
                                         options={options}
                                         isAbnormal={results[param.id]?.isAbnormal}
+                                        panicInfo={param.panicInfo}
                                       />
                                     ) : (
                                       <input type="text" value={results[param.id]?.textValue || ''} onChange={(e) => handleResultChange(param.id, 'textValue', e.target.value, parameters)} className={`border px-2 py-1 w-32 rounded ${results[param.id]?.isAbnormal ? "border-red-500 bg-red-50" : "border-gray-300"}`} />
@@ -1806,6 +1808,7 @@ const PatientResult = () => {
                                         onChange={(val) => handleResultChange(param.id, 'textValue', val, parameters)}
                                         options={options}
                                         isAbnormal={results[param.id]?.isAbnormal}
+                                        panicInfo={param.panicInfo}
                                       />
                                     ) : (
                                       <input type="text" value={results[param.id]?.textValue || ''} onChange={(e) => handleResultChange(param.id, 'textValue', e.target.value, parameters)} className={`border px-2 py-1 w-32 rounded ${results[param.id]?.isAbnormal ? "border-red-500 bg-red-50" : "border-gray-300"}`} />

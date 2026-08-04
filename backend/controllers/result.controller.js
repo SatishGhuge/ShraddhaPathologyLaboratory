@@ -286,6 +286,7 @@ export const getPatientTests = async (req, res) => {
         image_size: patientTest.test.imageSize,
         attachment_path: patientTest.attachmentPath || null,
         specimen_type: patientTest.test.sample_type?.Sample_Type || patientTest.sample || "N/A",
+        sampleTypeId: patientTest.test.sampleTypeId || 1,  // ✅ ADD SAMPLE TYPE ID FOR BARCODE
         ref_by: patientTest.referralDoctor || 'SELF',
         result_status: normalizeStatus(patientTest.status),
         status: patientTest.status,
@@ -1065,14 +1066,14 @@ export const updateTestStatus = async (req, res) => {
       'RECEIVED': 'Received',
       'PROVISIONAL': 'Entered',
       'AUTHENTICATED': 'Authorized',
-      'VALIDATED': 'Validation',
-      'VALIDATION': 'Validation',
+      'VALIDATED': 'Validated',
+      'VALIDATION': 'Validated',
       'DELIVERED': 'Delivered',
       'RETEST': 'Rectified',
       'RECTIFIED': 'Rectified',
       'REVERT': 'Rectified',
-      'HOLD': 'Validation',
-      'REJECTED': 'Validation'
+      'HOLD': 'Validated',
+      'REJECTED': 'Validated'
     };
 
     // Convert status to proper format
@@ -1083,7 +1084,7 @@ export const updateTestStatus = async (req, res) => {
     }
 
     // Validate status against allowed stages
-    const validStatuses = ['Registered', 'Received', 'Entered', 'Validation', 'Authorized', 'Delivered', 'Rectified'];
+    const validStatuses = ['Registered', 'Received', 'Entered', 'Validated', 'Authorized', 'Delivered', 'Rectified'];
     if (properStatus && !validStatuses.includes(properStatus)) {
       return res.status(400).json({
         success: false,
@@ -1145,14 +1146,14 @@ export const updateTestResult = async (req, res) => {
       'RECEIVED': 'Received',
       'PROVISIONAL': 'Entered',
       'AUTHENTICATED': 'Authorized',
-      'VALIDATED': 'Validation',
-      'VALIDATION': 'Validation',
+      'VALIDATED': 'Validated',
+      'VALIDATION': 'Validated',
       'DELIVERED': 'Delivered',
       'RETEST': 'Rectified',
       'RECTIFIED': 'Rectified',
       'REVERT': 'Rectified',
-      'HOLD': 'Validation',
-      'REJECTED': 'Validation'
+      'HOLD': 'Validated',
+      'REJECTED': 'Validated'
     };
 
     const updateData = {
@@ -1285,14 +1286,14 @@ export const bulkUpdateTestStatus = async (req, res) => {
       'RECEIVED': 'Received',
       'PROVISIONAL': 'Entered',
       'AUTHENTICATED': 'Authorized',
-      'VALIDATED': 'Validation',
-      'VALIDATION': 'Validation',
+      'VALIDATED': 'Validated',
+      'VALIDATION': 'Validated',
       'DELIVERED': 'Delivered',
       'RETEST': 'Rectified',
       'RECTIFIED': 'Rectified',
       'REVERT': 'Rectified',
-      'HOLD': 'Validation',
-      'REJECTED': 'Validation'
+      'HOLD': 'Validated',
+      'REJECTED': 'Validated'
     };
 
     // Convert status to proper format
@@ -1303,7 +1304,7 @@ export const bulkUpdateTestStatus = async (req, res) => {
     }
 
     // Validate status against allowed stages
-    const validStatuses = ['Registered', 'Received', 'Entered', 'Validation', 'Authorized', 'Delivered', 'Rectified'];
+    const validStatuses = ['Registered', 'Received', 'Entered', 'Validated', 'Authorized', 'Delivered', 'Rectified'];
     if (properStatus && !validStatuses.includes(properStatus)) {
       return res.status(400).json({
         success: false,
@@ -1383,19 +1384,19 @@ export const getTestStatistics = async (req, res) => {
       'RECEIVED': 'Received',
       'PROVISIONAL': 'Entered',
       'AUTHENTICATED': 'Authorized',
-      'VALIDATED': 'Validation',
-      'VALIDATION': 'Validation',
+      'VALIDATED': 'Validated',
+      'VALIDATION': 'Validated',
       'DELIVERED': 'Delivered',
       'RETEST': 'Rectified',
       'RECTIFIED': 'Rectified',
       'REVERT': 'Rectified',
-      'HOLD': 'Validation',
-      'REJECTED': 'Validation',
+      'HOLD': 'Validated',
+      'REJECTED': 'Validated',
       // Handle already mapped statuses (new format)
       'Registered': 'Registered',
       'Received': 'Received',
       'Entered': 'Entered',
-      'Validation': 'Validation',
+      'Validated': 'Validated',
       'Authorized': 'Authorized',
       'Delivered': 'Delivered',
       'Rectified': 'Rectified'
@@ -1413,7 +1414,7 @@ export const getTestStatistics = async (req, res) => {
     });
 
     // Ensure all new statuses are represented
-    const allStatuses = ['Registered', 'Received', 'Entered', 'Validation', 'Authorized', 'Delivered', 'Rectified'];
+    const allStatuses = ['Registered', 'Received', 'Entered', 'Validated', 'Authorized', 'Delivered', 'Rectified'];
     allStatuses.forEach(status => {
       if (!statistics.byStatus[status]) {
         statistics.byStatus[status] = 0;
