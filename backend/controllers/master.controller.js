@@ -36,34 +36,26 @@ function extractFirstName(fullName) {
 // Helper function to process age ranges and auto-assign gender based on label
 function processAgeRangesWithGender(ageRanges, parameterName = '') {
   if (!ageRanges || ageRanges.length === 0) {
+    console.log(`📌 No age ranges to process for ${parameterName}`);
     return null;
   }
   
+  console.log(`📋 Processing age ranges for ${parameterName}:`, JSON.stringify(ageRanges, null, 2));
+  
   const processedRanges = ageRanges.map(range => {
-    // Auto-assign gender based on label and gender dropdown selection
+    // ✅ Preserve the gender value as-is from the frontend (Both, Male, Female, Child)
+    // Don't convert to lowercase - keep the original value
     let gender = range.gender;
-    if (range.label && range.enabled) {
-      // Check for explicit gender selection in the dropdown
-      if (range.gender === 'Both') {
-        // "Both" means it applies to all genders - keep it as "both"
-        gender = 'both';
-      } else if (range.label.includes('Male') && !range.label.includes('Female')) {
-        gender = 'Male';
-      } else if (range.label.includes('Female') && !range.label.includes('Male')) {
-        gender = 'Female';
-      } else if (range.label.includes('Both') || (range.label.includes('Male') && range.label.includes('Female'))) {
-        // If label explicitly says "Both", set gender to "both"
-        gender = 'both';
-      }
-    }
+    
+    console.log(`   Range: Label="${range.label}" | Gender="${range.gender}" | Enabled=${range.enabled} | LL=${range.ll} | UL=${range.ul}`);
     
     return {
       ...range,
-      gender: gender
+      gender: gender  // ✅ Keep original gender value without conversion
     };
   });
   
-  console.log(`🎯 Processed age ranges for ${parameterName}:`, processedRanges);
+  console.log(`✅ Processed age ranges for ${parameterName}:`, JSON.stringify(processedRanges, null, 2));
   return JSON.stringify(processedRanges);
 }
 
@@ -1181,50 +1173,83 @@ export const updateTest = async (req, res) => {
       });
 
       // Helper function to prepare parameter data
-      const prepareParameterData = (param) => ({
-        parameterName: param.parameterName || 'Unnamed',
-        machineCode: param.machineCode || null,
-        multiplyBy: param.multiplyBy || null,
-        decimal: param.decimal ? parseInt(param.decimal) : null,
-        parameterSortOrder: param.sortOrder ? parseInt(param.sortOrder) : null,
-        isDescriptive: param.isDescriptive || false,
-        lowPanic: param.lowPanic ? parseFloat(param.lowPanic) : null,
-        highPanic: param.highPanic ? parseFloat(param.highPanic) : null,
-        isNABL: param.isNABL || false,
-        parameterCode: param.parameterCode || null,
-        hasFormula: param.hasFormula || false,
-        formula: param.formula || null,
-        type: param.type || 'Numeric',
-        isMandatory: param.isMandatory || false,
-        rangeType: param.rangeType || 'BySex',
-        unitId: param.unitId ? parseInt(param.unitId) : null,
-        displayRangeText: param.displayRangeText || null,
-        rangeText: param.rangeText || null,
-        textContent: param.textContent || null,
-        isMultipleOptions: param.isMultipleOptions || false,
-        testMethod: param.testMethod || null,
-        maleLowValue: param.normalRanges?.find(r => r.gender === 'Male')?.lowValue ? 
-          parseFloat(param.normalRanges.find(r => r.gender === 'Male').lowValue) : null,
-        maleHighValue: param.normalRanges?.find(r => r.gender === 'Male')?.highValue ? 
-          parseFloat(param.normalRanges.find(r => r.gender === 'Male').highValue) : null,
-        maleDefaultValue: param.normalRanges?.find(r => r.gender === 'Male')?.defaultValue || null,
-        maleActive: param.normalRanges?.find(r => r.gender === 'Male')?.isActive || false,
-        femaleLowValue: param.normalRanges?.find(r => r.gender === 'Female')?.lowValue ? 
-          parseFloat(param.normalRanges.find(r => r.gender === 'Female').lowValue) : null,
-        femaleHighValue: param.normalRanges?.find(r => r.gender === 'Female')?.highValue ? 
-          parseFloat(param.normalRanges.find(r => r.gender === 'Female').highValue) : null,
-        femaleDefaultValue: param.normalRanges?.find(r => r.gender === 'Female')?.defaultValue || null,
-        femaleActive: param.normalRanges?.find(r => r.gender === 'Female')?.isActive || false,
-        childLowValue: param.normalRanges?.find(r => r.gender === 'Child')?.lowValue ? 
-          parseFloat(param.normalRanges.find(r => r.gender === 'Child').lowValue) : null,
-        childHighValue: param.normalRanges?.find(r => r.gender === 'Child')?.highValue ? 
-          parseFloat(param.normalRanges.find(r => r.gender === 'Child').highValue) : null,
-        childDefaultValue: param.normalRanges?.find(r => r.gender === 'Child')?.defaultValue || null,
-        childActive: param.normalRanges?.find(r => r.gender === 'Child')?.isActive || false,
-        ageRanges: processAgeRangesWithGender(param.ageRanges, param.parameterName),
-        rangeValues: param.rangeValues && param.rangeValues.length > 0 ? JSON.stringify(param.rangeValues) : null,
-        isActive: true
-      });
+      const prepareParameterData = (param) => {
+        // ✅ NEW: Handle 'Both' gender which applies to both Male and Female
+        const getMaleRange = () => {
+          const maleRange = param.normalRanges?.find(r => r.gender === 'Male');
+          const bothRange = param.normalRanges?.find(r => r.gender === 'Both');
+          return maleRange || bothRange;
+        };
+        
+        const getFemaleRange = () => {
+          const femaleRange = param.normalRanges?.find(r => r.gender === 'Female');
+          const bothRange = param.normalRanges?.find(r => r.gender === 'Both');
+          return femaleRange || bothRange;
+        };
+        
+        const getChildRange = () => {
+          return param.normalRanges?.find(r => r.gender === 'Child');
+        };
+
+        const maleRange = getMaleRange();
+        const femaleRange = getFemaleRange();
+        const childRange = getChildRange();
+
+        return {
+          parameterName: param.parameterName || 'Unnamed',
+          machineCode: param.machineCode || null,
+          multiplyBy: param.multiplyBy || null,
+          decimal: param.decimal ? parseInt(param.decimal) : null,
+          parameterSortOrder: param.sortOrder ? parseInt(param.sortOrder) : null,
+          isDescriptive: param.isDescriptive || false,
+          lowPanic: param.lowPanic ? parseFloat(param.lowPanic) : null,
+          highPanic: param.highPanic ? parseFloat(param.highPanic) : null,
+          isNABL: param.isNABL || false,
+          parameterCode: param.parameterCode || null,
+          hasFormula: param.hasFormula || false,
+          formula: param.formula || null,
+          type: param.type || 'Numeric',
+          isMandatory: param.isMandatory || false,
+          rangeType: param.rangeType || 'BySex',
+          unitId: param.unitId ? parseInt(param.unitId) : null,
+          displayRangeText: param.displayRangeText || null,
+          rangeText: param.rangeText || null,
+          textContent: param.textContent || null,
+          isMultipleOptions: param.isMultipleOptions || false,
+          testMethod: param.testMethod || null,
+          maleLowValue: maleRange?.lowValue ? parseFloat(maleRange.lowValue) : null,
+          maleHighValue: maleRange?.highValue ? parseFloat(maleRange.highValue) : null,
+          maleDefaultValue: maleRange?.defaultValue || null,
+          maleActive: maleRange?.isActive || false,
+          femaleLowValue: femaleRange?.lowValue ? parseFloat(femaleRange.lowValue) : null,
+          femaleHighValue: femaleRange?.highValue ? parseFloat(femaleRange.highValue) : null,
+          femaleDefaultValue: femaleRange?.defaultValue || null,
+          femaleActive: femaleRange?.isActive || false,
+          childLowValue: childRange?.lowValue ? parseFloat(childRange.lowValue) : null,
+          childHighValue: childRange?.highValue ? parseFloat(childRange.highValue) : null,
+          childDefaultValue: childRange?.defaultValue || null,
+          childActive: childRange?.isActive || false,
+          ageRanges: (() => {
+            try {
+              // ✅ Handle both array and JSON string formats
+              let ageRangesData = param.ageRanges;
+              if (typeof ageRangesData === 'string') {
+                ageRangesData = JSON.parse(ageRangesData);
+              }
+              console.log(`📥 Original ageRangesData for ${param.parameterName}:`, JSON.stringify(ageRangesData, null, 2));
+              const processed = processAgeRangesWithGender(ageRangesData, param.parameterName);
+              console.log(`📤 Processed ageRanges to save:`, processed);
+              return processed;
+            } catch (e) {
+              console.error(`❌ Error processing age ranges for ${param.parameterName}:`, e);
+              console.error(`   ageRanges value was:`, param.ageRanges);
+              return null;
+            }
+          })(),
+          rangeValues: param.rangeValues && param.rangeValues.length > 0 ? JSON.stringify(param.rangeValues) : null,
+          isActive: true
+        };
+      };
 
       // Collect all incoming parameter IDs to keep
       const incomingParamIds = [];
@@ -1236,6 +1261,7 @@ export const updateTest = async (req, res) => {
             console.log(`📝 Processing parameter: ${param.parameterName}`);
             console.log(`   Raw ID value from request: ${param.id}`);
             console.log(`   Parsed ID: ${param.id ? parseInt(param.id) : 'null/undefined'} (original type: ${typeof param.id})`);
+            console.log(`   Normal Ranges: ${JSON.stringify(param.normalRanges)}`);
             
             // ✅ CRITICAL: Parse ID as integer to handle string or number
             const parsedId = param.id ? parseInt(param.id) : null;
@@ -1246,12 +1272,47 @@ export const updateTest = async (req, res) => {
             if (parsedId) {
               // ✅ EXISTING PARAMETER - UPDATE IT (keep same ID)
               console.log(`   ↻ Updating existing parameter ID: ${parsedId}`);
-              testParameter = await prisma.testParameter.update({
-                where: { id: parsedId },
-                data: prepareParameterData(param)
+              console.log(`   📊 Parameter data to update:`, {
+                parameterName: param.parameterName,
+                hasAgeRanges: !!param.ageRanges,
+                ageRangesType: typeof param.ageRanges,
+                ageRangesLength: Array.isArray(param.ageRanges) ? param.ageRanges.length : 'N/A',
+                normalRangesCount: param.normalRanges?.length || 0
               });
-              incomingParamIds.push(parsedId);
-              console.log(`   ✅ Parameter updated successfully with SAME ID: ${parsedId}`);
+              try {
+                const updatePayload = prepareParameterData(param);
+                console.log(`   📤 Prepared update payload for ${param.parameterName}:`, {
+                  parameterName: updatePayload.parameterName,
+                  ageRanges: updatePayload.ageRanges ? updatePayload.ageRanges.substring(0, 100) + '...' : 'null',
+                  maleLowValue: updatePayload.maleLowValue,
+                  maleActive: updatePayload.maleActive,
+                  hasAgeRanges: !!updatePayload.ageRanges
+                });
+                
+                testParameter = await prisma.testParameter.update({
+                  where: { id: parsedId },
+                  data: updatePayload
+                });
+                
+                // ✅ Verify the update actually saved
+                const verifyUpdate = await prisma.testParameter.findUnique({
+                  where: { id: parsedId }
+                });
+                
+                console.log(`   🔍 VERIFICATION - Data after update:`, {
+                  parameterName: verifyUpdate.parameterName,
+                  ageRanges: verifyUpdate.ageRanges ? verifyUpdate.ageRanges.substring(0, 100) + '...' : 'null',
+                  maleLowValue: verifyUpdate.maleLowValue,
+                  maleActive: verifyUpdate.maleActive
+                });
+                
+                incomingParamIds.push(parsedId);
+                console.log(`   ✅ Parameter updated successfully with SAME ID: ${parsedId}`);
+              } catch (updateError) {
+                console.error(`   ❌ ERROR updating parameter ID ${parsedId} (${param.parameterName}):`, updateError.message);
+                console.error(`   📋 Stack:`, updateError.stack);
+                throw updateError;
+              }
             } else {
               // ✅ NEW PARAMETER - CREATE IT (new ID generated)
               console.log(`   ➕ Creating new parameter (no ID provided)`);
