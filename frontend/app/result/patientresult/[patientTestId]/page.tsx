@@ -1565,7 +1565,12 @@ const PatientResult = () => {
                                   </div>
                                 </td>
                                 <td className="border p-2 text-xs">{param.units || '-'}</td>
-                                <td className="border p-2 text-xs">{stripHtmlTags(param.normalRange || param.displayRangeText || param.rangeText || '-')}</td>
+                                <td className="border p-2 text-xs">
+                                  {stripHtmlTags(
+                                    getAgeAppropriateRange(param, patientData?.patient?.ageYears, patientData?.patient?.ageMonths, patientData?.patient?.ageDays, patientData?.patient?.gender) 
+                                    || param.normalRange || param.displayRangeText || param.rangeText || '-'
+                                  )}
+                                </td>
                                 <td className="border p-2 text-center" style={{width: '40px'}}>
                                   <input 
                                     type="checkbox" 
@@ -1820,7 +1825,12 @@ const PatientResult = () => {
                                 return unitValue;
                               })()}
                             </td>
-                            <td className="border p-2">{stripHtmlTags(param.normalRange || param.displayRangeText || param.rangeText || '-')}</td>
+                            <td className="border p-2">
+                              {stripHtmlTags(
+                                getAgeAppropriateRange(param, patientData?.patient?.ageYears, patientData?.patient?.ageMonths, patientData?.patient?.ageDays, patientData?.patient?.gender)
+                                || param.normalRange || param.displayRangeText || param.rangeText || '-'
+                              )}
+                            </td>
                             <td className="border p-2 text-center" style={{width: '40px'}}>
                               <input 
                                 type="checkbox" 
