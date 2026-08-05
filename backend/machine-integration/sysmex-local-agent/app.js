@@ -191,7 +191,7 @@ const Database = {
   },
 
   // ✅ UPDATED: Store complete payload with visitId/sampleId/machine info
-  async saveResult(visitId, sampleId, machineId, machineModel, rawAstm, parsedData) {
+  async saveResult(visitId, sampleId, machineName, rawAstm, parsedData) {
     try {
       // ✅ Validate critical data before storing
       if (!visitId || !sampleId || !parsedData || !parsedData.parameters) {
@@ -244,12 +244,8 @@ const Database = {
         timestamp: new Date().toISOString(),
         checksum: this.calculateChecksum(parsedData),
         source: 'MACHINE',
-        machineId: machineId,
-        machineModel: machineModel
+        machineName: machineName  // ✅ Single machine name field
       };
-
-      // ✅ Store with machine name for multi-machine tracking
-      const machineName = `${machineId}^${machineModel}`;
 
       const query = `
         INSERT INTO pending_results 
@@ -260,7 +256,7 @@ const Database = {
       const [result] = await dbPool.execute(query, [
         sampleId,
         visitId,
-        machineName,
+        machineName,  // ✅ Store machine name as-is
         rawAstm,
         JSON.stringify(completePayload)
       ]);
@@ -390,6 +386,32 @@ const Database = {
     } catch (err) {
       console.error(`[DB ERROR] Failed to get stats: ${err.message}`);
       return [];
+    }
+  },
+
+  // ✅ NEW: Look up machine ID from database by full machine name
+  async getMachineByName(machineName) {
+    try {
+      if (!machineName) {
+        throw new Error('Machine name is required');
+      }
+
+      const connection = await dbPool.getConnection();
+      const [rows] = await connection.execute(
+        'SELECT id, name FROM machines WHERE name = ? LIMIT 1',
+        [machineName]
+      );
+      connection.release();
+
+      if (rows.length > 0) {
+        return rows[0];
+      }
+
+      console.warn(`[DB] Machine not found: "${machineName}"`);
+      return null;
+    } catch (err) {
+      console.error(`[DB ERROR] Failed to lookup machine: ${err.message}`);
+      return null;
     }
   }
 };
@@ -668,23 +690,23 @@ const QueryHandler = {
 // ============================================================================
 
 const ResultHandler = {
-  async handle(visitId, sampleId, rawAstm, parsedData, machineId, machineModel) {
+  async handle(visitId, sampleId, rawAstm, parsedData, machineName) {
     try {
       if (!visitId || !sampleId) {
         console.error(`[RESULT ERROR] Missing visitId or sampleId`);
         return;
       }
 
-      // ✅ Pass machine info to saveResult
-      const recordId = await Database.saveResult(visitId, sampleId, machineId, machineModel, rawAstm, parsedData);
-      const payload = this.buildPayload(visitId, sampleId, parsedData);
+      // ✅ Pass machine name to saveResult
+      const recordId = await Database.saveResult(visitId, sampleId, machineName, rawAstm, parsedData);
+      const payload = this.buildPayload(visitId, sampleId, parsedData, machineName);
       await ResultSync.sync(recordId, payload);
     } catch (err) {
       console.error(`[RESULT ERROR] ${err.message}`);
     }
   },
 
-  buildPayload(visitId, sampleId, parsedData) {
+  buildPayload(visitId, sampleId, parsedData, machineName) {
     const results = [];
     const testMap = {};
 
@@ -715,6 +737,7 @@ const ResultHandler = {
     return {
       visitId: visitId,
       sampleId: sampleId,
+      machineName: machineName,
       results: results,
       timestamp: new Date().toISOString()
     };
@@ -805,13 +828,15 @@ function createTcpServer() {
           console.log(`[TERMINATOR] Received, processing ${Object.keys(accumulatedResults).length} accumulated parameters`);
           if (currentVisitId && currentSampleId && Object.keys(accumulatedResults).length > 0) {
             console.log(`[RESULT] Processing all results for ${currentVisitId}/${currentSampleId} from machine: ${machineAnalyzer}`);
-            // ✅ Extract machineId and machineModel from analyzer string (e.g., "Sysmex^XN-350")
-            const [machineId, machineModel] = machineAnalyzer ? machineAnalyzer.split('^') : ['Unknown', 'Unknown'];
+            
+            // ✅ Send full machine name "Sysmex XN-550" to VPS for lookup
+            console.log(`[RESULT] Machine name to send: ${machineAnalyzer}`);
+            
             await ResultHandler.handle(currentVisitId, currentSampleId, frameContent, { 
               frameType: 'RESULT',
               parameters: accumulatedResults,
               timestamp: new Date().toISOString()
-            }, machineId, machineModel);
+            }, machineAnalyzer);
           } else {
             console.log(`[TERMINATOR] Skipping - missing visitId/sampleId or no results accumulated`);
           }

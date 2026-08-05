@@ -183,13 +183,20 @@ export const queryWorklist = async (req, res) => {
  */
 export const submitResults = async (req, res) => {
   try {
-    const { visitId, sampleId, results } = req.body;
+    const { visitId, sampleId, machineName, results } = req.body;
 
     // Validate payload
     if (!visitId || !sampleId) {
       return res.status(400).json({
         success: false,
         message: 'Missing required fields: visitId, sampleId'
+      });
+    }
+
+    if (!machineName) {
+      return res.status(400).json({
+        success: false,
+        message: 'Missing required field: machineName'
       });
     }
 
@@ -214,6 +221,38 @@ export const submitResults = async (req, res) => {
           message: 'Each result must have parameters object'
         });
       }
+    }
+
+    // ✅ Look up machine ID from database using the machine name
+    let machineId = null;
+    try {
+      // Normalize machine name: replace ^ with space
+      const normalizedMachineName = machineName.replace(/\^/g, ' ').trim();
+      console.log(`[MACHINE LOOKUP] Looking for machine: "${machineName}" -> normalized: "${normalizedMachineName}"`);
+      
+      const machine = await prisma.machine.findFirst({
+        where: {
+          name: normalizedMachineName
+        },
+        select: { id: true, name: true }
+      });
+
+      if (machine) {
+        machineId = machine.id;
+        console.log(`[MACHINE LOOKUP] Found machine: "${normalizedMachineName}" (ID: ${machineId})`);
+      } else {
+        console.warn(`[MACHINE LOOKUP] Machine not found in database: "${normalizedMachineName}"`);
+        return res.status(404).json({
+          success: false,
+          message: `Machine not found: "${normalizedMachineName}". Please ensure machine is registered in the system.`
+        });
+      }
+    } catch (err) {
+      console.error(`[MACHINE LOOKUP ERROR] ${err.message}`);
+      return res.status(500).json({
+        success: false,
+        message: 'Error looking up machine'
+      });
     }
 
     let resultsProcessed = 0;
@@ -272,7 +311,7 @@ export const submitResults = async (req, res) => {
                 OR: [
                   { parameterCode: paramCode },
                   { machineCode: paramCode },
-                  { parameterName: paramCode }  // ✅ Add parameterName matching
+                  { parameterName: paramCode }
                 ]
               }
             });
@@ -284,7 +323,7 @@ export const submitResults = async (req, res) => {
                   OR: [
                     { parameterCode: paramCode },
                     { machineCode: paramCode },
-                    { parameterName: paramCode }  // ✅ Add parameterName matching
+                    { parameterName: paramCode }
                   ]
                 }
               });
@@ -326,14 +365,17 @@ export const submitResults = async (req, res) => {
             });
           }
 
-          // Update PatientTest status to "Entered"
+          // ✅ Update PatientTest status to "Entered" AND save the machine ID
           await prisma.patientTest.update({
             where: { id: patientTest.id },
             data: {
               status: 'Entered',
+              usedMachineId: machineId,
               lastStatusUpdateAt: new Date()
             }
           });
+
+          console.log(`[MACHINE API RESULTS] PatientTest ${patientTest.id} updated: status=Entered, usedMachineId=${machineId}, machine="${machineName}"`);
 
           resultsProcessed++;
         }
@@ -347,13 +389,15 @@ export const submitResults = async (req, res) => {
       }
     }
 
-    console.log(`[MACHINE API] Results: ${visitId}/${sampleId} - Processed ${resultsProcessed} test(s)`);
+    console.log(`[MACHINE API] Results: ${visitId}/${sampleId} - Processed ${resultsProcessed} test(s), machine="${machineName}" (ID: ${machineId})`);
 
     return res.status(200).json({
       success: true,
       message: 'Results processed successfully',
       visitId: visitId,
       sampleId: sampleId,
+      machineName: machineName,
+      machineId: machineId,
       resultsProcessed: resultsProcessed,
       failedResults: failedResults.length > 0 ? failedResults : undefined,
       timestamp: new Date().toISOString()

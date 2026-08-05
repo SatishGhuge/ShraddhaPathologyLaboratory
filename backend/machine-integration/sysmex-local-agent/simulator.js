@@ -20,11 +20,10 @@ const ASTM = {
 const CONFIG = {
   host: 'localhost',
   port: 5100,
-  machineId: 'Sysmex',
-  machineModel: 'XN-350',
-  visitId: '202608040001',           // RAJ BHUTE patient barcode visitId
+  machineName: 'Sysmex XN-350',  // ✅ ONE field - complete machine name
+  visitId: '202608050001',           // RAJ BHUTE patient barcode visitId
   sampleId: '1',                     // Whole Blood-EDTA sample type
-  timestamp: '20260803180000',
+  timestamp: '20260805180000',
   backendUrl: 'http://localhost:3351'  // Backend API URL
 };
 
@@ -48,7 +47,7 @@ class ASTMBuilder {
   }
 
   static header() {
-    const content = `H|\\^&|||${CONFIG.machineId}^${CONFIG.machineModel}|||||||P|1|${CONFIG.timestamp}`;
+    const content = `H|\\^&|||${CONFIG.machineName}|||||||P|1|${CONFIG.timestamp}`;
     return this.frame(content);
   }
 
@@ -197,7 +196,7 @@ class MachineSimulator {
       log('═'.repeat(100), 'START');
       log(`🏥 REAL MACHINE SIMULATOR - DYNAMIC TEST FETCHING FROM BACKEND`, 'START');
       log('═'.repeat(100), 'START');
-      log(`Machine: ${CONFIG.machineId} ${CONFIG.machineModel}`, 'CONFIG');
+      log(`Machine: ${CONFIG.machineName}`, 'CONFIG');
       log(`Sample Barcode: ${CONFIG.visitId}-${CONFIG.sampleId}`, 'CONFIG');
       log(`Backend: ${CONFIG.backendUrl}`, 'CONFIG');
       log('', 'CONFIG');
@@ -279,7 +278,7 @@ class MachineSimulator {
       const query = new URLSearchParams({
         visitId: CONFIG.visitId,
         sampleId: CONFIG.sampleId,
-        analyzer: `${CONFIG.machineId}^${CONFIG.machineModel}`
+        analyzer: CONFIG.machineName  // ✅ Use single machine name
       });
 
       const url = `${CONFIG.backendUrl}/api/machine/v1/query?${query.toString()}`;
