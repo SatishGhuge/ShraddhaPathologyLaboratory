@@ -563,10 +563,10 @@ const ProfessionalReport = React.forwardRef<HTMLDivElement, ProfessionalReportPr
             // ✅ Render comments as a table row within the results table
             tableRows.push(
               <tr key={`comments-${bi}`} style={{ borderTop: '1px solid #000', borderBottom: 'none' }}>
-                <td style={{ padding: '2px 4px 2px 2mm', fontWeight: 'bold', fontSize: '10px', color: '#333' }}>
+                <td style={{ padding: '2px 4px 2px 2mm', fontWeight: 'bold', fontSize: '10px', color: '#000' }}>
                   COMMENTS
                 </td>
-                <td colSpan={showUnits || showRange ? 2 : 1} style={{ padding: '2px 4px', fontSize: '9px', color: '#555', whiteSpace: 'pre-wrap', fontWeight: 'bold' }}>
+                <td colSpan={showUnits || showRange ? 2 : 1} style={{ padding: '2px 4px', fontSize: '10px', color: '#000', whiteSpace: 'pre-wrap', fontWeight: '900' }}>
                   {strip(block.text)}
                 </td>
               </tr>
