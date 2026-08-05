@@ -19,7 +19,7 @@ export const getMachines = async (req, res) => {
 
     const machines = await prisma.machine.findMany({
       where: whereClause,
-      include: { _count: { select: { tests: true } } },
+      include: { _count: { select: { testMachines: true } } },
       orderBy: [{ isActive: 'desc' }, { name: 'asc' }]
     });
 
@@ -29,7 +29,7 @@ export const getMachines = async (req, res) => {
         id: m.id,
         name: m.name,
         isActive: m.isActive,
-        testCount: m._count.tests,
+        testCount: m._count.testMachines,
         createdAt: m.createdAt,
         updatedAt: m.updatedAt
       }))
@@ -75,12 +75,16 @@ export const getMachineById = async (req, res) => {
     const machine = await prisma.machine.findUnique({
       where: { id: parseInt(id) },
       include: {
-        tests: {
+        testMachines: {
           select: {
-            id: true,
-            name: true,
-            testCode: true,
-            department: { select: { id: true, name: true } }
+            test: {
+              select: {
+                id: true,
+                name: true,
+                testCode: true,
+                department: { select: { id: true, name: true } }
+              }
+            }
           }
         }
       }
@@ -273,16 +277,20 @@ export const getMachineUsage = async (req, res) => {
     const machine = await prisma.machine.findUnique({
       where: { id: parseInt(id) },
       include: {
-        tests: {
+        testMachines: {
           select: {
-            id: true,
-            name: true,
-            testCode: true,
-            isActive: true,
-            isDeleted: true,
-            department: { select: { id: true, name: true } }
+            test: {
+              select: {
+                id: true,
+                name: true,
+                testCode: true,
+                isActive: true,
+                isDeleted: true,
+                department: { select: { id: true, name: true } }
+              }
+            }
           },
-          orderBy: { name: 'asc' }
+          orderBy: { test: { name: 'asc' } }
         }
       }
     });
@@ -294,8 +302,9 @@ export const getMachineUsage = async (req, res) => {
       });
     }
 
-    const activeTests = machine.tests.filter(t => t.isActive && !t.isDeleted).length;
-    const totalTests = machine.tests.length;
+    const tests = machine.testMachines.map(tm => tm.test);
+    const activeTests = tests.filter(t => t.isActive && !t.isDeleted).length;
+    const totalTests = tests.length;
 
     return res.status(200).json({
       success: true,
@@ -310,7 +319,7 @@ export const getMachineUsage = async (req, res) => {
           activeTests,
           inactiveTests: totalTests - activeTests
         },
-        tests: machine.tests
+        tests: tests
       }
     });
   } catch (err) {
