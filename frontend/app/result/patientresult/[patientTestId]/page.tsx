@@ -19,11 +19,48 @@ const LetterHead = "/LetterHead.jpeg";
 // Text can be edited directly, formatted with Ctrl+B for bold
 // Shows [bold text] with visual formatting in report
 // Ctrl+B to make selected text bold
+// Resizable with drag handle - arrow on right side indicates panic direction
 const SuggestionInput = ({ value, onChange, options, isAbnormal, panicInfo }) => {
   const [show, setShow] = useState(false);
+  const [showTooltip, setShowTooltip] = useState(false);
   const [searchInput, setSearchInput] = useState('');
+  const [isResizing, setIsResizing] = useState(false);
+  const [customSize, setCustomSize] = useState({ width: 150, height: 30 });
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const containerRef = useRef(null);
   const ref = useRef(null);
+  const arrowRef = useRef(null);
+
+  console.log(`🎨 SuggestionInput rendered with isAbnormal=${isAbnormal}, panicInfo=`, panicInfo);
+
+  // Handle mouse move for resizing
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!isResizing || !containerRef.current) return;
+      
+      const rect = (containerRef.current as HTMLElement).getBoundingClientRect();
+      const newWidth = Math.max(80, e.clientX - rect.left);
+      const newHeight = Math.max(30, e.clientY - rect.top);
+      
+      setCustomSize({
+        width: Math.min(newWidth, 400),
+        height: Math.min(newHeight, 250)
+      });
+    };
+
+    const handleMouseUp = () => {
+      setIsResizing(false);
+    };
+
+    if (isResizing) {
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mouseup', handleMouseUp);
+      return () => {
+        document.removeEventListener('mousemove', handleMouseMove);
+        document.removeEventListener('mouseup', handleMouseUp);
+      };
+    }
+  }, [isResizing]);
 
   useEffect(() => {
     const handler = (e: any) => { if (ref.current && !(ref.current as HTMLElement).contains(e.target as Node)) setShow(false); };
@@ -87,31 +124,96 @@ const SuggestionInput = ({ value, onChange, options, isAbnormal, panicInfo }) =>
     }
   };
 
+  // Determine panic direction indicator
+  const getPanicIndicator = () => {
+    if (!isAbnormal || !panicInfo) return null;
+    return panicInfo.value < panicInfo.lowPanic ? '↓' : '↑';
+  };
+
+  const indicator = getPanicIndicator();
+  
+  // Get tooltip message based on panic direction
+  const getTooltipMessage = () => {
+    if (!indicator || !panicInfo) return '';
+    if (indicator === '↓') {
+      return `Lower Range: ${panicInfo.lowPanic}`;
+    } else {
+      return `Higher Range: ${panicInfo.highPanic}`;
+    }
+  };
+
   return (
-    <div ref={ref} className="relative w-full">
-      <div className={`border rounded px-3 py-2 w-full ${isAbnormal ? "border-red-500 bg-red-50" : "border-gray-300 bg-white"}`}>
+    <div ref={ref} className="relative flex items-center gap-1">
+      {/* Resizable container */}
+      <div 
+        ref={containerRef}
+        className={`border rounded relative ${isAbnormal ? "border-red-500 bg-red-50" : "border-gray-300 bg-white"}`}
+        style={{
+          width: `${customSize.width}px`,
+          height: `${customSize.height}px`,
+          overflow: 'hidden',
+          display: 'flex',
+          flexDirection: 'column',
+          position: 'relative'
+        }}
+      >
         <textarea
           ref={textareaRef}
           value={value || ''}
           onChange={handleInputChange}
           onKeyDown={handleKeyDown}
           onFocus={() => setShow(true)}
-          placeholder="Type values or select from options... (Ctrl+B for bold)"
-          className="outline-none text-xs w-full bg-transparent text-black resize-vertical font-sans border-none"
+          placeholder="Type or select..."
+          className="outline-none text-xs bg-transparent text-black resize-none font-sans border-none flex-1 p-2"
           style={{
             fontSize: '12px',
-            lineHeight: '1.6',
+            lineHeight: '1.5',
             fontFamily: 'Arial, sans-serif',
-            minHeight: '100px',
-            maxHeight: '300px'
+            overflow: 'hidden',
+            whiteSpace: 'pre-wrap',
+            wordWrap: 'break-word'
           }}
-          title="Ctrl+B to bold selected text | Type to add values | Backspace to clear"
+          title="Ctrl+B to bold selected text | Drag resize handle to adjust size"
+        />
+
+        {/* Resize handle at bottom-right */}
+        <div
+          onMouseDown={() => setIsResizing(true)}
+          className="absolute bottom-0 right-0 w-4 h-4 bg-gradient-to-tl from-gray-400 to-transparent cursor-se-resize rounded-tl"
+          style={{
+            cursor: 'nwse-resize',
+            zIndex: 10
+          }}
+          title="Drag to resize (expand/minimize)"
         />
       </div>
 
+      {/* ✅ Panic indicator arrow at right side with tooltip */}
+      {indicator && (
+        <div 
+          ref={arrowRef}
+          className="relative"
+          onMouseEnter={() => setShowTooltip(true)}
+          onMouseLeave={() => setShowTooltip(false)}
+        >
+          <div className={`flex items-center justify-center w-5 h-5 rounded-full text-sm font-bold text-white cursor-help ${indicator === '↓' ? 'bg-blue-600' : 'bg-red-600'}`}>
+            {indicator}
+          </div>
+          
+          {/* Tooltip on hover */}
+          {showTooltip && (
+            <div className="absolute left-1/2 bottom-full mb-2 -translate-x-1/2 bg-gray-800 text-white text-xs px-2 py-1 rounded whitespace-nowrap z-50">
+              {getTooltipMessage()}
+              {/* Tooltip arrow pointing down */}
+              <div className="absolute top-full left-1/2 -translate-x-1/2 w-0 h-0 border-l-3 border-r-3 border-t-3 border-l-transparent border-r-transparent border-t-gray-800"></div>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Dropdown with option suggestions */}
       {show && filtered.length > 0 && (
-        <ul className="absolute z-50 left-0 top-full mt-1 bg-white border border-gray-300 rounded shadow-lg max-h-48 overflow-y-auto w-full text-sm">
+        <ul className="absolute z-50 left-0 top-full mt-1 bg-white border border-gray-300 rounded shadow-lg max-h-48 overflow-y-auto text-sm" style={{ width: `${customSize.width}px` }}>
           {filtered.map(opt => (
             <li
               key={opt}
@@ -122,27 +224,6 @@ const SuggestionInput = ({ value, onChange, options, isAbnormal, panicInfo }) =>
             </li>
           ))}
         </ul>
-      )}
-
-      {/* Formatting hint */}
-      {value && (
-        <div className="text-xs text-gray-500 mt-1" style={{ fontSize: '11px' }}>
-          💡 Tip: Select text and press Ctrl+B to make it <strong>bold</strong> (shows as &lt;b&gt;text&lt;/b&gt; in editor)
-        </div>
-      )}
-
-      {/* Display panic range alert if abnormal */}
-      {isAbnormal && panicInfo && (
-        <div className="mt-2 p-2 bg-red-100 border border-red-400 rounded text-xs text-red-800">
-          <strong>⚠️ OUT OF PANIC RANGE:</strong>
-          <div>Value: <strong>{panicInfo.value}</strong></div>
-          <div>Low Panic: <strong>{panicInfo.lowPanic}</strong> | High Panic: <strong>{panicInfo.highPanic}</strong></div>
-          <div className="mt-1 text-red-700">
-            {panicInfo.value < panicInfo.lowPanic 
-              ? `🔴 ${panicInfo.value} is BELOW Low Panic (${panicInfo.lowPanic})` 
-              : `🔴 ${panicInfo.value} is ABOVE High Panic (${panicInfo.highPanic})`}
-          </div>
-        </div>
       )}
     </div>
   );
@@ -841,6 +922,8 @@ const PatientResult = () => {
           name: p.parameterName,
           units: p.units,
           type: p.type,
+          lowPanic: p.lowPanic,
+          highPanic: p.highPanic,
           category: p.categoryName
         })));
         const initialResults = {};
@@ -987,20 +1070,44 @@ const PatientResult = () => {
       
       // ✅ NEW: Check if text value contains numeric and has panic ranges
       if (field === 'textValue' && parameter) {
+        console.log(`📝 Checking text value for parameter: ${parameter.parameterName}`);
+        console.log(`   Value: "${value}"`);
+        console.log(`   Type: ${parameter.type}`);
+        console.log(`   isDescriptive: ${parameter.isDescriptive}`);
+        console.log(`   lowPanic: ${parameter.lowPanic}, highPanic: ${parameter.highPanic}`);
+        
         // Extract first numeric value from the text
         const numericMatch = value?.match(/^[\d.]+/);
+        console.log(`   Numeric match: ${numericMatch ? numericMatch[0] : 'none'}`);
+        
         // ✅ Check for BOTH isDescriptive AND type === 'Text' with panic ranges
         const isTextType = parameter.type === 'Text' || parameter.isDescriptive;
         const hasPanicRanges = parameter.lowPanic !== null && parameter.highPanic !== null && parameter.lowPanic !== undefined && parameter.highPanic !== undefined;
+        
+        console.log(`   isTextType: ${isTextType}, hasPanicRanges: ${hasPanicRanges}`);
         
         if (numericMatch && isTextType && hasPanicRanges) {
           const numericValue = parseFloat(numericMatch[0]);
           if (!isNaN(numericValue)) {
             // Check against panic ranges
             const isAbnormal = numericValue < parameter.lowPanic || numericValue > parameter.highPanic;
-            updated[parameterId] = { ...updated[parameterId], isAbnormal: isAbnormal };
-            console.log(`🔴 PANIC RANGE CHECK: Parameter "${parameter.parameterName}" (Type: ${parameter.type}, Descriptive: ${parameter.isDescriptive}) - Value: ${numericValue}, Low Panic: ${parameter.lowPanic}, High Panic: ${parameter.highPanic}, Abnormal: ${isAbnormal}`);
+            // ✅ NEW: Store panic info and set isAbnormal
+            updated[parameterId] = { 
+              ...updated[parameterId], 
+              isAbnormal: isAbnormal,
+              panicInfo: {
+                value: numericValue,
+                lowPanic: parameter.lowPanic,
+                highPanic: parameter.highPanic
+              }
+            };
+            console.log(`✅ PANIC RANGE CHECK: Parameter "${parameter.parameterName}" - Value: ${numericValue}, Range: ${parameter.lowPanic} - ${parameter.highPanic}, Abnormal: ${isAbnormal}`);
+            console.log(`✅ panicInfo set:`, updated[parameterId].panicInfo);
           }
+        } else {
+          console.log(`⚠️ Conditions not met: numericMatch=${!!numericMatch}, isTextType=${isTextType}, hasPanicRanges=${hasPanicRanges}`);
+          // Clear panicInfo if conditions not met
+          updated[parameterId] = { ...updated[parameterId], isAbnormal: false, panicInfo: null };
         }
       }
       
@@ -1560,7 +1667,7 @@ const PatientResult = () => {
                                           onChange={(val) => handleResultChange(paramKey, 'textValue', val, testData.parameters)}
                                           options={options}
                                           isAbnormal={results[paramKey]?.isAbnormal || false}
-                                          panicInfo={testData.parameters.find(p => p.id === paramKey)?.panicInfo}
+                                          panicInfo={results[paramKey]?.panicInfo}
                                         />
                                       ) : (
                                         <input
@@ -1808,7 +1915,7 @@ const PatientResult = () => {
                                         onChange={(val) => handleResultChange(param.id, 'textValue', val, parameters)}
                                         options={options}
                                         isAbnormal={results[param.id]?.isAbnormal}
-                                        panicInfo={param.panicInfo}
+                                        panicInfo={results[param.id]?.panicInfo}
                                       />
                                     ) : (
                                       <input type="text" value={results[param.id]?.textValue || ''} onChange={(e) => handleResultChange(param.id, 'textValue', e.target.value, parameters)} className={`border px-2 py-1 w-32 rounded ${results[param.id]?.isAbnormal ? "border-red-500 bg-red-50" : "border-gray-300"}`} />
@@ -1826,7 +1933,7 @@ const PatientResult = () => {
                                         onChange={(val) => handleResultChange(param.id, 'textValue', val, parameters)}
                                         options={options}
                                         isAbnormal={results[param.id]?.isAbnormal}
-                                        panicInfo={param.panicInfo}
+                                        panicInfo={results[param.id]?.panicInfo}
                                       />
                                     ) : (
                                       <input type="text" value={results[param.id]?.textValue || ''} onChange={(e) => handleResultChange(param.id, 'textValue', e.target.value, parameters)} className={`border px-2 py-1 w-32 rounded ${results[param.id]?.isAbnormal ? "border-red-500 bg-red-50" : "border-gray-300"}`} />
