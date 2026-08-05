@@ -279,6 +279,7 @@ model PatientTest {
   testId             Int
   packageId          Int?
   departmentId       Int
+  usedMachineId      Int?                // Machine that performed this test
   sample             String
   charge             Float
   status             String              @default("Registered")
@@ -316,12 +317,14 @@ model PatientTest {
   package            Package?            @relation(fields: [packageId], references: [id], onDelete: Cascade)
   patient            Patient             @relation(fields: [patientId], references: [patientId], onDelete: Cascade)
   test               Test                @relation(fields: [testId], references: [id])
+  usedMachine        Machine?            @relation(fields: [usedMachineId], references: [id], onDelete: SetNull)
   testResults        TestResult[]
   statusHistory      TestStatusHistory[]
 
   @@index([departmentId], map: "patient_tests_departmentId_fkey")
   @@index([testId], map: "patient_tests_testId_fkey")
   @@index([organizationId], map: "patient_tests_organizationId_fkey")
+  @@index([usedMachineId], map: "patient_tests_usedMachineId_fkey")
   @@index([status])
   @@index([barcode_status])
   @@index([visitDate])
@@ -695,12 +698,14 @@ model TestResult {
 }
 
 model Machine {
-  id        Int       @id @default(autoincrement())
-  name      String    @unique
-  isActive  Boolean   @default(true)
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  id          Int       @id @default(autoincrement())
+  name        String    @unique
+  description String?   @db.Text
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
   testMachines TestMachine[]
+  patientTests PatientTest[]
 
   @@map("machines")
 }
@@ -749,18 +754,6 @@ model Signature {
   updatedAt      DateTime @updatedAt
 
   @@map("signatures")
-}
-
-model Letterhead {
-  id                Int      @id @default(autoincrement())
-  letterheadName    String   @unique
-  headerImage       String?  @db.LongText
-  footerImage       String?  @db.LongText
-  isActive          Boolean  @default(true)
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
-
-  @@map("letterheads")
 }
 
 // ============================================

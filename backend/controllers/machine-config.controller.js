@@ -19,7 +19,7 @@ export const getMachines = async (req, res) => {
 
     const machines = await prisma.machine.findMany({
       where: whereClause,
-      include: { _count: { select: { tests: true } } },
+      include: { _count: { select: { testMachines: true } } },
       orderBy: [{ isActive: 'desc' }, { name: 'asc' }]
     });
 
@@ -28,8 +28,9 @@ export const getMachines = async (req, res) => {
       data: machines.map(m => ({
         id: m.id,
         name: m.name,
+        description: m.description,
         isActive: m.isActive,
-        testCount: m._count.tests,
+        testCount: m._count.testMachines,
         createdAt: m.createdAt,
         updatedAt: m.updatedAt
       }))
@@ -75,12 +76,16 @@ export const getMachineById = async (req, res) => {
     const machine = await prisma.machine.findUnique({
       where: { id: parseInt(id) },
       include: {
-        tests: {
+        testMachines: {
           select: {
-            id: true,
-            name: true,
-            testCode: true,
-            department: { select: { id: true, name: true } }
+            test: {
+              select: {
+                id: true,
+                name: true,
+                testCode: true,
+                department: { select: { id: true, name: true } }
+              }
+            }
           }
         }
       }
@@ -108,7 +113,7 @@ export const getMachineById = async (req, res) => {
 
 export const createMachine = async (req, res) => {
   try {
-    const { name } = req.body;
+    const { name, description } = req.body;
 
     if (!name || name.trim() === '') {
       return res.status(400).json({
@@ -131,7 +136,11 @@ export const createMachine = async (req, res) => {
     }
 
     const machine = await prisma.machine.create({
-      data: { name: normalizedName, isActive: true }
+      data: { 
+        name: normalizedName, 
+        description: description?.trim() || null,
+        isActive: true 
+      }
     });
 
     return res.status(201).json({
@@ -159,7 +168,7 @@ export const createMachine = async (req, res) => {
 export const updateMachine = async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, isActive } = req.body;
+    const { name, description, isActive } = req.body;
     const machineId = parseInt(id);
 
     const machine = await prisma.machine.findUnique({
@@ -199,6 +208,10 @@ export const updateMachine = async (req, res) => {
       }
 
       updateData.name = normalizedName;
+    }
+
+    if (description !== undefined) {
+      updateData.description = description?.trim() || null;
     }
 
     if (isActive !== undefined) {
@@ -273,16 +286,20 @@ export const getMachineUsage = async (req, res) => {
     const machine = await prisma.machine.findUnique({
       where: { id: parseInt(id) },
       include: {
-        tests: {
+        testMachines: {
           select: {
-            id: true,
-            name: true,
-            testCode: true,
-            isActive: true,
-            isDeleted: true,
-            department: { select: { id: true, name: true } }
+            test: {
+              select: {
+                id: true,
+                name: true,
+                testCode: true,
+                isActive: true,
+                isDeleted: true,
+                department: { select: { id: true, name: true } }
+              }
+            }
           },
-          orderBy: { name: 'asc' }
+          orderBy: { test: { name: 'asc' } }
         }
       }
     });
@@ -294,8 +311,9 @@ export const getMachineUsage = async (req, res) => {
       });
     }
 
-    const activeTests = machine.tests.filter(t => t.isActive && !t.isDeleted).length;
-    const totalTests = machine.tests.length;
+    const tests = machine.testMachines.map(tm => tm.test);
+    const activeTests = tests.filter(t => t.isActive && !t.isDeleted).length;
+    const totalTests = tests.length;
 
     return res.status(200).json({
       success: true,
@@ -310,7 +328,7 @@ export const getMachineUsage = async (req, res) => {
           activeTests,
           inactiveTests: totalTests - activeTests
         },
-        tests: machine.tests
+        tests: tests
       }
     });
   } catch (err) {
