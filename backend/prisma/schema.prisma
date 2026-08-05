@@ -752,18 +752,6 @@ model Signature {
   @@map("signatures")
 }
 
-model Letterhead {
-  id                Int      @id @default(autoincrement())
-  letterheadName    String   @unique
-  headerImage       String?  @db.LongText
-  footerImage       String?  @db.LongText
-  isActive          Boolean  @default(true)
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
-
-  @@map("letterheads")
-}
-
 // ============================================
 // INVENTORY MODULE
 // ============================================

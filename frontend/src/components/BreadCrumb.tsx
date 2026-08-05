@@ -15,7 +15,6 @@ const iconMap = {
   "Search for Booking": Search,
   "Outsourcing for Test": Send,
   "Configuration": Settings,
-  "Letterhead": Image,
   "Signature": FileSignature,
   "Machines": Database,
   "Tests": Database,
@@ -82,7 +81,6 @@ const urlPathMap: { [key: string]: string } = {
   "reports/bulk-settlement": "Reports / Bulk Settlement",
   
   // Configuration Module
-  "config/letterhead": "Configuration / Letterhead",
   "config/signature": "Configuration / Signature",
   "config/machines": "Configuration / Machines",
   
