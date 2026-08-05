@@ -143,12 +143,13 @@ function buildContentBlocks(
       }
     );
 
-    // ✅ Add comments as table row right after parameters
-    if (comments && comments.trim()) {
-      console.log('✅ Adding comments block:', comments);
-      blocks.push({ kind: 'comments', text: comments });
+    // ✅ Add comments as table row right after parameters - use per-test comments from testItem
+    const testComments = (testItem as any).comments || '';
+    if (testComments && testComments.trim()) {
+      console.log(`✅ Adding comments block for test "${testItem.name}":`, testComments);
+      blocks.push({ kind: 'comments', text: testComments });
     } else {
-      console.log('⚠️ No comments to add - comments is empty or not provided');
+      console.log(`⚠️ No comments for test "${testItem.name}"`);
     }
 
     if (testItem.interpretation) {

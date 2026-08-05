@@ -1445,7 +1445,9 @@ export default function Result() {
         // Include outsourcing data if available
         isOutsourced: r.patientTest.isOutsourced || false,
         outsourcedTo: r.patientTest.outsourcedTo || null,
-        outsourcingReport: r.outsourcingReport || null
+        outsourcingReport: r.outsourcingReport || null,
+        // ✅ Include per-test comments
+        comments: r.patientTest.comments || ''
       }));
 
       // Build results object mapping parameter IDs to their values
@@ -1489,7 +1491,8 @@ export default function Result() {
         printOption: option,
         results: resultsMap,
         referralDoctor: first.patientTest.referralDoctor,
-        comments: first.comments  // ✅ Access comments directly from response
+        // ✅ For single test, use first comments; for multiple tests, combinedTests has per-test comments
+        comments: combinedTests.length === 1 ? first.comments : ''
       });
       
       setReportWithHeader(true);

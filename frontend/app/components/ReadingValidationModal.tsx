@@ -217,19 +217,19 @@ const ReadingValidationModal = ({
   // Initialize results from existing data
   useEffect(() => {
     if (parameters && parameters.length > 0) {
-      const initialResults = {};
+      const initialResults: any = {};
       let savedValuesCount = 0;
       
       parameters.forEach(param => {
         const hasExistingResult = !!param.existingResult;
         
-        if (hasExistingResult) {
+        if (hasExistingResult && param.existingResult) {
           console.log(`✅ FOUND SAVED VALUE - Param: ${param.parameterName} (ID: ${param.id})`, {
             type: param.type,
             existingResult: param.existingResult,
-            numericValue: param.existingResult.numericValue,
-            textValue: param.existingResult.textValue,
-            selectedOption: param.existingResult.selectedOption
+            numericValue: param.existingResult?.numericValue,
+            textValue: param.existingResult?.textValue,
+            selectedOption: param.existingResult?.selectedOption
           });
           savedValuesCount++;
         } else {
@@ -246,15 +246,15 @@ const ReadingValidationModal = ({
             textValue: (textVal && typeof textVal === 'string' && textVal.trim() !== '') ? textVal : '',
             selectedOption: (optionVal && typeof optionVal === 'string' && optionVal.trim() !== '') ? optionVal : '',
             isAbnormal: param.existingResult.isAbnormal || false,
-            isHighlighted: param.existingResult.isHighlighted || false,
-            referenceRange: param.existingResult.referenceRange || param.normalRange
+            referenceRange: param.existingResult.referenceRange || param.normalRange,
+            isHighlighted: (param.existingResult as any)?.isHighlighted || false
           };
           
           console.log(`  → Init for param ${param.id}:`, {
-            numericValue: initialResults[param.id].numericValue,
-            textValue: initialResults[param.id].textValue,
-            selectedOption: initialResults[param.id].selectedOption,
-            isHighlighted: initialResults[param.id].isHighlighted
+            numericValue: (initialResults[param.id] as any).numericValue,
+            textValue: (initialResults[param.id] as any).textValue,
+            selectedOption: (initialResults[param.id] as any).selectedOption,
+            isHighlighted: (initialResults[param.id] as any).isHighlighted
           });
         } else {
           initialResults[param.id] = {
@@ -262,8 +262,8 @@ const ReadingValidationModal = ({
             textValue: '',
             selectedOption: '',
             isAbnormal: false,
-            isHighlighted: false,
-            referenceRange: param.normalRange
+            referenceRange: param.normalRange,
+            isHighlighted: false
           };
         }
       });
@@ -489,14 +489,13 @@ const ReadingValidationModal = ({
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ comments: newComments })
         });
-        console.log('✅ Comments auto-saved:', newComments);
+        console.log('✅ Comments auto-saved in Validation Modal:', newComments);
       } catch (error) {
-        console.error('⚠️ Error auto-saving comments:', error);
+        console.error('⚠️ Error auto-saving comments in Validation Modal:', error);
       }
     }
   };
 
-  // Handle comment checkbox change
   const handleCommentCheckbox = (checked: boolean) => {
     setShowComments(checked);
 
