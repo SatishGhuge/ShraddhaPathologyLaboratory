@@ -529,7 +529,7 @@ const ProfessionalReport = React.forwardRef<HTMLDivElement, ProfessionalReportPr
                 <td style={{ padding: '2px 4px 2px 2mm', fontWeight: 'bold', fontSize: '10px', color: '#333' }}>
                   COMMENTS
                 </td>
-                <td colSpan={showUnits || showRange ? 2 : 1} style={{ padding: '2px 4px', fontSize: '9px', color: '#555', whiteSpace: 'pre-wrap' }}>
+                <td colSpan={showUnits || showRange ? 2 : 1} style={{ padding: '2px 4px', fontSize: '9px', color: '#555', whiteSpace: 'pre-wrap', fontWeight: 'bold' }}>
                   {strip(block.text)}
                 </td>
               </tr>

@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, Fragment, useRef } from 'react';
 import { X, AlertCircle } from 'lucide-react';
 import API_BASE_URL from '@/src/api/config';
+import { deleteCommentFromHistory } from '@/src/api/result';
 import { parseHtmlText, HtmlPart } from '@/src/utils/htmlParser';
 
 // Helper function to extract ALL available options from a parameter (from ALL database fields)
@@ -948,19 +949,41 @@ const ReadingValidationModal = ({
                 {commentHistory.length > 0 && commentFocused && (
                   <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-300 rounded shadow-lg max-h-40 overflow-y-auto z-50">
                     {commentHistory.map((hist, idx) => (
-                      <button
+                      <div
                         key={idx}
-                        type="button"
-                        onMouseDown={(e) => e.preventDefault()}
-                        onClick={() => {
-                          const newComments = comments.trim() ? `${comments}, ${hist}` : hist;
-                          handleCommentChange(newComments);
-                          commentInputRef.current?.focus();
-                        }}
-                        className="w-full text-left px-2 py-1.5 text-xs bg-white hover:bg-blue-500 hover:text-white text-gray-800 border-b last:border-b-0 transition-colors"
+                        className="flex items-center gap-2 px-2 py-1.5 text-xs bg-white hover:bg-blue-50 text-gray-800 border-b last:border-b-0 transition-colors group"
                       >
-                        {hist}
-                      </button>
+                        <button
+                          type="button"
+                          onMouseDown={(e) => e.preventDefault()}
+                          onClick={() => {
+                            const newComments = comments.trim() ? `${comments}, ${hist}` : hist;
+                            handleCommentChange(newComments);
+                            commentInputRef.current?.focus();
+                          }}
+                          className="flex-1 text-left hover:text-blue-600 transition-colors"
+                        >
+                          {hist}
+                        </button>
+                        <button
+                          type="button"
+                          onMouseDown={(e) => e.preventDefault()}
+                          onClick={async (e) => {
+                            e.stopPropagation();
+                            try {
+                              await deleteCommentFromHistory(hist);
+                              setCommentHistory(prev => prev.filter(c => c !== hist));
+                            } catch (error) {
+                              console.error('Error deleting comment:', error);
+                              alert('Failed to delete comment');
+                            }
+                          }}
+                          className="text-red-500 hover:text-red-700 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0"
+                          title="Delete this comment"
+                        >
+                          ✕
+                        </button>
+                      </div>
                     ))}
                   </div>
                 )}

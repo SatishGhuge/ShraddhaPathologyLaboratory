@@ -2236,3 +2236,73 @@ export const getCommentHistory = async (req, res) => {
     });
   }
 };
+
+// Delete a comment from all tests
+export const deleteCommentFromHistory = async (req, res) => {
+  try {
+    const { comment } = req.body;
+
+    if (!comment || !comment.trim()) {
+      return res.status(400).json({
+        success: false,
+        message: 'Comment text is required'
+      });
+    }
+
+    const trimmedComment = comment.trim();
+    console.log(`🗑️ Deleting comment from history: "${trimmedComment}"`);
+
+    // Find all patient tests that contain this comment
+    const allPatientTests = await prisma.patientTest.findMany({
+      where: {
+        comments: {
+          not: null
+        }
+      },
+      select: {
+        id: true,
+        comments: true
+      }
+    });
+
+    let updatedCount = 0;
+
+    // Remove the comment from each test's comments field
+    for (const test of allPatientTests) {
+      if (test.comments && test.comments.trim()) {
+        // Split by comma, filter out the comment to delete, and rejoin
+        const parts = test.comments
+          .split(',')
+          .map(c => c.trim())
+          .filter(c => c.length > 0 && c !== trimmedComment);
+
+        // Update the test with the new comments
+        const newComments = parts.length > 0 ? parts.join(', ') : null;
+        
+        if (test.comments !== (newComments || '')) {
+          await prisma.patientTest.update({
+            where: { id: test.id },
+            data: { comments: newComments }
+          });
+          updatedCount++;
+          console.log(`✅ Updated test ${test.id}: removed "${trimmedComment}"`);
+        }
+      }
+    }
+
+    console.log(`✅ Deleted comment from ${updatedCount} test(s)`);
+
+    res.json({
+      success: true,
+      message: `Comment deleted from ${updatedCount} test(s)`,
+      data: { updatedCount }
+    });
+
+  } catch (error) {
+    console.error('Delete comment error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to delete comment: ' + error.message
+    });
+  }
+};

@@ -981,207 +981,189 @@ export default function Result() {
     });
   };
 
-  // Download report as PDF directly to device
-  const handleDownloadPdf = async (withHeader) => {
+  // Download report as PDF using professional format
+  const handleDownloadPdf = async (withHeader: boolean) => {
     setShowDownloadDropdown(false);
     if (selectedTests.size === 0) { alert('Please select a test'); return; }
     try {
       setLoading(true);
       const testIds = Array.from(selectedTests);
       const responses = await Promise.all(testIds.map(id => getPatientTestById(id)));
-      const first = responses[0];
-
-      // Fetch signature
-      let signature = first.patientTest.test?.signature || null;
-      if (!signature) {
-        try {
-          const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || '/api';
-          const testSpeciality = first.patientTest.test?.speciality || 'Regular';
-          const sigRes = await fetch(`${API_BASE_URL}/signatures/by-specialty/${encodeURIComponent(testSpeciality)}`);
-          const sigData = await sigRes.json();
-          if (sigData.success && sigData.data) signature = sigData.data;
-          else {
-            const allRes = await fetch(`${API_BASE_URL}/signatures`);
-            const allData = await allRes.json();
-            if (allData.success && allData.data.length > 0) {
-              const active = allData.data.filter(s => s.isActive);
-              if (active.length > 0) signature = active[0];
-            }
-          }
-        } catch (e) { console.warn('Could not fetch signature', e); }
+      
+      if (!responses || responses.length === 0) {
+        alert('No test data found');
+        return;
       }
 
-      const patient = first.patientTest.patient;
-      const visitId = first.patientTest.visitId;
-      const visitDate = first.patientTest.visitDate
-        ? new Date(first.patientTest.visitDate).toLocaleDateString('en-GB') : '-';
+      const first = responses[0];
+      const patientTestData = first.patientTest;
+      const patient = patientTestData.patient;
+      const visitId = patientTestData.visitId;
+      const visitDate = patientTestData.visitDate 
+        ? new Date(patientTestData.visitDate).toLocaleDateString('en-GB') 
+        : '-';
       const patientName = `${patient.title || ''} ${patient.firstName || ''} ${patient.lastName || ''}`.trim();
 
-      // Convert LetterHead image to base64 for embedding in PDF
+      // Fetch letterhead from DB if needed
+      let letterheadDB: LetterheadDB | null = null;
       let letterHeadBase64 = '';
       if (withHeader) {
         try {
-          const imgRes = await fetch(LetterHead);
-          const blob = await imgRes.blob();
-          letterHeadBase64 = await new Promise(resolve => {
-            const reader = new FileReader();
-            reader.onloadend = () => resolve(reader.result as string);
-            reader.readAsDataURL(blob);
-          });
-        } catch (e) { console.warn('Could not load letterhead', e); }
+          const lhRes = await fetch(`${API_BASE_URL}/letterhead/active`);
+          const lhData = await lhRes.json();
+          if (lhData.success && lhData.data?.length > 0) {
+            letterheadDB = lhData.data[0];
+            console.log('✅ Letterhead loaded from DB:', letterheadDB);
+          }
+        } catch (e) {
+          console.warn('Could not fetch letterhead from DB', e);
+        }
+
+        // Fallback: Convert static LetterHead to base64 if DB letterhead not available
+        if (!letterheadDB) {
+          try {
+            const imgRes = await fetch(LetterHead);
+            const blob = await imgRes.blob();
+            letterHeadBase64 = await new Promise<string>(resolve => {
+              const reader = new FileReader();
+              reader.onloadend = () => resolve(reader.result as string);
+              reader.readAsDataURL(blob);
+            });
+          } catch (e) { console.warn('Could not load static letterhead', e); }
+        }
       }
 
-      const fileName = `${patientName.replace(/\s+/g, '_')}_${visitId}_Report.pdf`;
+      // Create PDF document
+      const pdfDoc = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait' });
+      const A4_Width = 210;
+      const A4_Height = 297;
 
-      // Pre-convert all images to base64 to avoid CORS issues
-      const toBase64 = async (url) => {
-        const res = await fetch(url);
-        const blob = await res.blob();
-        return new Promise<string>(resolve => {
-          const reader = new FileReader();
-          reader.onloadend = () => resolve(reader.result as string);
-          reader.readAsDataURL(blob);
-        });
-      };
+      // Convert each test response to PDF page using professional format
+      for (let i = 0; i < responses.length; i++) {
+        const response = responses[i];
+        const testData = response.patientTest;
+        const testInfo = testData.test;
 
-      // Re-convert letterhead to base64 if not already done
-      if (withHeader && !letterHeadBase64) {
-        try { letterHeadBase64 = await toBase64(LetterHead) as string; } catch (e) {}
-      }
-
-      // Convert signature image to base64
-      let signatureImageBase64 = '';
-      if (signature?.signatureImage) {
-        try { signatureImageBase64 = await toBase64(signature.signatureImage) as string; } catch (e) { signatureImageBase64 = signature.signatureImage; }
-      }
-
-      // Replace signature image src with base64 in sigHtml (rebuild with base64)
-      const buildPageHtmlB64 = (r: any) => {
-        const t = r.patientTest.test;
-        const gp = r.groupedParameters || {};
-        const ptop = withHeader ? '144px' : '45px';
-        const pbot = withHeader ? '136px' : '45px';
-
-        const paramRows2 = (() => {
-          // Group parameters by category
-          const grouped: any = {};
-          const categoryOrder: any = {};
-          
-          Object.entries(gp).forEach(([catName, catParams]: [string, any]) => {
-            grouped[catName] = catParams;
-            categoryOrder[catName] = catName !== 'NO_CATEGORY_HEADER' && catParams[0]?.sortOrder
-              ? catParams[0].sortOrder
-              : 999;
-          });
-          
-          // Sort categories by sortOrder
-          const sortedCategories = Object.entries(grouped)
-            .sort((a: any, b: any) => categoryOrder[a[0]] - categoryOrder[b[0]]);
-          
-          let rows = '';
-          
-          sortedCategories.forEach(([catName, catParams]: [string, any]) => {
-            // Show category header only once
-            if (catName !== 'NO_CATEGORY_HEADER' && catParams[0]?.showCategoryHeader) {
-              const categoryMethod = catParams[0]?.categoryTestMethod || null;
-              // Parse category name to handle HTML tags - category is ALWAYS bold
-              const categoryNameHtml = catName
-                .replace(/<b>(.*?)<\/b>/g, '<strong>$1</strong>')
-                .replace(/<i>(.*?)<\/i>/g, '<em>$1</em>')
-                .replace(/<u>(.*?)<\/u>/g, '<u>$1</u>');
-              rows += `<tr><td colSpan="4" style="padding:6px;font-weight:bold;border-bottom:1px solid #ddd;background:#f5f5f5;font-size:12px;"><strong>${categoryNameHtml}</strong></td></tr>`;
-              
-              // Add category method below category name
-              if (categoryMethod) {
-                const methodHtml = categoryMethod
-                  .replace(/<b>(.*?)<\/b>/g, '<strong>$1</strong>')
-                  .replace(/<i>(.*?)<\/i>/g, '<em>$1</em>')
-                  .replace(/<u>(.*?)<\/u>/g, '<u>$1</u>');
-                rows += `<tr><td colSpan="4" style="padding:3px 6px;font-size:10px;color:#666;border-bottom:1px solid #eee;background:#fafafa;">Method: ${methodHtml}</td></tr>`;
-              }
+        // Build results map from parameters with existingResult
+        const resultsMap: any = {};
+        if (response.parameters && Array.isArray(response.parameters)) {
+          response.parameters.forEach((param: any) => {
+            if (param.existingResult) {
+              resultsMap[param.id] = {
+                numericValue: param.existingResult.numericValue,
+                textValue: param.existingResult.textValue,
+                referenceRange: param.existingResult.referenceRange,
+                isAbnormal: param.existingResult.isAbnormal || false,
+                isHighlighted: param.existingResult.isHighlighted || false
+              };
             }
-            
-            // Add parameters for this category (sorted by sortOrder)
-            const sortedParams = [...catParams].sort((a: any, b: any) => (a.sortOrder || 999) - (b.sortOrder || 999));
-            
-            sortedParams.forEach((p: any) => {
-              const er = p.existingResult;
-              const val = er ? (er.numericValue !== null && er.numericValue !== undefined ? er.numericValue : (er.textValue || '-')) : '-';
-              const outOfRange = isParamOutOfRange(p, er);
-              
-              // Parse parameter name to handle HTML tags and underline
-              const paramNameHtml = p.parameterName
-                .replace(/<b>(.*?)<\/b>/g, '<strong>$1</strong>')
-                .replace(/<i>(.*?)<\/i>/g, '<em>$1</em>')
-                .replace(/<u>(.*?)<\/u>/g, '<u>$1</u>');
-              
-              const parameterMethod = p.parameterTestMethod ? `<div style="font-size:9px;color:#999;margin-top:2px;">Method: ${p.parameterTestMethod.replace(/<b>(.*?)<\/b>/g, '<strong>$1</strong>').replace(/<i>(.*?)<\/i>/g, '<em>$1</em>').replace(/<u>(.*?)<\/u>/g, '<u>$1</u>')}</div>` : '';
-              
-              rows += `<tr>
-                <td style="padding:3px 6px;width:38%;font-weight:${outOfRange ? 'bold' : 'normal'};">${paramNameHtml}${parameterMethod}</td>
-                <td style="padding:3px 6px 3px 20px;width:22%;font-size:11px;${outOfRange ? 'color:#b91c1c;font-weight:bold;' : ''}">${val}${outOfRange ? ' *' : ''}</td>
-                <td style="padding:3px 6px;width:12%;color:#555;">${p.units || ''}</td>
-                <td style="padding:3px 6px;width:28%;color:#555;">${er?.referenceRange || ''}</td>
-              </tr>`;
+          });
+        }
+
+        // Build HTML content matching professional format
+        const interpretationHtml = testInfo.interpretation 
+          ? `<div style="margin-top:4mm;border-top:0.5px solid #999;padding-top:2mm;font-size:10px;color:#333;">${testInfo.interpretation}</div>` 
+          : '';
+
+        const commentsHtml = testData.comments 
+          ? `<div style="margin-top:3mm;padding:2mm 0;border-top:0.5px solid #ddd;font-size:10px;"><strong>Notes:</strong> ${testData.comments}</div>` 
+          : '';
+
+        // Build parameters table with grouped parameters
+        let paramsHtml = '';
+        if (response.groupedParameters) {
+          Object.entries(response.groupedParameters).forEach(([catName, params]: [string, any]) => {
+            // Add category header
+            if (catName !== 'NO_CATEGORY_HEADER' && (params as any)[0]?.showCategoryHeader) {
+              paramsHtml += `<tr><td colspan="4" style="padding:3mm 2mm;background:#f5f5f5;font-weight:bold;font-size:10px;border-bottom:0.5px solid #999;">${catName}</td></tr>`;
+            }
+
+            // Add category method if exists
+            const categoryMethod = (params as any)[0]?.categoryTestMethod;
+            if (categoryMethod) {
+              paramsHtml += `<tr><td colspan="4" style="padding:2mm;background:#fafafa;font-size:9px;color:#666;border-bottom:0.5px solid #eee;">Method: ${categoryMethod}</td></tr>`;
+            }
+
+            // Sort parameters by sortOrder
+            const sortedParams = [...(params as any[])].sort((a: any, b: any) => (a.sortOrder || 999) - (b.sortOrder || 999));
+
+            sortedParams.forEach((param: any) => {
+              const result = resultsMap[param.id] || {};
+              const resultValue = result.numericValue !== null && result.numericValue !== undefined 
+                ? result.numericValue 
+                : (result.textValue || '-');
+              const rangeText = result.referenceRange || param.normalRange || '-';
+              const outOfRange = result.isAbnormal ? 'color:#b91c1c;font-weight:bold;' : '';
+              const rowClass = result.isHighlighted ? 'background:#ffe6e6;' : '';
+
+              paramsHtml += `
+                <tr style="${rowClass}">
+                  <td style="padding:2mm;border-bottom:0.5px solid #ddd;font-size:10px;width:35%;">${param.parameterName}</td>
+                  <td style="padding:2mm;border-bottom:0.5px solid #ddd;font-size:10px;width:20%;text-align:center;${outOfRange}">${resultValue}${result.isAbnormal ? ' *' : ''}</td>
+                  <td style="padding:2mm;border-bottom:0.5px solid #ddd;font-size:10px;width:12%;">${param.units || '-'}</td>
+                  <td style="padding:2mm;border-bottom:0.5px solid #ddd;font-size:10px;width:33%;">${rangeText}</td>
+                </tr>
+              `;
             });
           });
-          
-          return rows;
-        })();
+        }
 
-        const sigHtml2 = signature ? `
-          <div style="margin-top:auto;padding-top:22px;display:flex;justify-content:flex-end;">
-            <div style="text-align:center;">
-              ${signatureImageBase64 ? `<img src="${signatureImageBase64}" style="width:${signature.width||150}px;height:${signature.height||80}px;object-fit:contain;display:block;margin:0 auto;" />` : ''}
-              ${signature.signatureText ? `<div style="font-size:11px;font-weight:bold;white-space:pre-line;">${signature.signatureText}</div>` : ''}
-              ${signature.doctorName ? `<div style="font-size:11px;font-weight:bold;">${signature.doctorName}</div>` : ''}
-              ${signature.specialty ? `<div style="font-size:10px;color:#444;">${signature.specialty}</div>` : ''}
-            </div>
-          </div>` : '';
+        // Build letterhead image HTML if available
+        const letterheadHtml = withHeader && (letterheadDB?.headerImage || letterHeadBase64)
+          ? `<img src="${letterheadDB?.headerImage || letterHeadBase64}" style="position:absolute;top:0;left:0;width:100%;height:100%;object-fit:fill;z-index:0;" />`
+          : '';
 
-        return `<div style="width:100%;height:1123px;position:relative;background:#fff;font-family:Arial,sans-serif;font-size:11px;overflow:hidden;">
-            ${withHeader && letterHeadBase64 ? `<img src="${letterHeadBase64}" style="position:absolute;top:0;left:0;width:100%;height:1123px;object-fit:fill;z-index:0;" />` : ''}
-            <div style="position:relative;z-index:1;height:1123px;display:flex;flex-direction:column;padding-top:${ptop};padding-bottom:${pbot};padding-left:53px;padding-right:53px;box-sizing:border-box;">
-              <div style="text-align:center;margin-bottom:22px;border-bottom:1.5px solid #333;padding-bottom:11px;">
-                <strong style="font-size:13px;letter-spacing:1px;">${t.name.toUpperCase()} REPORT</strong>
+        // Build complete HTML page
+        const pageHtml = `
+          <div style="width:100%;height:${A4_Height}mm;font-family:Arial,sans-serif;background:#fff;overflow:hidden;position:relative;">
+            ${letterheadHtml}
+            <div style="position:relative;z-index:1;padding:${withHeader ? '25mm' : '12mm'} 12mm;height:100%;box-sizing:border-box;overflow:hidden;display:flex;flex-direction:column;">
+              
+              <!-- Test Title -->
+              <div style="text-align:center;margin-bottom:5mm;padding-bottom:3mm;border-bottom:1px solid #333;">
+                <strong style="font-size:12px;letter-spacing:0.5px;">${testInfo.name.toUpperCase()} REPORT</strong>
               </div>
-              <table style="width:100%;border-collapse:collapse;margin-bottom:15px;font-size:11px;">
+
+              <!-- Patient Info Table -->
+              <table style="width:100%;border-collapse:collapse;margin-bottom:4mm;font-size:10px;">
                 <tr>
-                  <td style="padding:2px 4px;width:50%;"><strong>Patient:</strong> ${patientName}</td>
-                  <td style="padding:2px 4px;width:50%;"><strong>Age / Gender:</strong> ${patient.age || '-'} Yrs / ${patient.gender || '-'}</td>
+                  <td style="padding:2mm 3mm;width:50%;"><strong>Patient:</strong> ${patientName}</td>
+                  <td style="padding:2mm 3mm;width:50%;"><strong>Age / Gender:</strong> ${patient.ageYears || 0}Y ${patient.ageMonths || 0}M / ${patient.gender || '-'}</td>
                 </tr>
                 <tr>
-                  <td style="padding:2px 4px;"><strong>Lab No:</strong> ${visitId}</td>
-                  <td style="padding:2px 4px;"><strong>Date:</strong> ${visitDate}</td>
+                  <td style="padding:2mm 3mm;"><strong>Lab No:</strong> ${visitId}</td>
+                  <td style="padding:2mm 3mm;"><strong>Date:</strong> ${visitDate}</td>
                 </tr>
               </table>
-              <table style="width:100%;border-collapse:collapse;font-size:11px;">
+
+              <!-- Results Table -->
+              <table style="width:100%;border-collapse:collapse;font-size:10px;margin-bottom:4mm;flex:1;overflow:hidden;">
                 <thead>
                   <tr>
-                    <th style="border-bottom:1.5px solid #333;padding:4px 6px;text-align:left;width:38%;">Test Description</th>
-                    <th style="border-bottom:1.5px solid #333;padding:4px 6px 4px 20px;text-align:left;width:22%;">Result</th>
-                    <th style="border-bottom:1.5px solid #333;padding:4px 6px;text-align:left;width:12%;">Unit</th>
-                    <th style="border-bottom:1.5px solid #333;padding:4px 6px;text-align:left;width:28%;">Biological Reference Range</th>
+                    <th style="border-bottom:1px solid #333;padding:3mm 2mm;text-align:left;width:35%;"><strong>Test Description</strong></th>
+                    <th style="border-bottom:1px solid #333;padding:3mm 2mm;text-align:center;width:20%;"><strong>Result</strong></th>
+                    <th style="border-bottom:1px solid #333;padding:3mm 2mm;text-align:left;width:12%;"><strong>Unit</strong></th>
+                    <th style="border-bottom:1px solid #333;padding:3mm 2mm;text-align:left;width:33%;"><strong>Reference Range</strong></th>
                   </tr>
                 </thead>
                 <tbody>
-                  <tr><td colSpan={4} style="padding:4px 6px;font-weight:bold;border-bottom:1px solid #ccc;">${t.name}</td></tr>
-                  ${paramRows2}
+                  ${paramsHtml}
                 </tbody>
               </table>
-              ${t.interpretation ? `<div style="margin-top:15px;border-top:1px solid #ccc;padding-top:11px;font-size:11px;color:#444;">${t.interpretation}</div>` : ''}
-              ${sigHtml2}
+
+              <!-- Interpretation -->
+              ${interpretationHtml}
+
+              <!-- Comments/Notes -->
+              ${commentsHtml}
+
+              <!-- Footer Spacing -->
+              <div style="flex:1;"></div>
             </div>
-          </div>`;
-      };
+          </div>
+        `;
 
-      const pdf = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait' });
-      const A4_W = 210, A4_H = 297;
-
-      for (let i = 0; i < responses.length; i++) {
-        // html2pdf manages its own container/overlay — just pass the HTML string
-        const pageHtml = buildPageHtmlB64(responses[i]);
-
+        // Convert HTML to image and add to PDF
         const imgDataUrl = await html2pdf().set({
           margin: 0,
           jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
@@ -1195,24 +1177,13 @@ export default function Result() {
           }
         }).from(pageHtml).outputImg('datauristring');
 
-        if (i > 0) pdf.addPage();
-        pdf.addImage(imgDataUrl, 'JPEG', 0, 0, A4_W, A4_H);
+        if (i > 0) pdfDoc.addPage();
+        pdfDoc.addImage(imgDataUrl, 'JPEG', 0, 0, A4_Width, A4_Height);
       }
 
-      // Attachment page
-      const attachmentPath = responses.find(r => r.patientTest.attachmentPath)?.patientTest.attachmentPath
-        || (uploadedFiles[Array.from(selectedTests)[0] as string]?.serverPath);
-      if (attachmentPath && !attachmentPath.endsWith('.pdf')) {
-        try {
-          const baseUrl = (process.env.NEXT_PUBLIC_API_URL || '').replace('/api', '');
-          const src = attachmentPath.startsWith('http') ? attachmentPath : `${baseUrl}${attachmentPath}`;
-          const attachBase64 = await toBase64(src) as string;
-          pdf.addPage();
-          pdf.addImage(attachBase64, 'JPEG', 0, 0, A4_W, A4_H);
-        } catch (e) { console.warn('Could not add attachment page', e); }
-      }
-
-      pdf.save(fileName);
+      // Save PDF with proper filename
+      const fileName = `${patientName.replace(/\s+/g, '_')}_${visitId}_Report.pdf`;
+      pdfDoc.save(fileName);
     } catch (err) {
       console.error('PDF download error:', err);
       alert('Failed to generate PDF: ' + err.message);

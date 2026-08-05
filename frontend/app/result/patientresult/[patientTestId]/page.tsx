@@ -6,7 +6,7 @@ import React, { useState, useEffect, useCallback, useRef } from "react";
 
 import Header from "@/src/components/Header";
 import BarcodeModal, { generateBarcodeLabels, getSampleTypeId, getSampleTypeName, getTestName } from "@/app/components/BarcodeModal";
-import { getPatientTestById, updateTestStatus, updatePatientComments } from "@/src/api/result.js";
+import { getPatientTestById, updateTestStatus, updatePatientComments, deleteCommentFromHistory } from "@/src/api/result.js";
 import API_BASE_URL from "@/src/api/config";
 import { useTestTemplates } from '@/src/hooks/useTestTemplates';
 import InlineTemplateSelector from '@/app/components/InlineTemplateSelector';
@@ -1594,6 +1594,7 @@ const PatientResult = () => {
                                       handleHighlightChange(paramKey);
                                     }}
                                     className="w-5 h-5 accent-blue-600 cursor-pointer"
+                                    tabIndex={-1}
                                     title="Check to highlight this value bold in report"
                                   />
                                 </td>
@@ -1629,18 +1630,37 @@ const PatientResult = () => {
                                   <div className="absolute top-12 left-0 right-0 bg-white border border-gray-300 rounded shadow-lg p-2 max-h-40 overflow-y-auto z-50">
                                     <div className="space-y-1">
                                       {commentHistory.map((hist, idx) => (
-                                        <button
-                                          key={idx}
-                                          type="button"
-                                          onMouseDown={(e) => e.preventDefault()}
-                                          onClick={() => {
-                                            const newComments = comments.trim() ? `${comments}, ${hist}` : hist;
-                                            handleCommentChange(newComments);
-                                          }}
-                                          className="w-full text-left px-2 py-1.5 text-xs bg-gray-50 hover:bg-blue-500 hover:text-white text-gray-800 rounded cursor-pointer transition-colors"
-                                        >
-                                          {hist}
-                                        </button>
+                                        <div key={idx} className="flex items-center gap-2 px-2 py-1.5 text-xs bg-gray-50 hover:bg-blue-50 rounded group">
+                                          <button
+                                            type="button"
+                                            onMouseDown={(e) => e.preventDefault()}
+                                            onClick={() => {
+                                              const newComments = comments.trim() ? `${comments}, ${hist}` : hist;
+                                              handleCommentChange(newComments);
+                                            }}
+                                            className="flex-1 text-left text-gray-800 hover:text-blue-600 transition-colors cursor-pointer"
+                                          >
+                                            {hist}
+                                          </button>
+                                          <button
+                                            type="button"
+                                            onMouseDown={(e) => e.preventDefault()}
+                                            onClick={async (e) => {
+                                              e.stopPropagation();
+                                              try {
+                                                await deleteCommentFromHistory(hist);
+                                                setCommentHistory(prev => prev.filter(c => c !== hist));
+                                              } catch (error) {
+                                                console.error('Error deleting comment:', error);
+                                                alert('Failed to delete comment');
+                                              }
+                                            }}
+                                            className="text-red-500 hover:text-red-700 opacity-0 group-hover:opacity-100 transition-opacity"
+                                            title="Delete this comment"
+                                          >
+                                            ✕
+                                          </button>
+                                        </div>
                                       ))}
                                     </div>
                                   </div>
@@ -1860,6 +1880,7 @@ const PatientResult = () => {
                                   handleHighlightChange(param.id);
                                 }}
                                 className="w-5 h-5 accent-blue-600 cursor-pointer"
+                                tabIndex={-1}
                                 title="Check to highlight this value bold in report"
                               />
                             </td>
@@ -1895,18 +1916,37 @@ const PatientResult = () => {
                               <div className="absolute top-12 left-0 right-0 bg-white border border-gray-300 rounded shadow-lg p-2 max-h-40 overflow-y-auto z-50">
                                 <div className="space-y-1">
                                   {commentHistory.map((hist, idx) => (
-                                    <button
-                                      key={idx}
-                                      type="button"
-                                      onMouseDown={(e) => e.preventDefault()}
-                                      onClick={() => {
-                                        const newComments = comments.trim() ? `${comments}, ${hist}` : hist;
-                                        handleCommentChange(newComments);
-                                      }}
-                                      className="w-full text-left px-2 py-1.5 text-xs bg-gray-50 hover:bg-blue-500 hover:text-white text-gray-800 rounded cursor-pointer transition-colors"
-                                    >
-                                      {hist}
-                                    </button>
+                                    <div key={idx} className="flex items-center gap-2 px-2 py-1.5 text-xs bg-gray-50 hover:bg-blue-50 rounded group">
+                                      <button
+                                        type="button"
+                                        onMouseDown={(e) => e.preventDefault()}
+                                        onClick={() => {
+                                          const newComments = comments.trim() ? `${comments}, ${hist}` : hist;
+                                          handleCommentChange(newComments);
+                                        }}
+                                        className="flex-1 text-left text-gray-800 hover:text-blue-600 transition-colors cursor-pointer"
+                                      >
+                                        {hist}
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onMouseDown={(e) => e.preventDefault()}
+                                        onClick={async (e) => {
+                                          e.stopPropagation();
+                                          try {
+                                            await deleteCommentFromHistory(hist);
+                                            setCommentHistory(prev => prev.filter(c => c !== hist));
+                                          } catch (error) {
+                                            console.error('Error deleting comment:', error);
+                                            alert('Failed to delete comment');
+                                          }
+                                        }}
+                                        className="text-red-500 hover:text-red-700 opacity-0 group-hover:opacity-100 transition-opacity"
+                                        title="Delete this comment"
+                                      >
+                                        ✕
+                                      </button>
+                                    </div>
                                   ))}
                                 </div>
                               </div>
