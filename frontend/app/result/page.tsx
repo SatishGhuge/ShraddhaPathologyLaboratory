@@ -1486,20 +1486,6 @@ export default function Result() {
       }
 
       // Build combined tests array with results data
-<<<<<<< HEAD
-      const combinedTests = responses.map(r => ({
-        test_id: r.patientTest.test.id,
-        name: r.patientTest.test.name,
-        interpretation: r.patientTest.test.interpretation,
-        signature: r.patientTest.test.signature || signature,
-        groupedParameters: r.groupedParameters,
-        parameters: r.parameters,
-        // Include outsourcing data if available
-        isOutsourced: r.patientTest.isOutsourced || false,
-        outsourcedTo: r.patientTest.outsourcedTo || null,
-        outsourcingReport: r.outsourcingReport || null
-      }));
-=======
       const combinedTests = responses.map((r, idx) => {
         const testObj = {
           name: r.patientTest.test.name,
@@ -1535,7 +1521,6 @@ export default function Result() {
         machineName: t.usedMachine?.name,
         machineDesc: t.usedMachine?.description
       })));
->>>>>>> a9513a7cc3422d0d25a10d01d231719df1a0014e
 
       // Build results object mapping parameter IDs to their values
       const resultsMap: any = {};
@@ -1583,12 +1568,8 @@ export default function Result() {
         printOption: option,
         results: resultsMap,
         referralDoctor: first.patientTest.referralDoctor,
-<<<<<<< HEAD
-        commentsMap: commentsMap  // ✅ Pass per-test comments map instead of single comment
-=======
         // ✅ For single test, use combinedTests[0].comments; for multiple tests, combinedTests has per-test comments
         comments: combinedTests.length === 1 ? combinedTests[0].comments : ''
->>>>>>> a9513a7cc3422d0d25a10d01d231719df1a0014e
       });
       
       setReportWithHeader(true);
@@ -1673,7 +1654,8 @@ export default function Result() {
         parameters: r.parameters,
         isOutsourced: r.patientTest.isOutsourced || false,
         outsourcedTo: r.patientTest.outsourcedTo || null,
-        outsourcingReport: r.outsourcingReport || null
+        outsourcingReport: r.outsourcingReport || null,
+        comments: r.patientTest.comments || ''
       }));
 
       // Build results object mapping parameter IDs to their values
@@ -1709,11 +1691,7 @@ export default function Result() {
         printOption: 'nobreak',
         results: resultsMap,
         referralDoctor: first.patientTest.referralDoctor,
-<<<<<<< HEAD
-        commentsMap: commentsMap  // ✅ Use user-entered comments map
-=======
         comments: combinedTests.length === 1 ? combinedTests[0].comments : ''
->>>>>>> a9513a7cc3422d0d25a10d01d231719df1a0014e
       });
 
       setShowPerTestCommentsModal(false);
