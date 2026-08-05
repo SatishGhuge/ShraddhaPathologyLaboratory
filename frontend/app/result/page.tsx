@@ -1387,6 +1387,13 @@ export default function Result() {
       // Debug: Log the parameters received
       console.log('📋 Parameters received from API:', first.parameters);
       console.log('📋 Full response:', first);
+      console.log('🔧 MACHINE DATA from API Response:');
+      console.log('   usedMachineId:', first.patientTest?.usedMachineId);
+      console.log('   usedMachine:', first.patientTest?.usedMachine);
+      console.log('   usedMachine?.name:', first.patientTest?.usedMachine?.name);
+      console.log('   usedMachine?.description:', first.patientTest?.usedMachine?.description);
+      console.log('   debug.usedMachineName:', first.debug?.usedMachineName);
+      console.log('   debug.usedMachineId:', first.debug?.usedMachineId);
 
       // Fetch signature
       let signature = first.patientTest.test?.signature || null;
@@ -1436,19 +1443,41 @@ export default function Result() {
       }
 
       // Build combined tests array with results data
-      const combinedTests = responses.map(r => ({
-        name: r.patientTest.test.name,
-        interpretation: r.patientTest.test.interpretation,
-        signature: r.patientTest.test.signature || signature,
-        groupedParameters: r.groupedParameters,
-        parameters: r.parameters,
-        // Include outsourcing data if available
-        isOutsourced: r.patientTest.isOutsourced || false,
-        outsourcedTo: r.patientTest.outsourcedTo || null,
-        outsourcingReport: r.outsourcingReport || null,
-        // ✅ Include per-test comments
-        comments: r.patientTest.comments || ''
-      }));
+      const combinedTests = responses.map((r, idx) => {
+        const testObj = {
+          name: r.patientTest.test.name,
+          interpretation: r.patientTest.test.interpretation,
+          signature: r.patientTest.test.signature || signature,
+          groupedParameters: r.groupedParameters,
+          parameters: r.parameters,
+          // Include outsourcing data if available
+          isOutsourced: r.patientTest.isOutsourced || false,
+          outsourcedTo: r.patientTest.outsourcedTo || null,
+          outsourcingReport: r.outsourcingReport || null,
+          // ✅ Include per-test comments
+          comments: r.patientTest.comments || '',
+          // ✅ Include machine/instrument data
+          usedMachine: r.patientTest.usedMachine || null
+        };
+        
+        console.log(`📦 Test ${idx} (${testObj.name}):`, {
+          hasUsedMachine: !!testObj.usedMachine,
+          usedMachine: testObj.usedMachine,
+          usedMachineId: r.patientTest?.usedMachineId
+        });
+        
+        return testObj;
+      });
+
+      // ✅ DEBUG: Log machine data
+      console.log('🔧 Combined Tests with Machine Data:', combinedTests.map(t => ({
+        name: t.name,
+        usedMachine: t.usedMachine,
+        machineExists: !!t.usedMachine,
+        machineId: t.usedMachine?.id,
+        machineName: t.usedMachine?.name,
+        machineDesc: t.usedMachine?.description
+      })));
 
       // Build results object mapping parameter IDs to their values
       const resultsMap: any = {};
@@ -1491,8 +1520,8 @@ export default function Result() {
         printOption: option,
         results: resultsMap,
         referralDoctor: first.patientTest.referralDoctor,
-        // ✅ For single test, use first comments; for multiple tests, combinedTests has per-test comments
-        comments: combinedTests.length === 1 ? first.comments : ''
+        // ✅ For single test, use combinedTests[0].comments; for multiple tests, combinedTests has per-test comments
+        comments: combinedTests.length === 1 ? combinedTests[0].comments : ''
       });
       
       setReportWithHeader(true);
@@ -1515,7 +1544,7 @@ export default function Result() {
         printOption: option,
         results: resultsMap,
         referralDoctor: first.patientTest.referralDoctor,
-        comments: first.comments  // ✅ Access comments directly from response
+        comments: combinedTests.length === 1 ? combinedTests[0].comments : ''
       });
     } catch (err) {
       console.error('Error loading report:', err);

@@ -379,7 +379,8 @@ export const getPatientTestById = async (req, res) => {
           include: {
             testParameter: true
           }
-        }
+        },
+        usedMachine: true  // ✅ Changed from select to include true to ensure machine is fetched
       }
     });
 
@@ -801,17 +802,40 @@ export const getPatientTestById = async (req, res) => {
     console.log(`   patientTest.patient.gender: ${patientTest.patient?.gender}`);
     console.log(`   parameters count: ${allParameters.length}`);
     console.log(`   Total with ageRanges: ${allParameters.filter(p => p.ageRanges).length}`);
+    console.log(`   ✅ usedMachineId: ${patientTest.usedMachineId}`);
+    console.log(`   ✅ usedMachine data:`, JSON.stringify(patientTest.usedMachine, null, 2));
+    console.log(`   ✅ Full patientTest object keys:`, Object.keys(patientTest));
+
+    // ✅ Ensure usedMachine is included in response
+    const responseData = {
+      patientTest: {
+        ...patientTest,
+        usedMachine: patientTest.usedMachine || null  // Explicitly ensure it's in the response
+      },
+      parameters: allParameters,
+      groupedParameters,
+      outsourcingReport,
+      comments: patientTest.comments,
+      debug: { 
+        totalExistingResults, 
+        totalParameters: allParameters.length,
+        usedMachineId: patientTest.usedMachineId,
+        usedMachineIncluded: !!patientTest.usedMachine,
+        usedMachineName: patientTest.usedMachine?.name,
+        usedMachineDescription: patientTest.usedMachine?.description
+      }
+    };
+
+    console.log('🔧 MACHINE DATA DEBUG:');
+    console.log(`   usedMachineId in DB: ${patientTest.usedMachineId}`);
+    console.log(`   usedMachine object:`, patientTest.usedMachine);
+    console.log(`   usedMachine name: ${patientTest.usedMachine?.name}`);
+    console.log(`   usedMachine description: ${patientTest.usedMachine?.description}`);
+    console.log('📤 FINAL RESPONSE DATA usedMachine:', responseData.patientTest.usedMachine);
 
     res.json({
       success: true,
-      data: {
-        patientTest,
-        parameters: allParameters,
-        groupedParameters,
-        outsourcingReport,  // Include outsourcing data
-        comments: patientTest.comments,  // ✅ Explicitly include comments
-        debug: { totalExistingResults, totalParameters: allParameters.length }
-      }
+      data: responseData
     });
 
   } catch (error) {
