@@ -26,18 +26,26 @@ CREATE TABLE IF NOT EXISTS pending_results (
 
   -- Sample identification
   sample_id VARCHAR(100) NOT NULL,
+  visit_id VARCHAR(100),                                    -- ✅ NEW: For multi-visit tracking
+  machine_name VARCHAR(100),                                -- ✅ NEW: For multi-machine labs
   
   -- Raw ASTM transmission (for audit/debugging)
   raw_astm LONGTEXT NOT NULL,
   
-  -- Parsed JSON data structure
+  -- Parsed JSON data structure (now stores COMPLETE payload with visitId/sampleId)
   data_json JSON NOT NULL,
   
   -- Synchronization status
   -- PENDING: Just received from machine, not yet synced
   -- OFFLINE_QUEUED: Sync failed, waiting for retry
   -- SYNCED: Successfully sent to cloud backend
-  status ENUM('PENDING', 'OFFLINE_QUEUED', 'SYNCED') DEFAULT 'PENDING',
+  -- FAILED: Permanently failed (after max retries)
+  status ENUM('PENDING', 'OFFLINE_QUEUED', 'SYNCED', 'FAILED') DEFAULT 'PENDING',
+  
+  -- Retry tracking
+  retry_count INT DEFAULT 0,                                -- ✅ NEW: Track retry attempts
+  last_retry_at TIMESTAMP NULL DEFAULT NULL,                -- ✅ NEW: Prevent retry spam
+  error_message VARCHAR(500),                               -- ✅ NEW: Store last error
   
   -- Timestamps
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -46,8 +54,12 @@ CREATE TABLE IF NOT EXISTS pending_results (
   -- Indexes for performance
   INDEX idx_status (status),
   INDEX idx_sample_id (sample_id),
+  INDEX idx_visit_id (visit_id),                            -- ✅ NEW
+  INDEX idx_machine_name (machine_name),                    -- ✅ NEW
   INDEX idx_created_at (created_at),
-  INDEX idx_status_created (status, created_at)
+  INDEX idx_status_created (status, created_at),
+  INDEX idx_status_retry (status, retry_count),             -- ✅ NEW: For smart retry queries
+  INDEX idx_retry_backoff (status, last_retry_at)           -- ✅ NEW: For exponential backoff
 );
 
 -- ============================================================================
