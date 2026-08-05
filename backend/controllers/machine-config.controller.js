@@ -28,6 +28,7 @@ export const getMachines = async (req, res) => {
       data: machines.map(m => ({
         id: m.id,
         name: m.name,
+        description: m.description,
         isActive: m.isActive,
         testCount: m._count.testMachines,
         createdAt: m.createdAt,
@@ -112,7 +113,7 @@ export const getMachineById = async (req, res) => {
 
 export const createMachine = async (req, res) => {
   try {
-    const { name } = req.body;
+    const { name, description } = req.body;
 
     if (!name || name.trim() === '') {
       return res.status(400).json({
@@ -135,7 +136,11 @@ export const createMachine = async (req, res) => {
     }
 
     const machine = await prisma.machine.create({
-      data: { name: normalizedName, isActive: true }
+      data: { 
+        name: normalizedName, 
+        description: description?.trim() || null,
+        isActive: true 
+      }
     });
 
     return res.status(201).json({
@@ -163,7 +168,7 @@ export const createMachine = async (req, res) => {
 export const updateMachine = async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, isActive } = req.body;
+    const { name, description, isActive } = req.body;
     const machineId = parseInt(id);
 
     const machine = await prisma.machine.findUnique({
@@ -203,6 +208,10 @@ export const updateMachine = async (req, res) => {
       }
 
       updateData.name = normalizedName;
+    }
+
+    if (description !== undefined) {
+      updateData.description = description?.trim() || null;
     }
 
     if (isActive !== undefined) {
