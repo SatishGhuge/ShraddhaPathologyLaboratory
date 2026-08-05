@@ -257,3 +257,22 @@ export const updatePatientComments = async (testId: string, comments: string): P
   
   return result.data;
 };
+
+// Delete a comment from history
+export const deleteCommentFromHistory = async (comment: string): Promise<any> => {
+  const response = await fetch(`${API_BASE_URL}/results/history/comments`, {
+    method: 'DELETE',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ comment })
+  });
+  
+  const result: ApiResponse = await response.json();
+  
+  if (!result.success) {
+    throw new Error(result.message || 'Failed to delete comment from history');
+  }
+  
+  return result.data;
+};

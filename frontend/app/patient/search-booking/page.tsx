@@ -6,6 +6,7 @@ import BarcodeModal, { generateBarcodeLabels, getSampleTypeId, getSampleTypeName
 import BillReceipt from "@/app/components/BillReceipt";
 import API_BASE_URL from "@/src/api/config";
 import { generateCompactBarcodePrintHtml } from "@/app/utils/barcodePrintUtils";
+import JsBarcode from "jsbarcode";
 
 import { 
   Search, RotateCcw, Eye, Pencil, Trash2, Printer,
@@ -66,14 +67,14 @@ const DAYS=["Su","Mo","Tu","We","Th","Fr","Sa"];
 const MONTHS=["January","February","March","April","May","June","July","August","September","October","November","December"];
 
 /* ─────────────────── DateRangePicker ─────────────────── */
-function DateRangePicker({ value, onChange }: { value?: { start?: Date; end?: Date }; onChange?: (range: { start: Date; end: Date }) => void }) {
+function DateRangePicker({ value, onChange }: { value?: { start: Date; end: Date } | null; onChange?: (range: { start: Date; end: Date } | null) => void }) {
   const [open, setOpen]       = useState(false);
-  const [hoverDate, setHover] = useState<any>(null);
+  const [hoverDate, setHover] = useState<Date | null>(null);
   const [leftMonth, setLeft]  = useState(() => { const d=new Date(); d.setDate(1); return d; });
-  const [tempStart, setTempStart] = useState<any>(null);
-  const [tempEnd,   setTempEnd]   = useState<any>(null);
+  const [tempStart, setTempStart] = useState<Date | null>(null);
+  const [tempEnd,   setTempEnd]   = useState<Date | null>(null);
   const [selecting, setSelecting] = useState(false);
-  const ref = useRef(null);
+  const ref = useRef<HTMLDivElement>(null);
 
   const rightMonth = new Date(leftMonth.getFullYear(), leftMonth.getMonth()+1, 1);
 
@@ -98,17 +99,17 @@ function DateRangePicker({ value, onChange }: { value?: { start?: Date; end?: Da
 
   const [activePreset, setActivePreset] = useState("Last 7 Days");
 
-  function apply(s: any, e: any) {
+  function apply(s: Date, e: Date) {
     setTempStart(s); setTempEnd(e);
-    onChange({ start:s, end:e });
+    onChange?.({ start:s, end:e });
     setOpen(false);
   }
 
-  function handleDayClick(d: any) {
+  function handleDayClick(d: Date) {
     if (!selecting) {
       setTempStart(d); setTempEnd(null); setSelecting(true);
     } else {
-      if (d < tempStart) { setTempStart(d); setTempEnd(tempStart); }
+      if (d < tempStart!) { setTempStart(d); setTempEnd(tempStart); }
       else               { setTempEnd(d); }
       setSelecting(false);
     }
@@ -116,16 +117,16 @@ function DateRangePicker({ value, onChange }: { value?: { start?: Date; end?: Da
 
   function handleApply() {
     if (tempStart && tempEnd) {
-      onChange({ start:tempStart, end:tempEnd });
+      onChange?.({ start:tempStart, end:tempEnd });
       setOpen(false);
     }
   }
 
-  function buildCalendar(monthDate: any) {
+  function buildCalendar(monthDate: Date): Array<{ date: Date; cur: boolean }> {
     const year = monthDate.getFullYear(), month = monthDate.getMonth();
     const first = new Date(year, month, 1).getDay();
     const days  = new Date(year, month+1, 0).getDate();
-    const cells = [];
+    const cells: Array<{ date: Date; cur: boolean }> = [];
     for (let i=0; i<first; i++) {
       const prev = new Date(year, month, -first+i+1);
       cells.push({ date:prev, cur:false });
@@ -138,7 +139,7 @@ function DateRangePicker({ value, onChange }: { value?: { start?: Date; end?: Da
     return cells;
   }
 
-  function dayClass(date: any) {
+  function dayClass(date: Date): string {
     const s = tempStart, e = tempEnd || hoverDate;
     const isStart  = s && sameDay(date,s);
     const isEnd    = e && sameDay(date,e);
@@ -230,7 +231,7 @@ function DateRangePicker({ value, onChange }: { value?: { start?: Date; end?: Da
                 {tempStart && tempEnd ? `${fmt(tempStart)} - ${fmt(tempEnd)}` : tempStart ? `${fmt(tempStart)} - ...` : ""}
               </span>
               <div className="flex gap-2">
-                <button onClick={() => { setTempStart(null); setTempEnd(null); setSelecting(false); setOpen(false); onChange(null); }}
+                <button onClick={() => { setTempStart(null); setTempEnd(null); setSelecting(false); setOpen(false); onChange?.(null); }}
                   className="px-4 py-1 border rounded text-sm text-gray-600 hover:bg-gray-50">Cancel</button>
                 <button onClick={handleApply} disabled={!tempStart||!tempEnd}
                   className="px-4 py-1 bg-orange-500 hover:bg-orange-600 disabled:opacity-40 text-white rounded text-sm font-semibold">Apply</button>
@@ -246,14 +247,14 @@ function DateRangePicker({ value, onChange }: { value?: { start?: Date; end?: Da
 /* ─────────────────── sample data ─────────────────── */
 // Tests and packages are fetched from API — see state: allTests, packagesList
 
-const INIT_FORM = {
+const INIT_FORM: FormDataType = {
   visitDate:"", location:"SHRADDHA",
   reportMode:"By hand", mobile:"", title:"MR", firstName:"", lastName:"",
   age:"", ageUnit:"Year", gender:"Male", referralDoctor:"",
   referralDoctorChecked:false, patient_history:"", email:"", address:"", organizationCode:""
 };
 
-const INIT_BOOKING = [];
+const INIT_BOOKING: Booking[] = [];
 
 const style = {
   input:    "border px-3 py-1 rounded text-sm",
@@ -263,6 +264,126 @@ const style = {
 };
 
 const numInput = "w-full border rounded px-2 py-1 text-center text-xs [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none";
+
+/* ─────────────────── Type Definitions ─────────────────── */
+interface PatientData {
+  visitDate: string;
+  location: string;
+  reportMode: string;
+  mobile: string;
+  title: string;
+  firstName: string;
+  lastName: string;
+  age: string;
+  ageUnit: string;
+  gender: string;
+  referralDoctor: string;
+  referralDoctorChecked: boolean;
+  patient_history: string;
+  email: string;
+  address: string;
+  organizationCode: string;
+  organizationId?: string;
+  remark?: string;
+}
+
+interface Test {
+  id?: string;
+  name: string;
+  sample?: string;
+  testId?: string;
+  sampleTypeId?: string;
+  departmentId?: string;
+  organizationId?: string;
+  b2cCharge?: number;
+  b2bCharge?: number;
+  charge?: number;
+  isExisting?: boolean;
+  visitId?: string;
+  status?: string;
+  barcode_status?: string;
+  reportMode?: string;
+  referralDoctor?: string;
+  paymentMode?: string;
+  businessType?: string;
+  fromPackage?: string;
+  isPackage?: boolean;
+  packageTests?: Test[];
+  testCode?: string;
+  categories?: any[];
+  charges?: any[];
+  group?: string;
+  department?: any;
+}
+
+interface Booking {
+  bookingId: string;
+  name: string;
+  patientId: string;
+  date: string;
+  tests: Test[];
+  paymentStatus: string;
+  rawDate: any;
+  balanceAmount: number;
+  paidAmount: number;
+  totalAmount: number;
+  visitId: string;
+  discountAmount: number;
+  discountPercent: number;
+  discountRemark: string;
+  patientData: PatientData;
+}
+
+interface FormDataType {
+  visitDate: string;
+  location: string;
+  reportMode: string;
+  mobile: string;
+  title: string;
+  firstName: string;
+  lastName: string;
+  age: string;
+  ageUnit: string;
+  gender: string;
+  referralDoctor: string;
+  referralDoctorChecked: boolean;
+  patient_history: string;
+  email: string;
+  address: string;
+  organizationCode: string;
+  dob?: string;
+}
+
+interface BillingData {
+  advance: string;
+  discount: string;
+  discountPercent: string;
+  refund: string;
+  balAmt: string;
+  payment: string;
+  remarks: string;
+  paymentMode: string;
+}
+
+interface ReferralData {
+  type: string;
+  name: string;
+  degree: string;
+  compliment: string;
+  mobile: string;
+  email: string;
+  address: string;
+  allowSendReport: boolean;
+}
+
+interface BarcodePatientInfo {
+  patientName: string;
+  visitId: string;
+  age: string;
+  gender: string;
+  ageGender: string;
+  organizationCode: string;
+}
 
 // Generate Code128 barcode bars as SVG path data
 const buildCode128Svg = (text: any) => {
@@ -328,28 +449,28 @@ const buildCode128Svg = (text: any) => {
 export default function BookingPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [bookings,        setBookings]        = useState(INIT_BOOKING);
-  const [allBookings,     setAllBookings]     = useState<any[]>([]);
-  const [deletedIds,      setDeletedIds]      = useState(new Set());
+  const [bookings,        setBookings]        = useState<Booking[]>(INIT_BOOKING);
+  const [allBookings,     setAllBookings]     = useState<Booking[]>([]);
+  const [deletedIds,      setDeletedIds]      = useState<Set<string>>(new Set());
   const [doctorsList,     setDoctorsList]     = useState<any[]>([]);
   const [loadingBookings, setLoadingBookings] = useState(true);
-  const [selectedBooking, setSelectedBooking] = useState<any>(null);
+  const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
   
   // Barcode states
   const [showBarcodeModal, setShowBarcodeModal] = useState(false);
   const [barcodeLabels, setBarcodeLabels] = useState<any[]>([]);
-  const [barcodePatientInfo, setBarcodePatientInfo] = useState<any>(null);
+  const [barcodePatientInfo, setBarcodePatientInfo] = useState<BarcodePatientInfo | null>(null);
   const [selectedBarcodeIndices, setSelectedBarcodeIndices] = useState<Set<number>>(new Set());
   const [barcodeSelectedTests, setBarcodeSelectedTests] = useState<Set<number>>(new Set());
   const [barcodeLockedPatientUid, setBarcodeLockedPatientUid] = useState<string | null>(null);
   const [barcodeLockedVisitId, setBarcodeLockedVisitId] = useState<string | null>(null);
   const [barcodesPrinting, setBarcodesPrinting] = useState(false);
   
-  const [editingPatient,  setEditingPatient]  = useState<any>(null);
-  const [formData,        setFormData]        = useState(INIT_FORM);
+  const [editingPatient,  setEditingPatient]  = useState<Booking | null>(null);
+  const [formData,        setFormData]        = useState<FormDataType>(INIT_FORM);
   const [testView,        setTestView]        = useState("all");
   const [searchTest,      setSearchTest]      = useState("");
-  const [allTests,        setAllTests]        = useState<any[]>([]);
+  const [allTests,        setAllTests]        = useState<Test[]>([]);
   const [packagesList,    setPackagesList]    = useState<any[]>([]);
   const [specimenTypes,   setSpecimenTypes]   = useState<any[]>([]);
   const [selectedPackage, setSelectedPackage] = useState<any>(null);
@@ -357,21 +478,21 @@ export default function BookingPage() {
   const [showPkgDropdown, setShowPkgDropdown] = useState(false);
   const [businessType,    setBusinessType]    = useState("B2C");
   const [editingCharge,   setEditingCharge]   = useState<any>(null);
-  const [dateRange,       setDateRange]       = useState<any>(null);
+  const [dateRange,       setDateRange]       = useState<{ start: Date; end: Date } | null>(null);
   const [patientNameSearch, setPatientNameSearch] = useState("");
   const [mobileSearch, setMobileSearch] = useState("");
   const [showOutstanding, setShowOutstanding] = useState(false);
   const [showDateTimePicker, setShowDateTimePicker] = useState(false);
   const [doctorSearch, setDoctorSearch] = useState("");
   const [showDoctorDropdown, setShowDoctorDropdown] = useState(false);
-  const doctorDropdownRef = useRef(null);
+  const doctorDropdownRef = useRef<HTMLDivElement>(null);
   const [searchBarDoctorSearch, setSearchBarDoctorSearch] = useState("");
   const [showSearchBarDoctorDropdown, setShowSearchBarDoctorDropdown] = useState(false);
-  const searchBarDoctorDropdownRef = useRef(null);
+  const searchBarDoctorDropdownRef = useRef<HTMLDivElement>(null);
   const [organizations, setOrganizations] = useState<any[]>([]);
   const [searchBarOrganizationSearch, setSearchBarOrganizationSearch] = useState("");
   const [showSearchBarOrganizationDropdown, setShowSearchBarOrganizationDropdown] = useState(false);
-  const searchBarOrganizationDropdownRef = useRef(null);
+  const searchBarOrganizationDropdownRef = useRef<HTMLDivElement>(null);
   const [appliedOrganization, setAppliedOrganization] = useState("");
   
   // Applied filters (only updated when Search button is clicked)
@@ -382,7 +503,7 @@ export default function BookingPage() {
 
   /* ===== ADD REFERRAL MODAL STATES ===== */
   const [showAddReferral, setShowAddReferral] = useState(false);
-  const [referralData, setReferralData] = useState({
+  const [referralData, setReferralData] = useState<ReferralData>({
     type: "Doctor",
     name: "",
     degree: "",
@@ -392,9 +513,9 @@ export default function BookingPage() {
     address: "",
     allowSendReport: false
   });
-  const [referralErrors, setReferralErrors] = useState<any>({});
+  const [referralErrors, setReferralErrors] = useState<Record<string, string>>({});
 
-  const [billing, setBilling] = useState({
+  const [billing, setBilling] = useState<BillingData>({
     advance:"", discount:"", discountPercent:"",
     refund:"", balAmt:"", payment:"", remarks:"", paymentMode:"Cash"
   });
@@ -421,8 +542,8 @@ export default function BookingPage() {
   }, []);
 
   // Helper function to transform patients data to bookings format
-  const transformPatientsToBookings = (patients: any[], orgs: any[]) => {
-    const mapped = [];
+  const transformPatientsToBookings = (patients: any[], orgs: any[]): Booking[] => {
+    const mapped: Booking[] = [];
     
     patients.forEach((p) => {
       const patientTests = p.tests || [];
@@ -910,8 +1031,10 @@ export default function BookingPage() {
       b.bookingId===selectedBooking.bookingId ? {...b,tests:[...b.tests,testEntry]} : b
     );
     setBookings(updated);
-    const updatedSelected = updated.find(b=>b.bookingId===selectedBooking.bookingId);
-    setSelectedBooking(updatedSelected);
+    const updatedSelected = updated.find(b=>b.bookingId===selectedBooking!.bookingId);
+    if (updatedSelected) {
+      setSelectedBooking(updatedSelected);
+    }
     
     // Save to backend if this is an existing visit (has visitId)
     if (selectedBooking.visitId) {
@@ -951,7 +1074,10 @@ export default function BookingPage() {
       b.bookingId===selectedBooking.bookingId ? {...b,tests:[...b.tests,packageEntry]} : b
     );
     setBookings(updated);
-    setSelectedBooking(updated.find(b=>b.bookingId===selectedBooking.bookingId));
+    const updatedBooking = updated.find(b=>b.bookingId===selectedBooking!.bookingId);
+    if (updatedBooking) {
+      setSelectedBooking(updatedBooking);
+    }
   };
 
   const handleInputChange = (e: any) => {
@@ -960,6 +1086,7 @@ export default function BookingPage() {
   };
 
   const handleSaveEdit = async () => {
+    if (!editingPatient) return;
     try {
       const res = await updatePatient(editingPatient.patientId, {
         title:     formData.title,
@@ -990,7 +1117,7 @@ export default function BookingPage() {
         }
       }
     } catch (e) {
-      alert('Failed to update patient: ' + e.message); return;
+      alert('Failed to update patient: ' + (e instanceof Error ? e.message : 'Unknown error')); return;
     }
 
     const updated = bookings.map(b=>
@@ -998,8 +1125,12 @@ export default function BookingPage() {
         ? {...b, name:`${formData.title} ${formData.firstName} ${formData.lastName || ''}`.trim().toUpperCase(), patientData:formData} : b
     );
     setBookings(updated);
-    if (selectedBooking?.patientId===editingPatient.patientId)
-      setSelectedBooking(updated.find(b=>b.patientId===editingPatient.patientId));
+    if (selectedBooking?.patientId===editingPatient.patientId) {
+      const updatedBooking = updated.find(b=>b.patientId===editingPatient.patientId);
+      if (updatedBooking) {
+        setSelectedBooking(updatedBooking);
+      }
+    }
     setEditingPatient(null);
     setShowDateTimePicker(false);
     setSuccessPopup("Patient updated successfully!");
@@ -1085,17 +1216,23 @@ export default function BookingPage() {
     ${b.tests.map((t,i)=>`<tr><td>${i+1}</td><td>${t.name}</td><td>₹${t.b2cCharge||t.charge}</td></tr>`).join('')}
     </table><h3>Total: ₹${total}</h3></body></html>`;
     const w=window.open("","_blank");
-    w.document.write(html); w.document.close(); w.print();
+    if (w) {
+      w.document.write(html); w.document.close(); w.print();
+    }
   };
 
   const handleDeleteTest = (testToDelete: any) => {
+    if (!selectedBooking) return;
     if (window.confirm(`Delete ${testToDelete.name}?`)) {
       const updated = bookings.map(b=>
         b.bookingId===selectedBooking.bookingId
           ? {...b, tests: b.tests.filter(t => !(t.name===testToDelete.name && !!t.isExisting===!!testToDelete.isExisting))} : b
       );
       setBookings(updated);
-      setSelectedBooking(updated.find(b=>b.bookingId===selectedBooking.bookingId));
+      const updatedBooking = updated.find(b=>b.bookingId===selectedBooking.bookingId);
+      if (updatedBooking) {
+        setSelectedBooking(updatedBooking);
+      }
       // Clear discount when test is removed
       setBilling(prev => ({
         ...prev,
@@ -1106,6 +1243,7 @@ export default function BookingPage() {
   };
 
   const handleSaveCharge = (testName: any) => {
+    if (!selectedBooking) return;
     const newCharge = parseInt(editingCharge.value)||0;
     const updated = bookings.map(b=>
       b.bookingId===selectedBooking.bookingId
@@ -1117,7 +1255,10 @@ export default function BookingPage() {
         : b
     );
     setBookings(updated);
-    setSelectedBooking(updated.find(b=>b.bookingId===selectedBooking.bookingId));
+    const updatedBooking = updated.find(b=>b.bookingId===selectedBooking.bookingId);
+    if (updatedBooking) {
+      setSelectedBooking(updatedBooking);
+    }
     setEditingCharge(null);
   };
 
@@ -1759,7 +1900,7 @@ export default function BookingPage() {
               <div className="flex items-center gap-2">
                 {(() => {
                   const totalPages = Math.ceil(filteredBookings.length / ITEMS_PER_PAGE);
-                  const pages = [];
+                  const pages: (number | string)[] = [];
                   
                   // Show page numbers with ellipsis
                   if (totalPages <= 5) {
@@ -1780,8 +1921,8 @@ export default function BookingPage() {
                     ) : (
                       <button
                         key={idx}
-                        onClick={() => setCurrentPage(page)}
-                        className={`w-7 h-7 rounded ${currentPage === page ? 'bg-orange-500 text-white font-bold' : 'bg-white border hover:bg-gray-100'}`}>
+                        onClick={() => setCurrentPage(typeof page === 'number' ? page : 1)}
+                        className={`w-7 h-7 rounded ${typeof page === 'number' && currentPage === page ? 'bg-orange-500 text-white font-bold' : 'bg-white border hover:bg-gray-100'}`}>
                         {page}
                       </button>
                     )
@@ -1869,12 +2010,13 @@ export default function BookingPage() {
                       setShowPkgDropdown(false);
                       if (selectedBooking) {
                         const updated = bookings.map(b =>
-                          b.bookingId === selectedBooking.bookingId
+                          b.bookingId === selectedBooking!.bookingId
                             ? { ...b, tests: b.tests.filter(t => t.isExisting) }
                             : b
                         );
                         setBookings(updated);
-                        setSelectedBooking(updated.find(b => b.bookingId === selectedBooking.bookingId));
+                        const updatedBooking = updated.find(b => b.bookingId === selectedBooking!.bookingId);
+                        if (updatedBooking) setSelectedBooking(updatedBooking);
                       }
                     }}
                       className={`${testView==="all"?"bg-orange-600":"bg-slate-900"} text-white px-2 py-1 rounded shrink-0`}><RefreshCcw size={16}/></button>
@@ -1905,18 +2047,20 @@ export default function BookingPage() {
                                   fromPackage: selectedPackage.name,
                                 }));
                               const updated = bookings.map(b =>
-                                b.bookingId===selectedBooking.bookingId ? {...b, tests:[...b.tests, ...toAdd]} : b
+                                b.bookingId===selectedBooking!.bookingId ? {...b, tests:[...b.tests, ...toAdd]} : b
                               );
                               setBookings(updated);
-                              setSelectedBooking(updated.find(b=>b.bookingId===selectedBooking.bookingId));
+                              const updatedBooking = updated.find(b=>b.bookingId===selectedBooking!.bookingId);
+                              if (updatedBooking) setSelectedBooking(updatedBooking);
                             } else {
                               // remove only from new tests
                               const names = new Set(displayTests.map(t=>t.name));
                               const updated = bookings.map(b =>
-                                b.bookingId===selectedBooking.bookingId ? {...b, tests: b.tests.filter(t=>!(names.has(t.name) && !t.isExisting))} : b
+                                b.bookingId===selectedBooking!.bookingId ? {...b, tests: b.tests.filter(t=>!(names.has(t.name) && !t.isExisting))} : b
                               );
                               setBookings(updated);
-                              setSelectedBooking(updated.find(b=>b.bookingId===selectedBooking.bookingId));
+                              const updatedBooking = updated.find(b=>b.bookingId===selectedBooking!.bookingId);
+                              if (updatedBooking) setSelectedBooking(updatedBooking);
                             }
                           }}
                           title="Select / Deselect all"
@@ -1945,10 +2089,11 @@ export default function BookingPage() {
                             if (isPackageView) {
                               if (alreadyAdded) {
                                 const updated = bookings.map(b =>
-                                  b.bookingId===selectedBooking.bookingId ? {...b, tests: b.tests.filter(x=>!(x.name===t.name && !x.isExisting))} : b
+                                  b.bookingId===selectedBooking!.bookingId ? {...b, tests: b.tests.filter(x=>!(x.name===t.name && !x.isExisting))} : b
                                 );
                                 setBookings(updated);
-                                setSelectedBooking(updated.find(b=>b.bookingId===selectedBooking.bookingId));
+                                const updatedBooking = updated.find(b=>b.bookingId===selectedBooking!.bookingId);
+                                if (updatedBooking) setSelectedBooking(updatedBooking);
                               } else {
                                 handleClickTest(t, isPackageView ? selectedPackage : null);
                               }
@@ -2514,7 +2659,10 @@ export default function BookingPage() {
           <table><tr><th>Payment Date</th><th>Amount</th><th>Received By</th></tr>
           <tr><td>${paymentDate}</td><td>${paidAmt}</td><td>SHRADDHA PATHOLOGY LABORATORY</td></tr></table>
           </body></html>`;
-          const w = window.open("","_blank"); w.document.write(html); w.document.close(); w.print();
+          const w = window.open("","_blank");
+          if (w) {
+            w.document.write(html); w.document.close(); w.print();
+          }
         };
 
         return (
@@ -2976,6 +3124,7 @@ export default function BookingPage() {
     </div>
 
     {/* Barcode Modal */}
+    {barcodePatientInfo && (
     <BarcodeModal
       isOpen={showBarcodeModal}
       onClose={() => setShowBarcodeModal(false)}
@@ -3031,14 +3180,19 @@ export default function BookingPage() {
           console.error('⚠️ Status transition failed:', error);
         }
         
-        // Now print the barcodes after status update
+        // ✅ USE SAME PRINT ONLY APPROACH - NO MODAL
         setTimeout(() => {
-          console.log('📄 Status updated, now printing barcodes...');
+          console.log('📄 Status updated, now printing barcodes using Print Only method...');
           
           // Filter only selected barcode labels for printing
           const selectedLabels = barcodeLabels.filter((_, idx) => selectedBarcodeIndices.has(idx));
           
-          // Use unified print function with consistent formatting
+          if (!barcodePatientInfo) {
+            console.error('Barcode patient info is missing');
+            return;
+          }
+          
+          // Generate same barcode print HTML as Print Only button
           const printHtml = generateCompactBarcodePrintHtml(
             selectedLabels,
             {
@@ -3047,33 +3201,53 @@ export default function BookingPage() {
               age: barcodePatientInfo.age,
               visitId: barcodePatientInfo.visitId
             },
-            (value: string) => buildCode128Svg(value).svg
+            (value: string) => {
+              try {
+                const svgElement = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+                svgElement.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+                
+                JsBarcode(svgElement, value, {
+                  format: 'CODE128',
+                  width: 2,
+                  height: 40,
+                  margin: 0,
+                  lineColor: '#000000',
+                  displayValue: false,
+                  background: '#ffffff'
+                });
+                
+                return svgElement.innerHTML;
+              } catch (error) {
+                console.error('❌ Barcode generation error:', error);
+                return '';
+              }
+            }
           );
           
-          const iframe = document.getElementById('barcode-print-frame') as HTMLIFrameElement;
-          if (iframe && iframe.contentDocument) {
-            iframe.contentDocument.open();
-            iframe.contentDocument.write(printHtml);
-            iframe.contentDocument.close();
+          // Print using window.open approach (same as Print Only)
+          const win = window.open('', '_blank');
+          if (!win) {
+            console.error('Could not open print window');
+            return;
+          }
+          win.document.write(printHtml);
+          win.document.close();
+          win.focus();
+          win.print();
+          
+          // Close modal and reset state
+          setShowBarcodeModal(false);
+          setBarcodeSelectedTests(new Set());
+          setBarcodeLockedPatientUid(null);
+          setBarcodeLockedVisitId(null);
+          setSelectedBarcodeIndices(new Set());
+          
+          if (successCount > 0) {
             setTimeout(() => {
-              console.log('🖨️ Calling iframe print...');
-              iframe.contentWindow?.print();
-              
-              // AFTER print preview is shown, then close modal and reload
-              setTimeout(() => {
-                if (successCount > 0) {
-                  alert(`✅ ${successCount} test(s) marked as Received and ${selectedBarcodeIndices.size} barcode(s) printed!`);
-                }
-                setShowBarcodeModal(false);
-                setBarcodeSelectedTests(new Set());
-                setBarcodeLockedPatientUid(null);
-                setBarcodeLockedVisitId(null);
-                setSelectedBarcodeIndices(new Set());
-                
-                // Reload page to refresh barcode colors
-                window.location.reload();
-              }, 1000);
-            }, 300);
+              alert(`✅ ${successCount} test(s) marked as Received and ${selectedBarcodeIndices.size} barcode(s) printed!`);
+              // Reload to refresh barcode status
+              window.location.reload();
+            }, 800);
           }
         }, 500);
       }}
@@ -3083,6 +3257,7 @@ export default function BookingPage() {
       onBarcodeToggle={handleBarcodeToggle}
       isPrinting={barcodesPrinting}
     />
+    )}
     </>
   );
 }

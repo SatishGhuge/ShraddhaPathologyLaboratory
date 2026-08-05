@@ -56,6 +56,7 @@ type ContentBlock =
   | { kind: 'category'; catName: string }
   | { kind: 'param'; param: any }
   | { kind: 'comments'; text: string }  // ✅ NEW: Comments as table row
+  | { kind: 'instrument'; machine: any }  // ✅ NEW: Instrument/Machine as table row
   | { kind: 'test-gap' }
   | { kind: 'interpretation'; testData: any }
   | { kind: 'signature' }
@@ -98,6 +99,7 @@ function blockHeight(block: ContentBlock): number {
     case 'category': return ROW_CAT_MM;
     case 'param': return ROW_PARAM_MM;
     case 'comments': return ROW_PARAM_MM;  // ✅ Same height as param row
+    case 'instrument': return ROW_PARAM_MM;  // ✅ Same height as param row
     case 'interpretation': return INTERP_MM;
     case 'signature': return SIG_MM;
     case 'test-gap': return TEST_GAP_MM;
@@ -150,20 +152,33 @@ function buildContentBlocks(
       }
     );
 
-    // ✅ Add per-test comments from commentsMap, fallback to global comments
-    let testComment = '';
-    if (commentsMap && testItem.test_id) {
-      testComment = commentsMap[testItem.test_id] || '';
-    }
-    if (!testComment && comments) {
-      testComment = comments;
+    // ✅ Add comments as table row right after parameters - use per-test comments from testItem
+    const testComments = (testItem as any).comments || '';
+    if (testComments && testComments.trim()) {
+      console.log(`✅ Adding comments block for test "${testItem.name}":`, testComments);
+      blocks.push({ kind: 'comments', text: testComments });
+    } else {
+      console.log(`⚠️ No comments for test "${testItem.name}"`);
     }
 
-    if (testComment && testComment.trim()) {
-      console.log(`✅ Adding comments for test ${testItem.test_id}:`, testComment);
-      blocks.push({ kind: 'comments', text: testComment });
+    // ✅ Add instrument/machine as table row - use per-test machine from testItem
+    const testMachine = (testItem as any).usedMachine;
+    console.log(`🔍🔍🔍 DETAILED INSTRUMENT CHECK for test "${testItem.name}":`, {
+      testItemKeys: Object.keys(testItem).filter(k => k.includes('machine') || k.includes('Machine')),
+      testMachine,
+      machineType: typeof testMachine,
+      machineKeys: testMachine ? Object.keys(testMachine) : 'N/A',
+      hasName: !!testMachine?.name,
+      nameValue: testMachine?.name,
+      hasDesc: !!testMachine?.description,
+      descValue: testMachine?.description,
+      shouldAdd: testMachine && (testMachine.name || testMachine.description)
+    });
+    if (testMachine && (testMachine.name || testMachine.description)) {
+      console.log(`✅✅✅ Adding instrument block for test "${testItem.name}":`, testMachine);
+      blocks.push({ kind: 'instrument', machine: testMachine });
     } else {
-      console.log(`⚠️ No comments for test ${testItem.test_id}`);
+      console.log(`⚠️⚠️⚠️ No instrument/machine for test "${testItem.name}"`, { testMachine, hasName: testMachine?.name, hasDesc: testMachine?.description });
     }
 
     if (testItem.interpretation) {
@@ -350,8 +365,22 @@ const ProfessionalReport = React.forwardRef<HTMLDivElement, ProfessionalReportPr
     useEffect(() => {
       const testsToRender = combinedTests.length > 0
         ? combinedTests
-        : [{ test_id: test?.id, name: test?.name, interpretation: test?.interpretation,
-             signature: test?.signature, groupedParameters }];
+        : [{ 
+            name: test?.name, 
+            interpretation: test?.interpretation,
+            signature: test?.signature, 
+            groupedParameters,
+            usedMachine: null  // ✅ Add usedMachine for consistency
+          }];
+
+      console.log('🔍 ProfessionalReport useEffect - testsToRender:', {
+        count: testsToRender.length,
+        tests: testsToRender.map((t: any) => ({
+          name: t.name,
+          hasMachine: !!t.usedMachine,
+          machine: t.usedMachine
+        }))
+      });
 
       const blocks = buildContentBlocks(testsToRender, results, printOption, comments);
       setPages(paginateBlocks(blocks));
@@ -542,11 +571,25 @@ const ProfessionalReport = React.forwardRef<HTMLDivElement, ProfessionalReportPr
             // ✅ Render comments as a table row within the results table
             tableRows.push(
               <tr key={`comments-${bi}`} style={{ borderTop: '1px solid #000', borderBottom: 'none' }}>
-                <td style={{ padding: '2px 4px 2px 2mm', fontWeight: 'bold', fontSize: '10px', color: '#333' }}>
+                <td style={{ padding: '2px 4px 2px 2mm', fontWeight: 'bold', fontSize: '10px', color: '#000' }}>
                   COMMENTS
                 </td>
-                <td colSpan={showUnits || showRange ? 2 : 1} style={{ padding: '2px 4px', fontSize: '9px', color: '#555', whiteSpace: 'pre-wrap' }}>
+                <td colSpan={showUnits || showRange ? 2 : 1} style={{ padding: '2px 4px', fontSize: '10px', color: '#000', whiteSpace: 'pre-wrap', fontWeight: '900' }}>
                   {strip(block.text)}
+                </td>
+              </tr>
+            );
+            break;
+
+          case 'instrument':
+            // ✅ Render instrument/machine as a table row within the results table
+            tableRows.push(
+              <tr key={`instrument-${bi}`} style={{ borderTop: '1px solid #000', borderBottom: 'none' }}>
+                <td style={{ padding: '2px 4px 2px 2mm', fontWeight: 'bold', fontSize: '10px', color: '#333' }}>
+                  INSTRUMENT
+                </td>
+                <td colSpan={showUnits || showRange ? 2 : 1} style={{ padding: '2px 4px', fontSize: '9px', color: '#555', whiteSpace: 'pre-wrap', fontWeight: 'bold' }}>
+                  {block.machine?.name || '-'}{block.machine?.description ? ` (${block.machine.description})` : ''}
                 </td>
               </tr>
             );

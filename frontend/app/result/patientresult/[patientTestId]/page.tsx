@@ -6,7 +6,7 @@ import React, { useState, useEffect, useCallback, useRef } from "react";
 
 import Header from "@/src/components/Header";
 import BarcodeModal, { generateBarcodeLabels, getSampleTypeId, getSampleTypeName, getTestName } from "@/app/components/BarcodeModal";
-import { getPatientTestById, updateTestStatus, updatePatientComments } from "@/src/api/result.js";
+import { getPatientTestById, updateTestStatus, updatePatientComments, deleteCommentFromHistory } from "@/src/api/result.js";
 import API_BASE_URL from "@/src/api/config";
 import { useTestTemplates } from '@/src/hooks/useTestTemplates';
 import InlineTemplateSelector from '@/app/components/InlineTemplateSelector';
@@ -19,11 +19,48 @@ const LetterHead = "/LetterHead.jpeg";
 // Text can be edited directly, formatted with Ctrl+B for bold
 // Shows [bold text] with visual formatting in report
 // Ctrl+B to make selected text bold
+// Resizable with drag handle - arrow on right side indicates panic direction
 const SuggestionInput = ({ value, onChange, options, isAbnormal, panicInfo }) => {
   const [show, setShow] = useState(false);
+  const [showTooltip, setShowTooltip] = useState(false);
   const [searchInput, setSearchInput] = useState('');
+  const [isResizing, setIsResizing] = useState(false);
+  const [customSize, setCustomSize] = useState({ width: 150, height: 30 });
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const containerRef = useRef(null);
   const ref = useRef(null);
+  const arrowRef = useRef(null);
+
+  console.log(`🎨 SuggestionInput rendered with isAbnormal=${isAbnormal}, panicInfo=`, panicInfo);
+
+  // Handle mouse move for resizing
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!isResizing || !containerRef.current) return;
+      
+      const rect = (containerRef.current as HTMLElement).getBoundingClientRect();
+      const newWidth = Math.max(80, e.clientX - rect.left);
+      const newHeight = Math.max(30, e.clientY - rect.top);
+      
+      setCustomSize({
+        width: Math.min(newWidth, 400),
+        height: Math.min(newHeight, 250)
+      });
+    };
+
+    const handleMouseUp = () => {
+      setIsResizing(false);
+    };
+
+    if (isResizing) {
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mouseup', handleMouseUp);
+      return () => {
+        document.removeEventListener('mousemove', handleMouseMove);
+        document.removeEventListener('mouseup', handleMouseUp);
+      };
+    }
+  }, [isResizing]);
 
   useEffect(() => {
     const handler = (e: any) => { if (ref.current && !(ref.current as HTMLElement).contains(e.target as Node)) setShow(false); };
@@ -87,31 +124,96 @@ const SuggestionInput = ({ value, onChange, options, isAbnormal, panicInfo }) =>
     }
   };
 
+  // Determine panic direction indicator
+  const getPanicIndicator = () => {
+    if (!isAbnormal || !panicInfo) return null;
+    return panicInfo.value < panicInfo.lowPanic ? '↓' : '↑';
+  };
+
+  const indicator = getPanicIndicator();
+  
+  // Get tooltip message based on panic direction
+  const getTooltipMessage = () => {
+    if (!indicator || !panicInfo) return '';
+    if (indicator === '↓') {
+      return `Lower Range: ${panicInfo.lowPanic}`;
+    } else {
+      return `Higher Range: ${panicInfo.highPanic}`;
+    }
+  };
+
   return (
-    <div ref={ref} className="relative w-full">
-      <div className={`border rounded px-3 py-2 w-full ${isAbnormal ? "border-red-500 bg-red-50" : "border-gray-300 bg-white"}`}>
+    <div ref={ref} className="relative flex items-center gap-1">
+      {/* Resizable container */}
+      <div 
+        ref={containerRef}
+        className={`border rounded relative ${isAbnormal ? "border-red-500 bg-red-50" : "border-gray-300 bg-white"}`}
+        style={{
+          width: `${customSize.width}px`,
+          height: `${customSize.height}px`,
+          overflow: 'hidden',
+          display: 'flex',
+          flexDirection: 'column',
+          position: 'relative'
+        }}
+      >
         <textarea
           ref={textareaRef}
           value={value || ''}
           onChange={handleInputChange}
           onKeyDown={handleKeyDown}
           onFocus={() => setShow(true)}
-          placeholder="Type values or select from options... (Ctrl+B for bold)"
-          className="outline-none text-xs w-full bg-transparent text-black resize-vertical font-sans border-none"
+          placeholder="Type or select..."
+          className="outline-none text-xs bg-transparent text-black resize-none font-sans border-none flex-1 p-2"
           style={{
             fontSize: '12px',
-            lineHeight: '1.6',
+            lineHeight: '1.5',
             fontFamily: 'Arial, sans-serif',
-            minHeight: '100px',
-            maxHeight: '300px'
+            overflow: 'hidden',
+            whiteSpace: 'pre-wrap',
+            wordWrap: 'break-word'
           }}
-          title="Ctrl+B to bold selected text | Type to add values | Backspace to clear"
+          title="Ctrl+B to bold selected text | Drag resize handle to adjust size"
+        />
+
+        {/* Resize handle at bottom-right */}
+        <div
+          onMouseDown={() => setIsResizing(true)}
+          className="absolute bottom-0 right-0 w-4 h-4 bg-gradient-to-tl from-gray-400 to-transparent cursor-se-resize rounded-tl"
+          style={{
+            cursor: 'nwse-resize',
+            zIndex: 10
+          }}
+          title="Drag to resize (expand/minimize)"
         />
       </div>
 
+      {/* ✅ Panic indicator arrow at right side with tooltip */}
+      {indicator && (
+        <div 
+          ref={arrowRef}
+          className="relative"
+          onMouseEnter={() => setShowTooltip(true)}
+          onMouseLeave={() => setShowTooltip(false)}
+        >
+          <div className={`flex items-center justify-center w-5 h-5 rounded-full text-sm font-bold text-white cursor-help ${indicator === '↓' ? 'bg-blue-600' : 'bg-red-600'}`}>
+            {indicator}
+          </div>
+          
+          {/* Tooltip on hover */}
+          {showTooltip && (
+            <div className="absolute left-1/2 bottom-full mb-2 -translate-x-1/2 bg-gray-800 text-white text-xs px-2 py-1 rounded whitespace-nowrap z-50">
+              {getTooltipMessage()}
+              {/* Tooltip arrow pointing down */}
+              <div className="absolute top-full left-1/2 -translate-x-1/2 w-0 h-0 border-l-3 border-r-3 border-t-3 border-l-transparent border-r-transparent border-t-gray-800"></div>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Dropdown with option suggestions */}
       {show && filtered.length > 0 && (
-        <ul className="absolute z-50 left-0 top-full mt-1 bg-white border border-gray-300 rounded shadow-lg max-h-48 overflow-y-auto w-full text-sm">
+        <ul className="absolute z-50 left-0 top-full mt-1 bg-white border border-gray-300 rounded shadow-lg max-h-48 overflow-y-auto text-sm" style={{ width: `${customSize.width}px` }}>
           {filtered.map(opt => (
             <li
               key={opt}
@@ -122,27 +224,6 @@ const SuggestionInput = ({ value, onChange, options, isAbnormal, panicInfo }) =>
             </li>
           ))}
         </ul>
-      )}
-
-      {/* Formatting hint */}
-      {value && (
-        <div className="text-xs text-gray-500 mt-1" style={{ fontSize: '11px' }}>
-          💡 Tip: Select text and press Ctrl+B to make it <strong>bold</strong> (shows as &lt;b&gt;text&lt;/b&gt; in editor)
-        </div>
-      )}
-
-      {/* Display panic range alert if abnormal */}
-      {isAbnormal && panicInfo && (
-        <div className="mt-2 p-2 bg-red-100 border border-red-400 rounded text-xs text-red-800">
-          <strong>⚠️ OUT OF PANIC RANGE:</strong>
-          <div>Value: <strong>{panicInfo.value}</strong></div>
-          <div>Low Panic: <strong>{panicInfo.lowPanic}</strong> | High Panic: <strong>{panicInfo.highPanic}</strong></div>
-          <div className="mt-1 text-red-700">
-            {panicInfo.value < panicInfo.lowPanic 
-              ? `🔴 ${panicInfo.value} is BELOW Low Panic (${panicInfo.lowPanic})` 
-              : `🔴 ${panicInfo.value} is ABOVE High Panic (${panicInfo.highPanic})`}
-          </div>
-        </div>
       )}
     </div>
   );
@@ -205,6 +286,12 @@ const PatientResult = () => {
   const [commentHistory, setCommentHistory] = useState<string[]>([]);
   const [showCommentDropdown, setShowCommentDropdown] = useState(false);
   const [commentFocused, setCommentFocused] = useState(false);
+  
+  // ✅ Per-test comment state for multiple tests to prevent dropdown interference
+  const [testComments, setTestComments] = useState<{ [testIdx: number]: string }>({});
+  const [testCommentFocused, setTestCommentFocused] = useState<{ [testIdx: number]: boolean }>({});
+  const [testShowComment, setTestShowComment] = useState<{ [testIdx: number]: boolean }>({});
+  
   const [defaultSignature, setDefaultSignature] = useState<any>(null);
 
   // BarcodeModal state
@@ -841,6 +928,8 @@ const PatientResult = () => {
           name: p.parameterName,
           units: p.units,
           type: p.type,
+          lowPanic: p.lowPanic,
+          highPanic: p.highPanic,
           category: p.categoryName
         })));
         const initialResults = {};
@@ -885,6 +974,18 @@ const PatientResult = () => {
 
       const validTests = testDataArray.filter(td => td?.patientTest).map(td => td);
       setAllTestsData(validTests);
+
+      // ✅ Initialize testComments with previously saved comments for each test
+      const initialTestComments: { [testIdx: number]: string } = {};
+      const initialTestShowComment: { [testIdx: number]: boolean } = {};
+      validTests.forEach((testData, idx) => {
+        const savedComment = testData.patientTest?.comments || '';
+        initialTestComments[idx] = savedComment;
+        initialTestShowComment[idx] = savedComment.trim().length > 0; // Auto-check if comment exists
+        console.log(`✅ Loaded existing comment for test ${idx} (${testData.patientTest?.test?.name}):`, savedComment);
+      });
+      setTestComments(initialTestComments);
+      setTestShowComment(initialTestShowComment);
 
       // Use first test's patient data
       if (validTests.length > 0) {
@@ -987,20 +1088,44 @@ const PatientResult = () => {
       
       // ✅ NEW: Check if text value contains numeric and has panic ranges
       if (field === 'textValue' && parameter) {
+        console.log(`📝 Checking text value for parameter: ${parameter.parameterName}`);
+        console.log(`   Value: "${value}"`);
+        console.log(`   Type: ${parameter.type}`);
+        console.log(`   isDescriptive: ${parameter.isDescriptive}`);
+        console.log(`   lowPanic: ${parameter.lowPanic}, highPanic: ${parameter.highPanic}`);
+        
         // Extract first numeric value from the text
         const numericMatch = value?.match(/^[\d.]+/);
+        console.log(`   Numeric match: ${numericMatch ? numericMatch[0] : 'none'}`);
+        
         // ✅ Check for BOTH isDescriptive AND type === 'Text' with panic ranges
         const isTextType = parameter.type === 'Text' || parameter.isDescriptive;
         const hasPanicRanges = parameter.lowPanic !== null && parameter.highPanic !== null && parameter.lowPanic !== undefined && parameter.highPanic !== undefined;
+        
+        console.log(`   isTextType: ${isTextType}, hasPanicRanges: ${hasPanicRanges}`);
         
         if (numericMatch && isTextType && hasPanicRanges) {
           const numericValue = parseFloat(numericMatch[0]);
           if (!isNaN(numericValue)) {
             // Check against panic ranges
             const isAbnormal = numericValue < parameter.lowPanic || numericValue > parameter.highPanic;
-            updated[parameterId] = { ...updated[parameterId], isAbnormal: isAbnormal };
-            console.log(`🔴 PANIC RANGE CHECK: Parameter "${parameter.parameterName}" (Type: ${parameter.type}, Descriptive: ${parameter.isDescriptive}) - Value: ${numericValue}, Low Panic: ${parameter.lowPanic}, High Panic: ${parameter.highPanic}, Abnormal: ${isAbnormal}`);
+            // ✅ NEW: Store panic info and set isAbnormal
+            updated[parameterId] = { 
+              ...updated[parameterId], 
+              isAbnormal: isAbnormal,
+              panicInfo: {
+                value: numericValue,
+                lowPanic: parameter.lowPanic,
+                highPanic: parameter.highPanic
+              }
+            };
+            console.log(`✅ PANIC RANGE CHECK: Parameter "${parameter.parameterName}" - Value: ${numericValue}, Range: ${parameter.lowPanic} - ${parameter.highPanic}, Abnormal: ${isAbnormal}`);
+            console.log(`✅ panicInfo set:`, updated[parameterId].panicInfo);
           }
+        } else {
+          console.log(`⚠️ Conditions not met: numericMatch=${!!numericMatch}, isTextType=${isTextType}, hasPanicRanges=${hasPanicRanges}`);
+          // Clear panicInfo if conditions not met
+          updated[parameterId] = { ...updated[parameterId], isAbnormal: false, panicInfo: null };
         }
       }
       
@@ -1174,7 +1299,7 @@ const PatientResult = () => {
       
       // Save results for each test
       await Promise.all(
-        allTestsData.map(async (testData) => {
+        allTestsData.map(async (testData, idx) => {
           const testId = multipleTestIds[allTestsData.indexOf(testData)];
           const resultsData = testData.parameters.map(param => {
             const paramKey = `${testId}_${param.id}`;
@@ -1203,6 +1328,21 @@ const PatientResult = () => {
           
           const data = await response.json();
           if (data.success) {
+            // ✅ Save comments for this test if any
+            const testComment = testComments[idx];
+            if (testComment && testComment.trim()) {
+              try {
+                await fetch(`${API_BASE_URL}/results/${testData.patientTest.id}/comments`, {
+                  method: 'PUT',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ comments: testComment })
+                });
+                console.log(`✅ Saved comment for test ${idx}:`, testComment);
+              } catch (commentError) {
+                console.error(`⚠️ Failed to save comment for test ${idx}:`, commentError);
+              }
+            }
+            
             // Auto-transition to Entered status
             try {
               await fetch(`${API_BASE_URL}/results/${testData.patientTest.id}/auto-transition/result-saved`, {
@@ -1265,6 +1405,20 @@ const PatientResult = () => {
       });
       const data = await response.json();
       if (data.success) {
+        // ✅ Save comments for single test
+        if (comments && comments.trim()) {
+          try {
+            await fetch(`${API_BASE_URL}/results/${patientData.id}/comments`, {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ comments })
+            });
+            console.log('✅ Saved comments:', comments);
+          } catch (commentError) {
+            console.error('⚠️ Failed to save comments:', commentError);
+          }
+        }
+
         // Auto-transition to Entered status when first result is saved
         try {
           const transitionResponse = await fetch(`${API_BASE_URL}/results/${patientData.id}/auto-transition/result-saved`, {
@@ -1327,6 +1481,20 @@ const PatientResult = () => {
       });
       const data = await response.json();
       if (data.success) {
+        // ✅ Save comments for single test before printing
+        if (comments && comments.trim()) {
+          try {
+            await fetch(`${API_BASE_URL}/results/${patientData.id}/comments`, {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ comments })
+            });
+            console.log('✅ Saved comments:', comments);
+          } catch (commentError) {
+            console.error('⚠️ Failed to save comments:', commentError);
+          }
+        }
+
         // Upload attachment if selected
         if (attachedFile) {
           const formData = new FormData();
@@ -1560,6 +1728,7 @@ const PatientResult = () => {
                                           onChange={(val) => handleResultChange(paramKey, 'textValue', val, testData.parameters)}
                                           options={options}
                                           isAbnormal={results[paramKey]?.isAbnormal || false}
+                                          panicInfo={results[paramKey]?.panicInfo}
                                         />
                                       ) : (
                                         <input
@@ -1579,7 +1748,12 @@ const PatientResult = () => {
                                   </div>
                                 </td>
                                 <td className="border p-2 text-xs">{param.units || '-'}</td>
-                                <td className="border p-2 text-xs">{stripHtmlTags(param.normalRange || param.displayRangeText || param.rangeText || '-')}</td>
+                                <td className="border p-2 text-xs">
+                                  {stripHtmlTags(
+                                    getAgeAppropriateRange(param, patientData?.patient?.ageYears, patientData?.patient?.ageMonths, patientData?.patient?.ageDays, patientData?.patient?.gender) 
+                                    || param.normalRange || param.displayRangeText || param.rangeText || '-'
+                                  )}
+                                </td>
                                 <td className="border p-2 text-center" style={{width: '40px'}}>
                                   <input 
                                     type="checkbox" 
@@ -1588,6 +1762,7 @@ const PatientResult = () => {
                                       handleHighlightChange(paramKey);
                                     }}
                                     className="w-5 h-5 accent-blue-600 cursor-pointer"
+                                    tabIndex={-1}
                                     title="Check to highlight this value bold in report"
                                   />
                                 </td>
@@ -1602,39 +1777,59 @@ const PatientResult = () => {
                           <div className="flex items-center gap-3">
                             <input 
                               type="checkbox" 
-                              id="show-comment-single"
-                              checked={showComment}
-                              onChange={(e) => handleCommentCheckbox(e.target.checked)}
+                              id={`show-comment-test-${testIdx}`}
+                              checked={testShowComment[testIdx] || false}
+                              onChange={(e) => setTestShowComment(prev => ({ ...prev, [testIdx]: e.target.checked }))}
                               className="w-5 h-5 accent-blue-600 cursor-pointer flex-shrink-0"
                               title="Check to add comments"
                             />
-                            <label htmlFor="show-comment-single" className="text-sm font-semibold text-gray-700 cursor-pointer flex-shrink-0">Comment:</label>
-                            {showComment && (
+                            <label htmlFor={`show-comment-test-${testIdx}`} className="text-sm font-semibold text-gray-700 cursor-pointer flex-shrink-0">Comment:</label>
+                            {testShowComment[testIdx] && (
                               <div className="flex-1 relative">
                                 <textarea
-                                  value={comments}
-                                  onChange={(e) => handleCommentChange(e.target.value)}
-                                  onFocus={() => setCommentFocused(true)}
-                                  onBlur={() => setTimeout(() => setCommentFocused(false), 200)}
-                                  placeholder="Type comment here..."
+                                  value={testComments[testIdx] || ''}
+                                  onChange={(e) => setTestComments(prev => ({ ...prev, [testIdx]: e.target.value }))}
+                                  onFocus={() => setTestCommentFocused(prev => ({ ...prev, [testIdx]: true }))}
+                                  onBlur={() => setTimeout(() => setTestCommentFocused(prev => ({ ...prev, [testIdx]: false })), 200)}
+                                  placeholder="Type comment here or select from history"
                                   className="w-full border border-gray-300 rounded px-2 py-1 text-xs font-normal h-12 resize-none"
                                 />
-                                {commentHistory.length > 0 && commentFocused && (
+                                {commentHistory.length > 0 && testCommentFocused[testIdx] && (
                                   <div className="absolute top-12 left-0 right-0 bg-white border border-gray-300 rounded shadow-lg p-2 max-h-40 overflow-y-auto z-50">
                                     <div className="space-y-1">
                                       {commentHistory.map((hist, idx) => (
-                                        <button
-                                          key={idx}
-                                          type="button"
-                                          onMouseDown={(e) => e.preventDefault()}
-                                          onClick={() => {
-                                            const newComments = comments.trim() ? `${comments}, ${hist}` : hist;
-                                            handleCommentChange(newComments);
-                                          }}
-                                          className="w-full text-left px-2 py-1.5 text-xs bg-gray-50 hover:bg-blue-500 hover:text-white text-gray-800 rounded cursor-pointer transition-colors"
-                                        >
-                                          {hist}
-                                        </button>
+                                        <div key={idx} className="flex items-center gap-2 px-2 py-1.5 text-xs bg-gray-50 hover:bg-blue-50 rounded group">
+                                          <button
+                                            type="button"
+                                            onMouseDown={(e) => e.preventDefault()}
+                                            onClick={() => {
+                                              const currentComment = testComments[testIdx] || '';
+                                              const newComments = currentComment.trim() ? `${currentComment}, ${hist}` : hist;
+                                              setTestComments(prev => ({ ...prev, [testIdx]: newComments }));
+                                            }}
+                                            className="flex-1 text-left text-gray-800 hover:text-blue-600 transition-colors cursor-pointer"
+                                          >
+                                            {hist}
+                                          </button>
+                                          <button
+                                            type="button"
+                                            onMouseDown={(e) => e.preventDefault()}
+                                            onClick={async (e) => {
+                                              e.stopPropagation();
+                                              try {
+                                                await deleteCommentFromHistory(hist);
+                                                setCommentHistory(prev => prev.filter(c => c !== hist));
+                                              } catch (error) {
+                                                console.error('Error deleting comment:', error);
+                                                alert('Failed to delete comment');
+                                              }
+                                            }}
+                                            className="text-red-500 hover:text-red-700 opacity-0 group-hover:opacity-100 transition-opacity"
+                                            title="Delete this comment"
+                                          >
+                                            ✕
+                                          </button>
+                                        </div>
                                       ))}
                                     </div>
                                   </div>
@@ -1802,6 +1997,7 @@ const PatientResult = () => {
                                         onChange={(val) => handleResultChange(param.id, 'textValue', val, parameters)}
                                         options={options}
                                         isAbnormal={results[param.id]?.isAbnormal}
+                                        panicInfo={results[param.id]?.panicInfo}
                                       />
                                     ) : (
                                       <input type="text" value={results[param.id]?.textValue || ''} onChange={(e) => handleResultChange(param.id, 'textValue', e.target.value, parameters)} className={`border px-2 py-1 w-32 rounded ${results[param.id]?.isAbnormal ? "border-red-500 bg-red-50" : "border-gray-300"}`} />
@@ -1819,6 +2015,7 @@ const PatientResult = () => {
                                         onChange={(val) => handleResultChange(param.id, 'textValue', val, parameters)}
                                         options={options}
                                         isAbnormal={results[param.id]?.isAbnormal}
+                                        panicInfo={results[param.id]?.panicInfo}
                                       />
                                     ) : (
                                       <input type="text" value={results[param.id]?.textValue || ''} onChange={(e) => handleResultChange(param.id, 'textValue', e.target.value, parameters)} className={`border px-2 py-1 w-32 rounded ${results[param.id]?.isAbnormal ? "border-red-500 bg-red-50" : "border-gray-300"}`} />
@@ -1838,7 +2035,12 @@ const PatientResult = () => {
                                 return unitValue;
                               })()}
                             </td>
-                            <td className="border p-2">{stripHtmlTags(param.normalRange || param.displayRangeText || param.rangeText || '-')}</td>
+                            <td className="border p-2">
+                              {stripHtmlTags(
+                                getAgeAppropriateRange(param, patientData?.patient?.ageYears, patientData?.patient?.ageMonths, patientData?.patient?.ageDays, patientData?.patient?.gender)
+                                || param.normalRange || param.displayRangeText || param.rangeText || '-'
+                              )}
+                            </td>
                             <td className="border p-2 text-center" style={{width: '40px'}}>
                               <input 
                                 type="checkbox" 
@@ -1847,6 +2049,7 @@ const PatientResult = () => {
                                   handleHighlightChange(param.id);
                                 }}
                                 className="w-5 h-5 accent-blue-600 cursor-pointer"
+                                tabIndex={-1}
                                 title="Check to highlight this value bold in report"
                               />
                             </td>
@@ -1863,7 +2066,7 @@ const PatientResult = () => {
                           type="checkbox" 
                           id="show-comment-table"
                           checked={showComment}
-                          onChange={(e) => handleCommentCheckbox(e.target.checked)}
+                          onChange={(e) => setShowComment(e.target.checked)}
                           className="w-5 h-5 accent-blue-600 cursor-pointer flex-shrink-0"
                           title="Check to add comments"
                         />
@@ -1872,7 +2075,7 @@ const PatientResult = () => {
                           <div className="flex-1 relative">
                             <textarea
                               value={comments}
-                              onChange={(e) => handleCommentChange(e.target.value)}
+                              onChange={(e) => setComments(e.target.value)}
                               onFocus={() => setCommentFocused(true)}
                               onBlur={() => setTimeout(() => setCommentFocused(false), 200)}
                               placeholder="Type comment or select from history"
@@ -1882,18 +2085,37 @@ const PatientResult = () => {
                               <div className="absolute top-12 left-0 right-0 bg-white border border-gray-300 rounded shadow-lg p-2 max-h-40 overflow-y-auto z-50">
                                 <div className="space-y-1">
                                   {commentHistory.map((hist, idx) => (
-                                    <button
-                                      key={idx}
-                                      type="button"
-                                      onMouseDown={(e) => e.preventDefault()}
-                                      onClick={() => {
-                                        const newComments = comments.trim() ? `${comments}, ${hist}` : hist;
-                                        handleCommentChange(newComments);
-                                      }}
-                                      className="w-full text-left px-2 py-1.5 text-xs bg-gray-50 hover:bg-blue-500 hover:text-white text-gray-800 rounded cursor-pointer transition-colors"
-                                    >
-                                      {hist}
-                                    </button>
+                                    <div key={idx} className="flex items-center gap-2 px-2 py-1.5 text-xs bg-gray-50 hover:bg-blue-50 rounded group">
+                                      <button
+                                        type="button"
+                                        onMouseDown={(e) => e.preventDefault()}
+                                        onClick={() => {
+                                          const newComments = comments.trim() ? `${comments}, ${hist}` : hist;
+                                          setComments(newComments);
+                                        }}
+                                        className="flex-1 text-left text-gray-800 hover:text-blue-600 transition-colors cursor-pointer"
+                                      >
+                                        {hist}
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onMouseDown={(e) => e.preventDefault()}
+                                        onClick={async (e) => {
+                                          e.stopPropagation();
+                                          try {
+                                            await deleteCommentFromHistory(hist);
+                                            setCommentHistory(prev => prev.filter(c => c !== hist));
+                                          } catch (error) {
+                                            console.error('Error deleting comment:', error);
+                                            alert('Failed to delete comment');
+                                          }
+                                        }}
+                                        className="text-red-500 hover:text-red-700 opacity-0 group-hover:opacity-100 transition-opacity"
+                                        title="Delete this comment"
+                                      >
+                                        ✕
+                                      </button>
+                                    </div>
                                   ))}
                                 </div>
                               </div>

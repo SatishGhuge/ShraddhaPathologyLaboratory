@@ -15,14 +15,14 @@ export const normalizeStatus = (status) => {
     'ENTERED': 'Entered',
     'AUTHENTICATED': 'Authorized',
     'AUTHORIZED': 'Authorized',
-    'VALIDATION': 'Validation',
-    'VALIDATED': 'Validation',
+    'VALIDATION': 'Validated',
+    'VALIDATED': 'Validated',
     'DELIVERED': 'Delivered',
     'RETEST': 'Rectified',
     'RECTIFIED': 'Rectified',
     'REVERT': 'Rectified',
-    'HOLD': 'Validation',
-    'REJECTED': 'Validation'
+    'HOLD': 'Validated',
+    'REJECTED': 'Validated'
   };
   
   return statusMap[status.toUpperCase()] || status;
@@ -46,7 +46,7 @@ export const WORKFLOW_STAGES = [
   'Registered',
   'Received',
   'Entered',
-  'Validation',
+  'Validated',
   'Authorized',
   'Delivered',
   'Rectified'
@@ -81,7 +81,7 @@ export const STAGE_METADATA = {
     canEdit: true,         // Allow editing at this stage
     requiresApproval: false
   },
-  'Validation': {
+  'Validated': {
     order: 3,
     color: '#8B5CF6',      // Purple
     bgColor: '#F5F3FF',    // Light Purple
@@ -280,8 +280,8 @@ export const getNextAllowedStatuses = (currentStatus) => {
   const statusMap = {
     'Registered': ['Received'],
     'Received': ['Entered'],
-    'Entered': ['Validation'],
-    'Validation': ['Authorized'],
+    'Entered': ['Validated'],
+    'Validated': ['Authorized'],
     'Authorized': ['Delivered'],
     'Delivered': ['Rectified'],
     'Rectified': ['Authorized', 'Delivered']  // Can loop back after rectification
@@ -299,7 +299,7 @@ export const getNextAllowedStatuses = (currentStatus) => {
  */
 export const canEditResultsAtStage = (stage, userRole) => {
   // Stages where editing is allowed
-  const editableStages = ['Entered', 'Validation', 'Authorized', 'Delivered', 'Rectified'];
+  const editableStages = ['Entered', 'Validated', 'Authorized', 'Delivered', 'Rectified'];
 
   if (!editableStages.includes(stage)) {
     return false;

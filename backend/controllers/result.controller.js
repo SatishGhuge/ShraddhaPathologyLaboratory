@@ -286,6 +286,7 @@ export const getPatientTests = async (req, res) => {
         image_size: patientTest.test.imageSize,
         attachment_path: patientTest.attachmentPath || null,
         specimen_type: patientTest.test.sample_type?.Sample_Type || patientTest.sample || "N/A",
+        sampleTypeId: patientTest.test.sampleTypeId || 1,  // ✅ ADD SAMPLE TYPE ID FOR BARCODE
         ref_by: patientTest.referralDoctor || 'SELF',
         result_status: normalizeStatus(patientTest.status),
         status: patientTest.status,
@@ -378,7 +379,8 @@ export const getPatientTestById = async (req, res) => {
           include: {
             testParameter: true
           }
-        }
+        },
+        usedMachine: true  // ✅ Changed from select to include true to ensure machine is fetched
       }
     });
 
@@ -463,6 +465,8 @@ export const getPatientTestById = async (req, res) => {
             hasFormula: true,
             formula: true,
             decimal: true,
+            lowPanic: true,
+            highPanic: true,
             unit: {
               select: {
                 symbol: true
@@ -576,6 +580,10 @@ export const getPatientTestById = async (req, res) => {
           displayRangeText: category.testParameter.displayRangeText,
           rangeText: category.testParameter.rangeText,
           
+          // ✅ PANIC RANGES - CRITICAL FOR TEXT TYPE HIGHLIGHTING
+          lowPanic: category.testParameter.lowPanic,
+          highPanic: category.testParameter.highPanic,
+          
           // Complex age ranges from database
           ageRanges: category.testParameter.ageRanges,
           rangeValues: category.testParameter.rangeValues,
@@ -659,6 +667,9 @@ export const getPatientTestById = async (req, res) => {
           hasFormula: true,
           formula: true,
           decimal: true,
+          // ✅ PANIC RANGES - CRITICAL FOR TEXT TYPE HIGHLIGHTING
+          lowPanic: true,
+          highPanic: true,
           unit: {
             select: {
               symbol: true
@@ -708,6 +719,10 @@ export const getPatientTestById = async (req, res) => {
           rangeType: param.rangeType,
           displayRangeText: param.displayRangeText,
           rangeText: param.rangeText,
+          
+          // ✅ PANIC RANGES - CRITICAL FOR TEXT TYPE HIGHLIGHTING
+          lowPanic: param.lowPanic,
+          highPanic: param.highPanic,
           
           // Complex age ranges from database
           ageRanges: param.ageRanges,
@@ -787,17 +802,40 @@ export const getPatientTestById = async (req, res) => {
     console.log(`   patientTest.patient.gender: ${patientTest.patient?.gender}`);
     console.log(`   parameters count: ${allParameters.length}`);
     console.log(`   Total with ageRanges: ${allParameters.filter(p => p.ageRanges).length}`);
+    console.log(`   ✅ usedMachineId: ${patientTest.usedMachineId}`);
+    console.log(`   ✅ usedMachine data:`, JSON.stringify(patientTest.usedMachine, null, 2));
+    console.log(`   ✅ Full patientTest object keys:`, Object.keys(patientTest));
+
+    // ✅ Ensure usedMachine is included in response
+    const responseData = {
+      patientTest: {
+        ...patientTest,
+        usedMachine: patientTest.usedMachine || null  // Explicitly ensure it's in the response
+      },
+      parameters: allParameters,
+      groupedParameters,
+      outsourcingReport,
+      comments: patientTest.comments,
+      debug: { 
+        totalExistingResults, 
+        totalParameters: allParameters.length,
+        usedMachineId: patientTest.usedMachineId,
+        usedMachineIncluded: !!patientTest.usedMachine,
+        usedMachineName: patientTest.usedMachine?.name,
+        usedMachineDescription: patientTest.usedMachine?.description
+      }
+    };
+
+    console.log('🔧 MACHINE DATA DEBUG:');
+    console.log(`   usedMachineId in DB: ${patientTest.usedMachineId}`);
+    console.log(`   usedMachine object:`, patientTest.usedMachine);
+    console.log(`   usedMachine name: ${patientTest.usedMachine?.name}`);
+    console.log(`   usedMachine description: ${patientTest.usedMachine?.description}`);
+    console.log('📤 FINAL RESPONSE DATA usedMachine:', responseData.patientTest.usedMachine);
 
     res.json({
       success: true,
-      data: {
-        patientTest,
-        parameters: allParameters,
-        groupedParameters,
-        outsourcingReport,  // Include outsourcing data
-        comments: patientTest.comments,  // ✅ Explicitly include comments
-        debug: { totalExistingResults, totalParameters: allParameters.length }
-      }
+      data: responseData
     });
 
   } catch (error) {
@@ -1065,14 +1103,14 @@ export const updateTestStatus = async (req, res) => {
       'RECEIVED': 'Received',
       'PROVISIONAL': 'Entered',
       'AUTHENTICATED': 'Authorized',
-      'VALIDATED': 'Validation',
-      'VALIDATION': 'Validation',
+      'VALIDATED': 'Validated',
+      'VALIDATION': 'Validated',
       'DELIVERED': 'Delivered',
       'RETEST': 'Rectified',
       'RECTIFIED': 'Rectified',
       'REVERT': 'Rectified',
-      'HOLD': 'Validation',
-      'REJECTED': 'Validation'
+      'HOLD': 'Validated',
+      'REJECTED': 'Validated'
     };
 
     // Convert status to proper format
@@ -1083,7 +1121,7 @@ export const updateTestStatus = async (req, res) => {
     }
 
     // Validate status against allowed stages
-    const validStatuses = ['Registered', 'Received', 'Entered', 'Validation', 'Authorized', 'Delivered', 'Rectified'];
+    const validStatuses = ['Registered', 'Received', 'Entered', 'Validated', 'Authorized', 'Delivered', 'Rectified'];
     if (properStatus && !validStatuses.includes(properStatus)) {
       return res.status(400).json({
         success: false,
@@ -1145,14 +1183,14 @@ export const updateTestResult = async (req, res) => {
       'RECEIVED': 'Received',
       'PROVISIONAL': 'Entered',
       'AUTHENTICATED': 'Authorized',
-      'VALIDATED': 'Validation',
-      'VALIDATION': 'Validation',
+      'VALIDATED': 'Validated',
+      'VALIDATION': 'Validated',
       'DELIVERED': 'Delivered',
       'RETEST': 'Rectified',
       'RECTIFIED': 'Rectified',
       'REVERT': 'Rectified',
-      'HOLD': 'Validation',
-      'REJECTED': 'Validation'
+      'HOLD': 'Validated',
+      'REJECTED': 'Validated'
     };
 
     const updateData = {
@@ -1285,14 +1323,14 @@ export const bulkUpdateTestStatus = async (req, res) => {
       'RECEIVED': 'Received',
       'PROVISIONAL': 'Entered',
       'AUTHENTICATED': 'Authorized',
-      'VALIDATED': 'Validation',
-      'VALIDATION': 'Validation',
+      'VALIDATED': 'Validated',
+      'VALIDATION': 'Validated',
       'DELIVERED': 'Delivered',
       'RETEST': 'Rectified',
       'RECTIFIED': 'Rectified',
       'REVERT': 'Rectified',
-      'HOLD': 'Validation',
-      'REJECTED': 'Validation'
+      'HOLD': 'Validated',
+      'REJECTED': 'Validated'
     };
 
     // Convert status to proper format
@@ -1303,7 +1341,7 @@ export const bulkUpdateTestStatus = async (req, res) => {
     }
 
     // Validate status against allowed stages
-    const validStatuses = ['Registered', 'Received', 'Entered', 'Validation', 'Authorized', 'Delivered', 'Rectified'];
+    const validStatuses = ['Registered', 'Received', 'Entered', 'Validated', 'Authorized', 'Delivered', 'Rectified'];
     if (properStatus && !validStatuses.includes(properStatus)) {
       return res.status(400).json({
         success: false,
@@ -1383,19 +1421,19 @@ export const getTestStatistics = async (req, res) => {
       'RECEIVED': 'Received',
       'PROVISIONAL': 'Entered',
       'AUTHENTICATED': 'Authorized',
-      'VALIDATED': 'Validation',
-      'VALIDATION': 'Validation',
+      'VALIDATED': 'Validated',
+      'VALIDATION': 'Validated',
       'DELIVERED': 'Delivered',
       'RETEST': 'Rectified',
       'RECTIFIED': 'Rectified',
       'REVERT': 'Rectified',
-      'HOLD': 'Validation',
-      'REJECTED': 'Validation',
+      'HOLD': 'Validated',
+      'REJECTED': 'Validated',
       // Handle already mapped statuses (new format)
       'Registered': 'Registered',
       'Received': 'Received',
       'Entered': 'Entered',
-      'Validation': 'Validation',
+      'Validated': 'Validated',
       'Authorized': 'Authorized',
       'Delivered': 'Delivered',
       'Rectified': 'Rectified'
@@ -1413,7 +1451,7 @@ export const getTestStatistics = async (req, res) => {
     });
 
     // Ensure all new statuses are represented
-    const allStatuses = ['Registered', 'Received', 'Entered', 'Validation', 'Authorized', 'Delivered', 'Rectified'];
+    const allStatuses = ['Registered', 'Received', 'Entered', 'Validated', 'Authorized', 'Delivered', 'Rectified'];
     allStatuses.forEach(status => {
       if (!statistics.byStatus[status]) {
         statistics.byStatus[status] = 0;
@@ -2232,6 +2270,76 @@ export const getCommentHistory = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Failed to fetch comment history: ' + error.message
+    });
+  }
+};
+
+// Delete a comment from all tests
+export const deleteCommentFromHistory = async (req, res) => {
+  try {
+    const { comment } = req.body;
+
+    if (!comment || !comment.trim()) {
+      return res.status(400).json({
+        success: false,
+        message: 'Comment text is required'
+      });
+    }
+
+    const trimmedComment = comment.trim();
+    console.log(`🗑️ Deleting comment from history: "${trimmedComment}"`);
+
+    // Find all patient tests that contain this comment
+    const allPatientTests = await prisma.patientTest.findMany({
+      where: {
+        comments: {
+          not: null
+        }
+      },
+      select: {
+        id: true,
+        comments: true
+      }
+    });
+
+    let updatedCount = 0;
+
+    // Remove the comment from each test's comments field
+    for (const test of allPatientTests) {
+      if (test.comments && test.comments.trim()) {
+        // Split by comma, filter out the comment to delete, and rejoin
+        const parts = test.comments
+          .split(',')
+          .map(c => c.trim())
+          .filter(c => c.length > 0 && c !== trimmedComment);
+
+        // Update the test with the new comments
+        const newComments = parts.length > 0 ? parts.join(', ') : null;
+        
+        if (test.comments !== (newComments || '')) {
+          await prisma.patientTest.update({
+            where: { id: test.id },
+            data: { comments: newComments }
+          });
+          updatedCount++;
+          console.log(`✅ Updated test ${test.id}: removed "${trimmedComment}"`);
+        }
+      }
+    }
+
+    console.log(`✅ Deleted comment from ${updatedCount} test(s)`);
+
+    res.json({
+      success: true,
+      message: `Comment deleted from ${updatedCount} test(s)`,
+      data: { updatedCount }
+    });
+
+  } catch (error) {
+    console.error('Delete comment error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to delete comment: ' + error.message
     });
   }
 };

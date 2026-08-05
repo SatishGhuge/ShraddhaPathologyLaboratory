@@ -3,23 +3,12 @@
 import { useRouter, useSearchParams } from "next/navigation";
 import React, { useState, useEffect, useRef } from "react";
 import ReactDOM from "react-dom/client";
-import {
-  RefreshCcw,
-  Download,
-  Printer,
-  Mail,
-  Search,
-  FileText,
-  Calendar,
-  Settings,
-  Barcode,
-  ChevronDown,
-  Upload,
-  FileCheck,
-} from "lucide-react";
+import { RefreshCcw, Download, Printer, Mail, Search, FileText, Calendar, Settings, Barcode, ChevronDown, Upload, FileCheck } from "lucide-react";
+import JsBarcode from "jsbarcode";
 import BarcodeModal, { generateBarcodeLabels } from "@/app/components/BarcodeModal";
 import ProfessionalReport from "@/app/components/ProfessionalReport";
 import API_BASE_URL from "@/src/api/config";
+import { generateCompactBarcodePrintHtml } from "@/app/utils/barcodePrintUtils";
 
 import { FaWhatsapp } from "react-icons/fa";
 import html2pdf from "html2pdf.js";
@@ -383,7 +372,7 @@ export default function Result() {
       Registered: 0,
       Received: 0,
       Entered: 0,
-      Validation: 0,
+      Validated: 0,
       Authorized: 0,
       Delivered: 0,
       Rectified: 0
@@ -444,7 +433,7 @@ export default function Result() {
     loadLetterhead();
   }, []);
 
-  // Barcode Scanner - Capture barcode input from hardware scanner
+  // Barcode Scanner - Capture barcode input from hardware scanner (works globally on this page)
   React.useEffect(() => {
     let barcodeBuffer = '';
     let barcodeTimeout: any;
@@ -466,6 +455,8 @@ export default function Result() {
         barcodeBuffer = '';
         clearTimeout(barcodeTimeout);
 
+        console.log('📱 Barcode detected:', barcode);
+
         try {
           // Parse barcode via API
           const response = await fetch(`${API_BASE_URL}/result/parse-barcode`, {
@@ -477,28 +468,26 @@ export default function Result() {
           const data = await response.json();
 
           if (data.success) {
-            console.log('✅ Barcode scanned:', {
+            console.log('✅ Barcode parsed successfully:', {
               visitId: data.visitId,
               sampleId: data.sampleId,
               barcode: data.barcode
             });
             // Barcode processed successfully
-            // No UI notification - silent operation
           } else {
-            console.error('❌ Barcode error:', data.message);
+            console.error('❌ Barcode parsing failed:', data.message);
           }
         } catch (error) {
-          console.error('❌ Barcode scan error:', error);
+          console.error('❌ Barcode API error:', error);
         }
-      } else if (e.key.length === 1) {
-        // Accumulate barcode characters
+      } else if (e.key.length === 1 && e.key.match(/[0-9\-]/)) {
+        // Accumulate barcode characters (only numbers and dash)
         barcodeBuffer += e.key;
 
         // Reset timeout
         clearTimeout(barcodeTimeout);
         barcodeTimeout = setTimeout(() => {
           if (barcodeBuffer.length > 5) {
-            // Only process if buffer has reasonable length
             barcodeBuffer = '';
           }
         }, 100);
@@ -801,64 +790,15 @@ export default function Result() {
     if (!targetPatient) return;
 
     const selectedTestsList = (targetPatient as any).tests.filter((t: any) => barcodeSelectedTests.has(t.test_id));
-    const now = new Date();
-    const dateStr = now.toLocaleDateString('en-GB');
-    const timeStr = now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: true }).toUpperCase();
-
-    // Group by specimen type — one label per unique specimen
-    // Multiple tests with same specimen → one barcode, short names joined with " / "
-    const specimenGroups = {};
-    const specimenTestIds = {};
-    const specimenTestStatuses = {}; // Track ALL test statuses for each specimen group
-    const specimenBarcodeStatuses = {}; // Track ALL barcode statuses for each specimen group
     
-    selectedTestsList.forEach(t => {
-      const key = (t as any).specimen_type || 'Unknown';
-      if (!specimenGroups[key]) {
-        specimenGroups[key] = [];
-        specimenTestIds[key] = [];
-        specimenTestStatuses[key] = []; // Store array of all test statuses
-        specimenBarcodeStatuses[key] = []; // Store array of all barcode statuses
-      }
-      specimenGroups[key].push((t as any).test_short_name || (t as any).test_name);
-      specimenTestIds[key].push((t as any).test_id);
-      specimenTestStatuses[key].push((t as any).status || 'Registered'); // Store each test's status
-      specimenBarcodeStatuses[key].push((t as any).barcode_status || 'Unprinted'); // Store each barcode's status
-    });
+    // ✅ USE CENTRALIZED FUNCTION FOR CONSISTENT BARCODE GENERATION EVERYWHERE
+    const labels = generateBarcodeLabels(
+      selectedTestsList,
+      (targetPatient as any).visit_id,
+      (targetPatient as any).organizationCode || ''
+    );
 
-    // Build labels — barcode value = visitId for first specimen, visitId-2, visitId-3 ...
-    const specimenEntries = Object.entries(specimenGroups);
-    const labels = specimenEntries.map(([specimen, shortNames]: any, idx: number) => {
-      const statuses = specimenTestStatuses[specimen] || [];
-      const barcodeStatuses = specimenBarcodeStatuses[specimen] || [];
-      
-      // Determine final status: if ANY test is "Received", use "Received"
-      // Otherwise, if ANY barcode is "Printed", use "Printed"
-      // Otherwise use "Registered" (no test received yet)
-      let finalSampleStatus = 'Registered';
-      let finalBarcodeStatus = 'Unprinted';
-      
-      // Check if any test has been received
-      if (statuses.includes('Received')) {
-        finalSampleStatus = 'Received';
-      }
-      
-      // Check if any barcode has been printed
-      if (barcodeStatuses.includes('Printed')) {
-        finalBarcodeStatus = 'Printed';
-      }
-      
-      return {
-        barcodeValue: `${(targetPatient as any).visit_id}-${idx + 1}`,
-        specimen,
-        shortNamesStr: (shortNames as any[]).join(' / '),
-        dateStr,
-        timeStr,
-        testIds: specimenTestIds[specimen] || [],
-        sampleStatus: finalSampleStatus,
-        barcode_status: finalBarcodeStatus,
-      };
-    });
+    console.log('✅ Generated barcode labels using centralized function:', labels);
 
     const genderInitial = (targetPatient as any).gender ? (targetPatient as any).gender.charAt(0).toUpperCase() : '';
     const age = (targetPatient as any).age || '';
@@ -873,15 +813,9 @@ export default function Result() {
       organizationCode: (targetPatient as any).organizationCode || '', // ✅ Include organization code
     });
     
-    // Add organizationCode to each label
-    const labelsWithOrgCode = labels.map(label => ({
-      ...label,
-      organizationCode: (targetPatient as any).organizationCode || '', // ✅ Add org code to barcode labels
-    }));
-    
-    setBarcodeLabels(labelsWithOrgCode);
-    // Initialize NO barcodes as selected (user must manually select them)
-    setSelectedBarcodeIndices(new Set());
+    setBarcodeLabels(labels);
+    // ✅ Initialize ALL barcodes as selected by default
+    setSelectedBarcodeIndices(new Set(labels.map((_, idx) => idx)));
     setShowBarcodeModal(true);
   };
 
@@ -1055,207 +989,189 @@ export default function Result() {
     });
   };
 
-  // Download report as PDF directly to device
-  const handleDownloadPdf = async (withHeader) => {
+  // Download report as PDF using professional format
+  const handleDownloadPdf = async (withHeader: boolean) => {
     setShowDownloadDropdown(false);
     if (selectedTests.size === 0) { alert('Please select a test'); return; }
     try {
       setLoading(true);
       const testIds = Array.from(selectedTests);
       const responses = await Promise.all(testIds.map(id => getPatientTestById(id)));
-      const first = responses[0];
-
-      // Fetch signature
-      let signature = first.patientTest.test?.signature || null;
-      if (!signature) {
-        try {
-          const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || '/api';
-          const testSpeciality = first.patientTest.test?.speciality || 'Regular';
-          const sigRes = await fetch(`${API_BASE_URL}/signatures/by-specialty/${encodeURIComponent(testSpeciality)}`);
-          const sigData = await sigRes.json();
-          if (sigData.success && sigData.data) signature = sigData.data;
-          else {
-            const allRes = await fetch(`${API_BASE_URL}/signatures`);
-            const allData = await allRes.json();
-            if (allData.success && allData.data.length > 0) {
-              const active = allData.data.filter(s => s.isActive);
-              if (active.length > 0) signature = active[0];
-            }
-          }
-        } catch (e) { console.warn('Could not fetch signature', e); }
+      
+      if (!responses || responses.length === 0) {
+        alert('No test data found');
+        return;
       }
 
-      const patient = first.patientTest.patient;
-      const visitId = first.patientTest.visitId;
-      const visitDate = first.patientTest.visitDate
-        ? new Date(first.patientTest.visitDate).toLocaleDateString('en-GB') : '-';
+      const first = responses[0];
+      const patientTestData = first.patientTest;
+      const patient = patientTestData.patient;
+      const visitId = patientTestData.visitId;
+      const visitDate = patientTestData.visitDate 
+        ? new Date(patientTestData.visitDate).toLocaleDateString('en-GB') 
+        : '-';
       const patientName = `${patient.title || ''} ${patient.firstName || ''} ${patient.lastName || ''}`.trim();
 
-      // Convert LetterHead image to base64 for embedding in PDF
+      // Fetch letterhead from DB if needed
+      let letterheadDB: LetterheadDB | null = null;
       let letterHeadBase64 = '';
       if (withHeader) {
         try {
-          const imgRes = await fetch(LetterHead);
-          const blob = await imgRes.blob();
-          letterHeadBase64 = await new Promise(resolve => {
-            const reader = new FileReader();
-            reader.onloadend = () => resolve(reader.result as string);
-            reader.readAsDataURL(blob);
-          });
-        } catch (e) { console.warn('Could not load letterhead', e); }
+          const lhRes = await fetch(`${API_BASE_URL}/letterhead/active`);
+          const lhData = await lhRes.json();
+          if (lhData.success && lhData.data?.length > 0) {
+            letterheadDB = lhData.data[0];
+            console.log('✅ Letterhead loaded from DB:', letterheadDB);
+          }
+        } catch (e) {
+          console.warn('Could not fetch letterhead from DB', e);
+        }
+
+        // Fallback: Convert static LetterHead to base64 if DB letterhead not available
+        if (!letterheadDB) {
+          try {
+            const imgRes = await fetch(LetterHead);
+            const blob = await imgRes.blob();
+            letterHeadBase64 = await new Promise<string>(resolve => {
+              const reader = new FileReader();
+              reader.onloadend = () => resolve(reader.result as string);
+              reader.readAsDataURL(blob);
+            });
+          } catch (e) { console.warn('Could not load static letterhead', e); }
+        }
       }
 
-      const fileName = `${patientName.replace(/\s+/g, '_')}_${visitId}_Report.pdf`;
+      // Create PDF document
+      const pdfDoc = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait' });
+      const A4_Width = 210;
+      const A4_Height = 297;
 
-      // Pre-convert all images to base64 to avoid CORS issues
-      const toBase64 = async (url) => {
-        const res = await fetch(url);
-        const blob = await res.blob();
-        return new Promise<string>(resolve => {
-          const reader = new FileReader();
-          reader.onloadend = () => resolve(reader.result as string);
-          reader.readAsDataURL(blob);
-        });
-      };
+      // Convert each test response to PDF page using professional format
+      for (let i = 0; i < responses.length; i++) {
+        const response = responses[i];
+        const testData = response.patientTest;
+        const testInfo = testData.test;
 
-      // Re-convert letterhead to base64 if not already done
-      if (withHeader && !letterHeadBase64) {
-        try { letterHeadBase64 = await toBase64(LetterHead) as string; } catch (e) {}
-      }
-
-      // Convert signature image to base64
-      let signatureImageBase64 = '';
-      if (signature?.signatureImage) {
-        try { signatureImageBase64 = await toBase64(signature.signatureImage) as string; } catch (e) { signatureImageBase64 = signature.signatureImage; }
-      }
-
-      // Replace signature image src with base64 in sigHtml (rebuild with base64)
-      const buildPageHtmlB64 = (r: any) => {
-        const t = r.patientTest.test;
-        const gp = r.groupedParameters || {};
-        const ptop = withHeader ? '144px' : '45px';
-        const pbot = withHeader ? '136px' : '45px';
-
-        const paramRows2 = (() => {
-          // Group parameters by category
-          const grouped: any = {};
-          const categoryOrder: any = {};
-          
-          Object.entries(gp).forEach(([catName, catParams]: [string, any]) => {
-            grouped[catName] = catParams;
-            categoryOrder[catName] = catName !== 'NO_CATEGORY_HEADER' && catParams[0]?.sortOrder
-              ? catParams[0].sortOrder
-              : 999;
-          });
-          
-          // Sort categories by sortOrder
-          const sortedCategories = Object.entries(grouped)
-            .sort((a: any, b: any) => categoryOrder[a[0]] - categoryOrder[b[0]]);
-          
-          let rows = '';
-          
-          sortedCategories.forEach(([catName, catParams]: [string, any]) => {
-            // Show category header only once
-            if (catName !== 'NO_CATEGORY_HEADER' && catParams[0]?.showCategoryHeader) {
-              const categoryMethod = catParams[0]?.categoryTestMethod || null;
-              // Parse category name to handle HTML tags - category is ALWAYS bold
-              const categoryNameHtml = catName
-                .replace(/<b>(.*?)<\/b>/g, '<strong>$1</strong>')
-                .replace(/<i>(.*?)<\/i>/g, '<em>$1</em>')
-                .replace(/<u>(.*?)<\/u>/g, '<u>$1</u>');
-              rows += `<tr><td colSpan="4" style="padding:6px;font-weight:bold;border-bottom:1px solid #ddd;background:#f5f5f5;font-size:12px;"><strong>${categoryNameHtml}</strong></td></tr>`;
-              
-              // Add category method below category name
-              if (categoryMethod) {
-                const methodHtml = categoryMethod
-                  .replace(/<b>(.*?)<\/b>/g, '<strong>$1</strong>')
-                  .replace(/<i>(.*?)<\/i>/g, '<em>$1</em>')
-                  .replace(/<u>(.*?)<\/u>/g, '<u>$1</u>');
-                rows += `<tr><td colSpan="4" style="padding:3px 6px;font-size:10px;color:#666;border-bottom:1px solid #eee;background:#fafafa;">Method: ${methodHtml}</td></tr>`;
-              }
+        // Build results map from parameters with existingResult
+        const resultsMap: any = {};
+        if (response.parameters && Array.isArray(response.parameters)) {
+          response.parameters.forEach((param: any) => {
+            if (param.existingResult) {
+              resultsMap[param.id] = {
+                numericValue: param.existingResult.numericValue,
+                textValue: param.existingResult.textValue,
+                referenceRange: param.existingResult.referenceRange,
+                isAbnormal: param.existingResult.isAbnormal || false,
+                isHighlighted: param.existingResult.isHighlighted || false
+              };
             }
-            
-            // Add parameters for this category (sorted by sortOrder)
-            const sortedParams = [...catParams].sort((a: any, b: any) => (a.sortOrder || 999) - (b.sortOrder || 999));
-            
-            sortedParams.forEach((p: any) => {
-              const er = p.existingResult;
-              const val = er ? (er.numericValue !== null && er.numericValue !== undefined ? er.numericValue : (er.textValue || '-')) : '-';
-              const outOfRange = isParamOutOfRange(p, er);
-              
-              // Parse parameter name to handle HTML tags and underline
-              const paramNameHtml = p.parameterName
-                .replace(/<b>(.*?)<\/b>/g, '<strong>$1</strong>')
-                .replace(/<i>(.*?)<\/i>/g, '<em>$1</em>')
-                .replace(/<u>(.*?)<\/u>/g, '<u>$1</u>');
-              
-              const parameterMethod = p.parameterTestMethod ? `<div style="font-size:9px;color:#999;margin-top:2px;">Method: ${p.parameterTestMethod.replace(/<b>(.*?)<\/b>/g, '<strong>$1</strong>').replace(/<i>(.*?)<\/i>/g, '<em>$1</em>').replace(/<u>(.*?)<\/u>/g, '<u>$1</u>')}</div>` : '';
-              
-              rows += `<tr>
-                <td style="padding:3px 6px;width:38%;font-weight:${outOfRange ? 'bold' : 'normal'};">${paramNameHtml}${parameterMethod}</td>
-                <td style="padding:3px 6px 3px 20px;width:22%;font-size:11px;${outOfRange ? 'color:#b91c1c;font-weight:bold;' : ''}">${val}${outOfRange ? ' *' : ''}</td>
-                <td style="padding:3px 6px;width:12%;color:#555;">${p.units || ''}</td>
-                <td style="padding:3px 6px;width:28%;color:#555;">${er?.referenceRange || ''}</td>
-              </tr>`;
+          });
+        }
+
+        // Build HTML content matching professional format
+        const interpretationHtml = testInfo.interpretation 
+          ? `<div style="margin-top:4mm;border-top:0.5px solid #999;padding-top:2mm;font-size:10px;color:#333;">${testInfo.interpretation}</div>` 
+          : '';
+
+        const commentsHtml = testData.comments 
+          ? `<div style="margin-top:3mm;padding:2mm 0;border-top:0.5px solid #ddd;font-size:10px;"><strong>Notes:</strong> ${testData.comments}</div>` 
+          : '';
+
+        // Build parameters table with grouped parameters
+        let paramsHtml = '';
+        if (response.groupedParameters) {
+          Object.entries(response.groupedParameters).forEach(([catName, params]: [string, any]) => {
+            // Add category header
+            if (catName !== 'NO_CATEGORY_HEADER' && (params as any)[0]?.showCategoryHeader) {
+              paramsHtml += `<tr><td colspan="4" style="padding:3mm 2mm;background:#f5f5f5;font-weight:bold;font-size:10px;border-bottom:0.5px solid #999;">${catName}</td></tr>`;
+            }
+
+            // Add category method if exists
+            const categoryMethod = (params as any)[0]?.categoryTestMethod;
+            if (categoryMethod) {
+              paramsHtml += `<tr><td colspan="4" style="padding:2mm;background:#fafafa;font-size:9px;color:#666;border-bottom:0.5px solid #eee;">Method: ${categoryMethod}</td></tr>`;
+            }
+
+            // Sort parameters by sortOrder
+            const sortedParams = [...(params as any[])].sort((a: any, b: any) => (a.sortOrder || 999) - (b.sortOrder || 999));
+
+            sortedParams.forEach((param: any) => {
+              const result = resultsMap[param.id] || {};
+              const resultValue = result.numericValue !== null && result.numericValue !== undefined 
+                ? result.numericValue 
+                : (result.textValue || '-');
+              const rangeText = result.referenceRange || param.normalRange || '-';
+              const outOfRange = result.isAbnormal ? 'color:#b91c1c;font-weight:bold;' : '';
+              const rowClass = result.isHighlighted ? 'background:#ffe6e6;' : '';
+
+              paramsHtml += `
+                <tr style="${rowClass}">
+                  <td style="padding:2mm;border-bottom:0.5px solid #ddd;font-size:10px;width:35%;">${param.parameterName}</td>
+                  <td style="padding:2mm;border-bottom:0.5px solid #ddd;font-size:10px;width:20%;text-align:center;${outOfRange}">${resultValue}${result.isAbnormal ? ' *' : ''}</td>
+                  <td style="padding:2mm;border-bottom:0.5px solid #ddd;font-size:10px;width:12%;">${param.units || '-'}</td>
+                  <td style="padding:2mm;border-bottom:0.5px solid #ddd;font-size:10px;width:33%;">${rangeText}</td>
+                </tr>
+              `;
             });
           });
-          
-          return rows;
-        })();
+        }
 
-        const sigHtml2 = signature ? `
-          <div style="margin-top:auto;padding-top:22px;display:flex;justify-content:flex-end;">
-            <div style="text-align:center;">
-              ${signatureImageBase64 ? `<img src="${signatureImageBase64}" style="width:${signature.width||150}px;height:${signature.height||80}px;object-fit:contain;display:block;margin:0 auto;" />` : ''}
-              ${signature.signatureText ? `<div style="font-size:11px;font-weight:bold;white-space:pre-line;">${signature.signatureText}</div>` : ''}
-              ${signature.doctorName ? `<div style="font-size:11px;font-weight:bold;">${signature.doctorName}</div>` : ''}
-              ${signature.specialty ? `<div style="font-size:10px;color:#444;">${signature.specialty}</div>` : ''}
-            </div>
-          </div>` : '';
+        // Build letterhead image HTML if available
+        const letterheadHtml = withHeader && (letterheadDB?.headerImage || letterHeadBase64)
+          ? `<img src="${letterheadDB?.headerImage || letterHeadBase64}" style="position:absolute;top:0;left:0;width:100%;height:100%;object-fit:fill;z-index:0;" />`
+          : '';
 
-        return `<div style="width:100%;height:1123px;position:relative;background:#fff;font-family:Arial,sans-serif;font-size:11px;overflow:hidden;">
-            ${withHeader && letterHeadBase64 ? `<img src="${letterHeadBase64}" style="position:absolute;top:0;left:0;width:100%;height:1123px;object-fit:fill;z-index:0;" />` : ''}
-            <div style="position:relative;z-index:1;height:1123px;display:flex;flex-direction:column;padding-top:${ptop};padding-bottom:${pbot};padding-left:53px;padding-right:53px;box-sizing:border-box;">
-              <div style="text-align:center;margin-bottom:22px;border-bottom:1.5px solid #333;padding-bottom:11px;">
-                <strong style="font-size:13px;letter-spacing:1px;">${t.name.toUpperCase()} REPORT</strong>
+        // Build complete HTML page
+        const pageHtml = `
+          <div style="width:100%;height:${A4_Height}mm;font-family:Arial,sans-serif;background:#fff;overflow:hidden;position:relative;">
+            ${letterheadHtml}
+            <div style="position:relative;z-index:1;padding:${withHeader ? '25mm' : '12mm'} 12mm;height:100%;box-sizing:border-box;overflow:hidden;display:flex;flex-direction:column;">
+              
+              <!-- Test Title -->
+              <div style="text-align:center;margin-bottom:5mm;padding-bottom:3mm;border-bottom:1px solid #333;">
+                <strong style="font-size:12px;letter-spacing:0.5px;">${testInfo.name.toUpperCase()} REPORT</strong>
               </div>
-              <table style="width:100%;border-collapse:collapse;margin-bottom:15px;font-size:11px;">
+
+              <!-- Patient Info Table -->
+              <table style="width:100%;border-collapse:collapse;margin-bottom:4mm;font-size:10px;">
                 <tr>
-                  <td style="padding:2px 4px;width:50%;"><strong>Patient:</strong> ${patientName}</td>
-                  <td style="padding:2px 4px;width:50%;"><strong>Age / Gender:</strong> ${patient.age || '-'} Yrs / ${patient.gender || '-'}</td>
+                  <td style="padding:2mm 3mm;width:50%;"><strong>Patient:</strong> ${patientName}</td>
+                  <td style="padding:2mm 3mm;width:50%;"><strong>Age / Gender:</strong> ${patient.ageYears || 0}Y ${patient.ageMonths || 0}M / ${patient.gender || '-'}</td>
                 </tr>
                 <tr>
-                  <td style="padding:2px 4px;"><strong>Lab No:</strong> ${visitId}</td>
-                  <td style="padding:2px 4px;"><strong>Date:</strong> ${visitDate}</td>
+                  <td style="padding:2mm 3mm;"><strong>Lab No:</strong> ${visitId}</td>
+                  <td style="padding:2mm 3mm;"><strong>Date:</strong> ${visitDate}</td>
                 </tr>
               </table>
-              <table style="width:100%;border-collapse:collapse;font-size:11px;">
+
+              <!-- Results Table -->
+              <table style="width:100%;border-collapse:collapse;font-size:10px;margin-bottom:4mm;flex:1;overflow:hidden;">
                 <thead>
                   <tr>
-                    <th style="border-bottom:1.5px solid #333;padding:4px 6px;text-align:left;width:38%;">Test Description</th>
-                    <th style="border-bottom:1.5px solid #333;padding:4px 6px 4px 20px;text-align:left;width:22%;">Result</th>
-                    <th style="border-bottom:1.5px solid #333;padding:4px 6px;text-align:left;width:12%;">Unit</th>
-                    <th style="border-bottom:1.5px solid #333;padding:4px 6px;text-align:left;width:28%;">Biological Reference Range</th>
+                    <th style="border-bottom:1px solid #333;padding:3mm 2mm;text-align:left;width:35%;"><strong>Test Description</strong></th>
+                    <th style="border-bottom:1px solid #333;padding:3mm 2mm;text-align:center;width:20%;"><strong>Result</strong></th>
+                    <th style="border-bottom:1px solid #333;padding:3mm 2mm;text-align:left;width:12%;"><strong>Unit</strong></th>
+                    <th style="border-bottom:1px solid #333;padding:3mm 2mm;text-align:left;width:33%;"><strong>Reference Range</strong></th>
                   </tr>
                 </thead>
                 <tbody>
-                  <tr><td colSpan={4} style="padding:4px 6px;font-weight:bold;border-bottom:1px solid #ccc;">${t.name}</td></tr>
-                  ${paramRows2}
+                  ${paramsHtml}
                 </tbody>
               </table>
-              ${t.interpretation ? `<div style="margin-top:15px;border-top:1px solid #ccc;padding-top:11px;font-size:11px;color:#444;">${t.interpretation}</div>` : ''}
-              ${sigHtml2}
+
+              <!-- Interpretation -->
+              ${interpretationHtml}
+
+              <!-- Comments/Notes -->
+              ${commentsHtml}
+
+              <!-- Footer Spacing -->
+              <div style="flex:1;"></div>
             </div>
-          </div>`;
-      };
+          </div>
+        `;
 
-      const pdf = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait' });
-      const A4_W = 210, A4_H = 297;
-
-      for (let i = 0; i < responses.length; i++) {
-        // html2pdf manages its own container/overlay — just pass the HTML string
-        const pageHtml = buildPageHtmlB64(responses[i]);
-
+        // Convert HTML to image and add to PDF
         const imgDataUrl = await html2pdf().set({
           margin: 0,
           jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
@@ -1269,24 +1185,13 @@ export default function Result() {
           }
         }).from(pageHtml).outputImg('datauristring');
 
-        if (i > 0) pdf.addPage();
-        pdf.addImage(imgDataUrl, 'JPEG', 0, 0, A4_W, A4_H);
+        if (i > 0) pdfDoc.addPage();
+        pdfDoc.addImage(imgDataUrl, 'JPEG', 0, 0, A4_Width, A4_Height);
       }
 
-      // Attachment page
-      const attachmentPath = responses.find(r => r.patientTest.attachmentPath)?.patientTest.attachmentPath
-        || (uploadedFiles[Array.from(selectedTests)[0] as string]?.serverPath);
-      if (attachmentPath && !attachmentPath.endsWith('.pdf')) {
-        try {
-          const baseUrl = (process.env.NEXT_PUBLIC_API_URL || '').replace('/api', '');
-          const src = attachmentPath.startsWith('http') ? attachmentPath : `${baseUrl}${attachmentPath}`;
-          const attachBase64 = await toBase64(src) as string;
-          pdf.addPage();
-          pdf.addImage(attachBase64, 'JPEG', 0, 0, A4_W, A4_H);
-        } catch (e) { console.warn('Could not add attachment page', e); }
-      }
-
-      pdf.save(fileName);
+      // Save PDF with proper filename
+      const fileName = `${patientName.replace(/\s+/g, '_')}_${visitId}_Report.pdf`;
+      pdfDoc.save(fileName);
     } catch (err) {
       console.error('PDF download error:', err);
       alert('Failed to generate PDF: ' + err.message);
@@ -1525,6 +1430,13 @@ export default function Result() {
       // Debug: Log the parameters received
       console.log('📋 Parameters received from API:', first.parameters);
       console.log('📋 Full response:', first);
+      console.log('🔧 MACHINE DATA from API Response:');
+      console.log('   usedMachineId:', first.patientTest?.usedMachineId);
+      console.log('   usedMachine:', first.patientTest?.usedMachine);
+      console.log('   usedMachine?.name:', first.patientTest?.usedMachine?.name);
+      console.log('   usedMachine?.description:', first.patientTest?.usedMachine?.description);
+      console.log('   debug.usedMachineName:', first.debug?.usedMachineName);
+      console.log('   debug.usedMachineId:', first.debug?.usedMachineId);
 
       // Fetch signature
       let signature = first.patientTest.test?.signature || null;
@@ -1574,6 +1486,7 @@ export default function Result() {
       }
 
       // Build combined tests array with results data
+<<<<<<< HEAD
       const combinedTests = responses.map(r => ({
         test_id: r.patientTest.test.id,
         name: r.patientTest.test.name,
@@ -1586,6 +1499,43 @@ export default function Result() {
         outsourcedTo: r.patientTest.outsourcedTo || null,
         outsourcingReport: r.outsourcingReport || null
       }));
+=======
+      const combinedTests = responses.map((r, idx) => {
+        const testObj = {
+          name: r.patientTest.test.name,
+          interpretation: r.patientTest.test.interpretation,
+          signature: r.patientTest.test.signature || signature,
+          groupedParameters: r.groupedParameters,
+          parameters: r.parameters,
+          // Include outsourcing data if available
+          isOutsourced: r.patientTest.isOutsourced || false,
+          outsourcedTo: r.patientTest.outsourcedTo || null,
+          outsourcingReport: r.outsourcingReport || null,
+          // ✅ Include per-test comments
+          comments: r.patientTest.comments || '',
+          // ✅ Include machine/instrument data
+          usedMachine: r.patientTest.usedMachine || null
+        };
+        
+        console.log(`📦 Test ${idx} (${testObj.name}):`, {
+          hasUsedMachine: !!testObj.usedMachine,
+          usedMachine: testObj.usedMachine,
+          usedMachineId: r.patientTest?.usedMachineId
+        });
+        
+        return testObj;
+      });
+
+      // ✅ DEBUG: Log machine data
+      console.log('🔧 Combined Tests with Machine Data:', combinedTests.map(t => ({
+        name: t.name,
+        usedMachine: t.usedMachine,
+        machineExists: !!t.usedMachine,
+        machineId: t.usedMachine?.id,
+        machineName: t.usedMachine?.name,
+        machineDesc: t.usedMachine?.description
+      })));
+>>>>>>> a9513a7cc3422d0d25a10d01d231719df1a0014e
 
       // Build results object mapping parameter IDs to their values
       const resultsMap: any = {};
@@ -1633,7 +1583,12 @@ export default function Result() {
         printOption: option,
         results: resultsMap,
         referralDoctor: first.patientTest.referralDoctor,
+<<<<<<< HEAD
         commentsMap: commentsMap  // ✅ Pass per-test comments map instead of single comment
+=======
+        // ✅ For single test, use combinedTests[0].comments; for multiple tests, combinedTests has per-test comments
+        comments: combinedTests.length === 1 ? combinedTests[0].comments : ''
+>>>>>>> a9513a7cc3422d0d25a10d01d231719df1a0014e
       });
       
       setReportWithHeader(true);
@@ -1754,7 +1709,11 @@ export default function Result() {
         printOption: 'nobreak',
         results: resultsMap,
         referralDoctor: first.patientTest.referralDoctor,
+<<<<<<< HEAD
         commentsMap: commentsMap  // ✅ Use user-entered comments map
+=======
+        comments: combinedTests.length === 1 ? combinedTests[0].comments : ''
+>>>>>>> a9513a7cc3422d0d25a10d01d231719df1a0014e
       });
 
       setShowPerTestCommentsModal(false);
@@ -1955,7 +1914,7 @@ export default function Result() {
         // Find first test with single parameter in editable stage
         const firstEditableTest = results.find(
           test => test.parameter_count === 1 && 
-                  (test.result_status === 'Entered' || test.result_status === 'Validation')
+                  (test.result_status === 'Entered' || test.result_status === 'Validated')
         );
         
         if (firstEditableTest && inlineInputRefs.current[firstEditableTest.test_id]) {
@@ -1973,7 +1932,7 @@ export default function Result() {
       const statusMap = {
         'Provisional': 'Entered',
         'Authenticated': 'Authorized',
-        'Validated': 'Validation'
+        'Validated': 'Validated'
       };
       
       const testStatus = statusMap[test.result_status] || test.result_status;
@@ -2071,8 +2030,8 @@ export default function Result() {
       }
       
       // Determine which modal to show based on current status
-      if (status === 'Validation') {
-        // Status is Validation → Show Authenticate modal (next stage is Authorized)
+      if (status === 'Validated') {
+        // Status is Validated → Show Authenticate modal (next stage is Authorized)
         console.log('✅ Opening Authenticate modal for next stage');
         setAuthenticateData({
           patientTest: testData.patientTest,
@@ -2138,7 +2097,7 @@ export default function Result() {
       // Tab or Shift+Tab to navigate to next/previous result field
       e.preventDefault();
       const currentEditingTests = results.filter(t => 
-        t.parameter_count === 1 && (t.result_status === 'Entered' || t.result_status === 'Validation')
+        t.parameter_count === 1 && (t.result_status === 'Entered' || t.result_status === 'Validated')
       );
       const currentIndex = currentEditingTests.findIndex(t => t.test_id === test.test_id);
       
@@ -2163,7 +2122,7 @@ export default function Result() {
       // Down arrow to move to next result field
       e.preventDefault();
       const currentEditingTests = results.filter(t => 
-        t.parameter_count === 1 && (t.result_status === 'Entered' || t.result_status === 'Validation')
+        t.parameter_count === 1 && (t.result_status === 'Entered' || t.result_status === 'Validated')
       );
       const currentIndex = currentEditingTests.findIndex(t => t.test_id === test.test_id);
       
@@ -2179,7 +2138,7 @@ export default function Result() {
       // Up arrow to move to previous result field
       e.preventDefault();
       const currentEditingTests = results.filter(t => 
-        t.parameter_count === 1 && (t.result_status === 'Entered' || t.result_status === 'Validation')
+        t.parameter_count === 1 && (t.result_status === 'Entered' || t.result_status === 'Validated')
       );
       const currentIndex = currentEditingTests.findIndex(t => t.test_id === test.test_id);
       
@@ -2521,7 +2480,7 @@ export default function Result() {
           const statusMap = {
             'Provisional': 'Entered',
             'Authenticated': 'Authorized',
-            'Validated': 'Validation'
+            'Validated': 'Validated'
           };
           
           const testStatus = statusMap[test.result_status] || test.result_status;
@@ -2566,7 +2525,7 @@ export default function Result() {
     const statusMap = {
       'Provisional': 'Entered',
       'Authenticated': 'Authorized',
-      'Validated': 'Validation'
+      'Validated': 'Validated'
     };
     
     const displayStatus = statusMap[pascalStatus] || pascalStatus;
@@ -2578,7 +2537,7 @@ export default function Result() {
         return "bg-orange-100 text-orange-800";
       case "Entered":
         return "bg-purple-100 text-purple-800";
-      case "Validation":
+      case "Validated":
         return "bg-yellow-100 text-yellow-800";
       case "Authorized":
         return "bg-blue-100 text-blue-800";
@@ -2775,13 +2734,13 @@ export default function Result() {
                   </h3>
                 </div>
                 <div 
-                  onClick={() => setSelectedStatus("Validation")}
+                  onClick={() => setSelectedStatus("Validated")}
                   className={`rounded-lg p-1 text-center cursor-pointer hover:shadow-md transition-shadow ${
-                    selectedStatus === "Validation" ? "bg-yellow-200 ring-2 ring-yellow-600" : "bg-yellow-100"
+                    selectedStatus === "Validated" ? "bg-yellow-200 ring-2 ring-yellow-600" : "bg-yellow-100"
                   }`}
                 >
                   <h3 className="text-yellow-800 font-semibold text-[11px]">
-                    Validation ({statistics.byStatus.Validation})
+                    Validated ({statistics.byStatus.Validated})
                   </h3>
                 </div>
                 <div 
@@ -3221,8 +3180,8 @@ export default function Result() {
                                 >
                                   Parameter
                                 </span>
-                              ) : test.parameter_count === 1 && (test.result_status === 'Entered' || test.result_status === 'Validation') ? (
-                                // Single parameter in Entered or Validation stage - show inline input with black text
+                              ) : test.parameter_count === 1 && (test.result_status === 'Entered' || test.result_status === 'Validated') ? (
+                                // Single parameter in Entered or Validated stage - show inline input with black text
                                 <input
                                   ref={(el) => {
                                     if (el) inlineInputRefs.current[test.test_id] = el;
@@ -3266,7 +3225,7 @@ export default function Result() {
                                   }}
                                   tabIndex={0}
                                   role="button"
-                                  title={test.result_status === 'Validation' ? 'Press Enter to edit this value' : 'Read-only in this stage'}
+                                  title={test.result_status === 'Validated' ? 'Press Enter to edit this value' : 'Read-only in this stage'}
                                 >
                                   {test.isOutsourced ? (
                                     <span 
@@ -3280,7 +3239,7 @@ export default function Result() {
                                       <span>⚠️</span>
                                       <span>OUTSOURCING</span>
                                     </span>
-                                  ) : test.result_status === 'Entered' || test.result_status === 'Validation' || test.result_status === 'Authorized' || test.result_status === 'Delivered' 
+                                  ) : test.result_status === 'Entered' || test.result_status === 'Validated' || test.result_status === 'Authorized' || test.result_status === 'Delivered' 
                                     ? (test.result || '-') 
                                     : '-'}
                                 </span>
@@ -3543,9 +3502,9 @@ export default function Result() {
                     }
                     try {
                       for (const testId of testsToValidate) {
-                        await updateTestStatus(testId.toString(), { status: 'Validation' });
+                        await updateTestStatus(testId.toString(), { status: 'Validated' });
                       }
-                      alert(`${testsToValidate.length} test(s) moved to Validation stage`);
+                      alert(`${testsToValidate.length} test(s) moved to Validated stage`);
                       fetchResults();
                       setSelectedTests(new Set());
                     } catch (err) {
@@ -3796,7 +3755,7 @@ export default function Result() {
                                 <option value="Registered">Registered</option>
                                 <option value="Received">Received</option>
                                 <option value="Entered">Entered</option>
-                                <option value="Validation">Validation</option>
+                                <option value="Validated">Validated</option>
                                 <option value="Authorized">Authorized</option>
                                 <option value="Delivered">Delivered</option>
                                 <option value="Rectified">Rectified</option>
@@ -4038,86 +3997,120 @@ export default function Result() {
             }, 100);
           }
         }}
-        onPrintAndUpdate={async () => {
-          let successCount = 0;
+      onPrintAndUpdate={async () => {
+        let successCount = 0;
+        
+        try {
+          // Only process selected barcodes - collect test IDs from selected barcode labels
+          const selectedTestIds = new Set<number>();
           
-          try {
-            // Only process selected barcodes - collect test IDs from selected barcode labels
-            const selectedTestIds = new Set<number>();
-            
-            for (const idx of selectedBarcodeIndices) {
-              if (idx < barcodeLabels.length) {
-                const label = barcodeLabels[idx];
-                if (label.testIds && Array.isArray(label.testIds)) {
-                  label.testIds.forEach((id: number) => selectedTestIds.add(id));
-                }
+          for (const idx of selectedBarcodeIndices) {
+            if (idx < barcodeLabels.length) {
+              const label = barcodeLabels[idx];
+              if (label.testIds && Array.isArray(label.testIds)) {
+                label.testIds.forEach((id: number) => selectedTestIds.add(id));
               }
             }
-            
-            console.log('📝 Selected Test IDs:', Array.from(selectedTestIds));
-            console.log(`🖨️ Printing ${selectedBarcodeIndices.size}/${barcodeLabels.length} barcodes`);
-            
-            // Update status for selected tests
-            for (const testId of selectedTestIds) {
-              console.log(`🔄 Transitioning test ${testId} to Received status...`);
+          }
+          
+          console.log('📝 Selected Test IDs:', Array.from(selectedTestIds));
+          console.log(`🖨️ Printing ${selectedBarcodeIndices.size}/${barcodeLabels.length} barcodes`);
+          
+          // Update status for selected tests
+          for (const testId of selectedTestIds) {
+            console.log(`🔄 Transitioning test ${testId} to Received status...`);
+            try {
+              const response = await fetch(`${API_BASE_URL}/results/${testId}/auto-transition/barcode-printed`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ changedBy: 'search_booking' })
+              });
+              const data = await response.json();
+              if (data.success) {
+                console.log(`✅ Test ${testId} transitioned to Received`);
+                successCount++;
+              } else {
+                console.error(`❌ Test ${testId} failed:`, data.message);
+              }
+            } catch (error) {
+              console.error(`❌ Test ${testId} error:`, error);
+            }
+          }
+        } catch (error) {
+          console.error('⚠️ Status transition failed:', error);
+        }
+        
+        // Now print the barcodes after status update using generateCompactBarcodePrintHtml
+        setTimeout(() => {
+          console.log('📄 Status updated, now printing barcodes with proper format...');
+          
+          // Filter only selected barcodes
+          const selectedBarcodeLabels = Array.from(selectedBarcodeIndices)
+            .map(idx => barcodeLabels[idx])
+            .filter(label => label !== undefined);
+          
+          if (selectedBarcodeLabels.length === 0) {
+            console.error('No selected barcodes to print');
+            return;
+          }
+          
+          // Generate print HTML using the same function as Print Only button
+          const printHtml = generateCompactBarcodePrintHtml(
+            selectedBarcodeLabels.map(label => ({
+              barcodeValue: label.barcodeValue,
+              specimen: label.specimen,
+              shortNamesStr: label.shortNamesStr,
+              dateStr: label.dateStr,
+              timeStr: label.timeStr,
+              organizationCode: label.organizationCode
+            })),
+            {
+              patientName: barcodePatientInfo.patientName,
+              gender: barcodePatientInfo.gender,
+              age: barcodePatientInfo.age,
+              visitId: barcodePatientInfo.visitId
+            },
+            (value: string) => {
               try {
-                const response = await fetch(`${API_BASE_URL}/results/${testId}/auto-transition/barcode-printed`, {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ changedBy: 'result_page' })
+                const svgElement = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+                svgElement.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+                
+                JsBarcode(svgElement, value, {
+                  format: 'CODE128',
+                  width: 2,
+                  height: 40,
+                  margin: 0,
+                  lineColor: '#000000',
+                  displayValue: false,
+                  background: '#ffffff'
                 });
-                const data = await response.json();
-                if (data.success) {
-                  console.log(`✅ Test ${testId} transitioned to Received`);
-                  successCount++;
-                } else {
-                  console.error(`❌ Test ${testId} failed:`, data.message);
-                }
+                
+                return svgElement.innerHTML;
               } catch (error) {
-                console.error(`❌ Test ${testId} error:`, error);
+                console.error('❌ Barcode generation error:', error);
+                return '';
               }
             }
-          } catch (error) {
-            console.error('⚠️ Status transition failed:', error);
-          }
+          );
           
-          // Print only the selected barcodes
-          const printArea = document.getElementById('barcode-print-area');
-          if (!printArea) {
-            alert('Error: Could not find barcode print area');
-            return;
-          }
-          const allLabels = printArea.querySelectorAll('[data-barcode-index]');
+          // Use iframe to print with proper formatting
+          const iframe = document.createElement('iframe');
+          iframe.style.display = 'none';
+          document.body.appendChild(iframe);
           
-          // Create a new container with only selected labels
-          const selectedLabelsHtml = Array.from(allLabels)
-            .map((label, idx) => {
-              if (selectedBarcodeIndices.has(idx)) {
-                return (label as HTMLElement).outerHTML;
-              }
-              return '';
-            })
-            .filter(html => html.length > 0)
-            .join('');
-          
-          const win = window.open('', '_blank');
-          if (!win) {
-            console.error('Could not open print window - pop-ups may be blocked');
-            return;
+          if (iframe.contentDocument) {
+            iframe.contentDocument.open();
+            iframe.contentDocument.write(printHtml);
+            iframe.contentDocument.close();
+            
+            setTimeout(() => {
+              iframe.contentWindow?.print();
+              // Remove iframe after printing
+              setTimeout(() => {
+                document.body.removeChild(iframe);
+              }, 500);
+            }, 300);
           }
-          win.document.write(`<!DOCTYPE html><html><head><title>Barcode Labels</title>
-            <style>
-              * { margin:0; padding:0; box-sizing:border-box; }
-              body { font-family: Arial, sans-serif; background: white; padding: 8mm; }
-              .labels-wrap { display: flex; flex-wrap: wrap; gap: 6mm; justify-content: flex-start; }
-              .label { width: 58mm; border: 2px solid; padding: 3px; page-break-inside: avoid; }
-              @page { size: A4; margin: 8mm; }
-              @media print { body { padding: 0; } .labels-wrap { gap: 4mm; } }
-            </style>
-          </head><body><div class="labels-wrap">${selectedLabelsHtml}</div></body></html>`);
-          win.document.close();
-          win.focus();
-          win.print();
           
           setShowBarcodeModal(false);
           setBarcodeSelectedTests(new Set());
@@ -4132,7 +4125,8 @@ export default function Result() {
               fetchResults();
             }, 800);
           }
-        }}
+        }, 500);
+      }}
         barcodeLabels={barcodeLabels}
         barcodePatientInfo={barcodePatientInfo}
         selectedBarcodes={selectedBarcodeIndices}
