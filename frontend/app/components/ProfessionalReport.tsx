@@ -44,7 +44,8 @@ export interface ProfessionalReportProps {
   printOption?: 'pagebreak' | 'nobreak';
   results?: Record<string, { numericValue?: any; textValue?: string; isAbnormal?: any; isHighlighted?: boolean }>;
   referralDoctor?: string;
-  comments?: string;  // ✅ Add comments field
+  comments?: string;  // ✅ Keep for backward compatibility (single comment)
+ 
   onReady?: () => void;
 }
 
@@ -108,12 +109,18 @@ function buildContentBlocks(
   testsToRender: any[],
   results: Record<string, any>,
   printOption: 'pagebreak' | 'nobreak',
-  comments?: string  // ✅ Add comments parameter
+  comments?: string,  // Keep for backward compatibility
+  commentsMap?: Record<string, string>  // ✅ NEW: Per-test comments
 ): ContentBlock[] {
   const blocks: ContentBlock[] = [{ kind: 'patient' }];
   
   // ✅ Debug: Log comments at start of build
-  console.log('📦 buildContentBlocks - Comments input:', { comments, hasComments: !!comments });
+  console.log('📦 buildContentBlocks - Comments input:', { 
+    comments, 
+    commentsMap,
+    hasComments: !!comments,
+    hasCommentsMap: !!commentsMap && Object.keys(commentsMap || {}).length > 0
+  });
 
   testsToRender.forEach((testItem, idx) => {
     if (printOption === 'pagebreak' && idx > 0) {
@@ -143,12 +150,20 @@ function buildContentBlocks(
       }
     );
 
-    // ✅ Add comments as table row right after parameters
-    if (comments && comments.trim()) {
-      console.log('✅ Adding comments block:', comments);
-      blocks.push({ kind: 'comments', text: comments });
+    // ✅ Add per-test comments from commentsMap, fallback to global comments
+    let testComment = '';
+    if (commentsMap && testItem.test_id) {
+      testComment = commentsMap[testItem.test_id] || '';
+    }
+    if (!testComment && comments) {
+      testComment = comments;
+    }
+
+    if (testComment && testComment.trim()) {
+      console.log(`✅ Adding comments for test ${testItem.test_id}:`, testComment);
+      blocks.push({ kind: 'comments', text: testComment });
     } else {
-      console.log('⚠️ No comments to add - comments is empty or not provided');
+      console.log(`⚠️ No comments for test ${testItem.test_id}`);
     }
 
     if (testItem.interpretation) {
@@ -157,7 +172,7 @@ function buildContentBlocks(
   });
 
   blocks.push({ kind: 'signature' });
-  console.log('📦 buildContentBlocks - Total blocks:', blocks.length, 'including comments block:', blocks.some(b => b.kind === 'comments'));
+  console.log('📦 buildContentBlocks - Total blocks:', blocks.length, 'with comments:', blocks.filter(b => b.kind === 'comments').length);
   return blocks;
 }
 
@@ -251,7 +266,8 @@ const ProfessionalReport = React.forwardRef<HTMLDivElement, ProfessionalReportPr
       printOption = 'nobreak',
       results = {},
       referralDoctor = '',
-      comments = '',  // ✅ Extract comments from props
+      comments = '',  // ✅ Keep for backward compatibility
+      
       onReady,
     } = props;
 
@@ -267,7 +283,7 @@ const ProfessionalReport = React.forwardRef<HTMLDivElement, ProfessionalReportPr
         commentsLength: comments?.length,
         commentsExists: !!comments,
         commentsValue: comments,
-        resultsKeys: Object.keys(results || {}).length,
+       
         firstResult: Object.entries(results || {}).slice(0, 1)
       });
     }, [results, comments]);
@@ -334,7 +350,7 @@ const ProfessionalReport = React.forwardRef<HTMLDivElement, ProfessionalReportPr
     useEffect(() => {
       const testsToRender = combinedTests.length > 0
         ? combinedTests
-        : [{ name: test?.name, interpretation: test?.interpretation,
+        : [{ test_id: test?.id, name: test?.name, interpretation: test?.interpretation,
              signature: test?.signature, groupedParameters }];
 
       const blocks = buildContentBlocks(testsToRender, results, printOption, comments);
