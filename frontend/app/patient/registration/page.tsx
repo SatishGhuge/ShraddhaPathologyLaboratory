@@ -339,11 +339,14 @@ export default function PatientRegistration() {
   const mobileInputRef = useRef<HTMLInputElement>(null);
   const doctorDropdownRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
-  const rebookingData: RebookingData | null = null; // location.state is not available in Next.js App Router
+  
+  // Read rebooking data from localStorage
+  const [rebookingData, setRebookingData] = useState<RebookingData | null>(null);
+  
   const hideHeader = false; // Check if header should be hidden
 
-  const [firstName, setFirstName] = useState((rebookingData as RebookingData | null)?.firstName || "");
-  const [lastName, setLastName] = useState((rebookingData as RebookingData | null)?.lastName || "");
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
   const [title, setTitle] = useState("MR");
   const [createdBy, setCreatedBy] = useState(() => {
     try {
@@ -355,19 +358,19 @@ export default function PatientRegistration() {
   const [existingPatientId, setExistingPatientId] = useState<any>(null); // Track existing patient
   const [foundPatients, setFoundPatients] = useState<any[]>([]); // Store all found patients
   const [showPatientSelectionModal, setShowPatientSelectionModal] = useState(false); // Show patient selection
-  const [dob, setDob] = useState((rebookingData as RebookingData | null)?.visitDate?.split(' ')[0] || "");
-  const [age, setAge] = useState(String((rebookingData as RebookingData | null)?.age || ""));
+  const [dob, setDob] = useState("");
+  const [age, setAge] = useState("");
   const [babyAgeFormatted, setBabyAgeFormatted] = useState<string>(""); // "1 month 3 days" format for babies < 1 year
-  const [mobile, setMobile] = useState((rebookingData as RebookingData | null)?.mobile || "");
-  const [email, setEmail] = useState((rebookingData as RebookingData | null)?.email || "");
-  const [address, setAddress] = useState((rebookingData as RebookingData | null)?.address || "");
-  const [location, setLocation] = useState((rebookingData as RebookingData | null)?.location || "");
+  const [mobile, setMobile] = useState("");
+  const [email, setEmail] = useState("");
+  const [address, setAddress] = useState("");
+  const [location, setLocation] = useState("");
   const [locationSearch, setLocationSearch] = useState("");
   const [locationSuggestions, setLocationSuggestions] = useState<any[]>([]);
   const [showLocationDropdown, setShowLocationDropdown] = useState(false);
   const locationDropdownRef = useRef<HTMLDivElement>(null);
 
-  const [remarks, setRemarks] = useState((rebookingData as RebookingData | null)?.remark || "");
+  const [remarks, setRemarks] = useState("");
   const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
   const [time, setTime] = useState(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
 
@@ -384,8 +387,8 @@ export default function PatientRegistration() {
   const [navigateToResult, setNavigateToResult] = useState(false);
   const [showDoctorList, setShowDoctorList] = useState(false);
   const [showBillModal, setShowBillModal] = useState(false);
-  const [gender, setGender] = useState((rebookingData as RebookingData | null)?.gender || "Male");
-  const [refDoctor, setRefDoctor] = useState((rebookingData as RebookingData | null)?.referralDoctor || "");
+  const [gender, setGender] = useState("Male");
+  const [refDoctor, setRefDoctor] = useState("");
   const [frequentTests, setFrequentTests] = useState<any[]>([]);
   const [filterFrequent, setFilterFrequent] = useState(false);
   const [selectedPackage, setSelectedPackage] = useState<any>(null);
@@ -450,6 +453,56 @@ export default function PatientRegistration() {
       setOrganizations(orgs);
       console.log('📋 Organizations loaded:', orgs);
     }).catch(console.error);
+
+    // ✅ Load rebooking data from localStorage if available
+    if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem('rebookingData');
+      if (stored) {
+        try {
+          const data = JSON.parse(stored);
+          setRebookingData(data);
+          
+          console.log('🔄 Loading rebooking data:', {
+            firstName: data.patientData?.firstName,
+            lastName: data.patientData?.lastName,
+            testsCount: data.tests?.length,
+            previousBookingId: data.previousBookingId
+          });
+          
+          // Pre-fill patient details
+          if (data.patientData) {
+            const pd = data.patientData;
+            setFirstName(pd.firstName || "");
+            setLastName(pd.lastName || "");
+            setTitle(pd.title || "MR");
+            setMobile(pd.mobile || "");
+            setEmail(pd.email || "");
+            setGender(pd.gender || "Male");
+            setAge(pd.age ? String(pd.age) : "");
+            setDob(pd.dob || "");
+            setAddress(pd.address || "");
+            setLocation(pd.location || "");
+            if (pd.referralDoctor) {
+              setRefDoctor(pd.referralDoctor);
+            }
+            if (pd.remark) {
+              setRemarks(pd.remark);
+            }
+          }
+          
+          // ✅ Pre-load tests from previous visit (WITHOUT discount)
+          if (data.tests && Array.isArray(data.tests)) {
+            console.log('✅ Pre-loading', data.tests.length, 'tests from previous visit');
+            setSelectedTests(data.tests);
+          }
+          
+          // Clear localStorage after reading
+          localStorage.removeItem('rebookingData');
+        } catch (err) {
+          console.error('❌ Error parsing rebooking data:', err);
+        }
+      }
+    }
   }, []);
 
   // Fetch organization-specific charges when organization is selected

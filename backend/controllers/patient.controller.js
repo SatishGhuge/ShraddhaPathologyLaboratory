@@ -151,9 +151,22 @@ export const createPatient = async (req, res) => {
           sampleBarcodeNo,
           patient_history,
           totalAmount: parseFloat(test.charge),
+          
+          // ✅ Use ORIGINAL discount fields (this is initial registration)
+          originalDiscountPercent: discountPercent ? parseFloat(discountPercent) : 0,
+          originalDiscountAmount: discountAmount ? parseFloat(discountAmount) / testCount : 0,
+          originalDiscountRemark: discountRemark,
+          originalDiscountDate: new Date(),
+          
+          // Additional discount not applicable on initial registration
+          additionalDiscountPercent: 0,
+          additionalDiscountAmount: 0,
+          
+          // Keep for backward compatibility
           discountPercent: discountPercent ? parseFloat(discountPercent) : 0,
           discountAmount: discountAmount ? parseFloat(discountAmount) / testCount : 0,
           discountRemark,
+          
           paidAmount: perTestPaid,
           balanceAmount: perTestBalance,
           paymentMode,
@@ -239,9 +252,22 @@ export const createPatient = async (req, res) => {
               sampleBarcodeNo,
               patient_history,
               totalAmount: parseFloat(test.charge),
+              
+              // ✅ Use ORIGINAL discount fields (initial registration)
+              originalDiscountPercent: discountPercent ? parseFloat(discountPercent) : 0,
+              originalDiscountAmount: discountAmount ? parseFloat(discountAmount) / testCount : 0,
+              originalDiscountRemark: discountRemark,
+              originalDiscountDate: new Date(),
+              
+              // Additional discount not applicable on initial registration
+              additionalDiscountPercent: 0,
+              additionalDiscountAmount: 0,
+              
+              // Keep for backward compatibility
               discountPercent: discountPercent ? parseFloat(discountPercent) : 0,
               discountAmount: discountAmount ? parseFloat(discountAmount) / testCount : 0,
               discountRemark,
+              
               paidAmount: perTestPaid,
               balanceAmount: perTestBalance,
               paymentMode,
@@ -877,6 +903,198 @@ export const updatePayment = async (req, res) => {
   }
 };
 
+// ============================================================================
+// ADD TESTS TO EXISTING VISIT (BookingDetailsModal Save)
+// ============================================================================
+// When user adds new tests from BookingDetailsModal to an existing visit:
+// - Save new tests with NEW discount (applies only to new tests)
+// - Update existing PatientTest records with new overall discount
+// - Return barcode data for new tests (grouped by sample type)
+export const addTestsToExistingVisit = async (req, res) => {
+  try {
+    const { patientId, visitId, tests, discountPercent, discountAmount, discountRemark, businessType } = req.body;
+
+    if (!patientId || !visitId || !tests || tests.length === 0) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'patientId, visitId, and tests array are required' 
+      });
+    }
+
+    console.log('📝 Adding tests to existing visit:', {
+      patientId,
+      visitId,
+      newTestsCount: tests.length,
+      discountPercent,
+      discountAmount,
+      businessType
+    });
+
+    // Get existing tests for this visit to understand current state
+    const existingTests = await prisma.patientTest.findMany({
+      where: { patientId, visitId },
+      include: { test: true }
+    });
+
+    if (!existingTests.length) {
+      return res.status(404).json({ 
+        success: false, 
+        message: 'Visit not found for this patient' 
+      });
+    }
+
+    const firstExistingTest = existingTests[0];
+    
+    // Calculate totals
+    const existingTestsTotal = existingTests.reduce((sum, t) => sum + (t.totalAmount || 0), 0);
+    const newTestsTotal = tests.reduce((sum, t) => sum + (parseFloat(t.charge) || 0), 0);
+    const totalAmount = existingTestsTotal + newTestsTotal;
+    
+    // Discount logic:
+    // - NEW discount applies ONLY to newly added tests
+    // - Existing discount remains unchanged
+    const newDiscountAmount = discountPercent > 0 
+      ? Math.round((newTestsTotal * discountPercent) / 100) 
+      : (parseFloat(discountAmount) || 0);
+    
+    // Calculate net amount after new discount
+    const netAmountWithNewDiscount = Math.max(0, totalAmount - newDiscountAmount);
+    
+    // Get current paid and balance amounts
+    const currentPaidAmount = firstExistingTest.paidAmount || 0;
+    const newBalanceAmount = Math.max(0, netAmountWithNewDiscount - currentPaidAmount);
+
+    console.log('💰 Billing calculation:', {
+      existingTestsTotal,
+      newTestsTotal,
+      totalAmount,
+      newDiscountAmount,
+      netAmountWithNewDiscount,
+      currentPaidAmount,
+      newBalanceAmount
+    });
+
+    // Create new PatientTest records for new tests
+    const newPatientTests = await prisma.patientTest.createMany({
+      data: tests.map(test => ({
+        patientId,
+        visitId,
+        testId: test.id,
+        departmentId: test.departmentId,
+        organizationId: firstExistingTest.organizationId,
+        sample: test.sample,
+        charge: parseFloat(test.charge) || 0,
+        reportMode: firstExistingTest.reportMode,
+        referralDoctor: firstExistingTest.referralDoctor,
+        visitDate: firstExistingTest.visitDate,
+        visitTime: firstExistingTest.visitTime,
+        sampleTaken: firstExistingTest.sampleTaken,
+        sampleReceived: firstExistingTest.sampleReceived,
+        sampleBarcodeNo: firstExistingTest.sampleBarcodeNo,
+        patient_history: firstExistingTest.patient_history,
+        totalAmount: parseFloat(test.charge) || 0,
+        
+        // Original discount not applicable for new tests
+        originalDiscountPercent: 0,
+        originalDiscountAmount: 0,
+        
+        // ✅ Use ADDITIONAL discount fields (new tests from rebook)
+        additionalDiscountPercent: discountPercent ? parseFloat(discountPercent) : 0,
+        additionalDiscountAmount: newDiscountAmount / tests.length,
+        additionalDiscountRemark: discountRemark || '',
+        additionalDiscountDate: new Date(),
+        
+        // Keep for backward compatibility
+        discountPercent: discountPercent ? parseFloat(discountPercent) : 0,
+        discountAmount: newDiscountAmount / tests.length,
+        discountRemark: discountRemark || '',
+        
+        paidAmount: currentPaidAmount,
+        balanceAmount: newBalanceAmount,
+        paymentMode: firstExistingTest.paymentMode,
+        businessType: businessType || firstExistingTest.businessType,
+        status: 'Registered',
+        isOutsourced: test.isOutsourced || false,
+        outsourcedTo: test.outsourcedTo || null
+      }))
+    });
+
+    console.log(`✅ Created ${newPatientTests.count} new PatientTest records`);
+
+    // Update all existing PatientTest records for this visit with new totals and balance
+    // DO NOT CHANGE their original discount - only update totals
+    await prisma.patientTest.updateMany({
+      where: { patientId, visitId },
+      data: {
+        totalAmount: totalAmount, // Update total (now includes new tests)
+        balanceAmount: newBalanceAmount
+        // ⚠️ DO NOT update originalDiscountPercent, originalDiscountAmount
+        // They remain unchanged for existing tests
+      }
+    });
+
+    console.log('✅ Updated all PatientTest records with new balance and discount');
+
+    // Fetch all tests for this visit (both existing and new) to return barcode data
+    const allTestsForVisit = await prisma.patientTest.findMany({
+      where: { patientId, visitId },
+      include: {
+        test: {
+          include: { sample_type: true }
+        }
+      }
+    });
+
+    // Group new tests by sample type for barcode generation
+    const newTestsByBarcode = {};
+    tests.forEach(test => {
+      const sampleKey = test.sample || 'Unknown';
+      if (!newTestsByBarcode[sampleKey]) {
+        newTestsByBarcode[sampleKey] = [];
+      }
+      newTestsByBarcode[sampleKey].push(test);
+    });
+
+    // Check if any new tests have different sample types from existing tests
+    const existingSampleTypes = new Set(existingTests.map(t => t.sample));
+    const newSampleTypes = new Set(Object.keys(newTestsByBarcode));
+    const hasDifferentSampleTypes = [...newSampleTypes].some(sample => !existingSampleTypes.has(sample));
+
+    console.log('🔍 Barcode generation info:', {
+      existingSampleTypes: Array.from(existingSampleTypes),
+      newSampleTypes: Array.from(newSampleTypes),
+      hasDifferentSampleTypes,
+      newTestsByBarcode: Object.keys(newTestsByBarcode)
+    });
+
+    res.json({
+      success: true,
+      message: 'Tests added to existing visit successfully',
+      data: {
+        patientId,
+        visitId,
+        totalTests: allTestsForVisit.length,
+        newTestsCount: tests.length,
+        totalAmount,
+        discountAmount: newDiscountAmount,
+        balanceAmount: newBalanceAmount,
+        currentPaidAmount,
+        needsNewBarcode: hasDifferentSampleTypes,
+        newTestsByBarcode: newTestsByBarcode,
+        allTests: allTestsForVisit
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ Add tests to existing visit error:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Failed to add tests to existing visit', 
+      error: error.message 
+    });
+  }
+};
+
 // Get patient statistics for dashboard
 export const getPatientStatistics = async (req, res) => {
   try {
@@ -1240,6 +1458,153 @@ export const getPatientTests = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Failed to fetch patient tests'
+    });
+  }
+};
+
+// ============================================================================
+// GET TESTS BY VISIT ID - For Booking Details Modal
+// ============================================================================
+export const getTestsByVisitId = async (req, res) => {
+  try {
+    const { visitId } = req.query;
+
+    if (!visitId) {
+      return res.status(400).json({
+        success: false,
+        message: 'visitId query parameter is required'
+      });
+    }
+
+    console.log(`📋 Fetching tests for visitId: ${visitId}`);
+
+    // Find all tests for this visit
+    const tests = await prisma.patientTest.findMany({
+      where: { visitId },
+      include: {
+        test: {
+          select: {
+            id: true,
+            name: true,
+            shortName: true,
+            testCode: true,
+            departmentId: true,
+            sampleTypeId: true,
+            sample_type: {
+              select: {
+                id: true,
+                Sample_Type: true,
+                Sample_Color: true
+              }
+            }
+          }
+        },
+        department: {
+          select: {
+            id: true,
+            name: true,
+            code: true
+          }
+        },
+        organization: {
+          select: {
+            id: true,
+            name: true
+          }
+        },
+        package: {
+          select: {
+            id: true,
+            name: true
+          }
+        }
+      },
+      orderBy: {
+        createdAt: 'asc'
+      }
+    });
+
+    console.log(`✅ Found ${tests.length} test(s) for visitId: ${visitId}`);
+
+    if (!tests || tests.length === 0) {
+      return res.json({
+        success: true,
+        message: 'No tests found for this visit',
+        data: []
+      });
+    }
+
+    // Transform tests to match frontend expectations
+    const transformedTests = tests.map(pt => ({
+      id: pt.id,
+      patientTestId: pt.id,
+      name: pt.test?.name || pt.test?.shortName || 'Unknown Test',
+      shortName: pt.test?.shortName,
+      testCode: pt.test?.testCode,
+      sample: pt.test?.sample_type?.Sample_Type || 'N/A',
+      sampleColor: pt.test?.sample_type?.Sample_Color,
+      testId: pt.testId,
+      sampleTypeId: pt.test?.sampleTypeId,
+      departmentId: pt.departmentId,
+      departmentName: pt.department?.name,
+      organizationId: pt.organizationId,
+      organizationName: pt.organization?.name,
+      packageId: pt.packageId,
+      packageName: pt.package?.name,
+      
+      // Charge details
+      charge: pt.charge || 0,
+      b2cCharge: pt.charge || 0,
+      b2bCharge: pt.charge || 0,
+      
+      // Visit & status info
+      visitId: pt.visitId,
+      status: pt.status || 'Registered',
+      barcode_status: pt.barcode_status || 'Unprinted',
+      reportMode: pt.reportMode,
+      referralDoctor: pt.referralDoctor,
+      visitDate: pt.visitDate,
+      visitTime: pt.visitTime,
+      
+      // Payment & billing info
+      totalAmount: pt.totalAmount || pt.charge || 0,
+      paidAmount: pt.paidAmount || 0,
+      balanceAmount: pt.balanceAmount || 0,
+      discountAmount: pt.discountAmount || 0,
+      discountPercent: pt.discountPercent || 0,
+      discountRemark: pt.discountRemark,
+      paymentMode: pt.paymentMode,
+      businessType: pt.businessType,
+      
+      // Sample info
+      sampleBarcodeNo: pt.sampleBarcodeNo,
+      sampleReceived: pt.sampleReceived,
+      sampleTaken: pt.sampleTaken,
+      
+      // History & comments
+      patient_history: pt.patient_history,
+      comments: pt.comments,
+      
+      // Outsourcing info
+      isOutsourced: pt.isExcluded || false,
+      outsourcedTo: pt.outsourcedTo,
+      
+      // Marking as existing test from database
+      isExisting: true
+    }));
+
+    res.json({
+      success: true,
+      message: `Retrieved ${tests.length} test(s) for this visit`,
+      data: transformedTests
+    });
+
+  } catch (error) {
+    console.error('❌ Get tests by visitId error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch tests for this visit',
+      error: error.message
     });
   }
 };
