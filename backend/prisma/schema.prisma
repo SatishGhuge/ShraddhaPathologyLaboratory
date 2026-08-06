@@ -1013,3 +1013,56 @@ model LabToOrgTransferItem {
   @@index([itemId])
   @@map("lab_to_org_transfer_items")
 }
+
+
+// ============================================
+// REPORT SETTINGS MODULE
+// ============================================
+
+model ReportFieldConfiguration {
+  id              Int       @id @default(autoincrement())
+  fieldKey        String    @unique
+  fieldLabel      String
+  isVisible       Boolean   @default(true)
+  isBold          Boolean   @default(false)
+  isItalic        Boolean   @default(false)
+  isUnderline     Boolean   @default(false)
+  displayOrder    Int
+  sectionName     String
+  customLabel     String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([sectionName])
+  @@index([displayOrder])
+  @@map("report_field_configurations")
+}
+
+model ReportFormatting {
+  id                      Int       @id @default(autoincrement())
+  fontFamily              String    @default("Bookman Old Text")
+  fontSizeHeader          Float     @default(14)
+  fontSizeBody            Float     @default(11)
+  fontSizeFooter          Float     @default(9)
+  paperSize               String    @default("A4")
+  orientation             String    @default("Portrait")
+  topMargin               Float     @default(10)
+  bottomMargin            Float     @default(10)
+  leftMargin              Float     @default(10)
+  rightMargin             Float     @default(10)
+  lineHeight              Float     @default(1.4)
+  showHeader              Boolean   @default(true)
+  showFooter              Boolean   @default(true)
+  showWatermark           Boolean   @default(false)
+  showQRCode              Boolean   @default(true)
+  showBarcode             Boolean   @default(true)
+  showPrimarySignature    Boolean   @default(true)
+  showSecondarySignature  Boolean   @default(false)
+  signaturePosition       String    @default("Bottom Right")
+  footerText              String?   @db.Text
+  watermarkText           String?
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
+
+  @@map("report_formatting")
+}

@@ -76,6 +76,7 @@ const allModules: NavModule[] = [
     items: [
       { label: "Signature", path: "/config/signature" },
       { label: "Machines", path: "/config/machines" },
+      { label: "Report Settings", path: "/config/report-settings" },
     ],
   },
   {

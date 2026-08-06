@@ -17,9 +17,13 @@ import API_BASE_URL from "@/src/api/config";
 interface PatientInfo {
   title?: string;
   firstName?: string;
-  lastName?: string;  age?: number | string;  // Can be number or formatted string like "1 month 3 days"
+  lastName?: string;
+  age?: number | string;  // Can be number or formatted string like "1 month 3 days"
   gender?: string;
   dob?: string;  // Birthday date for babies
+  mobile?: string;
+  email?: string;
+  address?: string;
 }
 
 interface LetterheadDB {
@@ -28,6 +32,42 @@ interface LetterheadDB {
   headerImage?: string;
   footerImage?: string;
   fullPageImage?: string;
+}
+
+interface FieldConfig {
+  fieldKey: string;
+  fieldLabel: string;
+  isVisible: boolean;
+  isBold: boolean;
+  isItalic: boolean;
+  isUnderline: boolean;
+  displayOrder: number;
+  sectionName: string;
+  customLabel?: string;
+}
+
+interface FormattingConfig {
+  fontFamily: string;
+  fontSizeHeader: number;
+  fontSizeBody: number;
+  fontSizeFooter: number;
+  paperSize: string;
+  orientation: string;
+  topMargin: number;
+  bottomMargin: number;
+  leftMargin: number;
+  rightMargin: number;
+  lineHeight: number;
+  showHeader: boolean;
+  showFooter: boolean;
+  showWatermark: boolean;
+  showQRCode: boolean;
+  showBarcode: boolean;
+  showPrimarySignature: boolean;
+  showSecondarySignature: boolean;
+  signaturePosition: string;
+  footerText?: string;
+  watermarkText?: string;
 }
 
 export interface ProfessionalReportProps {
@@ -44,7 +84,7 @@ export interface ProfessionalReportProps {
   printOption?: 'pagebreak' | 'nobreak';
   results?: Record<string, { numericValue?: any; textValue?: string; isAbnormal?: any; isHighlighted?: boolean }>;
   referralDoctor?: string;
-  comments?: string;  // ✅ Add comments field
+  comments?: string;  // ✅ Comments field
   onReady?: () => void;
 }
 
@@ -281,8 +321,55 @@ const ProfessionalReport = React.forwardRef<HTMLDivElement, ProfessionalReportPr
     const [lh, setLh] = useState<LetterheadDB | null>(null);
     const [ready, setReady] = useState(false);
     const [pages, setPages] = useState<ReportPage[]>([]);
+    const [fieldConfigs, setFieldConfigs] = useState<Map<string, FieldConfig> | null>(null);
+    const [formatConfig, setFormatConfig] = useState<FormattingConfig | null>(null);
     const reportRef = React.useRef<HTMLDivElement>(null);
     const onReadyCalled = React.useRef(false);
+
+    // ✅ Load report settings from API
+    useEffect(() => {
+      const loadReportSettings = async () => {
+        try {
+          const response = await fetch(`${API_BASE_URL}/report-settings`);
+          if (response.ok) {
+            const data = await response.json();
+            if (data.data) {
+              // Convert fields array to Map for faster lookup
+              const fieldsMap = new Map<string, FieldConfig>(
+                (data.data.fields || []).map((f: FieldConfig) => [f.fieldKey, f])
+              );
+              setFieldConfigs(fieldsMap);
+              setFormatConfig(data.data.formatting);
+              console.log('✅ Report settings loaded:', {
+                fieldsCount: fieldsMap.size,
+                fontFamily: data.data.formatting?.fontFamily,
+                fontSize: data.data.formatting?.fontSizeBody
+              });
+            }
+          }
+        } catch (error) {
+          console.warn('[ProfessionalReport] Failed to load report settings:', error);
+          // Continue with defaults if API fails
+        }
+      };
+
+      loadReportSettings();
+
+      // Refresh settings every 2 seconds to detect changes from settings page
+      const interval = setInterval(loadReportSettings, 2000);
+
+      // Also refresh when window/tab comes into focus
+      const handleFocus = () => {
+        console.log('📱 Window focused, refreshing report settings');
+        loadReportSettings();
+      };
+      window.addEventListener('focus', handleFocus);
+
+      return () => {
+        clearInterval(interval);
+        window.removeEventListener('focus', handleFocus);
+      };
+    }, []);
 
     // ✅ Debug logging for data flow
     useEffect(() => {
@@ -291,9 +378,11 @@ const ProfessionalReport = React.forwardRef<HTMLDivElement, ProfessionalReportPr
         commentsExists: !!comments,
         commentsValue: comments,
         resultsKeys: Object.keys(results || {}).length,
-        firstResult: Object.entries(results || {}).slice(0, 1)
+        firstResult: Object.entries(results || {}).slice(0, 1),
+        fieldConfigsLoaded: !!fieldConfigs,
+        formatConfigLoaded: !!formatConfig
       });
-    }, [results, comments]);
+    }, [results, comments, fieldConfigs, formatConfig]);
 
     useEffect(() => {
       let dead = false;
@@ -318,6 +407,53 @@ const ProfessionalReport = React.forwardRef<HTMLDivElement, ProfessionalReportPr
       })();
       return () => { dead = true; };
     }, [letterhead]);
+
+    // ✅ Helper function to check if field should be visible
+    const isFieldVisible = (fieldKey: string): boolean => {
+      if (!fieldConfigs) return true; // Default: show all if settings not loaded
+      const config = fieldConfigs.get(fieldKey);
+      return config ? config.isVisible : true;
+    };
+
+    // ✅ Helper function to get field styling
+    const getFieldStyle = (fieldKey: string) => {
+      if (!fieldConfigs) return {};
+      const config = fieldConfigs.get(fieldKey);
+      if (!config) return {};
+      
+      return {
+        fontWeight: config.isBold ? 'bold' : 'normal',
+        fontStyle: config.isItalic ? 'italic' : 'normal',
+        textDecoration: config.isUnderline ? 'underline' : 'none'
+      };
+    };
+
+    // ✅ Helper function to get custom label or default
+    const getFieldLabel = (fieldKey: string, defaultLabel: string): string => {
+      if (!fieldConfigs) return defaultLabel;
+      const config = fieldConfigs.get(fieldKey);
+      return config?.customLabel || config?.fieldLabel || defaultLabel;
+    };
+
+    // ✅ Helper function to get formatting styles for specific section
+    const getFormattingStyle = (section: 'header' | 'body' | 'footer'): React.CSSProperties => {
+      if (!formatConfig) return {};
+      
+      const baseStyle: React.CSSProperties = {
+        fontFamily: formatConfig.fontFamily,
+      };
+
+      switch (section) {
+        case 'header':
+          return { ...baseStyle, fontSize: `${formatConfig.fontSizeHeader}pt` };
+        case 'body':
+          return { ...baseStyle, fontSize: `${formatConfig.fontSizeBody}pt`, lineHeight: formatConfig.lineHeight };
+        case 'footer':
+          return { ...baseStyle, fontSize: `${formatConfig.fontSizeFooter}pt` };
+        default:
+          return baseStyle;
+      }
+    };
 
     const strip = (s: string) => s?.replace(/<[^>]*>/g, '').trim() ?? '';
     const hasHtml = (s: string) => /<[^>]*>/.test(s ?? '');
@@ -423,13 +559,18 @@ const ProfessionalReport = React.forwardRef<HTMLDivElement, ProfessionalReportPr
         val = String(nv);
       }
 
+      // ✅ Get styling from field configuration
+      const paramStyle = getFieldStyle('parameter_name');
+      const bodyStyle = getFormattingStyle('body');
+
       return (
         <tr key={key} style={{ borderBottom: 'none' }}>
           <td style={{ 
-            padding: '2px 4px 2px 2mm', 
-            fontWeight: isabn || isHighlighted ? 'bold' : 'normal',
-            textDecoration: isHighlighted ? 'underline' : 'none',
-            fontSize: '10px' 
+            padding: '2px 4px 2px 2mm',
+            ...bodyStyle,
+            fontWeight: (isabn || isHighlighted) ? 'bold' : (paramStyle.fontWeight || 'normal'),
+            fontStyle: paramStyle.fontStyle || 'normal',
+            textDecoration: isHighlighted ? 'underline' : (paramStyle.textDecoration || 'none'),
           }}>
             {strip(p.parameterName ?? '').toUpperCase()}
             {p.parameterTestMethod && (
@@ -439,11 +580,11 @@ const ProfessionalReport = React.forwardRef<HTMLDivElement, ProfessionalReportPr
             )}
           </td>
           <td style={{ 
-            padding: '2px 4px', 
-            textAlign: 'left', 
+            padding: '2px 4px',
+            textAlign: 'left',
+            ...bodyStyle,
             fontWeight: isabn || isHighlighted ? 'bold' : 'normal',
             color: isHighlighted ? '#c0392b' : (isabn ? '#c0392b' : 'inherit'),
-            fontSize: '10px' 
           }}>
             {p.isDescriptive && val !== '-' && hasHtml(val) ? (
               <div dangerouslySetInnerHTML={{ __html: safe(val) }} style={{ whiteSpace: 'normal', textAlign: 'left', fontWeight: 'normal' }} />
@@ -452,12 +593,12 @@ const ProfessionalReport = React.forwardRef<HTMLDivElement, ProfessionalReportPr
             )}
           </td>
           {showUnits && (
-            <td style={{ padding: '2px 4px', textAlign: 'center', fontSize: '10px', color: '#000' }}>
+            <td style={{ padding: '2px 4px', textAlign: 'center', ...bodyStyle, color: '#000' }}>
               {strip(p.units ?? '') || '-'}
             </td>
           )}
           {showRange && (
-            <td style={{ padding: '2px 4px', fontSize: '10px', color: '#000' }}>
+            <td style={{ padding: '2px 4px', ...bodyStyle, color: '#000' }}>
               {strip(p.normalRange || p.rangeText || '') || '-'}
             </td>
           )}
@@ -465,16 +606,31 @@ const ProfessionalReport = React.forwardRef<HTMLDivElement, ProfessionalReportPr
       );
     };
 
-    const renderTableHead = () => (
-      <thead>
-        <tr style={{ borderBottom: '1px solid #000' }}>
-          <th style={{ ...TH, width: '40%', textAlign: 'left', borderBottom: 'none' }}>Test Description</th>
-          <th style={{ ...TH, width: showUnits || showRange ? '18%' : '30%', textAlign: 'left', borderBottom: 'none' }}>Value(s)</th>
-          {showUnits && <th style={{ ...TH, width: '12%', textAlign: 'center', borderBottom: 'none' }}>Unit</th>}
-          {showRange && <th style={{ ...TH, width: '30%', textAlign: 'left', borderBottom: 'none' }}>Reference Range</th>}
-        </tr>
-      </thead>
-    );
+    const renderTableHead = () => {
+      const headerStyle = getFormattingStyle('header');
+      return (
+        <thead>
+          <tr style={{ borderBottom: '1px solid #000' }}>
+            <th style={{ ...TH, ...headerStyle, width: '40%', textAlign: 'left', borderBottom: 'none' }}>
+              {getFieldLabel('parameter_name', 'Test Description')}
+            </th>
+            <th style={{ ...TH, ...headerStyle, width: showUnits || showRange ? '18%' : '30%', textAlign: 'left', borderBottom: 'none' }}>
+              {getFieldLabel('result_value', 'Value(s)')}
+            </th>
+            {showUnits && (
+              <th style={{ ...TH, ...headerStyle, width: '12%', textAlign: 'center', borderBottom: 'none' }}>
+                {getFieldLabel('unit', 'Unit')}
+              </th>
+            )}
+            {showRange && (
+              <th style={{ ...TH, ...headerStyle, width: '30%', textAlign: 'left', borderBottom: 'none' }}>
+                {getFieldLabel('reference_range', 'Reference Range')}
+              </th>
+            )}
+          </tr>
+        </thead>
+      );
+    };
 
     const renderPage = (pg: ReportPage) => {
       const letterheadSrc = lh?.fullPageImage || lh?.headerImage || letterHeadBase64 || null;
@@ -487,7 +643,7 @@ const ProfessionalReport = React.forwardRef<HTMLDivElement, ProfessionalReportPr
       const flushTable = () => {
         if (tableRows.length === 0 && !needsTableHeader) return;
         segments.push(
-          <table key={`tbl-${tableKey++}`} style={{ width: '100%', borderCollapse: 'collapse', fontSize: '9px', flexShrink: 0, backgroundColor: 'transparent' }}>
+          <table key={`tbl-${tableKey++}`} style={{ width: '100%', borderCollapse: 'collapse', fontSize: `${formatConfig?.fontSizeBody || 11}px`, flexShrink: 0, backgroundColor: 'transparent', ...getFormattingStyle('body') }}>
             {renderTableHead()}
             <tbody>{tableRows}</tbody>
           </table>
@@ -499,40 +655,138 @@ const ProfessionalReport = React.forwardRef<HTMLDivElement, ProfessionalReportPr
       pg.blocks.forEach((block, bi) => {
         switch (block.kind) {
           case 'patient':
+            // ✅ Build patient info rows based on field visibility settings
+            const patientRows: React.ReactNode[] = [];
+            const bodyStyle = getFormattingStyle('body');
+
+            // Row 1: Patient Name & Age
+            const row1: React.ReactNode[] = [];
+            if (isFieldVisible('patient_name')) {
+              const nameStyle = { ...PATIENT_TD, ...getFieldStyle('patient_name'), ...bodyStyle };
+              // ✅ FIX: Apply style to name value directly, not using <b> tag which overrides CSS
+              const nameValue = [patient.title, patient.firstName, patient.lastName].filter(Boolean).join(' ').toUpperCase();
+              row1.push(
+                <td key="pn" style={nameStyle}>
+                  {getFieldLabel('patient_name', 'Patient Name')} : <span style={{ fontWeight: nameStyle.fontWeight, fontStyle: nameStyle.fontStyle, textDecoration: nameStyle.textDecoration }}>{nameValue}</span>
+                </td>
+              );
+            }
+            if (isFieldVisible('patient_age') || isFieldVisible('gender')) {
+              const ageStyle = { ...PATIENT_TD, ...getFieldStyle('patient_age'), ...bodyStyle };
+              row1.push(
+                <td key="age" style={ageStyle}>
+                  {getFieldLabel('patient_age', 'Age')} : {patient.age ?? '-'} {patient.age ? 'years' : ''} ({patient.gender ?? '-'})
+                </td>
+              );
+            }
+            if (row1.length > 0) patientRows.push(<tr key="r1">{row1}</tr>);
+
+            // Row 2: Referral Doctor & Organization
+            const row2: React.ReactNode[] = [];
+            if (isFieldVisible('referred_doctor')) {
+              const refStyle = { ...PATIENT_TD, ...getFieldStyle('referred_doctor'), ...bodyStyle };
+              row2.push(
+                <td key="ref" style={refStyle}>
+                  {getFieldLabel('referred_doctor', 'Referral')} : {referralDoctor || '-'}
+                </td>
+              );
+            }
+            if (isFieldVisible('organization_name')) {
+              const orgStyle = { ...PATIENT_TD, ...getFieldStyle('organization_name'), ...bodyStyle };
+              row2.push(
+                <td key="org" style={orgStyle}>
+                  {getFieldLabel('organization_name', 'Org Name')} : {patient.title ? '1500' : 'Shraddha Pathology Laboratory'}
+                </td>
+              );
+            }
+            if (row2.length > 0) patientRows.push(<tr key="r2">{row2}</tr>);
+
+            // Row 3: Sample Date & Registration ID
+            const row3: React.ReactNode[] = [];
+            if (isFieldVisible('sample_date')) {
+              const sampleDateStyle = { ...PATIENT_TD, ...getFieldStyle('sample_date'), ...bodyStyle };
+              row3.push(
+                <td key="sd" style={sampleDateStyle}>
+                  {getFieldLabel('sample_date', 'Sample Date')} :{' '}
+                  {visitDate ? new Date(visitDate).toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }).replace('am', 'a.m.').replace('pm', 'p.m.') : '-'}
+                </td>
+              );
+            }
+            if (isFieldVisible('registration_no')) {
+              const regStyle = { ...PATIENT_TD, ...getFieldStyle('registration_no'), ...bodyStyle };
+              row3.push(
+                <td key="reg" style={regStyle}>
+                  {getFieldLabel('registration_no', 'Reg. ID')} : {visitId || '-'}
+                </td>
+              );
+            }
+            if (row3.length > 0) patientRows.push(<tr key="r3">{row3}</tr>);
+
+            // Row 4: Report Date & Sample ID
+            const row4: React.ReactNode[] = [];
+            if (isFieldVisible('report_date')) {
+              const reportDateStyle = { ...PATIENT_TD, ...getFieldStyle('report_date'), ...bodyStyle };
+              row4.push(
+                <td key="rd" style={reportDateStyle}>
+                  {getFieldLabel('report_date', 'Report Date')} :{' '}
+                  {new Date().toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }).replace('am', 'a.m.').replace('pm', 'p.m.')}
+                </td>
+              );
+            }
+            if (isFieldVisible('sample_id')) {
+              const sampleIdStyle = { ...PATIENT_TD, ...getFieldStyle('sample_id'), ...bodyStyle };
+              row4.push(
+                <td key="si" style={sampleIdStyle}>
+                  {getFieldLabel('sample_id', 'Sample ID')} : {visitId || '-'}
+                </td>
+              );
+            }
+            if (row4.length > 0) patientRows.push(<tr key="r4">{row4}</tr>);
+
+            // Row 5: Mobile & Email (System Fields - Optional)
+            const row5: React.ReactNode[] = [];
+            if (isFieldVisible('mobile')) {
+              const mobileStyle = { ...PATIENT_TD, ...getFieldStyle('mobile'), ...bodyStyle };
+              row5.push(
+                <td key="mob" style={mobileStyle}>
+                  {getFieldLabel('mobile', 'Mobile')} : {patient.mobile ?? '-'}
+                </td>
+              );
+            }
+            if (isFieldVisible('email')) {
+              const emailStyle = { ...PATIENT_TD, ...getFieldStyle('email'), ...bodyStyle };
+              row5.push(
+                <td key="email" style={emailStyle}>
+                  {getFieldLabel('email', 'Email')} : {patient.email ?? '-'}
+                </td>
+              );
+            }
+            if (row5.length > 0) patientRows.push(<tr key="r5">{row5}</tr>);
+
+            // Row 6: Address (System Fields - Optional)
+            const row6: React.ReactNode[] = [];
+            if (isFieldVisible('address')) {
+              const addressStyle = { ...PATIENT_TD, ...getFieldStyle('address'), ...bodyStyle };
+              row6.push(
+                <td key="addr" style={addressStyle} colSpan={2}>
+                  {getFieldLabel('address', 'Address')} : {patient.address ?? '-'}
+                </td>
+              );
+            }
+            if (row6.length > 0) patientRows.push(<tr key="r6">{row6}</tr>);
+
             segments.push(
-              <table key={`pat-${bi}`} style={{ width: '100%', borderCollapse: 'collapse', fontSize: '9px', marginBottom: '3mm', flexShrink: 0, backgroundColor: 'transparent' }}>
-                <tbody>
-                  <tr>
-                    <td style={PATIENT_TD}>Patient Name : <b>{[patient.title, patient.firstName, patient.lastName].filter(Boolean).join(' ').toUpperCase()}</b></td>
-                    <td style={PATIENT_TD}>Age : {patient.age ?? '-'} {patient.age ? 'years' : ''} ({patient.gender ?? '-'})</td>
-                  </tr>
-                  <tr>
-                    <td style={PATIENT_TD}>Referral : {referralDoctor || '-'}</td>
-                    <td style={PATIENT_TD}>Org Name : {patient.title ? '1500' : 'Shraddha Pathology Laboratory'}</td>
-                  </tr>
-                  <tr>
-                    <td style={PATIENT_TD}>
-                      Sample Date :{' '}
-                      {visitDate ? new Date(visitDate).toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }).replace('am', 'a.m.').replace('pm', 'p.m.') : '-'}
-                    </td>
-                    <td style={PATIENT_TD}>Reg. ID : {visitId || '-'}</td>
-                  </tr>
-                  <tr>
-                    <td style={PATIENT_TD}>
-                      Report Date :{' '}
-                      {new Date().toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }).replace('am', 'a.m.').replace('pm', 'p.m.')}
-                    </td>
-                    <td style={PATIENT_TD}>Sample ID : {visitId || '-'}</td>
-                  </tr>
-                </tbody>
+              <table key={`pat-${bi}`} style={{ width: '100%', borderCollapse: 'collapse', fontSize: `${formatConfig?.fontSizeBody || 11}px`, marginBottom: '3mm', flexShrink: 0, backgroundColor: 'transparent', ...getFormattingStyle('header') }}>
+                <tbody>{patientRows}</tbody>
               </table>
             );
             break;
 
           case 'test-title':
             flushTable();
+            const titleStyle = getFormattingStyle('body');
             segments.push(
-              <div key={`title-${bi}`} style={{ textAlign: 'center', fontWeight: 'bold', fontSize: '13px', textDecoration: 'underline', paddingBottom: '1mm', marginBottom: '2mm', flexShrink: 0 }}>
+              <div key={`title-${bi}`} style={{ textAlign: 'center', fontWeight: 'bold', fontSize: '13px', textDecoration: 'underline', paddingBottom: '1mm', marginBottom: '2mm', flexShrink: 0, ...titleStyle }}>
                 {strip(block.testData.name ?? '').toUpperCase()}
               </div>
             );
@@ -563,10 +817,10 @@ const ProfessionalReport = React.forwardRef<HTMLDivElement, ProfessionalReportPr
             // ✅ Render comments as a table row within the results table
             tableRows.push(
               <tr key={`comments-${bi}`} style={{ borderTop: '1px solid #000', borderBottom: 'none' }}>
-                <td style={{ padding: '2px 4px 2px 2mm', fontWeight: 'bold', fontSize: '10px', color: '#000' }}>
+                <td style={{ padding: '2px 4px 2px 2mm', fontWeight: 'bold', fontSize: `${(formatConfig?.fontSizeBody || 11) * 0.9}px`, color: '#000', ...getFormattingStyle('body') }}>
                   COMMENTS
                 </td>
-                <td colSpan={showUnits || showRange ? 2 : 1} style={{ padding: '2px 4px', fontSize: '10px', color: '#000', whiteSpace: 'pre-wrap', fontWeight: '900' }}>
+                <td colSpan={showUnits || showRange ? 2 : 1} style={{ padding: '2px 4px', fontSize: `${(formatConfig?.fontSizeBody || 11) * 0.9}px`, color: '#000', whiteSpace: 'pre-wrap', fontWeight: '900', ...getFormattingStyle('body') }}>
                   {strip(block.text)}
                 </td>
               </tr>
@@ -577,10 +831,10 @@ const ProfessionalReport = React.forwardRef<HTMLDivElement, ProfessionalReportPr
             // ✅ Render instrument/machine as a table row within the results table
             tableRows.push(
               <tr key={`instrument-${bi}`} style={{ borderTop: '1px solid #000', borderBottom: 'none' }}>
-                <td style={{ padding: '2px 4px 2px 2mm', fontWeight: 'bold', fontSize: '10px', color: '#333' }}>
+                <td style={{ padding: '2px 4px 2px 2mm', fontWeight: 'bold', fontSize: `${(formatConfig?.fontSizeBody || 11) * 0.9}px`, color: '#333', ...getFormattingStyle('body') }}>
                   INSTRUMENT
                 </td>
-                <td colSpan={showUnits || showRange ? 2 : 1} style={{ padding: '2px 4px', fontSize: '9px', color: '#555', whiteSpace: 'pre-wrap', fontWeight: 'bold' }}>
+                <td colSpan={showUnits || showRange ? 2 : 1} style={{ padding: '2px 4px', fontSize: `${(formatConfig?.fontSizeBody || 11) * 0.85}px`, color: '#555', whiteSpace: 'pre-wrap', fontWeight: 'bold', ...getFormattingStyle('body') }}>
                   {block.machine?.name || '-'}{block.machine?.description ? ` (${block.machine.description})` : ''}
                 </td>
               </tr>
@@ -636,7 +890,7 @@ const ProfessionalReport = React.forwardRef<HTMLDivElement, ProfessionalReportPr
             width: '210mm',
             height: '296mm',
             backgroundColor: '#fff',
-            fontFamily: 'Arial, Helvetica, sans-serif',
+            fontFamily: formatConfig?.fontFamily || 'Bookman Old Text',
             fontSize: '10px',
             margin: '0 auto',
             overflow: 'hidden',
@@ -664,7 +918,7 @@ const ProfessionalReport = React.forwardRef<HTMLDivElement, ProfessionalReportPr
               display: 'flex',
               flexDirection: 'column',
               fontSize: '10px',
-              fontFamily: 'Arial, sans-serif',
+              fontFamily: formatConfig?.fontFamily || 'Bookman Old Text',
             }}
           >
             {segments}
@@ -684,7 +938,7 @@ const ProfessionalReport = React.forwardRef<HTMLDivElement, ProfessionalReportPr
         reportRef.current = node;
         if (typeof ref === 'function') ref(node);
         else if (ref) ref.current = node;
-      }} className="professional-report">
+      }} className="professional-report" style={{ fontFamily: formatConfig?.fontFamily || 'Bookman Old Text' }}>
         <style>{`
           @page {
             size: A4 portrait;
@@ -716,6 +970,7 @@ const ProfessionalReport = React.forwardRef<HTMLDivElement, ProfessionalReportPr
               width: 210mm !important;
               margin: 0 !important;
               padding: 0 !important;
+              font-family: ${formatConfig?.fontFamily || 'Bookman Old Text'} !important;
             }
 
             .report-page {
