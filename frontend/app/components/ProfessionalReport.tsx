@@ -150,12 +150,18 @@ function buildContentBlocks(
   testsToRender: any[],
   results: Record<string, any>,
   printOption: 'pagebreak' | 'nobreak',
-  comments?: string  // ✅ Add comments parameter
+  comments?: string,  // Keep for backward compatibility
+  commentsMap?: Record<string, string>  // ✅ NEW: Per-test comments
 ): ContentBlock[] {
   const blocks: ContentBlock[] = [{ kind: 'patient' }];
   
   // ✅ Debug: Log comments at start of build
-  console.log('📦 buildContentBlocks - Comments input:', { comments, hasComments: !!comments });
+  console.log('📦 buildContentBlocks - Comments input:', { 
+    comments, 
+    commentsMap,
+    hasComments: !!comments,
+    hasCommentsMap: !!commentsMap && Object.keys(commentsMap || {}).length > 0
+  });
 
   testsToRender.forEach((testItem, idx) => {
     if (printOption === 'pagebreak' && idx > 0) {
@@ -220,7 +226,7 @@ function buildContentBlocks(
   });
 
   blocks.push({ kind: 'signature' });
-  console.log('📦 buildContentBlocks - Total blocks:', blocks.length, 'including comments block:', blocks.some(b => b.kind === 'comments'));
+  console.log('📦 buildContentBlocks - Total blocks:', blocks.length, 'with comments:', blocks.filter(b => b.kind === 'comments').length);
   return blocks;
 }
 
@@ -314,7 +320,8 @@ const ProfessionalReport = React.forwardRef<HTMLDivElement, ProfessionalReportPr
       printOption = 'nobreak',
       results = {},
       referralDoctor = '',
-      comments = '',  // ✅ Extract comments from props
+      comments = '',  // ✅ Keep for backward compatibility
+      
       onReady,
     } = props;
 

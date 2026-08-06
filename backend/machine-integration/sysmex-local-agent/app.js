@@ -12,7 +12,7 @@ const CONFIG = {
     host: '0.0.0.0'
   },
   vps: {
-    baseUrl: process.env.VPS_TAILSCALE_URL || 'http://localhost:3351'
+    baseUrl: process.env.VPS_TAILSCALE_URL || 'http://192.168.0.119:5000'
   },
   database: {
     host: process.env.DB_HOST || 'localhost',
@@ -56,12 +56,13 @@ const dbPool = mysql.createPool(CONFIG.database);
 // ============================================================================
 
 const ASTMFrame = {
+  // ✅ FIX 1: Modulo-256 additive checksum per ASTM E1381 standard (not XOR)
   checksum(content) {
     let sum = 0;
     for (let i = 0; i < content.length; i++) {
-      sum ^= content.charCodeAt(i);
+      sum += content.charCodeAt(i);  // ✅ CHANGED: Additive sum (was XOR)
     }
-    return sum.toString(16).padStart(2, '0').toUpperCase();
+    return (sum % 256).toString(16).padStart(2, '0').toUpperCase();  // ✅ CHANGED: Modulo-256
   },
 
   build(content) {
@@ -98,6 +99,7 @@ const ASTMParser = {
    * Parse ASTM frame content (already cleaned of STX/ETX/checksum)
    * Input example: "H|\^&|||Sysmex^XN-350|||||||P|1|20260729183000"
    * Input example: "Q|1|202607290001|5"
+   * ✅ FIX 2: Handle frame sequence number (FN digit 0-7 before record type)
    */
   parse(frameContent) {
     console.log(`[ASTM PARSER] Input: "${frameContent}"`);
@@ -109,11 +111,21 @@ const ASTMParser = {
     let analyzer = null;
     let parameters = {};
 
+    // ✅ FIX 2: Strip leading frame sequence number (0-7) if present
+    // Real ASTM machines send: "1H|..." or "2Q|..." 
+    // We need to extract just the record type
+    let contentToParse = frameContent;
+    if (frameContent.length > 0 && /^\d/.test(frameContent[0])) {
+      // First character is a digit (frame number 0-7), skip it
+      contentToParse = frameContent.substring(1);
+      console.log(`[ASTM PARSER] Stripped FN digit, now parsing: "${contentToParse}"`);
+    }
+
     // Split by pipe separator
-    const parts = frameContent.split('|');
+    const parts = contentToParse.split('|');
     console.log(`[ASTM PARSER] Split into ${parts.length} parts: [${parts.map((p, i) => `${i}:"${p}"`).join(', ')}]`);
 
-    const recordType = parts[0];
+    const recordType = parts[0];  // ✅ Now correctly "H", "Q", "R", or "L"
     console.log(`[ASTM PARSER] Record type: ${recordType}`);
 
     // Handle different frame types
@@ -538,9 +550,9 @@ const ResultSync = {
       const isVpsReachable = await CloudAPI.checkVpsHealth();
       
       if (!isVpsReachable) {
-        console.warn(`[SYNC] VPS not reachable - will retry later`);
-        // Don't mark as offline queued - just return silently
-        // This prevents incrementing retry_count for network issues
+        console.warn(`[SYNC] VPS not reachable - queueing for retry`);
+        // ✅ FIX: Mark as OFFLINE_QUEUED so retry worker will pick it up later
+        await Database.markOfflineQueued(recordId, 'VPS unreachable');
         return;
       }
 
@@ -769,7 +781,7 @@ function createTcpServer() {
       console.log(`[TCP RAW] Received (${data.length} bytes): ${data.toString('hex')}`);
       console.log(`[TCP BUFFER] Total buffer length: ${buffer.length}, content: "${buffer}"`);
       
-      socket.write(Buffer.from([ASTM.ACK]));
+      // ✅ FIX 4: Do NOT send ACK immediately - validate frame first
 
       // Process frames one by one (each frame starts with STX and ends with ETX+checksum)
       while (buffer.includes(String.fromCharCode(ASTM.STX))) {
@@ -777,12 +789,19 @@ function createTcpServer() {
         const etxIndex = buffer.indexOf(String.fromCharCode(ASTM.ETX), stxIndex);
         
         if (etxIndex === -1) {
-          console.log(`[TCP FRAME] Incomplete frame, waiting for more data...`);
+          console.log(`[TCP FRAME] Incomplete frame (no ETX), waiting for more data...`);
           break;
         }
 
-        // Extract the frame from STX to ETX (inclusive) plus 2 more chars for checksum
-        const frameEnd = Math.min(etxIndex + 3, buffer.length); // ETX + 2 checksum hex chars
+        // ✅ FIX 3: Verify checksum bytes are available before extraction
+        const requiredLength = etxIndex + 3;  // ETX + 2 hex checksum characters
+        if (buffer.length < requiredLength) {
+          console.log(`[TCP FRAME] Incomplete checksum (have ${buffer.length} bytes, need ${requiredLength}), waiting for more data...`);
+          break;  // ✅ CHANGED: Wait for next packet instead of truncating
+        }
+
+        // Extract the frame from STX to ETX (inclusive) plus 2 checksum hex chars
+        const frameEnd = requiredLength;
         const rawFrame = buffer.substring(stxIndex, frameEnd);
         console.log(`[TCP FRAME] Raw frame (with STX/ETX): "${rawFrame}" (hex: ${Buffer.from(rawFrame).toString('hex')})`);
 
@@ -790,15 +809,37 @@ function createTcpServer() {
         let frameContent = rawFrame.substring(1); // Remove STX
         
         const innerEtxIndex = frameContent.indexOf(String.fromCharCode(ASTM.ETX));
+        let checksumFromFrame = '';
         if (innerEtxIndex !== -1) {
+          checksumFromFrame = frameContent.substring(innerEtxIndex + 1);  // Extract checksum
           frameContent = frameContent.substring(0, innerEtxIndex);
         }
         
         console.log(`[TCP FRAME] Cleaned frame content: "${frameContent}"`);
+        console.log(`[TCP FRAME] Frame checksum: ${checksumFromFrame}`);
 
-        // Parse the frame
+        // ✅ FIX 4: Validate checksum before processing
+        const calculatedChecksum = ASTMFrame.checksum(frameContent);
+        const isValidChecksum = checksumFromFrame.toUpperCase() === calculatedChecksum;
+        console.log(`[TCP FRAME] Checksum validation: calculated=${calculatedChecksum}, received=${checksumFromFrame.toUpperCase()}, valid=${isValidChecksum}`);
+
+        if (!isValidChecksum) {
+          console.error(`[TCP FRAME] ❌ INVALID CHECKSUM - Sending NAK`);
+          socket.write(Buffer.from([ASTM.NAK]));
+          // Skip this frame and move buffer pointer forward
+          buffer = buffer.substring(frameEnd);
+          console.log(`[TCP BUFFER] Remaining buffer after bad frame (${buffer.length} bytes): "${buffer}"`);
+          continue;
+        }
+
+        // ✅ Checksum valid, now parse the frame
+        // Parse the frame 
         const parsed = ASTMParser.parse(frameContent);
         console.log(`[TCP FRAME] Parsed: frameType=${parsed.frameType}, visitId=${parsed.visitId}, sampleId=${parsed.sampleId}, analyzer=${parsed.analyzer}`);
+
+        // ✅ FIX 4: Send ACK only AFTER successful validation and parsing
+        console.log(`[TCP] Frame valid, sending ACK`);
+        socket.write(Buffer.from([ASTM.ACK]));
 
         // Store analyzer from HEADER frame
         if (parsed.frameType === 'HEADER' && parsed.analyzer) {

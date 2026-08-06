@@ -18,13 +18,12 @@ const ASTM = {
 // ============================================================================
 
 const CONFIG = {
-  host: 'localhost',
-  port: 5100,
+  agentHost: 'localhost',
+  agentPort: 5100,
   machineName: 'Sysmex XN-350',  // ✅ ONE field - complete machine name
-  visitId: '202608050001',           // RAJ BHUTE patient barcode visitId
-  sampleId: '1',                     // Whole Blood-EDTA sample type
-  timestamp: '20260805180000',
-  backendUrl: 'http://localhost:3351'  // Backend API URL
+  visitId: '202608060002',           // Barcode scanned at machine
+  sampleId: '3',                     // Sample type ID
+  timestamp: '20260805180000'
 };
 
 // ============================================================================
@@ -32,12 +31,13 @@ const CONFIG = {
 // ============================================================================
 
 class ASTMBuilder {
+  // ✅ FIX: Use Modulo-256 additive checksum per ASTM E1381 standard (not XOR)
   static checksum(content) {
     let sum = 0;
     for (let i = 0; i < content.length; i++) {
-      sum ^= content.charCodeAt(i);
+      sum += content.charCodeAt(i);  // ✅ CHANGED: Additive sum (was XOR)
     }
-    return sum.toString(16).padStart(2, '0').toUpperCase();
+    return (sum % 256).toString(16).padStart(2, '0').toUpperCase();  // ✅ CHANGED: Modulo-256
   }
 
   static frame(content) {
@@ -88,29 +88,27 @@ function log(msg, type = 'INFO') {
 }
 
 // ============================================================================
-// MACHINE SIMULATOR - GETS REAL TEST CODES FROM AGENT
+// MACHINE SIMULATOR - ONLY TALKS TO LOCAL AGENT VIA ASTM
 // ============================================================================
 
 class MachineSimulator {
   constructor() {
     this.socket = null;
     this.connected = false;
-    this.testCodes = [];
-    this.testDetails = [];
-    this.orderReceived = false;
+    this.testCodes = [];  // ✅ Store test codes received from ORDER frame
   }
 
   connect() {
     return new Promise((resolve, reject) => {
-      log(`Connecting to ${CONFIG.host}:${CONFIG.port}...`, 'CONNECT');
+      log(`Connecting to Local Agent ${CONFIG.agentHost}:${CONFIG.agentPort}...`, 'CONNECT');
       
       this.socket = net.createConnection({
-        host: CONFIG.host,
-        port: CONFIG.port
+        host: CONFIG.agentHost,
+        port: CONFIG.agentPort
       });
 
       this.socket.on('connect', () => {
-        log(`✓ Connected to agent`, 'SUCCESS');
+        log(`✓ Connected to Local Agent`, 'SUCCESS');
         this.connected = true;
         resolve();
       });
@@ -125,12 +123,12 @@ class MachineSimulator {
       });
 
       this.socket.on('end', () => {
-        log(`Connection closed`, 'DISCONNECT');
+        log(`Connection closed by agent`, 'DISCONNECT');
       });
 
       setTimeout(() => {
         if (!this.connected) {
-          reject(new Error('Connection timeout - agent not responding'));
+          reject(new Error('Connection timeout - Local Agent not responding on port 5100'));
         }
       }, 5000);
     });
@@ -140,15 +138,17 @@ class MachineSimulator {
     if (data.length === 1) {
       const byte = data[0];
       if (byte === ASTM.ACK) {
-        log('Received ACK', 'RESPONSE');
+        log('Received ACK from agent', 'RESPONSE');
       } else if (byte === ASTM.NAK) {
-        log('Received NAK (error)', 'ERROR');
+        log('Received NAK from agent (error)', 'ERROR');
       }
     } else {
-      logFrame('RECEIVED FROM AGENT', data, 'Order Frame with Real Tests');
+      logFrame('RECEIVED FROM LOCAL AGENT', data);
+      
+      // ✅ Parse ORDER frame to extract test codes
       let ascii = data.toString('utf8');
       
-      // Strip ASTM frame markers (STX, ETX, checksum)
+      // Strip ASTM frame markers
       if (ascii.charCodeAt(0) === ASTM.STX) {
         ascii = ascii.substring(1);
       }
@@ -158,33 +158,25 @@ class MachineSimulator {
         ascii = ascii.substring(0, etxIndex);
       }
       
-      log(`Cleaned frame: ${ascii}`, 'RESPONSE');
-      
-      // Parse ORDER frame to extract REAL test codes
+      // Parse ORDER frame: O|1|visitId|patientId|patientName||priority|||||testCodes
       if (ascii.includes('O|')) {
-        log('🎯 PARSING ORDER FRAME - Extracting REAL test codes from backend database', 'PARSE');
-        
         const parts = ascii.split('|');
-        if (parts.length > 11) {
-          const testCodesStr = (parts[11] || '').trim();
-          this.testCodes = testCodesStr.split('^').filter(t => t.trim());
-          
-          if (this.testCodes.length > 0) {
-            log(`✓ REAL test codes from backend database:`, 'SUCCESS');
-            this.testCodes.forEach(tc => {
-              log(`  → ${tc}`, 'TESTCODE');
-            });
-            this.orderReceived = true;
-          } else {
-            log('⚠️  No test codes found in order frame', 'WARNING');
-          }
+        // Test codes are at position 11
+        const testCodesStr = (parts[11] || '').trim();
+        this.testCodes = testCodesStr.split('^').filter(t => t.trim());
+        
+        if (this.testCodes.length > 0) {
+          log('✓ Extracted test codes from ORDER frame:', 'RESPONSE');
+          this.testCodes.forEach(tc => {
+            log(`  → ${tc}`, 'TESTCODE');
+          });
         }
       }
     }
   }
 
   async sendFrame(frameData, description) {
-    logFrame('SENDING TO AGENT', frameData, description);
+    logFrame('SENDING TO LOCAL AGENT', frameData, description);
     return new Promise((resolve) => {
       this.socket.write(frameData);
       setTimeout(resolve, 500);
@@ -194,337 +186,133 @@ class MachineSimulator {
   async run() {
     try {
       log('═'.repeat(100), 'START');
-      log(`🏥 REAL MACHINE SIMULATOR - DYNAMIC TEST FETCHING FROM BACKEND`, 'START');
+      log(`🏥 MACHINE SIMULATOR - PURE ASTM PROTOCOL ONLY`, 'START');
       log('═'.repeat(100), 'START');
-      log(`Machine: ${CONFIG.machineName}`, 'CONFIG');
-      log(`Sample Barcode: ${CONFIG.visitId}-${CONFIG.sampleId}`, 'CONFIG');
-      log(`Backend: ${CONFIG.backendUrl}`, 'CONFIG');
+      log(`Machine Name: ${CONFIG.machineName}`, 'CONFIG');
+      log(`Sample Barcode (visitId): ${CONFIG.visitId}`, 'CONFIG');
+      log(`Sample Type ID (sampleId): ${CONFIG.sampleId}`, 'CONFIG');
+      log(`Connecting to Local Agent: ${CONFIG.agentHost}:${CONFIG.agentPort}`, 'CONFIG');
       log('', 'CONFIG');
+      log('NOTE: Machine will ONLY talk to Local Agent via ASTM protocol', 'INFO');
+      log('      Local Agent handles ALL backend communication', 'INFO');
+      log('', 'INFO');
 
-      // Step 1: Send Header
-      log('STEP 1: Machine identifies itself to agent', 'STEP');
+      // ===== MACHINE BEHAVIOR =====
+
+      // STEP 1: Machine powers on, sends HEADER to identify itself
+      log('STEP 1: Machine powers on and identifies itself', 'STEP');
+      log(`Action: Send HEADER frame with machine name "${CONFIG.machineName}"`, 'ACTION');
       const headerFrame = ASTMBuilder.header();
-      await this.sendFrame(headerFrame, 'Header - Machine identification');
+      await this.sendFrame(headerFrame, 'HEADER - Machine identification');
       
-      // Step 2: Send Query (barcode scanned - ask for real test orders from backend)
-      log('STEP 2: 🔍 Technician scans tube barcode → Machine queries agent', 'STEP');
-      log(`Asking: "What tests should I run for sample ${CONFIG.visitId}-${CONFIG.sampleId}?"`, 'ACTION');
+      // STEP 2: Barcode is scanned at machine (tube with patient sample)
+      //         Machine asks local agent: "What tests should I run for this barcode?"
+      log('STEP 2: Barcode scanned at machine', 'STEP');
+      log(`Action: Send QUERY frame asking agent for tests`, 'ACTION');
+      log(`        visitId=${CONFIG.visitId}, sampleId=${CONFIG.sampleId}`, 'ACTION');
       const queryFrame = ASTMBuilder.query(CONFIG.visitId, CONFIG.sampleId);
-      await this.sendFrame(queryFrame, 'Query - Machine asks for test orders');
+      await this.sendFrame(queryFrame, 'QUERY - Machine asks "What tests to run?"');
 
-      // Step 3: Wait for ORDER response with REAL test codes
-      log('STEP 3: ⏳ Waiting for agent to fetch test codes from backend database...', 'STEP');
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      // STEP 3: Wait for agent to respond with ORDER
+      //         Local agent fetches from backend and sends back ORDER
+      log('STEP 3: Waiting for Local Agent to respond with test orders', 'STEP');
+      log('        (Agent queries backend, gets test codes, sends ORDER frame)', 'ACTION');
+      await new Promise(resolve => setTimeout(resolve, 3000));
 
-      // Verify we got real test codes
-      if (!this.orderReceived || this.testCodes.length === 0) {
-        log('⚠️  ERROR: No real test codes received!', 'ERROR');
+      // ✅ Check if we got test codes from ORDER frame
+      if (this.testCodes.length === 0) {
+        log('❌ ERROR: No test codes received from ORDER frame!', 'ERROR');
         log('Possible reasons:', 'ERROR');
-        log('  1. Backend API not responding (http://localhost:3351)', 'ERROR');
-        log('  2. Sample barcode not found in database', 'ERROR');
-        log('  3. No tests configured for this sample', 'ERROR');
-        log('  4. Check agent console for [CLOUD ERROR] messages', 'ERROR');
-        throw new Error('No test codes from agent');
+        log('  1. Backend not responding', 'ERROR');
+        log('  2. No tests assigned to this machine', 'ERROR');
+        log('  3. Visit/sample not found in database', 'ERROR');
+        throw new Error('No test codes received from agent');
       }
 
-      // Step 4: Fetch full test details (parameters, categories) from backend
-      log(`STEP 4: 📥 Fetching detailed test parameters for ${this.testCodes.length} test(s)...`, 'STEP');
-      const testDetails = await this.fetchTestDataFromBackend();
+      // STEP 4: Machine processes samples (runs tests)
+      //         Generates RESULT frames with fake data (would be real from analyzer)
+      log('STEP 4: Machine processes samples (simulating test execution)', 'STEP');
+      log(`        Running ${this.testCodes.length} test(s): ${this.testCodes.join(', ')}`, 'ACTION');
       
-      if (testDetails.length === 0) {
-        log('⚠️  ERROR: Could not fetch test details from backend', 'ERROR');
-        throw new Error('Test details fetch failed');
-      }
-
-      // Step 5: Generate REAL results based on database parameters
-      log(`STEP 5: 🧪 Generating results based on actual database parameters...`, 'STEP');
-      const allResults = this.generateResultsForTests(testDetails);
+      // ✅ Generate results for EACH test code received from ORDER frame
+      const allResults = [];
       
-      if (allResults.length === 0) {
-        log('⚠️  ERROR: No results generated', 'ERROR');
-        throw new Error('Result generation failed');
-      }
-
-      // Step 6: Send Results
-      log(`STEP 6: 📤 Sending ${allResults.length} result(s) to agent...`, 'STEP');
+      // Define parameters for each test code - maps test shortName to parameter list
+      // ⚠️ IMPORTANT: Only include parameters that are configured in the database!
+      const testParametersMap = {
+        'HMG': [      // ✅ Hemogram (short name from backend)
+          // Only include parameters that exist in test_parameters table for HMG test
+          { paramCode: 'MCV', value: '87.5', unit: 'fL' },
+          { paramCode: 'MCH', value: '29.5', unit: 'pg' },
+          { paramCode: 'MCHC', value: '33.7', unit: 'g/dL' },
+          { paramCode: 'PLT', value: '250', unit: 'K/uL' },
+          // ⚠️ NOTE: WBC, RBC, HGB, HCT not configured in database yet
+          // Add them to test_parameters table if needed
+        ],
+        'HEM001': [   // Keep for backward compatibility
+          { paramCode: 'WBC', value: '7.5', unit: 'K/uL' },
+          { paramCode: 'RBC', value: '4.8', unit: 'M/uL' },
+          { paramCode: 'HGB', value: '14.2', unit: 'g/dL' },
+          { paramCode: 'HCT', value: '42.0', unit: '%' },
+          { paramCode: 'MCV', value: '87.5', unit: 'fL' },
+          { paramCode: 'MCH', value: '29.5', unit: 'pg' },
+          { paramCode: 'MCHC', value: '33.7', unit: 'g/dL' },
+          { paramCode: 'PLT', value: '250', unit: 'K/uL' },
+        ]
+      };
       
-      for (const r of allResults) {
-        const resultFrame = ASTMBuilder.result(r.test, r.param, r.value, r.unit);
-        log(`  → ${r.test}/${r.param} = ${r.value} ${r.unit}`, 'RESULT');
-        await this.sendFrame(resultFrame, `Real Result - ${r.test}/${r.param}`);
+      for (const testCode of this.testCodes) {
+        log(`🧪 Generating results for test: ${testCode}`, 'RESULT_GEN');
+        
+        const params = testParametersMap[testCode] || [];
+        
+        if (params.length === 0) {
+          log(`  ⚠️  No parameters defined for test code: ${testCode}`, 'WARNING');
+          log(`     Available test codes: ${Object.keys(testParametersMap).join(', ')}`, 'WARNING');
+          continue;
+        }
+
+        for (const param of params) {
+          allResults.push({
+            testCode: testCode,
+            paramCode: param.paramCode,
+            value: param.value,
+            unit: param.unit
+          });
+        }
       }
 
-      // Step 7: Send Terminator
-      log('STEP 7: 🏁 Transmission complete', 'STEP');
+      log(`Sending ${allResults.length} result parameters...`, 'ACTION');
+      log(`     (Using test code(s) from backend: ${this.testCodes.join(', ')})`, 'ACTION');
+      
+      for (const result of allResults) {
+        const resultFrame = ASTMBuilder.result(result.testCode, result.paramCode, result.value, result.unit);
+        log(`  → ${result.testCode}/${result.paramCode} = ${result.value} ${result.unit}`, 'RESULT');
+        await this.sendFrame(resultFrame, `RESULT - ${result.paramCode}`);
+      }
+
+      // STEP 5: Machine signals end of transmission
+      log('STEP 5: Transmission complete', 'STEP');
+      log('        Machine sends TERMINATOR frame', 'ACTION');
       const terminatorFrame = ASTMBuilder.terminator();
-      await this.sendFrame(terminatorFrame, 'Terminator - End of transmission');
+      await this.sendFrame(terminatorFrame, 'TERMINATOR - End of transmission');
 
-      log('✅ SUCCESS! Real data from backend processed completely.', 'SUCCESS');
+      log('', 'INFO');
+      log('✅ SIMULATION COMPLETE', 'SUCCESS');
+      log('Local Agent now:', 'INFO');
+      log('  1. Processes results received from machine', 'INFO');
+      log('  2. Saves to local database', 'INFO');
+      log('  3. Syncs to backend (http://localhost:3351)', 'INFO');
+      log('', 'INFO');
 
     } catch (err) {
       log(`❌ Simulation failed: ${err.message}`, 'ERROR');
+      log('Make sure Local Agent is running: node app.js', 'ERROR');
     } finally {
       setTimeout(() => {
         if (this.socket) this.socket.end();
       }, 1000);
     }
-  }
-
-  // Fetch test data from backend API - gets real parameters and categories
-  async fetchTestDataFromBackend() {
-    return new Promise((resolve, reject) => {
-      log('📡 Fetching test parameters from backend API...', 'API');
-      
-      const query = new URLSearchParams({
-        visitId: CONFIG.visitId,
-        sampleId: CONFIG.sampleId,
-        analyzer: CONFIG.machineName  // ✅ Use single machine name
-      });
-
-      const url = `${CONFIG.backendUrl}/api/machine/v1/query?${query.toString()}`;
-      log(`Request: GET ${url}`, 'API');
-
-      http.get(url, (res) => {
-        let data = '';
-
-        res.on('data', (chunk) => {
-          data += chunk;
-        });
-
-        res.on('end', async () => {
-          try {
-            const response = JSON.parse(data);
-            
-            if (response.success && response.data.patientTests && response.data.patientTests.length > 0) {
-              log(`✓ Retrieved ${response.data.patientTests.length} test(s) from backend`, 'API_SUCCESS');
-              
-              // Extract test codes using actual API response structure
-              const patientTests = response.data.patientTests;
-              this.testCodes = patientTests.map(pt => pt.testCode); // testCode, not shortName
-              log(`✓ Test codes: ${this.testCodes.join(', ')}`, 'TESTCODE');
-
-              // Need to fetch test ID from master API first
-              // Use testCode to find the test ID
-              const testIdPromises = patientTests.map(pt => 
-                this.findTestIdByCode(pt.testCode)
-              );
-
-              try {
-                const testIds = await Promise.all(testIdPromises);
-                
-                // Now fetch full details for each test
-                const testDetailPromises = testIds.map((testId, idx) => 
-                  this.fetchTestDetails(testId, patientTests[idx].testCode)
-                );
-
-                const testDetailsArray = await Promise.all(testDetailPromises);
-                
-                const testDetails = patientTests.map((pt, idx) => ({
-                  shortName: pt.testCode,      // testCode is the machine code
-                  name: pt.testName,           // testName from API
-                  id: testIds[idx],            // testId fetched separately
-                  ...testDetailsArray[idx]
-                }));
-
-                log(`✓ Fetched details for ${testDetails.length} test(s)`, 'API_SUCCESS');
-                resolve(testDetails);
-              } catch (e) {
-                log(`Error fetching test details: ${e.message}`, 'ERROR');
-                reject(e);
-              }
-            } else {
-              log('⚠️ No tests found in response or empty patientTests', 'WARNING');
-              resolve([]);
-            }
-          } catch (e) {
-            log(`Error parsing response: ${e.message}`, 'ERROR');
-            reject(e);
-          }
-        });
-      }).on('error', (err) => {
-        log(`API request failed: ${err.message}`, 'ERROR');
-        reject(err);
-      });
-    });
-  }
-
-  // Find test ID by testCode (HMG, CBC, etc.)
-  async findTestIdByCode(testCode) {
-    return new Promise((resolve, reject) => {
-      const url = `${CONFIG.backendUrl}/api/master/tests`;
-      log(`  📥 Finding test ID for code "${testCode}": GET ${url}`, 'API_FIND');
-
-      http.get(url, (res) => {
-        let data = '';
-
-        res.on('data', (chunk) => {
-          data += chunk;
-        });
-
-        res.on('end', () => {
-          try {
-            const response = JSON.parse(data);
-            
-            if (response.success && response.data) {
-              // Find test with matching shortName or testCode
-              const tests = Array.isArray(response.data) ? response.data : response.data.data || [];
-              const matchingTest = tests.find(t => 
-                t.shortName === testCode || t.testCode === testCode
-              );
-
-              if (matchingTest) {
-                log(`    ✓ Found test ID ${matchingTest.id} for code "${testCode}"`, 'API_FIND');
-                resolve(matchingTest.id);
-              } else {
-                log(`    ❌ Test with code "${testCode}" not found`, 'ERROR');
-                reject(new Error(`Test not found for code: ${testCode}`));
-              }
-            } else {
-              reject(new Error('Invalid response from tests API'));
-            }
-          } catch (e) {
-            log(`Error parsing test list: ${e.message}`, 'ERROR');
-            reject(e);
-          }
-        });
-      }).on('error', (err) => {
-        log(`Test list request failed: ${err.message}`, 'ERROR');
-        reject(err);
-      });
-    });
-  }
-
-  // Fetch individual test details with all parameters and categories
-  async fetchTestDetails(testId, testCode) {
-    return new Promise((resolve, reject) => {
-      const url = `${CONFIG.backendUrl}/api/master/tests/${testId}`;
-      log(`  📥 Fetching test details for "${testCode}" (ID ${testId}): GET ${url}`, 'API_DETAIL');
-
-      http.get(url, (res) => {
-        let data = '';
-
-        res.on('data', (chunk) => {
-          data += chunk;
-        });
-
-        res.on('end', () => {
-          try {
-            const response = JSON.parse(data);
-            
-            if (response.success && response.data) {
-              const test = response.data;
-              const categories = test.categories || [];
-              const parameters = [];
-
-              // Extract all parameters from categories
-              for (const category of categories) {
-                if (category.parameters && Array.isArray(category.parameters)) {
-                  for (const param of category.parameters) {
-                    parameters.push({
-                      parameterName: param.parameterName,
-                      machineCode: param.machineCode || param.parameterName,
-                      type: param.type,
-                      unitId: param.unitId,
-                      unit: param.unit?.symbol || 'N/A',
-                      maleLowValue: param.normalRanges?.find(r => r.gender === 'Male')?.lowValue,
-                      maleHighValue: param.normalRanges?.find(r => r.gender === 'Male')?.highValue,
-                      femaleLowValue: param.normalRanges?.find(r => r.gender === 'Female')?.lowValue,
-                      femaleHighValue: param.normalRanges?.find(r => r.gender === 'Female')?.highValue,
-                      childLowValue: param.normalRanges?.find(r => r.gender === 'Child')?.lowValue,
-                      childHighValue: param.normalRanges?.find(r => r.gender === 'Child')?.highValue,
-                      categoryName: category.name
-                    });
-                    
-                    log(`    ✓ Parameter: ${param.parameterName} (${param.unit?.symbol || 'N/A'})`, 'PARAM');
-                  }
-                }
-              }
-
-              log(`  ✓ Total ${parameters.length} parameter(s) for "${testCode}"`, 'API_DETAIL');
-              resolve({
-                categories: categories,
-                parameters: parameters
-              });
-            } else {
-              resolve({ categories: [], parameters: [] });
-            }
-          } catch (e) {
-            log(`Error parsing test details: ${e.message}`, 'ERROR');
-            resolve({ categories: [], parameters: [] });
-          }
-        });
-      }).on('error', (err) => {
-        log(`Test detail request failed: ${err.message}`, 'ERROR');
-        resolve({ categories: [], parameters: [] });
-      });
-    });
-  }
-
-  // Generate realistic results based on actual test parameters from database
-  generateResultsForTests(testDetails) {
-    const results = [];
-    
-    if (!testDetails || testDetails.length === 0) {
-      log('⚠️  No test details available for result generation', 'WARNING');
-      return results;
-    }
-
-    // Realistic value generator based on parameter ranges
-    const generateValue = (param) => {
-      if (param.type === 'Numeric') {
-        // Try male range first, then female, then default
-        let low = param.maleLowValue;
-        let high = param.maleHighValue;
-        
-        if (low === null || low === undefined) {
-          low = param.femaleLowValue;
-          high = param.femaleHighValue;
-        }
-        
-        if (low === null || low === undefined) {
-          low = param.childLowValue;
-          high = param.childHighValue;
-        }
-
-        // If still no range, use default range
-        if (low === null || low === undefined) {
-          low = 0;
-          high = 100;
-        }
-
-        // Generate random value within range
-        const value = (Math.random() * (high - low) + low).toFixed(2);
-        return { value: value, unit: param.unit || '' };
-      } else {
-        // For descriptive/text parameters
-        return { value: 'Normal', unit: '' };
-      }
-    };
-
-    // Generate results for each test
-    for (const testDetail of testDetails) {
-      if (testDetail.parameters && testDetail.parameters.length > 0) {
-        log(`🧪 Generating results for ${testDetail.name} (${testDetail.shortName}):`, 'RESULT_GEN');
-        
-        for (const param of testDetail.parameters) {
-          const { value, unit } = generateValue(param);
-          
-          results.push({
-            test: testDetail.shortName,
-            param: param.parameterName,
-            value: value,
-            unit: unit,
-            machineCode: param.machineCode
-          });
-
-          log(`   → ${testDetail.shortName}/${param.parameterName} = ${value} ${unit}`, 'RESULT');
-        }
-      } else {
-        log(`   ⚠️  No parameters for ${testDetail.shortName}`, 'WARNING');
-      }
-    }
-
-    return results;
   }
 }
 

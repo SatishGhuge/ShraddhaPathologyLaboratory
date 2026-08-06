@@ -27,6 +27,8 @@ import {
 import { getOrganizations } from "@/src/api/master";
 import ReadingValidationModal from "@/app/components/ReadingValidationModal";
 import AuthenticateModal from "@/app/components/AuthenticateModal";
+import TestSelectionModal, { SelectedTestItem } from "@/app/components/TestSelectionModal";
+
 const LetterHead = "/LetterHead.jpeg";
 
 // ── Type definition for Letterhead from DB ──
@@ -338,8 +340,14 @@ export default function Result() {
 
   // State for test selection modal (for No Page Break option)
   const [showTestSelectionModal, setShowTestSelectionModal] = useState(false);
-  const [testSelectionOrder, setTestSelectionOrder] = useState<string[]>([]);
-  const [testSelectionData, setTestSelectionData] = useState<any>([]);
+  const [testSelectionData, setTestSelectionData] = useState<any[]>([]);
+  const [testSelectionOrder, setTestSelectionOrder] = useState<SelectedTestItem[]>([]);
+  const [pendingPrintTests, setPendingPrintTests] = useState<string[]>([]);
+  
+  // State for per-test comments modal (NEW)
+  const [showPerTestCommentsModal, setShowPerTestCommentsModal] = useState(false);
+  const [pendingTestsForComments, setPendingTestsForComments] = useState<any[]>([]);
+  const [pendingCommentsResponses, setPendingCommentsResponses] = useState<any[]>([]);
   
   // State for Authenticate Modal
   const [showAuthenticateModal, setShowAuthenticateModal] = useState(false);
@@ -1378,9 +1386,44 @@ export default function Result() {
   const proceedWithPrint = async (option: 'pagebreak' | 'nobreak') => {
     if (selectedTests.size === 0) { alert('Please select a test to print'); return; }
 
+    if (option === 'nobreak') {
+      // Show test selection modal first
+      setShowPrintOptionsModal(false);
+      
+      // Get test details for the modal
+      const testIds = Array.from(selectedTests);
+      
+      // Extract tests from the nested patient.tests structure
+      const testsForSelection: any[] = [];
+      results.forEach((patient: any) => {
+        if (patient.tests && Array.isArray(patient.tests)) {
+          patient.tests.forEach((test: any) => {
+            if (testIds.includes(test.test_id)) {
+              testsForSelection.push({
+                test_id: test.test_id,
+                test_name: test.test_name,
+                package_name: test.package_name
+              });
+            }
+          });
+        }
+      });
+      
+      console.log('📋 Tests for selection modal:', testsForSelection);
+      setTestSelectionData(testsForSelection);
+      setPendingPrintTests(testIds);
+      setShowTestSelectionModal(true);
+      return;
+    }
+
+    // For pagebreak option, proceed directly
+    await executePrint(option, Array.from(selectedTests));
+  };
+
+  // Execute the actual print with selected tests in order
+  const executePrint = async (option: 'pagebreak' | 'nobreak', testIds: string[]) => {
     try {
       setLoading(true);
-      const testIds = Array.from(selectedTests);
       const responses = await Promise.all(testIds.map(id => getPatientTestById(id)));
       const first = responses[0];
 
@@ -1494,15 +1537,20 @@ export default function Result() {
         });
       });
 
-      console.log('🔍 DEBUG: Report Data:', {
-        comments: first.comments,
-        commentsLength: first.comments?.length,
-        commentsExists: !!first.comments,
-        resultsMap: resultsMap,
-        paramCount: first.parameters.length
+      // ✅ Build comments map - one comment per test
+      const commentsMap: Record<string, string> = {};
+      responses.forEach(r => {
+        const testId = r.patientTest.test.id;
+        commentsMap[testId] = r.comments || '';
       });
-      console.log('🔍 Sample results:', Object.entries(resultsMap).slice(0, 3));
-      console.log('✅ Passing comments to directPrintReport:', first.comments);
+
+      console.log('🔍 DEBUG: Report Data:', {
+        commentsMap: commentsMap,
+        resultsMap: resultsMap,
+        paramCount: first.parameters.length,
+        totalTests: responses.length
+      });
+      console.log('✅ Passing per-test comments:', commentsMap);
 
       // ✅ DIRECT PRINT - trigger print immediately with report data
       setLoading(false);
@@ -1525,12 +1573,111 @@ export default function Result() {
       });
       
       setReportWithHeader(true);
-      // ❌ NO modal - trigger print immediately after a small delay to allow render
       setShowPrintOptionsModal(false);
-      
-      // Trigger print after rendering completes (onReady inside directPrintReport)
-      setShowPrintOptionsModal(false);
-      directPrintReport({
+    } catch (err) {
+      console.error('Error loading report:', err);
+      alert('Error loading report: ' + err.message);
+      setLoading(false);
+    }
+  };
+
+  // Handle test selection from modal
+  const handleTestSelectionConfirm = (selectedTests: SelectedTestItem[]) => {
+    // Sort tests by their sortOrder and get test IDs
+    const sortedTestIds = selectedTests
+      .sort((a, b) => a.sortOrder - b.sortOrder)
+      .map(t => t.test_id);
+    
+    setShowTestSelectionModal(false);
+    executePrint('nobreak', sortedTestIds);
+  };
+
+  // Handle per-test comments confirmation
+  const handlePerTestCommentsConfirm = async (commentsMap: Record<string, string>) => {
+    try {
+      setLoading(true);
+      const responses = pendingCommentsResponses;
+      const first = responses[0];
+
+      // Fetch signature
+      let signature = first.patientTest.test?.signature || null;
+      if (!signature) {
+        try {
+          const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || '/api';
+          const testSpeciality = first.patientTest.test?.speciality || 'Regular';
+          const sigRes = await fetch(`${API_BASE_URL}/signatures/by-specialty/${encodeURIComponent(testSpeciality)}`);
+          const sigData = await sigRes.json();
+          if (sigData.success && sigData.data) signature = sigData.data;
+          else {
+            const allRes = await fetch(`${API_BASE_URL}/signatures`);
+            const allData = await allRes.json();
+            if (allData.success && allData.data.length > 0) {
+              const active = allData.data.filter(s => s.isActive);
+              if (active.length > 0) signature = active[0];
+            }
+          }
+        } catch (e) { console.warn('Could not fetch signature', e); }
+      }
+
+      // Fetch letterhead
+      let letterheadDB: LetterheadDB | null = null;
+      let letterHeadBase64 = '';
+      try {
+        const lhRes = await fetch(`${API_BASE_URL}/letterhead/active`);
+        const lhData = await lhRes.json();
+        if (lhData.success && lhData.data?.length > 0) {
+          letterheadDB = lhData.data[0];
+        }
+      } catch (e) {
+        console.warn('Could not fetch letterhead from DB', e);
+      }
+
+      if (!letterheadDB) {
+        try {
+          const imgRes = await fetch(LetterHead);
+          const blob = await imgRes.blob();
+          letterHeadBase64 = await new Promise<string>(resolve => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(reader.result as string);
+            reader.readAsDataURL(blob);
+          });
+        } catch (e) { console.warn('Could not load static letterhead', e); }
+      }
+
+      // Build combined tests array with test_id
+      const combinedTests = responses.map(r => ({
+        test_id: r.patientTest.test.id,
+        name: r.patientTest.test.name,
+        interpretation: r.patientTest.test.interpretation,
+        signature: r.patientTest.test.signature || signature,
+        groupedParameters: r.groupedParameters,
+        parameters: r.parameters,
+        isOutsourced: r.patientTest.isOutsourced || false,
+        outsourcedTo: r.patientTest.outsourcedTo || null,
+        outsourcingReport: r.outsourcingReport || null,
+        comments: r.patientTest.comments || ''
+      }));
+
+      // Build results object mapping parameter IDs to their values
+      const resultsMap: any = {};
+      responses.forEach(r => {
+        r.parameters.forEach((param: any) => {
+          if (param.existingResult) {
+            resultsMap[param.id] = {
+              numericValue: param.existingResult.numericValue,
+              textValue: param.existingResult.textValue,
+              isAbnormal: param.existingResult.isAbnormal,
+              isHighlighted: param.existingResult.isHighlighted || false
+            };
+          }
+        });
+      });
+
+      console.log('✅ Per-test comments entered:', commentsMap);
+
+      // ✅ DIRECT PRINT - trigger print immediately with per-test comments
+      setLoading(false);
+      await directPrintReport({
         patient: first.patientTest.patient,
         visitId: first.patientTest.visitId,
         visitDate: first.patientTest.visitDate,
@@ -1541,19 +1688,21 @@ export default function Result() {
         signature,
         letterhead: letterheadDB,
         letterHeadBase64,
-        printOption: option,
+        printOption: 'nobreak',
         results: resultsMap,
         referralDoctor: first.patientTest.referralDoctor,
         comments: combinedTests.length === 1 ? combinedTests[0].comments : ''
       });
+
+      setShowPerTestCommentsModal(false);
+      setPendingTestsForComments([]);
+      setPendingCommentsResponses([]);
     } catch (err) {
-      console.error('Error loading report:', err);
-      alert('Error loading report: ' + err.message);
+      console.error('Error printing:', err);
+      alert('Error: ' + err.message);
       setLoading(false);
     }
   };
-
-  // Direct print report - renders ProfessionalReport off-screen, then prints via a clean popup window
   const directPrintReport = (reportProps: any) => {
     const printContainer = document.createElement('div');
     printContainer.id = 'print-report-container-' + Date.now();
@@ -1657,7 +1806,8 @@ export default function Result() {
         printOption={reportProps.printOption}
         results={reportProps.results}
         referralDoctor={reportProps.referralDoctor}
-        comments={reportProps.comments}  // ✅ ADD COMMENTS PROP
+        comments={reportProps.comments}  // Backward compatibility
+       
         onReady={doPrint}
       />
     );
@@ -4076,67 +4226,21 @@ export default function Result() {
                   
                   try {
                     setLoading(true);
-                    // Fetch only selected tests in the new order
+                    // Fetch full test data for selected tests
                     const responses = await Promise.all(
                       selectedTests.map(t => getPatientTestById(t.testId))
                     );
-                    const first = responses[0];
-
-                    // Fetch signature
-                    let signature = first.patientTest.test?.signature || null;
-                    if (!signature) {
-                      try {
-                        const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || '/api';
-                        const testSpeciality = first.patientTest.test?.speciality || 'Regular';
-                        const sigRes = await fetch(`${API_BASE_URL}/signatures/by-specialty/${encodeURIComponent(testSpeciality)}`);
-                        const sigData = await sigRes.json();
-                        if (sigData.success && sigData.data) signature = sigData.data;
-                        else {
-                          const allRes = await fetch(`${API_BASE_URL}/signatures`);
-                          const allData = await allRes.json();
-                          if (allData.success && allData.data.length > 0) {
-                            const active = allData.data.filter(s => s.isActive);
-                            if (active.length > 0) signature = active[0];
-                          }
-                        }
-                      } catch (e) { console.warn('Could not fetch signature', e); }
-                    }
-
-                    // Convert LetterHead to base64
-                    let letterHeadBase64 = '';
-                    try {
-                      const imgRes = await fetch(LetterHead);
-                      const blob = await imgRes.blob();
-                      letterHeadBase64 = await new Promise<string>(resolve => {
-                        const reader = new FileReader();
-                        reader.onloadend = () => resolve(reader.result as string);
-                        reader.readAsDataURL(blob);
-                      });
-                    } catch (e) { console.warn('Could not load letterhead', e); }
-
-                    // Build combined tests array in selected order
-                    const selectedCombinedTests = responses.map(r => ({
-                      name: r.patientTest.test.name,
-                      interpretation: r.patientTest.test.interpretation,
-                      groupedParameters: r.groupedParameters,
-                      parameters: r.parameters
+                    
+                    // Prepare test data for comment modal
+                    const testsForComments = responses.map(r => ({
+                      test_id: r.patientTest.test.id,
+                      test_name: r.patientTest.test.name
                     }));
 
-                    // Set report data and open modal
-                    setReportData({
-                      patient: first.patientTest.patient,
-                      visitId: first.patientTest.visitId,
-                      visitDate: first.patientTest.visitDate,
-                      test: first.patientTest.test,
-                      parameters: first.parameters,
-                      groupedParameters: first.groupedParameters,
-                      combinedTests: selectedCombinedTests,
-                      signature,
-                      letterHeadBase64,
-                      printOption: 'nobreak'
-                    });
-                    setReportWithHeader(true);
-                    setShowReportModal(true);
+                    // Store responses and show comments modal
+                    setPendingCommentsResponses(responses);
+                    setPendingTestsForComments(testsForComments);
+                    setShowPerTestCommentsModal(true);
                     setShowTestSelectionModal(false);
                     setTestSelectionData([]);
                     setTestSelectionOrder([]);
@@ -4216,6 +4320,21 @@ export default function Result() {
           </div>
         </div>
       )}
+
+      {/* Test Selection Modal - for Continuous on same page option */}
+      <TestSelectionModal
+        isOpen={showTestSelectionModal}
+        tests={testSelectionData}
+        onConfirm={handleTestSelectionConfirm}
+        onCancel={() => {
+          setShowTestSelectionModal(false);
+          setPendingPrintTests([]);
+          setTestSelectionData([]);
+        }}
+        loading={loading}
+      />
+
+      
     </>
   );
 }
