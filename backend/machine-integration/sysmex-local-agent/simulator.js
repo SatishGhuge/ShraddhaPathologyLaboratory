@@ -21,8 +21,8 @@ const CONFIG = {
   agentHost: 'localhost',
   agentPort: 5100,
   machineName: 'Sysmex XN-350',  // ✅ ONE field - complete machine name
-  visitId: '202608050003',           // Barcode scanned at machine
-  sampleId: '1',                     // Sample type ID
+  visitId: '202608060002',           // Barcode scanned at machine
+  sampleId: '3',                     // Sample type ID
   timestamp: '20260805180000'
 };
 
@@ -31,12 +31,13 @@ const CONFIG = {
 // ============================================================================
 
 class ASTMBuilder {
+  // ✅ FIX: Use Modulo-256 additive checksum per ASTM E1381 standard (not XOR)
   static checksum(content) {
     let sum = 0;
     for (let i = 0; i < content.length; i++) {
-      sum ^= content.charCodeAt(i);
+      sum += content.charCodeAt(i);  // ✅ CHANGED: Additive sum (was XOR)
     }
-    return sum.toString(16).padStart(2, '0').toUpperCase();
+    return (sum % 256).toString(16).padStart(2, '0').toUpperCase();  // ✅ CHANGED: Modulo-256
   }
 
   static frame(content) {

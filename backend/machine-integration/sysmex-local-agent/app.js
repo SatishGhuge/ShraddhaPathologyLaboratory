@@ -12,7 +12,7 @@ const CONFIG = {
     host: '0.0.0.0'
   },
   vps: {
-    baseUrl: process.env.VPS_TAILSCALE_URL || 'http://localhost:3351'
+    baseUrl: process.env.VPS_TAILSCALE_URL || 'http://192.168.0.119:5000'
   },
   database: {
     host: process.env.DB_HOST || 'localhost',
@@ -550,9 +550,9 @@ const ResultSync = {
       const isVpsReachable = await CloudAPI.checkVpsHealth();
       
       if (!isVpsReachable) {
-        console.warn(`[SYNC] VPS not reachable - will retry later`);
-        // Don't mark as offline queued - just return silently
-        // This prevents incrementing retry_count for network issues
+        console.warn(`[SYNC] VPS not reachable - queueing for retry`);
+        // ✅ FIX: Mark as OFFLINE_QUEUED so retry worker will pick it up later
+        await Database.markOfflineQueued(recordId, 'VPS unreachable');
         return;
       }
 
