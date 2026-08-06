@@ -1,4 +1,5 @@
 const net = require('net');
+const http = require('http');
 
 // ============================================================================
 // ASTM PROTOCOL CONSTANTS
@@ -17,13 +18,12 @@ const ASTM = {
 // ============================================================================
 
 const CONFIG = {
-  host: 'localhost',
-  port: 5100,
-  machineId: 'Roche',
-  machineModel: 'Cobas',
-  visitId: '202607310001',
-  sampleId: '5',  // Just the number, not the full barcode
-  timestamp: '20260731183000'
+  agentHost: 'localhost',
+  agentPort: 5100,
+  machineName: 'Sysmex XN-350',  // ✅ ONE field - complete machine name
+  visitId: '202608060002',           // Barcode scanned at machine
+  sampleId: '3',                     // Sample type ID
+  timestamp: '20260805180000'
 };
 
 // ============================================================================
@@ -31,12 +31,13 @@ const CONFIG = {
 // ============================================================================
 
 class ASTMBuilder {
+  // ✅ FIX: Use Modulo-256 additive checksum per ASTM E1381 standard (not XOR)
   static checksum(content) {
     let sum = 0;
     for (let i = 0; i < content.length; i++) {
-      sum ^= content.charCodeAt(i);
+      sum += content.charCodeAt(i);  // ✅ CHANGED: Additive sum (was XOR)
     }
-    return sum.toString(16).padStart(2, '0').toUpperCase();
+    return (sum % 256).toString(16).padStart(2, '0').toUpperCase();  // ✅ CHANGED: Modulo-256
   }
 
   static frame(content) {
@@ -46,7 +47,7 @@ class ASTMBuilder {
   }
 
   static header() {
-    const content = `H|\\^&|||${CONFIG.machineId}^${CONFIG.machineModel}|||||||P|1|${CONFIG.timestamp}`;
+    const content = `H|\\^&|||${CONFIG.machineName}|||||||P|1|${CONFIG.timestamp}`;
     return this.frame(content);
   }
 
@@ -87,28 +88,27 @@ function log(msg, type = 'INFO') {
 }
 
 // ============================================================================
-// MACHINE SIMULATOR - GETS REAL TEST CODES FROM AGENT
+// MACHINE SIMULATOR - ONLY TALKS TO LOCAL AGENT VIA ASTM
 // ============================================================================
 
 class MachineSimulator {
   constructor() {
     this.socket = null;
     this.connected = false;
-    this.testCodes = [];
-    this.orderReceived = false;
+    this.testCodes = [];  // ✅ Store test codes received from ORDER frame
   }
 
   connect() {
     return new Promise((resolve, reject) => {
-      log(`Connecting to ${CONFIG.host}:${CONFIG.port}...`, 'CONNECT');
+      log(`Connecting to Local Agent ${CONFIG.agentHost}:${CONFIG.agentPort}...`, 'CONNECT');
       
       this.socket = net.createConnection({
-        host: CONFIG.host,
-        port: CONFIG.port
+        host: CONFIG.agentHost,
+        port: CONFIG.agentPort
       });
 
       this.socket.on('connect', () => {
-        log(`✓ Connected to agent`, 'SUCCESS');
+        log(`✓ Connected to Local Agent`, 'SUCCESS');
         this.connected = true;
         resolve();
       });
@@ -123,12 +123,12 @@ class MachineSimulator {
       });
 
       this.socket.on('end', () => {
-        log(`Connection closed`, 'DISCONNECT');
+        log(`Connection closed by agent`, 'DISCONNECT');
       });
 
       setTimeout(() => {
         if (!this.connected) {
-          reject(new Error('Connection timeout - agent not responding'));
+          reject(new Error('Connection timeout - Local Agent not responding on port 5100'));
         }
       }, 5000);
     });
@@ -138,15 +138,17 @@ class MachineSimulator {
     if (data.length === 1) {
       const byte = data[0];
       if (byte === ASTM.ACK) {
-        log('Received ACK', 'RESPONSE');
+        log('Received ACK from agent', 'RESPONSE');
       } else if (byte === ASTM.NAK) {
-        log('Received NAK (error)', 'ERROR');
+        log('Received NAK from agent (error)', 'ERROR');
       }
     } else {
-      logFrame('RECEIVED FROM AGENT', data, 'Order Frame with Real Tests');
+      logFrame('RECEIVED FROM LOCAL AGENT', data);
+      
+      // ✅ Parse ORDER frame to extract test codes
       let ascii = data.toString('utf8');
       
-      // Strip ASTM frame markers (STX, ETX, checksum)
+      // Strip ASTM frame markers
       if (ascii.charCodeAt(0) === ASTM.STX) {
         ascii = ascii.substring(1);
       }
@@ -156,33 +158,25 @@ class MachineSimulator {
         ascii = ascii.substring(0, etxIndex);
       }
       
-      log(`Cleaned frame: ${ascii}`, 'RESPONSE');
-      
-      // Parse ORDER frame to extract REAL test codes
+      // Parse ORDER frame: O|1|visitId|patientId|patientName||priority|||||testCodes
       if (ascii.includes('O|')) {
-        log('🎯 PARSING ORDER FRAME - Extracting REAL test codes from backend database', 'PARSE');
-        
         const parts = ascii.split('|');
-        if (parts.length > 11) {
-          const testCodesStr = (parts[11] || '').trim();
-          this.testCodes = testCodesStr.split('^').filter(t => t.trim());
-          
-          if (this.testCodes.length > 0) {
-            log(`✓ REAL test codes from backend database:`, 'SUCCESS');
-            this.testCodes.forEach(tc => {
-              log(`  → ${tc}`, 'TESTCODE');
-            });
-            this.orderReceived = true;
-          } else {
-            log('⚠️  No test codes found in order frame', 'WARNING');
-          }
+        // Test codes are at position 11
+        const testCodesStr = (parts[11] || '').trim();
+        this.testCodes = testCodesStr.split('^').filter(t => t.trim());
+        
+        if (this.testCodes.length > 0) {
+          log('✓ Extracted test codes from ORDER frame:', 'RESPONSE');
+          this.testCodes.forEach(tc => {
+            log(`  → ${tc}`, 'TESTCODE');
+          });
         }
       }
     }
   }
 
   async sendFrame(frameData, description) {
-    logFrame('SENDING TO AGENT', frameData, description);
+    logFrame('SENDING TO LOCAL AGENT', frameData, description);
     return new Promise((resolve) => {
       this.socket.write(frameData);
       setTimeout(resolve, 500);
@@ -192,154 +186,133 @@ class MachineSimulator {
   async run() {
     try {
       log('═'.repeat(100), 'START');
-      log(`REAL MACHINE SIMULATOR - GETS TEST CODES FROM BACKEND`, 'START');
+      log(`🏥 MACHINE SIMULATOR - PURE ASTM PROTOCOL ONLY`, 'START');
       log('═'.repeat(100), 'START');
-      log(`Machine: ${CONFIG.machineId} ${CONFIG.machineModel}`, 'CONFIG');
-      log(`Sample Barcode: ${CONFIG.visitId}-${CONFIG.sampleId}`, 'CONFIG');
+      log(`Machine Name: ${CONFIG.machineName}`, 'CONFIG');
+      log(`Sample Barcode (visitId): ${CONFIG.visitId}`, 'CONFIG');
+      log(`Sample Type ID (sampleId): ${CONFIG.sampleId}`, 'CONFIG');
+      log(`Connecting to Local Agent: ${CONFIG.agentHost}:${CONFIG.agentPort}`, 'CONFIG');
       log('', 'CONFIG');
+      log('NOTE: Machine will ONLY talk to Local Agent via ASTM protocol', 'INFO');
+      log('      Local Agent handles ALL backend communication', 'INFO');
+      log('', 'INFO');
 
-      // Step 1: Send Header
-      log('STEP 1: Machine identifies itself to agent', 'STEP');
+      // ===== MACHINE BEHAVIOR =====
+
+      // STEP 1: Machine powers on, sends HEADER to identify itself
+      log('STEP 1: Machine powers on and identifies itself', 'STEP');
+      log(`Action: Send HEADER frame with machine name "${CONFIG.machineName}"`, 'ACTION');
       const headerFrame = ASTMBuilder.header();
-      await this.sendFrame(headerFrame, 'Header - Machine identification');
+      await this.sendFrame(headerFrame, 'HEADER - Machine identification');
       
-      // Step 2: Send Query (barcode scanned - ask for real test orders from backend)
-      log('STEP 2: 🔍 Technician scans tube barcode → Machine queries agent', 'STEP');
-      log(`Asking: "What tests should I run for sample ${CONFIG.visitId}-${CONFIG.sampleId}?"`, 'ACTION');
+      // STEP 2: Barcode is scanned at machine (tube with patient sample)
+      //         Machine asks local agent: "What tests should I run for this barcode?"
+      log('STEP 2: Barcode scanned at machine', 'STEP');
+      log(`Action: Send QUERY frame asking agent for tests`, 'ACTION');
+      log(`        visitId=${CONFIG.visitId}, sampleId=${CONFIG.sampleId}`, 'ACTION');
       const queryFrame = ASTMBuilder.query(CONFIG.visitId, CONFIG.sampleId);
-      await this.sendFrame(queryFrame, 'Query - Machine asks for test orders');
+      await this.sendFrame(queryFrame, 'QUERY - Machine asks "What tests to run?"');
 
-      // Step 3: Wait for ORDER response with REAL test codes
-      log('STEP 3: ⏳ Waiting for agent to fetch test codes from backend database...', 'STEP');
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      // STEP 3: Wait for agent to respond with ORDER
+      //         Local agent fetches from backend and sends back ORDER
+      log('STEP 3: Waiting for Local Agent to respond with test orders', 'STEP');
+      log('        (Agent queries backend, gets test codes, sends ORDER frame)', 'ACTION');
+      await new Promise(resolve => setTimeout(resolve, 3000));
 
-      // Verify we got real test codes
-      if (!this.orderReceived || this.testCodes.length === 0) {
-        log('⚠️  ERROR: No real test codes received!', 'ERROR');
+      // ✅ Check if we got test codes from ORDER frame
+      if (this.testCodes.length === 0) {
+        log('❌ ERROR: No test codes received from ORDER frame!', 'ERROR');
         log('Possible reasons:', 'ERROR');
-        log('  1. Backend API not responding (http://localhost:3351)', 'ERROR');
-        log('  2. Sample barcode not found in database', 'ERROR');
-        log('  3. No tests configured for this sample', 'ERROR');
-        log('  4. Check agent console for [CLOUD ERROR] messages', 'ERROR');
-        throw new Error('No test codes from agent');
+        log('  1. Backend not responding', 'ERROR');
+        log('  2. No tests assigned to this machine', 'ERROR');
+        log('  3. Visit/sample not found in database', 'ERROR');
+        throw new Error('No test codes received from agent');
       }
 
-      // Step 4: Send REAL Results based on actual test codes from backend
-      log(`STEP 4: ✓ Running tests for ${this.testCodes.length} actual test(s)`, 'STEP');
-      log('Generating results based on real backend test codes...', 'ACTION');
+      // STEP 4: Machine processes samples (runs tests)
+      //         Generates RESULT frames with fake data (would be real from analyzer)
+      log('STEP 4: Machine processes samples (simulating test execution)', 'STEP');
+      log(`        Running ${this.testCodes.length} test(s): ${this.testCodes.join(', ')}`, 'ACTION');
       
-      const allResults = this.generateResultsForTests(this.testCodes);
+      // ✅ Generate results for EACH test code received from ORDER frame
+      const allResults = [];
       
-      for (const r of allResults) {
-        const resultFrame = ASTMBuilder.result(r.test, r.param, r.value, r.unit);
-        log(`  → ${r.test}/${r.param} = ${r.value} ${r.unit}`, 'RESULT');
-        await this.sendFrame(resultFrame, `Real Result - ${r.test}/${r.param}`);
+      // Define parameters for each test code - maps test shortName to parameter list
+      // ⚠️ IMPORTANT: Only include parameters that are configured in the database!
+      const testParametersMap = {
+        'HMG': [      // ✅ Hemogram (short name from backend)
+          // Only include parameters that exist in test_parameters table for HMG test
+          { paramCode: 'MCV', value: '87.5', unit: 'fL' },
+          { paramCode: 'MCH', value: '29.5', unit: 'pg' },
+          { paramCode: 'MCHC', value: '33.7', unit: 'g/dL' },
+          { paramCode: 'PLT', value: '250', unit: 'K/uL' },
+          // ⚠️ NOTE: WBC, RBC, HGB, HCT not configured in database yet
+          // Add them to test_parameters table if needed
+        ],
+        'HEM001': [   // Keep for backward compatibility
+          { paramCode: 'WBC', value: '7.5', unit: 'K/uL' },
+          { paramCode: 'RBC', value: '4.8', unit: 'M/uL' },
+          { paramCode: 'HGB', value: '14.2', unit: 'g/dL' },
+          { paramCode: 'HCT', value: '42.0', unit: '%' },
+          { paramCode: 'MCV', value: '87.5', unit: 'fL' },
+          { paramCode: 'MCH', value: '29.5', unit: 'pg' },
+          { paramCode: 'MCHC', value: '33.7', unit: 'g/dL' },
+          { paramCode: 'PLT', value: '250', unit: 'K/uL' },
+        ]
+      };
+      
+      for (const testCode of this.testCodes) {
+        log(`🧪 Generating results for test: ${testCode}`, 'RESULT_GEN');
+        
+        const params = testParametersMap[testCode] || [];
+        
+        if (params.length === 0) {
+          log(`  ⚠️  No parameters defined for test code: ${testCode}`, 'WARNING');
+          log(`     Available test codes: ${Object.keys(testParametersMap).join(', ')}`, 'WARNING');
+          continue;
+        }
+
+        for (const param of params) {
+          allResults.push({
+            testCode: testCode,
+            paramCode: param.paramCode,
+            value: param.value,
+            unit: param.unit
+          });
+        }
       }
 
-      // Step 5: Send Terminator
-      log('STEP 5: 🏁 Transmission complete', 'STEP');
+      log(`Sending ${allResults.length} result parameters...`, 'ACTION');
+      log(`     (Using test code(s) from backend: ${this.testCodes.join(', ')})`, 'ACTION');
+      
+      for (const result of allResults) {
+        const resultFrame = ASTMBuilder.result(result.testCode, result.paramCode, result.value, result.unit);
+        log(`  → ${result.testCode}/${result.paramCode} = ${result.value} ${result.unit}`, 'RESULT');
+        await this.sendFrame(resultFrame, `RESULT - ${result.paramCode}`);
+      }
+
+      // STEP 5: Machine signals end of transmission
+      log('STEP 5: Transmission complete', 'STEP');
+      log('        Machine sends TERMINATOR frame', 'ACTION');
       const terminatorFrame = ASTMBuilder.terminator();
-      await this.sendFrame(terminatorFrame, 'Terminator - End of transmission');
+      await this.sendFrame(terminatorFrame, 'TERMINATOR - End of transmission');
 
-      log('✓ SUCCESS! Real data from backend processed completely.', 'SUCCESS');
+      log('', 'INFO');
+      log('✅ SIMULATION COMPLETE', 'SUCCESS');
+      log('Local Agent now:', 'INFO');
+      log('  1. Processes results received from machine', 'INFO');
+      log('  2. Saves to local database', 'INFO');
+      log('  3. Syncs to backend (http://localhost:3351)', 'INFO');
+      log('', 'INFO');
 
     } catch (err) {
       log(`❌ Simulation failed: ${err.message}`, 'ERROR');
+      log('Make sure Local Agent is running: node app.js', 'ERROR');
     } finally {
       setTimeout(() => {
         if (this.socket) this.socket.end();
       }, 1000);
     }
-  }
-
-  // Generate realistic results for ACTUAL test codes from backend (shortNames like CBC, PLT, etc.)
-  generateResultsForTests(testCodes) {
-    const resultMap = {
-      'CBC': [
-        { param: 'WBC', value: '7.5', unit: '10^3/uL' },
-        { param: 'RBC', value: '5.2', unit: '10^6/uL' },
-        { param: 'HGB', value: '15.5', unit: 'g/dL' }
-      ],
-      'HGB': [
-        { param: 'HCT', value: '46.5', unit: '%' },
-        { param: 'MCV', value: '89.2', unit: 'fL' },
-        { param: 'MCH', value: '29.8', unit: 'pg' }
-      ],
-      'BG': [
-        { param: 'MCHC', value: '33.5', unit: 'g/dL' },
-        { param: 'PLT', value: '250', unit: '10^3/uL' }
-      ],
-      'PLT': [
-        { param: 'RET', value: '1.2', unit: '%' }
-      ],
-      'PT': [
-        { param: 'PT_INR', value: '1.1', unit: 'INR' }
-      ],
-      'APTT': [
-        { param: 'APTT_SEC', value: '28.5', unit: 'sec' }
-      ],
-      'RET': [
-        { param: 'RET_PERCENT', value: '1.5', unit: '%' }
-      ],
-      'GLU': [
-        { param: 'GLUCOSE', value: '95', unit: 'mg/dL' }
-      ],
-      'GLU_RDM': [
-        { param: 'GLUCOSE', value: '105', unit: 'mg/dL' }
-      ],
-      'RFT': [
-        { param: 'BUN', value: '18', unit: 'mg/dL' },
-        { param: 'CREATININE', value: '0.95', unit: 'mg/dL' },
-        { param: 'NA', value: '140', unit: 'mmol/L' }
-      ],
-      'LFT': [
-        { param: 'ALT', value: '35', unit: 'U/L' },
-        { param: 'AST', value: '32', unit: 'U/L' },
-        { param: 'ALP', value: '68', unit: 'U/L' }
-      ],
-      'LIPID': [
-        { param: 'TOTAL_CHOL', value: '180', unit: 'mg/dL' },
-        { param: 'LDL', value: '110', unit: 'mg/dL' },
-        { param: 'HDL', value: '45', unit: 'mg/dL' }
-      ],
-      'ELEC': [
-        { param: 'K', value: '4.2', unit: 'mmol/L' },
-        { param: 'CL', value: '105', unit: 'mmol/L' }
-      ],
-      'TSH': [
-        { param: 'TSH', value: '2.1', unit: 'mIU/L' }
-      ],
-      'BCULTURE': [
-        { param: 'GROWTH', value: 'No Growth', unit: '' }
-      ],
-      'UCULTURE': [
-        { param: 'GROWTH', value: 'No Growth', unit: '' }
-      ],
-      'SCULTURE': [
-        { param: 'GROWTH', value: 'No Growth', unit: '' }
-      ],
-      'WCULTURE': [
-        { param: 'GROWTH', value: 'No Growth', unit: '' }
-      ]
-    };
-
-    const results = [];
-    for (const testCode of testCodes) {
-      const testResults = resultMap[testCode];
-      if (testResults) {
-        for (const res of testResults) {
-          results.push({
-            test: testCode,
-            param: res.param,
-            value: res.value,
-            unit: res.unit
-          });
-        }
-      } else {
-        log(`  ⚠️  No result template for shortName: ${testCode}`, 'WARNING');
-      }
-    }
-    return results;
   }
 }
 

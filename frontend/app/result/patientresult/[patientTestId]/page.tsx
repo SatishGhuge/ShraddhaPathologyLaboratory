@@ -6,7 +6,7 @@ import React, { useState, useEffect, useCallback, useRef } from "react";
 
 import Header from "@/src/components/Header";
 import BarcodeModal, { generateBarcodeLabels, getSampleTypeId, getSampleTypeName, getTestName } from "@/app/components/BarcodeModal";
-import { getPatientTestById, updateTestStatus, updatePatientComments } from "@/src/api/result.js";
+import { getPatientTestById, updateTestStatus, updatePatientComments, deleteCommentFromHistory } from "@/src/api/result.js";
 import API_BASE_URL from "@/src/api/config";
 import { useTestTemplates } from '@/src/hooks/useTestTemplates';
 import InlineTemplateSelector from '@/app/components/InlineTemplateSelector';
@@ -286,6 +286,12 @@ const PatientResult = () => {
   const [commentHistory, setCommentHistory] = useState<string[]>([]);
   const [showCommentDropdown, setShowCommentDropdown] = useState(false);
   const [commentFocused, setCommentFocused] = useState(false);
+  
+  // ✅ Per-test comment state for multiple tests to prevent dropdown interference
+  const [testComments, setTestComments] = useState<{ [testIdx: number]: string }>({});
+  const [testCommentFocused, setTestCommentFocused] = useState<{ [testIdx: number]: boolean }>({});
+  const [testShowComment, setTestShowComment] = useState<{ [testIdx: number]: boolean }>({});
+  
   const [defaultSignature, setDefaultSignature] = useState<any>(null);
 
   // BarcodeModal state
@@ -969,6 +975,18 @@ const PatientResult = () => {
       const validTests = testDataArray.filter(td => td?.patientTest).map(td => td);
       setAllTestsData(validTests);
 
+      // ✅ Initialize testComments with previously saved comments for each test
+      const initialTestComments: { [testIdx: number]: string } = {};
+      const initialTestShowComment: { [testIdx: number]: boolean } = {};
+      validTests.forEach((testData, idx) => {
+        const savedComment = testData.patientTest?.comments || '';
+        initialTestComments[idx] = savedComment;
+        initialTestShowComment[idx] = savedComment.trim().length > 0; // Auto-check if comment exists
+        console.log(`✅ Loaded existing comment for test ${idx} (${testData.patientTest?.test?.name}):`, savedComment);
+      });
+      setTestComments(initialTestComments);
+      setTestShowComment(initialTestShowComment);
+
       // Use first test's patient data
       if (validTests.length > 0) {
         setPatientData(validTests[0].patientTest);
@@ -1281,7 +1299,7 @@ const PatientResult = () => {
       
       // Save results for each test
       await Promise.all(
-        allTestsData.map(async (testData) => {
+        allTestsData.map(async (testData, idx) => {
           const testId = multipleTestIds[allTestsData.indexOf(testData)];
           const resultsData = testData.parameters.map(param => {
             const paramKey = `${testId}_${param.id}`;
@@ -1310,6 +1328,21 @@ const PatientResult = () => {
           
           const data = await response.json();
           if (data.success) {
+            // ✅ Save comments for this test if any
+            const testComment = testComments[idx];
+            if (testComment && testComment.trim()) {
+              try {
+                await fetch(`${API_BASE_URL}/results/${testData.patientTest.id}/comments`, {
+                  method: 'PUT',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ comments: testComment })
+                });
+                console.log(`✅ Saved comment for test ${idx}:`, testComment);
+              } catch (commentError) {
+                console.error(`⚠️ Failed to save comment for test ${idx}:`, commentError);
+              }
+            }
+            
             // Auto-transition to Entered status
             try {
               await fetch(`${API_BASE_URL}/results/${testData.patientTest.id}/auto-transition/result-saved`, {
@@ -1701,6 +1734,7 @@ const PatientResult = () => {
                                       handleHighlightChange(paramKey);
                                     }}
                                     className="w-5 h-5 accent-blue-600 cursor-pointer"
+                                    tabIndex={-1}
                                     title="Check to highlight this value bold in report"
                                   />
                                 </td>
@@ -1715,39 +1749,59 @@ const PatientResult = () => {
                           <div className="flex items-center gap-3">
                             <input 
                               type="checkbox" 
-                              id="show-comment-single"
-                              checked={showComment}
-                              onChange={(e) => handleCommentCheckbox(e.target.checked)}
+                              id={`show-comment-test-${testIdx}`}
+                              checked={testShowComment[testIdx] || false}
+                              onChange={(e) => setTestShowComment(prev => ({ ...prev, [testIdx]: e.target.checked }))}
                               className="w-5 h-5 accent-blue-600 cursor-pointer flex-shrink-0"
                               title="Check to add comments"
                             />
-                            <label htmlFor="show-comment-single" className="text-sm font-semibold text-gray-700 cursor-pointer flex-shrink-0">Comment:</label>
-                            {showComment && (
+                            <label htmlFor={`show-comment-test-${testIdx}`} className="text-sm font-semibold text-gray-700 cursor-pointer flex-shrink-0">Comment:</label>
+                            {testShowComment[testIdx] && (
                               <div className="flex-1 relative">
                                 <textarea
-                                  value={comments}
-                                  onChange={(e) => handleCommentChange(e.target.value)}
-                                  onFocus={() => setCommentFocused(true)}
-                                  onBlur={() => setTimeout(() => setCommentFocused(false), 200)}
-                                  placeholder="Type comment here..."
+                                  value={testComments[testIdx] || ''}
+                                  onChange={(e) => setTestComments(prev => ({ ...prev, [testIdx]: e.target.value }))}
+                                  onFocus={() => setTestCommentFocused(prev => ({ ...prev, [testIdx]: true }))}
+                                  onBlur={() => setTimeout(() => setTestCommentFocused(prev => ({ ...prev, [testIdx]: false })), 200)}
+                                  placeholder="Type comment here or select from history"
                                   className="w-full border border-gray-300 rounded px-2 py-1 text-xs font-normal h-12 resize-none"
                                 />
-                                {commentHistory.length > 0 && commentFocused && (
+                                {commentHistory.length > 0 && testCommentFocused[testIdx] && (
                                   <div className="absolute top-12 left-0 right-0 bg-white border border-gray-300 rounded shadow-lg p-2 max-h-40 overflow-y-auto z-50">
                                     <div className="space-y-1">
                                       {commentHistory.map((hist, idx) => (
-                                        <button
-                                          key={idx}
-                                          type="button"
-                                          onMouseDown={(e) => e.preventDefault()}
-                                          onClick={() => {
-                                            const newComments = comments.trim() ? `${comments}, ${hist}` : hist;
-                                            handleCommentChange(newComments);
-                                          }}
-                                          className="w-full text-left px-2 py-1.5 text-xs bg-gray-50 hover:bg-blue-500 hover:text-white text-gray-800 rounded cursor-pointer transition-colors"
-                                        >
-                                          {hist}
-                                        </button>
+                                        <div key={idx} className="flex items-center gap-2 px-2 py-1.5 text-xs bg-gray-50 hover:bg-blue-50 rounded group">
+                                          <button
+                                            type="button"
+                                            onMouseDown={(e) => e.preventDefault()}
+                                            onClick={() => {
+                                              const currentComment = testComments[testIdx] || '';
+                                              const newComments = currentComment.trim() ? `${currentComment}, ${hist}` : hist;
+                                              setTestComments(prev => ({ ...prev, [testIdx]: newComments }));
+                                            }}
+                                            className="flex-1 text-left text-gray-800 hover:text-blue-600 transition-colors cursor-pointer"
+                                          >
+                                            {hist}
+                                          </button>
+                                          <button
+                                            type="button"
+                                            onMouseDown={(e) => e.preventDefault()}
+                                            onClick={async (e) => {
+                                              e.stopPropagation();
+                                              try {
+                                                await deleteCommentFromHistory(hist);
+                                                setCommentHistory(prev => prev.filter(c => c !== hist));
+                                              } catch (error) {
+                                                console.error('Error deleting comment:', error);
+                                                alert('Failed to delete comment');
+                                              }
+                                            }}
+                                            className="text-red-500 hover:text-red-700 opacity-0 group-hover:opacity-100 transition-opacity"
+                                            title="Delete this comment"
+                                          >
+                                            ✕
+                                          </button>
+                                        </div>
                                       ))}
                                     </div>
                                   </div>
@@ -1967,6 +2021,7 @@ const PatientResult = () => {
                                   handleHighlightChange(param.id);
                                 }}
                                 className="w-5 h-5 accent-blue-600 cursor-pointer"
+                                tabIndex={-1}
                                 title="Check to highlight this value bold in report"
                               />
                             </td>
@@ -1983,7 +2038,7 @@ const PatientResult = () => {
                           type="checkbox" 
                           id="show-comment-table"
                           checked={showComment}
-                          onChange={(e) => handleCommentCheckbox(e.target.checked)}
+                          onChange={(e) => setShowComment(e.target.checked)}
                           className="w-5 h-5 accent-blue-600 cursor-pointer flex-shrink-0"
                           title="Check to add comments"
                         />
@@ -1992,7 +2047,7 @@ const PatientResult = () => {
                           <div className="flex-1 relative">
                             <textarea
                               value={comments}
-                              onChange={(e) => handleCommentChange(e.target.value)}
+                              onChange={(e) => setComments(e.target.value)}
                               onFocus={() => setCommentFocused(true)}
                               onBlur={() => setTimeout(() => setCommentFocused(false), 200)}
                               placeholder="Type comment or select from history"
@@ -2002,18 +2057,37 @@ const PatientResult = () => {
                               <div className="absolute top-12 left-0 right-0 bg-white border border-gray-300 rounded shadow-lg p-2 max-h-40 overflow-y-auto z-50">
                                 <div className="space-y-1">
                                   {commentHistory.map((hist, idx) => (
-                                    <button
-                                      key={idx}
-                                      type="button"
-                                      onMouseDown={(e) => e.preventDefault()}
-                                      onClick={() => {
-                                        const newComments = comments.trim() ? `${comments}, ${hist}` : hist;
-                                        handleCommentChange(newComments);
-                                      }}
-                                      className="w-full text-left px-2 py-1.5 text-xs bg-gray-50 hover:bg-blue-500 hover:text-white text-gray-800 rounded cursor-pointer transition-colors"
-                                    >
-                                      {hist}
-                                    </button>
+                                    <div key={idx} className="flex items-center gap-2 px-2 py-1.5 text-xs bg-gray-50 hover:bg-blue-50 rounded group">
+                                      <button
+                                        type="button"
+                                        onMouseDown={(e) => e.preventDefault()}
+                                        onClick={() => {
+                                          const newComments = comments.trim() ? `${comments}, ${hist}` : hist;
+                                          setComments(newComments);
+                                        }}
+                                        className="flex-1 text-left text-gray-800 hover:text-blue-600 transition-colors cursor-pointer"
+                                      >
+                                        {hist}
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onMouseDown={(e) => e.preventDefault()}
+                                        onClick={async (e) => {
+                                          e.stopPropagation();
+                                          try {
+                                            await deleteCommentFromHistory(hist);
+                                            setCommentHistory(prev => prev.filter(c => c !== hist));
+                                          } catch (error) {
+                                            console.error('Error deleting comment:', error);
+                                            alert('Failed to delete comment');
+                                          }
+                                        }}
+                                        className="text-red-500 hover:text-red-700 opacity-0 group-hover:opacity-100 transition-opacity"
+                                        title="Delete this comment"
+                                      >
+                                        ✕
+                                      </button>
+                                    </div>
                                   ))}
                                 </div>
                               </div>

@@ -3,6 +3,7 @@ import { apiCall } from './master';
 export interface Machine {
   id: number;
   name: string;
+  description?: string;
   isActive: boolean;
   testCount?: number;
   createdAt?: string;
@@ -112,11 +113,11 @@ export const getMachineUsage = async (id: number): Promise<MachineUsage | null> 
 /**
  * Create new machine
  */
-export const createMachine = async (name: string): Promise<Machine | null> => {
+export const createMachine = async (name: string, description?: string): Promise<Machine | null> => {
   try {
     const response = await apiCall<Machine>('/machines', {
       method: 'POST',
-      body: JSON.stringify({ name })
+      body: JSON.stringify({ name, description })
     });
     return response.data || null;
   } catch (err: any) {

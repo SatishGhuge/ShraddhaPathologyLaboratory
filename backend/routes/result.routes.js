@@ -15,7 +15,8 @@ import {
   getPreviousTestResult,
   getAllTestResults,
   updatePatientComments,
-  getCommentHistory
+  getCommentHistory,
+  deleteCommentFromHistory
 } from '../controllers/result.controller.js';
 import {
   getOutsourcingReport
@@ -215,6 +216,9 @@ router.put('/:id/comments', updatePatientComments);
 // Fetches from ALL patients for system-wide comment history
 router.get('/history/comments', getCommentHistory);
 router.get('/history/comments/:patientId', getCommentHistory);
+
+// Delete a comment from history (removes from all tests)
+router.delete('/history/comments', deleteCommentFromHistory);
 
 // Upload attachment (image/PDF) for a patient test
 router.post('/:id/attachment', upload.single('file'), uploadAttachment);

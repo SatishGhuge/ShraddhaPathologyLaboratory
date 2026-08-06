@@ -13,6 +13,7 @@ interface MachineFormProps {
 
 const MachineForm: React.FC<MachineFormProps> = ({ isOpen, onClose, machine, onSuccess }) => {
   const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const isEdit = !!machine;
@@ -20,8 +21,10 @@ const MachineForm: React.FC<MachineFormProps> = ({ isOpen, onClose, machine, onS
   useEffect(() => {
     if (machine) {
       setName(machine.name);
+      setDescription(machine.description || "");
     } else {
       setName("");
+      setDescription("");
     }
     setError(null);
   }, [machine, isOpen]);
@@ -39,9 +42,12 @@ const MachineForm: React.FC<MachineFormProps> = ({ isOpen, onClose, machine, onS
 
     try {
       if (isEdit && machine) {
-        await updateMachine(machine.id, { name: name.trim() });
+        await updateMachine(machine.id, { 
+          name: name.trim(),
+          description: description.trim() || null
+        });
       } else {
-        await createMachine(name.trim());
+        await createMachine(name.trim(), description.trim() || undefined);
       }
       onSuccess();
     } catch (err: any) {
@@ -101,6 +107,23 @@ const MachineForm: React.FC<MachineFormProps> = ({ isOpen, onClose, machine, onS
             />
             <p className="mt-1 text-xs text-slate-600">
               Enter the exact machine model name (will be matched with ASTM headers)
+            </p>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-slate-900 mb-2">
+              Description
+            </label>
+            <textarea
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="e.g., Lab location: Room 3, Hematology department"
+              disabled={loading}
+              rows={3}
+              className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent outline-none disabled:bg-slate-100 disabled:cursor-not-allowed resize-none"
+            />
+            <p className="mt-1 text-xs text-slate-600">
+              Optional: Add notes about the machine location, department, or specifications
             </p>
           </div>
 
