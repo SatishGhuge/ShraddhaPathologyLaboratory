@@ -289,29 +289,31 @@ model PatientTest {
   visitTime          String?
   sampleBarcodeNo    String?
   patient_history    String?             @db.Text
-  totalAmount        Float               @default(0)
   
-  // ===== ORIGINAL DISCOUNT (from patient registration) =====
-  originalDiscountPercent Float             @default(0)
-  originalDiscountAmount  Float             @default(0)
-  originalDiscountRemark  String?
-  originalDiscountDate    DateTime?         @default(now())
-  
-  // ===== ADDITIONAL DISCOUNT (from BookingDetailsModal rebook) =====
-  additionalDiscountPercent Float            @default(0)
-  additionalDiscountAmount  Float            @default(0)
-  additionalDiscountRemark  String?
-  additionalDiscountDate    DateTime?
+  // ===== NEW BILLING FIELDS (Patient Registration) =====
+  testCharges        Float               @default(0)        // Sum of selected test charges
+  discountPercent    Float               @default(0)        // Single discount % for all tests
+  discountAmount     Float               @default(0)        // Calculated discount in Rs
+  testAmount         Float               @default(0)        // testCharges - discountAmount
+  advanceAmount      Float               @default(0)        // Amount paid by patient
+  balanceAmount      Float               @default(0)        // testAmount - advanceAmount
   
   // ===== LEGACY FIELDS (kept for backward compatibility) =====
-  discountPercent    Float               @default(0)
-  discountAmount     Float               @default(0)
-  discountRemark     String?
+  totalAmount        Float               @default(0)        // DEPRECATED - use testAmount
+  originalDiscountPercent Float           @default(0)        // DEPRECATED
+  originalDiscountAmount  Float           @default(0)        // DEPRECATED
+  originalDiscountRemark  String?         // DEPRECATED
+  originalDiscountDate    DateTime?       @default(now())    // DEPRECATED
+  additionalDiscountPercent Float         @default(0)        // DEPRECATED
+  additionalDiscountAmount  Float         @default(0)        // DEPRECATED
+  additionalDiscountRemark  String?       // DEPRECATED
+  additionalDiscountDate    DateTime?     // DEPRECATED
+  paidAmount         Float               @default(0)        // DEPRECATED - use advanceAmount
   
-  paidAmount         Float               @default(0)
-  balanceAmount      Float               @default(0)
+  // ===== TRANSACTION FIELDS =====
   paymentMode        String?
   businessType       String?
+  discountRemark     String?
   createdAt          DateTime            @default(now())
   updatedAt          DateTime            @updatedAt
   sampleReceived     DateTime?

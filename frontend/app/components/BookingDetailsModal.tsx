@@ -88,70 +88,63 @@ const BookingDetailsModal: React.FC<BookingDetailsModalProps> = ({
   }
 
   // ============================================================================
-  // BILLING CALCULATION LOGIC (NEW)
+  // BILLING CALCULATION LOGIC (UPDATED)
   // ============================================================================
   
-  // Initial values from PatientTest table (for existing tests)
-  const advanceFromDB = booking?.paidAmount || 0;
-  const balanceAmountFromDB = booking?.balanceAmount || 0;
-  const existingDiscountPercentFromDB = booking?.discountPercent || 0; // Discount already in DB
-  const existingDiscountAmountFromDB = booking?.discountAmount || 0; // Discount amount already in DB
+  // Initial values from database
+  const advanceFromDB = booking?.paidAmount || 0;  // Running total of all payments
+  const balanceAmountFromDB = booking?.balanceAmount || 0;  // Previous balance (net)
+  const existingDiscountAmountFromDB = booking?.discountAmount || 0;  // Previous discount amount
   
-  // Calculate sum of NEW tests added (tests added during this visit, not from database)
-  const newTestsTotal = tests
-    .filter(t => !t.isExisting) // Only new tests (not from database)
+  // ✅ Step 1: Calculate PREVIOUS RAW TOTAL (reverse the net to get raw)
+  // Previous Raw Total = Balance + Advance + Discount
+  // Because: Balance = (Raw - Discount) - Advance
+  // So: Raw = Balance + Advance + Discount
+  const previousRawTotal = balanceAmountFromDB + advanceFromDB + existingDiscountAmountFromDB;
+  
+  // ✅ Step 2: Calculate GRAND TOTAL from PREVIOUS only
+  // Grand Total = Previous Raw Total - Previous Discount Amount
+  const grandTotal = Math.max(0, previousRawTotal - existingDiscountAmountFromDB);
+  
+  // New tests raw total
+  const newTestsRawTotal = tests
+    .filter(t => !t.isExisting)
     .reduce((sum: number, t: any) => sum + (businessType === "B2C" ? (t.b2cCharge || t.charge || 0) : (t.b2bCharge || t.charge || 0)), 0);
   
-  // Total from current existing tests (some may have been deleted)
-  const existingTestsTotal = tests
-    .filter(t => t.isExisting) // Only existing tests from database
-    .reduce((sum: number, t: any) => sum + (businessType === "B2C" ? (t.b2cCharge || t.charge || 0) : (t.b2bCharge || t.charge || 0)), 0);
-  
-  // Calculate totals
-  const totalAmount = existingTestsTotal + newTestsTotal;
-  
-  // Balance Amount: if tests were deleted, recalculate
-  // New balance = existing test total - original advance + new tests total - new discount
-  const newBalance = Math.max(0, existingTestsTotal - advanceFromDB + newTestsTotal);
+  // ✅ Add alias for compatibility with JSX
+  const newTestsTotal = newTestsRawTotal;
   
   // Discount logic for NEW TESTS:
-  // - Apply discount ONLY to new tests added during this visit (as a combined total, not per test)
-  // - Discount fields are DISABLED until new tests are added
-  const newTestDiscountAmount = discountPercent > 0 ? (newTestsTotal * discountPercent) / 100 : discount;
+  // Apply discount ONLY to new tests (as combined total)
+  const newTestDiscountAmount = discountPercent > 0 ? (newTestsRawTotal * discountPercent) / 100 : discount;
   
-  // New Tests Net Amount (after discount removed)
-  const newTestsNetAmount = Math.max(0, newTestsTotal - newTestDiscountAmount);
+  // New test net amount (after discount)
+  const newTestsNetAmount = Math.max(0, newTestsRawTotal - newTestDiscountAmount);
   
-  // Net Amount (before payment deduction):
-  // - If NO new tests added → shows Balance Amount (from DB)
-  // - If NEW tests ARE added → Balance Amount + New Tests Net Amount
-  const netAmountBeforePayment = newTestsAdded 
-    ? Math.max(0, newBalance + newTestsNetAmount) 
-    : newBalance;
+  // ✅ BALANCE = GRAND TOTAL - ADVANCE
+  const displayedBalanceAmount = Math.max(0, grandTotal - advanceFromDB);
   
-  // Display values (BEFORE payment is deducted):
-  // Net Amount should be the TOTAL amount patient needs to pay (after discount) - STAYS CONSTANT
-  // Balance Amount should be NET AMOUNT - PAYMENT (what's left to pay) - CHANGES WITH PAYMENT
+  // ✅ NET AMOUNT = BALANCE - PAYMENT (reduces real-time as you type payment)
+  const displayedNetAmount = Math.max(0, displayedBalanceAmount - paymentAmount);
   
-  // Final Net Amount (the total amount patient needs to pay) - CONSTANT
-  const displayedNetAmount = newTestsAdded 
-    ? Math.max(0, netAmountBeforePayment) 
-    : Math.max(0, newBalance);
+  // ✅ BALANCE AMOUNT = only reduces to 0 when FULL payment is made
+  const finalBalanceAmount = paymentAmount >= displayedBalanceAmount 
+    ? 0  // Fully paid
+    : displayedBalanceAmount;
   
-  // Balance Amount (what's left after payment) - CHANGES WHEN PAYMENT CHANGES
-  const displayedBalanceAmount = Math.max(0, displayedNetAmount - paymentAmount);
-  
-  // Total Discount Amount (existing discount + new test discount)
+  // Total Discount Amount (keep separate: existing + new)
   const totalDiscountAmount = existingDiscountAmountFromDB + newTestDiscountAmount;
   
+  // Total raw amount before any discount
+  const totalRawAmount = previousRawTotal + newTestsRawTotal;
+  
   // Total Discount Percentage
-  const originalTotalAmount = existingTestsTotal + newTestsTotal;
-  const totalDiscountPercent = originalTotalAmount > 0 
-    ? (totalDiscountAmount / originalTotalAmount * 100)
+  const totalDiscountPercent = totalRawAmount > 0 
+    ? (totalDiscountAmount / totalRawAmount * 100)
     : 0;
 
-  // Payment warning: if payment exceeds net amount
-  const paymentExceeds = paymentAmount > displayedNetAmount;
+  // Payment warning: if payment exceeds balance
+  const paymentExceeds = paymentAmount > displayedBalanceAmount;
 
   const handleAddTest = (test: any, pkg?: any) => {
     if (!tests.find(t => t.name === test.name)) {
@@ -202,7 +195,7 @@ const BookingDetailsModal: React.FC<BookingDetailsModalProps> = ({
     console.log('💾 Saving new tests to existing visit...', {
       newTestsCount: newTests.length,
       discountPercent,
-      discountAmount,
+      discount,
       visitId: booking.visitId,
       patientId: booking.patientId
     });
@@ -226,12 +219,11 @@ const BookingDetailsModal: React.FC<BookingDetailsModalProps> = ({
             charge: businessType === "B2C" ? (t.b2cCharge || t.charge || 0) : (t.b2bCharge || t.charge || 0),
             b2cCharge: t.b2cCharge,
             b2bCharge: t.b2bCharge,
-            isOutsourced: t.isOutsourced || false,
             outsourcedTo: t.outsourcedTo || null
           })),
           discountType: discountType,  // ✅ NEW: Send discount type
           discountPercent: parseFloat(discountPercent) || 0,
-          discountAmount: parseFloat(discountAmount) || 0,
+          discountAmount: parseFloat(discount) || 0,
           discountRemark: discountRemark,
           businessType
         })
@@ -258,13 +250,17 @@ const BookingDetailsModal: React.FC<BookingDetailsModalProps> = ({
       }
 
       // Update the booking with new totals
+      // ✅ IMPORTANT: Keep original balanceAmount UNCHANGED
+      // Balance Amount should remain from original tests only
+      // New test charges are shown separately in the modal
       const updatedBooking = {
         ...booking,
         tests: result.data.allTests.map((t: any) => ({
           ...t,
           isExisting: true // Mark all as existing now since they're in DB
         })),
-        balanceAmount: result.data.balanceAmount,
+        // ✅ Do NOT update balanceAmount - keep it from original tests only
+        // balanceAmount remains as booking.balanceAmount (unchanged)
         discountAmount: result.data.discountAmount,
         discountPercent: discountPercent ? parseFloat(discountPercent) : booking.discountPercent,
         patientData: {
@@ -516,16 +512,16 @@ const BookingDetailsModal: React.FC<BookingDetailsModalProps> = ({
 
             {/* Billing Details - Compact Layout */}
             <div className="bg-white rounded shadow p-2 flex-shrink-0">
-              {/* Original Amount Row */}
+              {/* Grand Total Row */}
               <div className="flex gap-2 mb-2 items-end">
                 <div className="flex-1">
-                  <div className="text-xs font-semibold text-gray-700 mb-1">Original Amount</div>
+                  <div className="text-xs font-semibold text-gray-700 mb-1">Grand Total</div>
                   <div className="flex gap-1.5 items-end">
                     {[
-                      { label: "Total", val: existingTestsTotal, ro: true, color: "text-orange-600" },
-                      { label: "Advance", val: advanceFromDB, ro: true, color: "text-blue-600" },
-                      { label: "Dis", val: existingDiscountAmountFromDB.toFixed(0), ro: true, color: "text-yellow-600" },
-                      { label: "Bal", val: displayedBalanceAmount, ro: true, color: "text-red-600" },
+                      { label: "Grand Total", val: grandTotal.toFixed(0), ro: true, color: "text-orange-600" },
+                      { label: "Advance", val: advanceFromDB.toFixed(0), ro: true, color: "text-blue-600" },
+                      { label: "Dis", val: totalDiscountAmount.toFixed(0), ro: true, color: "text-yellow-600" },
+                      { label: "Bal", val: finalBalanceAmount.toFixed(0), ro: true, color: "text-red-600" },
                     ].map((item, i) => (
                       <div key={i} className="flex-1">
                         <div className={`${item.color} font-bold text-xs text-center mb-0.5`}>{item.label}</div>

@@ -124,7 +124,7 @@ export default function PageHeader({ title = "", icon: Icon, path = "" }: { titl
   const showBackButton = pathname.includes('/test-excel-manager');
 
   return (
-    <div className="mb-4">
+    <div className="mb-2">
       {/* Breadcrumb Navigation */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-1 text-sm text-slate-600">

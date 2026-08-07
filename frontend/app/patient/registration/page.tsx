@@ -368,6 +368,7 @@ export default function PatientRegistration() {
   const [locationSearch, setLocationSearch] = useState("");
   const [locationSuggestions, setLocationSuggestions] = useState<any[]>([]);
   const [showLocationDropdown, setShowLocationDropdown] = useState(false);
+  const [expandAddressLocation, setExpandAddressLocation] = useState(false);
   const locationDropdownRef = useRef<HTMLDivElement>(null);
 
   const [remarks, setRemarks] = useState("");
@@ -2232,22 +2233,22 @@ export default function PatientRegistration() {
       }
     `}</style>
 
-    <div className="w-full px-3 sm:px-6 mt-16 overflow-x-hidden">
+    <div className="w-full px-3 sm:px-6 overflow-x-hidden">
 
       {/* TOP BAR */}
-      <div className="bg-white rounded-xl shadow p-4 mb-3">
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <div className="bg-white rounded-xl shadow p-4 mb-2">
+        <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
 
-          {/* LEFT - Patient Identity */}
-          <div>
-            <h2 className="text-sm font-semibold mb-3">Patient Identity</h2>
-            <div className="grid grid-cols-1 sm:grid-cols-4 gap-2">
-              {/* ROW 1: Title, First Name, Last Name, DOB */}
+          {/* LEFT - Patient Identity (3 columns) */}
+          <div className="lg:col-span-3">
+            <h2 className="text-xs font-semibold mb-2 text-cyan-900 uppercase tracking-wider">Patient Identity</h2>
+            <div className="grid grid-cols-1 sm:grid-cols-6 gap-1">
+              {/* ROW 1: Title, First Name, Last Name, DOB, Age */}
               <InlineSelect
                 value={title}
                 onChange={handleTitleChange}
                 options={["MR","MRS","MISS","Master","Baby Boy","Baby Girl"]}
-                placeholder="Title"
+                placeholder="Mr"
               />
               <input 
                 className={input} 
@@ -2274,8 +2275,6 @@ export default function PatientRegistration() {
                 required 
               />
               <InlineDatePicker value={dob} onChange={handleDobChange} placeholder="DOB" maxDate={new Date().toISOString().split("T")[0]} className="w-full" />
-
-              {/* ROW 2: Age, Gender, Mobile, Email */}
               <input 
                 className={input} 
                 placeholder="Age *" 
@@ -2288,6 +2287,8 @@ export default function PatientRegistration() {
                 title={babyAgeFormatted ? "Baby age calculated from DOB (months/days)" : (age && (age.includes('Y') || age.includes('M') || age.includes('D'))) ? "Age calculated from DOB (Y-M-D format)" : "Enter age in years"}
                 required 
               />
+              
+              {/* Gender */}
               <InlineSelect
                 value={gender}
                 onChange={setGender}
@@ -2298,109 +2299,11 @@ export default function PatientRegistration() {
                 ]}
                 placeholder="Gender *"
               />
-              <div className="relative" ref={mobileInputRef}>
-                <input className={input} placeholder="Mobile" value={mobile} onChange={(e) => handleMobileChange(e.target.value)} maxLength={10} />
-                {showSimilarPatientsDropdown && foundPatients.length > 0 && (
-                  <div className="absolute top-full left-0 right-0 bg-white border border-gray-200 rounded-xl shadow-xl mt-0.5 z-50 overflow-hidden">
-                    <div className="bg-white px-4 py-2 border-b border-gray-200">
-                      <p className="text-xs font-semibold text-gray-700">{foundPatients.length} patient{foundPatients.length > 1 ? 's' : ''} found</p>
-                    </div>
-                    <div className="max-h-48 overflow-y-auto py-1">
-                      {foundPatients.map((patient, i) => (
-                        <div
-                          key={patient.patientId}
-                          onMouseDown={(e) => {
-                            e.preventDefault();
-                            fillPatientData(patient);
-                            setShowSimilarPatientsDropdown(false);
-                          }}
-                          className={`px-4 py-2.5 cursor-pointer hover:bg-gray-50 ${i < foundPatients.length - 1 ? "border-b border-gray-100" : ""}`}
-                        >
-                          <div className="text-xs font-semibold text-gray-800">{patient.title} {patient.firstName} {patient.lastName}</div>
-                          <div className="text-xs text-gray-400">{patient.mobile}</div>
-                        </div>
-                      ))}
-                    </div>
-                    <div className="px-4 py-2 bg-gray-50 border-t border-gray-100">
-                      <button
-                        onMouseDown={(e) => {
-                          e.preventDefault();
-                          const currentMobile = mobile;
-                          setShowSimilarPatientsDropdown(false);
-                          setFoundPatients([]);
-                          setMobile(currentMobile);
-                        }}
-                        className="text-xs text-gray-400 hover:text-gray-600 w-full text-center"
-                      >
-                        + Add new with this number
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
+
+              {/* ROW 2: Organization, Location+Address (expandable), Mobile, Email */}
               
-              <input className={input} placeholder="Email" value={email} onChange={(e) => handleEmailChange(e.target.value)} />
-
-              {/* ROW 3: Address, Location */}
-              <textarea className={input} placeholder="Address" value={address} onChange={(e) => setAddress(e.target.value)} rows={3}></textarea>
-              
-              {/* Location Field - Searchable Input (Simple City-Village Format) */}
-              <div className="relative" ref={locationDropdownRef}>
-                <div className="relative">
-                  <input
-                    type="text"
-                    placeholder="Location *"
-                    value={locationSearch}
-                    onChange={(e) => handleLocationSearchChange(e.target.value)}
-                    onFocus={() => {
-                      if (locationSearch.trim()) {
-                        setShowLocationDropdown(true);
-                      }
-                    }}
-                    className={`${input} w-full`}
-                  />
-                  {locationSearch && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setLocationSearch("");
-                        setLocation("");
-                        setLocationSuggestions([]);
-                        setShowLocationDropdown(false);
-                      }}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                    >
-                      <X size={16} />
-                    </button>
-                  )}
-                </div>
-
-                {/* Location Suggestions Dropdown */}
-                {showLocationDropdown && locationSuggestions.length > 0 && (
-                  <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-50 max-h-64 overflow-y-auto">
-                    {locationSuggestions.map((suggestion, idx) => (
-                      <button
-                        key={idx}
-                        type="button"
-                        onClick={() => handleLocationSelect(suggestion.display)}
-                        className="w-full text-left px-3 py-2 hover:bg-orange-50 border-b border-gray-100 last:border-b-0 transition-colors"
-                      >
-                        <div className="text-sm font-medium text-gray-800">{suggestion.display}</div>
-                      </button>
-                    ))}
-                  </div>
-                )}
-
-                {/* No suggestions message */}
-                {showLocationDropdown && locationSearch.trim() && locationSuggestions.length === 0 && (
-                  <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-50 p-3 text-center text-gray-500 text-sm">
-                    No locations found matching "{locationSearch}"
-                  </div>
-                )}
-              </div>
-
-              {/* Organization - Wide field (spans 2 columns horizontally) */}
-              <div className="relative col-span-2" ref={organizationDropdownRef}>
+              {/* Organization */}
+              <div className="relative col-span-1" ref={organizationDropdownRef}>
                 <input
                   type="text"
                   placeholder="Organization"
@@ -2469,16 +2372,122 @@ export default function PatientRegistration() {
                   </div>
                 )}
               </div>
+
+              {/* Location + Address (Regular fields - side by side) */}
+              <div className="relative col-span-2 grid grid-cols-2 gap-1">
+                {/* Location Field */}
+                <div className="relative" ref={locationDropdownRef}>
+                  <input
+                    type="text"
+                    placeholder="Location *"
+                    value={locationSearch}
+                    onChange={(e) => handleLocationSearchChange(e.target.value)}
+                    onFocus={() => {
+                      if (locationSearch.trim()) {
+                        setShowLocationDropdown(true);
+                      }
+                    }}
+                    className={`${input} w-full`}
+                  />
+                  {locationSearch && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setLocationSearch("");
+                        setLocation("");
+                        setLocationSuggestions([]);
+                        setShowLocationDropdown(false);
+                      }}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    >
+                      <X size={16} />
+                    </button>
+                  )}
+                </div>
+
+                {/* Location Suggestions Dropdown */}
+                {showLocationDropdown && locationSuggestions.length > 0 && (
+                  <div className="absolute top-full left-0 right-1/2 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-50 max-h-40 overflow-y-auto">
+                    {locationSuggestions.map((suggestion, idx) => (
+                      <button
+                        key={idx}
+                        type="button"
+                        onMouseDown={(e) => {
+                          e.preventDefault();
+                          handleLocationSelect(suggestion.display);
+                        }}
+                        className="w-full text-left px-2 py-1 hover:bg-orange-50 border-b border-gray-100 last:border-b-0 transition-colors text-xs"
+                      >
+                        <div className="font-medium text-gray-800">{suggestion.display}</div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {/* Address Field */}
+                <input 
+                  type="text"
+                  className={input}
+                  placeholder="Address" 
+                  value={address} 
+                  onChange={(e) => setAddress(e.target.value)} 
+                />
+              </div>
+
+              {/* Mobile */}
+              <div className="relative col-span-1" ref={mobileInputRef}>
+                <input className={input} placeholder="Mobile" value={mobile} onChange={(e) => handleMobileChange(e.target.value)} maxLength={10} />
+                {showSimilarPatientsDropdown && foundPatients.length > 0 && (
+                  <div className="absolute top-full left-0 right-0 bg-white border border-gray-200 rounded-xl shadow-xl mt-0.5 z-50 overflow-hidden">
+                    <div className="bg-white px-4 py-2 border-b border-gray-200">
+                      <p className="text-xs font-semibold text-gray-700">{foundPatients.length} patient{foundPatients.length > 1 ? 's' : ''} found</p>
+                    </div>
+                    <div className="max-h-48 overflow-y-auto py-1">
+                      {foundPatients.map((patient, i) => (
+                        <div
+                          key={patient.patientId}
+                          onMouseDown={(e) => {
+                            e.preventDefault();
+                            fillPatientData(patient);
+                            setShowSimilarPatientsDropdown(false);
+                          }}
+                          className={`px-4 py-2.5 cursor-pointer hover:bg-gray-50 ${i < foundPatients.length - 1 ? "border-b border-gray-100" : ""}`}
+                        >
+                          <div className="text-xs font-semibold text-gray-800">{patient.title} {patient.firstName} {patient.lastName}</div>
+                          <div className="text-xs text-gray-400">{patient.mobile}</div>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="px-4 py-2 bg-gray-50 border-t border-gray-100">
+                      <button
+                        onMouseDown={(e) => {
+                          e.preventDefault();
+                          const currentMobile = mobile;
+                          setShowSimilarPatientsDropdown(false);
+                          setFoundPatients([]);
+                          setMobile(currentMobile);
+                        }}
+                        className="text-xs text-gray-400 hover:text-gray-600 w-full text-center"
+                      >
+                        + Add new with this number
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+              
+              {/* Email */}
+              <input className={input} placeholder="Email" value={email} onChange={(e) => handleEmailChange(e.target.value)} />
             </div>
           </div>
 
-          {/* RIGHT - Registration Details */}
-          <div>
-            <h2 className="text-sm font-semibold mb-3">Registration Details</h2>
-            <div className="space-y-2">
+          {/* RIGHT - Registration Details (2 columns) */}
+          <div className="lg:col-span-2">
+            <h2 className="text-xs font-semibold mb-2 text-cyan-900 uppercase tracking-wider">Registration Details</h2>
+            <div className="space-y-1">
               
               {/* ROW 1: Report Mode + Referral Doctor */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-1">
                 
                 {/* Report Mode */}
                 <InlineSelect
@@ -2563,18 +2572,16 @@ export default function PatientRegistration() {
               </div>
 
               {/* ROW 2: Patient History + Date + Time */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 items-start">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-1 items-start">
                 
                 {/* Patient History - takes up 1 column */}
-                <textarea className={input} placeholder="Patient History" value={remarks} onChange={(e) => setRemarks(e.target.value)} rows={3}></textarea>
+                <textarea className={input} placeholder="Patient History" value={remarks} onChange={(e) => setRemarks(e.target.value)} rows={2}></textarea>
                 
-                {/* Date - takes up 1 column */}
-                <div className="flex-1 min-w-0">
+                {/* Date + Time in one column */}
+                <div className="grid grid-cols-2 gap-1">
                   <InlineDatePicker value={date} onChange={setDate} placeholder="Date" className="w-full" />
+                  <input type='time' className={`${input} text-center`} value={time} onChange={(e) => setTime(e.target.value)} style={{ padding: '0.3rem 0.4rem' }} />
                 </div>
-                
-                {/* Time - takes up 1 column */}
-                <input type='time' className={`${input} text-center`} value={time} onChange={(e) => setTime(e.target.value)} style={{ padding: '0.3rem 0.4rem' }} />
               </div>
             </div>
           </div>
@@ -2621,7 +2628,7 @@ export default function PatientRegistration() {
             </div>
             <div className="flex justify-end gap-2 mt-4">
               <button onClick={() => setShowPackageModal(false)} className="px-4 py-2 border rounded">Cancel</button>
-              <button onClick={saveNewPackage} className="bg-slate-900 text-white px-4 py-2 rounded">Save Package</button>
+              <button onClick={saveNewPackage} className="bg-cyan-900 text-white px-4 py-2 rounded">Save Package</button>
             </div>
           </div>
         </div>
@@ -2636,15 +2643,15 @@ export default function PatientRegistration() {
       />
 
       {/* MAIN 3-COLUMN */}
-      <div className="grid grid-cols-1 md:grid-cols-12 gap-3 h-auto md:h-[75vh]">
+      <div className="grid grid-cols-1 md:grid-cols-12 gap-2 h-auto md:h-[75vh]">
 
         {/* LEFT */}
-        <div className="md:col-span-3 col-span-12 bg-white rounded-xl shadow flex flex-col">
+        <div className="md:col-span-2 col-span-12 bg-white rounded-xl shadow flex flex-col">
           <div className="flex text-xs font-semibold rounded-tl-xl rounded-tr-xl overflow-hidden">
             <button onClick={() => { setActiveTab("tests"); setShowAllTests(true); setSelectedDept(null); setSelectedPackage(null); }}
-              className={`flex-1 p-2 ${activeTab === "tests" ? "bg-slate-900 text-white" : "bg-gray-200"}`}>Department</button>
+              className={`flex-1 p-2 ${activeTab === "tests" ? "bg-cyan-900 text-white" : "bg-gray-200"}`}>Department</button>
             <button onClick={() => { setActiveTab("packages"); setSelectedPackage(null); setShowAllTests(false); }}
-              className={`flex-1 p-2 ${activeTab === "packages" ? "bg-slate-900 text-white" : "bg-gray-200"}`}>Packages</button>
+              className={`flex-1 p-2 ${activeTab === "packages" ? "bg-cyan-900 text-white" : "bg-gray-200"}`}>Packages</button>
           </div>
           <div className="flex-1 overflow-auto text-xs" style={{ maxHeight: 'calc(75vh - 40px)' }}>
             {activeTab === "tests" && (loading ? (
@@ -2685,21 +2692,21 @@ export default function PatientRegistration() {
           <div className="p-2 flex gap-2 border-b">
             <input className={`${input} flex-1`} placeholder="Search Test" value={search} onChange={(e) => setSearch(e.target.value)} />
             <div className="relative group/refresh">
-              <button onClick={() => { setSearch(""); setFilterFrequent(false); }} className="bg-slate-900 hover:bg-orange-500 text-white p-1 rounded transition-colors"><RefreshCcw size={16} /></button>
+              <button onClick={() => { setSearch(""); setFilterFrequent(false); }} className="bg-cyan-900 hover:bg-orange-500 text-white p-1 rounded transition-colors"><RefreshCcw size={16} /></button>
               <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 text-xs text-white bg-slate-800 rounded whitespace-nowrap opacity-0 group-hover/refresh:opacity-100 pointer-events-none transition-opacity z-50">
                 Reload Complete Test List
                 <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-slate-800"/>
               </div>
             </div>
             <div className="relative group/star">
-              <button onClick={() => setFilterFrequent(!filterFrequent)} className={`${filterFrequent ? 'bg-white0' : 'bg-slate-900 hover:bg-orange-500'} text-white p-1 rounded transition-colors`}><Star size={16} /></button>
+              <button onClick={() => setFilterFrequent(!filterFrequent)} className={`${filterFrequent ? 'bg-white0' : 'bg-cyan-900 hover:bg-orange-500'} text-white p-1 rounded transition-colors`}><Star size={16} /></button>
               <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 text-xs text-white bg-slate-800 rounded whitespace-nowrap opacity-0 group-hover/star:opacity-100 pointer-events-none transition-opacity z-50">
                 Frequently Used Tests
                 <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-slate-800"/>
               </div>
             </div>
           </div>
-          <div className="grid grid-cols-12 bg-slate-900 text-white font-semibold p-2 text-xs">
+          <div className="grid grid-cols-12 bg-cyan-900 text-white font-semibold p-2 text-xs">
               <div className="col-span-5 flex items-center gap-2">
                 {selectedPackage && (
                   <input 
@@ -2783,7 +2790,7 @@ export default function PatientRegistration() {
                     </div>
                   ));
                 })()}
-                <div className="grid grid-cols-12 border-t-2 border-slate-900 p-2 bg-gray-50 font-bold items-center">
+                <div className="grid grid-cols-12 border-t-2 border-cyan-900 p-2 bg-gray-50 font-bold items-center">
                   <div className="col-span-9 text-right">Total Package Cost</div>
                   <div className="col-span-3 text-right">₹{businessType === "B2C" ? selectedPackage.b2cCharge : selectedPackage.b2bCharge}</div>
                   <div className="col-span-1"></div>
@@ -2836,22 +2843,10 @@ export default function PatientRegistration() {
         </div>
 
         {/* RIGHT */}
-        <div className="md:col-span-4 col-span-12 bg-white rounded-xl shadow flex flex-col">
-          {/* Toolbar - Bill Button (Direct Print) */}
-          {selectedTests.length > 0 && (
-            <div className="flex items-center gap-2 p-2 border-b bg-gray-50">
-              {/* Bill Button - Direct Print */}
-              <button
-                onClick={handleShowBill}
-                className="bg-green-600 hover:bg-green-700 text-white px-4 py-1.5 rounded text-xs font-semibold"
-                title="View and print bill">
-                Bill
-              </button>
-            </div>
-          )}
+        <div className="md:col-span-5 col-span-12 bg-white rounded-xl shadow flex flex-col">
 
           {/* Header - Using grid for consistency with left table - Minimized */}
-          <div className="grid grid-cols-12 border-b bg-slate-900 text-white p-1 sticky top-0 font-semibold items-center rounded-t text-xs">
+          <div className="grid grid-cols-12 border-b bg-cyan-900 text-white p-1 sticky top-0 font-semibold items-center rounded-t text-xs">
             <div className="col-span-5">Test</div>
             <div className="col-span-3 text-center">Specimen</div>
             <div className="col-span-3 text-right">Charges</div>
@@ -2899,10 +2894,10 @@ export default function PatientRegistration() {
 
           {/* BILLING SECTION */}
           <div className="border-t bg-gray-50 text-xs">
-            <div className="grid grid-cols-5 gap-2 p-2 border-b bg-white">
+            <div className="grid grid-cols-6 gap-2 p-2 border-b bg-white">
               <div>
-                <label className="text-gray-600 block mb-1 text-xs">Total amount</label>
-                <input className={`${input} font-semibold`} value={total} readOnly />
+                <label className="text-gray-600 block mb-1 text-xs font-semibold text-blue-600">Test Charges</label>
+                <input className={`${input} font-semibold bg-blue-50 border-blue-200`} value={total} readOnly />
               </div>
               <div>
                 <label className="text-gray-600 block mb-1 text-xs">Discount(%)</label>
@@ -2912,22 +2907,26 @@ export default function PatientRegistration() {
                   onKeyPress={(e) => { if (e.key === '.' || e.key === ',') e.preventDefault(); }} />
               </div>
               <div>
-                <label className="text-gray-600 block mb-1 text-xs">Discount</label>
+                <label className="text-gray-600 block mb-1 text-xs">Discount Amt</label>
                 <input className={input} type="number" step="1"
                   value={discount === 0 ? '' : discount}
                   onChange={(e) => handleDiscountChange(e.target.value)}
                   onKeyPress={(e) => { if (e.key === '.' || e.key === ',') e.preventDefault(); }} />
               </div>
               <div>
-                <label className="text-gray-600 block mb-1 text-xs">Payment</label>
+                <label className="text-gray-600 block mb-1 text-xs font-semibold text-purple-600">Test Amount</label>
+                <input className={`${input} font-semibold bg-purple-50 border-purple-200`} value={(total - discount).toFixed(0)} readOnly />
+              </div>
+              <div>
+                <label className="text-gray-600 block mb-1 text-xs">Payment(Adv)</label>
                 <input className={input} type="number" step="1"
                   value={paid === 0 ? '' : paid}
                   onChange={(e) => handlePaymentChange(e.target.value)}
                   onKeyPress={(e) => { if (e.key === '.' || e.key === ',') e.preventDefault(); }} />
               </div>
               <div>
-                <label className="text-gray-600 block mb-1 text-xs">Balance</label>
-                <input className={`${input} font-semibold`} value={((total - discount) - paid).toFixed(0)} readOnly />
+                <label className="text-gray-600 block mb-1 text-xs font-semibold text-red-600">Balance</label>
+                <input className={`${input} font-semibold bg-red-50 border-red-200`} value={((total - discount) - paid).toFixed(0)} readOnly />
               </div>
             </div>
 
@@ -2955,10 +2954,19 @@ export default function PatientRegistration() {
 
               <button 
                 onClick={handleRegister} 
-                className="bg-slate-900 hover:bg-orange-600 text-white px-6 py-2 rounded font-semibold"
+                className="bg-cyan-900 hover:bg-orange-600 text-white px-6 py-2 rounded font-semibold"
                 title={selectedTests.length === 0 ? "Save patient information" : "Register patient with tests"}>
                 {selectedTests.length === 0 ? "Save" : "Register"}
               </button>
+
+              {selectedTests.length > 0 && (
+                <button
+                  onClick={handleShowBill}
+                  className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded font-semibold flex items-center gap-2"
+                  title="View and print bill">
+                  Bill
+                </button>
+              )}
 
               {lastRegisteredVisitId && (
                 <button 
@@ -3379,10 +3387,10 @@ export default function PatientRegistration() {
 
               {/* Tests/Packages */}
               <div>
-                <h3 className="text-lg font-semibold text-slate-900 mb-3 border-b pb-2">Selected Tests & Packages</h3>
+                <h3 className="text-lg font-semibold text-cyan-900 mb-3 border-b pb-2">Selected Tests & Packages</h3>
                 <div className="border rounded-lg overflow-hidden">
                   <table className="w-full text-sm">
-                    <thead className="bg-slate-900 text-white">
+                    <thead className="bg-cyan-900 text-white">
                       <tr>
                         <th className="p-2 text-left">Sr.</th>
                         <th className="p-2 text-left">Test/Package Name</th>
@@ -3437,31 +3445,54 @@ export default function PatientRegistration() {
               <div>
                 <h3 className="text-lg font-semibold text-slate-900 mb-3 border-b pb-2">Billing Summary</h3>
                 <div className="bg-gray-50 rounded-lg p-4 space-y-2 text-sm">
+                  {/* Test Charges */}
+                  <div className="flex justify-between bg-white p-3 rounded border border-blue-200">
+                    <span className="font-semibold text-blue-700">Test Charges (Total):</span>
+                    <span className="font-bold text-lg text-blue-700">₹{total}</span>
+                  </div>
+
+                  {/* Discount % */}
                   <div className="flex justify-between">
-                    <span className="font-semibold">Total Amount:</span>
-                    <span className="font-bold text-lg">₹{total}</span>
+                    <span className="font-semibold text-gray-700">Discount (%):</span>
+                    <span className="font-bold text-orange-600">{discountPercent}%</span>
                   </div>
-                  <div className="flex justify-between text-gray-600">
-                    <span>Discount ({discountPercent}%):</span>
-                    <span>- ₹{discount}</span>
+
+                  {/* Discount Amount */}
+                  <div className="flex justify-between">
+                    <span className="font-semibold text-gray-700">Discount Amount:</span>
+                    <span className="font-bold text-orange-600">₹{discount}</span>
                   </div>
+
+                  {/* Discount Remark */}
                   {discountRemark && (
-                    <div className="flex justify-between text-gray-600 text-xs">
+                    <div className="flex justify-between text-gray-600 text-xs bg-orange-50 p-2 rounded">
                       <span>Discount Remark:</span>
                       <span className="italic">{discountRemark}</span>
                     </div>
                   )}
-                  <div className="flex justify-between border-t pt-2">
-                    <span className="font-semibold">Net Amount:</span>
-                    <span className="font-bold text-lg text-slate-900">₹{total - discount}</span>
+
+                  {/* Test Amount (Total Amount after discount) */}
+                  <div className="flex justify-between border-t-2 pt-3 bg-gradient-to-r from-purple-50 to-purple-100 p-3 rounded">
+                    <span className="font-semibold text-purple-700">Test Amount (After Discount):</span>
+                    <span className="font-bold text-lg text-purple-700">₹{total - discount}</span>
                   </div>
-                  <div className="flex justify-between text-green-600">
-                    <span className="font-semibold">Payment ({paymentMode}):</span>
-                    <span className="font-bold">₹{paid}</span>
+
+                  {/* Payment Mode */}
+                  <div className="flex justify-between">
+                    <span className="font-semibold text-gray-700">Payment Mode:</span>
+                    <span className="font-bold text-green-600">{paymentMode}</span>
                   </div>
-                  <div className="flex justify-between border-t pt-2">
-                    <span className="font-semibold text-red-600">Balance Due:</span>
-                    <span className="font-bold text-lg text-red-600">₹{(total - discount) - paid}</span>
+
+                  {/* Advance Payment */}
+                  <div className="flex justify-between bg-green-50 p-2 rounded">
+                    <span className="font-semibold text-green-700">Advance Payment:</span>
+                    <span className="font-bold text-lg text-green-700">₹{paid}</span>
+                  </div>
+
+                  {/* Balance Amount */}
+                  <div className="flex justify-between border-t-2 pt-3 bg-gradient-to-r from-red-50 to-red-100 p-3 rounded">
+                    <span className="font-semibold text-red-700">Balance Amount (Pending):</span>
+                    <span className="font-bold text-lg text-red-700">₹{(total - discount) - paid}</span>
                   </div>
                 </div>
               </div>

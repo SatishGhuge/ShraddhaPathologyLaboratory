@@ -59,12 +59,41 @@ export const createPatient = async (req, res) => {
       // Registration Details (will be saved with each test)
       reportMode, referralDoctor, visitDate, visitTime,
       sampleTaken, sampleReceived, sampleBarcodeNo, patient_history,
-      // Billing Details (will be saved with each test)
-      totalAmount, discountPercent, discountAmount, discountRemark,
-      paidAmount, balanceAmount, paymentMode, businessType,
+      // NEW BILLING FIELDS (Single discount for all tests)
+      discountPercent = 0,
+      discountAmount = 0,
+      advanceAmount = 0,
+      discountRemark,
+      paymentMode = 'Cash',
+      businessType = 'B2C',
       // Tests
       tests 
     } = req.body;
+
+    // ✅ NEW BILLING VALIDATION
+    if (!tests || tests.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'At least 1 test must be selected'
+      });
+    }
+
+    // Validate tests exist and are active
+    const testIds = tests.map(t => parseInt(t.testId || t.id));
+    const validTests = await prisma.test.findMany({
+      where: {
+        id: { in: testIds },
+        isActive: true,
+        isDeleted: false
+      }
+    });
+
+    if (validTests.length !== tests.length) {
+      return res.status(400).json({
+        success: false,
+        message: 'One or more tests are invalid or inactive'
+      });
+    }
 
     // Normalize referralDoctor: remove all "Dr." prefixes and add exactly one
     if (referralDoctor && referralDoctor.trim()) {
@@ -130,62 +159,95 @@ export const createPatient = async (req, res) => {
       // Add tests to existing patient with NEW Visit ID
       const visitId = await generateVisitId(visitDate);
       
-      const testCount = tests?.length || 1;
-      const perTestPaid = parseFloat(paidAmount) || 0;
-      const perTestBalance = parseFloat(balanceAmount) || 0;
-      await prisma.patientTest.createMany({
-        data: tests?.map(test => ({
+      // ✅ NEW BILLING LOGIC: Single discount for all tests
+      // Step 1: Calculate total test charges
+      const totalTestCharges = tests.reduce((sum, t) => sum + (parseFloat(t.charge) || 0), 0);
+      
+      // Step 2: Calculate discount amount
+      let finalDiscountAmount = 0;
+      let finalDiscountPercent = 0;
+      
+      if (parseFloat(discountPercent) > 0) {
+        finalDiscountAmount = totalTestCharges * (parseFloat(discountPercent) / 100);
+        finalDiscountPercent = parseFloat(discountPercent);
+      } else if (parseFloat(discountAmount) > 0) {
+        finalDiscountAmount = parseFloat(discountAmount);
+        finalDiscountPercent = (finalDiscountAmount / totalTestCharges) * 100;
+      }
+      
+      // Ensure discount doesn't exceed total
+      finalDiscountAmount = Math.min(finalDiscountAmount, totalTestCharges);
+      
+      // Step 3: Calculate test amount (after discount)
+      const testAmount = totalTestCharges - finalDiscountAmount;
+      
+      // Step 4: Calculate advance and balance
+      const finalAdvanceAmount = Math.min(parseFloat(advanceAmount) || 0, testAmount);
+      const balanceAmount = testAmount - finalAdvanceAmount;
+      
+      console.log('💰 Billing Calculation:', {
+        totalTestCharges,
+        finalDiscountAmount,
+        testAmount,
+        advanceAmount: finalAdvanceAmount,
+        balanceAmount
+      });
+      
+      // Step 5: Distribute amounts proportionally among tests
+      const patientTestsData = tests.map(test => {
+        const testCharge = parseFloat(test.charge);
+        const proportion = testCharge / totalTestCharges;
+        
+        return {
           patientId: patient.patientId,
           visitId,
-          testId: test.id,
-          departmentId: test.departmentId,
+          testId: parseInt(test.testId || test.id),
+          departmentId: test.departmentId || 1,
           organizationId: req.body.organizationId || null,
-          sample: test.sample,
-          charge: parseFloat(test.charge),
-          reportMode,
+          sample: test.sample || 'Blood',
+          charge: testCharge,
+          reportMode: reportMode || 'Email',
           referralDoctor,
           visitDate: visitDate ? new Date(visitDate) : new Date(),
-          visitTime,
+          visitTime: visitTime || '10:00',
           sampleTaken: sampleTaken ? new Date(sampleTaken) : null,
           sampleReceived: sampleReceived ? new Date(sampleReceived) : null,
           sampleBarcodeNo,
           patient_history,
-          totalAmount: parseFloat(test.charge),
+          paymentMode: paymentMode || 'Cash',
+          businessType: businessType || 'B2C',
           
-          // ✅ Use ORIGINAL discount fields (this is initial registration)
-          originalDiscountPercent: discountPercent ? parseFloat(discountPercent) : 0,
-          originalDiscountAmount: discountAmount ? parseFloat(discountAmount) / testCount : 0,
-          originalDiscountRemark: discountRemark,
-          originalDiscountDate: new Date(),
+          // ✅ NEW BILLING FIELDS
+          testCharges: testCharge,
+          discountPercent: finalDiscountPercent,
+          discountAmount: finalDiscountAmount * proportion,
+          testAmount: testAmount * proportion,
+          advanceAmount: finalAdvanceAmount * proportion,
+          balanceAmount: balanceAmount * proportion,
           
-          // Additional discount not applicable on initial registration
-          additionalDiscountPercent: 0,
-          additionalDiscountAmount: 0,
-          
-          // Keep for backward compatibility
-          discountPercent: discountPercent ? parseFloat(discountPercent) : 0,
-          discountAmount: discountAmount ? parseFloat(discountAmount) / testCount : 0,
-          discountRemark,
-          
-          paidAmount: perTestPaid,
-          balanceAmount: perTestBalance,
-          paymentMode,
-          businessType
-        })) || []
+          // Legacy fields (for compatibility)
+          totalAmount: testAmount * proportion,
+          paidAmount: finalAdvanceAmount * proportion,
+          discountRemark: discountRemark || null
+        };
+      });
+      
+      await prisma.patientTest.createMany({
+        data: patientTestsData
       });
 
       // Create payment transaction if payment was made during registration
-      if(paymentMode && perTestPaid > 0){
+      if(paymentMode && finalAdvanceAmount > 0){
         await prisma.paymentTransaction.create({
           data: {
             visitId,
             patientId: patient.patientId,
             paymentMode,
-            paymentAmount: perTestPaid,
-            remarks: discountRemark || null
+            paymentAmount: finalAdvanceAmount,
+            remarks: `Advance payment at registration`
           }
         });
-        console.log(`✅ Payment transaction created: ${paymentMode} - ₹${perTestPaid}`);
+        console.log(`✅ Payment transaction created: ${paymentMode} - ₹${finalAdvanceAmount}`);
       }
 
       // Get updated patient with all tests
@@ -204,26 +266,88 @@ export const createPatient = async (req, res) => {
 
     } else {
       // Create new patient with new ID format: S + YY + MM + 00001
-      // Example: S260600001 (1st patient in June 2026)
       const patientId = await generatePatientId();
-      
-      // Generate Visit ID: YYYYMMDD + 0001
-      // Example: 2606080001 (1st visit on June 8, 2026)
       const visitId = await generateVisitId(visitDate);
 
-      const testCount = tests?.length || 1;
-      const perTestPaid = parseFloat(paidAmount) || 0;
-      const perTestBalance = parseFloat(balanceAmount) || 0;
+      // ✅ NEW BILLING LOGIC: Single discount for all tests
+      // Step 1: Calculate total test charges
+      const totalTestCharges = tests.reduce((sum, t) => sum + (parseFloat(t.charge) || 0), 0);
+      
+      // Step 2: Calculate discount amount
+      let finalDiscountAmount = 0;
+      let finalDiscountPercent = 0;
+      
+      if (parseFloat(discountPercent) > 0) {
+        finalDiscountAmount = totalTestCharges * (parseFloat(discountPercent) / 100);
+        finalDiscountPercent = parseFloat(discountPercent);
+      } else if (parseFloat(discountAmount) > 0) {
+        finalDiscountAmount = parseFloat(discountAmount);
+        finalDiscountPercent = (finalDiscountAmount / totalTestCharges) * 100;
+      }
+      
+      // Ensure discount doesn't exceed total
+      finalDiscountAmount = Math.min(finalDiscountAmount, totalTestCharges);
+      
+      // Step 3: Calculate test amount (after discount)
+      const testAmount = totalTestCharges - finalDiscountAmount;
+      
+      // Step 4: Calculate advance and balance
+      const finalAdvanceAmount = Math.min(parseFloat(advanceAmount) || 0, testAmount);
+      const balanceAmount = testAmount - finalAdvanceAmount;
+      
+      console.log('💰 Billing Calculation for NEW patient:', {
+        totalTestCharges,
+        finalDiscountAmount,
+        testAmount,
+        advanceAmount: finalAdvanceAmount,
+        balanceAmount
+      });
+      
+      // Step 5: Distribute amounts proportionally among tests
+      const testsWithBilling = tests.map(test => {
+        const testCharge = parseFloat(test.charge);
+        const proportion = testCharge / totalTestCharges;
+        
+        return {
+          visitId,
+          testId: parseInt(test.testId || test.id),
+          departmentId: test.departmentId || 1,
+          organizationId: req.body.organizationId || null,
+          sample: test.sample || 'Blood',
+          charge: testCharge,
+          reportMode: reportMode || 'Email',
+          referralDoctor: referralDoctor || null,
+          visitDate: visitDate ? new Date(visitDate) : new Date(),
+          visitTime: visitTime || '10:00',
+          sampleTaken: sampleTaken ? new Date(sampleTaken) : null,
+          sampleReceived: sampleReceived ? new Date(sampleReceived) : null,
+          sampleBarcodeNo,
+          patient_history,
+          paymentMode: paymentMode || 'Cash',
+          businessType: businessType || 'B2C',
+          
+          // ✅ NEW BILLING FIELDS
+          testCharges: testCharge,
+          discountPercent: finalDiscountPercent,
+          discountAmount: finalDiscountAmount * proportion,
+          testAmount: testAmount * proportion,
+          advanceAmount: finalAdvanceAmount * proportion,
+          balanceAmount: balanceAmount * proportion,
+          
+          // Legacy fields (for compatibility)
+          totalAmount: testAmount * proportion,
+          paidAmount: finalAdvanceAmount * proportion,
+          discountRemark: discountRemark || null
+        };
+      });
 
       patient = await prisma.patient.create({
         data: {
           patientId,
-          // Patient Identity ONLY
           title,
           firstName,
           lastName,
           dob: dob ? new Date(dob) : null,
-          // ✅ If manually entered age, save it (will be overridden by DOB calculation if DOB exists)
           ageYears: (age && !dob) ? parseInt(age) : null,
           ageMonths: (age && !dob) ? 0 : null,
           ageDays: (age && !dob) ? 0 : null,
@@ -233,46 +357,9 @@ export const createPatient = async (req, res) => {
           createdBy,
           createdAtLocation,
           address,
-          location,  // Add location field
-          // Tests with registration & billing details
+          location,
           tests: {
-            create: tests?.map(test => ({
-              visitId,
-              testId: test.id,
-              departmentId: test.departmentId,
-              organizationId: req.body.organizationId || null,
-              sample: test.sample,
-              charge: parseFloat(test.charge),
-              reportMode,
-              referralDoctor,
-              visitDate: visitDate ? new Date(visitDate) : new Date(),
-              visitTime,
-              sampleTaken: sampleTaken ? new Date(sampleTaken) : null,
-              sampleReceived: sampleReceived ? new Date(sampleReceived) : null,
-              sampleBarcodeNo,
-              patient_history,
-              totalAmount: parseFloat(test.charge),
-              
-              // ✅ Use ORIGINAL discount fields (initial registration)
-              originalDiscountPercent: discountPercent ? parseFloat(discountPercent) : 0,
-              originalDiscountAmount: discountAmount ? parseFloat(discountAmount) / testCount : 0,
-              originalDiscountRemark: discountRemark,
-              originalDiscountDate: new Date(),
-              
-              // Additional discount not applicable on initial registration
-              additionalDiscountPercent: 0,
-              additionalDiscountAmount: 0,
-              
-              // Keep for backward compatibility
-              discountPercent: discountPercent ? parseFloat(discountPercent) : 0,
-              discountAmount: discountAmount ? parseFloat(discountAmount) / testCount : 0,
-              discountRemark,
-              
-              paidAmount: perTestPaid,
-              balanceAmount: perTestBalance,
-              paymentMode,
-              businessType
-            })) || []
+            create: testsWithBilling
           }
         },
         include: {
@@ -293,25 +380,20 @@ export const createPatient = async (req, res) => {
       }
 
       // Create payment transaction if payment was made during registration
-      if(paymentMode && perTestPaid > 0){
+      if(paymentMode && finalAdvanceAmount > 0){
         try {
-          if(prisma.paymentTransaction && typeof prisma.paymentTransaction.create === 'function'){
-            await prisma.paymentTransaction.create({
-              data: {
-                visitId,
-                patientId: patient.patientId,
-                paymentMode,
-                paymentAmount: perTestPaid,
-                remarks: discountRemark || null
-              }
-            });
-            console.log(`✅ Payment transaction created: ${paymentMode} - ₹${perTestPaid}`);
-          } else {
-            console.warn('⚠️ PaymentTransaction model not available, skipping payment record');
-          }
+          await prisma.paymentTransaction.create({
+            data: {
+              visitId,
+              patientId: patient.patientId,
+              paymentMode,
+              paymentAmount: finalAdvanceAmount,
+              remarks: `Advance payment at registration`
+            }
+          });
+          console.log(`✅ Payment transaction created: ${paymentMode} - ₹${finalAdvanceAmount}`);
         } catch(paymentErr){
           console.warn('⚠️ Failed to create payment transaction:', paymentErr.message);
-          // Don't block patient creation if payment transaction fails
         }
       }
     }
@@ -1014,7 +1096,6 @@ export const addTestsToExistingVisit = async (req, res) => {
         paymentMode: firstExistingTest.paymentMode,
         businessType: businessType || firstExistingTest.businessType,
         status: 'Registered',
-        isOutsourced: test.isOutsourced || false,
         outsourcedTo: test.outsourcedTo || null
       }))
     });
