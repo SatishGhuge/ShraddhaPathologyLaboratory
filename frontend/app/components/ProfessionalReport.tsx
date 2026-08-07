@@ -62,7 +62,6 @@ interface FormattingConfig {
   showFooter: boolean;
   showWatermark: boolean;
   showQRCode: boolean;
-  showBarcode: boolean;
   showPrimarySignature: boolean;
   showSecondarySignature: boolean;
   signaturePosition: string;
@@ -112,23 +111,23 @@ interface ReportPage {
 // Constants
 // ─────────────────────────────────────────────────────────────────────────────
 
-const HEADER_SPACE_MM = 25;
-const FOOTER_SPACE_MM = 10;
-const PAD_LEFT_MM = 12;
-const PAD_RIGHT_MM = 12;
-const PAD_TOP_MM = 5;
-const PAD_BOT_MM = 5;
+const HEADER_SPACE_MM = 30;
+const FOOTER_SPACE_MM = 12;
+const PAD_LEFT_MM = 10;
+const PAD_RIGHT_MM = 10;
+const PAD_TOP_MM = 3;
+const PAD_BOT_MM = 3;
 
 const CONTENT_MM = 297 - HEADER_SPACE_MM - FOOTER_SPACE_MM - PAD_TOP_MM - PAD_BOT_MM;
 
-const ROW_PARAM_MM = 5.5;
-const ROW_CAT_MM = 6;
-const PATIENT_MM = 22;
-const TITLE_MM = 9;
-const THEAD_MM = 7;
-const INTERP_MM = 22;
-const SIG_MM = 20;
-const TEST_GAP_MM = 9;  // Increased from 4 to match new margin (3+4+2=9)
+const ROW_PARAM_MM = 5.5;  // Increased for better readability (was 5mm)
+const ROW_CAT_MM = 4.5;
+const PATIENT_MM = 14;
+const TITLE_MM = 6.5;
+const THEAD_MM = 3.5;  // Reduced (was 4mm) to give more space to parameters
+const INTERP_MM = 15;
+const SIG_MM = 15;
+const TEST_GAP_MM = 2;  // Increased from 4 to match new margin (3+4+2=9)
 
 function blockHeight(block: ContentBlock): number {
   switch (block.kind) {
@@ -273,7 +272,7 @@ function paginateBlocks(blocks: ContentBlock[]): ReportPage[] {
         if (next.kind === 'test-title' || next.kind === 'force-break' || next.kind === 'signature') break;
         j++;
       }
-    }
+    }   
 
     if (cur.length > 0 && used + h + reserve > CONTENT_MM) {
       flush();
@@ -333,63 +332,103 @@ const ProfessionalReport = React.forwardRef<HTMLDivElement, ProfessionalReportPr
     const reportRef = React.useRef<HTMLDivElement>(null);
     const onReadyCalled = React.useRef(false);
 
-    // ✅ Load report settings from API
+    // ✅ Load report settings from API - with proper error handling and state stability
     useEffect(() => {
+      let mounted = true;
+      let retryCount = 0;
+      const MAX_RETRIES = 3;
+
       const loadReportSettings = async () => {
         try {
-          const response = await fetch(`${API_BASE_URL}/report-settings`);
+          const response = await fetch(`${API_BASE_URL}/report-settings`, {
+            method: 'GET',
+            cache: 'no-cache', // Prevent browser caching
+          });
+          
+          if (!mounted) return;
+
           if (response.ok) {
             const data = await response.json();
-            if (data.data) {
+            if (data.data && mounted) {
               // Convert fields array to Map for faster lookup
               const fieldsMap = new Map<string, FieldConfig>(
                 (data.data.fields || []).map((f: FieldConfig) => [f.fieldKey, f])
               );
+              
+              // Ensure formatting has ALL defaults - never leave properties undefined
+              const formatting = data.data.formatting || {};
+              const completeFormatting: FormattingConfig = {
+                fontFamily: formatting.fontFamily && formatting.fontFamily.trim() ? formatting.fontFamily : 'Bookman Old Text',
+                fontSizeHeader: formatting.fontSizeHeader || 14,
+                fontSizeBody: formatting.fontSizeBody || 11,
+                fontSizeFooter: formatting.fontSizeFooter || 9,
+                lineHeight: formatting.lineHeight || 1.4,
+                paperSize: formatting.paperSize || 'A4',
+                orientation: formatting.orientation || 'Portrait',
+                topMargin: formatting.topMargin || 10,
+                bottomMargin: formatting.bottomMargin || 10,
+                leftMargin: formatting.leftMargin || 10,
+                rightMargin: formatting.rightMargin || 10,
+                showHeader: formatting.showHeader !== false,
+                showFooter: formatting.showFooter !== false,
+                showWatermark: formatting.showWatermark || false,
+                showQRCode: formatting.showQRCode !== false,
+                showPrimarySignature: formatting.showPrimarySignature !== false,
+                showSecondarySignature: formatting.showSecondarySignature || false,
+                signaturePosition: formatting.signaturePosition || 'Bottom Right',
+                footerText: formatting.footerText || '**END OF REPORT**',
+                watermarkText: formatting.watermarkText || '',
+              };
+              
               setFieldConfigs(fieldsMap);
-              setFormatConfig(data.data.formatting);
-              console.log('✅ Report settings loaded:', {
-                fieldsCount: fieldsMap.size,
-                fontFamily: data.data.formatting?.fontFamily,
-                fontSize: data.data.formatting?.fontSizeBody
-              });
+              setFormatConfig(completeFormatting);
+              retryCount = 0; // Reset retry on success
             }
+          } else if (retryCount < MAX_RETRIES) {
+            // Retry if failed
+            retryCount++;
+            setTimeout(() => loadReportSettings(), 500);
           }
         } catch (error) {
           console.warn('[ProfessionalReport] Failed to load report settings:', error);
-          // Continue with defaults if API fails
+          
+          // Set default formatting on error - ensure it's complete
+          if (mounted) {
+            setFormatConfig({
+              fontFamily: 'Bookman Old Text',
+              fontSizeHeader: 14,
+              fontSizeBody: 11,
+              fontSizeFooter: 9,
+              lineHeight: 1.4,
+              paperSize: 'A4',
+              orientation: 'Portrait',
+              topMargin: 10,
+              bottomMargin: 10,
+              leftMargin: 10,
+              rightMargin: 10,
+              showHeader: true,
+              showFooter: true,
+              showWatermark: false,
+              showQRCode: true,
+              showPrimarySignature: true,
+              showSecondarySignature: false,
+              signaturePosition: 'Bottom Right',
+              footerText: '**END OF REPORT**',
+              watermarkText: '',
+            });
+          }
         }
       };
 
+      // Load settings once on mount
       loadReportSettings();
 
-      // Refresh settings every 2 seconds to detect changes from settings page
-      const interval = setInterval(loadReportSettings, 2000);
-
-      // Also refresh when window/tab comes into focus
-      const handleFocus = () => {
-        console.log('📱 Window focused, refreshing report settings');
-        loadReportSettings();
-      };
-      window.addEventListener('focus', handleFocus);
-
-      return () => {
-        clearInterval(interval);
-        window.removeEventListener('focus', handleFocus);
+      return () => { 
+        mounted = false; 
       };
     }, []);
 
-    // ✅ Debug logging for data flow
-    useEffect(() => {
-      console.log('🔍 ProfessionalReport received:', {
-        commentsLength: comments?.length,
-        commentsExists: !!comments,
-        commentsValue: comments,
-        resultsKeys: Object.keys(results || {}).length,
-        firstResult: Object.entries(results || {}).slice(0, 1),
-        fieldConfigsLoaded: !!fieldConfigs,
-        formatConfigLoaded: !!formatConfig
-      });
-    }, [results, comments, fieldConfigs, formatConfig]);
+    // Removed debug logging - this was causing unnecessary re-renders
 
     useEffect(() => {
       let dead = false;
@@ -416,13 +455,40 @@ const ProfessionalReport = React.forwardRef<HTMLDivElement, ProfessionalReportPr
     }, [letterhead]);
 
     // ✅ Helper function to check if field should be visible
+    // Optional System Fields that should hide until settings are loaded and enabled
+    const optionalSystemFields = new Set(['mobile', 'email', 'address']);
+    
     const isFieldVisible = (fieldKey: string): boolean => {
-      if (!fieldConfigs) return true; // Default: show all if settings not loaded
-      const config = fieldConfigs.get(fieldKey);
-      return config ? config.isVisible : true;
+      // First check if field is in the field config from database
+      if (fieldConfigs) {
+        const config = fieldConfigs.get(fieldKey);
+        if (config) {
+          // Use the configured isVisible value from settings
+          return config.isVisible;
+        }
+      }
+      
+      // If field is not found in config, use these rules:
+      // - Optional system fields (mobile, email, address) should NOT be shown by default
+      // - All other fields should be shown by default
+      if (optionalSystemFields.has(fieldKey)) {
+        return false; // Hide optional fields by default
+      }
+      
+      return true; // Show all other fields by default
     };
 
-    // ✅ Helper function to get field styling
+    // ✅ Helper function to get proper font family with fallbacks
+    const getFontFamily = (font: string): string => {
+      const fontStacks: { [key: string]: string } = {
+        'Arial': 'Arial, Helvetica, sans-serif',
+        'Times New Roman': '"Times New Roman", Times, serif',
+        'Georgia': 'Georgia, serif',
+        'Courier New': '"Courier New", Courier, monospace',
+        'Bookman Old Text': '"Bookman Old Text", "Book Antiqua", serif',
+      };
+      return fontStacks[font] || font;
+    };
     const getFieldStyle = (fieldKey: string) => {
       if (!fieldConfigs) return {};
       const config = fieldConfigs.get(fieldKey);
@@ -447,7 +513,7 @@ const ProfessionalReport = React.forwardRef<HTMLDivElement, ProfessionalReportPr
       if (!formatConfig) return {};
       
       const baseStyle: React.CSSProperties = {
-        fontFamily: formatConfig.fontFamily,
+        fontFamily: getFontFamily(formatConfig.fontFamily),
       };
 
       switch (section) {
@@ -497,29 +563,34 @@ const ProfessionalReport = React.forwardRef<HTMLDivElement, ProfessionalReportPr
         })
       ), [allGroupedParams]);
 
+    // ✅ Memoize formatting object to prevent unnecessary updates
+    const memoizedFormatting = useMemo(() => ({
+      fontFamily: formatConfig?.fontFamily || 'Bookman Old Text',
+      fontSizeBody: formatConfig?.fontSizeBody || 11,
+      fontSizeHeader: formatConfig?.fontSizeHeader || 14,
+      fontSizeFooter: formatConfig?.fontSizeFooter || 9,
+      lineHeight: formatConfig?.lineHeight || 1.4,
+    }), [formatConfig?.fontFamily, formatConfig?.fontSizeBody, formatConfig?.fontSizeHeader, formatConfig?.fontSizeFooter, formatConfig?.lineHeight]);
+
     useEffect(() => {
-      const testsToRender = combinedTests.length > 0
-        ? combinedTests
-        : [{ 
-            name: test?.name, 
-            interpretation: test?.interpretation,
-            signature: test?.signature, 
-            groupedParameters,
-            usedMachine: null  // ✅ Add usedMachine for consistency
-          }];
+      // Add small delay to ensure formatConfig is fully loaded before rendering pages
+      const timer = setTimeout(() => {
+        const testsToRender = combinedTests.length > 0
+          ? combinedTests
+          : [{ 
+              name: test?.name, 
+              interpretation: test?.interpretation,
+              signature: test?.signature, 
+              groupedParameters,
+              usedMachine: null
+            }];
 
-      console.log('🔍 ProfessionalReport useEffect - testsToRender:', {
-        count: testsToRender.length,
-        tests: testsToRender.map((t: any) => ({
-          name: t.name,
-          hasMachine: !!t.usedMachine,
-          machine: t.usedMachine
-        }))
-      });
+        const blocks = buildContentBlocks(testsToRender, results, printOption, comments);
+        setPages(paginateBlocks(blocks));
+      }, 100); // Small delay to ensure state is stable
 
-      const blocks = buildContentBlocks(testsToRender, results, printOption, comments);
-      setPages(paginateBlocks(blocks));
-    }, [test, groupedParameters, combinedTests, results, printOption, comments]);
+      return () => clearTimeout(timer);
+    }, [test, groupedParameters, combinedTests, results, printOption, comments, fieldConfigs, formatConfig]);
 
     useEffect(() => {
       if (!ready || pages.length === 0 || !onReady || onReadyCalled.current) return;
@@ -571,27 +642,31 @@ const ProfessionalReport = React.forwardRef<HTMLDivElement, ProfessionalReportPr
       const bodyStyle = getFormattingStyle('body');
 
       return (
-        <tr key={key} style={{ borderBottom: 'none' }}>
+        <tr key={key} style={{ borderBottom: 'none', minHeight: '14px', lineHeight: '1.25' }}>
           <td style={{ 
-            padding: '2px 4px 2px 2mm',
+            padding: '1px 3px',
             ...bodyStyle,
             fontWeight: (isabn || isHighlighted) ? 'bold' : (paramStyle.fontWeight || 'normal'),
             fontStyle: paramStyle.fontStyle || 'normal',
             textDecoration: isHighlighted ? 'underline' : (paramStyle.textDecoration || 'none'),
+            minHeight: '14px',
+            fontSize: '11px',
           }}>
             {strip(p.parameterName ?? '').toUpperCase()}
             {p.parameterTestMethod && (
-              <div style={{ fontSize: '7.5px', color: '#000', fontWeight: 'normal', marginTop: '1px' }}>
+              <div style={{ fontSize: '7px', color: '#000', fontWeight: 'normal', marginTop: '0px' }}>
                 METHOD: {p.parameterTestMethod}
               </div>
             )}
           </td>
           <td style={{ 
-            padding: '2px 4px',
+            padding: '1px 3px',
             textAlign: 'left',
             ...bodyStyle,
             fontWeight: isabn || isHighlighted ? 'bold' : 'normal',
             color: isHighlighted ? '#c0392b' : (isabn ? '#c0392b' : 'inherit'),
+            minHeight: '14px',
+            fontSize: '11px',
           }}>
             {p.isDescriptive && val !== '-' && hasHtml(val) ? (
               <div dangerouslySetInnerHTML={{ __html: safe(val) }} style={{ whiteSpace: 'normal', textAlign: 'left', fontWeight: 'normal' }} />
@@ -600,12 +675,12 @@ const ProfessionalReport = React.forwardRef<HTMLDivElement, ProfessionalReportPr
             )}
           </td>
           {showUnits && (
-            <td style={{ padding: '2px 4px', textAlign: 'center', ...bodyStyle, color: '#000' }}>
+            <td style={{ padding: '1px 3px', textAlign: 'center', ...bodyStyle, color: '#000', minHeight: '14px', fontSize: '11px' }}>
               {strip(p.units ?? '') || '-'}
             </td>
           )}
           {showRange && (
-            <td style={{ padding: '2px 4px', ...bodyStyle, color: '#000' }}>
+            <td style={{ padding: '1px 3px', ...bodyStyle, color: '#000', minHeight: '14px', fontSize: '11px' }}>
               {strip(p.normalRange || p.rangeText || '') || '-'}
             </td>
           )}
@@ -650,7 +725,15 @@ const ProfessionalReport = React.forwardRef<HTMLDivElement, ProfessionalReportPr
       const flushTable = () => {
         if (tableRows.length === 0 && !needsTableHeader) return;
         segments.push(
-          <table key={`tbl-${tableKey++}`} style={{ width: '100%', borderCollapse: 'collapse', fontSize: `${formatConfig?.fontSizeBody || 11}px`, flexShrink: 0, backgroundColor: 'transparent', ...getFormattingStyle('body') }}>
+          <table key={`tbl-${tableKey++}`} style={{ 
+            width: '100%', 
+            borderCollapse: 'collapse', 
+            fontSize: `${formatConfig?.fontSizeBody || 11}px`, 
+            flexShrink: 0, 
+            backgroundColor: 'transparent',
+            fontFamily: getFontFamily(formatConfig?.fontFamily || 'Bookman Old Text'),
+            lineHeight: formatConfig?.lineHeight || 1.4,
+          }}>
             {renderTableHead()}
             <tbody>{tableRows}</tbody>
           </table>
@@ -670,10 +753,9 @@ const ProfessionalReport = React.forwardRef<HTMLDivElement, ProfessionalReportPr
             const row1: React.ReactNode[] = [];
             if (isFieldVisible('patient_name')) {
               const nameStyle = { ...PATIENT_TD, ...getFieldStyle('patient_name'), ...bodyStyle };
-              // ✅ FIX: Apply style to name value directly, not using <b> tag which overrides CSS
               const nameValue = [patient.title, patient.firstName, patient.lastName].filter(Boolean).join(' ').toUpperCase();
               row1.push(
-                <td key="pn" style={nameStyle}>
+                <td key="pn" style={{...nameStyle, lineHeight: '1.2', fontSize: '11px' }}>
                   {getFieldLabel('patient_name', 'Patient Name')} : <span style={{ fontWeight: nameStyle.fontWeight, fontStyle: nameStyle.fontStyle, textDecoration: nameStyle.textDecoration }}>{nameValue}</span>
                 </td>
               );
@@ -681,19 +763,19 @@ const ProfessionalReport = React.forwardRef<HTMLDivElement, ProfessionalReportPr
             if (isFieldVisible('patient_age') || isFieldVisible('gender')) {
               const ageStyle = { ...PATIENT_TD, ...getFieldStyle('patient_age'), ...bodyStyle };
               row1.push(
-                <td key="age" style={ageStyle}>
+                <td key="age" style={{...ageStyle, lineHeight: '1.2', fontSize: '11px' }}>
                   {getFieldLabel('patient_age', 'Age')} : {patient.age ?? '-'} {patient.age ? 'years' : ''} ({patient.gender ?? '-'})
                 </td>
               );
             }
-            if (row1.length > 0) patientRows.push(<tr key="r1">{row1}</tr>);
+            if (row1.length > 0) patientRows.push(<tr key="r1" style={{height: 'auto'}}>{row1}</tr>);
 
             // Row 2: Referral Doctor & Organization
             const row2: React.ReactNode[] = [];
             if (isFieldVisible('referred_doctor')) {
               const refStyle = { ...PATIENT_TD, ...getFieldStyle('referred_doctor'), ...bodyStyle };
               row2.push(
-                <td key="ref" style={refStyle}>
+                <td key="ref" style={{...refStyle, lineHeight: '1.2', fontSize: '11px' }}>
                   {getFieldLabel('referred_doctor', 'Referral')} : {referralDoctor || '-'}
                 </td>
               );
@@ -701,19 +783,19 @@ const ProfessionalReport = React.forwardRef<HTMLDivElement, ProfessionalReportPr
             if (isFieldVisible('organization_name')) {
               const orgStyle = { ...PATIENT_TD, ...getFieldStyle('organization_name'), ...bodyStyle };
               row2.push(
-                <td key="org" style={orgStyle}>
+                <td key="org" style={{...orgStyle, lineHeight: '1.2', fontSize: '11px' }}>
                   {getFieldLabel('organization_name', 'Org Name')} : {patient.title ? '1500' : 'Shraddha Pathology Laboratory'}
                 </td>
               );
             }
-            if (row2.length > 0) patientRows.push(<tr key="r2">{row2}</tr>);
+            if (row2.length > 0) patientRows.push(<tr key="r2" style={{height: 'auto'}}>{row2}</tr>);
 
             // Row 3: Sample Date & Registration ID
             const row3: React.ReactNode[] = [];
             if (isFieldVisible('sample_date')) {
               const sampleDateStyle = { ...PATIENT_TD, ...getFieldStyle('sample_date'), ...bodyStyle };
               row3.push(
-                <td key="sd" style={sampleDateStyle}>
+                <td key="sd" style={{...sampleDateStyle, lineHeight: '1.2', fontSize: '11px' }}>
                   {getFieldLabel('sample_date', 'Sample Date')} :{' '}
                   {visitDate ? new Date(visitDate).toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }).replace('am', 'a.m.').replace('pm', 'p.m.') : '-'}
                 </td>
@@ -722,19 +804,19 @@ const ProfessionalReport = React.forwardRef<HTMLDivElement, ProfessionalReportPr
             if (isFieldVisible('registration_no')) {
               const regStyle = { ...PATIENT_TD, ...getFieldStyle('registration_no'), ...bodyStyle };
               row3.push(
-                <td key="reg" style={regStyle}>
+                <td key="reg" style={{...regStyle, lineHeight: '1.2', fontSize: '11px' }}>
                   {getFieldLabel('registration_no', 'Reg. ID')} : {visitId || '-'}
                 </td>
               );
             }
-            if (row3.length > 0) patientRows.push(<tr key="r3">{row3}</tr>);
+            if (row3.length > 0) patientRows.push(<tr key="r3" style={{height: 'auto'}}>{row3}</tr>);
 
             // Row 4: Report Date & Sample ID
             const row4: React.ReactNode[] = [];
             if (isFieldVisible('report_date')) {
               const reportDateStyle = { ...PATIENT_TD, ...getFieldStyle('report_date'), ...bodyStyle };
               row4.push(
-                <td key="rd" style={reportDateStyle}>
+                <td key="rd" style={{...reportDateStyle, lineHeight: '1.2', fontSize: '11px' }}>
                   {getFieldLabel('report_date', 'Report Date')} :{' '}
                   {new Date().toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }).replace('am', 'a.m.').replace('pm', 'p.m.')}
                 </td>
@@ -743,19 +825,19 @@ const ProfessionalReport = React.forwardRef<HTMLDivElement, ProfessionalReportPr
             if (isFieldVisible('sample_id')) {
               const sampleIdStyle = { ...PATIENT_TD, ...getFieldStyle('sample_id'), ...bodyStyle };
               row4.push(
-                <td key="si" style={sampleIdStyle}>
+                <td key="si" style={{...sampleIdStyle, lineHeight: '1.2', fontSize: '11px' }}>
                   {getFieldLabel('sample_id', 'Sample ID')} : {visitId || '-'}
                 </td>
               );
             }
-            if (row4.length > 0) patientRows.push(<tr key="r4">{row4}</tr>);
+            if (row4.length > 0) patientRows.push(<tr key="r4" style={{height: 'auto'}}>{row4}</tr>);
 
             // Row 5: Mobile & Email (System Fields - Optional)
             const row5: React.ReactNode[] = [];
             if (isFieldVisible('mobile')) {
               const mobileStyle = { ...PATIENT_TD, ...getFieldStyle('mobile'), ...bodyStyle };
               row5.push(
-                <td key="mob" style={mobileStyle}>
+                <td key="mob" style={{...mobileStyle, lineHeight: '1.2', fontSize: '11px' }}>
                   {getFieldLabel('mobile', 'Mobile')} : {patient.mobile ?? '-'}
                 </td>
               );
@@ -763,27 +845,35 @@ const ProfessionalReport = React.forwardRef<HTMLDivElement, ProfessionalReportPr
             if (isFieldVisible('email')) {
               const emailStyle = { ...PATIENT_TD, ...getFieldStyle('email'), ...bodyStyle };
               row5.push(
-                <td key="email" style={emailStyle}>
+                <td key="email" style={{...emailStyle, lineHeight: '1.2', fontSize: '11px' }}>
                   {getFieldLabel('email', 'Email')} : {patient.email ?? '-'}
                 </td>
               );
             }
-            if (row5.length > 0) patientRows.push(<tr key="r5">{row5}</tr>);
+            if (row5.length > 0) patientRows.push(<tr key="r5" style={{height: 'auto'}}>{row5}</tr>);
 
             // Row 6: Address (System Fields - Optional)
             const row6: React.ReactNode[] = [];
             if (isFieldVisible('address')) {
               const addressStyle = { ...PATIENT_TD, ...getFieldStyle('address'), ...bodyStyle };
               row6.push(
-                <td key="addr" style={addressStyle} colSpan={2}>
+                <td key="addr" style={{...addressStyle, lineHeight: '1.2', fontSize: '11px' }} colSpan={2}>
                   {getFieldLabel('address', 'Address')} : {patient.address ?? '-'}
                 </td>
               );
             }
-            if (row6.length > 0) patientRows.push(<tr key="r6">{row6}</tr>);
+            if (row6.length > 0) patientRows.push(<tr key="r6" style={{height: 'auto'}}>{row6}</tr>);
 
             segments.push(
-              <table key={`pat-${bi}`} style={{ width: '100%', borderCollapse: 'collapse', fontSize: `${formatConfig?.fontSizeBody || 11}px`, marginBottom: '3mm', flexShrink: 0, backgroundColor: 'transparent', ...getFormattingStyle('header') }}>
+              <table key={`pat-${bi}`} style={{ 
+                width: '100%', 
+                borderCollapse: 'collapse', 
+                fontSize: `${formatConfig?.fontSizeBody || 11}px`, 
+                marginBottom: '3mm', 
+                flexShrink: 0, 
+                backgroundColor: 'transparent',
+                fontFamily: getFontFamily(formatConfig?.fontFamily || 'Bookman Old Text'),
+              }}>
                 <tbody>{patientRows}</tbody>
               </table>
             );
@@ -897,8 +987,9 @@ const ProfessionalReport = React.forwardRef<HTMLDivElement, ProfessionalReportPr
             width: '210mm',
             height: '296mm',
             backgroundColor: '#fff',
-            fontFamily: formatConfig?.fontFamily || 'Bookman Old Text',
-            fontSize: '10px',
+            fontFamily: getFontFamily(formatConfig?.fontFamily || 'Bookman Old Text'),
+            fontSize: `${formatConfig?.fontSizeBody || 11}px`,
+            lineHeight: formatConfig?.lineHeight || 1.4,
             margin: '0 auto',
             overflow: 'hidden',
             pageBreakInside: 'avoid',
@@ -924,8 +1015,9 @@ const ProfessionalReport = React.forwardRef<HTMLDivElement, ProfessionalReportPr
               overflow: 'visible',
               display: 'flex',
               flexDirection: 'column',
-              fontSize: '10px',
-              fontFamily: formatConfig?.fontFamily || 'Bookman Old Text',
+              fontSize: `${formatConfig?.fontSizeBody || 11}px`,
+              fontFamily: getFontFamily(formatConfig?.fontFamily || 'Bookman Old Text'),
+              lineHeight: formatConfig?.lineHeight || 1.4,
             }}
           >
             {segments}
@@ -945,7 +1037,7 @@ const ProfessionalReport = React.forwardRef<HTMLDivElement, ProfessionalReportPr
         reportRef.current = node;
         if (typeof ref === 'function') ref(node);
         else if (ref) ref.current = node;
-      }} className="professional-report" style={{ fontFamily: formatConfig?.fontFamily || 'Bookman Old Text' }}>
+      }} className="professional-report" style={{ fontFamily: getFontFamily(formatConfig?.fontFamily || 'Bookman Old Text') }}>
         <style>{`
           @page {
             size: A4 portrait;
@@ -977,7 +1069,6 @@ const ProfessionalReport = React.forwardRef<HTMLDivElement, ProfessionalReportPr
               width: 210mm !important;
               margin: 0 !important;
               padding: 0 !important;
-              font-family: ${formatConfig?.fontFamily || 'Bookman Old Text'} !important;
             }
 
             .report-page {
@@ -1019,19 +1110,24 @@ const ProfessionalReport = React.forwardRef<HTMLDivElement, ProfessionalReportPr
 ProfessionalReport.displayName = 'ProfessionalReport';
 
 const PATIENT_TD: React.CSSProperties = {
-  padding: '2px 4px',
+  padding: '1px 3px',
   verticalAlign: 'top',
   width: '50%',
   backgroundColor: 'transparent',
   border: 'none',
+  minHeight: '14px',
+  lineHeight: '1.25',
+  fontSize: '11px',
 };
 
 const TH: React.CSSProperties = {
-  padding: '3px 4px',
-  fontWeight: 'bold',
-  fontSize: '9px',
+  padding: '1px 3px',
+  fontWeight: '900',  // Extra bold
+  fontSize: '8px',  // Slightly larger (was 7px)
   textAlign: 'left',
   backgroundColor: 'transparent',
+  minHeight: '12px',
+  lineHeight: '1.1',
 };
 
 export default ProfessionalReport;

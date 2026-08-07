@@ -94,6 +94,8 @@ export default function ReportSettings() {
   const saveSettings = async () => {
     try {
       setLoading(true);
+      console.log('💾 Saving settings:', { fields: fields.map(f => ({ key: f.fieldKey, visible: f.isVisible })) });
+      
       const response = await fetch(`${API_BASE_URL}/report-settings`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -104,9 +106,16 @@ export default function ReportSettings() {
       });
 
       if (response.ok) {
+        console.log('✅ Settings saved successfully');
         setMessage({ type: "success", text: "Settings saved successfully!" });
+        
+        // Reload settings from database to confirm save
+        await new Promise(resolve => setTimeout(resolve, 500));
+        loadSettings();
+        
         setTimeout(() => setMessage({ type: "", text: "" }), 3000);
       } else {
+        console.error('❌ Save failed:', response.statusText);
         setMessage({ type: "error", text: "Failed to save settings" });
       }
     } catch (error) {
@@ -329,31 +338,51 @@ export default function ReportSettings() {
           {fields.length === 0 ? (
             <p className="text-xs text-gray-600">Loading field configurations...</p>
           ) : (
-            <div className="grid grid-cols-3 gap-4">
-              {/* Group fields by section */}
-              {['Patient Information', 'Report Details', 'System Fields'].map((section) => {
-                const sectionFields = fields.filter(f => f.sectionName === section);
-                if (sectionFields.length === 0) return null;
+            <div className="grid grid-cols-3 gap-6">
+              {/* Column 1: First 5 fields */}
+              <div className="space-y-2">
+                {fields.slice(0, 5).map((field) => (
+                  <label key={field.fieldKey} className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={field.isVisible}
+                      onChange={() => toggleFieldVisibility(field.fieldKey)}
+                      className="w-3 h-3 accent-blue-600 rounded"
+                    />
+                    <span className="text-xs text-gray-700">{field.fieldLabel}</span>
+                  </label>
+                ))}
+              </div>
 
-                // Distribute across 3 columns
-                const columnIndex = ['Patient Information', 'Report Details', 'System Fields'].indexOf(section);
-                
-                return (
-                  <div key={section} className="space-y-2">
-                    {sectionFields.map((field) => (
-                      <label key={field.fieldKey} className="flex items-center gap-2 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={field.isVisible}
-                          onChange={() => toggleFieldVisibility(field.fieldKey)}
-                          className="w-3 h-3 accent-blue-600 rounded"
-                        />
-                        <span className="text-xs text-gray-700">{field.fieldLabel}</span>
-                      </label>
-                    ))}
-                  </div>
-                );
-              })}
+              {/* Column 2: Next 5 fields */}
+              <div className="space-y-2">
+                {fields.slice(5, 10).map((field) => (
+                  <label key={field.fieldKey} className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={field.isVisible}
+                      onChange={() => toggleFieldVisibility(field.fieldKey)}
+                      className="w-3 h-3 accent-blue-600 rounded"
+                    />
+                    <span className="text-xs text-gray-700">{field.fieldLabel}</span>
+                  </label>
+                ))}
+              </div>
+
+              {/* Column 3: Remaining fields (up to 5) */}
+              <div className="space-y-2">
+                {fields.slice(10, 15).map((field) => (
+                  <label key={field.fieldKey} className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={field.isVisible}
+                      onChange={() => toggleFieldVisibility(field.fieldKey)}
+                      className="w-3 h-3 accent-blue-600 rounded"
+                    />
+                    <span className="text-xs text-gray-700">{field.fieldLabel}</span>
+                  </label>
+                ))}
+              </div>
             </div>
           )}
         </div>
