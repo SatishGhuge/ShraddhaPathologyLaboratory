@@ -290,9 +290,24 @@ model PatientTest {
   sampleBarcodeNo    String?
   patient_history    String?             @db.Text
   totalAmount        Float               @default(0)
+  
+  // ===== ORIGINAL DISCOUNT (from patient registration) =====
+  originalDiscountPercent Float             @default(0)
+  originalDiscountAmount  Float             @default(0)
+  originalDiscountRemark  String?
+  originalDiscountDate    DateTime?         @default(now())
+  
+  // ===== ADDITIONAL DISCOUNT (from BookingDetailsModal rebook) =====
+  additionalDiscountPercent Float            @default(0)
+  additionalDiscountAmount  Float            @default(0)
+  additionalDiscountRemark  String?
+  additionalDiscountDate    DateTime?
+  
+  // ===== LEGACY FIELDS (kept for backward compatibility) =====
   discountPercent    Float               @default(0)
   discountAmount     Float               @default(0)
   discountRemark     String?
+  
   paidAmount         Float               @default(0)
   balanceAmount      Float               @default(0)
   paymentMode        String?

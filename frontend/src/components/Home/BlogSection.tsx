@@ -33,16 +33,34 @@ export default function BlogSection() {
         </div>
 
         <SectionGrid columns={3} gap="6">
-          {blogs.map((blog, i) => (
+          {blogs.map((blog, i) => {
+            const boxColors = [
+              "oklch(75% 0.183 55.934)",  // First box
+              "oklch(66.6% 0.179 58.318)", // Second box
+              "oklch(55.4% 0.135 66.442)"  // Third box
+            ];
+            const bgColor = boxColors[i] || boxColors[boxColors.length - 1];
+            
+            return (
             <motion.div
               key={blog.id}
               initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }} transition={{ delay: i * 0.1 }}
               whileHover={{ y: -4 }}
-              className="bg-[#F8FAFC] rounded-2xl overflow-hidden shadow-sm border border-gray-100 cursor-pointer group"
+              className="rounded-2xl overflow-hidden shadow-sm border border-gray-100 cursor-pointer group"
+              style={{ backgroundColor: bgColor }}
             >
               {/* Image */}
-              <div className="h-40 bg-gradient-to-br from-[oklch(45%_0.085_224.283)] to-[oklch(40%_0.075_224.283)] flex items-center justify-center">
+              <div 
+                className="h-40 flex items-center justify-center"
+                style={{
+                  background: i === 0 
+                    ? `linear-gradient(to bottom right, oklch(45% 0.085 224.283), oklch(45% 0.085 224.283))`
+                    : i === 1
+                    ? `linear-gradient(to bottom right, oklch(50% 0.134 242.749), oklch(50% 0.134 242.749))`
+                    : `linear-gradient(to bottom right, oklch(44.3% 0.11 240.79), oklch(44.3% 0.11 240.79))`
+                }}
+              >
                 {blog.imageUrl ? (
                   <img src={blog.imageUrl} alt={blog.title} className="w-full h-full object-cover" />
                 ) : (
@@ -64,7 +82,8 @@ export default function BlogSection() {
                 </button>
               </div>
             </motion.div>
-          ))}
+            );
+          })}
         </SectionGrid>
       </div>
     </section>

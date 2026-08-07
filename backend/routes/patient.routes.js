@@ -15,8 +15,14 @@ import {
   createPaymentTransaction,
   getPaymentTransactions,
   getPatientPaymentTransactions,
-  getPatientTests
+  getPatientTests,
+  getTestsByVisitId,
+  addTestsToExistingVisit
 } from '../controllers/patient.controller.js';
+import {
+  getPatientVisitReport,
+  getPatientBillingSummary
+} from '../controllers/patient-report.controller.js';
 
 const router = express.Router();
 
@@ -32,6 +38,16 @@ router.get('/statistics/location', getPatientLocationStatistics);
 // Payment transaction routes — MUST be before /:id routes
 router.post('/payment-transaction', createPaymentTransaction);
 router.get('/payment-transactions/:visitId', getPaymentTransactions);
+
+// Get tests by visitId for booking details modal
+router.get('/tests-by-visit', getTestsByVisitId);
+
+// Report endpoints
+router.get('/report/visit-details', getPatientVisitReport);
+router.get('/report/billing-summary', getPatientBillingSummary);
+
+// Add tests to existing visit (from BookingDetailsModal)
+router.post('/add-tests-to-visit', addTestsToExistingVisit);
 
 // Get all patients
 router.get('/', getAllPatients);
