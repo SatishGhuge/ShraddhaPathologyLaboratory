@@ -35,11 +35,12 @@ export default function BlogSection() {
         <SectionGrid columns={3} gap="6">
           {blogs.map((blog, i) => {
             const boxColors = [
-              "oklch(75% 0.183 55.934)",  // First box
-              "oklch(66.6% 0.179 58.318)", // Second box
-              "oklch(55.4% 0.135 66.442)"  // Third box
+              "oklch(82.8% 0.189 84.429)",   // First box
+              "oklch(76.9% 0.188 70.08)",  // Second box
+              "oklch(66.6% 0.179 58.318)"   // Third box
             ];
             const bgColor = boxColors[i] || boxColors[boxColors.length - 1];
+            const imageBgColor = "oklch(45% 0.085 224.283)"; // Same blue tone for all boxes
             
             return (
             <motion.div
@@ -54,11 +55,7 @@ export default function BlogSection() {
               <div 
                 className="h-40 flex items-center justify-center"
                 style={{
-                  background: i === 0 
-                    ? `linear-gradient(to bottom right, oklch(45% 0.085 224.283), oklch(45% 0.085 224.283))`
-                    : i === 1
-                    ? `linear-gradient(to bottom right, oklch(50% 0.134 242.749), oklch(50% 0.134 242.749))`
-                    : `linear-gradient(to bottom right, oklch(44.3% 0.11 240.79), oklch(44.3% 0.11 240.79))`
+                  background: `linear-gradient(to bottom right, ${imageBgColor}, ${imageBgColor})`
                 }}
               >
                 {blog.imageUrl ? (
