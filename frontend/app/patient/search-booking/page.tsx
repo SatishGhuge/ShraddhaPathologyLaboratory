@@ -4,6 +4,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import React, { useState, useRef, useEffect } from "react";
 import BarcodeModal, { generateBarcodeLabels, getSampleTypeId, getSampleTypeName, getTestName } from "@/app/components/BarcodeModal";
 import BillReceipt from "@/app/components/BillReceipt";
+import BookingDetailsModal from "@/app/components/BookingDetailsModal";
 import API_BASE_URL from "@/src/api/config";
 import { generateCompactBarcodePrintHtml } from "@/app/utils/barcodePrintUtils";
 import JsBarcode from "jsbarcode";
@@ -526,6 +527,8 @@ export default function BookingPage() {
   const [showBillModal,    setShowBillModal]    = useState(false);
   const [showPrintDropdown, setShowPrintDropdown] = useState(false);
   const [showDownloadDropdown, setShowDownloadDropdown] = useState(false);
+  const [showBookingDetailsModal, setShowBookingDetailsModal] = useState(false);
+  const [selectedBookingForModal, setSelectedBookingForModal] = useState<any>(null);
   
   /* ===== PAGINATION STATES ===== */
   const [currentPage, setCurrentPage] = useState(1);
@@ -647,7 +650,7 @@ export default function BookingPage() {
     mapped.sort((a, b) => {
       const dateA = new Date(a.rawDate);
       const dateB = new Date(b.rawDate);
-      return dateA.getTime() - dateB.getTime();
+      return dateB.getTime() - dateA.getTime(); // Descending order (most recent first)
     });
     
     const updatedBookings = mapped.map(booking => {
@@ -1411,11 +1414,25 @@ export default function BookingPage() {
   };
 
   const handleRebooking = (booking: any) => {
-    // Store rebooking data in localStorage since Next.js doesn't support state in router.push
+    // Store rebooking data in localStorage with patient details AND tests (WITHOUT discount)
     localStorage.setItem('rebookingData', JSON.stringify({
       patientData: booking.patientData,
+      tests: booking.tests.map(t => ({
+        id: t.id || t.test?.id,
+        name: t.name || t.test?.name,
+        testId: t.testId || t.test?.id,
+        departmentId: t.departmentId || t.test?.departmentId,
+        sample: t.sample || t.test?.sample_type?.Sample_Type,
+        charge: t.charge,
+        b2cCharge: t.b2cCharge || t.charge,
+        b2bCharge: t.b2bCharge || t.charge,
+        isOutsourced: t.isOutsourced || false,
+        outsourcedTo: t.outsourcedTo || null
+        // ⚠️ NO discount fields - clean slate
+      })),
       isRebooking: true,
-      previousBookingId: booking.visitId || booking.bookingId
+      previousBookingId: booking.visitId || booking.bookingId,
+      previousVisitDate: booking.date
     }));
     router.push('/patient/registration');
   };
@@ -1653,10 +1670,10 @@ export default function BookingPage() {
       input[type=number] { -moz-appearance:textfield; }
     `}</style>
 
-    <div className="w-full px-3 sm:px-6 mt-16">
+    <div className="w-full px-3 sm:px-6 mt-2">
 
-      {/* SEARCH BAR */}
-      <div className="bg-white rounded shadow p-3 mb-4">
+      {/* SEARCH BAR - Single line filters with auto-search */}
+      <div className="bg-white rounded shadow p-3 mb-0">
         <div className="flex flex-wrap gap-2 items-center">
           <DateRangePicker value={dateRange} onChange={setDateRange} />
           
@@ -1736,15 +1753,19 @@ export default function BookingPage() {
           <input 
             placeholder="Patient Name" 
             value={patientNameSearch}
-            onChange={(e) => setPatientNameSearch(e.target.value)}
-            onKeyPress={handleKeyPress}
+            onChange={(e) => {
+              setPatientNameSearch(e.target.value);
+              setAppliedPatientName(e.target.value);
+            }}
             className={style.input} 
           />
           <input 
             placeholder="Mobile" 
             value={mobileSearch}
-            onChange={(e) => handleMobileChange(e.target.value)}
-            onKeyPress={handleKeyPress}
+            onChange={(e) => {
+              handleMobileChange(e.target.value);
+              setAppliedMobile(e.target.value);
+            }}
             maxLength={10}
             className={style.input}
             title="Enter 10 digit mobile number"
@@ -1757,10 +1778,10 @@ export default function BookingPage() {
               value={searchBarDoctorSearch}
               onChange={(e) => {
                 setSearchBarDoctorSearch(e.target.value);
+                setAppliedDoctor(e.target.value);
                 setShowSearchBarDoctorDropdown(true);
               }}
               onFocus={() => setShowSearchBarDoctorDropdown(true)}
-              onKeyPress={handleKeyPress}
               className={style.input}
             />
             
@@ -1793,17 +1814,14 @@ export default function BookingPage() {
             <input 
               type="checkbox" 
               checked={showOutstanding}
-              onChange={(e) => setShowOutstanding(e.target.checked)}
+              onChange={(e) => {
+                setShowOutstanding(e.target.checked);
+                setAppliedOutstanding(e.target.checked);
+              }}
               className="w-4 h-4 cursor-pointer"
             />
             <span className="font-semibold text-orange-700">Outstandings</span>
           </label>
-          
-          <button 
-            onClick={handleSearch}
-            className={`${style.btn} bg-slate-900 hover:bg-orange-600 transition-colors`}>
-            <Search size={15}/> Search
-          </button>
           
           <button 
             onClick={handleReset}
@@ -1821,27 +1839,25 @@ export default function BookingPage() {
       {/* MAIN GRID */}
       <div className="grid grid-cols-12 gap-4 h-[calc(100vh-180px)]">
 
-        {/* LEFT - BOOKING LIST */}
-        <div className="col-span-4 bg-white rounded shadow flex flex-col overflow-hidden">
-          <div className="bg-slate-900 text-white p-2 font-semibold flex justify-between items-center">
-            <span>Booking List</span>
-            <span className="text-yellow-300 text-xs">Page {currentPage} of {Math.ceil(filteredBookings.length / ITEMS_PER_PAGE) || 1}</span>
-          </div>
+        {/* LEFT - BOOKING LIST - FULL WIDTH */}
+        <div className="col-span-12 bg-white rounded shadow flex flex-col overflow-hidden">
           <div className="overflow-y-auto overflow-x-hidden flex-1">
-            <table className="w-full text-xs table-fixed">
-              <thead className="bg-slate-900 text-white sticky top-0">
+            <table className="w-full text-xs">
+              <thead className="bg-cyan-900 text-white sticky top-0">
                 <tr>
-                  <th className="p-2 w-8 text-center">No</th>
-                  <th className="p-2 text-left">Name / ID</th>
-                  <th className="p-2 text-left w-20">Date</th>
-                  <th className="p-2 text-center w-24">Action</th>
+                  <th className="p-2 w-12 text-center">No</th>
+                  <th className="p-2 text-left min-w-40">Patient Name</th>
+                  <th className="p-2 text-left min-w-24">Patient ID</th>
+                  <th className="p-2 text-left min-w-24">Visit ID</th>
+                  <th className="p-2 text-left min-w-24">Date</th>
+                  <th className="p-2 text-center min-w-32">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {loadingBookings ? (
-                  <tr><td colSpan={4} className="p-4 text-center text-gray-400">Loading...</td></tr>
+                  <tr><td colSpan={6} className="p-4 text-center text-gray-400">Loading...</td></tr>
                 ) : filteredBookings.length === 0 ? (
-                  <tr><td colSpan={4} className="p-4 text-center text-gray-400">No records found</td></tr>
+                  <tr><td colSpan={6} className="p-4 text-center text-gray-400">No records found</td></tr>
                 ) : (() => {
                   // Pagination logic
                   const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
@@ -1850,33 +1866,37 @@ export default function BookingPage() {
                   
                   return paginatedBookings.map((b,i) => (
                     <tr key={i} className={`border-b hover:bg-gray-50 ${getBookingRowColor(b)}`}>
-                      <td className="p-2 text-center">{startIndex + i + 1}</td>
+                      <td className="p-2 text-center font-medium">{startIndex + i + 1}</td>
                       <td className="p-2">
-                        <div className="flex items-center gap-1">
-                          {b.paymentStatus === "Due" && (
-                            <div className="relative group flex-shrink-0">
-                              <AlertCircle size={12} className="text-red-500 cursor-pointer" />
-                              <div className="absolute left-5 top-1/2 -translate-y-1/2 hidden group-hover:block z-50 bg-white border border-gray-300 rounded shadow-lg px-2 py-1 text-xs whitespace-nowrap text-gray-700">
-                                Balance: Rs.{Math.round(b.balanceAmount || 0)}
+                        <div className="font-semibold text-gray-800 flex items-center gap-1 group">
+                          <span>{b.name}</span>
+                          {b.balanceAmount > 0 && (
+                            <div className="relative flex items-center">
+                              <span className="text-red-500 font-bold text-sm shrink-0">₹</span>
+                              <div className="absolute left-5 top-1/2 -translate-y-1/2 bg-gray-800 text-white text-xs px-2 py-1 rounded whitespace-nowrap pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                                Balance: ₹{b.balanceAmount}
                               </div>
                             </div>
                           )}
-                          <div>
-                            <div className="font-medium">{b.name}</div>
-                            <div className="text-gray-400 text-[10px]">{b.patientId}</div>
-                            <div className="text-orange-600 text-[10px] font-semibold">Visit: {b.visitId}</div>
-                          </div>
                         </div>
                       </td>
+                      <td className="p-2">
+                        <div className="text-gray-600">{b.patientId}</div>
+                      </td>
+                      <td className="p-2">
+                        <div className="text-orange-600 font-semibold">{b.visitId}</div>
+                      </td>
                       <td className="p-2 whitespace-nowrap">{b.date}</td>
-                      <td className="p-1">
-                        <div className="flex flex-wrap gap-0.5 justify-center">
-                          <button onClick={()=>setSelectedBooking(b)} className="bg-slate-900 hover:bg-orange-600 text-white p-1 rounded" title="View"><Eye size={12}/></button>
-                          <button onClick={()=>{setEditingPatient(b);setFormData(b.patientData);}} className="bg-slate-900 hover:bg-orange-600 text-white p-1 rounded" title="Edit"><Pencil size={12}/></button>
-                          <button onClick={()=>handleDeleteBooking(b)} className="bg-red-500 hover:bg-red-600 text-white p-1 rounded" title="Delete"><Trash2 size={12}/></button>
-                          <button onClick={()=>handlePrintBooking(b)} className="bg-slate-900 hover:bg-orange-600 text-white p-1 rounded" title="Print"><Printer size={12}/></button>
-                          <button onClick={()=>handlePrintBarcode(b)} className="bg-slate-900 hover:bg-orange-600 text-white p-1 rounded" title="Barcode"><Barcode size={12}/></button>
-                          <button onClick={()=>handleRebooking(b)} className="bg-green-600 hover:bg-green-700 text-white p-1 rounded" title="Rebook"><RefreshCw size={12}/></button>
+                      <td className="p-2">
+                        <div className="flex flex-wrap gap-1 justify-center">
+                          <button onClick={() => {
+                            setSelectedBookingForModal(b);
+                            setShowBookingDetailsModal(true);
+                          }} className="text-slate-900 hover:bg-orange-400 p-1 rounded" title="View Details"><Eye size={16}/></button>
+                          <button onClick={()=>{setEditingPatient(b);setFormData(b.patientData);}} className="text-blue-900 hover:bg-orange-400 p-1 rounded" title="Edit"><Pencil size={16}/></button>
+                          <button onClick={()=>handlePrintBooking(b)} className="text-red-900 hover:bg-orange-400 p-1 rounded" title="Print"><Printer size={14}/></button>
+                          <button onClick={()=>handlePrintBarcode(b)} className="bg-white text-slate-900 hover:bg-orange-400 p-1 rounded" title="Barcode"><Barcode size={16}/></button>
+                          <button onClick={()=>handleRebooking(b)} className="text-green-600 hover:bg-orange-400 p-1 rounded" title="Rebook"><RefreshCw size={16}/></button>
                         </div>
                       </td>
                     </tr>
@@ -1941,8 +1961,8 @@ export default function BookingPage() {
           )}
         </div>
 
-        {/* RIGHT - TEST & BILLING */}
-        <div className="col-span-8 flex flex-col gap-3">
+        {/* RIGHT - TEST & BILLING - HIDDEN (Modal shows this now) */}
+        <div className="hidden">
           {selectedBooking ? (
             <>
               <div className="bg-white rounded shadow">
@@ -2282,9 +2302,7 @@ export default function BookingPage() {
               </div>
             </>
           ) : (
-            <div className="bg-white rounded shadow flex items-center justify-center h-full text-gray-400">
-              Select booking to view tests & billing
-            </div>
+            <div></div>
           )}
         </div>
       </div>
@@ -2753,7 +2771,7 @@ export default function BookingPage() {
                       setShowPrintDropdown(!showPrintDropdown);
                       setShowDownloadDropdown(false);
                     }}
-                    className="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded text-sm font-semibold flex items-center gap-2"
+                    className="text-Red px-5 py-2.5 rounded text-sm font-semibold flex items-center gap-2"
                   >
                     <Printer size={16} />
                     Print
@@ -3258,6 +3276,44 @@ export default function BookingPage() {
       isPrinting={barcodesPrinting}
     />
     )}
+
+    {/* Booking Details Modal - Full Right Panel in Modal */}
+    <BookingDetailsModal
+      booking={selectedBookingForModal}
+      isOpen={showBookingDetailsModal}
+      onClose={() => {
+        setShowBookingDetailsModal(false);
+        setSelectedBookingForModal(null);
+      }}
+      businessType={businessType}
+      allTests={allTests}
+      packagesList={packagesList}
+      onBookingUpdate={(updatedBooking) => {
+        // Update the selected booking in state
+        setSelectedBookingForModal(updatedBooking);
+        
+        // Update all bookings list with the updated booking
+        setAllBookings(prevBookings =>
+          prevBookings.map(b =>
+            b.bookingId === updatedBooking.bookingId ? updatedBooking : b
+          )
+        );
+        
+        // Update filtered bookings
+        setBookings(prevBookings =>
+          prevBookings.map(b =>
+            b.bookingId === updatedBooking.bookingId ? updatedBooking : b
+          )
+        );
+        
+        console.log('✅ Booking updated successfully:', {
+          bookingId: updatedBooking.bookingId,
+          newTestsCount: updatedBooking.tests?.length,
+          balanceAmount: updatedBooking.balanceAmount,
+          discountAmount: updatedBooking.discountAmount
+        });
+      }}
+    />
     </>
   );
 }
