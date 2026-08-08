@@ -1555,7 +1555,16 @@ export default function Result() {
       // ✅ DIRECT PRINT - trigger print immediately with report data
       setLoading(false);
       await directPrintReport({
-        patient: first.patientTest.patient,
+        patient: {
+          ...first.patientTest.patient,
+          // ✅ Get organization name and code from the organization relationship
+          organizationName: (first.patientTest.patient as any)?.organizationName || (first.patientTest as any)?.organization?.name || '',
+          organizationCode: (first.patientTest.patient as any)?.organizationCode || (first.patientTest as any)?.organization?.code || '',
+          // Ensure age fields are properly set
+          ageYears: (first.patientTest.patient as any)?.ageYears ?? (first.patientTest.patient as any)?.age,
+          ageMonths: (first.patientTest.patient as any)?.ageMonths ?? 0,
+          ageDays: (first.patientTest.patient as any)?.ageDays ?? 0
+        },
         visitId: first.patientTest.visitId,
         visitDate: first.patientTest.visitDate,
         test: first.patientTest.test,
@@ -1678,7 +1687,16 @@ export default function Result() {
       // ✅ DIRECT PRINT - trigger print immediately with per-test comments
       setLoading(false);
       await directPrintReport({
-        patient: first.patientTest.patient,
+        patient: {
+          ...first.patientTest.patient,
+          // ✅ Get organization name and code from the organization relationship
+          organizationName: (first.patientTest.patient as any)?.organizationName || (first.patientTest as any)?.organization?.name || '',
+          organizationCode: (first.patientTest.patient as any)?.organizationCode || (first.patientTest as any)?.organization?.code || '',
+          // Ensure age fields are properly set
+          ageYears: (first.patientTest.patient as any)?.ageYears ?? (first.patientTest.patient as any)?.age,
+          ageMonths: (first.patientTest.patient as any)?.ageMonths ?? 0,
+          ageDays: (first.patientTest.patient as any)?.ageDays ?? 0
+        },
         visitId: first.patientTest.visitId,
         visitDate: first.patientTest.visitDate,
         test: first.patientTest.test,
@@ -2997,14 +3015,16 @@ export default function Result() {
                               {testIndex === 0 && (
                                 <div 
                                   className="cursor-help relative group"
-                                  title={patient.organization_name || 'N/A'}
+                                  title={(patient.organization_name || patient.organizationName) || 'N/A'}
                                 >
-                                  <span>{patient.organizationCode ? patient.organizationCode : '-'}</span>
+                                  <span className="font-medium text-gray-900">
+                                    {(patient.organizationCode || patient.organizationId || '-')}
+                                  </span>
                                   {/* Tooltip - only show if organization exists */}
-                                  {patient.organizationCode && (
+                                  {(patient.organizationCode || patient.organizationId) && (
                                     <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 hidden group-hover:flex flex-col items-center z-50 pointer-events-none">
-                                      <span className="bg-gray-800 text-white text-[10px] font-semibold rounded px-2 py-1 whitespace-nowrap shadow-lg">
-                                        {patient.organization_name || 'Organization'}
+                                      <span className="bg-gray-800 text-white text-[10px] font-semibold rounded px-2 py-1 whitespace-nowrap shadow-lg max-w-xs">
+                                        {(patient.organization_name || patient.organizationName || 'Organization')}
                                       </span>
                                       <span className="w-2 h-2 bg-gray-800 rotate-45 -mt-1" />
                                     </span>

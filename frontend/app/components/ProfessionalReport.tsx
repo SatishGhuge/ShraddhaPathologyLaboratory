@@ -8,6 +8,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import DOMPurify from 'dompurify';
+import QRCode from 'qrcode';
 import API_BASE_URL from "@/src/api/config";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -17,9 +18,15 @@ import API_BASE_URL from "@/src/api/config";
 interface PatientInfo {
   title?: string;
   firstName?: string;
-  lastName?: string;  age?: number | string;  // Can be number or formatted string like "1 month 3 days"
+  lastName?: string;
+  age?: number | string;  // Can be number or formatted string like "1 month 3 days"
+  ageYears?: number;
+  ageMonths?: number;
+  ageDays?: number;
   gender?: string;
   dob?: string;  // Birthday date for babies
+  organizationName?: string;  // Organization name from patient registration
+ 
 }
 
 interface LetterheadDB {
@@ -289,6 +296,7 @@ const ProfessionalReport = React.forwardRef<HTMLDivElement, ProfessionalReportPr
     const [lh, setLh] = useState<LetterheadDB | null>(null);
     const [ready, setReady] = useState(false);
     const [pages, setPages] = useState<ReportPage[]>([]);
+    const [qrCodes, setQrCodes] = useState<Record<string, string>>({}); // ✅ Store QR code data URLs
     const reportRef = React.useRef<HTMLDivElement>(null);
     const onReadyCalled = React.useRef(false);
 
@@ -302,6 +310,41 @@ const ProfessionalReport = React.forwardRef<HTMLDivElement, ProfessionalReportPr
         firstResult: Object.entries(results || {}).slice(0, 1)
       });
     }, [results, comments]);
+
+    // ✅ Generate single QR code for entire visit (all tests combined)
+    useEffect(() => {
+      const generateQRCode = async () => {
+        try {
+          // Create a single QR code for the entire visit with all tests
+          const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
+          const reportParams = new URLSearchParams({
+            visitId: visitId || '',
+            patientName: [patient.title, patient.firstName, patient.lastName].filter(Boolean).join(' '),
+            visitDate: visitDate || new Date().toISOString(),
+            allTests: 'true', // Flag to indicate this is a combined report
+          });
+          const qrContent = `${baseUrl}/report-view?${reportParams.toString()}`;
+          
+          const qrDataUrl = await QRCode.toDataURL(qrContent, {
+            errorCorrectionLevel: 'H', // High error correction for better scanning
+            type: 'image/png',
+            quality: 0.95,
+            margin: 1,
+            width: 120,
+            color: {
+              dark: '#000000',
+              light: '#FFFFFF',
+            },
+          });
+          // Store with key 'visitId' for single QR code per visit
+          setQrCodes({ [visitId || 'default']: qrDataUrl });
+        } catch (err) {
+          console.error('Error generating QR code:', err);
+        }
+      };
+
+      generateQRCode();
+    }, [visitId, visitDate, patient]);
 
     useEffect(() => {
       let dead = false;
@@ -508,32 +551,79 @@ const ProfessionalReport = React.forwardRef<HTMLDivElement, ProfessionalReportPr
         switch (block.kind) {
           case 'patient':
             segments.push(
-              <table key={`pat-${bi}`} style={{ width: '100%', borderCollapse: 'collapse', fontSize: '9px', marginBottom: '3mm', flexShrink: 0, backgroundColor: 'transparent' }}>
-                <tbody>
-                  <tr>
-                    <td style={PATIENT_TD}>Patient Name : <b>{[patient.title, patient.firstName, patient.lastName].filter(Boolean).join(' ').toUpperCase()}</b></td>
-                    <td style={PATIENT_TD}>Age : {patient.age ?? '-'} {patient.age ? 'years' : ''} ({patient.gender ?? '-'})</td>
-                  </tr>
-                  <tr>
-                    <td style={PATIENT_TD}>Referral : {referralDoctor || '-'}</td>
-                    <td style={PATIENT_TD}>Org Name : {patient.title ? '1500' : 'Shraddha Pathology Laboratory'}</td>
-                  </tr>
-                  <tr>
-                    <td style={PATIENT_TD}>
-                      Sample Date :{' '}
-                      {visitDate ? new Date(visitDate).toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }).replace('am', 'a.m.').replace('pm', 'p.m.') : '-'}
-                    </td>
-                    <td style={PATIENT_TD}>Reg. ID : {visitId || '-'}</td>
-                  </tr>
-                  <tr>
-                    <td style={PATIENT_TD}>
-                      Report Date :{' '}
-                      {new Date().toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }).replace('am', 'a.m.').replace('pm', 'p.m.')}
-                    </td>
-                    <td style={PATIENT_TD}>Sample ID : {visitId || '-'}</td>
-                  </tr>
-                </tbody>
-              </table>
+              <div key={`pat-${bi}`} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '3mm', gap: '2mm', flexShrink: 0 }}>
+                {/* Left side: Patient info - full width */}
+                <table style={{ flex: 1, borderCollapse: 'collapse', fontSize: '9px', backgroundColor: 'transparent', flexShrink: 0 }}>
+                  <tbody>
+                    <tr>
+                      <td style={PATIENT_TD}>Patient Name : <b>{[patient.title, patient.firstName, patient.lastName].filter(Boolean).join(' ').toUpperCase()}</b></td>
+                      <td style={PATIENT_TD}>
+                        Age : <b>
+                          {(() => {
+                            // Format age from patient registration data (similar to result page)
+                            if (patient.ageYears !== undefined && patient.ageMonths !== undefined && patient.ageDays !== undefined) {
+                              // Under 1 year: show only months and days
+                              if (patient.ageYears === 0) {
+                                return `${patient.ageMonths}M ${patient.ageDays}D`;
+                              }
+                              // 1 to 12 years: show years, months, and days
+                              else if (patient.ageYears < 12) {
+                                return `${patient.ageYears}Y ${patient.ageMonths}M ${patient.ageDays}D`;
+                              }
+                              // 12 years and above: show as decimal (years.months)
+                              else {
+                                const decimalAge = (patient.ageYears + patient.ageMonths / 12).toFixed(1);
+                                return `${decimalAge} years`;
+                              }
+                            }
+                            // Fallback to simple age if available
+                            return patient.age ? `${patient.age} years` : '-';
+                          })()}
+                        </b>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td style={PATIENT_TD}>Referral : {referralDoctor || '-'}</td>
+                      <td style={PATIENT_TD}>
+                        Org Name : <b>{patient.organizationName ||  'Shraddha Pathology Laboratory'}</b>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td style={PATIENT_TD}>
+                        Sample Date :{' '}
+                        {visitDate ? new Date(visitDate).toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }).replace('am', 'a.m.').replace('pm', 'p.m.') : '-'}
+                      </td>
+                      <td style={PATIENT_TD}>Reg. ID : {visitId || '-'}</td>
+                    </tr>
+                    <tr>
+                      <td style={PATIENT_TD}>
+                        Report Date :{' '}
+                        {new Date().toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }).replace('am', 'a.m.').replace('pm', 'p.m.')}
+                      </td>
+                      <td style={PATIENT_TD}>Sample ID : {visitId || '-'}</td>
+                    </tr>
+                  </tbody>
+                </table>
+
+                {/* Right side: Single QR code for entire visit */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5mm', alignItems: 'center', justifyContent: 'flex-start', flexShrink: 0, minWidth: 'fit-content' }}>
+                  {(() => {
+                    const qrCode = qrCodes[visitId || 'default'];
+                    return qrCode ? (
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5mm', flexShrink: 0 }}>
+                        <img 
+                          src={qrCode} 
+                          alt="QR Code for Visit"
+                          style={{ width: '15mm', height: '15mm', border: '0.5px solid #000', flexShrink: 0 }}
+                        />
+                        <div style={{ fontSize: '6px', textAlign: 'center', maxWidth: '25mm', wordBreak: 'break-word', fontWeight: 'bold' }}>
+                          Visit ID:<br/>{visitId}
+                        </div>
+                      </div>
+                    ) : null;
+                  })()}
+                </div>
+              </div>
             );
             break;
 
