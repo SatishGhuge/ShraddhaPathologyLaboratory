@@ -1122,8 +1122,8 @@ const PATIENT_TD: React.CSSProperties = {
 
 const TH: React.CSSProperties = {
   padding: '1px 3px',
-  fontWeight: '900',  // Extra bold
-  fontSize: '8px',  // Slightly larger (was 7px)
+  fontWeight: 'normal',  // Reduced from 900 (extra bold)
+  fontSize: '5px',  // Reduced from 8px
   textAlign: 'left',
   backgroundColor: 'transparent',
   minHeight: '12px',
