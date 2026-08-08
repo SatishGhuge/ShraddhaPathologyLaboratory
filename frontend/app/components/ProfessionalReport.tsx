@@ -450,7 +450,12 @@ const ProfessionalReport = React.forwardRef<HTMLDivElement, ProfessionalReportPr
           }
 
           // Create a single QR code for the entire visit with all tests
-          const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
+          // ✅ Use API_BASE_URL domain instead of localhost for mobile scanning
+          let baseUrl = API_BASE_URL.replace('/api', '');  // Remove /api to get base domain
+          if (!baseUrl) {
+            baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
+          }
+          
           const reportParams = new URLSearchParams({
             visitId: visitId || '',
             patientName: [patient.title, patient.firstName, patient.lastName].filter(Boolean).join(' '),
@@ -458,6 +463,8 @@ const ProfessionalReport = React.forwardRef<HTMLDivElement, ProfessionalReportPr
             allTests: 'true', // Flag to indicate this is a combined report
           });
           const qrContent = `${baseUrl}/report-view?${reportParams.toString()}`;
+          
+          console.log('✅ QR Code URL:', qrContent);
           
           const qrDataUrl = await QRCode.toDataURL(qrContent, {
             errorCorrectionLevel: 'H', // High error correction for better scanning
@@ -740,22 +747,25 @@ const ProfessionalReport = React.forwardRef<HTMLDivElement, ProfessionalReportPr
 
     const renderTableHead = () => {
       const headerStyle = getFormattingStyle('header');
+      // Use larger header size (15px) but not bold
+      const tableHeaderStyle = { ...headerStyle, fontSize: '16px', fontWeight: 'normal' };
+      
       return (
         <thead>
           <tr style={{ borderBottom: '1px solid #000' }}>
-            <th style={{ ...TH, ...headerStyle, width: '40%', textAlign: 'left', borderBottom: 'none' }}>
+            <th style={{ ...TH, ...tableHeaderStyle, width: '40%', textAlign: 'left', borderBottom: 'none' }}>
               {getFieldLabel('parameter_name', 'Test Description')}
             </th>
-            <th style={{ ...TH, ...headerStyle, width: showUnits || showRange ? '18%' : '30%', textAlign: 'left', borderBottom: 'none' }}>
+            <th style={{ ...TH, ...tableHeaderStyle, width: showUnits || showRange ? '18%' : '30%', textAlign: 'left', borderBottom: 'none' }}>
               {getFieldLabel('result_value', 'Value(s)')}
             </th>
             {showUnits && (
-              <th style={{ ...TH, ...headerStyle, width: '12%', textAlign: 'center', borderBottom: 'none' }}>
+              <th style={{ ...TH, ...tableHeaderStyle, width: '12%', textAlign: 'center', borderBottom: 'none' }}>
                 {getFieldLabel('unit', 'Unit')}
               </th>
             )}
             {showRange && (
-              <th style={{ ...TH, ...headerStyle, width: '30%', textAlign: 'left', borderBottom: 'none' }}>
+              <th style={{ ...TH, ...tableHeaderStyle, width: '30%', textAlign: 'left', borderBottom: 'none' }}>
                 {getFieldLabel('reference_range', 'Reference Range')}
               </th>
             )}
@@ -812,9 +822,29 @@ const ProfessionalReport = React.forwardRef<HTMLDivElement, ProfessionalReportPr
             }
             if (isFieldVisible('patient_age') || isFieldVisible('gender')) {
               const ageStyle = { ...PATIENT_TD, ...getFieldStyle('patient_age'), ...bodyStyle };
+              
+              // Format age properly from age components
+              let ageDisplay = '-';
+              if (patient.ageYears !== undefined || patient.ageMonths !== undefined || patient.ageDays !== undefined) {
+                const years = patient.ageYears || 0;
+                const months = patient.ageMonths || 0;
+                const days = patient.ageDays || 0;
+                
+                if (years === 0) {
+                  ageDisplay = `${months}M ${days}D`;
+                } else if (years < 12) {
+                  ageDisplay = `${years}Y ${months}M ${days}D`;
+                } else {
+                  const decimalAge = (years + months / 12).toFixed(1);
+                  ageDisplay = `${decimalAge} years`;
+                }
+              } else if (patient.age) {
+                ageDisplay = `${patient.age} years`;
+              }
+              
               row1.push(
                 <td key="age" style={{...ageStyle, lineHeight: '1.2', fontSize: '11px' }}>
-                  {getFieldLabel('patient_age', 'Age')} : {patient.age ?? '-'} {patient.age ? 'years' : ''} ({patient.gender ?? '-'})
+                  {getFieldLabel('patient_age', 'Age')} : {ageDisplay} ({patient.gender ?? '-'})
                 </td>
               );
             }
@@ -834,7 +864,7 @@ const ProfessionalReport = React.forwardRef<HTMLDivElement, ProfessionalReportPr
               const orgStyle = { ...PATIENT_TD, ...getFieldStyle('organization_name'), ...bodyStyle };
               row2.push(
                 <td key="org" style={{...orgStyle, lineHeight: '1.2', fontSize: '11px' }}>
-                  {getFieldLabel('organization_name', 'Org Name')} : {patient.title ? '1500' : 'Shraddha Pathology Laboratory'}
+                  {getFieldLabel('organization_name', 'Org Name')} : {patient.organizationName || 'Shraddha Pathology Laboratory'}
                 </td>
               );
             }
@@ -1191,8 +1221,8 @@ const PATIENT_TD: React.CSSProperties = {
 
 const TH: React.CSSProperties = {
   padding: '1px 3px',
-  fontWeight: 'normal',  // Reduced from 900 (extra bold)
-  fontSize: '5px',  // Reduced from 8px
+  fontWeight: 'normal',  // Not bold
+  fontSize: '5px',  // Same as body text (appears larger due to not being in pt)
   textAlign: 'left',
   backgroundColor: 'transparent',
   minHeight: '12px',

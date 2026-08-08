@@ -123,7 +123,11 @@ router.get('/qr-scan/:visitId', async (req, res) => {
     const patientTests = await prisma.patientTest.findMany({
       where: { visitId: visitId },
       include: {
-        patient: true,
+        patient: {
+          include: {
+            organization: true  // ✅ Include patient's organization
+          }
+        },
         test: {
           include: {
             sample_type: true
@@ -218,6 +222,11 @@ router.get('/qr-scan/:visitId', async (req, res) => {
           if (!groupedParams[catName]) {
             groupedParams[catName] = [];
           }
+          
+          // ✅ Include all parameter details with results
+          const paramId = tc.testParameter.id;
+          const paramResult = results[paramId] || {};
+          
           groupedParams[catName].push({
             id: tc.testParameter.id,
             parameterName: tc.testParameter.parameterName,
@@ -226,7 +235,19 @@ router.get('/qr-scan/:visitId', async (req, res) => {
             isDescriptive: tc.testParameter.isDescriptive,
             testMethod: tc.testParameter.testMethod,
             normalRange: tc.testParameter.rangeText,
-            showCategoryHeader: tc.categoryName ? true : false
+            rangeText: tc.testParameter.rangeText,
+            maleLowValue: tc.testParameter.maleLowValue,
+            maleHighValue: tc.testParameter.maleHighValue,
+            femaleLowValue: tc.testParameter.femaleLowValue,
+            femaleHighValue: tc.testParameter.femaleHighValue,
+            childLowValue: tc.testParameter.childLowValue,
+            childHighValue: tc.testParameter.childHighValue,
+            showCategoryHeader: tc.categoryName ? true : false,
+            // ✅ Add results to each parameter
+            numericValue: paramResult.numericValue,
+            textValue: paramResult.textValue,
+            isAbnormal: paramResult.isAbnormal || false,
+            isHighlighted: paramResult.isHighlighted || false
           });
         }
       });
@@ -241,6 +262,9 @@ router.get('/qr-scan/:visitId', async (req, res) => {
     const ageMonths = patient.ageMonths || 0;
     const ageDays = patient.ageDays || 0;
 
+    // Get organization name from patient's organization if available
+    const organizationName = patient.organization?.name || 'Shraddha Pathology Laboratory';
+
     const patientInfo = {
       title: patient.title,
       firstName: patient.firstName,
@@ -249,7 +273,7 @@ router.get('/qr-scan/:visitId', async (req, res) => {
       ageMonths,
       ageDays,
       gender: patient.gender,
-      organizationName: patient.organizationName || 'Shraddha Pathology Laboratory'
+      organizationName  // ✅ Use patient's actual organization name
     };
 
     res.json({
