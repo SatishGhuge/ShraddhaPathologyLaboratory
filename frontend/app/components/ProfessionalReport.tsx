@@ -10,6 +10,9 @@ import React, { useState, useEffect, useMemo } from 'react';
 import DOMPurify from 'dompurify';
 import API_BASE_URL from "@/src/api/config";
 
+// QRCode will be loaded dynamically
+let QRCode: any = null;
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
 // ─────────────────────────────────────────────────────────────────────────────
@@ -19,8 +22,12 @@ interface PatientInfo {
   firstName?: string;
   lastName?: string;
   age?: number | string;  // Can be number or formatted string like "1 month 3 days"
+  ageYears?: number;
+  ageMonths?: number;
+  ageDays?: number;
   gender?: string;
   dob?: string;  // Birthday date for babies
+  organizationName?: string;  // Organization name from patient registration
   mobile?: string;
   email?: string;
   address?: string;
@@ -329,6 +336,7 @@ const ProfessionalReport = React.forwardRef<HTMLDivElement, ProfessionalReportPr
     const [pages, setPages] = useState<ReportPage[]>([]);
     const [fieldConfigs, setFieldConfigs] = useState<Map<string, FieldConfig> | null>(null);
     const [formatConfig, setFormatConfig] = useState<FormattingConfig | null>(null);
+    const [qrCodes, setQrCodes] = useState<Record<string, string>>({}); // ✅ Store QR code data URLs
     const reportRef = React.useRef<HTMLDivElement>(null);
     const onReadyCalled = React.useRef(false);
 
@@ -429,6 +437,48 @@ const ProfessionalReport = React.forwardRef<HTMLDivElement, ProfessionalReportPr
     }, []);
 
     // Removed debug logging - this was causing unnecessary re-renders
+
+    // ✅ Generate single QR code for entire visit (all tests combined)
+    useEffect(() => {
+      const generateQRCode = async () => {
+        try {
+          // Dynamically load QRCode if not already loaded
+          if (!QRCode) {
+            // @ts-ignore - qrcode package is installed
+            const module = await import('qrcode');
+            QRCode = module.default;
+          }
+
+          // Create a single QR code for the entire visit with all tests
+          const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
+          const reportParams = new URLSearchParams({
+            visitId: visitId || '',
+            patientName: [patient.title, patient.firstName, patient.lastName].filter(Boolean).join(' '),
+            visitDate: visitDate || new Date().toISOString(),
+            allTests: 'true', // Flag to indicate this is a combined report
+          });
+          const qrContent = `${baseUrl}/report-view?${reportParams.toString()}`;
+          
+          const qrDataUrl = await QRCode.toDataURL(qrContent, {
+            errorCorrectionLevel: 'H', // High error correction for better scanning
+            type: 'image/png',
+            quality: 0.95,
+            margin: 1,
+            width: 120,
+            color: {
+              dark: '#000000',
+              light: '#FFFFFF',
+            },
+          });
+          // Store with key 'visitId' for single QR code per visit
+          setQrCodes({ [visitId || 'default']: qrDataUrl });
+        } catch (err) {
+          console.error('Error generating QR code:', err);
+        }
+      };
+
+      generateQRCode();
+    }, [visitId, visitDate, patient]);
 
     useEffect(() => {
       let dead = false;
@@ -864,18 +914,37 @@ const ProfessionalReport = React.forwardRef<HTMLDivElement, ProfessionalReportPr
             }
             if (row6.length > 0) patientRows.push(<tr key="r6" style={{height: 'auto'}}>{row6}</tr>);
 
+            // ✅ MERGED: Combine report settings + QR code functionality
+            const showQRInReport = formatConfig?.showQRCode !== false;
+            
             segments.push(
-              <table key={`pat-${bi}`} style={{ 
-                width: '100%', 
-                borderCollapse: 'collapse', 
-                fontSize: `${formatConfig?.fontSizeBody || 11}px`, 
-                marginBottom: '3mm', 
-                flexShrink: 0, 
-                backgroundColor: 'transparent',
-                fontFamily: getFontFamily(formatConfig?.fontFamily || 'Bookman Old Text'),
-              }}>
-                <tbody>{patientRows}</tbody>
-              </table>
+              <div key={`pat-${bi}`} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '3mm', gap: '2mm', flexShrink: 0 }}>
+                {/* Left side: Patient info using field visibility settings */}
+                <table style={{ flex: 1, borderCollapse: 'collapse', fontSize: `${formatConfig?.fontSizeBody || 11}px`, backgroundColor: 'transparent', flexShrink: 0, fontFamily: getFontFamily(formatConfig?.fontFamily || 'Bookman Old Text') }}>
+                  <tbody>{patientRows}</tbody>
+                </table>
+
+                {/* Right side: Single QR code for entire visit (if enabled) */}
+                {showQRInReport && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5mm', alignItems: 'center', justifyContent: 'flex-start', flexShrink: 0, minWidth: 'fit-content' }}>
+                    {(() => {
+                      const qrCode = qrCodes[visitId || 'default'];
+                      return qrCode ? (
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5mm', flexShrink: 0 }}>
+                          <img 
+                            src={qrCode} 
+                            alt="QR Code for Visit"
+                            style={{ width: '15mm', height: '15mm', border: '0.5px solid #000', flexShrink: 0 }}
+                          />
+                          <div style={{ fontSize: '6px', textAlign: 'center', maxWidth: '25mm', wordBreak: 'break-word', fontWeight: 'bold' }}>
+                            Visit ID:<br/>{visitId}
+                          </div>
+                        </div>
+                      ) : null;
+                    })()}
+                  </div>
+                )}
+              </div>
             );
             break;
 

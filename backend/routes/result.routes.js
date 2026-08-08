@@ -101,6 +101,184 @@ router.post('/parse-barcode', async (req, res) => {
 });
 
 // Get all patient tests for results page
+// MUST be after specific routes like /qr-scan/:visitId
+// router.get('/', getPatientTests);
+
+// 🟢 QR CODE ENDPOINT: Get complete report data by visitId for mobile viewing
+// MUST be before /:id to avoid conflict - specific paths before dynamic params
+router.get('/qr-scan/:visitId', async (req, res) => {
+  try {
+    const { visitId } = req.params;
+
+    if (!visitId) {
+      return res.status(400).json({
+        success: false,
+        message: 'visitId is required'
+      });
+    }
+
+    console.log('📱 QR Scan - Fetching all tests for visitId:', visitId);
+
+    // Get all patient tests for this visit
+    const patientTests = await prisma.patientTest.findMany({
+      where: { visitId: visitId },
+      include: {
+        patient: true,
+        test: {
+          include: {
+            sample_type: true
+          }
+        },
+        testResults: {
+          include: {
+            testParameter: {
+              include: {
+                unit: true,
+                ageRanges: true
+              }
+            }
+          }
+        },
+        organization: true,
+        usedMachine: true
+      }
+    });
+
+    if (patientTests.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'No tests found for this visit ID'
+      });
+    }
+
+    console.log(`📱 Found ${patientTests.length} test(s) for visitId: ${visitId}`);
+
+    // Get the first test to extract patient info
+    const firstTest = patientTests[0];
+    const patient = firstTest.patient;
+
+    // Build combined response with all tests
+    const combinedTests = patientTests.map(pt => ({
+      id: pt.id,
+      name: pt.test.name,
+      testCode: pt.test.testCode,
+      testId: pt.test.id,
+      interpretation: pt.test.interpretation,
+      groupedParameters: {}, // Will be filled below
+      usedMachine: pt.usedMachine,
+      comments: pt.comments
+    }));
+
+    // Build results map and grouped parameters for each test
+    const results = {};
+    const testParametersMap = {};
+
+    patientTests.forEach(pt => {
+      if (pt.testResults && pt.testResults.length > 0) {
+        pt.testResults.forEach(tr => {
+          results[tr.testParameterId] = {
+            numericValue: tr.numericValue,
+            textValue: tr.textValue,
+            isAbnormal: tr.isAbnormal || false,
+            isHighlighted: tr.isHighlighted || false
+          };
+          
+          // Store parameter details for grouped display
+          if (tr.testParameter) {
+            testParametersMap[tr.testParameterId] = tr.testParameter;
+          }
+        });
+      }
+    });
+
+    // Fetch test categories for proper grouping
+    const testIds = patientTests.map(pt => pt.test.id);
+    const testCategories = await prisma.testCategory.findMany({
+      where: {
+        testId: { in: testIds }
+      },
+      include: {
+        testParameter: {
+          include: {
+            unit: true,
+            ageRanges: true
+          }
+        }
+      }
+    });
+
+    // Group parameters by test and category
+    patientTests.forEach((pt, testIndex) => {
+      const testCategories_ = testCategories.filter(tc => tc.testId === pt.test.id);
+      const groupedParams = {};
+
+      testCategories_.forEach(tc => {
+        if (tc.testParameter) {
+          const catName = tc.categoryName || 'NO_CATEGORY_HEADER';
+          if (!groupedParams[catName]) {
+            groupedParams[catName] = [];
+          }
+          groupedParams[catName].push({
+            id: tc.testParameter.id,
+            parameterName: tc.testParameter.parameterName,
+            units: tc.testParameter.unit?.symbol || '',
+            type: tc.testParameter.type,
+            isDescriptive: tc.testParameter.isDescriptive,
+            testMethod: tc.testParameter.testMethod,
+            normalRange: tc.testParameter.rangeText,
+            showCategoryHeader: tc.categoryName ? true : false
+          });
+        }
+      });
+
+      if (combinedTests[testIndex]) {
+        combinedTests[testIndex].groupedParameters = groupedParams;
+      }
+    });
+
+    // Calculate age from patient data
+    const ageYears = patient.ageYears || 0;
+    const ageMonths = patient.ageMonths || 0;
+    const ageDays = patient.ageDays || 0;
+
+    const patientInfo = {
+      title: patient.title,
+      firstName: patient.firstName,
+      lastName: patient.lastName,
+      ageYears,
+      ageMonths,
+      ageDays,
+      gender: patient.gender,
+      organizationName: patient.organizationName || 'Shraddha Pathology Laboratory'
+    };
+
+    res.json({
+      success: true,
+      data: {
+        visitId,
+        patientInfo,
+        patientName: [patient.title, patient.firstName, patient.lastName]
+          .filter(Boolean)
+          .join(' '),
+        visitDate: firstTest.visitDate,
+        combinedTests,
+        results,
+        signature: firstTest.test.signature || null,
+        letterhead: null // Will be fetched by frontend
+      }
+    });
+
+  } catch (error) {
+    console.error('QR scan error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch report data',
+      error: error.message
+    });
+  }
+});
+
+// Get all patient tests for results page
 router.get('/', getPatientTests);
 
 // 🔴 DEBUG ENDPOINT: Get department statistics
