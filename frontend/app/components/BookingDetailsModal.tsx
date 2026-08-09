@@ -3,6 +3,41 @@
 import React, { useState, useEffect } from "react";
 import { X, Plus, RefreshCcw, Pencil, Eye, Trash2 } from "lucide-react";
 
+/*
+ * ============================================================================
+ * BOOKING DETAILS MODAL - NORMALIZED BILLING TABLE MAPPING
+ * ============================================================================
+ * 
+ * ADD NEW TESTS (handleSave):
+ * ├─ BillingSession created with:
+ * │  ├─ sessionType: "ADD_TEST"
+ * │  ├─ sequence: incremented from previous
+ * │  └─ remarks: optional
+ * │
+ * ├─ BillDiscount created (if discount > 0):
+ * │  ├─ discountType: "PERCENTAGE" | "FLAT"
+ * │  ├─ discountValue: discountPercent or discountAmount
+ * │  └─ appliedOnAmount: newTestsTotal
+ * │
+ * ├─ Payment created (if payment > 0):
+ * │  ├─ amount: paymentAmount
+ * │  └─ paymentMode
+ * │
+ * ├─ VisitBill updated with:
+ * │  ├─ grossAmount: sum of all tests (old + new)
+ * │  ├─ totalDiscount: sum of all discounts
+ * │  ├─ totalPaid: sum of all payments
+ * │  ├─ balanceAmount: recalculated
+ * │  └─ status: "PENDING" | "PARTIAL" | "PAID"
+ * │
+ * └─ BillTransaction created:
+ *    ├─ transactionType: "ADD_TEST"
+ *    ├─ amount: newTestsTotal
+ *    └─ balanceAfter: newBalance
+ * 
+ * ============================================================================
+ */
+
 interface BookingDetailsModalProps {
   booking: any;
   isOpen: boolean;
@@ -28,12 +63,13 @@ const BookingDetailsModal: React.FC<BookingDetailsModalProps> = ({
   const [packageSearch, setPackageSearch] = useState("");
   const [showPkgDropdown, setShowPkgDropdown] = useState(false);
   const [editingCharge, setEditingCharge] = useState<any>(null);
-  const [discount, setDiscount] = useState(booking?.discountAmount || 0);
-  const [discountPercent, setDiscountPercent] = useState(booking?.discountPercent || 0);
-  const [discountRemark, setDiscountRemark] = useState(booking?.discountRemark || "");
-  const [discountType, setDiscountType] = useState("additional"); // ✅ NEW: Track discount type
-  const [paymentMode, setPaymentMode] = useState(booking?.patientData?.paymentMode || "Cash");
-  const [paymentAmount, setPaymentAmount] = useState(booking?.paidAmount || 0);
+  const [discount, setDiscount] = useState(0); // ✅ Reset on modal open
+  const [discountPercent, setDiscountPercent] = useState(0); // ✅ Reset on modal open
+  const [discountRemark, setDiscountRemark] = useState("");
+  // Map to new BillingSession/BillDiscount enum
+  const [discountType, setDiscountType] = useState("FLAT");
+  const [paymentMode, setPaymentMode] = useState(booking?.paymentMode || booking?.patientData?.paymentMode || "Cash");
+  const [paymentAmount, setPaymentAmount] = useState(0); // ✅ ALWAYS start at 0 - this is for NEW payment input, not existing
   // Load tests from booking - these are the tests already added to this visit
   const [tests, setTests] = useState(booking?.tests && booking.tests.length > 0 ? booking.tests : []);
   // Track if new tests have been added (to enable/disable discount fields)
@@ -42,28 +78,57 @@ const BookingDetailsModal: React.FC<BookingDetailsModalProps> = ({
 
   // Fetch tests from backend when modal opens
   // This MUST be before the early return to avoid React hooks violation
+  const [billingSummary, setBillingSummary] = useState<any>(null);
+  
   useEffect(() => {
     const fetchTests = async () => {
-      if (!booking?.visitId) return;
+      if (!booking?.visitId) {
+        console.log('⚠️ No visitId provided to BookingDetailsModal');
+        return;
+      }
       
       try {
         const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || '/api';
-        const response = await fetch(
-          `${API_BASE_URL}/patients/tests-by-visit?visitId=${booking.visitId}`
-        );
+        const url = `${API_BASE_URL}/patients/tests-by-visit?visitId=${booking.visitId}`;
+        console.log('🔍 Fetching tests from:', url);
+        
+        const response = await fetch(url);
         const result = await response.json();
         
-        if (result.success && result.data && Array.isArray(result.data)) {
+        console.log('🔍 API Response:', result);
+        
+        if (result.success && result.data) {
           console.log('✅ Fetched tests from PatientTest table:', result.data);
           
-          // Data is already properly formatted from backend
-          setTests(result.data);
+          // If data is an array (old format), use it as tests
+          if (Array.isArray(result.data)) {
+            console.log('📋 Using array format, setting', result.data.length, 'tests');
+            setTests(result.data);
+          } else if (result.data.tests) {
+            // New format with tests and billingSummary
+            console.log('📋 Using object format with tests array, setting', result.data.tests.length, 'tests');
+            setTests(result.data.tests);
+            if (result.data.billingSummary) {
+              console.log('💰 RAW Billing Summary from backend:', JSON.stringify(result.data.billingSummary));
+              setBillingSummary(result.data.billingSummary);
+              console.log('✅ billingSummary state set with totalDiscount:', result.data.billingSummary.totalDiscount);
+            }
+          } else {
+            console.warn('⚠️ Unexpected response structure:', result.data);
+            setTests([]);
+          }
+        } else {
+          console.warn('⚠️ API returned unsuccessful response:', result);
+          setTests([]);
         }
       } catch (error) {
         console.error('❌ Error fetching tests:', error);
         // Fall back to using booking.tests if API fails
         if (booking?.tests && booking.tests.length > 0) {
+          console.log('📋 Using fallback tests from booking.tests');
           setTests(booking.tests);
+        } else {
+          setTests([]);
         }
       }
     };
@@ -72,6 +137,27 @@ const BookingDetailsModal: React.FC<BookingDetailsModalProps> = ({
       fetchTests();
     }
   }, [isOpen, booking?.visitId]);
+
+  // ✅ Cleanup: Clear all form states when modal closes
+  useEffect(() => {
+    if (!isOpen) {
+      console.log('🧹 Clearing BookingDetailsModal form states on close');
+      setSearchTest("");
+      setTestView("all");
+      setSelectedPackage(null);
+      setPackageSearch("");
+      setShowPkgDropdown(false);
+      setEditingCharge(null);
+      setDiscount(0);
+      setDiscountPercent(0);
+      setDiscountRemark("");
+      setDiscountType("FLAT");
+      setPaymentAmount(0);
+      setTests([]);
+      setBillingSummary(null);
+      setNewTestsAdded(false);
+    }
+  }, [isOpen]);
 
   if (!isOpen || !booking) return null;
 
@@ -88,63 +174,156 @@ const BookingDetailsModal: React.FC<BookingDetailsModalProps> = ({
   }
 
   // ============================================================================
-  // BILLING CALCULATION LOGIC (UPDATED)
+  // BILLING CALCULATION LOGIC - Map to new VisitBill/BillDiscount/Payment structure
   // ============================================================================
   
-  // Initial values from database
-  const advanceFromDB = booking?.paidAmount || 0;  // Running total of all payments
-  const balanceAmountFromDB = booking?.balanceAmount || 0;  // Previous balance (net)
-  const existingDiscountAmountFromDB = booking?.discountAmount || 0;  // Previous discount amount
+  // Use backend summary if available, otherwise calculate locally
+  let finalGrandTotal, finalInitialDiscount, finalInitialAmount, finalNewTestTotal, finalNewDiscount, finalNetAmount, finalBalance;
   
-  // ✅ Step 1: Calculate PREVIOUS RAW TOTAL (reverse the net to get raw)
-  // Previous Raw Total = Balance + Advance + Discount
-  // Because: Balance = (Raw - Discount) - Advance
-  // So: Raw = Balance + Advance + Discount
-  const previousRawTotal = balanceAmountFromDB + advanceFromDB + existingDiscountAmountFromDB;
+  console.log('🔍 BILLING STATE DEBUG:', {
+    'billingSummary exists': !!billingSummary,
+    'billingSummary.grossAmount': billingSummary?.grossAmount,
+    'billingSummary.totalDiscount': billingSummary?.totalDiscount,
+    'billingSummary.balanceAmount': billingSummary?.balanceAmount,
+    'billingSummary.totalPaid': billingSummary?.totalPaid,
+    'booking.billing': booking?.billing
+  });
   
-  // ✅ Step 2: Calculate GRAND TOTAL from PREVIOUS only
-  // Grand Total = Previous Raw Total - Previous Discount Amount
-  const grandTotal = Math.max(0, previousRawTotal - existingDiscountAmountFromDB);
+  if (billingSummary && billingSummary.grossAmount) {
+    // ✅ NEW: Map from VisitBill normalized structure (after backend fix)
+    finalGrandTotal = parseFloat(billingSummary.grossAmount) || 0;
+    finalInitialDiscount = parseFloat(billingSummary.totalDiscount) || 0;
+    finalInitialAmount = finalGrandTotal - finalInitialDiscount;
+    finalNewTestTotal = 0;  // No separate new tests in normalized structure
+    finalNewDiscount = 0;
+    finalNetAmount = finalGrandTotal - finalInitialDiscount;
+    finalBalance = parseFloat(billingSummary.balanceAmount) || 0;
+    
+    console.log('✅ Using VisitBill from backend (FRESH DATA):', {
+      grossAmount: finalGrandTotal,
+      totalDiscount: finalInitialDiscount,
+      balanceAmount: finalBalance,
+      totalPaid: billingSummary.totalPaid,
+      status: billingSummary.status,
+      rawBillingSummary: JSON.stringify(billingSummary)
+    });
+  } else {
+    // Local fallback calculation using old field names
+    const advanceFromDB = parseFloat(booking?.billing?.paidAmount) || parseFloat(booking?.paidAmount) || 0;
+    const balanceAmountFromDB = parseFloat(booking?.billing?.balanceAmount) || parseFloat(booking?.balanceAmount) || 0;
+    const existingDiscountAmountFromDB = parseFloat(booking?.billing?.discountAmount) || parseFloat(booking?.billing?.totalDiscount) || parseFloat(booking?.discountAmount) || 0;
+    
+    finalGrandTotal = parseFloat(booking?.billing?.grossAmount) || (advanceFromDB + balanceAmountFromDB + existingDiscountAmountFromDB) || 0;
+    finalInitialDiscount = existingDiscountAmountFromDB;
+    finalInitialAmount = finalGrandTotal - finalInitialDiscount;
+    finalBalance = balanceAmountFromDB;
+    finalNewTestTotal = 0;
+    finalNewDiscount = 0;
+    finalNetAmount = finalInitialAmount;
+    
+    console.log('⚠️ Using fallback calculation (billingSummary not available):', {
+      grossAmount: finalGrandTotal,
+      totalDiscount: finalInitialDiscount,
+      balanceAmount: finalBalance,
+      bookingBillingObject: booking?.billing
+    });
+  }
   
-  // New tests raw total
-  const newTestsRawTotal = tests
-    .filter(t => !t.isExisting)
-    .reduce((sum: number, t: any) => sum + (businessType === "B2C" ? (t.b2cCharge || t.charge || 0) : (t.b2bCharge || t.charge || 0)), 0);
+  // ✅ NOW CALCULATE NEW TEST CHARGES FOR DISPLAY
+  // When user adds new tests, calculate their totals locally for preview
+  const newTestsAddedToModal = tests.filter(t => !t.isExisting);
+  const newTestsChargeTotal = newTestsAddedToModal.reduce((sum, t) => {
+    const charge = businessType === "B2C" ? (t.b2cCharge || t.charge || 0) : (t.b2bCharge || t.charge || 0);
+    return sum + charge;
+  }, 0);
   
-  // ✅ Add alias for compatibility with JSX
-  const newTestsTotal = newTestsRawTotal;
+  // ✅ NEW LOGIC: Discount applies to BALANCE AMOUNT (not just new tests)
+  // New total balance = existing balance + new test charges
+  const newTotalBalance = finalBalance + newTestsChargeTotal;
   
-  // Discount logic for NEW TESTS:
-  // Apply discount ONLY to new tests (as combined total)
-  const newTestDiscountAmount = discountPercent > 0 ? (newTestsRawTotal * discountPercent) / 100 : discount;
+  // Calculate discount on TOTAL BALANCE (not just new tests)
+  let newTestDiscountForPreview = 0;
+  if (discountPercent > 0 && newTotalBalance > 0) {
+    newTestDiscountForPreview = Math.round((newTotalBalance * discountPercent) / 100);
+  } else if (discount > 0) {
+    newTestDiscountForPreview = discount;
+  }
   
-  // New test net amount (after discount)
-  const newTestsNetAmount = Math.max(0, newTestsRawTotal - newTestDiscountAmount);
+  const newTestsNetForPreview = newTotalBalance - newTestDiscountForPreview;
   
-  // ✅ BALANCE = GRAND TOTAL - ADVANCE
+  // Display values - get from billingSummary or fallback to booking data
+  // ✅ NEW LOGIC: Discount applies to balance, not just new tests
+  const balanceBeforeDiscount = finalBalance + newTestsChargeTotal;  // Balance before discount
+  
+  // ✅ FIX: TOTAL DISCOUNT from DB (not just previous session)
+  // finalInitialDiscount already contains the AGGREGATE total from billingSummary.totalDiscount OR booking.billing.discountAmount/totalDiscount
+  const previousDiscount = parseFloat(String(finalInitialDiscount)) || 0;  // Ensure it's a number
+  const previousDiscountPercent = billingSummary?.totalDiscountPercent ? Math.round(billingSummary.totalDiscountPercent) : (finalGrandTotal > 0 ? Math.round((previousDiscount / finalGrandTotal) * 100) : 0);
+  const aggregateDiscountAmount = previousDiscount + newTestDiscountForPreview;  // AGGREGATE - for SUMMARY
+  
+  console.log('📊 Final Bill Display Values:', {
+    finalGrandTotal,
+    finalInitialDiscount,
+    finalBalance,
+    previousDiscount,
+    newTestDiscountForPreview,
+    aggregateDiscountAmount,
+    newTestsAdded,
+    billingSummaryExists: !!billingSummary,
+    billingSummaryTotalDiscount: billingSummary?.totalDiscount
+  });
+  
+  console.log('📊 Calculation Debug:', {
+    finalBalance,
+    newTestsChargeTotal,
+    newTotalBalance,
+    discountPercent,
+    newTestDiscountForPreview,
+    previousDiscount,
+    aggregateDiscountAmount,
+    balanceBeforeDiscount
+  });
+  
+  // ✅ FIX: Calculate totals correctly
+  const grandTotal = finalGrandTotal + newTestsChargeTotal;  // Total gross with new tests
+  
+  const newTestsTotal = newTestsChargeTotal;
+  const newTestDiscountAmount = newTestDiscountForPreview;  // Applied to balance
+  
+  // ✅ Get ADVANCE from database (cumulative payment across all sessions)
+  const advanceFromDB = billingSummary?.totalPaid 
+    ? parseFloat(billingSummary.totalPaid) 
+    : (booking?.billing?.paidAmount || booking?.paidAmount || 0);
+  
+  // ✅ For Net Amount and Balance: Apply aggregate discount to balance
+  const balanceAfterAggregateDiscount = Math.max(0, balanceBeforeDiscount - aggregateDiscountAmount);
+  
+  // ✅ CORRECT: Calculate discount % based on TOTAL GROSS AMOUNT
+  const totalTestCharges = finalGrandTotal + newTestsChargeTotal;  // All test charges
+  const aggregateDiscountPercent = totalTestCharges > 0 ? Math.round((aggregateDiscountAmount / totalTestCharges) * 100) : 0;
+  
+  // ✅ For display in Grand Total (shows EXISTING state, not aggregate)
   const displayedBalanceAmount = Math.max(0, grandTotal - advanceFromDB);
-  
-  // ✅ NET AMOUNT = BALANCE - PAYMENT (reduces real-time as you type payment)
   const displayedNetAmount = Math.max(0, displayedBalanceAmount - paymentAmount);
+  const finalBalanceAmount = paymentAmount >= displayedBalanceAmount ? 0 : displayedBalanceAmount;
   
-  // ✅ BALANCE AMOUNT = only reduces to 0 when FULL payment is made
-  const finalBalanceAmount = paymentAmount >= displayedBalanceAmount 
-    ? 0  // Fully paid
-    : displayedBalanceAmount;
-  
-  // Total Discount Amount (keep separate: existing + new)
-  const totalDiscountAmount = existingDiscountAmountFromDB + newTestDiscountAmount;
-  
-  // Total raw amount before any discount
-  const totalRawAmount = previousRawTotal + newTestsRawTotal;
-  
-  // Total Discount Percentage
-  const totalDiscountPercent = totalRawAmount > 0 
-    ? (totalDiscountAmount / totalRawAmount * 100)
-    : 0;
-
-  // Payment warning: if payment exceeds balance
   const paymentExceeds = paymentAmount > displayedBalanceAmount;
+  const newTestsNetAmount = newTestsTotal - newTestDiscountAmount;
+  
+  // ✅ NEW: Calculate remaining balance after all discounts and payments
+  // Advance = Total of ALL payments made (cumulative) + NEW payment being entered
+  // Balance = Gross - Discount - All Payments Made
+  const totalAmountDue = finalGrandTotal - previousDiscount;  // After discount
+  
+  // ✅ KEY: Add the NEW payment amount to the existing advance
+  const totalAdvancePaid = advanceFromDB + paymentAmount;  // Cumulative: previous + new
+  const remainingBalance = Math.max(0, totalAmountDue - totalAdvancePaid);  // What's still owed
+  
+  const totalAmountDueAfterNewDiscount = (finalGrandTotal + newTestsChargeTotal - previousDiscount - newTestDiscountForPreview);
+  const remainingBalanceAfterNewDiscount = Math.max(0, totalAmountDueAfterNewDiscount - totalAdvancePaid);
+  
+  // ✅ Determine if should show Advance field (only if something was paid or will be paid)
+  const shouldShowAdvance = totalAdvancePaid > 0;
 
   const handleAddTest = (test: any, pkg?: any) => {
     if (!tests.find(t => t.name === test.name)) {
@@ -168,7 +347,19 @@ const BookingDetailsModal: React.FC<BookingDetailsModalProps> = ({
       console.log(`Deleting existing test: ${testName}, charge: ${testCharge}`);
       // This will trigger recalculation on next render
     }
-    setTests(tests.filter(t => t.name !== testName));
+    
+    const updatedTests = tests.filter(t => t.name !== testName);
+    setTests(updatedTests);
+    
+    // ✅ Reset discount when test is deleted
+    setDiscountPercent(0);
+    setDiscount(0);
+    
+    // ✅ If no new tests left, reset newTestsAdded flag
+    const remainingNewTests = updatedTests.filter(t => !t.isExisting);
+    if (remainingNewTests.length === 0) {
+      setNewTestsAdded(false);
+    }
   };
 
   const handleSaveCharge = (testName: string) => {
@@ -221,10 +412,23 @@ const BookingDetailsModal: React.FC<BookingDetailsModalProps> = ({
             b2bCharge: t.b2bCharge,
             outsourcedTo: t.outsourcedTo || null
           })),
-          discountType: discountType,  // ✅ NEW: Send discount type
-          discountPercent: parseFloat(discountPercent) || 0,
-          discountAmount: parseFloat(discount) || 0,
-          discountRemark: discountRemark,
+          // NEW: Map to BillingSession and BillDiscount enums
+          billingSession: {
+            sessionType: "ADD_TEST",
+            remarks: discountRemark || null,
+            createdBy: null
+          },
+          discount: {
+            discountType: discountPercent > 0 ? "PERCENTAGE" : "FLAT",
+            discountValue: discountPercent || discount || 0,
+            discountAmount: discount || 0,
+            discountPercent: discountPercent || 0,
+            discountRemark: discountRemark || null
+          },
+          payment: {
+            paymentMode: paymentMode,
+            amount: paymentAmount || 0
+          },
           businessType
         })
       });
@@ -249,20 +453,26 @@ const BookingDetailsModal: React.FC<BookingDetailsModalProps> = ({
         console.log('📋 New tests by barcode:', result.data.newTestsByBarcode);
       }
 
-      // Update the booking with new totals
-      // ✅ IMPORTANT: Keep original balanceAmount UNCHANGED
-      // Balance Amount should remain from original tests only
-      // New test charges are shown separately in the modal
+      // Update the booking with new totals from VisitBill
       const updatedBooking = {
         ...booking,
         tests: result.data.allTests.map((t: any) => ({
           ...t,
           isExisting: true // Mark all as existing now since they're in DB
         })),
-        // ✅ Do NOT update balanceAmount - keep it from original tests only
-        // balanceAmount remains as booking.balanceAmount (unchanged)
-        discountAmount: result.data.discountAmount,
-        discountPercent: discountPercent ? parseFloat(discountPercent) : booking.discountPercent,
+        // NEW: Update with VisitBill normalized structure
+        billing: {
+          grossAmount: result.data.visitBill?.grossAmount || result.data.totalAmount || 0,
+          totalDiscount: result.data.visitBill?.totalDiscount || result.data.discountAmount || 0,
+          discountPercent: result.data.visitBill?.totalDiscount ? 
+            Math.round((result.data.visitBill.totalDiscount / result.data.visitBill.grossAmount) * 100) :
+            discountPercent || 0,
+          discountAmount: result.data.visitBill?.totalDiscount || result.data.discountAmount || 0,
+          discountRemark: discountRemark,
+          paidAmount: paymentAmount || 0,
+          balanceAmount: result.data.visitBill?.balanceAmount || result.data.balanceAmount || 0,
+          status: result.data.visitBill?.status || "PENDING"
+        },
         patientData: {
           ...booking.patientData,
           paymentMode
@@ -270,6 +480,20 @@ const BookingDetailsModal: React.FC<BookingDetailsModalProps> = ({
       };
 
       onBookingUpdate?.(updatedBooking);
+      
+      // ✅ Build success message
+      const messages: string[] = [];
+      if (newTests.length > 0) {
+        messages.push(`✅ ${newTests.length} new test(s) added successfully`);
+      }
+      messages.push(`✅ Payment updated successfully`);
+      
+      const successMessage = messages.join('\n');
+      alert(successMessage);
+      
+      // ✅ Reset payment field to 0
+      setPaymentAmount(0);
+      
       onClose();
 
     } catch (error) {
@@ -518,10 +742,16 @@ const BookingDetailsModal: React.FC<BookingDetailsModalProps> = ({
                   <div className="text-xs font-semibold text-gray-700 mb-1">Grand Total</div>
                   <div className="flex gap-1.5 items-end">
                     {[
-                      { label: "Grand Total", val: grandTotal.toFixed(0), ro: true, color: "text-orange-600" },
-                      { label: "Advance", val: advanceFromDB.toFixed(0), ro: true, color: "text-blue-600" },
-                      { label: "Dis", val: totalDiscountAmount.toFixed(0), ro: true, color: "text-yellow-600" },
-                      { label: "Bal", val: finalBalanceAmount.toFixed(0), ro: true, color: "text-red-600" },
+                      { label: "Grand Total", val: (finalGrandTotal + newTestsChargeTotal).toFixed(0), ro: true, color: "text-orange-600" },
+                      // Only show Advance if something was paid or will be paid
+                      ...(shouldShowAdvance ? [
+                        { label: "Advance", val: totalAdvancePaid.toFixed(0), ro: true, color: "text-blue-600" }
+                      ] : []),
+                      { label: "Dis", val: previousDiscount.toFixed(0), ro: true, color: "text-yellow-600" }, // ✅ Shows TOTAL aggregate discount from DB
+                      { label: "Bal", val: (newTestsAdded 
+                        ? Math.max(0, (finalGrandTotal + newTestsChargeTotal) - (previousDiscount + newTestDiscountForPreview) - totalAdvancePaid)
+                        : Math.max(0, finalGrandTotal - previousDiscount - totalAdvancePaid)
+                      ).toFixed(0), ro: true, color: "text-red-600" },
                     ].map((item, i) => (
                       <div key={i} className="flex-1">
                         <div className={`${item.color} font-bold text-xs text-center mb-0.5`}>{item.label}</div>
@@ -545,10 +775,8 @@ const BookingDetailsModal: React.FC<BookingDetailsModalProps> = ({
                     </div>
                     <div className="flex gap-1.5 items-end">
                       {[
-                        { label: "Amt", val: newTestsTotal.toFixed(0), ro: true, color: "text-blue-600" },
                         { label: "Dis%", val: discountPercent > 0 ? discountPercent.toFixed(0) : '', ro: false, color: "text-gray-600" },
                         { label: "DisAmt", val: newTestDiscountAmount > 0 ? newTestDiscountAmount.toFixed(0) : '', ro: true, color: "text-green-600" },
-                        { label: "Total", val: newTestsNetAmount.toFixed(0), ro: true, color: "text-blue-700" },
                       ].map((item, i) => (
                         <div key={i} className="flex-1">
                           <div className={`${item.color} font-bold text-xs text-center mb-0.5`}>{item.label}</div>
@@ -582,9 +810,11 @@ const BookingDetailsModal: React.FC<BookingDetailsModalProps> = ({
                   <div className="text-xs font-semibold text-gray-700 mb-1">Summary</div>
                   <div className="flex gap-1.5 items-end">
                     {[
-                      { label: "Total Dis", val: totalDiscountAmount > 0 ? totalDiscountAmount.toFixed(0) : '', ro: true, color: "text-red-600" },
-                      { label: "Dis%", val: totalDiscountPercent > 0 ? totalDiscountPercent.toFixed(0) : '', ro: true, color: "text-red-600" },
-                      { label: "Net Amt", val: displayedNetAmount.toFixed(0), ro: true, color: "text-purple-600" },
+                      // Only show Total Dis if new test was added and there's a discount
+                      ...(newTestsAdded && (previousDiscount + newTestDiscountForPreview) > 0 ? [
+                        { label: "Total Dis", val: (previousDiscount + newTestDiscountForPreview).toFixed(0), ro: true, color: "text-red-600" }
+                      ] : []),
+                      { label: "Net Amt", val: (newTestsAdded ? remainingBalanceAfterNewDiscount : remainingBalance).toFixed(0), ro: true, color: "text-purple-600" },
                       { label: "Payment", val: paymentAmount > 0 ? paymentAmount.toFixed(0) : '', ro: false, color: paymentExceeds ? "text-red-700" : "text-green-700" },
                     ].map((item, i) => (
                       <div key={i} className="flex-1">
@@ -605,7 +835,7 @@ const BookingDetailsModal: React.FC<BookingDetailsModalProps> = ({
                     ))}
                   </div>
                   {paymentExceeds && (
-                    <div className="text-xs text-red-600 font-semibold mt-1">⚠️ Exceed amount: ₹{(paymentAmount - displayedNetAmount).toFixed(0)}</div>
+                    <div className="text-xs text-red-600 font-semibold mt-1">⚠️ Exceed amount: ₹{(paymentAmount - (newTestsAdded ? remainingBalanceAfterNewDiscount : remainingBalance)).toFixed(0)}</div>
                   )}
                 </div>
 

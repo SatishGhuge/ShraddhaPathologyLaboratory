@@ -1,4 +1,5 @@
 import prisma from '../config/database.js';
+import { Decimal } from '@prisma/client/runtime/library.js';
 import { validationResult } from 'express-validator';
 import { getPaginationParams, buildPaginatedResponse } from '../utils/pagination.js';
 import { generatePatientId, generateVisitId } from '../utils/idGenerator.js';
@@ -27,6 +28,135 @@ async function calculateAndSaveAgeFields(patientId, dob) {
     console.log(`✅ Updated age fields for ${patientId}: ${ageData.years}Y ${ageData.months}M ${ageData.days}D`);
   } catch (error) {
     console.error(`Error calculating age fields for ${patientId}:`, error);
+  }
+}
+
+// ✅ Helper: Create VisitBill record
+async function createVisitBill(visitId, patientId, grossAmount, totalDiscount, totalPaid, balanceAmount) {
+  try {
+    const visitBill = await prisma.visitBill.create({
+      data: {
+        visitId,
+        patientId,
+        grossAmount: new Decimal(grossAmount.toString()),
+        totalDiscount: new Decimal(totalDiscount.toString()),
+        totalPaid: new Decimal(totalPaid.toString()),
+        totalRefund: new Decimal('0'),
+        balanceAmount: new Decimal(balanceAmount.toString()),
+        status: totalPaid >= grossAmount - totalDiscount ? 'PAID' : totalPaid > 0 ? 'PARTIAL' : 'PENDING'
+      }
+    });
+    
+    console.log(`✅ VisitBill created: visitId=${visitId}, grossAmount=${grossAmount}, balance=${balanceAmount}`);
+    return visitBill;
+  } catch (error) {
+    console.error('Error creating VisitBill:', error);
+    throw error;
+  }
+}
+
+// ✅ Helper: Create BillingSession record
+async function createBillingSession(visitId, sessionType, sequence, remarks = null, createdBy = null) {
+  try {
+    const billingSession = await prisma.billingSession.create({
+      data: {
+        visitId,
+        sessionType,
+        sequence,
+        remarks,
+        createdBy
+      }
+    });
+    
+    console.log(`✅ BillingSession created: sessionType=${sessionType}, sequence=${sequence}`);
+    return billingSession;
+  } catch (error) {
+    console.error('Error creating BillingSession:', error);
+    throw error;
+  }
+}
+
+// ✅ Helper: Create BillDiscount record
+async function createBillDiscount(visitId, billingSessionId, discountType, discountValue, discountAmount, appliedOnAmount, remarks = null, createdBy = null) {
+  try {
+    const billDiscount = await prisma.billDiscount.create({
+      data: {
+        visitId,
+        billingSessionId,
+        discountType,
+        discountValue: new Decimal(discountValue.toString()),
+        discountAmount: new Decimal(discountAmount.toString()),
+        appliedOnAmount: new Decimal(appliedOnAmount.toString()),
+        remarks,
+        createdBy
+      }
+    });
+    
+    console.log(`✅ BillDiscount created: type=${discountType}, amount=${discountAmount}`);
+    return billDiscount;
+  } catch (error) {
+    console.error('Error creating BillDiscount:', error);
+    throw error;
+  }
+}
+
+// ✅ Helper: Create Payment record
+async function createPaymentRecord(visitId, billingSessionId, amount, paymentMode, remarks = null, receivedBy = null) {
+  try {
+    const payment = await prisma.payment.create({
+      data: {
+        visitId,
+        billingSessionId,
+        amount: new Decimal(amount.toString()),
+        paymentMode,
+        remarks,
+        receivedBy
+      }
+    });
+    
+    console.log(`✅ Payment created: amount=${amount}, mode=${paymentMode}`);
+    return payment;
+  } catch (error) {
+    console.error('Error creating Payment:', error);
+    throw error;
+  }
+}
+
+// ✅ Helper: Create BillTransaction (audit trail)
+async function createBillTransaction(visitId, billingSessionId, transactionType, amount, balanceAfter, remarks = null, createdBy = null) {
+  try {
+    const transaction = await prisma.billTransaction.create({
+      data: {
+        visitId,
+        billingSessionId,
+        transactionType,
+        amount: new Decimal(amount.toString()),
+        balanceAfter: new Decimal(balanceAfter.toString()),
+        remarks,
+        createdBy
+      }
+    });
+    
+    console.log(`✅ BillTransaction created: type=${transactionType}, amount=${amount}`);
+    return transaction;
+  } catch (error) {
+    console.error('Error creating BillTransaction:', error);
+    throw error;
+  }
+}
+
+// ✅ Helper: Get next BillingSession sequence for a visit
+async function getNextSequence(visitId) {
+  try {
+    const lastSession = await prisma.billingSession.findFirst({
+      where: { visitId },
+      orderBy: { sequence: 'desc' }
+    });
+    
+    return (lastSession?.sequence || 0) + 1;
+  } catch (error) {
+    console.error('Error getting next sequence:', error);
+    return 1;
   }
 }
 
@@ -59,16 +189,33 @@ export const createPatient = async (req, res) => {
       // Registration Details (will be saved with each test)
       reportMode, referralDoctor, visitDate, visitTime,
       sampleTaken, sampleReceived, sampleBarcodeNo, patient_history,
-      // NEW BILLING FIELDS (Single discount for all tests)
-      discountPercent = 0,
-      discountAmount = 0,
-      advanceAmount = 0,
-      discountRemark,
       paymentMode = 'Cash',
       businessType = 'B2C',
+      // Billing object (contains discount and payment info)
+      billing = {},
       // Tests
       tests 
     } = req.body;
+
+    // ✅ EXTRACT BILLING FIELDS FROM billing OBJECT
+    let discountPercent = billing.discountPercent || 0;
+    let discountAmount = billing.discountAmount || 0;
+    let advanceAmount = billing.paidAmount || 0; // Frontend sends paidAmount, not advanceAmount
+    let discountRemark = billing.discountRemark || null;
+
+    // 🔧 FIX: Declare visitId at top level so it's accessible in response
+    let visitId = null;
+
+    console.log('💳 BILLING FIELDS RECEIVED:', {
+      'billing.discountPercent': billing.discountPercent,
+      'billing.discountAmount': billing.discountAmount,
+      'billing.paidAmount': billing.paidAmount,
+      'billing.discountRemark': billing.discountRemark,
+      'extracted discountPercent': discountPercent,
+      'extracted discountAmount': discountAmount,
+      'extracted advanceAmount': advanceAmount,
+      'extracted discountRemark': discountRemark
+    });
 
     // ✅ NEW BILLING VALIDATION
     if (!tests || tests.length === 0) {
@@ -157,7 +304,7 @@ export const createPatient = async (req, res) => {
 
     if (isExistingPatient && patient) {
       // Add tests to existing patient with NEW Visit ID
-      const visitId = await generateVisitId(visitDate);
+      visitId = await generateVisitId(visitDate);
       
       // ✅ NEW BILLING LOGIC: Single discount for all tests
       // Step 1: Calculate total test charges
@@ -185,7 +332,7 @@ export const createPatient = async (req, res) => {
       const finalAdvanceAmount = Math.min(parseFloat(advanceAmount) || 0, testAmount);
       const balanceAmount = testAmount - finalAdvanceAmount;
       
-      console.log('💰 Billing Calculation:', {
+      console.log('💰 Billing Calculation (Existing Patient):', {
         totalTestCharges,
         finalDiscountAmount,
         testAmount,
@@ -193,68 +340,117 @@ export const createPatient = async (req, res) => {
         balanceAmount
       });
       
-      // Step 5: Distribute amounts proportionally among tests
-      const patientTestsData = tests.map(test => {
-        const testCharge = parseFloat(test.charge);
-        const proportion = testCharge / totalTestCharges;
-        
-        return {
-          patientId: patient.patientId,
-          visitId,
-          testId: parseInt(test.testId || test.id),
-          departmentId: test.departmentId || 1,
-          organizationId: req.body.organizationId || null,
-          sample: test.sample || 'Blood',
-          charge: testCharge,
-          reportMode: reportMode || 'Email',
-          referralDoctor,
-          visitDate: visitDate ? new Date(visitDate) : new Date(),
-          visitTime: visitTime || '10:00',
-          sampleTaken: sampleTaken ? new Date(sampleTaken) : null,
-          sampleReceived: sampleReceived ? new Date(sampleReceived) : null,
-          sampleBarcodeNo,
-          patient_history,
-          paymentMode: paymentMode || 'Cash',
-          businessType: businessType || 'B2C',
-          
-          // ✅ NEW BILLING FIELDS
-          testCharges: testCharge,
-          discountPercent: finalDiscountPercent,
-          discountAmount: finalDiscountAmount * proportion,
-          testAmount: testAmount * proportion,
-          advanceAmount: finalAdvanceAmount * proportion,
-          balanceAmount: balanceAmount * proportion,
-          
-          // Legacy fields (for compatibility)
-          totalAmount: testAmount * proportion,
-          paidAmount: finalAdvanceAmount * proportion,
-          discountRemark: discountRemark || null
-        };
-      });
-      
-      await prisma.patientTest.createMany({
-        data: patientTestsData
-      });
-
-      // Create payment transaction if payment was made during registration
-      if(paymentMode && finalAdvanceAmount > 0){
-        await prisma.paymentTransaction.create({
+      // ✅ WRAP IN TRANSACTION - All or nothing
+      // ⚠️ CRITICAL: Create VisitBill FIRST (foreign key constraint)
+      // BillingSession, BillDiscount, Payment all reference VisitBill.visitId
+      await prisma.$transaction(async (tx) => {
+        // Step 1: Create VisitBill FIRST (master record with FK reference)
+        await tx.visitBill.create({
           data: {
             visitId,
             patientId: patient.patientId,
-            paymentMode,
-            paymentAmount: finalAdvanceAmount,
-            remarks: `Advance payment at registration`
+            grossAmount: new Decimal(totalTestCharges),
+            totalDiscount: new Decimal(finalDiscountAmount),
+            totalDiscountPercent: finalDiscountPercent,
+            totalPaid: new Decimal(finalAdvanceAmount),
+            totalRefund: new Decimal('0'),
+            balanceAmount: new Decimal(balanceAmount),
+            status: finalAdvanceAmount >= testAmount ? 'PAID' : finalAdvanceAmount > 0 ? 'PARTIAL' : 'PENDING'
           }
         });
-        console.log(`✅ Payment transaction created: ${paymentMode} - ₹${finalAdvanceAmount}`);
-      }
+        
+        console.log(`✅ [TX] VisitBill created: ₹${totalTestCharges} (balance: ₹${balanceAmount})`);
+        
+        // Step 2: Create BillingSession (references VisitBill.visitId)
+        const billingSession = await tx.billingSession.create({
+          data: {
+            visitId,
+            sessionType: 'REGISTRATION',
+            sequence: 1,
+            remarks: `Patient registration with ${tests.length} tests`
+          }
+        });
+        
+        console.log(`✅ [TX] BillingSession created: sessionType=REGISTRATION, sequence=1`);
+        
+        // Step 3: Create BillDiscount if discount > 0
+        if (finalDiscountAmount > 0) {
+          await tx.billDiscount.create({
+            data: {
+              visitId,
+              billingSessionId: billingSession.id,
+              discountType: discountPercent > 0 ? 'PERCENTAGE' : 'FLAT',
+              discountValue: new Decimal(discountPercent > 0 ? finalDiscountPercent : finalDiscountAmount),
+              discountAmount: new Decimal(finalDiscountAmount),
+              appliedOnAmount: new Decimal(totalTestCharges),
+              remarks: discountRemark || null
+            }
+          });
+          console.log(`✅ [TX] BillDiscount created: ₹${finalDiscountAmount}`);
+        }
+        
+        // Step 4: Create Payment if advance > 0
+        if (finalAdvanceAmount > 0) {
+          const payMode = paymentMode === 'Cash' ? 'CASH' : 
+                         paymentMode === 'Card' ? 'CARD' : 
+                         paymentMode === 'UPI' ? 'UPI' :
+                         paymentMode === 'Cheque' ? 'CHEQUE' :
+                         paymentMode === 'Bank Transfer' ? 'BANK_TRANSFER' : 'OTHER';
+          
+          await tx.payment.create({
+            data: {
+              visitId,
+              billingSessionId: billingSession.id,
+              amount: new Decimal(finalAdvanceAmount),
+              paymentMode: payMode,
+              transactionStatus: 'SUCCESS',
+              remarks: `Advance payment at registration`,
+              paymentDate: new Date()
+            }
+          });
+          console.log(`✅ [TX] Payment created: ₹${finalAdvanceAmount}`);
+        }
+        
+        // Step 5: Create PatientTest records (source of truth for test data)
+        const patientTestsData = tests.map(test => {
+          const testCharge = parseFloat(test.charge);
+          return {
+            patientId: patient.patientId,
+            visitId,
+            testId: parseInt(test.testId || test.id),
+            departmentId: test.departmentId || 1,
+            organizationId: req.body.organizationId || null,
+            sample: test.sample || 'Blood',
+            charge: testCharge,
+            reportMode: reportMode || 'Email',
+            referralDoctor,
+            visitDate: visitDate ? new Date(visitDate) : new Date(),
+            visitTime: visitTime || '10:00',
+            sampleTaken: sampleTaken ? new Date(sampleTaken) : null,
+            sampleReceived: sampleReceived ? new Date(sampleReceived) : null,
+            sampleBarcodeNo,
+            patient_history,
+            paymentMode: paymentMode || 'Cash',
+            businessType: businessType || 'B2C',
+            billingSessionId: billingSession.id
+          };
+        });
+        
+        await tx.patientTest.createMany({
+          data: patientTestsData
+        });
+        
+        console.log(`✅ [TX] PatientTest records created: ${tests.length} tests`);
+      });
+      
+      console.log(`✅ Transaction completed successfully for existing patient`);
 
-      // Get updated patient with all tests
+      // Get updated patient with ONLY the tests from the current visit
       patient = await prisma.patient.findUnique({
         where: { patientId: patient.patientId },
         include: { 
           tests: {
+            where: { visitId: visitId },
             include: {
               test: true,
               department: true,
@@ -263,11 +459,13 @@ export const createPatient = async (req, res) => {
           }
         }
       });
+      
+      console.log(`✅ Fetched patient with current visit tests: visitId=${visitId}, testsCount=${patient.tests.length}`);
 
     } else {
       // Create new patient with new ID format: S + YY + MM + 00001
       const patientId = await generatePatientId();
-      const visitId = await generateVisitId(visitDate);
+      visitId = await generateVisitId(visitDate);
 
       // ✅ NEW BILLING LOGIC: Single discount for all tests
       // Step 1: Calculate total test charges
@@ -303,67 +501,140 @@ export const createPatient = async (req, res) => {
         balanceAmount
       });
       
-      // Step 5: Distribute amounts proportionally among tests
-      const testsWithBilling = tests.map(test => {
-        const testCharge = parseFloat(test.charge);
-        const proportion = testCharge / totalTestCharges;
-        
-        return {
-          visitId,
-          testId: parseInt(test.testId || test.id),
-          departmentId: test.departmentId || 1,
-          organizationId: req.body.organizationId || null,
-          sample: test.sample || 'Blood',
-          charge: testCharge,
-          reportMode: reportMode || 'Email',
-          referralDoctor: referralDoctor || null,
-          visitDate: visitDate ? new Date(visitDate) : new Date(),
-          visitTime: visitTime || '10:00',
-          sampleTaken: sampleTaken ? new Date(sampleTaken) : null,
-          sampleReceived: sampleReceived ? new Date(sampleReceived) : null,
-          sampleBarcodeNo,
-          patient_history,
-          paymentMode: paymentMode || 'Cash',
-          businessType: businessType || 'B2C',
-          
-          // ✅ NEW BILLING FIELDS
-          testCharges: testCharge,
-          discountPercent: finalDiscountPercent,
-          discountAmount: finalDiscountAmount * proportion,
-          testAmount: testAmount * proportion,
-          advanceAmount: finalAdvanceAmount * proportion,
-          balanceAmount: balanceAmount * proportion,
-          
-          // Legacy fields (for compatibility)
-          totalAmount: testAmount * proportion,
-          paidAmount: finalAdvanceAmount * proportion,
-          discountRemark: discountRemark || null
-        };
-      });
-
-      patient = await prisma.patient.create({
-        data: {
-          patientId,
-          title,
-          firstName,
-          lastName,
-          dob: dob ? new Date(dob) : null,
-          ageYears: (age && !dob) ? parseInt(age) : null,
-          ageMonths: (age && !dob) ? 0 : null,
-          ageDays: (age && !dob) ? 0 : null,
-          gender,
-          mobile,
-          email,
-          createdBy,
-          createdAtLocation,
-          address,
-          location,
-          tests: {
-            create: testsWithBilling
+      // ✅ WRAP IN TRANSACTION - All or nothing
+      // ⚠️ CRITICAL: Create VisitBill FIRST (foreign key constraint)
+      // BillingSession, BillDiscount, Payment all reference VisitBill.visitId
+      await prisma.$transaction(async (tx) => {
+        // Step 1: Create Patient (must exist before tests)
+        patient = await tx.patient.create({
+          data: {
+            patientId,
+            title,
+            firstName,
+            lastName,
+            dob: dob ? new Date(dob) : null,
+            ageYears: (age && !dob) ? parseInt(age) : null,
+            ageMonths: (age && !dob) ? 0 : null,
+            ageDays: (age && !dob) ? 0 : null,
+            gender,
+            mobile,
+            email,
+            createdBy,
+            createdAtLocation,
+            address,
+            location
           }
-        },
+        });
+        
+        console.log(`✅ [TX] Patient created: ${patient.patientId}`);
+        
+        // Step 2: Create VisitBill SECOND (master record with FK reference for BillingSession)
+        await tx.visitBill.create({
+          data: {
+            visitId,
+            patientId,
+            grossAmount: new Decimal(totalTestCharges),
+            totalDiscount: new Decimal(finalDiscountAmount),
+            totalDiscountPercent: finalDiscountPercent,
+            totalPaid: new Decimal(finalAdvanceAmount),
+            totalRefund: new Decimal('0'),
+            balanceAmount: new Decimal(balanceAmount),
+            status: finalAdvanceAmount >= testAmount ? 'PAID' : finalAdvanceAmount > 0 ? 'PARTIAL' : 'PENDING'
+          }
+        });
+        
+        console.log(`✅ [TX] VisitBill created: ₹${totalTestCharges} (balance: ₹${balanceAmount})`);
+        
+        // Step 3: Create BillingSession (references VisitBill.visitId)
+        const billingSession = await tx.billingSession.create({
+          data: {
+            visitId,
+            sessionType: 'REGISTRATION',
+            sequence: 1,
+            remarks: `Patient registration with ${tests.length} tests`
+          }
+        });
+        
+        console.log(`✅ [TX] BillingSession created: sessionType=REGISTRATION, sequence=1`);
+        
+        // Step 4: Create BillDiscount if discount > 0
+        if (finalDiscountAmount > 0) {
+          await tx.billDiscount.create({
+            data: {
+              visitId,
+              billingSessionId: billingSession.id,
+              discountType: discountPercent > 0 ? 'PERCENTAGE' : 'FLAT',
+              discountValue: new Decimal(discountPercent > 0 ? finalDiscountPercent : finalDiscountAmount),
+              discountAmount: new Decimal(finalDiscountAmount),
+              appliedOnAmount: new Decimal(totalTestCharges),
+              remarks: discountRemark || null
+            }
+          });
+          console.log(`✅ [TX] BillDiscount created: ₹${finalDiscountAmount}`);
+        }
+        
+        // Step 5: Create Payment if advance > 0
+        if (finalAdvanceAmount > 0) {
+          const payMode = paymentMode === 'Cash' ? 'CASH' : 
+                         paymentMode === 'Card' ? 'CARD' : 
+                         paymentMode === 'UPI' ? 'UPI' :
+                         paymentMode === 'Cheque' ? 'CHEQUE' :
+                         paymentMode === 'Bank Transfer' ? 'BANK_TRANSFER' : 'OTHER';
+          
+          await tx.payment.create({
+            data: {
+              visitId,
+              billingSessionId: billingSession.id,
+              amount: new Decimal(finalAdvanceAmount),
+              paymentMode: payMode,
+              transactionStatus: 'SUCCESS',
+              remarks: `Advance payment at registration`,
+              paymentDate: new Date()
+            }
+          });
+          console.log(`✅ [TX] Payment created: ₹${finalAdvanceAmount}`);
+        }
+        
+        // Step 6: Create PatientTest records (source of truth)
+        const patientTestsData = tests.map(test => {
+          const testCharge = parseFloat(test.charge);
+          return {
+            patientId,
+            visitId,
+            testId: parseInt(test.testId || test.id),
+            departmentId: test.departmentId || 1,
+            organizationId: req.body.organizationId || null,
+            sample: test.sample || 'Blood',
+            charge: testCharge,
+            reportMode: reportMode || 'Email',
+            referralDoctor: referralDoctor || null,
+            visitDate: visitDate ? new Date(visitDate) : new Date(),
+            visitTime: visitTime || '10:00',
+            sampleTaken: sampleTaken ? new Date(sampleTaken) : null,
+            sampleReceived: sampleReceived ? new Date(sampleReceived) : null,
+            sampleBarcodeNo,
+            patient_history,
+            paymentMode: paymentMode || 'Cash',
+            businessType: businessType || 'B2C',
+            billingSessionId: billingSession.id
+          };
+        });
+        
+        await tx.patientTest.createMany({
+          data: patientTestsData
+        });
+        
+        console.log(`✅ [TX] PatientTest records created: ${tests.length} tests`);
+      });
+      
+      console.log(`✅ Transaction completed successfully for new patient`);
+
+      // Fetch patient with tests
+      patient = await prisma.patient.findUnique({
+        where: { patientId },
         include: {
           tests: {
+            where: { visitId },
             include: {
               test: true,
               department: true
@@ -372,29 +643,13 @@ export const createPatient = async (req, res) => {
         }
       });
 
+      console.log(`✅ Patient created and fetched: ${patient.patientId}`);
+      
       // ✅ Calculate and save age fields from DOB (takes priority over manual age)
       if (dob) {
         await calculateAndSaveAgeFields(patient.patientId, dob);
       } else if (age) {
         console.log(`✅ Manually entered age: ${age} years → ageYears=${age}, ageMonths=0, ageDays=0`);
-      }
-
-      // Create payment transaction if payment was made during registration
-      if(paymentMode && finalAdvanceAmount > 0){
-        try {
-          await prisma.paymentTransaction.create({
-            data: {
-              visitId,
-              patientId: patient.patientId,
-              paymentMode,
-              paymentAmount: finalAdvanceAmount,
-              remarks: `Advance payment at registration`
-            }
-          });
-          console.log(`✅ Payment transaction created: ${paymentMode} - ₹${finalAdvanceAmount}`);
-        } catch(paymentErr){
-          console.warn('⚠️ Failed to create payment transaction:', paymentErr.message);
-        }
       }
     }
 
@@ -426,13 +681,30 @@ export const createPatient = async (req, res) => {
       }
     }
 
+    // 🔍 DEBUG: Log what we're returning to frontend
+    console.log('🔍 RESPONSE DEBUG - Returning patient to frontend:', {
+      patientId: patient?.patientId,
+      allTestsCount: patient?.tests?.length,
+      currentVisitId: isExistingPatient ? visitId : (patient?.tests?.[0]?.visitId || 'UNKNOWN'),
+      allTestVisitIds: patient?.tests?.map(t => t.visitId),
+      firstTestVisitId: patient?.tests?.[0]?.visitId,
+      firstTestData: {
+        id: patient?.tests?.[0]?.id,
+        visitId: patient?.tests?.[0]?.visitId,
+        testId: patient?.tests?.[0]?.testId,
+        charge: patient?.tests?.[0]?.charge
+      }
+    });
+
     res.status(201).json({
       success: true,
       message: isExistingPatient 
         ? `Tests added to existing patient (${patient.patientId})` 
         : 'New patient registered successfully',
       data: patient,
-      isExistingPatient: isExistingPatient
+      isExistingPatient: isExistingPatient,
+      // 🔧 FIX: Also return the visitId explicitly so frontend doesn't have to guess
+      visitId: isExistingPatient ? visitId : (patient?.tests?.[0]?.visitId || null)
     });
 
   } catch (error) {
@@ -677,15 +949,56 @@ export const getAllPatients = async (req, res) => {
       age: formatAgeFromComponents(patient.ageYears, patient.ageMonths, patient.ageDays)
     }));
 
-    console.log('✅ getAllPatients - Sample patient with formatted age:', {
-      patientId: patientsWithFormattedAge[0]?.patientId,
-      ageYears: patientsWithFormattedAge[0]?.ageYears,
-      ageMonths: patientsWithFormattedAge[0]?.ageMonths,
-      ageDays: patientsWithFormattedAge[0]?.ageDays,
-      age: patientsWithFormattedAge[0]?.age
+    // 🔧 FIX: Fetch balance amounts from VisitBill for each visit
+    const patientsWithBalance = await Promise.all(patientsWithFormattedAge.map(async (patient) => {
+      // Group tests by visitId to get unique visits
+      const visitIds = new Set(patient.tests.map(t => t.visitId).filter(Boolean));
+      
+      // Fetch VisitBill for each unique visit
+      const visitBills = await prisma.visitBill.findMany({
+        where: {
+          visitId: { in: Array.from(visitIds) }
+        },
+        select: {
+          visitId: true,
+          balanceAmount: true,
+          totalPaid: true,
+          totalDiscount: true,
+          grossAmount: true
+        }
+      });
+
+      // Create a map of visitId -> balance data
+      const balanceMap = {};
+      visitBills.forEach(bill => {
+        balanceMap[bill.visitId] = {
+          balanceAmount: bill.balanceAmount?.toNumber?.() || Number(bill.balanceAmount) || 0,
+          paidAmount: bill.totalPaid?.toNumber?.() || Number(bill.totalPaid) || 0,
+          discountAmount: bill.totalDiscount?.toNumber?.() || Number(bill.totalDiscount) || 0,
+          grossAmount: bill.grossAmount?.toNumber?.() || Number(bill.grossAmount) || 0
+        };
+      });
+
+      // Add balance amounts to tests
+      return {
+        ...patient,
+        tests: patient.tests.map(test => ({
+          ...test,
+          balanceAmount: balanceMap[test.visitId]?.balanceAmount || 0,
+          paidAmount: balanceMap[test.visitId]?.paidAmount || 0,
+          discountAmount: balanceMap[test.visitId]?.discountAmount || 0,
+          totalAmount: balanceMap[test.visitId]?.grossAmount || 0
+        }))
+      };
+    }));
+
+    console.log('✅ getAllPatients - Sample patient with balance:', {
+      patientId: patientsWithBalance[0]?.patientId,
+      firstTestBalance: patientsWithBalance[0]?.tests[0]?.balanceAmount,
+      age: patientsWithBalance[0]?.age
     });
 
-    res.json(buildPaginatedResponse(patientsWithFormattedAge, total, page, limit));
+    res.json(buildPaginatedResponse(patientsWithBalance, total, page, limit));
 
   } catch (error) {
     console.error('Get patients error:', error);
@@ -992,189 +1305,7 @@ export const updatePayment = async (req, res) => {
 // - Save new tests with NEW discount (applies only to new tests)
 // - Update existing PatientTest records with new overall discount
 // - Return barcode data for new tests (grouped by sample type)
-export const addTestsToExistingVisit = async (req, res) => {
-  try {
-    const { patientId, visitId, tests, discountPercent, discountAmount, discountRemark, businessType } = req.body;
 
-    if (!patientId || !visitId || !tests || tests.length === 0) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'patientId, visitId, and tests array are required' 
-      });
-    }
-
-    console.log('📝 Adding tests to existing visit:', {
-      patientId,
-      visitId,
-      newTestsCount: tests.length,
-      discountPercent,
-      discountAmount,
-      businessType
-    });
-
-    // Get existing tests for this visit to understand current state
-    const existingTests = await prisma.patientTest.findMany({
-      where: { patientId, visitId },
-      include: { test: true }
-    });
-
-    if (!existingTests.length) {
-      return res.status(404).json({ 
-        success: false, 
-        message: 'Visit not found for this patient' 
-      });
-    }
-
-    const firstExistingTest = existingTests[0];
-    
-    // Calculate totals
-    const existingTestsTotal = existingTests.reduce((sum, t) => sum + (t.totalAmount || 0), 0);
-    const newTestsTotal = tests.reduce((sum, t) => sum + (parseFloat(t.charge) || 0), 0);
-    const totalAmount = existingTestsTotal + newTestsTotal;
-    
-    // Discount logic:
-    // - NEW discount applies ONLY to newly added tests
-    // - Existing discount remains unchanged
-    const newDiscountAmount = discountPercent > 0 
-      ? Math.round((newTestsTotal * discountPercent) / 100) 
-      : (parseFloat(discountAmount) || 0);
-    
-    // Calculate net amount after new discount
-    const netAmountWithNewDiscount = Math.max(0, totalAmount - newDiscountAmount);
-    
-    // Get current paid and balance amounts
-    const currentPaidAmount = firstExistingTest.paidAmount || 0;
-    const newBalanceAmount = Math.max(0, netAmountWithNewDiscount - currentPaidAmount);
-
-    console.log('💰 Billing calculation:', {
-      existingTestsTotal,
-      newTestsTotal,
-      totalAmount,
-      newDiscountAmount,
-      netAmountWithNewDiscount,
-      currentPaidAmount,
-      newBalanceAmount
-    });
-
-    // Create new PatientTest records for new tests
-    const newPatientTests = await prisma.patientTest.createMany({
-      data: tests.map(test => ({
-        patientId,
-        visitId,
-        testId: test.id,
-        departmentId: test.departmentId,
-        organizationId: firstExistingTest.organizationId,
-        sample: test.sample,
-        charge: parseFloat(test.charge) || 0,
-        reportMode: firstExistingTest.reportMode,
-        referralDoctor: firstExistingTest.referralDoctor,
-        visitDate: firstExistingTest.visitDate,
-        visitTime: firstExistingTest.visitTime,
-        sampleTaken: firstExistingTest.sampleTaken,
-        sampleReceived: firstExistingTest.sampleReceived,
-        sampleBarcodeNo: firstExistingTest.sampleBarcodeNo,
-        patient_history: firstExistingTest.patient_history,
-        totalAmount: parseFloat(test.charge) || 0,
-        
-        // Original discount not applicable for new tests
-        originalDiscountPercent: 0,
-        originalDiscountAmount: 0,
-        
-        // ✅ Use ADDITIONAL discount fields (new tests from rebook)
-        additionalDiscountPercent: discountPercent ? parseFloat(discountPercent) : 0,
-        additionalDiscountAmount: newDiscountAmount / tests.length,
-        additionalDiscountRemark: discountRemark || '',
-        additionalDiscountDate: new Date(),
-        
-        // Keep for backward compatibility
-        discountPercent: discountPercent ? parseFloat(discountPercent) : 0,
-        discountAmount: newDiscountAmount / tests.length,
-        discountRemark: discountRemark || '',
-        
-        paidAmount: currentPaidAmount,
-        balanceAmount: newBalanceAmount,
-        paymentMode: firstExistingTest.paymentMode,
-        businessType: businessType || firstExistingTest.businessType,
-        status: 'Registered',
-        outsourcedTo: test.outsourcedTo || null
-      }))
-    });
-
-    console.log(`✅ Created ${newPatientTests.count} new PatientTest records`);
-
-    // Update all existing PatientTest records for this visit with new totals and balance
-    // DO NOT CHANGE their original discount - only update totals
-    await prisma.patientTest.updateMany({
-      where: { patientId, visitId },
-      data: {
-        totalAmount: totalAmount, // Update total (now includes new tests)
-        balanceAmount: newBalanceAmount
-        // ⚠️ DO NOT update originalDiscountPercent, originalDiscountAmount
-        // They remain unchanged for existing tests
-      }
-    });
-
-    console.log('✅ Updated all PatientTest records with new balance and discount');
-
-    // Fetch all tests for this visit (both existing and new) to return barcode data
-    const allTestsForVisit = await prisma.patientTest.findMany({
-      where: { patientId, visitId },
-      include: {
-        test: {
-          include: { sample_type: true }
-        }
-      }
-    });
-
-    // Group new tests by sample type for barcode generation
-    const newTestsByBarcode = {};
-    tests.forEach(test => {
-      const sampleKey = test.sample || 'Unknown';
-      if (!newTestsByBarcode[sampleKey]) {
-        newTestsByBarcode[sampleKey] = [];
-      }
-      newTestsByBarcode[sampleKey].push(test);
-    });
-
-    // Check if any new tests have different sample types from existing tests
-    const existingSampleTypes = new Set(existingTests.map(t => t.sample));
-    const newSampleTypes = new Set(Object.keys(newTestsByBarcode));
-    const hasDifferentSampleTypes = [...newSampleTypes].some(sample => !existingSampleTypes.has(sample));
-
-    console.log('🔍 Barcode generation info:', {
-      existingSampleTypes: Array.from(existingSampleTypes),
-      newSampleTypes: Array.from(newSampleTypes),
-      hasDifferentSampleTypes,
-      newTestsByBarcode: Object.keys(newTestsByBarcode)
-    });
-
-    res.json({
-      success: true,
-      message: 'Tests added to existing visit successfully',
-      data: {
-        patientId,
-        visitId,
-        totalTests: allTestsForVisit.length,
-        newTestsCount: tests.length,
-        totalAmount,
-        discountAmount: newDiscountAmount,
-        balanceAmount: newBalanceAmount,
-        currentPaidAmount,
-        needsNewBarcode: hasDifferentSampleTypes,
-        newTestsByBarcode: newTestsByBarcode,
-        allTests: allTestsForVisit
-      }
-    });
-
-  } catch (error) {
-    console.error('❌ Add tests to existing visit error:', error);
-    res.status(500).json({ 
-      success: false, 
-      message: 'Failed to add tests to existing visit', 
-      error: error.message 
-    });
-  }
-};
 
 // Get patient statistics for dashboard
 export const getPatientStatistics = async (req, res) => {
@@ -1559,6 +1690,25 @@ export const getTestsByVisitId = async (req, res) => {
 
     console.log(`📋 Fetching tests for visitId: ${visitId}`);
 
+    // ✅ NEW: Fetch VisitBill (master bill record)
+    let visitBill = await prisma.visitBill.findUnique({
+      where: { visitId },
+      include: {
+        billingSessions: {
+          include: {
+            discounts: true,
+            payments: true,
+            refunds: true
+          }
+        }
+      }
+    });
+
+    // If VisitBill doesn't exist, create one from existing PatientTest data
+    if (!visitBill) {
+      console.log(`⚠️ VisitBill not found for visitId: ${visitId}, will calculate from PatientTest data`);
+    }
+
     // Find all tests for this visit
     const tests = await prisma.patientTest.findMany({
       where: { visitId },
@@ -1598,6 +1748,13 @@ export const getTestsByVisitId = async (req, res) => {
             id: true,
             name: true
           }
+        },
+        patient: {
+          select: {
+            patientId: true,
+            firstName: true,
+            lastName: true
+          }
         }
       },
       orderBy: {
@@ -1607,13 +1764,114 @@ export const getTestsByVisitId = async (req, res) => {
 
     console.log(`✅ Found ${tests.length} test(s) for visitId: ${visitId}`);
 
+    // If VisitBill doesn't exist, calculate totals from PatientTest records
+    if (!visitBill && tests.length > 0) {
+      console.log('📊 Calculating billing totals from PatientTest records...');
+      
+      // Sum up all test charges
+      grossAmount = tests.reduce((sum, t) => sum + (parseFloat(t.charge) || 0), 0);
+      
+      // Sum up all discounts from PatientTest records
+      totalDiscount = tests.reduce((sum, t) => sum + (parseFloat(t.discountAmount) || parseFloat(t.New_discountAmount) || 0), 0);
+      
+      // Sum up all payments
+      totalPaid = tests.reduce((sum, t) => sum + (parseFloat(t.advanceAmount) || 0), 0);
+      
+      // Calculate balance
+      balanceAmount = Math.max(0, grossAmount - totalDiscount - totalPaid);
+      
+      // Determine status
+      if (balanceAmount <= 0) {
+        billStatus = 'PAID';
+      } else if (totalPaid > 0) {
+        billStatus = 'PARTIAL';
+      } else {
+        billStatus = 'PENDING';
+      }
+      
+      console.log('✅ Calculated from PatientTest:', { grossAmount, totalDiscount, totalPaid, balanceAmount, billStatus });
+    }
+
     if (!tests || tests.length === 0) {
       return res.json({
         success: true,
         message: 'No tests found for this visit',
-        data: []
+        data: {
+          tests: [],
+          billingSummary: {
+            grossAmount: visitBill?.grossAmount || 0,
+            totalDiscount: visitBill?.totalDiscount || 0,
+            totalPaid: visitBill?.totalPaid || 0,
+            balanceAmount: visitBill?.balanceAmount || 0,
+            status: visitBill?.status || 'PENDING',
+            billingSessions: visitBill?.billingSessions || []
+          }
+        }
       });
     }
+
+    // ✅ Calculate billing summary FROM VisitBill (master record)
+    let initialTestCharges = 0;
+    let initialDiscountPercent = 0;
+    let initialDiscountAmount = 0;
+    let initialTestAmount = 0;
+    let initialAdvanceAmount = 0;
+    let initialBalanceAmount = 0;
+    
+    let newTestCharges = 0;
+    let newDiscountPercent = 0;
+    // ✅ GET BILLING DATA FROM VisitBill (master record) - NEW NORMALIZED STRUCTURE
+    let grossAmount, totalDiscount, totalPaid, balanceAmount, billStatus;
+    
+    if (visitBill) {
+      // Data from VisitBill table
+      grossAmount = visitBill?.grossAmount ? parseFloat(visitBill.grossAmount) : 0;
+      totalDiscount = visitBill?.totalDiscount ? parseFloat(visitBill.totalDiscount) : 0;
+      totalPaid = visitBill?.totalPaid ? parseFloat(visitBill.totalPaid) : 0;
+      balanceAmount = visitBill?.balanceAmount ? parseFloat(visitBill.balanceAmount) : 0;
+      billStatus = visitBill?.status || 'PENDING';
+      
+      console.log('✅ Using VisitBill data:', { grossAmount, totalDiscount, totalPaid, balanceAmount });
+    } else {
+      // Fallback: Calculate from PatientTest records
+      console.log('⚠️ VisitBill not found, calculating from PatientTest records...');
+      // Will calculate after fetching tests
+      grossAmount = 0;
+      totalDiscount = 0;
+      totalPaid = 0;
+      balanceAmount = 0;
+      billStatus = 'PENDING';
+    }
+    
+    // Get latest discount details from BillDiscount records
+    const latestDiscount = visitBill?.billingSessions
+      ?.flatMap((session) => session.discounts || [])
+      .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))[0];
+    
+    const discountType = latestDiscount?.discountType || 'FLAT';
+    const discountValue = latestDiscount?.discountValue ? parseFloat(latestDiscount.discountValue) : 0;
+    const discountRemark = latestDiscount?.remarks || '';
+    
+    // Get latest payment mode from Payment records
+    const latestPayment = visitBill?.billingSessions
+      ?.flatMap((session) => session.payments || [])
+      .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))[0];
+    
+    const paymentMode = latestPayment?.paymentMode || 'CASH';
+    
+    // Use stored discount percent from VisitBill, or calculate if not available
+    const totalDiscountPercent = visitBill?.totalDiscountPercent || (grossAmount > 0 ? Math.round((totalDiscount * 100) / grossAmount) : 0);
+    
+    console.log('💰 VisitBill Data:', {
+      grossAmount,
+      totalDiscount,
+      totalPaid,
+      balanceAmount,
+      discountType,
+      discountValue,
+      paymentMode,
+      status: billStatus
+    });
 
     // Transform tests to match frontend expectations
     const transformedTests = tests.map(pt => ({
@@ -1638,6 +1896,27 @@ export const getTestsByVisitId = async (req, res) => {
       b2cCharge: pt.charge || 0,
       b2bCharge: pt.charge || 0,
       
+      // Initial billing (from registration)
+      testCharges: pt.testCharges || 0,
+      discountPercent: pt.discountPercent || 0,
+      discountAmount: pt.discountAmount || 0,
+      testAmount: pt.testAmount || 0,
+      advanceAmount: pt.advanceAmount || 0,
+      balanceAmount: pt.balanceAmount || 0,
+      
+      // New billing (from search-booking additions)
+      New_testCharges: pt.New_testCharges || 0,
+      New_discountPercent: pt.New_discountPercent || 0,
+      New_discountAmount: pt.New_discountAmount || 0,
+      New_testAmount: pt.New_testAmount || 0,
+      
+      // Overall totals
+      Total_testCharges: pt.Total_testCharges || 0,
+      Total_discountPercent: pt.Total_discountPercent || 0,
+      Total_discountAmount: pt.Total_discountAmount || 0,
+      Total_testAmount: pt.Total_testAmount || 0,
+      Net_Amount: pt.Net_Amount || 0,
+      
       // Visit & status info
       visitId: pt.visitId,
       status: pt.status || 'Registered',
@@ -1646,16 +1925,6 @@ export const getTestsByVisitId = async (req, res) => {
       referralDoctor: pt.referralDoctor,
       visitDate: pt.visitDate,
       visitTime: pt.visitTime,
-      
-      // Payment & billing info
-      totalAmount: pt.totalAmount || pt.charge || 0,
-      paidAmount: pt.paidAmount || 0,
-      balanceAmount: pt.balanceAmount || 0,
-      discountAmount: pt.discountAmount || 0,
-      discountPercent: pt.discountPercent || 0,
-      discountRemark: pt.discountRemark,
-      paymentMode: pt.paymentMode,
-      businessType: pt.businessType,
       
       // Sample info
       sampleBarcodeNo: pt.sampleBarcodeNo,
@@ -1674,10 +1943,45 @@ export const getTestsByVisitId = async (req, res) => {
       isExisting: true
     }));
 
+    // ✅ Billing summary FROM VisitBill (normalized structure)
+    const billingSummary = {
+      // From VisitBill master record
+      grossAmount: Math.round(grossAmount),
+      totalDiscount: Math.round(totalDiscount),
+      totalDiscountPercent,
+      totalPaid: Math.round(totalPaid),
+      balanceAmount: Math.round(balanceAmount),
+      status: billStatus,
+      
+      // From BillDiscount records
+      discountType,
+      discountValue: Math.round(discountValue),
+      discountRemark,
+      
+      // From Payment records
+      paymentMode,
+      
+      // For backward compatibility with old field names
+      netAmount: Math.round(grossAmount - totalDiscount),
+      
+      // Include billing sessions for detailed view
+      billingSessions: visitBill?.billingSessions || []
+    };
+
+    console.log('💰 Billing Summary from VisitBill:', billingSummary);
+
     res.json({
       success: true,
       message: `Retrieved ${tests.length} test(s) for this visit`,
-      data: transformedTests
+      data: {
+        tests: transformedTests,
+        billingSummary,
+        visitBill: billingSummary,
+        patientInfo: tests.length > 0 ? {
+          patientId: tests[0].patientId,
+          patientName: `${tests[0].patient?.firstName || ''} ${tests[0].patient?.lastName || ''}`.trim()
+        } : null
+      }
     });
 
   } catch (error) {
@@ -1685,6 +1989,809 @@ export const getTestsByVisitId = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Failed to fetch tests for this visit',
+      error: error.message
+    });
+  }
+};
+
+
+// ============================================
+// BILLING OPERATIONS - NEW ENDPOINTS
+// ============================================
+
+// Apply discount to existing bill
+export const applyDiscount = async (req, res) => {
+  try {
+    const { visitId } = req.params;
+    const { discountType, discountValue, remarks, createdBy } = req.body;
+
+    // Validate inputs
+    if (!visitId || !discountType || discountValue === undefined) {
+      return res.status(400).json({
+        success: false,
+        message: 'visitId, discountType, and discountValue are required'
+      });
+    }
+
+    // Get the VisitBill
+    const visitBill = await prisma.visitBill.findUnique({
+      where: { visitId }
+    });
+
+    if (!visitBill) {
+      return res.status(404).json({
+        success: false,
+        message: 'Visit bill not found'
+      });
+    }
+
+    // Get the latest BillingSession
+    const lastSession = await prisma.billingSession.findFirst({
+      where: { visitId },
+      orderBy: { sequence: 'desc' }
+    });
+
+    // Calculate discount amount
+    const appliedOnAmount = visitBill.grossAmount.toNumber() - visitBill.totalDiscount.toNumber();
+    let discountAmount = 0;
+
+    if (discountType === 'PERCENTAGE') {
+      discountAmount = (appliedOnAmount * parseFloat(discountValue)) / 100;
+    } else if (discountType === 'FLAT') {
+      discountAmount = parseFloat(discountValue);
+    }
+
+    // Create new BillingSession for DISCOUNT
+    const sequence = await getNextSequence(visitId);
+    const discountSession = await createBillingSession(
+      visitId,
+      'DISCOUNT',
+      sequence,
+      remarks || null,
+      null  // ✅ createdBy must be Int or Null, not string
+    );
+
+    // Create BillDiscount record
+    await createBillDiscount(
+      visitId,
+      discountSession.id,
+      discountType,
+      discountValue,
+      discountAmount,
+      appliedOnAmount,
+      remarks || null,
+      null  // ✅ createdBy must be Int or Null, not string
+    );
+
+    // Update VisitBill with new discount total
+    const newTotalDiscount = visitBill.totalDiscount.toNumber() + discountAmount;
+    const newBalance = visitBill.grossAmount.toNumber() - newTotalDiscount - visitBill.totalPaid.toNumber();
+
+    const updatedBill = await prisma.visitBill.update({
+      where: { visitId },
+      data: {
+        totalDiscount: new Decimal(newTotalDiscount),
+        balanceAmount: new Decimal(newBalance),
+        status: newBalance <= 0 ? 'PAID' : visitBill.totalPaid.toNumber() > 0 ? 'PARTIAL' : 'PENDING'
+      }
+    });
+
+    // Create BillTransaction for audit trail
+    await createBillTransaction(
+      visitId,
+      discountSession.id,
+      'DISCOUNT',
+      discountAmount,
+      newBalance,
+      `${discountType} discount of ${discountValue}`,
+      createdBy
+    );
+
+    res.json({
+      success: true,
+      message: 'Discount applied successfully',
+      data: updatedBill
+    });
+  } catch (error) {
+    console.error('Apply discount error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to apply discount',
+      error: error.message
+    });
+  }
+};
+
+// Record payment for a visit
+export const recordPayment = async (req, res) => {
+  try {
+    const { visitId } = req.params;
+    const { amount, paymentMode, remarks, receivedBy } = req.body;
+
+    // Validate inputs
+    if (!visitId || !amount || !paymentMode) {
+      return res.status(400).json({
+        success: false,
+        message: 'visitId, amount, and paymentMode are required'
+      });
+    }
+
+    // Get the VisitBill
+    const visitBill = await prisma.visitBill.findUnique({
+      where: { visitId }
+    });
+
+    if (!visitBill) {
+      return res.status(404).json({
+        success: false,
+        message: 'Visit bill not found'
+      });
+    }
+
+    // Convert PaymentMode
+    const payMode = paymentMode === 'Cash' ? 'CASH' : 
+                   paymentMode === 'Card' ? 'CARD' : 
+                   paymentMode === 'UPI' ? 'UPI' :
+                   paymentMode === 'Cheque' ? 'CHEQUE' :
+                   paymentMode === 'Bank Transfer' ? 'BANK_TRANSFER' : 'OTHER';
+
+    // Create new BillingSession for PAYMENT
+    const sequence = await getNextSequence(visitId);
+    const paymentSession = await createBillingSession(
+      visitId,
+      'PAYMENT',
+      sequence,
+      remarks || null,
+      null  // ✅ createdBy must be Int or Null, not string
+    );
+
+    // Create Payment record
+    await createPaymentRecord(
+      visitId,
+      paymentSession.id,
+      amount,
+      payMode,
+      remarks || null,
+      null  // ✅ receivedBy must be Int or Null, not string
+    );
+
+    // Update VisitBill with new payment total
+    const newTotalPaid = visitBill.totalPaid.toNumber() + parseFloat(amount);
+    const netAmount = visitBill.grossAmount.toNumber() - visitBill.totalDiscount.toNumber();
+    const newBalance = Math.max(0, netAmount - newTotalPaid);
+
+    const updatedBill = await prisma.visitBill.update({
+      where: { visitId },
+      data: {
+        totalPaid: new Decimal(newTotalPaid),
+        balanceAmount: new Decimal(newBalance),
+        status: newBalance <= 0 ? 'PAID' : newTotalPaid > 0 ? 'PARTIAL' : 'PENDING'
+      }
+    });
+
+    // Create BillTransaction for audit trail
+    await createBillTransaction(
+      visitId,
+      paymentSession.id,
+      'PAYMENT',
+      amount,
+      newBalance,
+      `Payment received via ${paymentMode}`,
+      receivedBy
+    );
+
+    // Also create legacy PaymentTransaction for compatibility
+    await prisma.paymentTransaction.create({
+      data: {
+        visitId,
+        patientId: visitBill.patientId,
+        paymentMode: paymentMode,
+        paymentAmount: parseFloat(amount),
+        remarks: remarks || `Payment received via ${paymentMode}`
+      }
+    });
+
+    res.json({
+      success: true,
+      message: 'Payment recorded successfully',
+      data: updatedBill
+    });
+  } catch (error) {
+    console.error('Record payment error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to record payment',
+      error: error.message
+    });
+  }
+};
+
+// Cancel a test and update billing
+export const cancelTest = async (req, res) => {
+  try {
+    const { visitId, patientTestId } = req.params;
+    const { remarks, cancelledBy } = req.body;
+
+    // Validate inputs
+    if (!visitId || !patientTestId) {
+      return res.status(400).json({
+        success: false,
+        message: 'visitId and patientTestId are required'
+      });
+    }
+
+    // Get the PatientTest
+    const patientTest = await prisma.patientTest.findUnique({
+      where: { id: parseInt(patientTestId) }
+    });
+
+    if (!patientTest) {
+      return res.status(404).json({
+        success: false,
+        message: 'Test not found'
+      });
+    }
+
+    if (patientTest.status === 'Cancelled') {
+      return res.status(400).json({
+        success: false,
+        message: 'Test is already cancelled'
+      });
+    }
+
+    // Get the VisitBill
+    const visitBill = await prisma.visitBill.findUnique({
+      where: { visitId }
+    });
+
+    if (!visitBill) {
+      return res.status(404).json({
+        success: false,
+        message: 'Visit bill not found'
+      });
+    }
+
+    const testCharge = parseFloat(patientTest.charge || 0);
+    
+    console.log('📝 Cancelling test:', {
+      patientTestId,
+      visitId,
+      testName: patientTest.testId,
+      testCharge,
+      remarks
+    });
+
+    // ✅ WRAP IN TRANSACTION
+    let updatedTest;
+    let updatedBill;
+    let refundRecord = null;
+    
+    await prisma.$transaction(async (tx) => {
+      // Step 1: Mark PatientTest as Cancelled
+      updatedTest = await tx.patientTest.update({
+        where: { id: parseInt(patientTestId) },
+        data: { 
+          status: 'Cancelled',
+          cancelledAt: new Date(),
+          cancelledReason: remarks || 'User cancelled'
+        }
+      });
+      
+      console.log(`✅ [TX] PatientTest marked as Cancelled`);
+
+      // Step 2: Get all ACTIVE tests for this visit to recalculate
+      const activeTests = await tx.patientTest.findMany({
+        where: { 
+          visitId,
+          status: { not: 'Cancelled' }  // Only non-cancelled tests
+        }
+      });
+      
+      // Calculate new gross amount from active tests only
+      const newGrossAmount = activeTests.reduce((sum, t) => sum + parseFloat(t.charge || 0), 0);
+      
+      console.log(`✅ [TX] Active tests remaining: ${activeTests.length}, new gross: ₹${newGrossAmount}`);
+
+      // Step 3: Recalculate discount proportionally (if applicable)
+      const oldGross = visitBill.grossAmount.toNumber();
+      const oldDiscount = visitBill.totalDiscount.toNumber();
+      const discountPercent = oldGross > 0 ? (oldDiscount / oldGross) * 100 : 0;
+      
+      // New discount based on proportion
+      const newDiscount = newGrossAmount > 0 
+        ? Math.round((newGrossAmount * discountPercent) / 100)
+        : 0;
+      
+      const discountReduction = oldDiscount - newDiscount;
+      
+      console.log(`✅ [TX] Discount recalculated: old=₹${oldDiscount}, new=₹${newDiscount}, reduction=₹${discountReduction}`);
+
+      // Step 4: Create CANCEL_TEST BillingSession
+      const lastSession = await tx.billingSession.findFirst({
+        where: { visitId },
+        orderBy: { sequence: 'desc' }
+      });
+      const nextSequence = (lastSession?.sequence || 0) + 1;
+      
+      const cancelSession = await tx.billingSession.create({
+        data: {
+          visitId,
+          sessionType: 'CANCEL_TEST',
+          sequence: nextSequence,
+          remarks: remarks || `Cancelled test: ${patientTest.testId}`
+        }
+      });
+      
+      console.log(`✅ [TX] BillingSession created: CANCEL_TEST, sequence=${nextSequence}`);
+
+      // Step 5: Calculate new balance and check for overpayment
+      const oldBalance = visitBill.balanceAmount.toNumber();
+      const oldPaid = visitBill.totalPaid.toNumber();
+      
+      // New amount due (after test cancellation and discount recalculation)
+      const newAmountDue = newGrossAmount - newDiscount;
+      
+      // New balance (how much patient still owes)
+      const newBalance = Math.max(0, newAmountDue - oldPaid);
+      
+      // Check if patient overpaid
+      const overpaymentAmount = Math.max(0, oldPaid - newAmountDue);
+      
+      console.log(`✅ [TX] Balance calculation:`, {
+        oldGross,
+        newGross: newGrossAmount,
+        oldDiscount,
+        newDiscount,
+        oldPaid,
+        newAmountDue,
+        oldBalance,
+        newBalance,
+        overpaymentAmount
+      });
+
+      // Step 6: Create Refund record if overpaid
+      if (overpaymentAmount > 0) {
+        refundRecord = await tx.refund.create({
+          data: {
+            visitId,
+            billingSessionId: cancelSession.id,
+            amount: new Decimal(overpaymentAmount),
+            reason: `Overpayment from cancelled test: ${patientTest.testId}`
+          }
+        });
+        
+        console.log(`✅ [TX] Refund created: ₹${overpaymentAmount}`);
+      }
+
+      // Step 7: Update VisitBill with recalculated values
+      const totalDiscountPercent = newGrossAmount > 0 
+        ? Math.round((newDiscount / newGrossAmount) * 100)
+        : 0;
+      
+      updatedBill = await tx.visitBill.update({
+        where: { visitId },
+        data: {
+          grossAmount: new Decimal(newGrossAmount),
+          totalDiscount: new Decimal(newDiscount),
+          totalDiscountPercent: totalDiscountPercent,
+          balanceAmount: new Decimal(newBalance),
+          status: newBalance <= 0 ? 'PAID' : oldPaid > 0 ? 'PARTIAL' : 'PENDING'
+        }
+      });
+      
+      console.log(`✅ [TX] VisitBill updated: grossAmount=₹${newGrossAmount}, balance=₹${newBalance}`);
+    });
+    
+    console.log(`✅ Transaction completed successfully for CANCEL_TEST`);
+
+    res.json({
+      success: true,
+      message: 'Test cancelled successfully',
+      data: {
+        updatedTest,
+        updatedBill: {
+          ...updatedBill,
+          grossAmount: updatedBill.grossAmount.toNumber(),
+          totalDiscount: updatedBill.totalDiscount.toNumber(),
+          totalPaid: updatedBill.totalPaid.toNumber(),
+          totalRefund: updatedBill.totalRefund?.toNumber ? updatedBill.totalRefund.toNumber() : 0,
+          balanceAmount: updatedBill.balanceAmount.toNumber()
+        },
+        refund: refundRecord ? {
+          ...refundRecord,
+          amount: refundRecord.amount.toNumber()
+        } : null
+      }
+    });
+
+  } catch (error) {
+    console.error('Cancel test error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to cancel test',
+      error: error.message
+    });
+  }
+};
+
+// Get visit bill summary with all transactions
+export const getBillSummary = async (req, res) => {
+  try {
+    const { visitId } = req.params;
+
+    if (!visitId) {
+      return res.status(400).json({
+        success: false,
+        message: 'visitId is required'
+      });
+    }
+
+    // Get VisitBill with all related records
+    const visitBill = await prisma.visitBill.findUnique({
+      where: { visitId },
+      include: {
+        billingSessions: {
+          include: {
+            discounts: true,
+            payments: true,
+            refunds: true
+          },
+          orderBy: { sequence: 'asc' }
+        },
+        discounts: true,
+        payments: {
+          orderBy: { createdAt: 'asc' }
+        },
+        refunds: {
+          orderBy: { createdAt: 'asc' }
+        }
+      }
+    });
+
+    if (!visitBill) {
+      return res.status(404).json({
+        success: false,
+        message: 'Visit bill not found'
+      });
+    }
+
+    res.json({
+      success: true,
+      data: visitBill
+    });
+  } catch (error) {
+    console.error('Get bill summary error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch bill summary',
+      error: error.message
+    });
+  }
+};
+
+// Get transaction history for a visit (from BillingSession + Payment/Refund records)
+export const getTransactionHistory = async (req, res) => {
+  try {
+    const { visitId } = req.params;
+
+    if (!visitId) {
+      return res.status(400).json({
+        success: false,
+        message: 'visitId is required'
+      });
+    }
+
+    // Get all billing sessions with related records
+    const sessions = await prisma.billingSession.findMany({
+      where: { visitId },
+      include: {
+        payments: true,
+        discounts: true,
+        refunds: true
+      },
+      orderBy: { sequence: 'asc' }
+    });
+
+    // Build transaction history from sessions
+    const transactions = [];
+    sessions.forEach(session => {
+      transactions.push({
+        type: session.sessionType,
+        sequence: session.sequence,
+        remarks: session.remarks,
+        createdAt: session.createdAt,
+        payments: session.payments,
+        discounts: session.discounts,
+        refunds: session.refunds
+      });
+    });
+
+    res.json({
+      success: true,
+      data: transactions
+    });
+  } catch (error) {
+    console.error('Get transaction history error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch transaction history',
+      error: error.message
+    });
+  }
+};
+
+
+// Add tests to existing visit - Create new BillingSession for ADD_TEST
+export const addTestsToExistingVisit = async (req, res) => {
+  try {
+    const { patientId, visitId, tests, discountPercent, discountAmount, discountRemark, businessType, payment, discount } = req.body;
+
+    // Validate inputs
+    if (!patientId || !visitId || !tests || tests.length === 0) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'patientId, visitId, and tests array are required' 
+      });
+    }
+
+    console.log('📝 Adding tests to existing visit:', {
+      patientId,
+      visitId,
+      newTestsCount: tests.length,
+      discountPercent: discountPercent || discount?.discountPercent,
+      discountAmount: discountAmount || discount?.discountAmount || discount?.amount,
+      paymentAmount: payment?.amount,
+      paymentMode: payment?.paymentMode,
+      businessType
+    });
+
+    // Get existing VisitBill
+    const visitBill = await prisma.visitBill.findUnique({
+      where: { visitId }
+    });
+
+    if (!visitBill) {
+      return res.status(404).json({ 
+        success: false, 
+        message: 'Visit bill not found' 
+      });
+    }
+
+    // Get existing tests for this visit
+    const existingTests = await prisma.patientTest.findMany({
+      where: { patientId, visitId },
+      include: { test: true }
+    });
+
+    if (!existingTests.length) {
+      return res.status(404).json({ 
+        success: false, 
+        message: 'Visit not found for this patient' 
+      });
+    }
+
+    const firstExistingTest = existingTests[0];
+    
+    // ✅ BILLING CALCULATION for new tests
+    // Step 1: Calculate new test charges total
+    const newTestChargesTotal = tests.reduce((sum, t) => sum + (parseFloat(t.charge) || 0), 0);
+    
+    // ✅ For Session 2+: Discount applies to BALANCE AMOUNT (not just new tests)
+    // Balance amount = existing balance + new test charges
+    const currentBalance = visitBill.balanceAmount.toNumber();
+    const balanceAfterNewTests = currentBalance + newTestChargesTotal;
+    
+    // ✅ Extract discount fields from nested object OR top-level
+    let finalDiscountPercent = discountPercent || (discount?.discountPercent) || 0;
+    let finalDiscountAmount = discountAmount || (discount?.discountAmount) || (discount?.amount) || 0;
+    const discountRemark_final = discountRemark || (discount?.discountRemark) || null;
+    
+    // ✅ Calculate discount on BALANCE AMOUNT (existing balance + new tests)
+    let newDiscountPercent = 0;
+    let newDiscountAmount = 0;
+    
+    if (parseFloat(finalDiscountPercent) > 0) {
+      newDiscountPercent = parseFloat(finalDiscountPercent);
+      newDiscountAmount = Math.round((balanceAfterNewTests * newDiscountPercent) / 100);
+    } else if (parseFloat(finalDiscountAmount) > 0) {
+      newDiscountAmount = parseFloat(finalDiscountAmount);
+      newDiscountPercent = balanceAfterNewTests > 0 
+        ? Math.round((newDiscountAmount / balanceAfterNewTests) * 100)
+        : 0;
+    }
+    
+    // Ensure new discount doesn't exceed balance
+    newDiscountAmount = Math.min(newDiscountAmount, balanceAfterNewTests);
+    
+    // Step 3: Calculate overall totals (existing + new)
+    const totalTestCharges = visitBill.grossAmount.toNumber() + newTestChargesTotal;
+    const totalDiscountAmount = visitBill.totalDiscount.toNumber() + newDiscountAmount;
+    const totalTestAmount = totalTestCharges - totalDiscountAmount;
+    
+    // Calculate new total paid (existing + new payment)
+    let newTotalPaid = visitBill.totalPaid.toNumber();
+    const paymentAmount = payment && parseFloat(payment.amount) > 0 ? parseFloat(payment.amount) : 0;
+    newTotalPaid += paymentAmount;
+    
+    // ✅ Calculate final balance using formula: grossAmount - totalDiscount - totalPaid
+    const finalBalance = Math.max(0, totalTestCharges - totalDiscountAmount - newTotalPaid);
+    
+    console.log('💰 Billing calculation for ADD_TEST:', {
+      existingGross: visitBill.grossAmount.toNumber(),
+      existingDiscount: visitBill.totalDiscount.toNumber(),
+      existingBalance: currentBalance,
+      newTestChargesTotal,
+      balanceAfterNewTests,
+      newDiscountPercent,
+      newDiscountAmount,
+      paymentAmount,
+      finalBalance: 0, // Will calculate after
+      totalTestCharges: 0, // Will calculate after
+      totalDiscountAmount: 0, // Will calculate after
+      totalPaid: 0 // Will calculate after
+    });
+
+    // ✅ WRAP IN TRANSACTION - All or nothing
+    let allTestsForVisit;
+    let updatedBill;
+    
+    await prisma.$transaction(async (tx) => {
+      // Step 1: Create new BillingSession for ADD_TEST
+      const lastSession = await tx.billingSession.findFirst({
+        where: { visitId },
+        orderBy: { sequence: 'desc' }
+      });
+      const nextSequence = (lastSession?.sequence || 0) + 1;
+      
+      const addTestSession = await tx.billingSession.create({
+        data: {
+          visitId,
+          sessionType: 'ADD_TEST',
+          sequence: nextSequence,
+          remarks: `Added ${tests.length} new test(s)`
+        }
+      });
+      
+      console.log(`✅ [TX] BillingSession created: sessionType=ADD_TEST, sequence=${nextSequence}`);
+
+      // Step 2: Create BillDiscount for new discount if applicable
+      if (newDiscountAmount > 0) {
+        const discountRecord = await tx.billDiscount.create({
+          data: {
+            visitId,
+            billingSessionId: addTestSession.id,
+            discountType: newDiscountPercent > 0 ? 'PERCENTAGE' : 'FLAT',
+            discountValue: new Decimal(newDiscountPercent > 0 ? newDiscountPercent : newDiscountAmount),
+            discountAmount: new Decimal(newDiscountAmount),
+            appliedOnAmount: new Decimal(newTestChargesTotal),
+            remarks: discountRemark_final || null
+          }
+        });
+        console.log(`✅ [TX] BillDiscount created: id=${discountRecord.id}, ₹${newDiscountAmount}, type=${newDiscountPercent > 0 ? 'PERCENTAGE' : 'FLAT'}`);
+      } else {
+        console.log(`ℹ️ [TX] No discount for this session (newDiscountAmount=0)`);
+      }
+
+      // Step 3: Create Payment record if payment > 0
+      if (paymentAmount > 0) {
+        const payMode = payment?.paymentMode === 'Cash' ? 'CASH' : 
+                       payment?.paymentMode === 'Card' ? 'CARD' : 
+                       payment?.paymentMode === 'UPI' ? 'UPI' :
+                       payment?.paymentMode === 'Cheque' ? 'CHEQUE' :
+                       payment?.paymentMode === 'Bank Transfer' ? 'BANK_TRANSFER' : 'OTHER';
+        
+        await tx.payment.create({
+          data: {
+            visitId,
+            billingSessionId: addTestSession.id,
+            amount: new Decimal(paymentAmount),
+            paymentMode: payMode,
+            transactionStatus: 'SUCCESS',
+            remarks: `Payment for added tests`,
+            paymentDate: new Date()
+          }
+        });
+        console.log(`✅ [TX] Payment created: ₹${paymentAmount}`);
+      }
+
+      // Step 4: Create PatientTest records for new tests (FIRST - source of truth)
+      const newPatientTestsData = tests.map(test => {
+        const testCharge = parseFloat(test.charge) || 0;
+        
+        return {
+          patientId,
+          visitId,
+          testId: test.id || test.testId,
+          departmentId: test.departmentId || 1,
+          organizationId: firstExistingTest.organizationId,
+          sample: test.sample || 'Blood',
+          charge: testCharge,
+          reportMode: firstExistingTest.reportMode,
+          referralDoctor: firstExistingTest.referralDoctor,
+          visitDate: firstExistingTest.visitDate,
+          visitTime: firstExistingTest.visitTime,
+          sampleTaken: firstExistingTest.sampleTaken,
+          sampleReceived: firstExistingTest.sampleReceived,
+          sampleBarcodeNo: firstExistingTest.sampleBarcodeNo,
+          patient_history: firstExistingTest.patient_history,
+          paymentMode: firstExistingTest.paymentMode,
+          businessType: businessType || firstExistingTest.businessType,
+          status: 'Registered',
+          outsourcedTo: test.outsourcedTo || null,
+          billingSessionId: addTestSession.id
+        };
+      });
+      
+      await tx.patientTest.createMany({
+        data: newPatientTestsData
+      });
+      
+      console.log(`✅ [TX] Created ${tests.length} new PatientTest records`);
+
+      // Step 5: Update VisitBill LAST (summary/cache)
+      const totalDiscountPercent = totalTestCharges > 0 
+        ? Math.round((totalDiscountAmount / totalTestCharges) * 100)
+        : 0;
+      
+      updatedBill = await tx.visitBill.update({
+        where: { visitId },
+        data: {
+          grossAmount: new Decimal(totalTestCharges.toString()),
+          totalDiscount: new Decimal(totalDiscountAmount.toString()),
+          totalDiscountPercent: totalDiscountPercent,
+          totalPaid: new Decimal(newTotalPaid.toString()),
+          balanceAmount: new Decimal(finalBalance.toString()),
+          status: finalBalance <= 0 ? 'PAID' : newTotalPaid > 0 ? 'PARTIAL' : 'PENDING'
+        }
+      });
+      
+      console.log(`✅ [TX] VisitBill updated: grossAmount=₹${totalTestCharges}, balance=₹${finalBalance}`);
+    });
+    
+    console.log(`✅ Transaction completed successfully for ADD_TEST`);
+
+    // Fetch all tests for this visit to return
+    allTestsForVisit = await prisma.patientTest.findMany({
+      where: { patientId, visitId },
+      include: {
+        test: {
+          include: { sample_type: true }
+        }
+      },
+      orderBy: { createdAt: 'asc' }
+    });
+
+    res.json({
+      success: true,
+      message: `${tests.length} test(s) added to existing visit successfully`,
+      data: {
+        patientId,
+        visitId,
+        allTests: allTestsForVisit,
+        visitBill: {
+          ...updatedBill,
+          grossAmount: updatedBill.grossAmount.toNumber ? updatedBill.grossAmount.toNumber() : parseFloat(updatedBill.grossAmount),
+          totalDiscount: updatedBill.totalDiscount.toNumber ? updatedBill.totalDiscount.toNumber() : parseFloat(updatedBill.totalDiscount),
+          totalPaid: updatedBill.totalPaid.toNumber ? updatedBill.totalPaid.toNumber() : parseFloat(updatedBill.totalPaid),
+          totalRefund: updatedBill.totalRefund?.toNumber ? updatedBill.totalRefund.toNumber() : 0,
+          balanceAmount: updatedBill.balanceAmount.toNumber ? updatedBill.balanceAmount.toNumber() : parseFloat(updatedBill.balanceAmount)
+        },
+        billingSummary: {
+          grossAmount: totalTestCharges,
+          totalDiscount: totalDiscountAmount,
+          totalDiscountPercent: Math.round((totalDiscountAmount / totalTestCharges) * 100),
+          netAmount: totalTestAmount,
+          totalPaid: newTotalPaid,
+          balance: finalBalance
+        }
+      }
+    });
+
+  } catch (error) {
+    console.error('Add tests to existing visit error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to add tests to existing visit',
       error: error.message
     });
   }

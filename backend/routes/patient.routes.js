@@ -17,7 +17,12 @@ import {
   getPatientPaymentTransactions,
   getPatientTests,
   getTestsByVisitId,
-  addTestsToExistingVisit
+  addTestsToExistingVisit,
+  applyDiscount,
+  recordPayment,
+  cancelTest,
+  getBillSummary,
+  getTransactionHistory
 } from '../controllers/patient.controller.js';
 import {
   getPatientVisitReport,
@@ -41,6 +46,13 @@ router.get('/payment-transactions/:visitId', getPaymentTransactions);
 
 // Get tests by visitId for booking details modal
 router.get('/tests-by-visit', getTestsByVisitId);
+
+// ✅ NEW BILLING OPERATIONS - MUST be before /:id routes
+router.post('/:visitId/discount', applyDiscount);
+router.post('/:visitId/payment-record', recordPayment);
+router.post('/:visitId/cancel-test/:patientTestId', cancelTest);
+router.get('/:visitId/bill-summary', getBillSummary);
+router.get('/:visitId/transaction-history', getTransactionHistory);
 
 // Report endpoints
 router.get('/report/visit-details', getPatientVisitReport);

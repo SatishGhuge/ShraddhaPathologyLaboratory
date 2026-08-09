@@ -607,6 +607,14 @@ export default function BookingPage() {
         const visitDate = visit.visitDate || p.createdAt;
         const paymentStatus = visit.balanceAmount > 0 ? "Due" : "Paid";
         
+        console.log('🔍 VISIT DATA:', {
+          visitId: visit.visitId,
+          balanceAmount: visit.balanceAmount,
+          paidAmount: visit.paidAmount,
+          discountAmount: visit.discountAmount,
+          grossAmount: visit.totalAmount
+        });
+        
         mapped.push({
           bookingId: `${p.patientId}-${visit.visitId}`,
           name: `${p.title || ""} ${p.firstName || ""} ${p.lastName || ""}`.trim().toUpperCase(),
@@ -1868,13 +1876,14 @@ export default function BookingPage() {
                     <tr key={i} className={`border-b hover:bg-gray-50 ${getBookingRowColor(b)}`}>
                       <td className="p-2 text-center font-medium">{startIndex + i + 1}</td>
                       <td className="p-2">
-                        <div className="font-semibold text-gray-800 flex items-center gap-1 group">
+                        <div className="font-semibold text-gray-800 flex items-center gap-2 group">
                           <span>{b.name}</span>
                           {b.balanceAmount > 0 && (
-                            <div className="relative flex items-center">
-                              <span className="text-red-500 font-bold text-sm shrink-0">₹</span>
-                              <div className="absolute left-5 top-1/2 -translate-y-1/2 bg-gray-800 text-white text-xs px-2 py-1 rounded whitespace-nowrap pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity z-10">
-                                Balance: ₹{b.balanceAmount}
+                            <div className="relative inline-flex items-center cursor-help">
+                              <span className="text-red-600 font-bold text-lg hover:text-red-700 transition-colors">₹</span>
+                              <div className="absolute left-0 bottom-full mb-2 bg-red-600 text-white text-xs px-3 py-2 rounded whitespace-nowrap pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity z-50 shadow-lg font-semibold">
+                                Balance: ₹{Math.round(b.balanceAmount)}
+                                <div className="absolute top-full left-1/2 -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-l-transparent border-r-transparent border-t-red-600"></div>
                               </div>
                             </div>
                           )}

@@ -1,5 +1,45 @@
 "use client";
 
+/*
+ * ============================================================================
+ * FRONTEND TO BACKEND BILLING TABLE MAPPING
+ * ============================================================================
+ * 
+ * This component maps frontend billing fields to normalized database tables:
+ * 
+ * PATIENT REGISTRATION (handleSaveRegistration):
+ * ├─ VisitBill table created with:
+ * │  ├─ visitId (unique per visit)
+ * │  ├─ patientId
+ * │  ├─ grossAmount → billing.grossAmount
+ * │  ├─ totalDiscount → billing.discountAmount
+ * │  ├─ totalPaid → billing.paidAmount
+ * │  ├─ balanceAmount → calculated: (grossAmount - discount - paidAmount)
+ * │  └─ status → calculated: "PENDING" | "PARTIAL" | "PAID"
+ * │
+ * ├─ BillingSession table created with:
+ * │  ├─ sessionType: "REGISTRATION"
+ * │  ├─ sequence: 1 (first session)
+ * │  └─ PatientTest records link to billingSessionId
+ * │
+ * ├─ BillDiscount table created (if discount > 0):
+ * │  ├─ discountType: "PERCENTAGE" | "FLAT"
+ * │  ├─ discountValue: discountPercent or discountAmount
+ * │  ├─ discountAmount: rupees
+ * │  └─ appliedOnAmount: grossAmount
+ * │
+ * ├─ Payment table created (if payment > 0):
+ * │  ├─ amount: paidAmount
+ * │  └─ paymentMode: "Cash" | "Card" | "UPI" etc
+ * │
+ * └─ BillTransaction table created:
+ *    ├─ transactionType: "INITIAL_BILL"
+ *    ├─ amount: grossAmount
+ *    └─ balanceAfter: balanceAmount
+ * 
+ * ============================================================================
+ */
+
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import BarcodeModal, { generateBarcodeLabels, getSampleTypeId, getSampleTypeName, getTestName } from "@/app/components/BarcodeModal";
@@ -925,6 +965,14 @@ export default function PatientRegistration() {
     setSelectedOrganization("");
     setSelectedOrganizationCode("");
     setOrganizationSearch("");
+    // 🔧 FIX: Clear cached visit ID and bill state to show fresh data on next registration
+    setLastRegisteredVisitId(null);
+    setBillData(null);
+    setShowBillModal(false);
+    // ✅ IMPORTANT: DO NOT clear barcode modal state here!
+    // User needs to see barcode and print it before proceeding
+    // Barcode modal will close when user clicks the X button
+    // Only clear the barcode DATA when starting a NEW registration (not here)
     clearSavedFormData();
   };
   /* ============ END LOCALSTORAGE PERSISTENCE ============ */
@@ -1130,8 +1178,14 @@ export default function PatientRegistration() {
   };
 
   const fillPatientData = (patient: any) => {
-    // Store existing patient ID
-    setExistingPatientId(patient.id);
+    // Store existing patient ID - backend returns patientId, not id
+    const patientId = patient.patientId || patient.id;
+    console.log('✅ fillPatientData - Storing existing patient ID:', {
+      'patient.patientId': patient.patientId,
+      'patient.id': patient.id,
+      'final patientId': patientId
+    });
+    setExistingPatientId(patientId);
     
     // Fill ONLY Patient Identity fields
     setTitle(patient.title || "MR");
@@ -1720,26 +1774,50 @@ export default function PatientRegistration() {
         visitTime: time || "00:00",  // Default time
         sampleBarcodeNo: sampleBarcodeNo || null,
         patient_history: remarks || null,
-        // Billing Details
-        totalAmount: totalAmt || 0,
-        discountPercent: discPct || 0,
-        discountAmount: discAmt || 0,
-        discountRemark: discountRemark || null,
-        paidAmount: paidAmt || 0,
-        balanceAmount: balAmt || 0,
         paymentMode: paymentMode || "Cash",  // Default value
         businessType: businessType || "B2C",  // Default value
+        // NEW NORMALIZED BILLING STRUCTURE (maps to new tables)
+        billing: {
+          grossAmount: totalAmt || 0,
+          discountType: discPct > 0 ? "PERCENTAGE" : (discAmt > 0 ? "FLAT" : null),
+          discountValue: discPct || discAmt || 0,
+          discountAmount: discAmt || 0,
+          discountPercent: discPct || 0,
+          discountRemark: discountRemark || null,
+          paidAmount: paidAmt || 0,
+          balanceAmount: balAmt || 0,
+          totalPaid: paidAmt || 0,
+          totalRefund: 0,
+          status: paidAmt >= totalAmt ? "PAID" : (paidAmt > 0 ? "PARTIAL" : "PENDING")
+        },
         // Tests (expanded from packages)
         tests: expandedTests
       };
 
       const response = await createPatient(patientData);
       
-      // Handle response structure correctly - response.data contains the patient object
+      // 🔍 DEBUG: Log the full response
+      console.log('🔍 FRONTEND - Full Response from Backend:', JSON.stringify(response, null, 2));
+      console.log('🔍 FRONTEND - Response structure:', {
+        'response.visitId': response?.visitId,
+        'response.data': !!response?.data,
+        'response.data.patientId': response?.data?.patientId,
+        'response.data.tests': Array.isArray(response?.data?.tests) ? response.data.tests.length + ' tests' : 'NOT ARRAY',
+        'response.data.tests[0]?.visitId': response?.data?.tests?.[0]?.visitId,
+        'response.isExistingPatient': response?.isExistingPatient
+      });
+      
+      // 🔧 FIX: Use explicit visitId from response (backend now returns it directly)
       const patientId = response?.data?.patientId || response?.patientId || 'N/A';
-      // Extract visitId from the first test (all tests have the same visitId for this registration)
-      const visitId = response?.data?.tests?.[0]?.visitId || 'N/A';
+      const visitId = response?.visitId || response?.data?.tests?.[0]?.visitId || 'N/A';
       const isExisting = response?.isExistingPatient || false;
+      
+      console.log('🔍 FRONTEND - Extracted values:', {
+        patientId,
+        visitId,
+        isExisting,
+        'visitId source': response?.visitId ? 'EXPLICIT FROM RESPONSE' : (response?.data?.tests?.[0]?.visitId ? 'FROM FIRST TEST' : 'FALLBACK')
+      });
       
       // Store the actual visitId for use in bill modal
       setLastRegisteredVisitId(visitId);
@@ -1775,8 +1853,16 @@ export default function PatientRegistration() {
       
       alert(message);
       
+      console.log('🔍 AFTER ALERT - About to show barcode');
+      console.log({
+        testsForBarcode_length: testsForBarcode.length,
+        visitId
+      });
+      
       // If tests were added, show barcode modal
       if (testsForBarcode.length > 0 && visitId !== 'N/A') {
+        console.log('✅ CONDITIONS MET - Calling showBarcodeAfterRegistration');
+        
         showBarcodeAfterRegistration(
           `${title} ${firstName} ${lastName || ''}`.trim(),
           visitId,
@@ -1785,10 +1871,17 @@ export default function PatientRegistration() {
           testsForBarcode,
           selectedOrganizationCode // Pass organization code to barcode function
         );
+        
+        // ✅ CLEAR FORM immediately - barcode modal will stay open for user to print
+        handleClearForm();
+      } else {
+        console.log('❌ CONDITIONS NOT MET', {
+          testsForBarcode_length: testsForBarcode.length,
+          visitId
+        });
+        // No tests added, clear form immediately
+        handleClearForm();
       }
-      
-      // ✅ CLEAR FORM after successful registration ✅
-      handleClearForm();
       
       // Close registration modal if it was open
       setShowRegistrationModal(false);
@@ -2967,15 +3060,6 @@ export default function PatientRegistration() {
                   Bill
                 </button>
               )}
-
-              {lastRegisteredVisitId && (
-                <button 
-                  onClick={handlePrintBarcode} 
-                  className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded font-semibold flex items-center gap-2"
-                  title="Print barcode for registered patient">
-                  🔖 Print Barcode
-                </button>
-              )}
             </div>
           </div>
         </div>
@@ -3537,7 +3621,15 @@ export default function PatientRegistration() {
       {/* Barcode Modal - Using Reusable Component */}
       <BarcodeModal
         isOpen={showBarcodeModal}
-        onClose={() => setShowBarcodeModal(false)}
+        onClose={() => {
+          // ✅ Clear barcode data when user closes modal
+          setBarcodeLabels([]);
+          setBarcodePatientInfo(null);
+          setBarcodeLockedPatientUid(null);
+          setBarcodeLockedVisitId(null);
+          setSelectedBarcodeIndices(new Set());
+          setShowBarcodeModal(false);
+        }}
         onPrintOnly={async () => {
           // Trigger iframe print - handled by BarcodeModal component
           const iframe = document.getElementById('barcode-print-frame') as HTMLIFrameElement;
