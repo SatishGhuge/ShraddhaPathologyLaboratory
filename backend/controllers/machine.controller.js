@@ -304,24 +304,35 @@ export const submitResults = async (req, res) => {
           for (const [paramCode, value] of Object.entries(parameters)) {
             console.log(`[MACHINE API RESULTS] Looking for parameter: ${paramCode}`);
             
-            // Find the test parameter by parameterCode, machineCode, OR parameterName
-            let testParam = await prisma.testParameter.findFirst({
+            // ✅ PRIORITY-BASED MATCHING (Fix: Match by parameterCode first, test-specific)
+            // 1. First try: parameterCode exact match for this test
+            // 2. Second try: parameterCode global match
+            // 3. Fallback: machineCode, parameterName
+            
+            let testParam = null;
+            
+            // Step 1: Try exact parameterCode match within this test
+            testParam = await prisma.testParameter.findFirst({
               where: {
                 testId: patientTest.testId,
-                OR: [
-                  { parameterCode: paramCode },
-                  { machineCode: paramCode },
-                  { parameterName: paramCode }
-                ]
+                parameterCode: paramCode
               }
             });
-
-            // If not found by testId, try global search
+            
+            if (!testParam) {
+              // Step 2: Try global parameterCode match
+              testParam = await prisma.testParameter.findFirst({
+                where: {
+                  parameterCode: paramCode
+                }
+              });
+            }
+            
+            // Step 3: Fallback to machineCode or parameterName (for backward compatibility)
             if (!testParam) {
               testParam = await prisma.testParameter.findFirst({
                 where: {
                   OR: [
-                    { parameterCode: paramCode },
                     { machineCode: paramCode },
                     { parameterName: paramCode }
                   ]
@@ -334,7 +345,7 @@ export const submitResults = async (req, res) => {
               failedResults.push({
                 testCode: testCode,
                 paramCode: paramCode,
-                reason: `Parameter '${paramCode}' not configured in system`
+                reason: `Parameter code '${paramCode}' not configured in system`
               });
               continue;
             }
