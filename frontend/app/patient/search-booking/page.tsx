@@ -1836,11 +1836,6 @@ export default function BookingPage() {
             className={`${style.btn} bg-red-500 hover:bg-red-600 transition-colors`}>
             <RotateCcw size={15}/> Reset
           </button>
-          
-          <div className="ml-auto flex items-center gap-2 bg-orange-100 text-orange-700 px-4 py-1 rounded font-semibold">
-            <span>Total Patients:</span>
-            <span className="text-lg font-bold">{filteredBookings.length}</span>
-          </div>
         </div>
       </div>
 
@@ -1853,59 +1848,64 @@ export default function BookingPage() {
             <table className="w-full text-xs">
               <thead className="bg-cyan-900 text-white sticky top-0">
                 <tr>
-                  <th className="p-2 w-12 text-center">No</th>
-                  <th className="p-2 text-left min-w-40">Patient Name</th>
-                  <th className="p-2 text-left min-w-24">Patient ID</th>
-                  <th className="p-2 text-left min-w-24">Visit ID</th>
-                  <th className="p-2 text-left min-w-24">Date</th>
-                  <th className="p-2 text-center min-w-32">Actions</th>
+                  <th className="px-2 py-1 w-12 text-center">No</th>
+                  <th className="px-2 py-1 text-left min-w-40">Patient Name</th>
+                  <th className="px-2 py-1 text-left min-w-24">Patient ID</th>
+                  <th className="px-2 py-1 text-left min-w-24">Visit ID</th>
+                  <th className="px-2 py-1 text-left min-w-24">Date</th>
+                  <th className="px-2 py-1 text-center min-w-32">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {loadingBookings ? (
-                  <tr><td colSpan={6} className="p-4 text-center text-gray-400">Loading...</td></tr>
+                  <tr><td colSpan={6} className="px-2 py-1 text-center text-gray-400">Loading...</td></tr>
                 ) : filteredBookings.length === 0 ? (
-                  <tr><td colSpan={6} className="p-4 text-center text-gray-400">No records found</td></tr>
+                  <tr><td colSpan={6} className="px-2 py-1 text-center text-gray-400">No records found</td></tr>
                 ) : (() => {
+                  // Sort by visitId only
+                  const sortedBookings = [...filteredBookings].sort((a, b) => {
+                    return (b.visitId || '').localeCompare(a.visitId || '');
+                  });
+                  
                   // Pagination logic
                   const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
                   const endIndex = startIndex + ITEMS_PER_PAGE;
-                  const paginatedBookings = filteredBookings.slice(startIndex, endIndex);
+                  const paginatedBookings = sortedBookings.slice(startIndex, endIndex);
                   
                   return paginatedBookings.map((b,i) => (
                     <tr key={i} className={`border-b hover:bg-gray-50 ${getBookingRowColor(b)}`}>
-                      <td className="p-2 text-center font-medium">{startIndex + i + 1}</td>
-                      <td className="p-2">
-                        <div className="font-semibold text-gray-800 flex items-center gap-2 group">
+                      <td className="px-2 py-1 text-center font-medium text-xs">{startIndex + i + 1}</td>
+                      <td className="px-2 py-1">
+                        <div className="font-semibold text-gray-800 flex items-center gap-2 group text-xs">
                           <span>{b.name}</span>
                           {b.balanceAmount > 0 && (
                             <div className="relative inline-flex items-center cursor-help">
-                              <span className="text-red-600 font-bold text-lg hover:text-red-700 transition-colors">₹</span>
-                              <div className="absolute left-0 bottom-full mb-2 bg-red-600 text-white text-xs px-3 py-2 rounded whitespace-nowrap pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity z-50 shadow-lg font-semibold">
+                              <span className="text-red-600 font-bold text-sm hover:text-red-700 transition-colors">₹</span>
+                              <div className="absolute left-0 bottom-full mb-1 bg-red-600 text-white text-xs px-2 py-1 rounded whitespace-nowrap pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity z-50 shadow-lg font-semibold">
                                 Balance: ₹{Math.round(b.balanceAmount)}
-                                <div className="absolute top-full left-1/2 -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-l-transparent border-r-transparent border-t-red-600"></div>
+                                <div className="absolute top-full left-1/2 -translate-x-1/2 w-0 h-0 border-l-3 border-r-3 border-t-3 border-l-transparent border-r-transparent border-t-red-600"></div>
                               </div>
                             </div>
                           )}
                         </div>
                       </td>
-                      <td className="p-2">
-                        <div className="text-gray-600">{b.patientId}</div>
+                      <td className="px-2 py-1">
+                        <div className="text-gray-600 text-xs">{b.patientId}</div>
                       </td>
-                      <td className="p-2">
-                        <div className="text-orange-600 font-semibold">{b.visitId}</div>
+                      <td className="px-2 py-1">
+                        <div className="text-orange-600 font-semibold text-xs">{b.visitId}</div>
                       </td>
-                      <td className="p-2 whitespace-nowrap">{b.date}</td>
-                      <td className="p-2">
-                        <div className="flex flex-wrap gap-1 justify-center">
+                      <td className="px-2 py-1 whitespace-nowrap text-xs">{b.date}</td>
+                      <td className="px-2 py-1">
+                        <div className="flex flex-wrap gap-0.5 justify-center">
                           <button onClick={() => {
                             setSelectedBookingForModal(b);
                             setShowBookingDetailsModal(true);
-                          }} className="text-slate-900 hover:bg-orange-400 p-1 rounded" title="View Details"><Eye size={16}/></button>
-                          <button onClick={()=>{setEditingPatient(b);setFormData(b.patientData);}} className="text-blue-900 hover:bg-orange-400 p-1 rounded" title="Edit"><Pencil size={16}/></button>
-                          <button onClick={()=>handlePrintBooking(b)} className="text-red-900 hover:bg-orange-400 p-1 rounded" title="Print"><Printer size={14}/></button>
-                          <button onClick={()=>handlePrintBarcode(b)} className="bg-white text-slate-900 hover:bg-orange-400 p-1 rounded" title="Barcode"><Barcode size={16}/></button>
-                          <button onClick={()=>handleRebooking(b)} className="text-green-600 hover:bg-orange-400 p-1 rounded" title="Rebook"><RefreshCw size={16}/></button>
+                          }} className="text-slate-900 hover:bg-orange-400 p-0.5 rounded" title="View Details"><Eye size={14}/></button>
+                          <button onClick={()=>{setEditingPatient(b);setFormData(b.patientData);}} className="text-blue-900 hover:bg-orange-400 p-0.5 rounded" title="Edit"><Pencil size={14}/></button>
+                          <button onClick={()=>handlePrintBooking(b)} className="text-red-900 hover:bg-orange-400 p-0.5 rounded" title="Print"><Printer size={12}/></button>
+                          <button onClick={()=>handlePrintBarcode(b)} className="bg-white text-slate-900 hover:bg-orange-400 p-0.5 rounded" title="Barcode"><Barcode size={14}/></button>
+                          <button onClick={()=>handleRebooking(b)} className="text-green-600 hover:bg-orange-400 p-0.5 rounded" title="Rebook"><RefreshCw size={14}/></button>
                         </div>
                       </td>
                     </tr>

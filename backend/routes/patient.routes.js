@@ -18,6 +18,7 @@ import {
   getPatientTests,
   getTestsByVisitId,
   addTestsToExistingVisit,
+  addPaymentToVisit,
   applyDiscount,
   recordPayment,
   cancelTest,
@@ -60,6 +61,9 @@ router.get('/report/billing-summary', getPatientBillingSummary);
 
 // Add tests to existing visit (from BookingDetailsModal)
 router.post('/add-tests-to-visit', addTestsToExistingVisit);
+
+// Add payment to existing visit (payment-only, no new tests)
+router.post('/add-payment-to-visit', addPaymentToVisit);
 
 // Get all patients
 router.get('/', getAllPatients);

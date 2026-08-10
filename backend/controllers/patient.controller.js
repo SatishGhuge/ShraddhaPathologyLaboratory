@@ -2796,3 +2796,197 @@ export const addTestsToExistingVisit = async (req, res) => {
     });
   }
 };
+
+// ✅ NEW: Add Payment Only to Existing Visit (no new tests)
+export const addPaymentToVisit = async (req, res) => {
+  try {
+    const { patientId, visitId, payment, discount } = req.body;
+
+    // Validate inputs
+    if (!patientId || !visitId) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'patientId and visitId are required' 
+      });
+    }
+
+    const paymentAmount = payment && parseFloat(payment.amount) > 0 ? parseFloat(payment.amount) : 0;
+    const discountPercent = discount?.discountPercent || 0;
+    const discountAmount = discount?.discountAmount || 0;
+    const discountRemark = discount?.discountRemark || null;
+
+    // Check if there's anything to save
+    if (paymentAmount === 0 && discountPercent === 0 && discountAmount === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'No payment or discount to process'
+      });
+    }
+
+    // Get existing VisitBill
+    const visitBill = await prisma.visitBill.findUnique({
+      where: { visitId }
+    });
+
+    if (!visitBill) {
+      return res.status(404).json({ 
+        success: false, 
+        message: 'Visit bill not found' 
+      });
+    }
+
+    console.log('📝 Adding payment/discount to existing visit:', {
+      patientId,
+      visitId,
+      paymentAmount,
+      discountPercent,
+      discountAmount
+    });
+
+    // Calculate new discount if applicable
+    let newDiscountAmount = 0;
+    let newDiscountPercent = 0;
+
+    if (parseFloat(discountPercent) > 0) {
+      // Apply discount to current balance
+      const currentBalance = visitBill.balanceAmount.toNumber();
+      newDiscountPercent = parseFloat(discountPercent);
+      newDiscountAmount = Math.round((currentBalance * newDiscountPercent) / 100);
+    } else if (parseFloat(discountAmount) > 0) {
+      newDiscountAmount = parseFloat(discountAmount);
+      const currentBalance = visitBill.balanceAmount.toNumber();
+      newDiscountPercent = currentBalance > 0 ? Math.round((newDiscountAmount / currentBalance) * 100) : 0;
+    }
+
+    // Ensure discount doesn't exceed balance
+    const currentBalance = visitBill.balanceAmount.toNumber();
+    newDiscountAmount = Math.min(newDiscountAmount, currentBalance);
+
+    // Calculate new totals
+    const totalTestCharges = visitBill.grossAmount.toNumber();
+    const totalDiscountAmount = visitBill.totalDiscount.toNumber() + newDiscountAmount;
+    let newTotalPaid = visitBill.totalPaid.toNumber() + paymentAmount;
+    
+    // ✅ Calculate final balance using formula: grossAmount - totalDiscount - totalPaid
+    const finalBalance = Math.max(0, totalTestCharges - totalDiscountAmount - newTotalPaid);
+
+    console.log('💰 Payment/Discount calculation:', {
+      existingGross: visitBill.grossAmount.toNumber(),
+      existingDiscount: visitBill.totalDiscount.toNumber(),
+      existingBalance: visitBill.balanceAmount.toNumber(),
+      newDiscountAmount,
+      newDiscountPercent,
+      paymentAmount,
+      newTotalPaid,
+      finalBalance,
+      totalDiscountAmount
+    });
+
+    // ✅ WRAP IN TRANSACTION - All or nothing
+    let updatedBill;
+    
+    await prisma.$transaction(async (tx) => {
+      // Step 1: Create new BillingSession for PAYMENT
+      const lastSession = await tx.billingSession.findFirst({
+        where: { visitId },
+        orderBy: { sequence: 'desc' }
+      });
+      const nextSequence = (lastSession?.sequence || 0) + 1;
+      
+      const paymentSession = await tx.billingSession.create({
+        data: {
+          visitId,
+          sessionType: 'PAYMENT',
+          sequence: nextSequence,
+          remarks: `Payment received: ₹${paymentAmount}`
+        }
+      });
+      
+      console.log(`✅ [TX] BillingSession created: PAYMENT, sequence=${nextSequence}`);
+
+      // Step 2: Create BillDiscount if discount > 0
+      if (newDiscountAmount > 0) {
+        await tx.billDiscount.create({
+          data: {
+            visitId,
+            billingSessionId: paymentSession.id,
+            discountType: newDiscountPercent > 0 ? 'PERCENTAGE' : 'FLAT',
+            discountValue: new Decimal(newDiscountPercent > 0 ? newDiscountPercent : newDiscountAmount),
+            discountAmount: new Decimal(newDiscountAmount),
+            appliedOnAmount: new Decimal(currentBalance),
+            remarks: discountRemark || null
+          }
+        });
+        console.log(`✅ [TX] BillDiscount created: ₹${newDiscountAmount}`);
+      }
+
+      // Step 3: Create Payment record if payment > 0
+      if (paymentAmount > 0) {
+        const payMode = payment?.paymentMode === 'Cash' ? 'CASH' : 
+                       payment?.paymentMode === 'Card' ? 'CARD' : 
+                       payment?.paymentMode === 'UPI' ? 'UPI' :
+                       payment?.paymentMode === 'Cheque' ? 'CHEQUE' :
+                       payment?.paymentMode === 'Bank Transfer' ? 'BANK_TRANSFER' : 'OTHER';
+        
+        await tx.payment.create({
+          data: {
+            visitId,
+            billingSessionId: paymentSession.id,
+            amount: new Decimal(paymentAmount),
+            paymentMode: payMode,
+            transactionStatus: 'SUCCESS',
+            remarks: `Payment`,
+            paymentDate: new Date()
+          }
+        });
+        console.log(`✅ [TX] Payment created: ₹${paymentAmount}`);
+      }
+
+      // Step 4: Update VisitBill (summary/cache)
+      const totalDiscountPercent = totalTestCharges > 0 
+        ? Math.round((totalDiscountAmount / totalTestCharges) * 100)
+        : 0;
+      
+      updatedBill = await tx.visitBill.update({
+        where: { visitId },
+        data: {
+          grossAmount: new Decimal(totalTestCharges.toString()),
+          totalDiscount: new Decimal(totalDiscountAmount.toString()),
+          totalDiscountPercent: totalDiscountPercent,
+          totalPaid: new Decimal(newTotalPaid.toString()),
+          balanceAmount: new Decimal(finalBalance.toString()),
+          status: finalBalance <= 0 ? 'PAID' : newTotalPaid > 0 ? 'PARTIAL' : 'PENDING'
+        }
+      });
+      
+      console.log(`✅ [TX] VisitBill updated: balance=₹${finalBalance}, status=${finalBalance <= 0 ? 'PAID' : 'PARTIAL'}`);
+    });
+    
+    console.log(`✅ Transaction completed successfully for PAYMENT`);
+
+    res.json({
+      success: true,
+      message: `Payment processed successfully`,
+      data: {
+        patientId,
+        visitId,
+        visitBill: {
+          ...updatedBill,
+          grossAmount: updatedBill.grossAmount.toNumber ? updatedBill.grossAmount.toNumber() : parseFloat(updatedBill.grossAmount),
+          totalDiscount: updatedBill.totalDiscount.toNumber ? updatedBill.totalDiscount.toNumber() : parseFloat(updatedBill.totalDiscount),
+          totalPaid: updatedBill.totalPaid.toNumber ? updatedBill.totalPaid.toNumber() : parseFloat(updatedBill.totalPaid),
+          totalRefund: updatedBill.totalRefund?.toNumber ? updatedBill.totalRefund.toNumber() : 0,
+          balanceAmount: updatedBill.balanceAmount.toNumber ? updatedBill.balanceAmount.toNumber() : parseFloat(updatedBill.balanceAmount)
+        }
+      }
+    });
+
+  } catch (error) {
+    console.error('Add payment to visit error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to add payment to visit',
+      error: error.message
+    });
+  }
+};

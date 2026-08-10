@@ -373,16 +373,107 @@ const BookingDetailsModal: React.FC<BookingDetailsModalProps> = ({
   };
 
   const handleSave = async () => {
-    // Check if new tests were added
+    // Check if new tests were added or payment was made
     const newTests = tests.filter(t => !t.isExisting);
+    const hasPayment = paymentAmount > 0;
+    const hasDiscount = discountPercent > 0 || discount > 0;
     
-    if (newTests.length === 0) {
-      // No new tests - just close modal
-      console.log('ℹ️ No new tests added, closing modal');
+    // If no changes at all - just close
+    if (newTests.length === 0 && !hasPayment && !hasDiscount) {
+      console.log('ℹ️ No changes made, closing modal');
       onClose();
       return;
     }
 
+    // If only payment/discount (no new tests), call payment-only endpoint
+    if (newTests.length === 0 && (hasPayment || hasDiscount)) {
+      console.log('💾 Saving payment/discount only...', {
+        hasPayment,
+        paymentAmount,
+        hasDiscount,
+        discountPercent,
+        discount
+      });
+
+      try {
+        const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || '/api';
+        
+        // Call a new endpoint for payment-only transactions
+        const response = await fetch(`${API_BASE_URL}/patients/add-payment-to-visit`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            patientId: booking.patientId,
+            visitId: booking.visitId,
+            payment: {
+              paymentMode: paymentMode,
+              amount: paymentAmount || 0
+            },
+            discount: {
+              discountPercent: discountPercent || 0,
+              discountAmount: discount || 0,
+              discountRemark: discountRemark || null
+            },
+            businessType
+          })
+        });
+
+        const result = await response.json();
+        console.log('✅ Backend response:', result);
+
+        if (!response.ok) {
+          throw new Error(result.message || 'Failed to save payment');
+        }
+
+        // Update the booking with new totals
+        const finalBalance = result.data.visitBill?.balanceAmount || 0;
+        
+        const updatedBooking = {
+          ...booking,
+          tests: booking.tests, // Keep existing tests
+          billing: {
+            grossAmount: result.data.visitBill?.grossAmount || booking.billing?.grossAmount || 0,
+            totalDiscount: result.data.visitBill?.totalDiscount || booking.billing?.totalDiscount || 0,
+            discountPercent: result.data.visitBill?.totalDiscount ? 
+              Math.round((result.data.visitBill.totalDiscount / result.data.visitBill.grossAmount) * 100) : 0,
+            discountAmount: result.data.visitBill?.totalDiscount || booking.billing?.discountAmount || 0,
+            discountRemark: discountRemark || booking.billing?.discountRemark,
+            paidAmount: result.data.visitBill?.totalPaid || 0,
+            balanceAmount: finalBalance,
+            status: result.data.visitBill?.status || "PENDING"
+          },
+          balanceAmount: finalBalance,
+          paidAmount: result.data.visitBill?.totalPaid || 0,
+          totalAmount: result.data.visitBill?.grossAmount || booking.billing?.grossAmount || 0,
+          discountAmount: result.data.visitBill?.totalDiscount || booking.billing?.discountAmount || 0,
+          patientData: {
+            ...booking.patientData,
+            paymentMode
+          }
+        };
+
+        onBookingUpdate?.(updatedBooking);
+
+        // Show message if fully paid
+        if (finalBalance <= 0) {
+          alert(`✅ Payment received - Amount Fully Paid!`);
+        } else {
+          alert(`✅ Payment received successfully!\nRemaining Balance: ₹${Math.round(finalBalance)}`);
+        }
+
+        setPaymentAmount(0);
+        setDiscount(0);
+        setDiscountPercent(0);
+        onClose();
+        return;
+
+      } catch (error) {
+        console.error('❌ Error saving payment:', error);
+        alert('Failed to save payment: ' + (error instanceof Error ? error.message : String(error)));
+      }
+    }
+
+    // Original logic for adding tests
     console.log('💾 Saving new tests to existing visit...', {
       newTestsCount: newTests.length,
       discountPercent,
@@ -469,10 +560,15 @@ const BookingDetailsModal: React.FC<BookingDetailsModalProps> = ({
             discountPercent || 0,
           discountAmount: result.data.visitBill?.totalDiscount || result.data.discountAmount || 0,
           discountRemark: discountRemark,
-          paidAmount: paymentAmount || 0,
+          paidAmount: result.data.visitBill?.totalPaid || paymentAmount || 0,
           balanceAmount: result.data.visitBill?.balanceAmount || result.data.balanceAmount || 0,
           status: result.data.visitBill?.status || "PENDING"
         },
+        // ✅ Also update top-level balance amount so parent table updates red rupee icon
+        balanceAmount: result.data.visitBill?.balanceAmount || result.data.balanceAmount || 0,
+        paidAmount: result.data.visitBill?.totalPaid || paymentAmount || 0,
+        totalAmount: result.data.visitBill?.grossAmount || result.data.totalAmount || 0,
+        discountAmount: result.data.visitBill?.totalDiscount || result.data.discountAmount || 0,
         patientData: {
           ...booking.patientData,
           paymentMode
@@ -481,15 +577,20 @@ const BookingDetailsModal: React.FC<BookingDetailsModalProps> = ({
 
       onBookingUpdate?.(updatedBooking);
       
-      // ✅ Build success message
-      const messages: string[] = [];
-      if (newTests.length > 0) {
-        messages.push(`✅ ${newTests.length} new test(s) added successfully`);
-      }
-      messages.push(`✅ Payment updated successfully`);
+      // ✅ Only show message if fully paid (balance = 0)
+      const finalBalance = result.data.visitBill?.balanceAmount || result.data.balanceAmount || 0;
       
-      const successMessage = messages.join('\n');
-      alert(successMessage);
+      if (finalBalance <= 0) {
+        // Fully paid - show success message
+        const messages: string[] = [];
+        if (newTests.length > 0) {
+          messages.push(`✅ ${newTests.length} new test(s) added successfully`);
+        }
+        messages.push(`✅ Payment received - Amount Fully Paid!`);
+        
+        const successMessage = messages.join('\n');
+        alert(successMessage);
+      }
       
       // ✅ Reset payment field to 0
       setPaymentAmount(0);
@@ -866,8 +967,16 @@ const BookingDetailsModal: React.FC<BookingDetailsModalProps> = ({
                     />
                   </div>
                   <button
-                    onClick={handleSave}
-                    className="bg-orange-500 hover:bg-orange-600 text-white px-3 py-1 rounded font-semibold text-xs h-6"
+                    onClick={() => {
+                      // Check if already fully paid
+                      if (finalBalance <= 0 && !newTestsAdded && paymentAmount === 0) {
+                        alert('✅ Payment already completed!\nNo further payment required.');
+                        return;
+                      }
+                      handleSave();
+                    }}
+                    disabled={finalBalance <= 0 && !newTestsAdded && paymentAmount === 0}
+                    className="bg-orange-500 hover:bg-orange-600 text-white px-3 py-1 rounded font-semibold text-xs h-6 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     Save
                   </button>
