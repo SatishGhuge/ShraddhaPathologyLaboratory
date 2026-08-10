@@ -90,7 +90,8 @@ export interface ProfessionalReportProps {
   printOption?: 'pagebreak' | 'nobreak';
   results?: Record<string, { numericValue?: any; textValue?: string; isAbnormal?: any; isHighlighted?: boolean }>;
   referralDoctor?: string;
-  comments?: string;  // ✅ Comments field
+  comments?: string;
+  forceShowReferenceRange?: boolean;  // ✅ NEW: Force show reference ranges
   onReady?: () => void;
 }
 
@@ -327,7 +328,7 @@ const ProfessionalReport = React.forwardRef<HTMLDivElement, ProfessionalReportPr
       results = {},
       referralDoctor = '',
       comments = '',  // ✅ Keep for backward compatibility
-      
+      forceShowReferenceRange = false,  // ✅ NEW: Force show reference ranges
       onReady,
     } = props;
 
@@ -492,6 +493,15 @@ const ProfessionalReport = React.forwardRef<HTMLDivElement, ProfessionalReportPr
       let dead = false;
       (async () => {
         try {
+          // ✅ If letterhead is explicitly undefined/null, don't load any letterhead
+          if (letterhead === undefined || letterhead === null) {
+            if (!dead) {
+              setLh(null);
+              setReady(true);
+            }
+            return;
+          }
+          
           // Use letterhead passed as prop first
           if (letterhead?.fullPageImage || letterhead?.headerImage) {
             if (!dead) {
@@ -500,6 +510,8 @@ const ProfessionalReport = React.forwardRef<HTMLDivElement, ProfessionalReportPr
             }
             return;
           }
+          
+          // Only fetch if letterhead was not explicitly set to undefined
           const r = await fetch(`${API_BASE_URL}/letterhead/active`);
           const d = await r.json();
           if (!dead && d.success && d.data?.length > 0) setLh(d.data[0]);
@@ -612,14 +624,19 @@ const ProfessionalReport = React.forwardRef<HTMLDivElement, ProfessionalReportPr
         (cp as any[]).some((p: any) => p.units?.trim() && p.units !== '-')
       ), [allGroupedParams]);
 
-    const showRange = useMemo(() =>
-      allGroupedParams.some((cp: any) =>
+    const showRange = useMemo(() => {
+      // If forceShowReferenceRange is true, always show ranges
+      if (forceShowReferenceRange) return true;
+      
+      // Otherwise, use the detection logic
+      return allGroupedParams.some((cp: any) =>
         (cp as any[]).some((p: any) => {
           if (p.type === 'Text' || p.isDescriptive) return false;
           const r = p.normalRange || p.rangeText;
           return r?.trim() && r !== '-';
         })
-      ), [allGroupedParams]);
+      );
+    }, [allGroupedParams, forceShowReferenceRange]);
 
     // ✅ Memoize formatting object to prevent unnecessary updates
     const memoizedFormatting = useMemo(() => ({

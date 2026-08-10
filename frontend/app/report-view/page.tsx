@@ -213,11 +213,11 @@ export default function ReportViewPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-8">
-      {/* Mobile Header with Actions */}
-      <div className="bg-white border-b border-gray-200 sticky top-0 z-40 shadow-sm">
+    <div className="min-h-screen bg-gray-50 pb-32 print:pb-0">
+      {/* Mobile Header */}
+      <div className="bg-white border-b border-gray-200 sticky top-0 z-40 shadow-sm print:hidden">
         <div className="max-w-7xl mx-auto px-4 py-3">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+          <div className="flex items-center justify-between gap-3">
             <button
               onClick={() => router.back()}
               className="flex items-center gap-2 text-blue-600 hover:text-blue-800 text-sm sm:text-base"
@@ -226,55 +226,20 @@ export default function ReportViewPage() {
               Back
             </button>
             
-            {/* Action Buttons - Stack on mobile, row on desktop */}
-            <div className="flex gap-2 w-full sm:w-auto flex-wrap">
-              <button
-                onClick={handleDownloadPDF}
-                className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-3 rounded-lg transition text-sm sm:text-base"
-                title="Download PDF"
-              >
-                <FileDown size={18} />
-                <span className="hidden sm:inline">Download PDF</span>
-                <span className="sm:hidden">PDF</span>
-              </button>
-              
-              <button
-                onClick={handlePrint}
-                className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-gray-600 hover:bg-gray-700 text-white font-semibold py-2 px-3 rounded-lg transition text-sm sm:text-base"
-                title="Print report"
-              >
-                <Printer size={18} />
-                <span className="hidden sm:inline">Print</span>
-                <span className="sm:hidden">Print</span>
-              </button>
-
-              {navigator.share && (
-                <button
-                  onClick={handleShare}
-                  className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-3 rounded-lg transition text-sm sm:text-base"
-                  title="Share report"
-                >
-                  <Share2 size={18} />
-                  <span className="hidden sm:inline">Share</span>
-                  <span className="sm:hidden">Share</span>
-                </button>
-              )}
+            {/* Report Info */}
+            <div className="text-sm text-right">
+              <p className="text-gray-700 font-semibold">
+                {reportData.patientName}
+              </p>
+              <p className="text-gray-600 text-xs">
+                ID: {reportData.visitId}
+              </p>
             </div>
-          </div>
-          
-          {/* Report Info */}
-          <div className="mt-3 text-sm">
-            <p className="text-gray-700 font-semibold">
-              {reportData.patientName}
-            </p>
-            <p className="text-gray-600">
-              Visit ID: <span className="font-mono font-semibold text-gray-800">{reportData.visitId}</span>
-            </p>
           </div>
         </div>
       </div>
 
-      {/* Professional Report Component - Optimized for mobile */}
+      {/* Professional Report Component - Clean, no header */}
       <div className="max-w-7xl mx-auto px-2 sm:px-4 py-4">
         <div 
           ref={reportRef} 
@@ -290,19 +255,47 @@ export default function ReportViewPage() {
               combinedTests={reportData.combinedTests}
               results={reportData.results}
               signature={reportData.signature}
-              letterhead={reportData.letterhead}
+              letterhead={undefined}
+              letterHeadBase64={undefined}
               printOption="pagebreak"
+              forceShowReferenceRange={true}
             />
           )}
         </div>
       </div>
 
-      {/* Footer */}
-      <div className="max-w-7xl mx-auto px-4 mt-8 text-center text-gray-600 text-sm print:hidden">
-        <p className="mb-2">
-          © {new Date().getFullYear()} Shraddha Pathology Laboratory
-        </p>
-        <p>This is a professional test report accessed via secure QR code.</p>
+      {/* Fixed Footer with Buttons - Only visible on screen, not on print */}
+      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 shadow-lg print:hidden">
+        <div className="max-w-7xl mx-auto px-2 sm:px-4 py-3 flex gap-2 flex-wrap justify-center">
+          <button
+            onClick={handleDownloadPDF}
+            className="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg transition text-sm flex-1 sm:flex-none"
+            title="Download PDF"
+          >
+            <FileDown size={18} />
+            Download PDF
+          </button>
+          
+          <button
+            onClick={handlePrint}
+            className="flex items-center justify-center gap-2 bg-gray-600 hover:bg-gray-700 text-white font-semibold py-2 px-4 rounded-lg transition text-sm flex-1 sm:flex-none"
+            title="Print report"
+          >
+            <Printer size={18} />
+            Print
+          </button>
+
+          {navigator.share && (
+            <button
+              onClick={handleShare}
+              className="flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded-lg transition text-sm flex-1 sm:flex-none"
+              title="Share report"
+            >
+              <Share2 size={18} />
+              Share
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Print Styles */}
@@ -316,6 +309,7 @@ export default function ReportViewPage() {
           
           .min-h-screen {
             min-height: auto;
+            padding-bottom: 0 !important;
           }
           
           .max-w-7xl {
@@ -327,17 +321,9 @@ export default function ReportViewPage() {
             padding-right: 0;
           }
           
-          .py-3, .py-4, .py-8 {
+          .py-3, .py-4 {
             padding-top: 0;
             padding-bottom: 0;
-          }
-          
-          .mt-3, .mt-4, .mt-8 {
-            margin-top: 0;
-          }
-          
-          .mb-2, .mb-4, .mb-6, .mb-8 {
-            margin-bottom: 0;
           }
           
           /* Hide interactive elements when printing */
@@ -367,13 +353,10 @@ export default function ReportViewPage() {
           tr {
             page-break-inside: avoid;
           }
-        }
-
-        @media screen and (max-width: 640px) {
-          /* Mobile optimizations */
-          .px-2 {
-            padding-left: 0.5rem;
-            padding-right: 0.5rem;
+          
+          /* Hide header on print */
+          .sticky {
+            display: none !important;
           }
         }
       `}</style>
