@@ -5,7 +5,8 @@ import { useRouter, usePathname } from "next/navigation";
 import Header from "@/src/components/Header";
 import PageHeader from "@/src/components/BreadCrumb";
 
-const publicRoutes = ["/", "/login", "/seed-data"];
+const publicRoutes = ["/", "/login", "/seed-data", "/report-view", "/report"];
+
 
 // Create context for sidebar state
 export const SidebarContext = createContext<{
@@ -45,7 +46,14 @@ export function LayoutWrapper({ children }: { children: ReactNode }) {
       .find((row) => row.startsWith("token="))
       ?.split("=")[1];
 
-    const isPublic = publicRoutes.includes(pathname);
+    // Check if current pathname is public
+    // Include routes that start with /report-view or /report/ (for both token-based and visitId-based)
+    const isPublic = publicRoutes.some(route => {
+      if (route === pathname) return true;
+      if (pathname.startsWith(route + '/')) return true; // Handle /report/[token], /report-view/...
+      return false;
+    });
+    
     setIsPublicRoute(isPublic);
 
     if (!token && !isPublic) {

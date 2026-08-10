@@ -41,15 +41,29 @@ export default function ReportViewPage() {
   const [reportData, setReportData] = useState<ReportData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [debugInfo, setDebugInfo] = useState<string>('');
   const reportRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const fetchReportData = async () => {
       try {
         const visitId = searchParams.get("visitId");
+        
+        const debugLog = `
+        🔍 Report View Debug Info:
+        - Current URL: ${window.location.href}
+        - Search Params: ${searchParams.toString()}
+        - Visit ID: ${visitId}
+        - API Base URL: ${API_BASE_URL}
+        `;
+        
+        console.log(debugLog);
+        setDebugInfo(debugLog);
 
         if (!visitId) {
-          setError("Invalid report parameters - missing Visit ID");
+          const errorMsg = "Invalid report parameters - missing Visit ID";
+          console.error(errorMsg);
+          setError(errorMsg);
           setLoading(false);
           return;
         }
@@ -57,16 +71,22 @@ export default function ReportViewPage() {
         console.log("📊 Fetching report data for visitId:", visitId);
 
         // Fetch complete report data from new QR scan endpoint
-        const response = await fetch(
-          `${API_BASE_URL}/result/qr-scan/${encodeURIComponent(visitId)}`
-        );
+        const apiUrl = `${API_BASE_URL}/results/qr-scan/${encodeURIComponent(visitId)}`;
+        console.log("🌐 Calling API:", apiUrl);
+        
+        const response = await fetch(apiUrl);
+
+        console.log("📡 API Response Status:", response.status);
+        console.log("📡 API Response Headers:", response.headers);
 
         if (!response.ok) {
-          throw new Error(`HTTP ${response.status}`);
+          const responseText = await response.text();
+          console.error("❌ API Error Response:", responseText);
+          throw new Error(`HTTP ${response.status} - ${responseText.substring(0, 100)}`);
         }
 
         const apiResponse = await response.json();
-        console.log("📊 API Response:", apiResponse);
+        console.log("✅ API Response:", apiResponse);
 
         if (!apiResponse.success || !apiResponse.data) {
           setError("Failed to load report data. Please try again.");
@@ -89,8 +109,10 @@ export default function ReportViewPage() {
 
         setLoading(false);
       } catch (err) {
-        console.error("Error processing report:", err);
-        setError(`Failed to load report: ${err instanceof Error ? err.message : 'Unknown error'}`);
+        console.error("❌ Error processing report:", err);
+        const errorMsg = `Failed to load report: ${err instanceof Error ? err.message : 'Unknown error'}`;
+        setError(errorMsg);
+        setDebugInfo(prev => prev + `\n\n❌ Error: ${errorMsg}`);
         setLoading(false);
       }
     };
@@ -120,9 +142,12 @@ export default function ReportViewPage() {
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white flex items-center justify-center p-4">
-        <div className="text-center">
+        <div className="text-center max-w-md">
           <Loader className="animate-spin h-12 w-12 text-blue-600 mx-auto mb-4" />
           <p className="text-gray-600 font-semibold">Loading professional report...</p>
+          <pre className="text-xs text-gray-500 mt-4 text-left bg-gray-100 p-2 rounded overflow-auto max-h-48">
+            {debugInfo}
+          </pre>
         </div>
       </div>
     );
@@ -141,7 +166,10 @@ export default function ReportViewPage() {
           </button>
           <div className="bg-red-50 border border-red-200 rounded-lg p-6">
             <h1 className="text-xl font-bold text-red-800 mb-2">Error Loading Report</h1>
-            <p className="text-red-700">{error || "Unable to load report data"}</p>
+            <p className="text-red-700 mb-4">{error || "Unable to load report data"}</p>
+            <pre className="text-xs text-red-600 bg-red-100 p-3 rounded overflow-auto max-h-64 whitespace-pre-wrap break-words">
+              {debugInfo}
+            </pre>
           </div>
         </div>
       </div>

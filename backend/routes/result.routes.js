@@ -100,15 +100,13 @@ router.post('/parse-barcode', async (req, res) => {
   }
 });
 
-// Get all patient tests for results page
-// MUST be after specific routes like /qr-scan/:visitId
-// router.get('/', getPatientTests);
-
-// 🟢 QR CODE ENDPOINT: Get complete report data by visitId for mobile viewing
-// MUST be before /:id to avoid conflict - specific paths before dynamic params
+// 🟢 QR CODE ENDPOINT: MUST BE FIRST - Get complete report data by visitId for mobile viewing
+// This MUST be registered BEFORE the generic /:id route
 router.get('/qr-scan/:visitId', async (req, res) => {
   try {
     const { visitId } = req.params;
+
+    console.log('🟢🟢🟢 QR-SCAN ENDPOINT HIT! visitId:', visitId);
 
     if (!visitId) {
       return res.status(400).json({
@@ -123,11 +121,7 @@ router.get('/qr-scan/:visitId', async (req, res) => {
     const patientTests = await prisma.patientTest.findMany({
       where: { visitId: visitId },
       include: {
-        patient: {
-          include: {
-            organization: true  // ✅ Include patient's organization
-          }
-        },
+        patient: true,  // Patient doesn't have organization relation, removed
         test: {
           include: {
             sample_type: true
@@ -137,21 +131,23 @@ router.get('/qr-scan/:visitId', async (req, res) => {
           include: {
             testParameter: {
               include: {
-                unit: true,
-                ageRanges: true
+                unit: true
               }
-            }
+            },
+            testCategory: true
           }
         },
+        department: true,
         organization: true,
         usedMachine: true
       }
     });
 
     if (patientTests.length === 0) {
+      console.warn('⚠️ No tests found for visitId:', visitId);
       return res.status(404).json({
         success: false,
-        message: 'No tests found for this visit ID'
+        message: `No tests found for this visit ID: ${visitId}`
       });
     }
 
@@ -204,8 +200,7 @@ router.get('/qr-scan/:visitId', async (req, res) => {
       include: {
         testParameter: {
           include: {
-            unit: true,
-            ageRanges: true
+            unit: true
           }
         }
       }

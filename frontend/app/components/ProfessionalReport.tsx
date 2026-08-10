@@ -450,21 +450,22 @@ const ProfessionalReport = React.forwardRef<HTMLDivElement, ProfessionalReportPr
           }
 
           // Create a single QR code for the entire visit with all tests
-          // ✅ Use API_BASE_URL domain instead of localhost for mobile scanning
-          let baseUrl = API_BASE_URL.replace('/api', '');  // Remove /api to get base domain
-          if (!baseUrl) {
-            baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
+          // ✅ Get the correct base URL for mobile scanning
+          let baseUrl = '';
+          
+          if (typeof window !== 'undefined') {
+            // Client-side: Use window.location.origin for reliable domain
+            baseUrl = window.location.origin;
+          } else {
+            // Server-side fallback
+            baseUrl = API_BASE_URL.replace('/api', '').replace('http:', 'https:');
           }
           
-          const reportParams = new URLSearchParams({
-            visitId: visitId || '',
-            patientName: [patient.title, patient.firstName, patient.lastName].filter(Boolean).join(' '),
-            visitDate: visitDate || new Date().toISOString(),
-            allTests: 'true', // Flag to indicate this is a combined report
-          });
-          const qrContent = `${baseUrl}/report-view?${reportParams.toString()}`;
+          // ✅ SIMPLIFIED: Only send visitId - that's all we need
+          const qrContent = `${baseUrl}/report-view?visitId=${encodeURIComponent(visitId || '')}`;
           
           console.log('✅ QR Code URL:', qrContent);
+          console.log('✅ Base URL used:', baseUrl);
           
           const qrDataUrl = await QRCode.toDataURL(qrContent, {
             errorCorrectionLevel: 'H', // High error correction for better scanning

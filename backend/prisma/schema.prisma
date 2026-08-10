@@ -335,6 +335,7 @@ model PatientTest {
   usedMachine        Machine?            @relation(fields: [usedMachineId], references: [id], onDelete: SetNull)
   testResults        TestResult[]
   statusHistory      TestStatusHistory[]
+  reportQRToken      ReportQRToken?
 
   @@index([departmentId], map: "patient_tests_departmentId_fkey")
   @@index([testId], map: "patient_tests_testId_fkey")
@@ -823,6 +824,28 @@ model OutsourcingReport {
   @@index([patientTestId])
   @@index([outsourcingLabId])
   @@map("outsourcing_reports")
+}
+
+// ============================================
+// QR CODE REPORT VERIFICATION MODULE
+// ============================================
+
+model ReportQRToken {
+  id                 Int         @id @default(autoincrement())
+  reportQRTokenHash  String      @unique
+  patientTestId      Int         @unique
+  createdAt          DateTime    @default(now())
+  expiresAt          DateTime?
+  isDisabled         Boolean     @default(false)
+  accessCount        Int         @default(0)
+  lastAccessedAt     DateTime?
+  
+  patientTest        PatientTest @relation(fields: [patientTestId], references: [id], onDelete: Cascade)
+
+  @@index([reportQRTokenHash])
+  @@index([isDisabled])
+  @@index([createdAt])
+  @@map("report_qr_tokens")
 }
 model HSNCode {
   id        Int      @id @default(autoincrement())
