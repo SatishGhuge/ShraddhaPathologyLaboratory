@@ -2,7 +2,7 @@
 
 import { useSearchParams, useRouter } from "next/navigation";
 import { useState, useEffect, useRef } from "react";
-import { ArrowLeft, Download, Share2, Loader, Download as PrintIcon } from "lucide-react";
+import { ArrowLeft, Share2, Loader, Printer, FileDown } from "lucide-react";
 import API_BASE_URL from "@/src/api/config";
 import dynamic from "next/dynamic";
 
@@ -43,6 +43,47 @@ export default function ReportViewPage() {
   const [error, setError] = useState<string | null>(null);
   const [debugInfo, setDebugInfo] = useState<string>('');
   const reportRef = useRef<HTMLDivElement>(null);
+
+  // Handle PDF download - Optimized for mobile
+  const handleDownloadPDF = async () => {
+    if (!reportRef.current) return;
+
+    try {
+      const html2pdf = (await import('html2pdf.js')).default;
+      const element = reportRef.current;
+      
+      const fileName = `Report-${reportData?.visitId}-${new Date().toISOString().split('T')[0]}.pdf`;
+      
+      const opt = {
+        margin: [8, 8, 8, 8],
+        filename: fileName,
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: { scale: 2, useCORS: true, logging: false },
+        jsPDF: { orientation: 'portrait', unit: 'mm', format: 'a4' }
+      };
+
+      // Generate and download PDF
+      html2pdf()
+        .set(opt)
+        .from(element)
+        .save()
+        .then(() => {
+          console.log('✅ PDF downloaded successfully');
+        })
+        .catch((err: any) => {
+          console.error('Error downloading PDF:', err);
+          alert('Failed to download PDF. Please try again.');
+        });
+    } catch (err) {
+      console.error('Error in PDF download:', err);
+      alert('PDF download failed. Make sure you have a stable internet connection.');
+    }
+  };
+
+  // Handle print
+  const handlePrint = () => {
+    window.print();
+  };
 
   useEffect(() => {
     const fetchReportData = async () => {
@@ -120,7 +161,6 @@ export default function ReportViewPage() {
     fetchReportData();
   }, [searchParams]);
 
-
   const handleShare = async () => {
     if (navigator.share && reportData) {
       try {
@@ -135,17 +175,13 @@ export default function ReportViewPage() {
     }
   };
 
-  const handlePrint = () => {
-    window.print();
-  };
-
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white flex items-center justify-center p-4">
         <div className="text-center max-w-md">
           <Loader className="animate-spin h-12 w-12 text-blue-600 mx-auto mb-4" />
           <p className="text-gray-600 font-semibold">Loading professional report...</p>
-          <pre className="text-xs text-gray-500 mt-4 text-left bg-gray-100 p-2 rounded overflow-auto max-h-48">
+          <pre className="text-xs text-gray-500 mt-4 text-left bg-gray-100 p-2 rounded overflow-auto max-h-48 break-words">
             {debugInfo}
           </pre>
         </div>
@@ -155,8 +191,8 @@ export default function ReportViewPage() {
 
   if (error || !reportData) {
     return (
-      <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white">
-        <div className="max-w-2xl mx-auto p-4">
+      <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white p-4">
+        <div className="max-w-2xl mx-auto">
           <button
             onClick={() => router.back()}
             className="flex items-center gap-2 text-blue-600 hover:text-blue-800 mb-6"
@@ -177,73 +213,96 @@ export default function ReportViewPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-100 py-4">
-      <div className="max-w-4xl mx-auto">
-        {/* Header */}
-        <div className="mb-4 px-4">
-          <div className="flex items-center justify-between mb-4">
+    <div className="min-h-screen bg-gray-50 pb-8">
+      {/* Mobile Header with Actions */}
+      <div className="bg-white border-b border-gray-200 sticky top-0 z-40 shadow-sm">
+        <div className="max-w-7xl mx-auto px-4 py-3">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
             <button
               onClick={() => router.back()}
-              className="flex items-center gap-2 text-blue-600 hover:text-blue-800"
+              className="flex items-center gap-2 text-blue-600 hover:text-blue-800 text-sm sm:text-base"
             >
               <ArrowLeft size={20} />
               Back
             </button>
-            <div className="flex gap-2">
+            
+            {/* Action Buttons - Stack on mobile, row on desktop */}
+            <div className="flex gap-2 w-full sm:w-auto flex-wrap">
+              <button
+                onClick={handleDownloadPDF}
+                className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-3 rounded-lg transition text-sm sm:text-base"
+                title="Download PDF"
+              >
+                <FileDown size={18} />
+                <span className="hidden sm:inline">Download PDF</span>
+                <span className="sm:hidden">PDF</span>
+              </button>
+              
               <button
                 onClick={handlePrint}
-                className="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg transition"
+                className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-gray-600 hover:bg-gray-700 text-white font-semibold py-2 px-3 rounded-lg transition text-sm sm:text-base"
+                title="Print report"
               >
-                <Download size={18} />
-                Print / PDF
+                <Printer size={18} />
+                <span className="hidden sm:inline">Print</span>
+                <span className="sm:hidden">Print</span>
               </button>
+
               {navigator.share && (
                 <button
                   onClick={handleShare}
-                  className="flex items-center justify-center gap-2 bg-gray-600 hover:bg-gray-700 text-white font-semibold py-2 px-4 rounded-lg transition"
+                  className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-3 rounded-lg transition text-sm sm:text-base"
+                  title="Share report"
                 >
                   <Share2 size={18} />
-                  Share
+                  <span className="hidden sm:inline">Share</span>
+                  <span className="sm:hidden">Share</span>
                 </button>
               )}
             </div>
           </div>
-          <div className="bg-white rounded-lg shadow p-4">
-            <h1 className="text-2xl font-bold text-gray-800">
-              Professional Test Report
-            </h1>
-            <p className="text-gray-600 mt-1">
-              Visit ID: <span className="font-mono font-semibold">{reportData.visitId}</span>
+          
+          {/* Report Info */}
+          <div className="mt-3 text-sm">
+            <p className="text-gray-700 font-semibold">
+              {reportData.patientName}
+            </p>
+            <p className="text-gray-600">
+              Visit ID: <span className="font-mono font-semibold text-gray-800">{reportData.visitId}</span>
             </p>
           </div>
         </div>
+      </div>
 
-        {/* Professional Report Component */}
-        <div className="bg-white rounded-lg shadow p-4">
-          <div ref={reportRef} className="professional-report">
-            {reportData.combinedTests && reportData.combinedTests.length > 0 && (
-              <ProfessionalReport
-                patient={reportData.patientInfo}
-                visitId={reportData.visitId}
-                visitDate={reportData.visitDate}
-                test={reportData.combinedTests[0]}
-                combinedTests={reportData.combinedTests}
-                results={reportData.results}
-                signature={reportData.signature}
-                letterhead={reportData.letterhead}
-                printOption="pagebreak"
-              />
-            )}
-          </div>
+      {/* Professional Report Component - Optimized for mobile */}
+      <div className="max-w-7xl mx-auto px-2 sm:px-4 py-4">
+        <div 
+          ref={reportRef} 
+          className="bg-white rounded-lg shadow-md p-3 sm:p-6 print:rounded-none print:shadow-none print:p-0"
+          style={{ printColorAdjust: 'exact', WebkitPrintColorAdjust: 'exact' } as any}
+        >
+          {reportData.combinedTests && reportData.combinedTests.length > 0 && (
+            <ProfessionalReport
+              patient={reportData.patientInfo}
+              visitId={reportData.visitId}
+              visitDate={reportData.visitDate}
+              test={reportData.combinedTests[0]}
+              combinedTests={reportData.combinedTests}
+              results={reportData.results}
+              signature={reportData.signature}
+              letterhead={reportData.letterhead}
+              printOption="pagebreak"
+            />
+          )}
         </div>
+      </div>
 
-        {/* Footer */}
-        <div className="mt-6 text-center text-gray-600 text-sm">
-          <p className="mb-2">
-            © {new Date().getFullYear()} Shraddha Pathology Laboratory
-          </p>
-          <p>This is a professional test report scanned via QR code.</p>
-        </div>
+      {/* Footer */}
+      <div className="max-w-7xl mx-auto px-4 mt-8 text-center text-gray-600 text-sm print:hidden">
+        <p className="mb-2">
+          © {new Date().getFullYear()} Shraddha Pathology Laboratory
+        </p>
+        <p>This is a professional test report accessed via secure QR code.</p>
       </div>
 
       {/* Print Styles */}
@@ -254,39 +313,67 @@ export default function ReportViewPage() {
             padding: 0;
             margin: 0;
           }
+          
           .min-h-screen {
             min-height: auto;
           }
-          .max-w-4xl {
+          
+          .max-w-7xl {
             max-width: 100%;
           }
-          .px-4 {
-            padding: 0;
+          
+          .px-2, .px-4, .px-6 {
+            padding-left: 0;
+            padding-right: 0;
           }
-          .mb-4 {
-            margin-bottom: 0;
+          
+          .py-3, .py-4, .py-8 {
+            padding-top: 0;
+            padding-bottom: 0;
           }
-          .mt-6 {
+          
+          .mt-3, .mt-4, .mt-8 {
             margin-top: 0;
           }
+          
+          .mb-2, .mb-4, .mb-6, .mb-8 {
+            margin-bottom: 0;
+          }
+          
+          /* Hide interactive elements when printing */
           button,
-          .flex items-center justify-between {
-            display: none;
+          .print\\:hidden {
+            display: none !important;
           }
+          
+          /* Ensure report prints properly */
           .bg-white {
-            background: white;
-            box-shadow: none;
+            background: white !important;
           }
-          .professional-report {
-            margin: 0;
-            padding: 0;
+          
+          .rounded-lg {
+            border-radius: 0 !important;
+          }
+          
+          .shadow-md {
+            box-shadow: none !important;
+          }
+          
+          /* Ensure tables and text are readable */
+          table {
+            page-break-inside: avoid;
+          }
+          
+          tr {
+            page-break-inside: avoid;
           }
         }
 
-        @media screen {
-          .professional-report {
-            background: #f9f9f9;
-            border-radius: 8px;
+        @media screen and (max-width: 640px) {
+          /* Mobile optimizations */
+          .px-2 {
+            padding-left: 0.5rem;
+            padding-right: 0.5rem;
           }
         }
       `}</style>
