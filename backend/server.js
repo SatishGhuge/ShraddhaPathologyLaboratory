@@ -15,6 +15,7 @@ import pdfExtractRoutes from './routes/pdf-extract.routes.js';
 import machineRoutes from './routes/machine.routes.js';
 import machineConfigRoutes from './routes/machine-config.routes.js';
 import inventoryRoutes from './routes/inventory.routes.js';
+import reportSettingsRoutes from './routes/report-settings.routes.js';
 import { emailService } from './services/notification.service.js';
 
 // Load environment variables
@@ -55,6 +56,7 @@ app.use('/api/doctor-revenue', doctorRevenueRoutes);
 app.use('/api/pdf-extract', pdfExtractRoutes);
 app.use('/api/machine/v1', machineRoutes);
 app.use('/api/inventory', inventoryRoutes);
+app.use('/api/report-settings', reportSettingsRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {

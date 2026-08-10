@@ -1405,6 +1405,20 @@ const PatientResult = () => {
       });
       const data = await response.json();
       if (data.success) {
+        // ✅ Save comments for single test
+        if (comments && comments.trim()) {
+          try {
+            await fetch(`${API_BASE_URL}/results/${patientData.id}/comments`, {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ comments })
+            });
+            console.log('✅ Saved comments:', comments);
+          } catch (commentError) {
+            console.error('⚠️ Failed to save comments:', commentError);
+          }
+        }
+
         // Auto-transition to Entered status when first result is saved
         try {
           const transitionResponse = await fetch(`${API_BASE_URL}/results/${patientData.id}/auto-transition/result-saved`, {
@@ -1467,6 +1481,20 @@ const PatientResult = () => {
       });
       const data = await response.json();
       if (data.success) {
+        // ✅ Save comments for single test before printing
+        if (comments && comments.trim()) {
+          try {
+            await fetch(`${API_BASE_URL}/results/${patientData.id}/comments`, {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ comments })
+            });
+            console.log('✅ Saved comments:', comments);
+          } catch (commentError) {
+            console.error('⚠️ Failed to save comments:', commentError);
+          }
+        }
+
         // Upload attachment if selected
         if (attachedFile) {
           const formData = new FormData();
