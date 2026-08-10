@@ -304,11 +304,12 @@ export const submitResults = async (req, res) => {
           for (const [paramCode, value] of Object.entries(parameters)) {
             console.log(`[MACHINE API RESULTS] Looking for parameter: ${paramCode}`);
             
-            // ✅ PRIORITY-BASED MATCHING (Fix: Match by parameterCode first, test-specific)
+            // ✅ PRIORITY-BASED MATCHING with FUZZY MATCHING for variations
             // 1. First try: parameterCode exact match for this test
-            // 2. Second try: parameterCode global match
-            // 3. Fallback: machineCode, parameterName
-            
+            // 2. Second try: parameterCode exact global match
+            // 3. Third try: parameterCode partial/fuzzy match (handle "PCT*2" → "PCT")
+            // 4. Fallback: machineCode, parameterName
+
             let testParam = null;
             
             // Step 1: Try exact parameterCode match within this test
@@ -320,7 +321,7 @@ export const submitResults = async (req, res) => {
             });
             
             if (!testParam) {
-              // Step 2: Try global parameterCode match
+              // Step 2: Try exact global parameterCode match
               testParam = await prisma.testParameter.findFirst({
                 where: {
                   parameterCode: paramCode
@@ -328,7 +329,40 @@ export const submitResults = async (req, res) => {
               });
             }
             
-            // Step 3: Fallback to machineCode or parameterName (for backward compatibility)
+            // Step 3: Fuzzy matching - extract base parameter code (before special characters)
+            // Example: "PCT*2" → extract "PCT" and try matching
+            if (!testParam) {
+              // Extract base parameter code (letters/numbers only, remove special chars)
+              const baseParamCode = paramCode.replace(/[^A-Za-z0-9]/g, '').toUpperCase();
+              console.log(`[MACHINE API RESULTS] Trying fuzzy match: "${paramCode}" → "${baseParamCode}"`);
+              
+              // Try fuzzy match for this test first
+              testParam = await prisma.testParameter.findFirst({
+                where: {
+                  testId: patientTest.testId,
+                  parameterCode: {
+                    startsWith: baseParamCode
+                  }
+                }
+              });
+              
+              if (!testParam && baseParamCode.length > 0) {
+                // Try fuzzy match globally
+                testParam = await prisma.testParameter.findFirst({
+                  where: {
+                    parameterCode: {
+                      startsWith: baseParamCode
+                    }
+                  }
+                });
+              }
+              
+              if (testParam) {
+                console.log(`[MACHINE API RESULTS] ✅ Fuzzy matched: "${paramCode}" → parameterCode="${testParam.parameterCode}"`);
+              }
+            }
+            
+            // Step 4: Fallback to machineCode or parameterName (for backward compatibility)
             if (!testParam) {
               testParam = await prisma.testParameter.findFirst({
                 where: {
