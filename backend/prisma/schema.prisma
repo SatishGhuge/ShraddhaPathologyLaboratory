@@ -324,6 +324,7 @@ model PatientTest {
   usedMachine       Machine?            @relation(fields: [usedMachineId], references: [id], onDelete: SetNull)
   testResults       TestResult[]
   statusHistory     TestStatusHistory[]
+  reportQRToken      ReportQRToken?
 
   @@index([departmentId], map: "patient_tests_departmentId_fkey")
   @@index([testId], map: "patient_tests_testId_fkey")
