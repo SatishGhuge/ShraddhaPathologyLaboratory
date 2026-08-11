@@ -1,5 +1,35 @@
 import React from 'react';
 
+/*
+ * ============================================================================
+ * BILL RECEIPT - NORMALIZED BILLING TABLE DISPLAY MAPPING
+ * ============================================================================
+ * 
+ * Displays data from VisitBill normalized structure:
+ * 
+ * billing object maps from:
+ * ├─ VisitBill fields:
+ * │  ├─ grossAmount → displayed as "Gross Amount"
+ * │  ├─ totalDiscount → displayed as "Total Discount"
+ * │  ├─ balanceAmount → displayed as "Balance Due"
+ * │  └─ status → displayed as BillStatus
+ * │
+ * ├─ BillDiscount fields (latest record):
+ * │  ├─ discountType → displayed as "PERCENTAGE" or "FLAT"
+ * │  ├─ discountValue → displayed as "% value" or "Amount"
+ * │  ├─ discountAmount → displayed as discount amount
+ * │  └─ discountRemark → displayed in Remarks section
+ * │
+ * ├─ Payment fields (sum of all):
+ * │  ├─ amount → displayed as "Total Paid"
+ * │  └─ paymentMode → displayed as mode
+ * │
+ * └─ BillTransaction (audit trail):
+ *    └─ Used for complete transaction history (not shown in receipt)
+ * 
+ * ============================================================================
+ */
+
 interface BillReceiptProps {
   booking: any;
   billing: any;
@@ -8,19 +38,46 @@ interface BillReceiptProps {
 }
 
 const BillReceipt: React.FC<BillReceiptProps> = ({ booking, billing, businessType, numberToWords }) => {
-  // Calculate totals
-  const billTotal = booking.tests.reduce(
+  // Map from new VisitBill normalized structure
+  // billing object contains: grossAmount, totalDiscount, totalPaid, balanceAmount, status
+  
+  // Gross Amount from VisitBill
+  const billTotal = billing?.grossAmount ? parseFloat(billing.grossAmount) : booking.tests.reduce(
     (sum: number, t: any) => sum + (businessType === "B2C" ? (t.b2cCharge || t.charge || 0) : (t.b2bCharge || t.charge || 0)),
     0
   );
   
-  const currentDiscountPercent = parseFloat(billing.discountPercent) || 0;
-  const currentDiscountAmount = parseFloat(billing.discount) || 0;
-  const billDiscountAmount = currentDiscountPercent > 0
-    ? Math.round(billTotal * currentDiscountPercent / 100)
-    : Math.round(currentDiscountAmount);
+  // Total Discount from VisitBill (totalDiscount field)
+  const billDiscountAmount = billing?.totalDiscount ? parseFloat(billing.totalDiscount) : 0;
   
+  // Total Paid from VisitBill (totalPaid field)
+  const totalPaid = billing?.totalPaid ? parseFloat(billing.totalPaid) : 0;
+  
+  // Balance Amount from VisitBill
+  const balanceAmount = billing?.balanceAmount ? parseFloat(billing.balanceAmount) : 0;
+  
+  // Net Amount = Gross - Discount
   const billNetAmount = Math.max(0, billTotal - billDiscountAmount);
+  
+  // Get discount details from latest BillDiscount in billingSessions
+  const latestBillDiscount = billing?.billingSessions?.length > 0
+    ? billing.billingSessions
+        .flatMap((session: any) => session.discounts || [])
+        .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0]
+    : null;
+  
+  const discountType = latestBillDiscount?.discountType || 'FLAT';
+  const discountValue = latestBillDiscount?.discountValue || 0;
+  const discountRemark = latestBillDiscount?.remarks || billing?.remarks || '';
+  
+  // Get payment mode from latest Payment in billingSessions
+  const latestPayment = billing?.billingSessions?.length > 0
+    ? billing.billingSessions
+        .flatMap((session: any) => session.payments || [])
+        .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0]
+    : null;
+  
+  const paymentMode = latestPayment?.paymentMode || billing?.paymentMode || 'CASH';
   
   const patientName = booking.patientData?.firstName && booking.patientData?.lastName
     ? `${booking.patientData?.title || ''} ${booking.patientData?.firstName} ${booking.patientData?.lastName}`.trim()
@@ -63,7 +120,7 @@ const BillReceipt: React.FC<BillReceiptProps> = ({ booking, billing, businessTyp
             </div>
             <div className="flex mb-1">
               <span className="w-32 font-semibold">Payment Mode :</span>
-              <span>{billing.paymentMode || 'CASH'}</span>
+              <span>{paymentMode || 'CASH'}</span>
             </div>
           </div>
           <div>
@@ -118,11 +175,17 @@ const BillReceipt: React.FC<BillReceiptProps> = ({ booking, billing, businessTyp
             <span className="font-bold">{Math.round(billTotal).toFixed(2)}</span>
           </div>
           
-          {/* Discount Breakdown */}
-          {(currentDiscountPercent > 0 || currentDiscountAmount > 0) && (
+          {/* Discount Breakdown - Map from new BillDiscount structure */}
+          {billDiscountAmount > 0 && (
             <>
               <div className="flex justify-between text-xs mb-1">
-                <span>Discount {currentDiscountPercent > 0 ? `(${currentDiscountPercent}%)` : '(Fixed)'} :</span>
+                <span>
+                  Discount {
+                    discountType === 'PERCENTAGE' 
+                      ? `(${discountValue}%)`
+                      : '(Fixed)'
+                  } :
+                </span>
                 <span className="font-bold text-red-600">-{billDiscountAmount.toFixed(2)}</span>
               </div>
             </>
@@ -133,17 +196,33 @@ const BillReceipt: React.FC<BillReceiptProps> = ({ booking, billing, businessTyp
             <span className="font-bold text-green-600">{Math.round(billNetAmount).toFixed(2)}</span>
           </div>
           
+          {/* Payment Info - from VisitBill totalPaid */}
+          {totalPaid > 0 && (
+            <div className="flex justify-between text-xs mb-1">
+              <span>Amount Paid :</span>
+              <span className="font-bold text-green-600">{totalPaid.toFixed(2)}</span>
+            </div>
+          )}
+          
+          {/* Balance Info - from VisitBill balanceAmount */}
+          {balanceAmount > 0 && (
+            <div className="flex justify-between text-xs mb-1">
+              <span className="font-bold">Balance Due :</span>
+              <span className="font-bold text-orange-600">{balanceAmount.toFixed(2)}</span>
+            </div>
+          )}
+          
           <div className="flex justify-between text-xs mb-1">
             <span>Payable Amount (in words) :</span>
             <span className="font-semibold">{numberToWords(Math.round(billNetAmount))} Only</span>
           </div>
         </div>
 
-        {/* Remarks Section */}
-        {billing.remarks && (
+        {/* Remarks Section - from BillDiscount record */}
+        {discountRemark && (
           <div className="bg-yellow-50 border border-yellow-200 p-2 mb-2 rounded text-xs" style={{ pageBreakInside: 'avoid' }}>
             <div className="font-semibold text-gray-700 mb-1">Remarks / Notes :</div>
-            <div className="text-gray-800">{billing.remarks}</div>
+            <div className="text-gray-800">{discountRemark}</div>
           </div>
         )}
 

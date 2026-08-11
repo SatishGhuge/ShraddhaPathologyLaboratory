@@ -161,6 +161,7 @@ model Patient {
   tests             PatientTest[]
   auth              PatientAuth?
   homeVisits        HomeVisitTracking[]
+  bills              VisitBill[]         // NEW: Billing relation
 
   createdAt         DateTime?     @default(now())
   updatedAt         DateTime      @updatedAt
@@ -273,69 +274,56 @@ model RunnerLocation {
 }
 
 model PatientTest {
-  id                 Int                 @id @default(autoincrement())
-  patientId          String
-  visitId            String
-  testId             Int
-  packageId          Int?
-  departmentId       Int
-  usedMachineId      Int?                // Machine that performed this test
-  sample             String
-  charge             Float
-  status             String              @default("Registered")
-  reportMode         String?
-  referralDoctor     String?
-  visitDate          DateTime?
-  visitTime          String?
-  sampleBarcodeNo    String?
-  patient_history    String?             @db.Text
-  totalAmount        Float               @default(0)
+  id                Int                 @id @default(autoincrement())
+  patientId         String
+  visitId           String
+  testId            Int
+  packageId         Int?
+  departmentId      Int
+  usedMachineId     Int?                // Machine that performed this test
+  sample            String
+  charge            Decimal             @db.Decimal(10, 2)
+  status            String              @default("Registered")  // Registered, Completed, Cancelled
+  reportMode        String?
+  referralDoctor    String?
+  visitDate         DateTime?
+  visitTime         String?
+  sampleBarcodeNo   String?
+  patient_history   String?             @db.Text
   
-  // ===== ORIGINAL DISCOUNT (from patient registration) =====
-  originalDiscountPercent Float             @default(0)
-  originalDiscountAmount  Float             @default(0)
-  originalDiscountRemark  String?
-  originalDiscountDate    DateTime?         @default(now())
-  
-  // ===== ADDITIONAL DISCOUNT (from BookingDetailsModal rebook) =====
-  additionalDiscountPercent Float            @default(0)
-  additionalDiscountAmount  Float            @default(0)
-  additionalDiscountRemark  String?
-  additionalDiscountDate    DateTime?
-  
-  // ===== LEGACY FIELDS (kept for backward compatibility) =====
-  discountPercent    Float               @default(0)
-  discountAmount     Float               @default(0)
-  discountRemark     String?
-  
-  paidAmount         Float               @default(0)
-  balanceAmount      Float               @default(0)
-  paymentMode        String?
-  businessType       String?
-  createdAt          DateTime            @default(now())
-  updatedAt          DateTime            @updatedAt
-  sampleReceived     DateTime?
-  sampleTaken        DateTime?
-  resultDate         DateTime?
-  isExcluded         Boolean             @default(false)
-  attachmentPath     String?
-  organizationId     String?
-  lastUpdatedBy      String?
+  // ===== MEDICAL FIELDS (No billing here anymore) =====
+  paymentMode       String?
+  businessType      String?
+  sampleReceived    DateTime?
+  sampleTaken       DateTime?
+  resultDate        DateTime?
+  isExcluded        Boolean             @default(false)
+  attachmentPath    String?
+  organizationId    String?
+  lastUpdatedBy     String?
   lastStatusUpdateAt DateTime?
-  barcode_status     String              @default("Unprinted")
-  comments           String?             @db.Text
-  outsourcedTo       String?
-  homeVisitTracking  HomeVisitTracking?
-  outsourcingReport  OutsourcingReport?
-  department         Department          @relation(fields: [departmentId], references: [id])
-  organization       Organization?       @relation(fields: [organizationId], references: [id])
-  package            Package?            @relation(fields: [packageId], references: [id], onDelete: Cascade)
-  patient            Patient             @relation(fields: [patientId], references: [patientId], onDelete: Cascade)
-  test               Test                @relation(fields: [testId], references: [id])
-  usedMachine        Machine?            @relation(fields: [usedMachineId], references: [id], onDelete: SetNull)
-  testResults        TestResult[]
-  statusHistory      TestStatusHistory[]
-  reportQRToken      ReportQRToken?
+  barcode_status    String              @default("Unprinted")
+  comments          String?             @db.Text
+  outsourcedTo      String?
+  
+  // ===== BILLING SESSION REFERENCE =====
+  billingSessionId  Int?
+  billingSession    BillingSession?     @relation(fields: [billingSessionId], references: [id], onDelete: SetNull)
+  
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+
+  // Relations
+  homeVisitTracking HomeVisitTracking?
+  outsourcingReport OutsourcingReport?
+  department        Department          @relation(fields: [departmentId], references: [id])
+  organization      Organization?       @relation(fields: [organizationId], references: [id])
+  package           Package?            @relation(fields: [packageId], references: [id], onDelete: Cascade)
+  patient           Patient             @relation(fields: [patientId], references: [patientId], onDelete: Cascade)
+  test              Test                @relation(fields: [testId], references: [id])
+  usedMachine       Machine?            @relation(fields: [usedMachineId], references: [id], onDelete: SetNull)
+  testResults       TestResult[]
+  statusHistory     TestStatusHistory[]
 
   @@index([departmentId], map: "patient_tests_departmentId_fkey")
   @@index([testId], map: "patient_tests_testId_fkey")
@@ -346,6 +334,7 @@ model PatientTest {
   @@index([visitDate])
   @@index([visitId])
   @@index([patientId, visitId])
+  @@index([billingSessionId])
   @@index([patientId], map: "patient_tests_patientId_fkey")
   @@index([packageId], map: "patient_tests_packageId_fkey")
   @@map("patient_tests")
@@ -741,20 +730,195 @@ model TestMachine {
   @@map("test_machines")
 }
 
-model PaymentTransaction {
-  id            Int      @id @default(autoincrement())
-  visitId       String
-  patientId     String
-  paymentMode   String
-  paymentAmount Float
-  remarks       String?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
 
-  @@index([visitId])
+// ============================================
+// BILLING & INVOICE MODULE (NORMALIZED)
+// ============================================
+
+// Enums for Billing
+enum BillStatus {
+  PENDING
+  PARTIAL
+  PAID
+  CANCELLED
+  OVERPAID
+}
+
+enum BillingSessionType {
+  REGISTRATION
+  ADD_TEST
+  PAYMENT
+  DISCOUNT
+  REFUND
+  CANCEL_TEST
+  EDIT_TEST
+}
+
+enum PaymentMode {
+  CASH
+  CARD
+  UPI
+  CHEQUE
+  BANK_TRANSFER
+  OTHER
+}
+
+enum DiscountType {
+  PERCENTAGE
+  FLAT
+  WRITEOFF
+}
+
+enum TransactionType {
+  INITIAL_BILL
+  ADD_TEST
+  CANCEL_TEST
+  DISCOUNT
+  PAYMENT
+  REFUND
+  WRITE_OFF
+  EDIT_CHARGE
+}
+
+// Master Bill Record - One per Visit
+model VisitBill {
+  id                Int             @id @default(autoincrement())
+  visitId           String          @unique
+  patientId         String
+  
+  // Financial Summary
+  grossAmount       Decimal         @db.Decimal(12, 2)  // Sum of all test charges
+  totalDiscount     Decimal         @db.Decimal(12, 2)  // Total discount applied (in rupees)
+  totalDiscountPercent Float        @default(0)        // Average discount percentage
+  totalPaid         Decimal         @db.Decimal(12, 2)  // Total payment received
+  totalRefund       Decimal         @db.Decimal(12, 2)  // Total refund given
+  balanceAmount     Decimal         @db.Decimal(12, 2)  // Outstanding balance
+  
+  // Status
+  status            BillStatus      @default(PENDING)
+  
+  // Timestamps
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+  
+  // Relations
+  patient           Patient         @relation(fields: [patientId], references: [patientId], onDelete: Cascade)
+  billingSessions   BillingSession[]
+  discounts         BillDiscount[]
+  payments          Payment[]
+  refunds           Refund[]
+  
   @@index([patientId])
-  @@index([paymentMode])
-  @@map("payment_transactions")
+  @@index([status])
+  @@index([createdAt])
+  @@map("visit_bills")
+}
+
+// Billing Session - Groups related activities
+model BillingSession {
+  id                Int                 @id @default(autoincrement())
+  visitId           String
+  visitBill         VisitBill           @relation(fields: [visitId], references: [visitId], onDelete: Cascade)
+  
+  sequence          Int                 // Order of sessions (1, 2, 3, etc.)
+  sessionType       BillingSessionType
+  remarks           String?             @db.Text
+  createdBy         Int?
+  createdAt         DateTime            @default(now())
+  
+  // Relations
+  patientTests      PatientTest[]
+  discounts         BillDiscount[]
+  payments          Payment[]
+  refunds           Refund[]
+  
+  @@index([visitId])
+  @@index([sessionType])
+  @@index([createdAt])
+  @@unique([visitId, sequence])
+  @@map("billing_sessions")
+}
+
+// Discount Records - Never overwritten
+model BillDiscount {
+  id                Int             @id @default(autoincrement())
+  visitId           String
+  visitBill         VisitBill       @relation(fields: [visitId], references: [visitId], onDelete: Cascade)
+  
+  billingSessionId  Int
+  billingSession    BillingSession  @relation(fields: [billingSessionId], references: [id], onDelete: Cascade)
+  
+  // Discount Details
+  discountType      DiscountType    // PERCENTAGE or FLAT
+  discountValue     Decimal         @db.Decimal(10, 2)  // Either % value or flat amount
+  discountAmount    Decimal         @db.Decimal(12, 2)  // Actual discount in rupees
+  appliedOnAmount   Decimal         @db.Decimal(12, 2)  // Amount on which discount was applied
+  
+  remarks           String?         @db.Text
+  createdBy         Int?
+  createdAt         DateTime        @default(now())
+  
+  @@index([visitId])
+  @@index([billingSessionId])
+  @@map("bill_discounts")
+}
+
+// Payment Records - COMBINED (Payment + PaymentTransaction + BillTransaction for payments)
+// Never overwritten, contains full audit trail
+model Payment {
+  id                Int             @id @default(autoincrement())
+  visitId           String
+  visitBill         VisitBill       @relation(fields: [visitId], references: [visitId], onDelete: Cascade)
+  
+  billingSessionId  Int
+  billingSession    BillingSession  @relation(fields: [billingSessionId], references: [id], onDelete: Cascade)
+  
+  // Payment Details
+  amount            Decimal         @db.Decimal(12, 2)      // Amount received
+  paymentMode       PaymentMode                              // CASH, CARD, UPI, etc.
+  
+  // Transaction Details (previously in PaymentTransaction)
+  transactionId     String?                                  // Bank/gateway transaction ID
+  transactionStatus String          @default("SUCCESS")     // SUCCESS, FAILED, PENDING
+  
+  // Audit Trail (previously in BillTransaction)
+  remarks           String?         @db.Text
+  receivedBy        Int?                                     // User who received payment
+  paymentDate       DateTime        @default(now())         // When payment was received
+  
+  // Reconciliation
+  isReconciled      Boolean         @default(false)
+  reconciledBy      Int?
+  reconciledAt      DateTime?
+  
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @default(now()) @updatedAt
+  
+  @@index([visitId])
+  @@index([billingSessionId])
+  @@index([paymentDate])
+  @@index([transactionStatus])
+  @@map("payments")
+}
+
+// Refund Records - Never overwritten
+model Refund {
+  id                Int             @id @default(autoincrement())
+  visitId           String
+  visitBill         VisitBill       @relation(fields: [visitId], references: [visitId], onDelete: Cascade)
+  
+  billingSessionId  Int
+  billingSession    BillingSession  @relation(fields: [billingSessionId], references: [id], onDelete: Cascade)
+  
+  // Refund Details
+  amount            Decimal         @db.Decimal(12, 2)
+  reason            String?         @db.Text
+  refundedBy        Int?
+  createdAt         DateTime        @default(now())
+  
+  @@index([visitId])
+  @@index([billingSessionId])
+  @@map("refunds")
 }
 
 model Signature {

@@ -41,22 +41,24 @@ export const generatePatientId = async () => {
 
 /**
  * Generates Visit ID in format: YYYYMMDD + 0001
- * Example: 2606080001 (1st visit on June 8, 2026)
+ * Example: 20260808001 (1st visit on Aug 8, 2026)
  * 
  * For same patient, same date: counter increments (0002, 0003, etc.)
  * For same patient, different date: counter resets or continues based on daily logic
+ * 
+ * ⚠️ CHANGED: Now searches VisitBill table (master billing table) instead of PatientTest
  */
 export const generateVisitId = async (visitDate = null) => {
   try {
     const today = visitDate ? new Date(visitDate) : new Date();
     const year = String(today.getFullYear()); // 2026
-    const month = String(today.getMonth() + 1).padStart(2, '0'); // 06
+    const month = String(today.getMonth() + 1).padStart(2, '0'); // 08
     const day = String(today.getDate()).padStart(2, '0'); // 08
     
-    const datePrefix = `${year}${month}${day}`; // 20260608
+    const datePrefix = `${year}${month}${day}`; // 20260808
     
-    // Find the last visit created on this date
-    const lastVisit = await prisma.patientTest.findFirst({
+    // ✅ FIXED: Find the last visit created on this date from VisitBill (master billing table)
+    const lastVisit = await prisma.visitBill.findFirst({
       where: {
         visitId: {
           startsWith: datePrefix
