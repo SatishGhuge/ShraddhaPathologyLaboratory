@@ -380,6 +380,7 @@ export const getPatientTestById = async (req, res) => {
             testParameter: true
           }
         },
+        organization: true,  // ✅ ADD organization include to get org name and code
         usedMachine: true  // ✅ Changed from select to include true to ensure machine is fetched
       }
     });

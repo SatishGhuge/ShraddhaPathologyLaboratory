@@ -10,6 +10,9 @@ import React, { useState, useEffect, useMemo } from 'react';
 import DOMPurify from 'dompurify';
 import API_BASE_URL from "@/src/api/config";
 
+// QRCode will be loaded dynamically
+let QRCode: any = null;
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
 // ─────────────────────────────────────────────────────────────────────────────
@@ -19,8 +22,12 @@ interface PatientInfo {
   firstName?: string;
   lastName?: string;
   age?: number | string;  // Can be number or formatted string like "1 month 3 days"
+  ageYears?: number;
+  ageMonths?: number;
+  ageDays?: number;
   gender?: string;
   dob?: string;  // Birthday date for babies
+  organizationName?: string;  // Organization name from patient registration
   mobile?: string;
   email?: string;
   address?: string;
@@ -83,7 +90,8 @@ export interface ProfessionalReportProps {
   printOption?: 'pagebreak' | 'nobreak';
   results?: Record<string, { numericValue?: any; textValue?: string; isAbnormal?: any; isHighlighted?: boolean }>;
   referralDoctor?: string;
-  comments?: string;  // ✅ Comments field
+  comments?: string;
+  forceShowReferenceRange?: boolean;  // ✅ NEW: Force show reference ranges
   onReady?: () => void;
 }
 
@@ -320,7 +328,7 @@ const ProfessionalReport = React.forwardRef<HTMLDivElement, ProfessionalReportPr
       results = {},
       referralDoctor = '',
       comments = '',  // ✅ Keep for backward compatibility
-      
+      forceShowReferenceRange = false,  // ✅ NEW: Force show reference ranges
       onReady,
     } = props;
 
@@ -329,6 +337,7 @@ const ProfessionalReport = React.forwardRef<HTMLDivElement, ProfessionalReportPr
     const [pages, setPages] = useState<ReportPage[]>([]);
     const [fieldConfigs, setFieldConfigs] = useState<Map<string, FieldConfig> | null>(null);
     const [formatConfig, setFormatConfig] = useState<FormattingConfig | null>(null);
+    const [qrCodes, setQrCodes] = useState<Record<string, string>>({}); // ✅ Store QR code data URLs
     const reportRef = React.useRef<HTMLDivElement>(null);
     const onReadyCalled = React.useRef(false);
 
@@ -430,10 +439,69 @@ const ProfessionalReport = React.forwardRef<HTMLDivElement, ProfessionalReportPr
 
     // Removed debug logging - this was causing unnecessary re-renders
 
+    // ✅ Generate single QR code for entire visit (all tests combined)
+    useEffect(() => {
+      const generateQRCode = async () => {
+        try {
+          // Dynamically load QRCode if not already loaded
+          if (!QRCode) {
+            // @ts-ignore - qrcode package is installed
+            const module = await import('qrcode');
+            QRCode = module.default;
+          }
+
+          // Create a single QR code for the entire visit with all tests
+          // ✅ Get the correct base URL for mobile scanning
+          let baseUrl = '';
+          
+          if (typeof window !== 'undefined') {
+            // Client-side: Use window.location.origin for reliable domain
+            baseUrl = window.location.origin;
+          } else {
+            // Server-side fallback
+            baseUrl = API_BASE_URL.replace('/api', '').replace('http:', 'https:');
+          }
+          
+          // ✅ SIMPLIFIED: Only send visitId - that's all we need
+          const qrContent = `${baseUrl}/report-view?visitId=${encodeURIComponent(visitId || '')}`;
+          
+          console.log('✅ QR Code URL:', qrContent);
+          console.log('✅ Base URL used:', baseUrl);
+          
+          const qrDataUrl = await QRCode.toDataURL(qrContent, {
+            errorCorrectionLevel: 'H', // High error correction for better scanning
+            type: 'image/png',
+            quality: 0.95,
+            margin: 1,
+            width: 120,
+            color: {
+              dark: '#000000',
+              light: '#FFFFFF',
+            },
+          });
+          // Store with key 'visitId' for single QR code per visit
+          setQrCodes({ [visitId || 'default']: qrDataUrl });
+        } catch (err) {
+          console.error('Error generating QR code:', err);
+        }
+      };
+
+      generateQRCode();
+    }, [visitId, visitDate, patient]);
+
     useEffect(() => {
       let dead = false;
       (async () => {
         try {
+          // ✅ If letterhead is explicitly undefined/null, don't load any letterhead
+          if (letterhead === undefined || letterhead === null) {
+            if (!dead) {
+              setLh(null);
+              setReady(true);
+            }
+            return;
+          }
+          
           // Use letterhead passed as prop first
           if (letterhead?.fullPageImage || letterhead?.headerImage) {
             if (!dead) {
@@ -442,6 +510,8 @@ const ProfessionalReport = React.forwardRef<HTMLDivElement, ProfessionalReportPr
             }
             return;
           }
+          
+          // Only fetch if letterhead was not explicitly set to undefined
           const r = await fetch(`${API_BASE_URL}/letterhead/active`);
           const d = await r.json();
           if (!dead && d.success && d.data?.length > 0) setLh(d.data[0]);
@@ -554,14 +624,19 @@ const ProfessionalReport = React.forwardRef<HTMLDivElement, ProfessionalReportPr
         (cp as any[]).some((p: any) => p.units?.trim() && p.units !== '-')
       ), [allGroupedParams]);
 
-    const showRange = useMemo(() =>
-      allGroupedParams.some((cp: any) =>
+    const showRange = useMemo(() => {
+      // If forceShowReferenceRange is true, always show ranges
+      if (forceShowReferenceRange) return true;
+      
+      // Otherwise, use the detection logic
+      return allGroupedParams.some((cp: any) =>
         (cp as any[]).some((p: any) => {
           if (p.type === 'Text' || p.isDescriptive) return false;
           const r = p.normalRange || p.rangeText;
           return r?.trim() && r !== '-';
         })
-      ), [allGroupedParams]);
+      );
+    }, [allGroupedParams, forceShowReferenceRange]);
 
     // ✅ Memoize formatting object to prevent unnecessary updates
     const memoizedFormatting = useMemo(() => ({
@@ -690,22 +765,25 @@ const ProfessionalReport = React.forwardRef<HTMLDivElement, ProfessionalReportPr
 
     const renderTableHead = () => {
       const headerStyle = getFormattingStyle('header');
+      // Use larger header size (15px) but not bold
+      const tableHeaderStyle = { ...headerStyle, fontSize: '16px', fontWeight: 'normal' };
+      
       return (
         <thead>
           <tr style={{ borderBottom: '1px solid #000' }}>
-            <th style={{ ...TH, ...headerStyle, width: '40%', textAlign: 'left', borderBottom: 'none' }}>
+            <th style={{ ...TH, ...tableHeaderStyle, width: '40%', textAlign: 'left', borderBottom: 'none' }}>
               {getFieldLabel('parameter_name', 'Test Description')}
             </th>
-            <th style={{ ...TH, ...headerStyle, width: showUnits || showRange ? '18%' : '30%', textAlign: 'left', borderBottom: 'none' }}>
+            <th style={{ ...TH, ...tableHeaderStyle, width: showUnits || showRange ? '18%' : '30%', textAlign: 'left', borderBottom: 'none' }}>
               {getFieldLabel('result_value', 'Value(s)')}
             </th>
             {showUnits && (
-              <th style={{ ...TH, ...headerStyle, width: '12%', textAlign: 'center', borderBottom: 'none' }}>
+              <th style={{ ...TH, ...tableHeaderStyle, width: '12%', textAlign: 'center', borderBottom: 'none' }}>
                 {getFieldLabel('unit', 'Unit')}
               </th>
             )}
             {showRange && (
-              <th style={{ ...TH, ...headerStyle, width: '30%', textAlign: 'left', borderBottom: 'none' }}>
+              <th style={{ ...TH, ...tableHeaderStyle, width: '30%', textAlign: 'left', borderBottom: 'none' }}>
                 {getFieldLabel('reference_range', 'Reference Range')}
               </th>
             )}
@@ -762,9 +840,29 @@ const ProfessionalReport = React.forwardRef<HTMLDivElement, ProfessionalReportPr
             }
             if (isFieldVisible('patient_age') || isFieldVisible('gender')) {
               const ageStyle = { ...PATIENT_TD, ...getFieldStyle('patient_age'), ...bodyStyle };
+              
+              // Format age properly from age components
+              let ageDisplay = '-';
+              if (patient.ageYears !== undefined || patient.ageMonths !== undefined || patient.ageDays !== undefined) {
+                const years = patient.ageYears || 0;
+                const months = patient.ageMonths || 0;
+                const days = patient.ageDays || 0;
+                
+                if (years === 0) {
+                  ageDisplay = `${months}M ${days}D`;
+                } else if (years < 12) {
+                  ageDisplay = `${years}Y ${months}M ${days}D`;
+                } else {
+                  const decimalAge = (years + months / 12).toFixed(1);
+                  ageDisplay = `${decimalAge} years`;
+                }
+              } else if (patient.age) {
+                ageDisplay = `${patient.age} years`;
+              }
+              
               row1.push(
                 <td key="age" style={{...ageStyle, lineHeight: '1.2', fontSize: '11px' }}>
-                  {getFieldLabel('patient_age', 'Age')} : {patient.age ?? '-'} {patient.age ? 'years' : ''} ({patient.gender ?? '-'})
+                  {getFieldLabel('patient_age', 'Age')} : {ageDisplay} ({patient.gender ?? '-'})
                 </td>
               );
             }
@@ -784,7 +882,7 @@ const ProfessionalReport = React.forwardRef<HTMLDivElement, ProfessionalReportPr
               const orgStyle = { ...PATIENT_TD, ...getFieldStyle('organization_name'), ...bodyStyle };
               row2.push(
                 <td key="org" style={{...orgStyle, lineHeight: '1.2', fontSize: '11px' }}>
-                  {getFieldLabel('organization_name', 'Org Name')} : {patient.title ? '1500' : 'Shraddha Pathology Laboratory'}
+                  {getFieldLabel('organization_name', 'Org Name')} : {patient.organizationName || 'Shraddha Pathology Laboratory'}
                 </td>
               );
             }
@@ -864,18 +962,37 @@ const ProfessionalReport = React.forwardRef<HTMLDivElement, ProfessionalReportPr
             }
             if (row6.length > 0) patientRows.push(<tr key="r6" style={{height: 'auto'}}>{row6}</tr>);
 
+            // ✅ MERGED: Combine report settings + QR code functionality
+            const showQRInReport = formatConfig?.showQRCode !== false;
+            
             segments.push(
-              <table key={`pat-${bi}`} style={{ 
-                width: '100%', 
-                borderCollapse: 'collapse', 
-                fontSize: `${formatConfig?.fontSizeBody || 11}px`, 
-                marginBottom: '3mm', 
-                flexShrink: 0, 
-                backgroundColor: 'transparent',
-                fontFamily: getFontFamily(formatConfig?.fontFamily || 'Bookman Old Text'),
-              }}>
-                <tbody>{patientRows}</tbody>
-              </table>
+              <div key={`pat-${bi}`} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '3mm', gap: '2mm', flexShrink: 0 }}>
+                {/* Left side: Patient info using field visibility settings */}
+                <table style={{ flex: 1, borderCollapse: 'collapse', fontSize: `${formatConfig?.fontSizeBody || 11}px`, backgroundColor: 'transparent', flexShrink: 0, fontFamily: getFontFamily(formatConfig?.fontFamily || 'Bookman Old Text') }}>
+                  <tbody>{patientRows}</tbody>
+                </table>
+
+                {/* Right side: Single QR code for entire visit (if enabled) */}
+                {showQRInReport && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5mm', alignItems: 'center', justifyContent: 'flex-start', flexShrink: 0, minWidth: 'fit-content' }}>
+                    {(() => {
+                      const qrCode = qrCodes[visitId || 'default'];
+                      return qrCode ? (
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5mm', flexShrink: 0 }}>
+                          <img 
+                            src={qrCode} 
+                            alt="QR Code for Visit"
+                            style={{ width: '15mm', height: '15mm', border: '0.5px solid #000', flexShrink: 0 }}
+                          />
+                          <div style={{ fontSize: '6px', textAlign: 'center', maxWidth: '25mm', wordBreak: 'break-word', fontWeight: 'bold' }}>
+                            Visit ID:<br/>{visitId}
+                          </div>
+                        </div>
+                      ) : null;
+                    })()}
+                  </div>
+                )}
+              </div>
             );
             break;
 
@@ -1122,8 +1239,8 @@ const PATIENT_TD: React.CSSProperties = {
 
 const TH: React.CSSProperties = {
   padding: '1px 3px',
-  fontWeight: '900',  // Extra bold
-  fontSize: '8px',  // Slightly larger (was 7px)
+  fontWeight: 'normal',  // Not bold
+  fontSize: '5px',  // Same as body text (appears larger due to not being in pt)
   textAlign: 'left',
   backgroundColor: 'transparent',
   minHeight: '12px',

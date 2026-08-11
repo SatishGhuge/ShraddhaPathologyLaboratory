@@ -16,6 +16,7 @@ import machineRoutes from './routes/machine.routes.js';
 import machineConfigRoutes from './routes/machine-config.routes.js';
 import inventoryRoutes from './routes/inventory.routes.js';
 import reportSettingsRoutes from './routes/report-settings.routes.js';
+import reportQRRoutes from './routes/report-qr.routes.js';
 import { emailService } from './services/notification.service.js';
 
 // Load environment variables
@@ -25,14 +26,18 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 
 // Middleware
+const allowedOrigins = [
+  process.env.FRONTEND_URL || 'http://localhost:3000',
+  'http://localhost:3000',
+  'http://localhost:5173',
+  'http://localhost:5174',
+  'http://localhost:5175',
+  'http://192.168.0.119:3000',  // ← Your phone IP
+  'http://192.168.0.119:5000',  // ← Your phone can access backend too
+];
+
 app.use(cors({
-  origin: [
-    process.env.FRONTEND_URL || 'http://localhost:3000',
-    'http://localhost:3000',
-    'http://localhost:5173',
-    'http://localhost:5174',
-    'http://localhost:5175'
-  ],
+  origin: allowedOrigins,
   credentials: true
 }));
 app.use(express.json({ limit: '10mb' }));
@@ -57,6 +62,7 @@ app.use('/api/pdf-extract', pdfExtractRoutes);
 app.use('/api/machine/v1', machineRoutes);
 app.use('/api/inventory', inventoryRoutes);
 app.use('/api/report-settings', reportSettingsRoutes);
+app.use('/api/report-qr', reportQRRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {
@@ -86,7 +92,7 @@ app.use((req, res) => {
 });
 
 // Start server
-app.listen(PORT, async () => {
+app.listen(PORT, '0.0.0.0', async () => {
   console.log(`🚀 Server running on port ${PORT}`);
   console.log(`📍 Environment: ${process.env.NODE_ENV}`);
   console.log(`🌐 CORS enabled for: ${process.env.FRONTEND_URL}`);

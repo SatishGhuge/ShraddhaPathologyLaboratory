@@ -2,21 +2,19 @@
 
 import { useRouter } from "next/navigation";
 import React, { useState, useEffect } from "react";
-
-
-import { FlaskConical, RotateCwIcon, Upload, FileSpreadsheet } from "lucide-react";
-import { getTests, deleteTest, updateTest } from "@/src/api/master";
+import { RotateCwIcon, Upload, FileSpreadsheet } from "lucide-react";
+import { getTests, updateTest } from "@/src/api/master";
 import API_BASE_URL from "@/src/api/config";
 
 const TestList = () => {
   const router = useRouter();
 
-  const [search, setSearch] = useState("");
+  const [search, setSearch] = useState<string>("");
   const [tests, setTests] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<any>(null);
-  const [showInactive, setShowInactive] = useState(false);
-  const [currentPage, setCurrentPage] = useState(1);
+  const [showInactive, setShowInactive] = useState<boolean>(false);
+  const [currentPage, setCurrentPage] = useState<number>(1);
   const [pagination, setPagination] = useState<any>(null);
   const [outsourcedTestIds, setOutsourcedTestIds] = useState<Set<number>>(new Set());
   const ITEMS_PER_PAGE = 20;
@@ -61,7 +59,7 @@ const TestList = () => {
     setCurrentPage(1);
   }, [search, showInactive]);
 
-  const fetchTests = async (page: number = 1) => {
+  const fetchTests = async (page: number = 1): Promise<void> => {
     try {
       setLoading(true);
       setError(null);
@@ -71,7 +69,7 @@ const TestList = () => {
       const testsArray = response.data || [];
       
       // Sort tests alphabetically by name
-      const sortedTests = testsArray.sort((a, b) => {
+      const sortedTests = testsArray.sort((a: any, b: any) => {
         const nameA = (a.name || '').toLowerCase();
         const nameB = (b.name || '').toLowerCase();
         return nameA.localeCompare(nameB);
@@ -88,7 +86,7 @@ const TestList = () => {
   };
 
   // 🔹 Copy Test - Creates a duplicate
-  const handleCopyTest = async (id) => {
+  const handleCopyTest = async (id: number) => {
     const testToCopy = tests.find((t) => t.id === id);
     if (!testToCopy) return;
 
@@ -129,12 +127,12 @@ const TestList = () => {
       }
     } catch (err) {
       console.error('Error copying test:', err);
-      alert(`Failed to copy test: ${err.message}`);
+      alert(`Failed to copy test: ${err instanceof Error ? err.message : 'Unknown error'}`);
     }
   };
 
   // 🔹 Delete Test
-  const handleDeleteTest = async (id) => {
+  const handleDeleteTest = async (id: number) => {
     const testToDelete = tests.find((t) => t.id === id);
     if (!testToDelete) return;
 
@@ -150,18 +148,18 @@ const TestList = () => {
         if (updateData[key] === undefined) delete updateData[key];
       });
       
-      await updateTest(id, updateData);
+      await updateTest(String(id), updateData);
       alert("Test deleted permanently!");
       setCurrentPage(1); // Reset to page 1
       fetchTests(1); // Fetch first page
     } catch (err) {
       console.error('Error deleting test:', err);
-      alert(`Failed to delete test: ${err.message}`);
+      alert(`Failed to delete test: ${err instanceof Error ? err.message : 'Unknown error'}`);
     }
   };
 
   // 🔹 Toggle Active / Inactive with dynamic message
-  const handleToggleActive = async (id) => {
+  const handleToggleActive = async (id: number) => {
     const currentTest = tests.find((t) => t.id === id);
 
     const message = currentTest.isActive
@@ -182,13 +180,13 @@ const TestList = () => {
         if (updateData[key] === undefined) delete updateData[key];
       });
       
-      await updateTest((Array.isArray(id) ? id[0] : id) as string, updateData);
+      await updateTest(String(id), updateData);
       alert(currentTest.isActive ? "Test inactivated successfully!" : "Test activated successfully!");
       setCurrentPage(1); // Reset to page 1
       fetchTests(1); // Fetch first page
     } catch (err) {
       console.error('Error toggling test status:', err);
-      alert(`Failed to update test: ${err.message}`);
+      alert(`Failed to update test: ${err instanceof Error ? err.message : 'Unknown error'}`);
     }
   };
 
@@ -200,7 +198,7 @@ const TestList = () => {
   };
 
   // 🔹 Handle file selection for import
-  const handleImportFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImportFileSelect = (e: React.ChangeEvent<HTMLInputElement>): void => {
     const selectedFile = e.target.files?.[0];
     if (selectedFile) {
       if (!selectedFile.name.endsWith('.xlsx')) {
@@ -493,7 +491,7 @@ const TestList = () => {
 
                 <div className="flex items-center gap-1">
                   {(() => {
-                    const pages = [];
+                    const pages: (number | string)[] = [];
                     const totalPages = pagination.totalPages;
                     
                     if (totalPages <= 5) {
