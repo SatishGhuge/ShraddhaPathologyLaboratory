@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { RotateCcw, Printer, FileSpreadsheet, DollarSign, ChevronDown, Calendar, ChevronLeft, ChevronRight } from "lucide-react";
+import { RotateCcw, Printer, FileSpreadsheet, DollarSign, ChevronDown, Calendar, ChevronLeft, ChevronRight, X } from "lucide-react";
 import Header from "@/src/components/Header";
+import SettlementModal from "@/src/components/Settlement/SettlementModal";
 import { getAllPatients, getOrganizations } from "@/src/api/patient";
 
 /* ── Date helpers ── */
@@ -151,6 +152,9 @@ export default function CollectionReport() {
   const ITEMS_PER_PAGE = 40;
   const [currentPage, setCurrentPage] = useState(1);
   const [pagination, setPagination] = useState<any>(null);
+  
+  // Settlement state - simplified, delegate to SettlementModal
+  const [showSettlement, setShowSettlement] = useState(false);
 
   const reportType = getReportType(dateFrom, dateTo);
   const reportTitle = reportType === "daily" ? "Daily Collection" : reportType === "monthly" ? "Monthly Collection" : reportType === "annual" ? "Annual Collection" : "Collection Report";
@@ -247,6 +251,8 @@ export default function CollectionReport() {
               center: p.createdAtLocation || "-",
               corporate: t.businessType || "-",
               patient: patName,
+              patientId: p.patientId || "-",
+              orgId: t.organization?.id || selOrg || "-",
               mobile: p.mobile || "-",
               remark: t.remarks || "",
               referralDr: t.referralDoctor || "-",
@@ -254,6 +260,7 @@ export default function CollectionReport() {
               discount: 0, refund: 0,
               netAmount: 0, total: 0, balance: 0,
               paymentMode: t.paymentMode || "",
+              billStatus: t.billStatus || "PENDING",  // ✅ NEW
             });
           }
           
@@ -455,6 +462,10 @@ export default function CollectionReport() {
               className="flex gap-1.5 items-center bg-orange-600 hover:bg-orange-700 text-white px-2 sm:px-3 py-1.5 sm:py-2 rounded text-xs sm:text-sm">
               <Printer size={14}/> Print
             </button>
+            <button onClick={()=>setShowSettlement(true)}
+              className="flex gap-1.5 items-center bg-blue-600 hover:bg-blue-700 text-white px-2 sm:px-3 py-1.5 sm:py-2 rounded text-xs sm:text-sm">
+              <DollarSign size={14}/> Settlement
+            </button>
           </div>
         </div>
 
@@ -548,146 +559,19 @@ export default function CollectionReport() {
             </table>
           </div>
         </div>
-
-        {/* PAGINATION */}
-        {pagination && pagination.totalPages > 1 && (
-          <div className="mt-3 p-2 bg-white border border-gray-300 rounded flex items-center justify-between">
-            <div className="text-xs text-gray-600">
-              Showing {Math.min((currentPage - 1) * ITEMS_PER_PAGE + 1, pagination.total)}-{Math.min(currentPage * ITEMS_PER_PAGE, pagination.total)} of {pagination.total} records | Page {currentPage} of {pagination.totalPages}
-            </div>
-            <div className="flex gap-1.5">
-              <button onClick={() => goToPage(1)} disabled={currentPage === 1}
-                className="px-2 py-1 text-xs border border-gray-300 rounded hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed">
-                First
-              </button>
-              <button onClick={() => goToPage(currentPage - 1)} disabled={currentPage === 1}
-                className="px-2 py-1 text-xs border border-gray-300 rounded hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed">
-                ← Prev
-              </button>
-              
-              {/* Page numbers */}
-              <div className="flex gap-1">
-                {Array.from({ length: Math.min(5, pagination.totalPages) }, (_, i) => {
-                  let pageNum;
-                  if (pagination.totalPages <= 5) {
-                    pageNum = i + 1;
-                  } else if (currentPage <= 3) {
-                    pageNum = i + 1;
-                  } else if (currentPage >= pagination.totalPages - 2) {
-                    pageNum = pagination.totalPages - 4 + i;
-                  } else {
-                    pageNum = currentPage - 2 + i;
-                  }
-                  
-                  return pageNum >= 1 && pageNum <= pagination.totalPages ? (
-                    <button key={pageNum} onClick={() => goToPage(pageNum)}
-                      className={`px-2 py-1 text-xs border rounded ${
-                        currentPage === pageNum
-                          ? 'bg-blue-600 text-white border-blue-600'
-                          : 'border-gray-300 hover:bg-gray-100'
-                      }`}>
-                      {pageNum}
-                    </button>
-                  ) : null;
-                })}
-              </div>
-              
-              <button onClick={() => goToPage(currentPage + 1)} disabled={currentPage === pagination.totalPages}
-                className="px-2 py-1 text-xs border border-gray-300 rounded hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed">
-                Next →
-              </button>
-              <button onClick={() => goToPage(pagination.totalPages)} disabled={currentPage === pagination.totalPages}
-                className="px-2 py-1 text-xs border border-gray-300 rounded hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed">
-                Last
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* Report Type Info */}
-        <div className="mt-3 p-2 bg-blue-50 border border-blue-200 rounded text-xs text-blue-700">
-          <strong>Report Type:</strong> {reportTitle} | <strong>Records:</strong> {data.length} | <strong>Date Range:</strong> {dispRange(dateFrom, dateTo)}
-        </div>
       </div>
 
-      {/* PRINT ONLY SECTION */}
-      <div className="print-only">
-        <style>{`@media print{body *{visibility:hidden}.print-only,.print-only *{visibility:visible}.print-only{position:absolute;left:0;top:0;width:100%;padding:20px}@page{size:A4 landscape;margin:10mm}}@media screen{.print-only{display:none}}`}</style>
-        <div style={{textAlign:"center",marginBottom:"16px"}}>
-          <h1 style={{fontSize:"20px",fontWeight:"bold",margin:"0"}}>SHRADDHA PATHOLOGY LABORATORY</h1>
-          <p style={{margin:"4px 0",fontSize:"11px"}}>Plot No-38, Sector-1, D-Mart Road, New Panvel - 410 206</p>
-          <hr style={{margin:"8px 0",border:"1px solid #000"}}/>
-          <h2 style={{fontSize:"14px",fontWeight:"bold",color:"#0066cc",margin:"8px 0"}}>{reportTitle}</h2>
-          <p style={{margin:"4px 0",fontSize:"11px"}}>Period: {dispRange(dateFrom,dateTo)}</p>
-          <hr style={{margin:"8px 0",border:"1px dashed #000"}}/>
-        </div>
-        <table style={{width:"100%",borderCollapse:"collapse",fontSize:"9px"}}>
-          <thead><tr style={{backgroundColor:"#f0f0f0"}}>
-            {has("srNo") && <th style={{padding:"5px",border:"1px solid #000"}}>Sr.No</th>}
-            {has("date") && <th style={{padding:"5px",border:"1px solid #000"}}>Date</th>}
-            {has("billNo") && <th style={{padding:"5px",border:"1px solid #000"}}>Bill No.</th>}
-            {has("center") && <th style={{padding:"5px",border:"1px solid #000"}}>Center</th>}
-            {has("patient") && <th style={{padding:"5px",border:"1px solid #000"}}>Patient</th>}
-            {has("mobile") && <th style={{padding:"5px",border:"1px solid #000"}}>Mobile</th>}
-            {has("referralDr") && <th style={{padding:"5px",border:"1px solid #000"}}>Referral Dr.</th>}
-            {has("corporate") && <th style={{padding:"5px",border:"1px solid #000"}}>Corporate</th>}
-            {has("cash") && <th style={{padding:"5px",border:"1px solid #000",textAlign:"right"}}>Cash</th>}
-            {has("card") && <th style={{padding:"5px",border:"1px solid #000",textAlign:"right"}}>Card</th>}
-            {has("upi") && <th style={{padding:"5px",border:"1px solid #000",textAlign:"right"}}>UPI</th>}
-            {has("cheque") && <th style={{padding:"5px",border:"1px solid #000",textAlign:"right"}}>Cheque</th>}
-            {has("netBanking") && <th style={{padding:"5px",border:"1px solid #000",textAlign:"right"}}>Net Banking</th>}
-            {has("discount") && <th style={{padding:"5px",border:"1px solid #000",textAlign:"right"}}>Discount</th>}
-            {has("netAmount") && <th style={{padding:"5px",border:"1px solid #000",textAlign:"right"}}>Net Amount</th>}
-            {has("total") && <th style={{padding:"5px",border:"1px solid #000",textAlign:"right"}}>Total Bill</th>}
-            {has("balance") && <th style={{padding:"5px",border:"1px solid #000",textAlign:"right"}}>Balance</th>}
-            {has("remark") && <th style={{padding:"5px",border:"1px solid #000"}}>Remark</th>}
-          </tr></thead>
-          <tbody>{data.map((row,i)=>(
-            <tr key={i}>
-              {has("srNo") && <td style={{padding:"5px",border:"1px solid #000"}}>{row.srNo}</td>}
-              {has("date") && <td style={{padding:"5px",border:"1px solid #000"}}>{row.date}</td>}
-              {has("billNo") && <td style={{padding:"5px",border:"1px solid #000"}}>{row.billNo}</td>}
-              {has("center") && <td style={{padding:"5px",border:"1px solid #000"}}>{row.center}</td>}
-              {has("patient") && <td style={{padding:"5px",border:"1px solid #000"}}>{row.patient}</td>}
-              {has("mobile") && <td style={{padding:"5px",border:"1px solid #000"}}>{row.mobile}</td>}
-              {has("referralDr") && <td style={{padding:"5px",border:"1px solid #000"}}>{row.referralDr}</td>}
-              {has("corporate") && <td style={{padding:"5px",border:"1px solid #000"}}>{row.corporate}</td>}
-              {has("cash") && <td style={{padding:"5px",border:"1px solid #000",textAlign:"right"}}>{row.cash||0}</td>}
-              {has("card") && <td style={{padding:"5px",border:"1px solid #000",textAlign:"right"}}>{row.card||0}</td>}
-              {has("upi") && <td style={{padding:"5px",border:"1px solid #000",textAlign:"right"}}>{row.upi||0}</td>}
-              {has("cheque") && <td style={{padding:"5px",border:"1px solid #000",textAlign:"right"}}>{row.cheque||0}</td>}
-              {has("netBanking") && <td style={{padding:"5px",border:"1px solid #000",textAlign:"right"}}>{row.netBanking||0}</td>}
-              {has("discount") && <td style={{padding:"5px",border:"1px solid #000",textAlign:"right"}}>{row.discount||0}</td>}
-              {has("netAmount") && <td style={{padding:"5px",border:"1px solid #000",textAlign:"right"}}>{row.netAmount?.toFixed(2)}</td>}
-              {has("total") && <td style={{padding:"5px",border:"1px solid #000",textAlign:"right"}}>{row.total?.toFixed(2)}</td>}
-              {has("balance") && <td style={{padding:"5px",border:"1px solid #000",textAlign:"right"}}>{row.balance?.toFixed(2)}</td>}
-              {has("remark") && <td style={{padding:"5px",border:"1px solid #000"}}>{row.remark}</td>}
-            </tr>
-          ))}</tbody>
-          {data.length > 0 && (
-            <tfoot><tr style={{backgroundColor:"#f0f0f0",fontWeight:"bold"}}>
-              {has("srNo") && <td style={{padding:"5px",border:"1px solid #000"}}></td>}
-              {has("date") && <td style={{padding:"5px",border:"1px solid #000"}}></td>}
-              {has("billNo") && <td style={{padding:"5px",border:"1px solid #000"}}></td>}
-              {has("center") && <td style={{padding:"5px",border:"1px solid #000"}}></td>}
-              {has("patient") && <td style={{padding:"5px",border:"1px solid #000",textAlign:"right"}}>TOTAL</td>}
-              {has("mobile") && <td style={{padding:"5px",border:"1px solid #000"}}></td>}
-              {has("referralDr") && <td style={{padding:"5px",border:"1px solid #000"}}></td>}
-              {has("corporate") && <td style={{padding:"5px",border:"1px solid #000"}}></td>}
-              {has("cash") && <td style={{padding:"5px",border:"1px solid #000",textAlign:"right"}}>{sum("cash").toFixed(2)}</td>}
-              {has("card") && <td style={{padding:"5px",border:"1px solid #000",textAlign:"right"}}>{sum("card").toFixed(2)}</td>}
-              {has("upi") && <td style={{padding:"5px",border:"1px solid #000",textAlign:"right"}}>{sum("upi").toFixed(2)}</td>}
-              {has("cheque") && <td style={{padding:"5px",border:"1px solid #000",textAlign:"right"}}>{sum("cheque").toFixed(2)}</td>}
-              {has("netBanking") && <td style={{padding:"5px",border:"1px solid #000",textAlign:"right"}}>{sum("netBanking").toFixed(2)}</td>}
-              {has("discount") && <td style={{padding:"5px",border:"1px solid #000",textAlign:"right"}}>{sum("discount").toFixed(2)}</td>}
-              {has("netAmount") && <td style={{padding:"5px",border:"1px solid #000",textAlign:"right"}}>{sum("netAmount").toFixed(2)}</td>}
-              {has("total") && <td style={{padding:"5px",border:"1px solid #000",textAlign:"right"}}>{sum("total").toFixed(2)}</td>}
-              {has("balance") && <td style={{padding:"5px",border:"1px solid #000",textAlign:"right"}}>{sum("balance").toFixed(2)}</td>}
-              {has("remark") && <td style={{padding:"5px",border:"1px solid #000"}}></td>}
-            </tr></tfoot>
-          )}
-        </table>
-      </div>
+      {/* SETTLEMENT MODAL - Using New Component */}
+      <SettlementModal
+        isOpen={showSettlement}
+        onClose={() => setShowSettlement(false)}
+        data={data}
+        organizations={organizations}
+        onSaveSettlement={async (formData) => {
+          // Refresh collection report data after settlement
+          await fetchData(dateFrom, dateTo, organization, nameSearch);
+        }}
+      />
     </>
   );
 }

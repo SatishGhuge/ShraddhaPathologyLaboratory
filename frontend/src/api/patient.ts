@@ -224,3 +224,58 @@ export const addTestToVisit = async (patientId: string, visitId: string, testDat
     body: JSON.stringify(testData),
   });
 };
+
+// Save settlement from collection report
+export const saveSettlement = async (settlementData: {
+  visitId: string;
+  orgId: string;
+  orgDiscount: number;
+  tdsChecked: boolean;
+  tdsPercent: number;
+  otherDiscountPercent: number;
+  otherDiscountAmount: number;
+  amountPaid: number;
+  remark?: string;
+}): Promise<ApiResponse> => {
+  return apiCall('/patients/settle-visit', {
+    method: 'POST',
+    body: JSON.stringify(settlementData)
+  });
+};
+
+// Save bulk patient settlement (all visits under org)
+export const savePatientSettlement = async (settlementData: {
+  patientId: string;
+  orgId: string;
+  visitIds: string[];
+  orgDiscount: number;
+  tdsChecked: boolean;
+  tdsPercent: number;
+  otherDiscountPercent: number;
+  otherDiscountAmount: number;
+  amountPaid: number;
+  remark?: string;
+}): Promise<ApiResponse> => {
+  return apiCall('/patients/settle-patient-visits', {
+    method: 'POST',
+    body: JSON.stringify(settlementData)
+  });
+};
+
+// Save organization-wide settlement (ALL visits under org from ALL patients)
+export const saveOrgSettlement = async (settlementData: {
+  orgId: string;
+  visitIds: string[];
+  orgDiscount: number;
+  tdsChecked: boolean;
+  tdsPercent: number;
+  otherDiscountPercent: number;
+  otherDiscountAmount: number;
+  amountPaid: number;
+  remark?: string;
+}): Promise<ApiResponse> => {
+  return apiCall('/patients/settle-org-visits', {
+    method: 'POST',
+    body: JSON.stringify(settlementData)
+  });
+};

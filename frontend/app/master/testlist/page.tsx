@@ -472,14 +472,6 @@ const TestList = () => {
                             >
                               {test.isActive ? "Active" : "Inactive"}
                             </button>
-
-                            <button 
-                              onClick={() => handleDeleteTest(test.id)}
-                              className="bg-red-500 text-white px-2 py-1 rounded text-[10px] sm:text-xs hover:bg-red-600 transition-colors"
-                              title="Permanently delete test"
-                            >
-                              Delete
-                            </button>
                           </div>
                         </td>
                       </tr>

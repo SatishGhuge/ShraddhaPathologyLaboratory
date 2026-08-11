@@ -95,6 +95,7 @@ model Organization {
   mobile                 String?
   email                  String?
   date                   DateTime?
+  discount               Float?             @default(0)    // ✅ NEW: Organization discount field
   isActive               Boolean            @default(true)
   createdAt              DateTime           @default(now())
   updatedAt              DateTime           @updatedAt
@@ -571,16 +572,16 @@ model TestParameter {
   rangeText          String?          @db.Text
   textContent        String?          @db.Text
   isMultipleOptions  Boolean          @default(false)
-  maleLowValue       Float?
-  maleHighValue      Float?
+  maleLowValue       String?
+  maleHighValue      String?
   maleDefaultValue   String?
   maleActive         Boolean          @default(true)
-  femaleLowValue     Float?
-  femaleHighValue    Float?
+  femaleLowValue     String?
+  femaleHighValue    String?
   femaleDefaultValue String?
   femaleActive       Boolean          @default(false)
-  childLowValue      Float?
-  childHighValue     Float?
+  childLowValue      String?
+  childHighValue     String?
   childDefaultValue  String?
   childActive        Boolean          @default(false)
   ageRanges          String?          @db.Text
@@ -752,6 +753,7 @@ enum BillingSessionType {
   REFUND
   CANCEL_TEST
   EDIT_TEST
+  SETTLEMENT
 }
 
 enum PaymentMode {

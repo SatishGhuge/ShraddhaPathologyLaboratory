@@ -293,15 +293,6 @@ const DepartmentTable = () => {
                       >
                         {dept.isActive ? "Active" : "Inactive"}
                       </button>
-
-                      <button
-                        onClick={() => handleDelete(dept.id, dept.name)}
-                        disabled={loading}
-                        className="bg-red-500 text-white px-2 py-1 rounded text-xs hover:bg-red-600 transition-colors flex items-center gap-1 disabled:opacity-50"
-                        title="Permanently delete department"
-                      >
-                        <Trash2 size={14} /> Delete
-                      </button>
                     </div>
                   </td>
                 </tr>

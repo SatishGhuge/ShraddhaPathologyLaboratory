@@ -518,7 +518,7 @@ export const getTestById = async (req, res) => {
               }
             }
           },
-          orderBy: { categoryName: 'asc' }
+         
         },
         testMachines: {
           include: {
@@ -598,22 +598,22 @@ export const getTestById = async (req, res) => {
           normalRanges: [
             {
               gender: 'Male',
-              lowValue: param.maleLowValue,
-              highValue: param.maleHighValue,
+              lowValue: param.maleLowValue ? String(param.maleLowValue) : null,
+              highValue: param.maleHighValue ? String(param.maleHighValue) : null,
               defaultValue: param.maleDefaultValue,
               isActive: param.maleActive
             },
             {
               gender: 'Female',
-              lowValue: param.femaleLowValue,
-              highValue: param.femaleHighValue,
+              lowValue: param.femaleLowValue ? String(param.femaleLowValue) : null,
+              highValue: param.femaleHighValue ? String(param.femaleHighValue) : null,
               defaultValue: param.femaleDefaultValue,
               isActive: param.femaleActive
             },
             {
               gender: 'Child',
-              lowValue: param.childLowValue,
-              highValue: param.childHighValue,
+              lowValue: param.childLowValue ? String(param.childLowValue) : null,
+              highValue: param.childHighValue ? String(param.childHighValue) : null,
               defaultValue: param.childDefaultValue,
               isActive: param.childActive
             }
@@ -922,22 +922,16 @@ export const createTest = async (req, res) => {
                 textContent: param.textContent || null,
                 isMultipleOptions: param.isMultipleOptions || false,
                 testMethod: param.testMethod || null,
-                maleLowValue: param.normalRanges?.find(r => r.gender === 'Male')?.lowValue ? 
-                  parseFloat(param.normalRanges.find(r => r.gender === 'Male').lowValue) : null,
-                maleHighValue: param.normalRanges?.find(r => r.gender === 'Male')?.highValue ? 
-                  parseFloat(param.normalRanges.find(r => r.gender === 'Male').highValue) : null,
+                maleLowValue: param.normalRanges?.find(r => r.gender === 'Male')?.lowValue ? String(param.normalRanges.find(r => r.gender === 'Male').lowValue) : null,
+                maleHighValue: param.normalRanges?.find(r => r.gender === 'Male')?.highValue ? String(param.normalRanges.find(r => r.gender === 'Male').highValue) : null,
                 maleDefaultValue: param.normalRanges?.find(r => r.gender === 'Male')?.defaultValue || null,
                 maleActive: param.normalRanges?.find(r => r.gender === 'Male')?.isActive || false,
-                femaleLowValue: param.normalRanges?.find(r => r.gender === 'Female')?.lowValue ? 
-                  parseFloat(param.normalRanges.find(r => r.gender === 'Female').lowValue) : null,
-                femaleHighValue: param.normalRanges?.find(r => r.gender === 'Female')?.highValue ? 
-                  parseFloat(param.normalRanges.find(r => r.gender === 'Female').highValue) : null,
+                femaleLowValue: param.normalRanges?.find(r => r.gender === 'Female')?.lowValue ? String(param.normalRanges.find(r => r.gender === 'Female').lowValue) : null,
+                femaleHighValue: param.normalRanges?.find(r => r.gender === 'Female')?.highValue ? String(param.normalRanges.find(r => r.gender === 'Female').highValue) : null,
                 femaleDefaultValue: param.normalRanges?.find(r => r.gender === 'Female')?.defaultValue || null,
                 femaleActive: param.normalRanges?.find(r => r.gender === 'Female')?.isActive || false,
-                childLowValue: param.normalRanges?.find(r => r.gender === 'Child')?.lowValue ? 
-                  parseFloat(param.normalRanges.find(r => r.gender === 'Child').lowValue) : null,
-                childHighValue: param.normalRanges?.find(r => r.gender === 'Child')?.highValue ? 
-                  parseFloat(param.normalRanges.find(r => r.gender === 'Child').highValue) : null,
+                childLowValue: param.normalRanges?.find(r => r.gender === 'Child')?.lowValue ? String(param.normalRanges.find(r => r.gender === 'Child').lowValue) : null,
+                childHighValue: param.normalRanges?.find(r => r.gender === 'Child')?.highValue ? String(param.normalRanges.find(r => r.gender === 'Child').highValue) : null,
                 childDefaultValue: param.normalRanges?.find(r => r.gender === 'Child')?.defaultValue || null,
                 childActive: param.normalRanges?.find(r => r.gender === 'Child')?.isActive || false,
                 ageRanges: processAgeRangesWithGender(param.ageRanges, param.parameterName),
@@ -977,7 +971,7 @@ export const createTest = async (req, res) => {
           include: {
             testParameter: true
           },
-          orderBy: { categoryName: 'asc' }
+         
         },
         testMachines: {
           include: {
@@ -1217,16 +1211,16 @@ export const updateTest = async (req, res) => {
           textContent: param.textContent || null,
           isMultipleOptions: param.isMultipleOptions || false,
           testMethod: param.testMethod || null,
-          maleLowValue: maleRange?.lowValue ? parseFloat(maleRange.lowValue) : null,
-          maleHighValue: maleRange?.highValue ? parseFloat(maleRange.highValue) : null,
+          maleLowValue: maleRange?.lowValue ? String(maleRange.lowValue) : null,
+          maleHighValue: maleRange?.highValue ? String(maleRange.highValue) : null,
           maleDefaultValue: maleRange?.defaultValue || null,
           maleActive: maleRange?.isActive || false,
-          femaleLowValue: femaleRange?.lowValue ? parseFloat(femaleRange.lowValue) : null,
-          femaleHighValue: femaleRange?.highValue ? parseFloat(femaleRange.highValue) : null,
+          femaleLowValue: femaleRange?.lowValue ? String(femaleRange.lowValue) : null,
+          femaleHighValue: femaleRange?.highValue ? String(femaleRange.highValue) : null,
           femaleDefaultValue: femaleRange?.defaultValue || null,
           femaleActive: femaleRange?.isActive || false,
-          childLowValue: childRange?.lowValue ? parseFloat(childRange.lowValue) : null,
-          childHighValue: childRange?.highValue ? parseFloat(childRange.highValue) : null,
+          childLowValue: childRange?.lowValue ? String(childRange.lowValue) : null,
+          childHighValue: childRange?.highValue ? String(childRange.highValue) : null,
           childDefaultValue: childRange?.defaultValue || null,
           childActive: childRange?.isActive || false,
           ageRanges: (() => {
@@ -1417,7 +1411,7 @@ export const updateTest = async (req, res) => {
           include: {
             testParameter: true
           },
-          orderBy: { categoryName: 'asc' }
+         
         },
         testMachines: {
           include: {
@@ -1505,7 +1499,7 @@ export const getTests = async (req, res) => {
                 }
               }
             },
-            orderBy: { categoryName: 'asc' }
+           
           },
           testMachines: {
             include: {
@@ -2063,6 +2057,7 @@ export const getOrganizations = async (req, res) => {
         mobile: true,
         email: true,
         date: true,
+        discount: true,
         isActive: true,
         createdAt: true,
         updatedAt: true,
@@ -2095,6 +2090,7 @@ export const getOrganizationById = async (req, res) => {
         mobile: true,
         email: true,
         date: true,
+        discount: true,
         isActive: true,
         createdAt: true,
         updatedAt: true,
@@ -2118,6 +2114,7 @@ export const getOrganizationById = async (req, res) => {
     console.log('📦 getOrganizationById FULL response:', {
       orgId: organization.id,
       orgName: organization.name,
+      discount: organization.discount,
       hasModuleAllocations: !!organization.moduleAllocations,
       moduleAllocationsCount: organization.moduleAllocations?.length,
       modulesValue: organization.moduleAllocations?.[0]?.modules ? 'EXISTS' : 'NULL',
@@ -2128,6 +2125,7 @@ export const getOrganizationById = async (req, res) => {
         data: {
           id: response.id,
           name: response.name,
+          discount: response.discount,
           moduleAllocation: response.moduleAllocation ? '...JSON STRING...' : null
         }
       }
@@ -2143,7 +2141,7 @@ export const getOrganizationById = async (req, res) => {
 // Create organization
 export const createOrganization = async (req, res) => {
   try {
-    const { name, code, location, address, mobile, email, date, isActive, adminName, testCharges, moduleAllocation, sendReportsViaWhatsApp, sendReportsViaMail } = req.body;
+    const { name, code, location, address, mobile, email, date, isActive, adminName, testCharges, moduleAllocation, sendReportsViaWhatsApp, sendReportsViaMail, discount } = req.body;
     if (!name) return res.status(400).json({ success: false, message: 'Name is required' });
 
     const newId = await generateOrganizationId();
@@ -2151,7 +2149,7 @@ export const createOrganization = async (req, res) => {
     const username = newId;           // ORG-AAA
     const plainPassword = `${suffix}@123`;  // AAA@123
 
-    console.log('Creating organization:', { newId, name, email, adminName });
+    console.log('Creating organization:', { newId, name, email, adminName, discount });
 
     // Check if organization already exists
     const existingOrg = await prisma.organization.findUnique({ where: { id: newId } });
@@ -2172,6 +2170,7 @@ export const createOrganization = async (req, res) => {
         isActive: isActive !== false,
         sendReportsViaWhatsApp: sendReportsViaWhatsApp || false,
         sendReportsViaMail: sendReportsViaMail || false,
+        discount: discount ? parseFloat(discount) : null,
       },
     });
 
@@ -2296,7 +2295,7 @@ export const createOrganization = async (req, res) => {
 export const updateOrganization = async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, code, location, address, mobile, email, date, isActive, moduleAllocation, sendReportsViaWhatsApp, sendReportsViaMail } = req.body;
+    const { name, code, location, address, mobile, email, date, isActive, moduleAllocation, sendReportsViaWhatsApp, sendReportsViaMail, discount } = req.body;
     const existing = await prisma.organization.findUnique({ where: { id } });
     if (!existing) return res.status(404).json({ success: false, message: 'Organization not found' });
 
@@ -2313,6 +2312,7 @@ export const updateOrganization = async (req, res) => {
         isActive: isActive !== undefined ? isActive : undefined,
         sendReportsViaWhatsApp: sendReportsViaWhatsApp !== undefined ? sendReportsViaWhatsApp : undefined,
         sendReportsViaMail: sendReportsViaMail !== undefined ? sendReportsViaMail : undefined,
+        discount: discount !== undefined ? (discount ? parseFloat(discount) : null) : undefined,
       },
     });
 
@@ -3807,16 +3807,16 @@ export const createParameterMaster = async (req, res) => {
         rangeText,
         textContent,
         isMultipleOptions: isMultipleOptions || false,
-        maleLowValue: maleLowValue ? parseFloat(maleLowValue) : null,
-        maleHighValue: maleHighValue ? parseFloat(maleHighValue) : null,
+        maleLowValue: maleLowValue || null,
+        maleHighValue: maleHighValue || null,
         maleDefaultValue,
         maleActive: maleActive !== undefined ? maleActive : true,
-        femaleLowValue: femaleLowValue ? parseFloat(femaleLowValue) : null,
-        femaleHighValue: femaleHighValue ? parseFloat(femaleHighValue) : null,
+        femaleLowValue: femaleLowValue || null,
+        femaleHighValue: femaleHighValue || null,
         femaleDefaultValue,
         femaleActive: femaleActive || false,
-        childLowValue: childLowValue ? parseFloat(childLowValue) : null,
-        childHighValue: childHighValue ? parseFloat(childHighValue) : null,
+        childLowValue: childLowValue || null,
+        childHighValue: childHighValue || null,
         childDefaultValue,
         childActive: childActive || false,
         ageRanges: processAgeRangesWithGender(ageRanges, parameterName || "Parameter"),
@@ -3880,12 +3880,12 @@ export const updateParameterMaster = async (req, res) => {
       decimal: updateData.decimal ? parseInt(updateData.decimal) : undefined,
       lowPanic: updateData.lowPanic ? parseFloat(updateData.lowPanic) : null,
       highPanic: updateData.highPanic ? parseFloat(updateData.highPanic) : null,
-      maleLowValue: updateData.maleLowValue ? parseFloat(updateData.maleLowValue) : null,
-      maleHighValue: updateData.maleHighValue ? parseFloat(updateData.maleHighValue) : null,
-      femaleLowValue: updateData.femaleLowValue ? parseFloat(updateData.femaleLowValue) : null,
-      femaleHighValue: updateData.femaleHighValue ? parseFloat(updateData.femaleHighValue) : null,
-      childLowValue: updateData.childLowValue ? parseFloat(updateData.childLowValue) : null,
-      childHighValue: updateData.childHighValue ? parseFloat(updateData.childHighValue) : null,
+      maleLowValue: updateData.maleLowValue || null,
+      maleHighValue: updateData.maleHighValue || null,
+      femaleLowValue: updateData.femaleLowValue || null,
+      femaleHighValue: updateData.femaleHighValue || null,
+      childLowValue: updateData.childLowValue || null,
+      childHighValue: updateData.childHighValue || null,
       departmentId: updateData.departmentId ? parseInt(updateData.departmentId) : null,
       ageRanges: updateData.ageRanges && updateData.ageRanges.length > 0 ? JSON.stringify(updateData.ageRanges) : null,
       rangeValues: updateData.rangeValues && updateData.rangeValues.length > 0 ? JSON.stringify(updateData.rangeValues) : null
@@ -4323,16 +4323,16 @@ export const createTestParameter = async (req, res) => {
         rangeText: rangeText || null,
         textContent: textContent || null,
         isMultipleOptions: isMultipleOptions || false,
-        maleLowValue: normalRanges?.find(r => r.gender === 'Male')?.lowValue ? parseFloat(normalRanges.find(r => r.gender === 'Male').lowValue) : null,
-        maleHighValue: normalRanges?.find(r => r.gender === 'Male')?.highValue ? parseFloat(normalRanges.find(r => r.gender === 'Male').highValue) : null,
+        maleLowValue: normalRanges?.find(r => r.gender === 'Male')?.lowValue ? String(normalRanges.find(r => r.gender === 'Male').lowValue) : null,
+        maleHighValue: normalRanges?.find(r => r.gender === 'Male')?.highValue ? String(normalRanges.find(r => r.gender === 'Male').highValue) : null,
         maleDefaultValue: normalRanges?.find(r => r.gender === 'Male')?.defaultValue || null,
         maleActive: normalRanges?.find(r => r.gender === 'Male')?.isActive || false,
-        femaleLowValue: normalRanges?.find(r => r.gender === 'Female')?.lowValue ? parseFloat(normalRanges.find(r => r.gender === 'Female').lowValue) : null,
-        femaleHighValue: normalRanges?.find(r => r.gender === 'Female')?.highValue ? parseFloat(normalRanges.find(r => r.gender === 'Female').highValue) : null,
+        femaleLowValue: normalRanges?.find(r => r.gender === 'Female')?.lowValue ? String(normalRanges.find(r => r.gender === 'Female').lowValue) : null,
+        femaleHighValue: normalRanges?.find(r => r.gender === 'Female')?.highValue ? String(normalRanges.find(r => r.gender === 'Female').highValue) : null,
         femaleDefaultValue: normalRanges?.find(r => r.gender === 'Female')?.defaultValue || null,
         femaleActive: normalRanges?.find(r => r.gender === 'Female')?.isActive || false,
-        childLowValue: normalRanges?.find(r => r.gender === 'Child')?.lowValue ? parseFloat(normalRanges.find(r => r.gender === 'Child').lowValue) : null,
-        childHighValue: normalRanges?.find(r => r.gender === 'Child')?.highValue ? parseFloat(normalRanges.find(r => r.gender === 'Child').highValue) : null,
+        childLowValue: normalRanges?.find(r => r.gender === 'Child')?.lowValue ? String(normalRanges.find(r => r.gender === 'Child').lowValue) : null,
+        childHighValue: normalRanges?.find(r => r.gender === 'Child')?.highValue ? String(normalRanges.find(r => r.gender === 'Child').highValue) : null,
         childDefaultValue: normalRanges?.find(r => r.gender === 'Child')?.defaultValue || null,
         childActive: normalRanges?.find(r => r.gender === 'Child')?.isActive || false,
         ageRanges: processAgeRangesWithGender(ageRanges, parameterName || "Parameter"),
@@ -4457,16 +4457,16 @@ export const createTestCategoryWithParameter = async (req, res) => {
         rangeText: rangeText || null,
         textContent: textContent || null,
         isMultipleOptions: isMultipleOptions || false,
-        maleLowValue: normalRanges?.find(r => r.gender === 'Male')?.lowValue ? parseFloat(normalRanges.find(r => r.gender === 'Male').lowValue) : null,
-        maleHighValue: normalRanges?.find(r => r.gender === 'Male')?.highValue ? parseFloat(normalRanges.find(r => r.gender === 'Male').highValue) : null,
+        maleLowValue: normalRanges?.find(r => r.gender === 'Male')?.lowValue ? String(normalRanges.find(r => r.gender === 'Male').lowValue) : null,
+        maleHighValue: normalRanges?.find(r => r.gender === 'Male')?.highValue ? String(normalRanges.find(r => r.gender === 'Male').highValue) : null,
         maleDefaultValue: normalRanges?.find(r => r.gender === 'Male')?.defaultValue || null,
         maleActive: normalRanges?.find(r => r.gender === 'Male')?.isActive || false,
-        femaleLowValue: normalRanges?.find(r => r.gender === 'Female')?.lowValue ? parseFloat(normalRanges.find(r => r.gender === 'Female').lowValue) : null,
-        femaleHighValue: normalRanges?.find(r => r.gender === 'Female')?.highValue ? parseFloat(normalRanges.find(r => r.gender === 'Female').highValue) : null,
+        femaleLowValue: normalRanges?.find(r => r.gender === 'Female')?.lowValue ? String(normalRanges.find(r => r.gender === 'Female').lowValue) : null,
+        femaleHighValue: normalRanges?.find(r => r.gender === 'Female')?.highValue ? String(normalRanges.find(r => r.gender === 'Female').highValue) : null,
         femaleDefaultValue: normalRanges?.find(r => r.gender === 'Female')?.defaultValue || null,
         femaleActive: normalRanges?.find(r => r.gender === 'Female')?.isActive || false,
-        childLowValue: normalRanges?.find(r => r.gender === 'Child')?.lowValue ? parseFloat(normalRanges.find(r => r.gender === 'Child').lowValue) : null,
-        childHighValue: normalRanges?.find(r => r.gender === 'Child')?.highValue ? parseFloat(normalRanges.find(r => r.gender === 'Child').highValue) : null,
+        childLowValue: normalRanges?.find(r => r.gender === 'Child')?.lowValue ? String(normalRanges.find(r => r.gender === 'Child').lowValue) : null,
+        childHighValue: normalRanges?.find(r => r.gender === 'Child')?.highValue ? String(normalRanges.find(r => r.gender === 'Child').highValue) : null,
         childDefaultValue: normalRanges?.find(r => r.gender === 'Child')?.defaultValue || null,
         childActive: normalRanges?.find(r => r.gender === 'Child')?.isActive || false,
         ageRanges: processAgeRangesWithGender(ageRanges, parameterName || "Parameter"),

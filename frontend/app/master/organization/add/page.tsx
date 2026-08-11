@@ -247,6 +247,8 @@ const AddOrganization = () => {
     active: "Yes",
     sendReportsViaWhatsApp: false,
     sendReportsViaMail: false,
+    discountPercent: "",
+    discountAmount: "",
   });
 
   const [toast, setToast] = useState<any>(null);
@@ -273,6 +275,8 @@ const AddOrganization = () => {
                 active: organization.isActive ? "Yes" : "No",
                 sendReportsViaWhatsApp: organization.sendReportsViaWhatsApp || false,
                 sendReportsViaMail: organization.sendReportsViaMail || false,
+                discountPercent: organization.discount || "",
+                discountAmount: organization.discount || "",
               });
               if (organization.moduleAllocation) {
                 try {
@@ -378,6 +382,7 @@ const AddOrganization = () => {
         moduleAllocation: JSON.stringify(moduleAllocation),
         sendReportsViaWhatsApp: formData.sendReportsViaWhatsApp,
         sendReportsViaMail: formData.sendReportsViaMail,
+        discount: parseFloat(formData.discountPercent) || parseFloat(formData.discountAmount) || 0,
       };
 
       if (isEditMode) {
@@ -506,6 +511,27 @@ const AddOrganization = () => {
                 <textarea name="address" value={formData.address} onChange={handleChange}
                   disabled={isViewMode} rows={2} required={!isViewMode}
                   className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm disabled:bg-gray-50 bg-white" />
+              </div>
+
+              {/* Discount Section */}
+              <div>
+                <label className="font-medium text-gray-700 text-sm">Discount (%)</label>
+                <div className="flex items-center border border-gray-300 rounded px-2 bg-white">
+                  <span className="text-orange-600 font-semibold">%</span>
+                  <input type="number" name="discountPercent" value={formData.discountPercent} onChange={handleChange}
+                    disabled={isViewMode} placeholder="0" step="0.01" min="0" max="100"
+                    className="w-full px-2 py-1.5 outline-none text-sm disabled:bg-gray-50 bg-transparent" />
+                </div>
+              </div>
+
+              <div>
+                <label className="font-medium text-gray-700 text-sm">Discount (₹)</label>
+                <div className="flex items-center border border-gray-300 rounded px-2 bg-white">
+                  <span className="text-orange-600 font-semibold">₹</span>
+                  <input type="number" name="discountAmount" value={formData.discountAmount} onChange={handleChange}
+                    disabled={isViewMode} placeholder="0" step="0.01" min="0"
+                    className="w-full px-2 py-1.5 outline-none text-sm disabled:bg-gray-50 bg-transparent" />
+                </div>
               </div>
             </div>
 

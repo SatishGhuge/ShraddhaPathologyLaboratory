@@ -939,7 +939,7 @@ const AddTest = () => {
         categoryId: category.categoryId, // ✅ Include unique category ID
         name: category.name ?? "",
         isCategory: category.isCategory || false,
-        sortOrder: category.sortOrder ? parseInt(category.sortOrder) : null,
+        sortOrder: null, // ❌ Don't use sortOrder in add/edit forms
         testMethod: category.testMethod || null,
         color: category.color || null,
         icon: category.icon || null,
@@ -954,7 +954,7 @@ const AddTest = () => {
           machineCode: param.machineCode || null,
           multiplyBy: param.multiplyBy || null,
           decimal: param.decimal ? parseInt(param.decimal) : null,
-          sortOrder: param.sortOrder ? parseInt(param.sortOrder) : null,
+          sortOrder: null, // ❌ Don't use sortOrder in add/edit forms
           testMethod: param.testMethod || null,
           isDescriptive: param.isDescriptive || false,
           lowPanic: param.lowPanic ? parseFloat(param.lowPanic) : null,
@@ -974,9 +974,9 @@ const AddTest = () => {
           isMultipleOptions: param.isMultipleOptions || false,
           normalRanges: param.normalRanges ? param.normalRanges.map(range => ({
             gender: range.gender,
-            lowValue: range.ll ? parseFloat(range.ll) : null,
-            highValue: range.ul ? parseFloat(range.ul) : null,
-            defaultValue: range.default || null,
+            lowValue: range.ll ? String(range.ll) : null,
+            highValue: range.ul ? String(range.ul) : null,
+            defaultValue: range.default ? String(range.default) : null,
             isActive: range.isActive
           })) : [],
           ageRanges: (() => {
@@ -985,19 +985,19 @@ const AddTest = () => {
               label: ageRange.label,
               gender: (ageRange as any).gender || null,
               enabled: ageRange.isActive,
-              value: (ageRange as any).value ? parseFloat((ageRange as any).value) : null,
-              from: (ageRange as any).from ? parseFloat((ageRange as any).from) : null,
-              to: (ageRange as any).to ? parseFloat((ageRange as any).to) : null,
-              ll: ageRange.ll ? parseFloat(ageRange.ll) : null,
-              ul: ageRange.ul ? parseFloat(ageRange.ul) : null,
-              default: ageRange.default ? parseFloat(ageRange.default) : null,
+              value: (ageRange as any).value ? String((ageRange as any).value) : null,
+              from: (ageRange as any).from ? String((ageRange as any).from) : null,
+              to: (ageRange as any).to ? String((ageRange as any).to) : null,
+              ll: ageRange.ll ? String(ageRange.ll) : null,
+              ul: ageRange.ul ? String(ageRange.ul) : null,
+              default: ageRange.default ? String(ageRange.default) : null,
               timeUnit: ageRange.timeUnit || "Days"
             })) : [];
           })(),
           rangeValues: param.rangeValues ? param.rangeValues.map(rangeValue => ({
             label: rangeValue.label,
-            min: rangeValue.min ? parseFloat(rangeValue.min) : null,
-            max: rangeValue.max ? parseFloat(rangeValue.max) : null,
+            min: rangeValue.min ? String(rangeValue.min) : null,
+            max: rangeValue.max ? String(rangeValue.max) : null,
             interpretation: rangeValue.interpretation || null,
             isActive: rangeValue.isActive
           })) : []

@@ -25,7 +25,7 @@
   "author": "Shraddha Pathology Laboratory",
   "license": "ISC",
   "dependencies": {
-    "@prisma/client": "^5.7.1",
+    "@prisma/client": "^5.22.0",
     "axios": "^1.6.5",
     "bcryptjs": "^2.4.3",
     "cors": "^2.8.5",
@@ -36,10 +36,10 @@
     "jsonwebtoken": "^9.0.2",
     "multer": "^2.1.1",
     "nodemailer": "^6.9.7",
-    "pdf2json": "^4.0.3"
+    "pdf2json": "^4.0.3",
+    "prisma": "^5.22.0"
   },
   "devDependencies": {
-    "nodemon": "^3.0.2",
-    "prisma": "^5.7.1"
+    "nodemon": "^3.0.2"
   }
 }

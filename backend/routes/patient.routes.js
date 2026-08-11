@@ -23,7 +23,10 @@ import {
   recordPayment,
   cancelTest,
   getBillSummary,
-  getTransactionHistory
+  getTransactionHistory,
+  saveSettlement,
+  savePatientSettlement,
+  saveOrgSettlement
 } from '../controllers/patient.controller.js';
 import {
   getPatientVisitReport,
@@ -54,6 +57,11 @@ router.post('/:visitId/payment-record', recordPayment);
 router.post('/:visitId/cancel-test/:patientTestId', cancelTest);
 router.get('/:visitId/bill-summary', getBillSummary);
 router.get('/:visitId/transaction-history', getTransactionHistory);
+
+// ✅ Settlement endpoints for collection report
+router.post('/settle-visit', saveSettlement);
+router.post('/settle-patient-visits', savePatientSettlement);
+router.post('/settle-org-visits', saveOrgSettlement);
 
 // Report endpoints
 router.get('/report/visit-details', getPatientVisitReport);

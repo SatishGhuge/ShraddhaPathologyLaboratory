@@ -1878,7 +1878,7 @@ export default function BookingPage() {
                       <td className="px-2 py-1">
                         <div className="font-semibold text-gray-800 flex items-center gap-2 group text-xs">
                           <span>{b.name}</span>
-                          {b.balanceAmount > 0 && (
+                          {b.balanceAmount > 0 && b.billStatus !== 'PAID' && (
                             <div className="relative inline-flex items-center cursor-help">
                               <span className="text-red-600 font-bold text-sm hover:text-red-700 transition-colors">₹</span>
                               <div className="absolute left-0 bottom-full mb-1 bg-red-600 text-white text-xs px-2 py-1 rounded whitespace-nowrap pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity z-50 shadow-lg font-semibold">
