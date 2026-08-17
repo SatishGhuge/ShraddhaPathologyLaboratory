@@ -2606,22 +2606,33 @@ export const getDoctorTestCharges = async (req, res) => {
     });
 
     // Format response with discount data
-    const formattedTests = tests.map(test => ({
-      id: test.id,
-      name: test.name,
-      shortName: test.testCode,
-      group: test.department?.name || '',
-      // Default charges from test_charges table
-      defaultB2C: test.charges[0]?.b2cCharge || 0,
-      defaultB2B: test.charges[0]?.b2bCharge || 0,
-      // Doctor charges - discountR (default time) and discountS (customized)
-      discountR: test.doctorTestCharges[0]?.discountR || 0,
-      discountS: test.doctorTestCharges[0]?.discountS || 0,
-      // Doctor B2C (for backward compatibility) = Default B2C - discountS
-      doctorB2C: Math.max(0, (test.charges[0]?.b2cCharge || 0) - (test.doctorTestCharges[0]?.discountS || 0)),
-      // Is customized - use the isCustomized flag if available, fallback to old logic for backward compatibility
-      isCustomized: test.doctorTestCharges.length > 0 ? (test.doctorTestCharges[0]?.isCustomized === true) : false
-    }));
+    const formattedTests = tests.map(test => {
+      const defaultB2C = test.charges[0]?.b2cCharge || 0;
+      const defaultB2B = test.charges[0]?.b2bCharge || 0;
+      
+      // If doctor has custom charges, use those; otherwise use defaults
+      const hasCustomCharges = test.doctorTestCharges.length > 0;
+      const docCharge = test.doctorTestCharges[0];
+      
+      return {
+        id: test.id,
+        name: test.name,
+        shortName: test.testCode,
+        group: test.department?.name || '',
+        // Default charges from test_charges table
+        defaultB2C: defaultB2C,
+        defaultB2B: defaultB2B,
+        // Doctor charges - discountR (default) and discountS (customized)
+        // If NO custom record exists: discountR = defaultB2C, discountS = defaultB2C (not customized)
+        // If custom record exists: use the values from DoctorTestCharge
+        discountR: hasCustomCharges ? (docCharge?.discountR || defaultB2C) : defaultB2C,
+        discountS: hasCustomCharges ? (docCharge?.discountS || defaultB2C) : defaultB2C,
+        // Doctor B2C (for backward compatibility)
+        doctorB2C: Math.max(0, hasCustomCharges ? (docCharge?.discountS || defaultB2C) : defaultB2C),
+        // Is customized - use the isCustomized flag from custom record, false if no record
+        isCustomized: hasCustomCharges ? (docCharge?.isCustomized === true) : false
+      };
+    });
 
     res.json({
       success: true,
@@ -2693,22 +2704,33 @@ export const getOrganizationTestCharges = async (req, res) => {
     });
 
     // Format response with discount data (same structure as doctor charges)
-    const formattedTests = tests.map(test => ({
-      id: test.id,
-      name: test.name,
-      shortName: test.testCode,
-      group: test.department?.name || '',
-      // Default charges from test_charges table
-      defaultB2C: test.charges[0]?.b2cCharge || 0,
-      defaultB2B: test.charges[0]?.b2bCharge || 0,
-      // Organization charges - discountR (default time) and discountS (customized)
-      discountR: test.organizationTestCharges[0]?.discountR || 0,
-      discountS: test.organizationTestCharges[0]?.discountS || 0,
-      // Organization B2C (for backward compatibility) = Default B2C - discountS
-      organizationB2C: Math.max(0, (test.charges[0]?.b2cCharge || 0) - (test.organizationTestCharges[0]?.discountS || 0)),
-      // Is customized - use the isCustomized flag
-      isCustomized: test.organizationTestCharges.length > 0 ? (test.organizationTestCharges[0]?.isCustomized === true) : false
-    }));
+    const formattedTests = tests.map(test => {
+      const defaultB2C = test.charges[0]?.b2cCharge || 0;
+      const defaultB2B = test.charges[0]?.b2bCharge || 0;
+      
+      // If organization has custom charges, use those; otherwise use defaults
+      const hasCustomCharges = test.organizationTestCharges.length > 0;
+      const orgCharge = test.organizationTestCharges[0];
+      
+      return {
+        id: test.id,
+        name: test.name,
+        shortName: test.testCode,
+        group: test.department?.name || '',
+        // Default charges from test_charges table
+        defaultB2C: defaultB2C,
+        defaultB2B: defaultB2B,
+        // Organization charges - discountR (default) and discountS (customized)
+        // If NO custom record exists: discountR = defaultB2C, discountS = defaultB2C (not customized)
+        // If custom record exists: use the values from OrganizationTestCharge
+        discountR: hasCustomCharges ? (orgCharge?.discountR || defaultB2C) : defaultB2C,
+        discountS: hasCustomCharges ? (orgCharge?.discountS || defaultB2C) : defaultB2C,
+        // Organization B2C (for backward compatibility)
+        organizationB2C: Math.max(0, hasCustomCharges ? (orgCharge?.discountS || defaultB2C) : defaultB2C),
+        // Is customized - use the isCustomized flag from custom record, false if no record
+        isCustomized: hasCustomCharges ? (orgCharge?.isCustomized === true) : false
+      };
+    });
 
     res.json({
       success: true,
