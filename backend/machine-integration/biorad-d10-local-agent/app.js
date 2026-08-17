@@ -1,4 +1,4 @@
-const net = require('net');
+const { SerialPort } = require('serialport');
 const mysql = require('mysql2/promise');
 const axios = require('axios');
 
@@ -7,9 +7,14 @@ const axios = require('axios');
 // ============================================================================
 
 const CONFIG = {
-  tcp: {
-    port: parseInt(process.env.TCP_PORT || '5200'),  // ✅ Bio-Rad D-10 uses port 5200
-    host: '0.0.0.0'
+  serial: {
+    port: process.env.SERIAL_PORT || 'COM3',  // ✅ RS-232 serial port (e.g., COM3, /dev/ttyUSB0)
+    baudRate: parseInt(process.env.BAUD_RATE || '9600'),  // ✅ Standard Bio-Rad D-10 baud rate
+    dataBits: 8,
+    stopBits: 1,
+    parity: 'none',
+    flowControl: false,
+    autoOpen: false  // ✅ Manual open with proper error handling
   },
   vps: {
     baseUrl: process.env.VPS_TAILSCALE_URL || 'http://localhost:3351'
@@ -433,11 +438,11 @@ const CloudAPI = {
 // ============================================================================
 
 const QueryHandler = {
-  async handle(visitId, sampleId, analyzer, socket) {
+  async handle(visitId, sampleId, analyzer, serialPort) {
     try {
       if (!visitId || !sampleId || !analyzer) {
         console.error(`[QUERY ERROR] Missing visitId, sampleId, or analyzer`);
-        socket.write(Buffer.from([ASTM.NAK]));
+        serialPort.write(Buffer.from([ASTM.NAK]));
         return;
       }
 
@@ -449,7 +454,7 @@ const QueryHandler = {
       
       if (!response.data || !response.data.data || !response.data.data.patientTests) {
         console.error(`[QUERY ERROR] Invalid response structure from backend`);
-        socket.write(Buffer.from([ASTM.NAK]));
+        serialPort.write(Buffer.from([ASTM.NAK]));
         return;
       }
 
@@ -462,7 +467,7 @@ const QueryHandler = {
 
       if (!hasA1CTest || orderData.patientTests.length === 0) {
         console.error(`[QUERY ERROR] No A1C test assigned for this sample`);
-        socket.write(Buffer.from([ASTM.NAK]));
+        serialPort.write(Buffer.from([ASTM.NAK]));
         return;
       }
 
@@ -473,14 +478,14 @@ const QueryHandler = {
       const orderFrame = ASTMFrame.build(orderContent);
       
       console.log(`[QUERY] Sending ORDER frame to machine`);
-      socket.write(orderFrame);
-      socket.write(Buffer.from([ASTM.ACK]));
+      serialPort.write(orderFrame);
+      serialPort.write(Buffer.from([ASTM.ACK]));
 
       // Send terminator
       const terminatorContent = `L|1|N`;
       const terminatorFrame = ASTMFrame.build(terminatorContent);
-      socket.write(terminatorFrame);
-      socket.write(Buffer.from([ASTM.ACK]));
+      serialPort.write(terminatorFrame);
+      serialPort.write(Buffer.from([ASTM.ACK]));
 
       console.log(`[QUERY] ✓ ORDER sent successfully for visitId=${visitId}, sampleId=${sampleId}`);
 
@@ -496,7 +501,7 @@ const QueryHandler = {
       } else {
         console.error(`[QUERY ERROR] ${err.message}`);
       }
-      socket.write(Buffer.from([ASTM.NAK]));
+      serialPort.write(Buffer.from([ASTM.NAK]));
     }
   }
 };
@@ -615,30 +620,39 @@ const ResultHandler = {
 };
 
 // ============================================================================
-// TCP SERVER - ASTM Frame Handling with ETB Multi-frame Support & QueryHandler
+// SERIAL PORT LISTENER - ASTM Frame Handling with ETB Multi-frame Support & QueryHandler
 // ============================================================================
 
-function createTcpServer() {
-  const server = net.createServer((socket) => {
-    const remoteAddr = socket.remoteAddress;
-    console.log(`\n[TCP] 📱 Machine connected: ${remoteAddr}`);
+function createSerialPortListener() {
+  const port = new SerialPort({
+    path: CONFIG.serial.port,
+    baudRate: CONFIG.serial.baudRate,
+    dataBits: CONFIG.serial.dataBits,
+    stopBits: CONFIG.serial.stopBits,
+    parity: CONFIG.serial.parity,
+    autoOpen: CONFIG.serial.autoOpen
+  });
 
-    let buffer = Buffer.alloc(0);
-    let sessionOpen = false;
-    let currentFrameNumber = 0;
-    let accumulatedFrames = [];  // ✅ For ETB multi-frame assembly
-    let machineAnalyzer = null;  // ✅ Store analyzer from HEADER frame
-    let currentVisitId = null;   // ✅ Store visitId from QUERY frame
-    let currentSampleId = null;  // ✅ Store sampleId from QUERY frame
+  let buffer = Buffer.alloc(0);
+  let sessionOpen = false;
+  let currentFrameNumber = 0;
+  let accumulatedFrames = [];  // ✅ For ETB multi-frame assembly
+  let machineAnalyzer = null;  // ✅ Store analyzer from HEADER frame
+  let currentVisitId = null;   // ✅ Store visitId from ORDER frame
+  let currentSampleId = null;  // ✅ Store sampleId from ORDER frame
 
-    socket.write(Buffer.from([ASTM.ACK]));
-    console.log(`[TCP] Sent ACK to ${remoteAddr}`);
+  // ✅ Send initial ACK to machine when port opens
+  port.on('open', () => {
+    console.log(`\n[SERIAL] 📱 Serial port opened: ${CONFIG.serial.port} @ ${CONFIG.serial.baudRate} baud`);
+    port.write(Buffer.from([ASTM.ACK]));
+    console.log(`[SERIAL] Sent initial ACK to Bio-Rad D-10`);
     sessionOpen = true;
+  });
 
-    socket.on('data', async (chunk) => {
+  port.on('data', async (chunk) => {
       try {
         buffer = Buffer.concat([buffer, chunk]);
-        console.log(`[TCP BUFFER] Total buffer length: ${buffer.length}, content: "${buffer.toString('utf8')}"`);
+        console.log(`[SERIAL BUFFER] Total buffer length: ${buffer.length}, content: "${buffer.toString('utf8')}"`);
 
         // ✅ Process all complete frames in buffer
         let processed = true;
@@ -648,7 +662,7 @@ function createTcpServer() {
           // Look for STX
           const stxIndex = buffer.indexOf(ASTM.STX);
           if (stxIndex === -1) {
-            console.log(`[TCP] No STX found, waiting for more data`);
+            console.log(`[SERIAL] No STX found, waiting for more data`);
             break;  // ✅ FIX: Don't slice when stxIndex is -1
           }
 
@@ -668,7 +682,7 @@ function createTcpServer() {
           }
 
           if (terminatorIndex === -1) {
-            console.log(`[TCP] No terminator (ETX/ETB) found, waiting for more data`);
+            console.log(`[SERIAL] No terminator (ETX/ETB) found, waiting for more data`);
             break;
           }
 
@@ -677,45 +691,45 @@ function createTcpServer() {
           const checksumEnd = checksumStart + 2;
           
           if (buffer.length < checksumEnd) {
-            console.log(`[TCP] Incomplete frame (have ${buffer.length} bytes, need at least ${checksumEnd}), waiting`);
+            console.log(`[SERIAL] Incomplete frame (have ${buffer.length} bytes, need at least ${checksumEnd}), waiting`);
             break;
           }
 
           const frameChecksum = buffer.slice(checksumStart, checksumEnd).toString('utf8');
           const frame = buffer.slice(stxIndex, checksumEnd);
 
-          console.log(`[TCP FRAME] Raw frame (with STX/ETX/ETB): "${frame.toString('utf8')}" (hex: ${frame.toString('hex')})`);
+          console.log(`[SERIAL FRAME] Raw frame (with STX/ETX/ETB): "${frame.toString('utf8')}" (hex: ${frame.toString('hex')})`);
 
           // Extract content (between STX and ETX/ETB)
           let frameContent = buffer.slice(stxIndex + 1, terminatorIndex).toString('utf8');
-          console.log(`[TCP FRAME] Cleaned frame content: "${frameContent}"`);
-          console.log(`[TCP FRAME] Frame checksum: ${frameChecksum}`);
+          console.log(`[SERIAL FRAME] Cleaned frame content: "${frameContent}"`);
+          console.log(`[SERIAL FRAME] Frame checksum: ${frameChecksum}`);
 
           // ✅ Verify checksum
           const calculatedChecksum = ASTMFrame.checksum(frameContent);
           const isChecksumValid = frameChecksum.toUpperCase() === calculatedChecksum;
-          console.log(`[TCP FRAME] Checksum validation: calculated=${calculatedChecksum}, received=${frameChecksum}, valid=${isChecksumValid}`);
+          console.log(`[SERIAL FRAME] Checksum validation: calculated=${calculatedChecksum}, received=${frameChecksum}, valid=${isChecksumValid}`);
 
           if (!isChecksumValid) {
-            console.error(`[TCP FRAME] ❌ INVALID CHECKSUM - Sending NAK`);
-            socket.write(Buffer.from([ASTM.NAK]));
+            console.error(`[SERIAL FRAME] ❌ INVALID CHECKSUM - Sending NAK`);
+            port.write(Buffer.from([ASTM.NAK]));
             buffer = buffer.slice(checksumEnd + 2);
             processed = true;
             continue;
           }
 
           // ✅ Valid frame - send ACK and process
-          socket.write(Buffer.from([ASTM.ACK]));
-          console.log(`[TCP FRAME] ✅ Frame valid, sent ACK`);
+          port.write(Buffer.from([ASTM.ACK]));
+          console.log(`[SERIAL FRAME] ✅ Frame valid, sent ACK`);
 
           // Parse the frame
           const parsed = ASTMParser.parse(frameContent);
-          console.log(`[TCP FRAME] Parsed: frameType=${parsed.frameType}`);
+          console.log(`[SERIAL FRAME] Parsed: frameType=${parsed.frameType}`);
 
           // ✅ Store analyzer from HEADER frame
           if (parsed.frameType === 'HEADER' && parsed.analyzer) {
             machineAnalyzer = parsed.analyzer;
-            console.log(`[TCP] Stored analyzer for this connection: ${machineAnalyzer}`);
+            console.log(`[SERIAL] Stored analyzer for this connection: ${machineAnalyzer}`);
           }
 
           // ✅ Handle ORDER frame - Bio-Rad sends visitId and sampleId in ORDER (not QUERY)
@@ -723,21 +737,21 @@ function createTcpServer() {
             // ✅ Extract visitId and sampleId from ORDER frame
             currentVisitId = parsed.visitId;
             currentSampleId = parsed.sampleId;
-            console.log(`[TCP] ORDER frame detected: visitId=${currentVisitId}, sampleId=${currentSampleId}`);
+            console.log(`[SERIAL] ORDER frame detected: visitId=${currentVisitId}, sampleId=${currentSampleId}`);
             
             // ✅ Now we have visitId, sampleId, and analyzer - fetch assigned tests
             if (currentVisitId && currentSampleId && machineAnalyzer) {
-              console.log(`[TCP] Fetching assigned tests from VPS`);
-              await QueryHandler.handle(currentVisitId, currentSampleId, machineAnalyzer, socket);
+              console.log(`[SERIAL] Fetching assigned tests from VPS`);
+              await QueryHandler.handle(currentVisitId, currentSampleId, machineAnalyzer, port);
             } else {
-              console.warn(`[TCP] Cannot fetch tests - missing visitId/sampleId/analyzer`);
+              console.warn(`[SERIAL] Cannot fetch tests - missing visitId/sampleId/analyzer`);
             }
           }
 
           // ✅ Handle ETB frames (accumulate for multi-frame data)
           if (isETB && parsed.frameType === 'RESULT') {
             accumulatedFrames.push(frameContent);
-            console.log(`[TCP] Accumulated ETB frame, waiting for more...`);
+            console.log(`[SERIAL] Accumulated ETB frame, waiting for more...`);
             buffer = buffer.slice(checksumEnd + 2);
             processed = true;
             continue;
@@ -748,7 +762,7 @@ function createTcpServer() {
             accumulatedFrames.push(frameContent);
             
             // Now we have complete result (possibly from multiple ETB frames)
-            console.log(`[TCP] Processing complete result from ${accumulatedFrames.length} frame(s)`);
+            console.log(`[SERIAL] Processing complete result from ${accumulatedFrames.length} frame(s)`);
             
             // ✅ Bio-Rad: Extract A1C from result and save with visitId/sampleId from ORDER
             for (const resultFrame of accumulatedFrames) {
@@ -770,7 +784,7 @@ function createTcpServer() {
 
           // ✅ Handle TERMINATOR - flush if ETX
           if (!isETB && parsed.frameType === 'TERMINATOR') {
-            console.log(`[TCP] Received TERMINATOR, session ending`);
+            console.log(`[SERIAL] Received TERMINATOR, session ending`);
             sessionOpen = false;
           }
 
@@ -790,35 +804,42 @@ function createTcpServer() {
           processed = true;
         }
       } catch (err) {
-        console.error(`[TCP ERROR] ${err.message}`);
-        socket.write(Buffer.from([ASTM.NAK]));
+        console.error(`[SERIAL ERROR] ${err.message}`);
+        port.write(Buffer.from([ASTM.NAK]));
       }
     });
 
-    socket.on('end', () => {
-      console.log(`[TCP] Disconnected: ${remoteAddr}`);
-      sessionOpen = false;
-    });
-
-    socket.on('error', (err) => {
-      console.error(`[TCP ERROR] ${remoteAddr}: ${err.message}`);
-    });
+  port.on('close', () => {
+    console.log(`[SERIAL] Port closed`);
+    sessionOpen = false;
   });
 
-  return server;
+  port.on('error', (err) => {
+    console.error(`[SERIAL ERROR] ${err.message}`);
+    if (err.code === 'EACCES') {
+      console.error(`[SERIAL ERROR] Permission denied - check serial port permissions`);
+    } else if (err.code === 'ENOENT') {
+      console.error(`[SERIAL ERROR] Serial port not found: ${CONFIG.serial.port}`);
+    }
+  });
+
+  return port;
 }
 
 // ============================================================================
 // STARTUP & MONITORING
 // ============================================================================
 
-let tcpServer = null;
+let serialPort = null;
 
 async function startup() {
   console.log('\n' + '='.repeat(70));
   console.log('BIO-RAD D-10 LOCAL AGENT - STARTING');
   console.log('='.repeat(70));
-  console.log(`TCP Server:       0.0.0.0:${CONFIG.tcp.port}`);
+  console.log(`Serial Port:      ${CONFIG.serial.port} @ ${CONFIG.serial.baudRate} baud`);
+  console.log(`Data Bits:        ${CONFIG.serial.dataBits}`);
+  console.log(`Stop Bits:        ${CONFIG.serial.stopBits}`);
+  console.log(`Parity:           ${CONFIG.serial.parity}`);
   console.log(`Database:         ${CONFIG.database.host}:${CONFIG.database.port}/${CONFIG.database.database}`);
   console.log(`VPS Backend:      ${CONFIG.vps.baseUrl}`);
   console.log('='.repeat(70) + '\n');
@@ -834,20 +855,24 @@ async function startup() {
     process.exit(1);
   }
 
-  // Start TCP server
-  tcpServer = createTcpServer();
-  tcpServer.listen(CONFIG.tcp.port, CONFIG.tcp.host, () => {
-    console.log(`[TCP] ✓ Listening on port ${CONFIG.tcp.port} for Bio-Rad D-10 machine`);
-  });
-
-  tcpServer.on('error', (err) => {
-    if (err.code === 'EADDRINUSE') {
-      console.error(`[TCP] ✗ Port ${CONFIG.tcp.port} already in use`);
+  // Start serial port listener
+  serialPort = createSerialPortListener();
+  
+  try {
+    await serialPort.open();
+    console.log(`[SERIAL] ✓ Serial port opened and listening`);
+  } catch (err) {
+    if (err.code === 'EACCES') {
+      console.error(`[SERIAL] ✗ Permission denied - check serial port permissions`);
+      console.error(`[SERIAL] On Linux: sudo chmod 666 ${CONFIG.serial.port}`);
+    } else if (err.code === 'ENOENT') {
+      console.error(`[SERIAL] ✗ Serial port not found: ${CONFIG.serial.port}`);
+      console.error(`[SERIAL] Available ports: Check device manager or run 'dmesg' on Linux`);
     } else {
-      console.error(`[TCP] ✗ Error: ${err.message}`);
+      console.error(`[SERIAL] ✗ Error opening serial port: ${err.message}`);
     }
     process.exit(1);
-  });
+  }
 
   // Start retry worker (every 30 seconds)
   const retryWorker = setInterval(() => ResultSync.retryOfflineRecords(), CONFIG.retry.intervalMs);
@@ -903,7 +928,7 @@ async function startup() {
     shutdown(retryWorker, healthCheckInterval);
   });
 
-  console.log('[AGENT] ✓ Ready to accept connections from Bio-Rad D-10\n');
+  console.log('[AGENT] ✓ Ready to accept A1C results from Bio-Rad D-10 on serial port\n');
 }
 
 async function shutdown(retryWorker, healthCheckInterval) {
@@ -913,9 +938,9 @@ async function shutdown(retryWorker, healthCheckInterval) {
   clearInterval(healthCheckInterval);
   console.log('[SHUTDOWN] ✓ Intervals cleared');
 
-  if (tcpServer) {
-    tcpServer.close(() => {
-      console.log('[SHUTDOWN] ✓ TCP server closed');
+  if (serialPort && serialPort.isOpen) {
+    serialPort.close(() => {
+      console.log('[SHUTDOWN] ✓ Serial port closed');
     });
   }
 

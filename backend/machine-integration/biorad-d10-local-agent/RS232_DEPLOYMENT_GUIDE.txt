@@ -1,0 +1,427 @@
+================================================================================
+BIO-RAD D-10 LOCAL AGENT - RS-232 SERIAL DEPLOYMENT GUIDE
+Updated: August 11, 2026
+================================================================================
+
+EXECUTIVE SUMMARY
+================================================================================
+Status: ✅ PRODUCTION READY - RS-232 SERIAL PORT VERSION
+
+The Bio-Rad D-10 local agent has been COMPLETELY MIGRATED from TCP/IP to 
+RS-232 serial port communication. This is the industry-standard connection 
+method for laboratory analyzers.
+
+✅ All TCP/IP logic has been REMOVED
+✅ RS-232 SerialPort implementation is COMPLETE
+✅ All ASTM parsing, offline queueing, and VPS sync logic PRESERVED
+✅ Ready for production deployment
+
+
+ARCHITECTURE CHANGES
+================================================================================
+
+BEFORE (TCP/IP):
+- Bio-Rad D-10 → Network Cable → TCP Server (port 5200) → Agent
+
+AFTER (RS-232 Serial):
+- Bio-Rad D-10 → RS-232 Cable → Serial Port (COM3) → Agent
+
+Key Points:
+• Communication: RS-232 Serial @ 9600 baud (8-N-1)
+• Protocol: ASTM E1381/E1394 (unchanged)
+• Database: MySQL pending_results (unchanged)
+• VPS Sync: HTTP REST API (unchanged)
+• Offline Queue: Automatic retry (unchanged)
+
+
+HARDWARE REQUIREMENTS
+================================================================================
+
+1. RS-232 Serial Cable
+   ├─ Type: DB-9 or DB-25 null modem cable
+   ├─ Length: Up to 15 meters (50 feet) maximum
+   └─ Pinout: Standard RS-232 null modem (TX↔RX, RX↔TX, GND↔GND)
+
+2. Serial Port on PC
+   ├─ Option A: Built-in COM port (older PCs)
+   ├─ Option B: USB-to-RS232 adapter (modern PCs - RECOMMENDED)
+   └─ Drivers: Install drivers for USB adapter if needed
+
+3. Bio-Rad D-10 Analyzer
+   ├─ RS-232 port enabled in machine settings
+   ├─ Baud rate configured: 9600 (default)
+   └─ Protocol: ASTM E1381
+
+Recommended USB-to-RS232 Adapter:
+• FTDI chipset-based adapters (most reliable)
+• Prolific PL2303 chipset (common, check driver compatibility)
+• Install manufacturer drivers before connecting
+
+
+SOFTWARE REQUIREMENTS
+================================================================================
+
+1. Node.js 18+ installed
+2. npm packages: mysql2, axios, serialport
+3. MySQL database with pending_results table
+4. Windows: No additional dependencies
+5. Linux: May need to add user to dialout group
+
+
+SERIAL PORT CONFIGURATION
+================================================================================
+
+Default Settings (Bio-Rad D-10 Standard):
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ Parameter          │ Value                                                  │
+├────────────────────┼────────────────────────────────────────────────────────┤
+│ Port               │ COM3 (Windows) or /dev/ttyUSB0 (Linux)                │
+│ Baud Rate          │ 9600                                                   │
+│ Data Bits          │ 8                                                      │
+│ Stop Bits          │ 1                                                      │
+│ Parity             │ None                                                   │
+│ Flow Control       │ None (disabled)                                        │
+│ Handshake          │ None                                                   │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+⚠️ IMPORTANT: These settings MUST match the Bio-Rad D-10 configuration exactly!
+
+
+WINDOWS SETUP
+================================================================================
+
+Step 1: Install USB-to-RS232 Adapter (if needed)
+──────────────────────────────────────────────────
+1. Connect USB-to-RS232 adapter to PC
+2. Windows will auto-install driver (or install from manufacturer website)
+3. Open Device Manager (devmgmt.msc)
+4. Expand "Ports (COM & LPT)"
+5. Find your adapter (e.g., "USB Serial Port (COM3)")
+6. Note the COM port number (e.g., COM3, COM5, etc.)
+
+Step 2: Configure Serial Port Settings
+──────────────────────────────────────────────────
+1. In Device Manager, right-click your COM port
+2. Select "Properties"
+3. Go to "Port Settings" tab
+4. Configure:
+   - Bits per second: 9600
+   - Data bits: 8
+   - Parity: None
+   - Stop bits: 1
+   - Flow control: None
+5. Click "OK"
+
+Step 3: Test Serial Port
+──────────────────────────────────────────────────
+1. Open Command Prompt
+2. Run: mode COM3
+3. Verify output shows:
+   Baud: 9600
+   Parity: None
+   Data Bits: 8
+   Stop Bits: 1
+
+Step 4: Update Agent Configuration
+──────────────────────────────────────────────────
+1. Navigate to biorad-d10-local-agent folder
+2. Copy .env.example to .env:
+   copy .env.example .env
+
+3. Edit .env file:
+   SERIAL_PORT=COM3        ← Use YOUR COM port number
+   BAUD_RATE=9600
+   DB_HOST=localhost
+   DB_PORT=3306
+   DB_USER=root
+   DB_PASSWORD=your_password
+   DB_NAME=lab_agent_db
+   VPS_TAILSCALE_URL=http://your_vps_url:port
+
+4. Save file
+
+Step 5: Install Dependencies
+──────────────────────────────────────────────────
+cd "s:\SnapSofts\Shraddha Lab\ShraddhaPathologyLaboratory\backend\machine-integration\biorad-d10-local-agent"
+npm install
+
+This will install:
+• mysql2 (database connectivity)
+• axios (HTTP requests)
+• serialport (RS-232 communication)
+
+Step 6: Start Agent
+──────────────────────────────────────────────────
+node app.js
+
+Expected output:
+======================================================================
+BIO-RAD D-10 LOCAL AGENT - STARTING
+======================================================================
+Serial Port:      COM3 @ 9600 baud
+Data Bits:        8
+Stop Bits:        1
+Parity:           none
+Database:         localhost:3306/lab_agent_db
+VPS Backend:      http://localhost:3351
+======================================================================
+
+[DB] ✓ Database connection successful
+[SERIAL] 📱 Serial port opened: COM3 @ 9600 baud
+[SERIAL] Sent initial ACK to Bio-Rad D-10
+[WORKER] ✓ Retry job scheduled every 30000ms
+[AGENT] ✓ Ready to accept A1C results from Bio-Rad D-10 on serial port
+
+
+LINUX SETUP
+================================================================================
+
+Step 1: Install USB-to-RS232 Adapter (if needed)
+──────────────────────────────────────────────────
+1. Connect USB-to-RS232 adapter to PC
+2. Check kernel logs:
+   dmesg | grep tty
+3. Find device (usually /dev/ttyUSB0 or /dev/ttyS0)
+4. Verify device exists:
+   ls -l /dev/ttyUSB0
+
+Step 2: Add User to dialout Group
+──────────────────────────────────────────────────
+sudo usermod -a -G dialout $USER
+logout
+(Log back in for changes to take effect)
+
+Step 3: Set Serial Port Permissions
+──────────────────────────────────────────────────
+sudo chmod 666 /dev/ttyUSB0
+
+(Or permanently via udev rules)
+
+Step 4: Test Serial Port
+──────────────────────────────────────────────────
+stty -F /dev/ttyUSB0 9600 cs8 -cstopb -parenb
+
+Verify:
+stty -F /dev/ttyUSB0
+
+Step 5: Update Agent Configuration
+──────────────────────────────────────────────────
+cd /path/to/biorad-d10-local-agent
+cp .env.example .env
+nano .env
+
+Update:
+SERIAL_PORT=/dev/ttyUSB0    ← Use YOUR device path
+BAUD_RATE=9600
+(rest of config same as Windows)
+
+Step 6: Install Dependencies & Start
+──────────────────────────────────────────────────
+npm install
+node app.js
+
+
+TROUBLESHOOTING
+================================================================================
+
+Problem 1: "Serial port not found: COM3"
+──────────────────────────────────────────────────
+Cause: COM port doesn't exist or wrong port number
+Solution:
+• Windows: Check Device Manager → Ports (COM & LPT)
+• Linux: Run "dmesg | grep tty" or "ls /dev/tty*"
+• Update SERIAL_PORT in .env file with correct port
+
+Problem 2: "Permission denied - check serial port permissions"
+──────────────────────────────────────────────────
+Cause: User doesn't have permission to access serial port
+Solution (Windows):
+• Run Command Prompt as Administrator
+• Or grant permissions to COM port in Device Manager
+Solution (Linux):
+• sudo chmod 666 /dev/ttyUSB0
+• OR add user to dialout group: sudo usermod -a -G dialout $USER
+
+Problem 3: "Port is already in use"
+──────────────────────────────────────────────────
+Cause: Another application is using the serial port
+Solution:
+• Close other serial terminal programs (PuTTY, Hyperterminal, etc.)
+• Check running Node.js processes: tasklist /FI "IMAGENAME eq node.exe"
+• Kill conflicting process
+
+Problem 4: Agent starts but no data received
+──────────────────────────────────────────────────
+Cause: Bio-Rad D-10 not configured correctly or cable issue
+Solution:
+• Verify cable is properly connected at BOTH ends
+• Check Bio-Rad D-10 interface settings (9600-8-N-1)
+• Verify ASTM protocol is enabled on machine
+• Try swapping TX/RX pins (null modem vs straight cable)
+• Test with loopback (short TX to RX on adapter)
+
+Problem 5: Garbage data or corrupted frames
+──────────────────────────────────────────────────
+Cause: Baud rate mismatch or wrong serial settings
+Solution:
+• Verify Bio-Rad D-10 baud rate matches agent (9600)
+• Check data bits (8), stop bits (1), parity (none)
+• Verify cable quality (replace if old/damaged)
+• Check for EMI interference (keep away from motors/power supplies)
+
+Problem 6: Checksum validation failures
+──────────────────────────────────────────────────
+Cause: Data corruption during transmission
+Solution:
+• Check cable connections (loose connectors)
+• Shorten cable length (< 15 meters)
+• Replace cable
+• Check for electrical noise sources nearby
+
+
+TESTING PROCEDURE
+================================================================================
+
+Pre-Test Checklist:
+☑ Serial cable connected: Bio-Rad D-10 ↔ PC
+☑ COM port identified and configured
+☑ Agent .env file configured correctly
+☑ MySQL database running with pending_results table
+☑ A1C test registered in database (see A1C_TEST_REGISTRATION_FORM.txt)
+☑ Patient registered with A1C test assigned
+☑ Bio-Rad D-10 configured for ASTM @ 9600 baud
+
+Test Procedure:
+1. Start agent: node app.js
+2. Verify startup message shows correct serial port
+3. On Bio-Rad D-10: Load patient sample (scan barcode)
+4. Machine sends HEADER frame → Agent logs: "Stored analyzer: Bio-Rad D-10"
+5. Machine sends ORDER frame → Agent logs: "ORDER frame detected: visitId=..."
+6. Agent fetches tests from VPS → Agent logs: "A1C test is assigned"
+7. Machine sends RESULT frame → Agent logs: "A1C=6.8%, Flag=N"
+8. Agent saves to database → Check pending_results table
+9. Agent syncs to VPS → Status changes to SYNCED
+
+Expected Log Output:
+[SERIAL BUFFER] Total buffer length: 47, content: "...H|\^&|||Bio-Rad D-10..."
+[SERIAL FRAME] ✅ Frame valid, sent ACK
+[SERIAL FRAME] Parsed: frameType=HEADER
+[SERIAL] Stored analyzer for this connection: Bio-Rad D-10
+[SERIAL] ORDER frame detected: visitId=202608110001, sampleId=2
+[SERIAL] Fetching assigned tests from VPS
+[QUERY] ✓ A1C test is assigned - sending ORDER frame
+[RESULT] A1C=6.8%, Flag=N, Abnormal=false
+[DB SUCCESS] Result stored: id=1, visitId=202608110001, sampleId=2, A1C=6.8%
+[CLOUD] ✓ A1C result sent for 202608110001
+
+
+COMPARISON: TCP vs RS-232
+================================================================================
+
+Feature                    TCP/IP (OLD)              RS-232 (NEW)
+─────────────────────────────────────────────────────────────────────────
+Connection Type            Network cable             Serial cable
+Port                       TCP 5200                  COM3 (configurable)
+Communication              Socket-based              Serial port
+Max Distance               100m+ (ethernet)          15m (RS-232 spec)
+Setup Complexity           Medium (network config)   Low (plug & play)
+Reliability                Network-dependent         Direct connection
+Industry Standard          No (custom)               Yes (ASTM standard)
+Real-World Use             Rare                      Standard for analyzers
+Cable Cost                 Low (ethernet)            Low (RS-232/USB)
+Latency                    Network latency           Minimal (direct)
+Security                   Network-based             Physical access only
+
+
+PRODUCTION DEPLOYMENT CHECKLIST
+================================================================================
+
+Hardware Setup:
+☑ RS-232 cable connected and secure
+☑ USB-to-RS232 adapter drivers installed (if applicable)
+☑ Serial port configured correctly (9600-8-N-1)
+☑ COM port number documented
+
+Software Setup:
+☑ Node.js 18+ installed
+☑ npm dependencies installed (npm install)
+☑ .env file created and configured
+☑ Database connection tested
+☑ VPS backend URL configured
+
+Database Setup:
+☑ MySQL running
+☑ pending_results table exists
+☑ A1C test registered
+☑ Bio-Rad D-10 machine registered
+☑ A1C assigned to Bio-Rad D-10 in test_machines
+
+Bio-Rad D-10 Configuration:
+☑ Interface type: RS-232
+☑ Baud rate: 9600
+☑ Protocol: ASTM E1381
+☑ Data bits: 8
+☑ Stop bits: 1
+☑ Parity: None
+
+Testing:
+☑ Agent starts without errors
+☑ Serial port opens successfully
+☑ Test sample processed end-to-end
+☑ Result saved to database (pending_results)
+☑ Result synced to VPS (status=SYNCED)
+
+Monitoring:
+☑ Log file rotation configured (optional)
+☑ Health check scheduled (every 5 minutes)
+☑ Alert system for FAILED records (optional)
+
+
+MAINTENANCE & MONITORING
+================================================================================
+
+Daily Checks:
+• Verify agent is running (check process status)
+• Review logs for errors
+• Check pending_results for OFFLINE_QUEUED records
+
+Weekly Checks:
+• Verify serial cable connections are secure
+• Review FAILED records and investigate root cause
+• Check disk space for logs
+
+Monthly Checks:
+• Inspect serial cable for wear/damage
+• Update npm dependencies if needed
+• Review health check statistics
+
+
+SUPPORT & RESOURCES
+================================================================================
+
+Documentation Files:
+• RS232_DEPLOYMENT_GUIDE.txt (this file)
+• PRODUCTION_READINESS_AUDIT.txt (feature audit)
+• A1C_TEST_REGISTRATION_FORM.txt (test setup guide)
+• README.md (overview)
+
+Environment Variables:
+• SERIAL_PORT - COM port or /dev/tty device
+• BAUD_RATE - Serial communication speed (default: 9600)
+• DB_HOST, DB_PORT, DB_USER, DB_PASSWORD, DB_NAME - Database config
+• VPS_TAILSCALE_URL - Backend API URL
+
+Logs Location:
+• Console output (stdout/stderr)
+• Consider redirecting to file: node app.js > agent.log 2>&1
+
+Contact:
+• SnapSofts Development Team
+• Bio-Rad D-10 Technical Support (hardware issues)
+
+
+================================================================================
+END OF RS-232 DEPLOYMENT GUIDE
+Generated: 2026-08-11
+Version: 2.0 (RS-232 Serial Port Edition)
+================================================================================
