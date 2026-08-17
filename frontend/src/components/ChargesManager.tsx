@@ -120,8 +120,63 @@ export default function ChargesManager({
         } else {
           setError("Failed to load doctor charges");
         }
+      } else if (entityType === "organization") {
+        // For organizations, use dedicated endpoint (same as doctors)
+        const chargesResponse = await fetch(
+          `${process.env.NEXT_PUBLIC_API_URL}/master/organizations/${entityId}/charges?t=${Date.now()}`
+        );
+        const chargesResult = await chargesResponse.json();
+
+        if (chargesResult.success) {
+          // Transform organization charges response to match format expected by component
+          const transformedTests = chargesResult.data.map((item: any) => ({
+            id: item.id,
+            name: item.name,
+            shortName: item.shortName,
+            testCode: item.shortName,
+            group: item.group,
+            department: { name: item.group },
+            discountR: item.discountR || 0,
+            discountS: item.discountS || 0,
+            isCustomized: item.isCustomized === true,
+            charges: [
+              {
+                id: null,
+                testId: item.id,
+                discountR: item.discountR || 0,
+                discountS: item.discountS || 0,
+                isCustomized: item.isCustomized === true
+              }
+            ]
+          }));
+
+          setTests(transformedTests);
+
+          // Build default charges map
+          const defaultChargesMap: any = {};
+          chargesResult.data.forEach((item: any) => {
+            defaultChargesMap[item.id] = {
+              defaultB2C: item.defaultB2C,
+              discountR: item.discountR || 0,
+              discountS: item.discountS || 0
+            };
+          });
+          setDefaultCharges(defaultChargesMap);
+
+          // Build organization charges array
+          const organizationCharges = chargesResult.data
+            .map((item: any) => ({
+              testId: item.id,
+              discountR: item.discountR || 0,
+              discountS: item.discountS || 0,
+              isCustomized: item.isCustomized === true
+            }));
+          setCharges(organizationCharges);
+        } else {
+          setError("Failed to load organization charges");
+        }
       } else {
-        // For organizations, use the original flow
+        // For other entities, use the original flow
         // Fetch all tests
         const testsResponse = await fetch(
           `${process.env.NEXT_PUBLIC_API_URL}/master/test-charges/all`
@@ -173,23 +228,19 @@ export default function ChargesManager({
         const defaultCharge = defaultCharges[test.id];
 
         // A test is customized if:
-        // - For doctor: has a record in charges with isCustomized = true
-        // - For organization: has a record in charges (exists = customized)
+        // - For doctor: check isCustomized flag from backend
+        // - For organization: check isCustomized flag from backend (same as doctor)
         let isCustomized = false;
-        if (entityType === "doctor" && testCharge) {
-          // Use the isCustomized flag from the backend
+        
+        if (testCharge) {
+          // Both doctor and organization charges: use the isCustomized flag from backend
           isCustomized = testCharge.isCustomized === true;
-        } else if (testCharge && defaultCharge) {
-          // For organization charges: check if it exists and differs from default
-          isCustomized = 
-            testCharge.b2cCharge !== defaultCharge.b2cCharge ||
-            testCharge.b2bCharge !== defaultCharge.b2bCharge;
         }
 
         // For doctor charges, if isCustomized, show discountS (special price), otherwise show defaultB2C
-        // For organization charges, always show the actual charge
+        // For organization charges, if isCustomized, show discountS (special price), otherwise show defaultB2C
         let displayCharge = defaultCharge?.defaultB2C || 0;
-        if (entityType === "doctor" && isCustomized && testCharge?.discountS) {
+        if (isCustomized && testCharge?.discountS) {
           displayCharge = testCharge.discountS;
         }
 
@@ -245,13 +296,8 @@ export default function ChargesManager({
     
     if (!testCharge) return false;
     
-    // For doctor charges: check the isCustomized flag
-    if (entityType === "doctor") {
-      return testCharge.isCustomized === true;
-    }
-    
-    // For organization charges: check if it exists (exists = customized)
-    return true;
+    // For BOTH doctor and organization charges: check the isCustomized flag
+    return testCharge.isCustomized === true;
   }).length;
 
   const totalDefault = tests.length - totalCustomized;
@@ -324,24 +370,15 @@ export default function ChargesManager({
         .map((item) => {
           const currentCharge = parseFloat(item.charges) || 0;
 
-          if (entityType === "doctor") {
-            // For doctor:
-            // discountR = regular/default price (original from test_charges)
-            // discountS = special/customized price (what admin set)
-            
-            return {
-              testId: item.id,
-              discountR: item.defaultB2C || 0,  // Regular price (from test_charges)
-              discountS: currentCharge           // Special price (customized by admin)
-            };
-          } else {
-            // For organization: use the new charge value
-            return {
-              testId: item.id,
-              b2cCharge: currentCharge,
-              b2bCharge: currentCharge
-            };
-          }
+          // For BOTH doctor and organization: send discountR and discountS
+          // discountR = regular/default price (original from test_charges)
+          // discountS = special/customized price (what admin set)
+          
+          return {
+            testId: item.id,
+            discountR: item.defaultB2C || 0,  // Regular price (from test_charges)
+            discountS: currentCharge           // Special price (customized by admin)
+          };
         });
 
       console.log("Filtered bulkCharges:", bulkCharges);
@@ -357,7 +394,11 @@ export default function ChargesManager({
 
       const token = localStorage.getItem("token");
       const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/master/test-charges/bulk`,
+        `${process.env.NEXT_PUBLIC_API_URL}${
+          entityType === "organization"
+            ? `/master/organizations/${entityId}/charges/bulk`
+            : `/master/test-charges/bulk`
+        }`,
         {
           method: "POST",
           headers: {
