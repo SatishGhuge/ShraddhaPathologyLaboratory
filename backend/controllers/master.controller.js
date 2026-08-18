@@ -593,28 +593,31 @@ export const getTestById = async (req, res) => {
           displayRangeText: param.displayRangeText,
           rangeText: param.rangeText,
           textContent: param.textContent,
+          maleDisplayText: param.maleDisplayText,         // ✅ NEW
+          femaleDisplayText: param.femaleDisplayText,     // ✅ NEW
+          defaultDisplayText: param.defaultDisplayText,   // ✅ NEW
           isMultipleOptions: param.isMultipleOptions,
           testMethod: param.testMethod || "",
           normalRanges: [
             {
               gender: 'Male',
-              lowValue: param.maleLowValue ? String(param.maleLowValue) : null,
-              highValue: param.maleHighValue ? String(param.maleHighValue) : null,
-              defaultValue: param.maleDefaultValue,
+              ll: param.maleLowValue ? String(param.maleLowValue) : null,
+              ul: param.maleHighValue ? String(param.maleHighValue) : null,
+              default: param.maleDefaultValue,
               isActive: param.maleActive
             },
             {
               gender: 'Female',
-              lowValue: param.femaleLowValue ? String(param.femaleLowValue) : null,
-              highValue: param.femaleHighValue ? String(param.femaleHighValue) : null,
-              defaultValue: param.femaleDefaultValue,
+              ll: param.femaleLowValue ? String(param.femaleLowValue) : null,
+              ul: param.femaleHighValue ? String(param.femaleHighValue) : null,
+              default: param.femaleDefaultValue,
               isActive: param.femaleActive
             },
             {
               gender: 'Child',
-              lowValue: param.childLowValue ? String(param.childLowValue) : null,
-              highValue: param.childHighValue ? String(param.childHighValue) : null,
-              defaultValue: param.childDefaultValue,
+              ll: param.childLowValue ? String(param.childLowValue) : null,
+              ul: param.childHighValue ? String(param.childHighValue) : null,
+              default: param.childDefaultValue,
               isActive: param.childActive
             }
           ],
@@ -672,6 +675,9 @@ export const getTestById = async (req, res) => {
           displayRangeText: "",
           rangeText: "",
           textContent: "",
+          maleDisplayText: "",         // ✅ NEW
+          femaleDisplayText: "",       // ✅ NEW
+          defaultDisplayText: "",      // ✅ NEW
           isMultipleOptions: false,
           normalRanges: [
             { gender: "Male", lowValue: "", highValue: "", defaultValue: "", isActive: true },
@@ -905,7 +911,7 @@ export const createTest = async (req, res) => {
                 machineCode: param.machineCode || null,
                 multiplyBy: param.multiplyBy || null,
                 decimal: param.decimal ? parseInt(param.decimal) : null,
-                parameterSortOrder: param.sortOrder ? parseInt(param.sortOrder) : null,
+                parameterSortOrder: param.sortOrder !== undefined && param.sortOrder !== null ? parseInt(param.sortOrder) : null,
                 isDescriptive: param.isDescriptive || false,
                 lowPanic: param.lowPanic ? parseFloat(param.lowPanic) : null,
                 highPanic: param.highPanic ? parseFloat(param.highPanic) : null,
@@ -920,19 +926,22 @@ export const createTest = async (req, res) => {
                 displayRangeText: param.displayRangeText || null,
                 rangeText: param.rangeText || null,
                 textContent: param.textContent || null,
+                maleDisplayText: param.maleDisplayText || null,
+                femaleDisplayText: param.femaleDisplayText || null,
+                defaultDisplayText: param.defaultDisplayText || null,
                 isMultipleOptions: param.isMultipleOptions || false,
                 testMethod: param.testMethod || null,
-                maleLowValue: param.normalRanges?.find(r => r.gender === 'Male')?.lowValue ? String(param.normalRanges.find(r => r.gender === 'Male').lowValue) : null,
-                maleHighValue: param.normalRanges?.find(r => r.gender === 'Male')?.highValue ? String(param.normalRanges.find(r => r.gender === 'Male').highValue) : null,
-                maleDefaultValue: param.normalRanges?.find(r => r.gender === 'Male')?.defaultValue || null,
+                maleLowValue: param.normalRanges?.find(r => r.gender === 'Male')?.ll ? String(param.normalRanges.find(r => r.gender === 'Male').ll) : null,
+                maleHighValue: param.normalRanges?.find(r => r.gender === 'Male')?.ul ? String(param.normalRanges.find(r => r.gender === 'Male').ul) : null,
+                maleDefaultValue: param.normalRanges?.find(r => r.gender === 'Male')?.default || null,
                 maleActive: param.normalRanges?.find(r => r.gender === 'Male')?.isActive || false,
-                femaleLowValue: param.normalRanges?.find(r => r.gender === 'Female')?.lowValue ? String(param.normalRanges.find(r => r.gender === 'Female').lowValue) : null,
-                femaleHighValue: param.normalRanges?.find(r => r.gender === 'Female')?.highValue ? String(param.normalRanges.find(r => r.gender === 'Female').highValue) : null,
-                femaleDefaultValue: param.normalRanges?.find(r => r.gender === 'Female')?.defaultValue || null,
+                femaleLowValue: param.normalRanges?.find(r => r.gender === 'Female')?.ll ? String(param.normalRanges.find(r => r.gender === 'Female').ll) : null,
+                femaleHighValue: param.normalRanges?.find(r => r.gender === 'Female')?.ul ? String(param.normalRanges.find(r => r.gender === 'Female').ul) : null,
+                femaleDefaultValue: param.normalRanges?.find(r => r.gender === 'Female')?.default || null,
                 femaleActive: param.normalRanges?.find(r => r.gender === 'Female')?.isActive || false,
-                childLowValue: param.normalRanges?.find(r => r.gender === 'Child')?.lowValue ? String(param.normalRanges.find(r => r.gender === 'Child').lowValue) : null,
-                childHighValue: param.normalRanges?.find(r => r.gender === 'Child')?.highValue ? String(param.normalRanges.find(r => r.gender === 'Child').highValue) : null,
-                childDefaultValue: param.normalRanges?.find(r => r.gender === 'Child')?.defaultValue || null,
+                childLowValue: param.normalRanges?.find(r => r.gender === 'Child')?.ll ? String(param.normalRanges.find(r => r.gender === 'Child').ll) : null,
+                childHighValue: param.normalRanges?.find(r => r.gender === 'Child')?.ul ? String(param.normalRanges.find(r => r.gender === 'Child').ul) : null,
+                childDefaultValue: param.normalRanges?.find(r => r.gender === 'Child')?.default || null,
                 childActive: param.normalRanges?.find(r => r.gender === 'Child')?.isActive || false,
                 ageRanges: processAgeRangesWithGender(param.ageRanges, param.parameterName),
                 rangeValues: param.rangeValues && param.rangeValues.length > 0 ? JSON.stringify(param.rangeValues) : null,
@@ -1194,7 +1203,7 @@ export const updateTest = async (req, res) => {
           machineCode: param.machineCode || null,
           multiplyBy: param.multiplyBy || null,
           decimal: param.decimal ? parseInt(param.decimal) : null,
-          parameterSortOrder: param.sortOrder ? parseInt(param.sortOrder) : null,
+          parameterSortOrder: param.sortOrder !== undefined && param.sortOrder !== null ? parseInt(param.sortOrder) : undefined,
           isDescriptive: param.isDescriptive || false,
           lowPanic: param.lowPanic ? parseFloat(param.lowPanic) : null,
           highPanic: param.highPanic ? parseFloat(param.highPanic) : null,
@@ -1209,19 +1218,22 @@ export const updateTest = async (req, res) => {
           displayRangeText: param.displayRangeText || null,
           rangeText: param.rangeText || null,
           textContent: param.textContent || null,
+          maleDisplayText: param.maleDisplayText || null,           // ✅ NEW
+          femaleDisplayText: param.femaleDisplayText || null,       // ✅ NEW
+          defaultDisplayText: param.defaultDisplayText || null,     // ✅ NEW
           isMultipleOptions: param.isMultipleOptions || false,
           testMethod: param.testMethod || null,
-          maleLowValue: maleRange?.lowValue ? String(maleRange.lowValue) : null,
-          maleHighValue: maleRange?.highValue ? String(maleRange.highValue) : null,
-          maleDefaultValue: maleRange?.defaultValue || null,
+          maleLowValue: maleRange?.ll ? String(maleRange.ll) : null,
+          maleHighValue: maleRange?.ul ? String(maleRange.ul) : null,
+          maleDefaultValue: maleRange?.default || null,
           maleActive: maleRange?.isActive || false,
-          femaleLowValue: femaleRange?.lowValue ? String(femaleRange.lowValue) : null,
-          femaleHighValue: femaleRange?.highValue ? String(femaleRange.highValue) : null,
-          femaleDefaultValue: femaleRange?.defaultValue || null,
+          femaleLowValue: femaleRange?.ll ? String(femaleRange.ll) : null,
+          femaleHighValue: femaleRange?.ul ? String(femaleRange.ul) : null,
+          femaleDefaultValue: femaleRange?.default || null,
           femaleActive: femaleRange?.isActive || false,
-          childLowValue: childRange?.lowValue ? String(childRange.lowValue) : null,
-          childHighValue: childRange?.highValue ? String(childRange.highValue) : null,
-          childDefaultValue: childRange?.defaultValue || null,
+          childLowValue: childRange?.ll ? String(childRange.ll) : null,
+          childHighValue: childRange?.ul ? String(childRange.ul) : null,
+          childDefaultValue: childRange?.default || null,
           childActive: childRange?.isActive || false,
           ageRanges: (() => {
             try {
@@ -1338,7 +1350,7 @@ export const updateTest = async (req, res) => {
                   categoryName: category.name ?? "",
                   isCategory: category.isCategory || false,
                   testMethod: category.testMethod || null,
-                  sortOrder: category.sortOrder ? parseInt(category.sortOrder) : null
+                  sortOrder: category.sortOrder !== undefined && category.sortOrder !== null ? parseInt(category.sortOrder) : undefined
                 }
               });
               console.log(`   ✅ Category updated successfully with SAME ID: ${existingCategory.id}`);
@@ -1353,7 +1365,7 @@ export const updateTest = async (req, res) => {
                   categoryName: category.name ?? "",
                   isCategory: category.isCategory || false,
                   testMethod: category.testMethod || null,
-                  sortOrder: category.sortOrder ? parseInt(category.sortOrder) : null
+                  sortOrder: category.sortOrder !== undefined && category.sortOrder !== null ? parseInt(category.sortOrder) : null
                 }
               });
               console.log(`   ✅ NEW category link created with NEW ID: ${newCat.id}`);
@@ -4271,6 +4283,9 @@ export const createTestParameter = async (req, res) => {
       rangeText,
       textContent,
       isMultipleOptions,
+      maleDisplayText,        // ✅ NEW
+      femaleDisplayText,      // ✅ NEW
+      defaultDisplayText,     // ✅ NEW
       normalRanges,
       ageRanges,
       rangeValues
@@ -4322,18 +4337,21 @@ export const createTestParameter = async (req, res) => {
         displayRangeText: displayRangeText || null,
         rangeText: rangeText || null,
         textContent: textContent || null,
+        maleDisplayText: maleDisplayText || null,           // ✅ NEW
+        femaleDisplayText: femaleDisplayText || null,       // ✅ NEW
+        defaultDisplayText: defaultDisplayText || null,     // ✅ NEW
         isMultipleOptions: isMultipleOptions || false,
-        maleLowValue: normalRanges?.find(r => r.gender === 'Male')?.lowValue ? String(normalRanges.find(r => r.gender === 'Male').lowValue) : null,
-        maleHighValue: normalRanges?.find(r => r.gender === 'Male')?.highValue ? String(normalRanges.find(r => r.gender === 'Male').highValue) : null,
-        maleDefaultValue: normalRanges?.find(r => r.gender === 'Male')?.defaultValue || null,
+        maleLowValue: normalRanges?.find(r => r.gender === 'Male')?.ll ? String(normalRanges.find(r => r.gender === 'Male').ll) : null,
+        maleHighValue: normalRanges?.find(r => r.gender === 'Male')?.ul ? String(normalRanges.find(r => r.gender === 'Male').ul) : null,
+        maleDefaultValue: normalRanges?.find(r => r.gender === 'Male')?.default || null,
         maleActive: normalRanges?.find(r => r.gender === 'Male')?.isActive || false,
-        femaleLowValue: normalRanges?.find(r => r.gender === 'Female')?.lowValue ? String(normalRanges.find(r => r.gender === 'Female').lowValue) : null,
-        femaleHighValue: normalRanges?.find(r => r.gender === 'Female')?.highValue ? String(normalRanges.find(r => r.gender === 'Female').highValue) : null,
-        femaleDefaultValue: normalRanges?.find(r => r.gender === 'Female')?.defaultValue || null,
+        femaleLowValue: normalRanges?.find(r => r.gender === 'Female')?.ll ? String(normalRanges.find(r => r.gender === 'Female').ll) : null,
+        femaleHighValue: normalRanges?.find(r => r.gender === 'Female')?.ul ? String(normalRanges.find(r => r.gender === 'Female').ul) : null,
+        femaleDefaultValue: normalRanges?.find(r => r.gender === 'Female')?.default || null,
         femaleActive: normalRanges?.find(r => r.gender === 'Female')?.isActive || false,
-        childLowValue: normalRanges?.find(r => r.gender === 'Child')?.lowValue ? String(normalRanges.find(r => r.gender === 'Child').lowValue) : null,
-        childHighValue: normalRanges?.find(r => r.gender === 'Child')?.highValue ? String(normalRanges.find(r => r.gender === 'Child').highValue) : null,
-        childDefaultValue: normalRanges?.find(r => r.gender === 'Child')?.defaultValue || null,
+        childLowValue: normalRanges?.find(r => r.gender === 'Child')?.ll ? String(normalRanges.find(r => r.gender === 'Child').ll) : null,
+        childHighValue: normalRanges?.find(r => r.gender === 'Child')?.ul ? String(normalRanges.find(r => r.gender === 'Child').ul) : null,
+        childDefaultValue: normalRanges?.find(r => r.gender === 'Child')?.default || null,
         childActive: normalRanges?.find(r => r.gender === 'Child')?.isActive || false,
         ageRanges: processAgeRangesWithGender(ageRanges, parameterName || "Parameter"),
         rangeValues: rangeValues && rangeValues.length > 0 ? JSON.stringify(rangeValues) : null,
@@ -4390,6 +4408,9 @@ export const createTestCategoryWithParameter = async (req, res) => {
       rangeText,
       textContent,
       isMultipleOptions,
+      maleDisplayText,        // ✅ NEW
+      femaleDisplayText,      // ✅ NEW
+      defaultDisplayText,     // ✅ NEW
       normalRanges,
       ageRanges,
       rangeValues
@@ -4456,18 +4477,21 @@ export const createTestCategoryWithParameter = async (req, res) => {
         displayRangeText: displayRangeText || null,
         rangeText: rangeText || null,
         textContent: textContent || null,
+        maleDisplayText: maleDisplayText || null,           // ✅ NEW
+        femaleDisplayText: femaleDisplayText || null,       // ✅ NEW
+        defaultDisplayText: defaultDisplayText || null,     // ✅ NEW
         isMultipleOptions: isMultipleOptions || false,
-        maleLowValue: normalRanges?.find(r => r.gender === 'Male')?.lowValue ? String(normalRanges.find(r => r.gender === 'Male').lowValue) : null,
-        maleHighValue: normalRanges?.find(r => r.gender === 'Male')?.highValue ? String(normalRanges.find(r => r.gender === 'Male').highValue) : null,
-        maleDefaultValue: normalRanges?.find(r => r.gender === 'Male')?.defaultValue || null,
+        maleLowValue: normalRanges?.find(r => r.gender === 'Male')?.ll ? String(normalRanges.find(r => r.gender === 'Male').ll) : null,
+        maleHighValue: normalRanges?.find(r => r.gender === 'Male')?.ul ? String(normalRanges.find(r => r.gender === 'Male').ul) : null,
+        maleDefaultValue: normalRanges?.find(r => r.gender === 'Male')?.default || null,
         maleActive: normalRanges?.find(r => r.gender === 'Male')?.isActive || false,
-        femaleLowValue: normalRanges?.find(r => r.gender === 'Female')?.lowValue ? String(normalRanges.find(r => r.gender === 'Female').lowValue) : null,
-        femaleHighValue: normalRanges?.find(r => r.gender === 'Female')?.highValue ? String(normalRanges.find(r => r.gender === 'Female').highValue) : null,
-        femaleDefaultValue: normalRanges?.find(r => r.gender === 'Female')?.defaultValue || null,
+        femaleLowValue: normalRanges?.find(r => r.gender === 'Female')?.ll ? String(normalRanges.find(r => r.gender === 'Female').ll) : null,
+        femaleHighValue: normalRanges?.find(r => r.gender === 'Female')?.ul ? String(normalRanges.find(r => r.gender === 'Female').ul) : null,
+        femaleDefaultValue: normalRanges?.find(r => r.gender === 'Female')?.default || null,
         femaleActive: normalRanges?.find(r => r.gender === 'Female')?.isActive || false,
-        childLowValue: normalRanges?.find(r => r.gender === 'Child')?.lowValue ? String(normalRanges.find(r => r.gender === 'Child').lowValue) : null,
-        childHighValue: normalRanges?.find(r => r.gender === 'Child')?.highValue ? String(normalRanges.find(r => r.gender === 'Child').highValue) : null,
-        childDefaultValue: normalRanges?.find(r => r.gender === 'Child')?.defaultValue || null,
+        childLowValue: normalRanges?.find(r => r.gender === 'Child')?.ll ? String(normalRanges.find(r => r.gender === 'Child').ll) : null,
+        childHighValue: normalRanges?.find(r => r.gender === 'Child')?.ul ? String(normalRanges.find(r => r.gender === 'Child').ul) : null,
+        childDefaultValue: normalRanges?.find(r => r.gender === 'Child')?.default || null,
         childActive: normalRanges?.find(r => r.gender === 'Child')?.isActive || false,
         ageRanges: processAgeRangesWithGender(ageRanges, parameterName || "Parameter"),
         rangeValues: rangeValues && rangeValues.length > 0 ? JSON.stringify(rangeValues) : null,

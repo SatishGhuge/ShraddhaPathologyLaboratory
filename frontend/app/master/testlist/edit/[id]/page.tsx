@@ -406,8 +406,27 @@ const AddTest = () => {
             // Set categories if they exist
             if (testData.categories && testData.categories.length > 0) {
               console.log('📂 Categories received:', testData.categories);
-              setCategories(testData.categories.map(category => {
+              
+              // ✅ SORT FUNCTION: Sort by sortOrder (ascending numeric order, null/undefined treated as 0)
+              const sortBySortOrder = (arr) => {
+                return [...arr].sort((a, b) => {
+                  const aOrder = a.sortOrder ? parseInt(a.sortOrder) : 0;
+                  const bOrder = b.sortOrder ? parseInt(b.sortOrder) : 0;
+                  return aOrder - bOrder;
+                });
+              };
+              
+              // Sort categories by sortOrder
+              const sortedCategories = sortBySortOrder(testData.categories);
+              
+              setCategories(sortedCategories.map(category => {
                 console.log('📋 Processing category:', category.name, 'with', category.parameters?.length || 0, 'parameters');
+                
+                // Sort parameters within each category by their sortOrder
+                const sortedParameters = category.parameters && category.parameters.length > 0
+                  ? sortBySortOrder(category.parameters)
+                  : [];
+                
                 return {
                   categoryId: category.categoryId || crypto.randomUUID(), // ✅ Add fallback for existing tests
                   name: category.name || "",
@@ -419,8 +438,8 @@ const AddTest = () => {
                   description: category.description || "",
                   categoryType: category.categoryType || "PARAMETER",
                   parentId: category.parentId || null,
-                  parameters: category.parameters && category.parameters.length > 0 
-                    ? category.parameters.map(param => {
+                  parameters: sortedParameters.length > 0 
+                    ? sortedParameters.map(param => {
                         console.log('🔍 Parameter:', param.parameterName, 'ID:', param.id, 'ageRanges:', param.ageRanges);
                         return {
                           id: param.id,  // ✅ CRITICAL FIX: Include parameter ID from API response
@@ -445,6 +464,9 @@ const AddTest = () => {
                           displayRangeText: param.displayRangeText || "",
                           rangeText: param.rangeText || "",
                           textContent: param.textContent || "",
+                          maleDisplayText: param.maleDisplayText || "",         // ✅ NEW
+                          femaleDisplayText: param.femaleDisplayText || "",     // ✅ NEW
+                          defaultDisplayText: param.defaultDisplayText || "",   // ✅ NEW
                           isMultipleOptions: param.isMultipleOptions || false,
                           normalRanges: param.normalRanges && param.normalRanges.length > 0
                             ? param.normalRanges.map(range => ({
@@ -510,6 +532,9 @@ const AddTest = () => {
                         units: "",
                         unitId: "",
                         displayRangeText: "",
+                        maleDisplayText: "",
+                        femaleDisplayText: "",
+                        defaultDisplayText: "",
                         normalRanges: [
                           { gender: "Male", ll: "", ul: "", default: "", isActive: false },
                           { gender: "Female", ll: "", ul: "", default: "", isActive: false },
@@ -518,6 +543,8 @@ const AddTest = () => {
                       }]
                 };
               }));
+              
+              console.log('✅ Categories sorted by sortOrder:', sortedCategories.map(c => ({ name: c.name, sortOrder: c.sortOrder })));
             }
             
             // Load linked tests if present (edit mode)
@@ -661,6 +688,9 @@ const AddTest = () => {
         unitId: "",
         displayRangeText: "",
         rangeText: "",
+        maleDisplayText: "",         // ✅ NEW
+        femaleDisplayText: "",       // ✅ NEW
+        defaultDisplayText: "",      // ✅ NEW
         isMultipleOptions: false,
         textContent: "",
         normalRanges: [
@@ -731,6 +761,9 @@ const AddTest = () => {
       unitId: "",
       displayRangeText: "",
       rangeText: "",
+      maleDisplayText: "",         // ✅ NEW
+      femaleDisplayText: "",       // ✅ NEW
+      defaultDisplayText: "",      // ✅ NEW
       isMultipleOptions: false,
       textContent: "",
       normalRanges: [
@@ -775,6 +808,10 @@ const AddTest = () => {
         units: "",
         unitId: "",
         displayRangeText: "",
+        rangeText: "",
+        maleDisplayText: "",         // ✅ NEW
+        femaleDisplayText: "",       // ✅ NEW
+        defaultDisplayText: "",      // ✅ NEW
         normalRanges: [
           { gender: "Male", ll: "", ul: "", default: "", isActive: false },
           { gender: "Female", ll: "", ul: "", default: "", isActive: false },
@@ -939,7 +976,7 @@ const AddTest = () => {
         categoryId: category.categoryId, // ✅ Include unique category ID
         name: category.name ?? "",
         isCategory: category.isCategory || false,
-        sortOrder: null, // ❌ Don't use sortOrder in add/edit forms
+        sortOrder: category.sortOrder ? parseInt(category.sortOrder) : undefined, // ✅ FIX: Preserve existing sortOrder or use undefined
         testMethod: category.testMethod || null,
         color: category.color || null,
         icon: category.icon || null,
@@ -954,7 +991,7 @@ const AddTest = () => {
           machineCode: param.machineCode || null,
           multiplyBy: param.multiplyBy || null,
           decimal: param.decimal ? parseInt(param.decimal) : null,
-          sortOrder: null, // ❌ Don't use sortOrder in add/edit forms
+          sortOrder: param.sortOrder ? parseInt(param.sortOrder) : undefined, // ✅ FIX: Preserve existing sortOrder or use undefined
           testMethod: param.testMethod || null,
           isDescriptive: param.isDescriptive || false,
           lowPanic: param.lowPanic ? parseFloat(param.lowPanic) : null,
@@ -971,12 +1008,15 @@ const AddTest = () => {
           displayRangeText: param.displayRangeText || null,
           rangeText: param.rangeText || null,
           textContent: param.textContent || null,
+          maleDisplayText: param.maleDisplayText || null,           // ✅ NEW
+          femaleDisplayText: param.femaleDisplayText || null,       // ✅ NEW
+          defaultDisplayText: param.defaultDisplayText || null,     // ✅ NEW
           isMultipleOptions: param.isMultipleOptions || false,
           normalRanges: param.normalRanges ? param.normalRanges.map(range => ({
             gender: range.gender,
-            lowValue: range.ll ? String(range.ll) : null,
-            highValue: range.ul ? String(range.ul) : null,
-            defaultValue: range.default ? String(range.default) : null,
+            ll: range.ll ? String(range.ll) : null,
+            ul: range.ul ? String(range.ul) : null,
+            default: range.default ? String(range.default) : null,
             isActive: range.isActive
           })) : [],
           ageRanges: (() => {
@@ -2770,19 +2810,19 @@ const AddTest = () => {
                           </div>
                         ) : (
                           // Original By Sex Table Structure
-                          <table className="border-collapse border border-gray-300 text-xs sm:text-sm min-w-[600px]">
+                          <table className="border-collapse border border-gray-300 text-xs sm:text-sm min-w-full">
                             <thead>
                               <tr className="bg-orange-700 text-white">
-                                <th className="border border-gray-300 px-2 py-1 text-left w-24">Gender</th>
+                                <th className="border border-gray-300 px-2 py-1 text-left w-20">Gender</th>
                                 <th className="border border-gray-300 px-2 py-1 w-20">LOW</th>
                                 <th className="border border-gray-300 px-2 py-1 w-20">HIGH</th>
                                 <th className="border border-gray-300 px-2 py-1 w-20">Default</th>
-                                <th className="border border-gray-300 px-2 py-1 w-56">Display range text</th>
+                                <th className="border border-gray-300 px-2 py-1 flex-1">Display Range Text</th>
                               </tr>
                             </thead>
                             <tbody>
                               {parameter.normalRanges && parameter.normalRanges.map((range, rangeIndex) => (
-                                <tr key={rangeIndex} className="bg-white">
+                                <tr key={rangeIndex} className="bg-white align-top">
                                   <td className="border border-gray-300 px-2 py-1">
                                     <span className="text-xs sm:text-sm">{range.gender}</span>
                                   </td>
@@ -2812,17 +2852,37 @@ const AddTest = () => {
                                       disabled={isViewMode} 
                                     />
                                   </td>
-                                  {rangeIndex === 0 && (
-                                    <td className="border border-gray-300 p-1" rowSpan={parameter.normalRanges.length}>
+                                  {/* Display text area - aligned to each gender row */}
+                                  <td className="border border-gray-300 p-1">
+                                    {range.gender === "Male" ? (
                                       <textarea 
-                                        className="w-full h-full px-2 py-1 border border-gray-300 rounded text-xs sm:text-sm resize min-h-[3rem]" 
-                                        placeholder="Display Range"
-                                        value={parameter.displayRangeText || ""}
-                                        onChange={(e) => handleParameterChange(categoryIndex, paramIndex, 'displayRangeText', e.target.value)}
+                                        className="w-full px-1.5 py-1 border border-gray-300 rounded text-xs" 
+                                        placeholder="Male text..."
+                                        value={parameter.maleDisplayText || ""}
+                                        onChange={(e) => handleParameterChange(categoryIndex, paramIndex, 'maleDisplayText', e.target.value)}
                                         disabled={isViewMode}
+                                        style={{ minHeight: '40px', resize: 'both' }}
                                       />
-                                    </td>
-                                  )}
+                                    ) : range.gender === "Female" ? (
+                                      <textarea 
+                                        className="w-full px-1.5 py-1 border border-gray-300 rounded text-xs" 
+                                        placeholder="Female text..."
+                                        value={parameter.femaleDisplayText || ""}
+                                        onChange={(e) => handleParameterChange(categoryIndex, paramIndex, 'femaleDisplayText', e.target.value)}
+                                        disabled={isViewMode}
+                                        style={{ minHeight: '40px', resize: 'both' }}
+                                      />
+                                    ) : (
+                                      <textarea 
+                                        className="w-full px-1.5 py-1 border border-gray-300 rounded text-xs" 
+                                        placeholder="Default text..."
+                                        value={parameter.defaultDisplayText || ""}
+                                        onChange={(e) => handleParameterChange(categoryIndex, paramIndex, 'defaultDisplayText', e.target.value)}
+                                        disabled={isViewMode}
+                                        style={{ minHeight: '40px', resize: 'both' }}
+                                      />
+                                    )}
+                                  </td>
                                 </tr>
                               ))}
                             </tbody>

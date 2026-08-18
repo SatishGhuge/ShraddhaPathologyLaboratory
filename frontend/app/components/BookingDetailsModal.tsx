@@ -75,6 +75,7 @@ const BookingDetailsModal: React.FC<BookingDetailsModalProps> = ({
   // Track if new tests have been added (to enable/disable discount fields)
   const [newTestsAdded, setNewTestsAdded] = useState(false);
   const [initialTestCount] = useState(booking?.tests?.length || 0);
+  const [deletedTests, setDeletedTests] = useState<any[]>([]);  // ✅ NEW: Track deleted tests
 
   // Fetch tests from backend when modal opens
   // This MUST be before the early return to avoid React hooks violation
@@ -177,65 +178,49 @@ const BookingDetailsModal: React.FC<BookingDetailsModalProps> = ({
   // BILLING CALCULATION LOGIC - Map to new VisitBill/BillDiscount/Payment structure
   // ============================================================================
   
-  // Use backend summary if available, otherwise calculate locally
-  let finalGrandTotal, finalInitialDiscount, finalInitialAmount, finalNewTestTotal, finalNewDiscount, finalNetAmount, finalBalance;
-  
-  console.log('🔍 BILLING STATE DEBUG:', {
-    'billingSummary exists': !!billingSummary,
-    'billingSummary.grossAmount': billingSummary?.grossAmount,
-    'billingSummary.totalDiscount': billingSummary?.totalDiscount,
-    'billingSummary.balanceAmount': billingSummary?.balanceAmount,
-    'billingSummary.totalPaid': billingSummary?.totalPaid,
-    'booking.billing': booking?.billing
-  });
-  
-  if (billingSummary && billingSummary.grossAmount) {
-    // ✅ NEW: Map from VisitBill normalized structure (after backend fix)
-    finalGrandTotal = parseFloat(billingSummary.grossAmount) || 0;
-    finalInitialDiscount = parseFloat(billingSummary.totalDiscount) || 0;
-    finalInitialAmount = finalGrandTotal - finalInitialDiscount;
-    finalNewTestTotal = 0;  // No separate new tests in normalized structure
-    finalNewDiscount = 0;
-    finalNetAmount = finalGrandTotal - finalInitialDiscount;
-    finalBalance = parseFloat(billingSummary.balanceAmount) || 0;
-    
-    console.log('✅ Using VisitBill from backend (FRESH DATA):', {
-      grossAmount: finalGrandTotal,
-      totalDiscount: finalInitialDiscount,
-      balanceAmount: finalBalance,
-      totalPaid: billingSummary.totalPaid,
-      status: billingSummary.status,
-      rawBillingSummary: JSON.stringify(billingSummary)
-    });
-  } else {
-    // Local fallback calculation using old field names
-    const advanceFromDB = parseFloat(booking?.billing?.paidAmount) || parseFloat(booking?.paidAmount) || 0;
-    const balanceAmountFromDB = parseFloat(booking?.billing?.balanceAmount) || parseFloat(booking?.balanceAmount) || 0;
-    const existingDiscountAmountFromDB = parseFloat(booking?.billing?.discountAmount) || parseFloat(booking?.billing?.totalDiscount) || parseFloat(booking?.discountAmount) || 0;
-    
-    finalGrandTotal = parseFloat(booking?.billing?.grossAmount) || (advanceFromDB + balanceAmountFromDB + existingDiscountAmountFromDB) || 0;
-    finalInitialDiscount = existingDiscountAmountFromDB;
-    finalInitialAmount = finalGrandTotal - finalInitialDiscount;
-    finalBalance = balanceAmountFromDB;
-    finalNewTestTotal = 0;
-    finalNewDiscount = 0;
-    finalNetAmount = finalInitialAmount;
-    
-    console.log('⚠️ Using fallback calculation (billingSummary not available):', {
-      grossAmount: finalGrandTotal,
-      totalDiscount: finalInitialDiscount,
-      balanceAmount: finalBalance,
-      bookingBillingObject: booking?.billing
-    });
-  }
-  
-  // ✅ NOW CALCULATE NEW TEST CHARGES FOR DISPLAY
-  // When user adds new tests, calculate their totals locally for preview
+  // ✅ REACTIVE CALCULATION: Calculate Grand Total from CURRENT tests (updates on deletion)
+  const currentTestsTotal = tests.reduce((sum, t) => {
+    const charge = businessType === "B2C" ? (t.b2cCharge || t.charge || 0) : (t.b2bCharge || t.charge || 0);
+    return sum + charge;
+  }, 0);
+
   const newTestsAddedToModal = tests.filter(t => !t.isExisting);
   const newTestsChargeTotal = newTestsAddedToModal.reduce((sum, t) => {
     const charge = businessType === "B2C" ? (t.b2cCharge || t.charge || 0) : (t.b2bCharge || t.charge || 0);
     return sum + charge;
   }, 0);
+
+  // ✅ Use CURRENT test total as Grand Total (reactive to test additions/deletions)
+  let finalGrandTotal = currentTestsTotal || 0;  // Ensure it's always a number
+  let finalInitialDiscount, finalInitialAmount, finalNewTestTotal, finalNewDiscount, finalNetAmount, finalBalance;
+  
+  console.log('🔍 BILLING STATE DEBUG:', {
+    'currentTestsTotal': currentTestsTotal,
+    'testsCount': tests.length,
+    'newTestsCount': newTestsAddedToModal.length,
+    'billingSummary exists': !!billingSummary,
+    'billingSummary.totalDiscount': billingSummary?.totalDiscount,
+    'booking.billing': booking?.billing
+  });
+  
+  // Get discount from billingSummary or fallback
+  const discountFromDB = billingSummary?.totalDiscount || parseFloat(booking?.billing?.totalDiscount) || parseFloat(booking?.discountAmount) || 0;
+  const paidFromDB = billingSummary?.totalPaid || parseFloat(booking?.billing?.paidAmount) || parseFloat(booking?.paidAmount) || 0;
+  
+  finalInitialDiscount = discountFromDB;
+  finalInitialAmount = finalGrandTotal - finalInitialDiscount;
+  finalBalance = Math.max(0, finalGrandTotal - finalInitialDiscount - paidFromDB);
+  finalNewTestTotal = 0;
+  finalNewDiscount = 0;
+  finalNetAmount = finalGrandTotal - finalInitialDiscount;
+  
+  console.log('✅ REACTIVE TOTALS:', {
+    finalGrandTotal,
+    finalInitialDiscount,
+    finalBalance,
+    currentTestsTotal,
+    testsCount: tests.length
+  });
   
   // ✅ NEW LOGIC: Discount applies to BALANCE AMOUNT (not just new tests)
   // New total balance = existing balance + new test charges
@@ -285,8 +270,6 @@ const BookingDetailsModal: React.FC<BookingDetailsModalProps> = ({
   });
   
   // ✅ FIX: Calculate totals correctly
-  const grandTotal = finalGrandTotal + newTestsChargeTotal;  // Total gross with new tests
-  
   const newTestsTotal = newTestsChargeTotal;
   const newTestDiscountAmount = newTestDiscountForPreview;  // Applied to balance
   
@@ -344,8 +327,10 @@ const BookingDetailsModal: React.FC<BookingDetailsModalProps> = ({
     if (testToDelete && testToDelete.isExisting) {
       // If deleting existing test, subtract from balance
       const testCharge = businessType === "B2C" ? (testToDelete.b2cCharge || testToDelete.charge || 0) : (testToDelete.b2bCharge || testToDelete.charge || 0);
-      console.log(`Deleting existing test: ${testName}, charge: ${testCharge}`);
-      // This will trigger recalculation on next render
+      console.log(`🗑️  Deleting existing test: ${testName}, charge: ${testCharge}`);
+      
+      // ✅ Track deleted test for backend
+      setDeletedTests([...deletedTests, testToDelete]);
     }
     
     const updatedTests = tests.filter(t => t.name !== testName);
@@ -373,20 +358,21 @@ const BookingDetailsModal: React.FC<BookingDetailsModalProps> = ({
   };
 
   const handleSave = async () => {
-    // Check if new tests were added or payment was made
+    // Check if new tests were added or payment was made or tests were deleted
     const newTests = tests.filter(t => !t.isExisting);
     const hasPayment = paymentAmount > 0;
     const hasDiscount = discountPercent > 0 || discount > 0;
+    const hasDeletedTests = deletedTests.length > 0;  // ✅ NEW: Check if tests were deleted
     
     // If no changes at all - just close
-    if (newTests.length === 0 && !hasPayment && !hasDiscount) {
+    if (newTests.length === 0 && !hasPayment && !hasDiscount && !hasDeletedTests) {
       console.log('ℹ️ No changes made, closing modal');
       onClose();
       return;
     }
 
-    // If only payment/discount (no new tests), call payment-only endpoint
-    if (newTests.length === 0 && (hasPayment || hasDiscount)) {
+    // If only payment/discount (no new tests, no deleted tests), call payment-only endpoint
+    if (newTests.length === 0 && !hasDeletedTests && (hasPayment || hasDiscount)) {
       console.log('💾 Saving payment/discount only...', {
         hasPayment,
         paymentAmount,
@@ -464,12 +450,77 @@ const BookingDetailsModal: React.FC<BookingDetailsModalProps> = ({
         setPaymentAmount(0);
         setDiscount(0);
         setDiscountPercent(0);
+        setDeletedTests([]);  // ✅ Clear deleted tests after successful save
         onClose();
         return;
 
       } catch (error) {
         console.error('❌ Error saving payment:', error);
         alert('Failed to save payment: ' + (error instanceof Error ? error.message : String(error)));
+      }
+    }
+
+    // ✅ NEW: Handle deleted tests (without new tests)
+    if (hasDeletedTests && newTests.length === 0) {
+      console.log('🗑️  Deleting tests...', {
+        deletedTestsCount: deletedTests.length,
+        deletedTests: deletedTests.map(t => t.name)
+      });
+
+      try {
+        const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || '/api';
+        
+        // Call backend endpoint to delete tests from visit
+        const response = await fetch(`${API_BASE_URL}/patients/cancel-tests`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            patientId: booking.patientId,
+            visitId: booking.visitId,
+            testIds: deletedTests.map(t => t.id),
+            businessType
+          })
+        });
+
+        const result = await response.json();
+        console.log('✅ Delete response:', result);
+
+        if (!response.ok) {
+          throw new Error(result.message || 'Failed to delete tests');
+        }
+
+        // Update the booking with new totals
+        const finalBalance = result.data.visitBill?.balanceAmount || 0;
+        
+        const updatedBooking = {
+          ...booking,
+          tests: result.data.tests || [],  // Updated tests list from backend
+          billing: {
+            grossAmount: result.data.visitBill?.grossAmount || 0,
+            totalDiscount: result.data.visitBill?.totalDiscount || 0,
+            discountPercent: result.data.visitBill?.totalDiscount ? 
+              Math.round((result.data.visitBill.totalDiscount / result.data.visitBill.grossAmount) * 100) : 0,
+            discountAmount: result.data.visitBill?.totalDiscount || 0,
+            paidAmount: result.data.visitBill?.totalPaid || 0,
+            balanceAmount: finalBalance,
+            status: result.data.visitBill?.status || "PENDING"
+          },
+          balanceAmount: finalBalance,
+          paidAmount: result.data.visitBill?.totalPaid || 0,
+          totalAmount: result.data.visitBill?.grossAmount || 0,
+          discountAmount: result.data.visitBill?.totalDiscount || 0
+        };
+
+        onBookingUpdate?.(updatedBooking);
+        alert(`✅ Test(s) deleted successfully!\nNew Balance: ₹${Math.round(finalBalance)}`);
+
+        setDeletedTests([]);  // ✅ Clear deleted tests after successful save
+        onClose();
+        return;
+
+      } catch (error) {
+        console.error('❌ Error deleting tests:', error);
+        alert('Failed to delete tests: ' + (error instanceof Error ? error.message : String(error)));
       }
     }
 
@@ -843,14 +894,14 @@ const BookingDetailsModal: React.FC<BookingDetailsModalProps> = ({
                   <div className="text-xs font-semibold text-gray-700 mb-1">Grand Total</div>
                   <div className="flex gap-1.5 items-end">
                     {[
-                      { label: "Grand Total", val: (finalGrandTotal + newTestsChargeTotal).toFixed(0), ro: true, color: "text-orange-600" },
+                      { label: "Grand Total", val: finalGrandTotal.toFixed(0), ro: true, color: "text-orange-600" },
                       // Only show Advance if something was paid or will be paid
                       ...(shouldShowAdvance ? [
                         { label: "Advance", val: totalAdvancePaid.toFixed(0), ro: true, color: "text-blue-600" }
                       ] : []),
                       { label: "Dis", val: previousDiscount.toFixed(0), ro: true, color: "text-yellow-600" }, // ✅ Shows TOTAL aggregate discount from DB
                       { label: "Bal", val: (newTestsAdded 
-                        ? Math.max(0, (finalGrandTotal + newTestsChargeTotal) - (previousDiscount + newTestDiscountForPreview) - totalAdvancePaid)
+                        ? Math.max(0, finalGrandTotal - (previousDiscount + newTestDiscountForPreview) - totalAdvancePaid)
                         : Math.max(0, finalGrandTotal - previousDiscount - totalAdvancePaid)
                       ).toFixed(0), ro: true, color: "text-red-600" },
                     ].map((item, i) => (

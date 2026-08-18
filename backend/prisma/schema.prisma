@@ -572,6 +572,9 @@ model TestParameter {
   displayRangeText   String?          @db.Text
   rangeText          String?          @db.Text
   textContent        String?          @db.Text
+  maleDisplayText    String?          @db.Text        // ✅ NEW: Male-specific display range text
+  femaleDisplayText  String?          @db.Text        // ✅ NEW: Female-specific display range text
+  defaultDisplayText String?          @db.Text        // ✅ NEW: Default display text for both
   isMultipleOptions  Boolean          @default(false)
   maleLowValue       String?
   maleHighValue      String?
