@@ -729,8 +729,8 @@ const ProfessionalReport = React.forwardRef<HTMLDivElement, ProfessionalReportPr
           }}>
             {strip(p.parameterName ?? '').toUpperCase()}
             {p.parameterTestMethod && (
-              <div style={{ fontSize: '7px', color: '#000', fontWeight: 'normal', marginTop: '0px' }}>
-                METHOD: {p.parameterTestMethod}
+              <div style={{ fontSize: '9px', color: '#000', fontWeight: 'normal', marginTop: '0px', marginBottom: '1px' }}>
+                <small>METHOD: {p.parameterTestMethod}</small>
               </div>
             )}
           </td>
@@ -765,25 +765,25 @@ const ProfessionalReport = React.forwardRef<HTMLDivElement, ProfessionalReportPr
 
     const renderTableHead = () => {
       const headerStyle = getFormattingStyle('header');
-      // Use larger header size (15px) but not bold
-      const tableHeaderStyle = { ...headerStyle, fontSize: '16px', fontWeight: 'normal' };
+      // Match PDF format: bold headers with proper text size
+      const tableHeaderStyle = { ...headerStyle, fontSize: '11px', fontWeight: 'bold' };
       
       return (
         <thead>
           <tr style={{ borderBottom: '1px solid #000' }}>
-            <th style={{ ...TH, ...tableHeaderStyle, width: '40%', textAlign: 'left', borderBottom: 'none' }}>
+            <th style={{ ...TH, ...tableHeaderStyle, width: '40%', textAlign: 'left', borderBottom: 'none', fontWeight: 'bold' }}>
               {getFieldLabel('parameter_name', 'Test Description')}
             </th>
-            <th style={{ ...TH, ...tableHeaderStyle, width: showUnits || showRange ? '18%' : '30%', textAlign: 'left', borderBottom: 'none' }}>
+            <th style={{ ...TH, ...tableHeaderStyle, width: showUnits || showRange ? '18%' : '30%', textAlign: 'left', borderBottom: 'none', fontWeight: 'bold' }}>
               {getFieldLabel('result_value', 'Value(s)')}
             </th>
             {showUnits && (
-              <th style={{ ...TH, ...tableHeaderStyle, width: '12%', textAlign: 'center', borderBottom: 'none' }}>
+              <th style={{ ...TH, ...tableHeaderStyle, width: '12%', textAlign: 'center', borderBottom: 'none', fontWeight: 'bold' }}>
                 {getFieldLabel('unit', 'Unit')}
               </th>
             )}
             {showRange && (
-              <th style={{ ...TH, ...tableHeaderStyle, width: '30%', textAlign: 'left', borderBottom: 'none' }}>
+              <th style={{ ...TH, ...tableHeaderStyle, width: '30%', textAlign: 'left', borderBottom: 'none', fontWeight: 'bold' }}>
                 {getFieldLabel('reference_range', 'Reference Range')}
               </th>
             )}
@@ -834,7 +834,7 @@ const ProfessionalReport = React.forwardRef<HTMLDivElement, ProfessionalReportPr
               const nameValue = [patient.title, patient.firstName, patient.lastName].filter(Boolean).join(' ').toUpperCase();
               row1.push(
                 <td key="pn" style={{...nameStyle, lineHeight: '1.2', fontSize: '11px' }}>
-                  {getFieldLabel('patient_name', 'Patient Name')} : <span style={{ fontWeight: nameStyle.fontWeight, fontStyle: nameStyle.fontStyle, textDecoration: nameStyle.textDecoration }}>{nameValue}</span>
+                  {getFieldLabel('patient_name', 'Patient Name')} : <b>{nameValue}</b>
                 </td>
               );
             }
@@ -862,7 +862,7 @@ const ProfessionalReport = React.forwardRef<HTMLDivElement, ProfessionalReportPr
               
               row1.push(
                 <td key="age" style={{...ageStyle, lineHeight: '1.2', fontSize: '11px' }}>
-                  {getFieldLabel('patient_age', 'Age')} : {ageDisplay} ({patient.gender ?? '-'})
+                  Age : {ageDisplay} ({patient.gender ?? '-'})
                 </td>
               );
             }
@@ -874,7 +874,7 @@ const ProfessionalReport = React.forwardRef<HTMLDivElement, ProfessionalReportPr
               const refStyle = { ...PATIENT_TD, ...getFieldStyle('referred_doctor'), ...bodyStyle };
               row2.push(
                 <td key="ref" style={{...refStyle, lineHeight: '1.2', fontSize: '11px' }}>
-                  {getFieldLabel('referred_doctor', 'Referral')} : {referralDoctor || '-'}
+                  Referral : {referralDoctor || '-'}
                 </td>
               );
             }
@@ -882,7 +882,7 @@ const ProfessionalReport = React.forwardRef<HTMLDivElement, ProfessionalReportPr
               const orgStyle = { ...PATIENT_TD, ...getFieldStyle('organization_name'), ...bodyStyle };
               row2.push(
                 <td key="org" style={{...orgStyle, lineHeight: '1.2', fontSize: '11px' }}>
-                  {getFieldLabel('organization_name', 'Org Name')} : {patient.organizationName || 'Shraddha Pathology Laboratory'}
+                  Org Name : {patient.organizationName || 'Shraddha Pathology Laboratory'}
                 </td>
               );
             }
@@ -894,8 +894,7 @@ const ProfessionalReport = React.forwardRef<HTMLDivElement, ProfessionalReportPr
               const sampleDateStyle = { ...PATIENT_TD, ...getFieldStyle('sample_date'), ...bodyStyle };
               row3.push(
                 <td key="sd" style={{...sampleDateStyle, lineHeight: '1.2', fontSize: '11px' }}>
-                  {getFieldLabel('sample_date', 'Sample Date')} :{' '}
-                  {visitDate ? new Date(visitDate).toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }).replace('am', 'a.m.').replace('pm', 'p.m.') : '-'}
+                  Sample Date : {visitDate ? new Date(visitDate).toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }).replace('am', 'a.m.').replace('pm', 'p.m.') : '-'}
                 </td>
               );
             }
@@ -903,7 +902,7 @@ const ProfessionalReport = React.forwardRef<HTMLDivElement, ProfessionalReportPr
               const regStyle = { ...PATIENT_TD, ...getFieldStyle('registration_no'), ...bodyStyle };
               row3.push(
                 <td key="reg" style={{...regStyle, lineHeight: '1.2', fontSize: '11px' }}>
-                  {getFieldLabel('registration_no', 'Reg. ID')} : {visitId || '-'}
+                  Reg. ID : {visitId || '-'}
                 </td>
               );
             }
@@ -915,8 +914,7 @@ const ProfessionalReport = React.forwardRef<HTMLDivElement, ProfessionalReportPr
               const reportDateStyle = { ...PATIENT_TD, ...getFieldStyle('report_date'), ...bodyStyle };
               row4.push(
                 <td key="rd" style={{...reportDateStyle, lineHeight: '1.2', fontSize: '11px' }}>
-                  {getFieldLabel('report_date', 'Report Date')} :{' '}
-                  {new Date().toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }).replace('am', 'a.m.').replace('pm', 'p.m.')}
+                  Report Date : {new Date().toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }).replace('am', 'a.m.').replace('pm', 'p.m.')}
                 </td>
               );
             }
@@ -924,7 +922,7 @@ const ProfessionalReport = React.forwardRef<HTMLDivElement, ProfessionalReportPr
               const sampleIdStyle = { ...PATIENT_TD, ...getFieldStyle('sample_id'), ...bodyStyle };
               row4.push(
                 <td key="si" style={{...sampleIdStyle, lineHeight: '1.2', fontSize: '11px' }}>
-                  {getFieldLabel('sample_id', 'Sample ID')} : {visitId || '-'}
+                  Sample ID : {visitId || '-'}
                 </td>
               );
             }
@@ -936,7 +934,7 @@ const ProfessionalReport = React.forwardRef<HTMLDivElement, ProfessionalReportPr
               const mobileStyle = { ...PATIENT_TD, ...getFieldStyle('mobile'), ...bodyStyle };
               row5.push(
                 <td key="mob" style={{...mobileStyle, lineHeight: '1.2', fontSize: '11px' }}>
-                  {getFieldLabel('mobile', 'Mobile')} : {patient.mobile ?? '-'}
+                  Mobile : {patient.mobile ?? '-'}
                 </td>
               );
             }
@@ -944,7 +942,7 @@ const ProfessionalReport = React.forwardRef<HTMLDivElement, ProfessionalReportPr
               const emailStyle = { ...PATIENT_TD, ...getFieldStyle('email'), ...bodyStyle };
               row5.push(
                 <td key="email" style={{...emailStyle, lineHeight: '1.2', fontSize: '11px' }}>
-                  {getFieldLabel('email', 'Email')} : {patient.email ?? '-'}
+                  Email : {patient.email ?? '-'}
                 </td>
               );
             }
@@ -956,7 +954,7 @@ const ProfessionalReport = React.forwardRef<HTMLDivElement, ProfessionalReportPr
               const addressStyle = { ...PATIENT_TD, ...getFieldStyle('address'), ...bodyStyle };
               row6.push(
                 <td key="addr" style={{...addressStyle, lineHeight: '1.2', fontSize: '11px' }} colSpan={2}>
-                  {getFieldLabel('address', 'Address')} : {patient.address ?? '-'}
+                  Address : {patient.address ?? '-'}
                 </td>
               );
             }
@@ -982,7 +980,7 @@ const ProfessionalReport = React.forwardRef<HTMLDivElement, ProfessionalReportPr
                           <img 
                             src={qrCode} 
                             alt="QR Code for Visit"
-                            style={{ width: '15mm', height: '15mm', border: '0.5px solid #000', flexShrink: 0 }}
+                            style={{ width: '15mm', height: '15mm', flexShrink: 0 }}
                           />
                           <div style={{ fontSize: '6px', textAlign: 'center', maxWidth: '25mm', wordBreak: 'break-word', fontWeight: 'bold' }}>
                             Visit ID:<br/>{visitId}
@@ -1000,8 +998,8 @@ const ProfessionalReport = React.forwardRef<HTMLDivElement, ProfessionalReportPr
             flushTable();
             const titleStyle = getFormattingStyle('body');
             segments.push(
-              <div key={`title-${bi}`} style={{ textAlign: 'center', fontWeight: 'bold', fontSize: '13px', textDecoration: 'underline', paddingBottom: '1mm', marginBottom: '2mm', flexShrink: 0, ...titleStyle }}>
-                {strip(block.testData.name ?? '').toUpperCase()}
+              <div key={`title-${bi}`} style={{ textAlign: 'center', fontWeight: 'bold', fontSize: '12px', textDecoration: 'underline', paddingBottom: '2mm', marginBottom: '2mm', flexShrink: 0, ...titleStyle }}>
+                <u><b>{strip(block.testData.name ?? '').toUpperCase()}</b></u>
               </div>
             );
             break;
@@ -1019,8 +1017,22 @@ const ProfessionalReport = React.forwardRef<HTMLDivElement, ProfessionalReportPr
             break;
 
           case 'category':
-            // ✅ Don't render category as a separate row - it's just visual grouping
-            // Parameters will be rendered directly after this
+            // ✅ Render category as a bold row header
+            tableRows.push(
+              <tr key={`cat-${bi}`} style={{ borderBottom: 'none', minHeight: '12px' }}>
+                <td colSpan={2 + (showUnits ? 1 : 0) + (showRange ? 1 : 0)} style={{ 
+                  padding: '1px 3px',
+                  fontWeight: 'bold',
+                  fontSize: `${formatConfig?.fontSizeBody || 11}px`,
+                  color: '#000',
+                  minHeight: '12px',
+                  lineHeight: '1.25',
+                  ...getFormattingStyle('body')
+                }}>
+                  <u>{strip(block.catName ?? '').toUpperCase()}</u>
+                </td>
+              </tr>
+            );
             break;
 
           case 'param':
@@ -1029,13 +1041,15 @@ const ProfessionalReport = React.forwardRef<HTMLDivElement, ProfessionalReportPr
 
           case 'comments':
             // ✅ Render comments as a table row within the results table
+            // Strip line breaks to make it continuous flowing text
+            const commentsText = strip(block.text).replace(/\n/g, ' ').replace(/\s+/g, ' ');
             tableRows.push(
               <tr key={`comments-${bi}`} style={{ borderTop: '1px solid #000', borderBottom: 'none' }}>
-                <td style={{ padding: '2px 4px 2px 2mm', fontWeight: 'bold', fontSize: `${(formatConfig?.fontSizeBody || 11) * 0.9}px`, color: '#000', ...getFormattingStyle('body') }}>
+                <td style={{ padding: '2px 4px 2px 2mm', fontWeight: 'bold', fontSize: '12px', color: '#000' }}>
                   COMMENTS
                 </td>
-                <td colSpan={showUnits || showRange ? 2 : 1} style={{ padding: '2px 4px', fontSize: `${(formatConfig?.fontSizeBody || 11) * 0.9}px`, color: '#000', whiteSpace: 'pre-wrap', fontWeight: '900', ...getFormattingStyle('body') }}>
-                  {strip(block.text)}
+                <td colSpan={showUnits || showRange ? 3 : 2} style={{ padding: '2px 4px', fontSize: '12px', color: '#000', whiteSpace: 'normal', wordWrap: 'break-word', wordBreak: 'break-word', overflowWrap: 'break-word', fontWeight: 'normal' }}>
+                  {commentsText}
                 </td>
               </tr>
             );
@@ -1045,10 +1059,10 @@ const ProfessionalReport = React.forwardRef<HTMLDivElement, ProfessionalReportPr
             // ✅ Render instrument/machine as a table row within the results table
             tableRows.push(
               <tr key={`instrument-${bi}`} style={{ borderTop: '1px solid #000', borderBottom: 'none' }}>
-                <td style={{ padding: '2px 4px 2px 2mm', fontWeight: 'bold', fontSize: `${(formatConfig?.fontSizeBody || 11) * 0.9}px`, color: '#333', ...getFormattingStyle('body') }}>
+                <td style={{ padding: '2px 4px 2px 2mm', fontWeight: 'bold', fontSize: '12px', color: '#000', verticalAlign: 'middle' }}>
                   INSTRUMENT
                 </td>
-                <td colSpan={showUnits || showRange ? 2 : 1} style={{ padding: '2px 4px', fontSize: `${(formatConfig?.fontSizeBody || 11) * 0.85}px`, color: '#555', whiteSpace: 'pre-wrap', fontWeight: 'bold', ...getFormattingStyle('body') }}>
+                <td colSpan={showUnits || showRange ? 3 : 2} style={{ padding: '2px 4px', fontSize: '12px', color: '#000', whiteSpace: 'normal', wordWrap: 'break-word', wordBreak: 'break-word', overflowWrap: 'break-word', fontWeight: 'normal', verticalAlign: 'middle' }}>
                   {block.machine?.name || '-'}{block.machine?.description ? ` (${block.machine.description})` : ''}
                 </td>
               </tr>
@@ -1058,7 +1072,7 @@ const ProfessionalReport = React.forwardRef<HTMLDivElement, ProfessionalReportPr
           case 'interpretation':
             flushTable();
             segments.push(
-              <div key={`interp-${bi}`} style={{ marginTop: '3mm', fontSize: '9px', lineHeight: '1.6', borderTop: '1px solid #aaa', paddingTop: '2mm', flexShrink: 0 }}>
+              <div key={`interp-${bi}`} style={{ marginTop: '3mm', fontSize: '12px', lineHeight: '1.6', borderTop: '1px solid #aaa', paddingTop: '2mm', flexShrink: 0 }}>
                 <b style={{ display: 'block', marginBottom: '1mm' }}>Interpretation:</b>
                 <div dangerouslySetInnerHTML={{ __html: safe(block.testData.interpretation) }} style={{ whiteSpace: 'pre-wrap' }} />
               </div>
@@ -1238,13 +1252,13 @@ const PATIENT_TD: React.CSSProperties = {
 };
 
 const TH: React.CSSProperties = {
-  padding: '1px 3px',
-  fontWeight: 'normal',  // Not bold
-  fontSize: '5px',  // Same as body text (appears larger due to not being in pt)
+  padding: '2px 4px',
+  fontWeight: 'bold',  // Bold headers to match PDF
+  fontSize: '11px',  // Standard body font size
   textAlign: 'left',
   backgroundColor: 'transparent',
-  minHeight: '12px',
-  lineHeight: '1.1',
+  minHeight: '14px',
+  lineHeight: '1.25',
 };
 
 export default ProfessionalReport;
