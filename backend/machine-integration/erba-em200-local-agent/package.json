@@ -1,0 +1,20 @@
+{
+  "name": "erba-em200-local-agent",
+  "version": "1.0.0",
+  "description": "Erba EM 200 Local Agent - ASTM Protocol Bridge for Clinical Chemistry Lab Integration",
+  "main": "app.js",
+  "bin": "app.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node app.js",
+    "build": "pkg . --targets node18-win-x64 --output dist/erba-em200-agent.exe"
+  },
+  "keywords": ["erba", "em200", "astm", "chemistry", "laboratory", "analyzer"],
+  "author": "Shraddha Development Team",
+  "license": "ISC",
+  "dependencies": {
+    "axios": "^1.18.1",
+    "mysql2": "^3.23.1",
+    "pkg": "^5.8.1"
+  }
+}

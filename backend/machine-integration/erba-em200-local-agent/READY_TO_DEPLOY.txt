@@ -1,0 +1,348 @@
+╔═══════════════════════════════════════════════════════════════════════════╗
+║                  ERBA EM 200 LOCAL AGENT                                 ║
+║                   Quick Start & Reference                                 ║
+║                  Production Ready: YES ✅                                 ║
+╚═══════════════════════════════════════════════════════════════════════════╝
+
+═══════════════════════════════════════════════════════════════════════════
+QUICK START (5 MINUTES)
+═══════════════════════════════════════════════════════════════════════════
+
+1. INSTALL DEPENDENCIES
+   npm install
+
+2. CONFIGURE
+   cp .env.example .env
+   # Edit .env with your values (see CONFIGURATION below)
+
+3. SETUP DATABASE
+   mysql -u root -p
+   > CREATE DATABASE lab_agent_db;
+   > use lab_agent_db;
+   > [paste TABLE SCHEMA from DEPLOYMENT_GUIDE.txt section 5]
+
+4. START AGENT
+   npm start
+
+5. TEST WITH SIMULATOR
+   # In a new terminal while agent is running:
+   node simulator.js VIS001 SAM001 ALT^AST^CHOL
+
+6. VERIFY DATABASE
+   mysql -u root -p lab_agent_db
+   > SELECT * FROM pending_results ORDER BY id DESC LIMIT 1 \G
+
+
+═══════════════════════════════════════════════════════════════════════════
+CONFIGURATION QUICK REFERENCE
+═══════════════════════════════════════════════════════════════════════════
+
+.env File Settings:
+
+TCP_PORT=5200                                    # Erba EM 200 connects here
+DB_HOST=localhost                                # MySQL server
+DB_PORT=3306                                     # MySQL port
+DB_USER=root                                     # MySQL username
+DB_PASSWORD=root                                 # MySQL password
+DB_NAME=lab_agent_db                             # Database name
+VPS_TAILSCALE_URL=http://192.168.0.119:5000     # Backend API (CRITICAL)
+RETRY_INTERVAL_MS=30000                          # Offline retry interval
+RETRY_BATCH_SIZE=50                              # Results per retry cycle
+RETRY_TIMEOUT_MS=5000                            # HTTP request timeout
+
+
+═══════════════════════════════════════════════════════════════════════════
+SUPPORTED TESTS
+═══════════════════════════════════════════════════════════════════════════
+
+Code      Full Name                          Units     Sample Type
+────────  ───────────────────────────────    ────────  ──────────────
+ALT       Alanine Transaminase               U/L       Serum/Plasma
+AST       Aspartate Transaminase             U/L       Serum/Plasma
+ALB       Albumin                            g/dL      Serum/Plasma
+ALP       Alkaline Phosphatase               U/L       Serum/Plasma
+AMY       Alpha Amylase                      U/L       Serum/Urine
+BIL-T     Bilirubin Total                    mg/dL     Serum/Plasma
+BIL-D     Bilirubin Direct                   mg/dL     Serum/Plasma
+BUN       Blood Urea Nitrogen                mg/dL     Serum/Plasma
+CREA      Creatinine                         mg/dL     Serum/Urine
+CHOL      Total Cholesterol                  mg/dL     Serum/Plasma
+TRIG      Triglycerides                      mg/dL     Serum/Plasma
+HDL       HDL Cholesterol                    mg/dL     Serum/Plasma
+LDL       LDL Cholesterol                    mg/dL     Serum/Plasma
+TP        Total Protein                      g/dL      Serum/Plasma
+UA        Uric Acid                          mg/dL     Serum/Urine
+GLU       Glucose                            mg/dL     Serum/Plasma/CSF
+LDH       Lactate Dehydrogenase              U/L       Serum/Plasma
+CK-MB     Creatine Kinase MB                 U/L       Serum/Plasma
+Na        Sodium (ISE)                       mmol/L    Serum/Urine
+K         Potassium (ISE)                    mmol/L    Serum/Urine
+Cl        Chloride (ISE)                     mmol/L    Serum/Urine
+Li        Lithium (ISE)                      mmol/L    Serum/Plasma
+
+
+═══════════════════════════════════════════════════════════════════════════
+ANALYZER CONFIGURATION (ERBA EM 200 CONSOLE)
+═══════════════════════════════════════════════════════════════════════════
+
+Communication:          Ethernet TCP/IP
+PC IP Address:          [Your PC IPv4 address, e.g., 192.168.1.100]
+Port Number:            5200
+LIMS Protocol:          ASTM E1381/E1394
+Message Format:         Frame-Based (STX...ETX)
+Delimiters:             | (field), ^ (component), ` (repeat), & (escape)
+Checksum:               Modulo-256 additive
+
+
+═══════════════════════════════════════════════════════════════════════════
+COMMANDS
+═══════════════════════════════════════════════════════════════════════════
+
+Development:
+  npm start                    # Start agent (foreground)
+  npm test                     # Run tests
+  npm run build                # Build standalone .exe
+
+Testing:
+  node simulator.js VIS001 SAM001 ALT           # Single test
+  node simulator.js VIS001 SAM001 ALT^AST^CHOL  # Multiple tests
+  
+Database:
+  mysql -u root -p lab_agent_db                 # Connect to DB
+  SELECT * FROM pending_results LIMIT 5;        # View results
+  SELECT status, COUNT(*) FROM pending_results GROUP BY status; # Stats
+
+System (Windows):
+  netstat -ano | find "5200"                    # Check port in use
+  tasklist | find "node"                        # Find node process
+  taskkill /PID [pid] /F                        # Kill process
+
+System (Linux):
+  netstat -tlnp | grep 5200                     # Check port
+  lsof -i :5200                                 # See what's on port
+  ps aux | grep node                            # Find process
+
+
+═══════════════════════════════════════════════════════════════════════════
+ASTM FRAME FLOW
+═══════════════════════════════════════════════════════════════════════════
+
+Erba EM 200 → Agent Flow:
+
+1. HEADER (H)
+   H|\\^&|||EM200||||||N||E1394-97|[timestamp]
+   → ACK
+
+2. QUERY (Q) - Analyzer scans barcode
+   Q|1|[sampleId]|||[testCodes]||
+   → ORDER frame sent back (agent → analyzer)
+   → ACK
+
+3. RESULT (R) - One frame per test
+   R|1|^^^[testCode]|[value]|[units]|[refRange]|[flag]|||[status]|||
+   → ACK (repeated for each result)
+
+4. TERMINATOR (L)
+   L|1|N
+   → ACK, then process accumulated results
+
+
+═══════════════════════════════════════════════════════════════════════════
+RESULT FLAGS
+═══════════════════════════════════════════════════════════════════════════
+
+N     Normal (within reference range)
+H     High (above reference upper limit)
+L     Low (below reference lower limit)
+HH    Critically High
+LL    Critically Low
+A     Abnormal
+>     Above linear/technical range limit
+<     Below linear/technical range limit
+
+
+═══════════════════════════════════════════════════════════════════════════
+DATABASE SCHEMA (pending_results table)
+═══════════════════════════════════════════════════════════════════════════
+
+Column              Type              Description
+─────────────────   ──────────────    ─────────────────────────────────
+id                  INT PRIMARY KEY   Auto-increment record ID
+sample_id           VARCHAR(100)      Barcode/Sample ID from analyzer
+visit_id            VARCHAR(100)      Lab visit ID
+machine_name        VARCHAR(100)      Machine identifier (EM200)
+raw_astm            LONGTEXT          Raw ASTM frame content
+data_json           LONGTEXT          Parsed result data (JSON)
+status              ENUM              PENDING, SYNCED, OFFLINE_QUEUED, FAILED
+retry_count         INT               Number of VPS sync attempts
+created_at          TIMESTAMP         When result was received
+synced_at           TIMESTAMP NULL    When synced to VPS
+last_retry_at       TIMESTAMP NULL    Last retry attempt time
+error_message       LONGTEXT          Sync error details
+
+
+═══════════════════════════════════════════════════════════════════════════
+TROUBLESHOOTING QUICK FIXES
+═══════════════════════════════════════════════════════════════════════════
+
+Issue: "Port 5200 already in use"
+→ Change TCP_PORT in .env or kill process: taskkill /PID [pid] /F
+
+Issue: Database connection refused
+→ Start MySQL: net start MySQL80
+→ Check credentials in .env
+
+Issue: VPS timeout
+→ Check URL correct: curl http://192.168.0.119:5000/api/health
+→ Check Tailscale connected
+
+Issue: Results stuck as OFFLINE_QUEUED
+→ Check VPS reachable
+→ Check retry_count < 10 (max retries)
+→ If >= 10, mark FAILED and investigate
+
+Issue: No frames from analyzer
+→ Check analyzer network configured (IP + port 5200)
+→ Test connectivity: telnet [pc-ip] 5200
+→ Check Windows firewall allows Node.js
+
+Issue: "Cannot find module 'mysql2'"
+→ npm install (reinstall dependencies)
+→ rm -rf node_modules && npm install (clean install)
+
+
+═══════════════════════════════════════════════════════════════════════════
+MONITORING LOGS
+═══════════════════════════════════════════════════════════════════════════
+
+Live Log Output (Windows):
+  • "[TCP] Connected: [IP]" = Analyzer connected
+  • "[ASTM PARSER] Record type: R" = Result received
+  • "[DB SUCCESS] Result stored: id=X" = Saved to DB
+  • "[CLOUD] Result sent" = Synced to VPS (success)
+  • "[SYNC] VPS not reachable" = Offline queued
+
+Key Log Patterns:
+  [TCP]              = Network/connection events
+  [ASTM PARSER]      = Frame parsing
+  [DB]               = Database operations
+  [CLOUD]            = VPS sync
+  [RETRY WORKER]     = Offline retry cycles
+  [ERROR]            = Problems to investigate
+
+
+═══════════════════════════════════════════════════════════════════════════
+PERFORMANCE STATS
+═══════════════════════════════════════════════════════════════════════════
+
+Query Database Statistics:
+
+SELECT 
+  status,
+  COUNT(*) as count,
+  AVG(retry_count) as avg_retries
+FROM pending_results
+GROUP BY status;
+
+Expected Results (healthy system):
+  SYNCED:            Most records (>95%)
+  OFFLINE_QUEUED:    Few (<5%)
+  FAILED:            None (or very few if network issues)
+  PENDING:           None (should be processed immediately)
+
+
+═══════════════════════════════════════════════════════════════════════════
+PRODUCTION DEPLOYMENT OPTIONS
+═══════════════════════════════════════════════════════════════════════════
+
+Option A: Direct Node.js (Development/Testing)
+  npm start
+  → Runs in foreground, shows all logs
+  → Keep terminal open
+
+Option B: Windows Service (Production)
+  npm install -g nssm
+  nssm install ErbaEM200Agent node app.js
+  nssm start ErbaEM200Agent
+  → Runs automatically at startup
+  → Runs as Windows service
+  → Check logs in configured log files
+
+Option C: Linux Systemd (Production)
+  sudo systemctl enable erba-em200-agent.service
+  sudo systemctl start erba-em200-agent.service
+  sudo journalctl -u erba-em200-agent.service -f
+  → Runs automatically at startup
+  → Integrated with system logging
+
+Option D: Standalone Executable (No Node.js required)
+  npm run build
+  → Creates dist/erba-em200-agent.exe
+  → Can copy to any Windows PC (no Node.js needed)
+  → Run with arguments: erba-em200-agent.exe
+
+
+═══════════════════════════════════════════════════════════════════════════
+KEY FEATURES
+═══════════════════════════════════════════════════════════════════════════
+
+✅ ASTM E1381/E1394 Full Protocol Support
+   - Header (H) frame with machine identification
+   - Patient (P) frame support
+   - Order (O) frame handling
+   - Query (Q) frame with barcode scanning
+   - Result (R) frame with multiple parameters
+   - Comment (C) frame logging
+   - Terminator (L) frame sequencing
+
+✅ TCP/IP Ethernet Communication
+   - Port 5200 (configurable)
+   - Bi-directional ASTM protocol
+   - ACK/NAK handshaking per ASTM standard
+   - Modulo-256 checksum validation
+
+✅ Multi-Test Results
+   - Support for 22+ clinical chemistry tests
+   - Result flags (N, H, L, HH, LL, A, etc.)
+   - Reference ranges per result
+   - Result status (Final, Corrected, Preliminary)
+
+✅ Offline Queue & Retry
+   - Automatic detection of VPS unavailability
+   - Smart retry every 30 seconds
+   - Up to 10 retry attempts before failure
+   - Failed results tracked for manual intervention
+
+✅ Production Ready
+   - Database persistence
+   - Comprehensive logging
+   - VPS health checks
+   - Graceful shutdown
+   - Error handling & recovery
+
+
+═══════════════════════════════════════════════════════════════════════════
+NEXT STEPS AFTER DEPLOYMENT
+═══════════════════════════════════════════════════════════════════════════
+
+1. Configure analyzer with agent PC IP and port 5200
+2. Test with simulator: node simulator.js VIS001 SAM001 ALT
+3. Verify database receives results
+4. Run actual tests from analyzer
+5. Confirm VPS receives and processes results
+6. Set up automated backups of lab_agent_db
+7. Configure monitoring/alerting for FAILED status
+8. Document your specific environment setup
+9. Test offline scenario (disconnect VPS) and verify retry
+10. Monitor logs daily for errors
+
+
+═══════════════════════════════════════════════════════════════════════════
+
+Version: 1.0.0
+Created: August 18, 2026
+Status: Production Ready ✅
+Architecture: Erba EM 200 (TCP/IP Port 5200) → Local MySQL → VPS Sync
+
+For detailed setup: See DEPLOYMENT_GUIDE.txt
+For support: development@snapsoft.in

@@ -1,0 +1,648 @@
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                    ERBA EM 200 LOCAL AGENT                                   ║
+║              Production Deployment & Configuration Guide                     ║
+║                     ASTM Protocol Implementation                             ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+TABLE OF CONTENTS
+═════════════════════════════════════════════════════════════════════════════
+1. OVERVIEW
+2. REQUIREMENTS
+3. INSTALLATION
+4. CONFIGURATION
+5. DATABASE SETUP
+6. NETWORK SETUP
+7. DEPLOYMENT (WINDOWS/LINUX)
+8. TESTING & VALIDATION
+9. TROUBLESHOOTING
+10. PRODUCTION CHECKLIST
+
+
+═════════════════════════════════════════════════════════════════════════════
+1. OVERVIEW
+═════════════════════════════════════════════════════════════════════════════
+
+The Erba EM 200 Local Agent is a standalone Node.js application that:
+• Listens on TCP port 5200 for ASTM protocol frames from Erba EM 200 analyzer
+• Parses ASTM E1381/E1394 frames from the analyzer
+• Queues results locally in MySQL pending_results table
+• Syncs results to VPS backend when connected (HTTP API)
+• Retries offline results every 30 seconds (up to 10 attempts)
+• Handles multi-test results per sample (e.g., ALT, AST, CHOL in one order)
+
+ARCHITECTURE:
+  Erba EM 200 (TCP/IP) 
+       ↓ [ASTM Frames Port 5200]
+  Local Agent (Node.js TCP Server)
+       ↓ [MySQL Connection]
+  Local MySQL DB (pending_results table)
+       ↓ [HTTP API - Tailscale/VPN]
+  VPS Backend (Result Processing)
+
+
+═════════════════════════════════════════════════════════════════════════════
+2. REQUIREMENTS
+═════════════════════════════════════════════════════════════════════════════
+
+HARDWARE:
+• Dedicated PC or VM (recommended: 2GB RAM, 1 CPU minimum)
+• Windows 10+ or Linux (Ubuntu 18.04+)
+• Stable network connection to Erba EM 200
+• Access to VPS via Tailscale/VPN
+
+SOFTWARE:
+• Node.js 18.0.0 or later (https://nodejs.org/)
+• MySQL 5.7 or later (local database for queuing)
+• npm 9.0.0 or later (comes with Node.js)
+
+NETWORK:
+• Port 5200 accessible from Erba EM 200 analyzer (TCP/IP Ethernet)
+• Port 3306 accessible locally for MySQL
+• VPS URL reachable via Tailscale/VPN (for result sync)
+
+DATABASE:
+• MySQL database "lab_agent_db" created
+• Table "pending_results" exists with correct schema
+• User credentials with SELECT/INSERT/UPDATE/DELETE permissions
+
+
+═════════════════════════════════════════════════════════════════════════════
+3. INSTALLATION
+═════════════════════════════════════════════════════════════════════════════
+
+STEP 1: Install Node.js
+─────────────────────────────────────────────────────────────────────────────
+
+Windows:
+1. Download from https://nodejs.org/ (LTS version)
+2. Run installer, accept defaults
+3. Verify installation:
+   node --version
+   npm --version
+
+Linux (Ubuntu):
+  sudo apt-get update
+  sudo apt-get install nodejs npm
+  node --version
+
+
+STEP 2: Create Application Directory
+─────────────────────────────────────────────────────────────────────────────
+
+Windows (Recommended):
+  mkdir C:\Lab\ErbaEM200Agent
+  cd C:\Lab\ErbaEM200Agent
+
+Linux:
+  sudo mkdir -p /opt/erba-em200-agent
+  sudo chown $USER:$USER /opt/erba-em200-agent
+  cd /opt/erba-em200-agent
+
+
+STEP 3: Copy Application Files
+─────────────────────────────────────────────────────────────────────────────
+
+Copy the following files to your application directory:
+  • app.js
+  • package.json
+  • simulator.js (for testing)
+  • .env.example (rename to .env)
+  • DEPLOYMENT_GUIDE.txt (this file)
+
+
+STEP 4: Install Dependencies
+─────────────────────────────────────────────────────────────────────────────
+
+In application directory:
+  npm install
+
+This will install:
+  • axios (HTTP client for VPS sync)
+  • mysql2 (MySQL database driver)
+  • pkg (for building standalone executables)
+
+
+═════════════════════════════════════════════════════════════════════════════
+4. CONFIGURATION
+═════════════════════════════════════════════════════════════════════════════
+
+STEP 1: Create .env Configuration File
+─────────────────────────────────────────────────────────────────────────────
+
+Copy .env.example to .env and configure:
+
+  cp .env.example .env
+  
+Then edit .env with your values:
+
+  # TCP Server Configuration
+  TCP_PORT=5200
+
+  # Database Configuration
+  DB_HOST=localhost          # MySQL server address
+  DB_PORT=3306              # MySQL port
+  DB_USER=root              # MySQL username
+  DB_PASSWORD=root          # MySQL password
+  DB_NAME=lab_agent_db      # Database name
+
+  # VPS Backend Configuration
+  VPS_TAILSCALE_URL=http://192.168.0.119:5000    # Backend API URL
+
+  # Retry Configuration
+  RETRY_INTERVAL_MS=30000   # Retry every 30 seconds
+  RETRY_BATCH_SIZE=50       # Process up to 50 offline records per cycle
+  RETRY_TIMEOUT_MS=5000     # 5 second timeout for VPS requests
+
+
+STEP 2: Verify Configuration
+─────────────────────────────────────────────────────────────────────────────
+
+Important settings:
+• TCP_PORT: Must be 5200 (configure Erba EM 200 to this port)
+• DB_HOST: Should be 'localhost' if MySQL is on same machine
+• DB_NAME: Must match your MySQL database name (lab_agent_db)
+• VPS_TAILSCALE_URL: Must be reachable from this PC (test with curl)
+
+Test VPS connectivity:
+  Windows:  curl http://192.168.0.119:5000/api/health
+  Linux:    curl http://192.168.0.119:5000/api/health
+
+Should return 200 OK (not connection refused)
+
+
+═════════════════════════════════════════════════════════════════════════════
+5. DATABASE SETUP
+═════════════════════════════════════════════════════════════════════════════
+
+STEP 1: Create Database
+─────────────────────────────────────────────────────────────────────────────
+
+Connect to MySQL and run:
+
+  CREATE DATABASE lab_agent_db;
+  USE lab_agent_db;
+
+Verify database created:
+  SHOW DATABASES;
+
+
+STEP 2: Create pending_results Table
+─────────────────────────────────────────────────────────────────────────────
+
+CREATE TABLE pending_results (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  sample_id VARCHAR(100) NOT NULL,
+  visit_id VARCHAR(100) NOT NULL,
+  machine_name VARCHAR(100) NOT NULL,
+  raw_astm LONGTEXT,
+  data_json LONGTEXT NOT NULL,
+  status ENUM('PENDING', 'SYNCED', 'OFFLINE_QUEUED', 'FAILED') DEFAULT 'PENDING',
+  retry_count INT DEFAULT 0,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  synced_at TIMESTAMP NULL,
+  last_retry_at TIMESTAMP NULL,
+  error_message LONGTEXT,
+  INDEX idx_status (status),
+  INDEX idx_sample_id (sample_id),
+  INDEX idx_visit_id (visit_id),
+  INDEX idx_created_at (created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+
+STEP 3: Verify Table Creation
+─────────────────────────────────────────────────────────────────────────────
+
+SELECT * FROM pending_results LIMIT 1;
+
+Should show table structure (empty initially).
+
+
+═════════════════════════════════════════════════════════════════════════════
+6. NETWORK SETUP
+═════════════════════════════════════════════════════════════════════════════
+
+CONFIGURE ERBA EM 200
+──────────────────────
+
+Access analyzer console and set:
+
+Parameter              Value
+────────────────────  ────────────────────────
+Communication Mode    Ethernet TCP/IP
+Host PC IP Address    [Your PC's IP, e.g., 192.168.1.100]
+Port Number           5200
+Baud Rate             N/A (Ethernet, not serial)
+Protocol              ASTM E1381/E1394
+Message Format        Frame-based
+
+
+FIND YOUR PC'S IP ADDRESS
+
+Windows:
+  ipconfig
+  Look for IPv4 Address under your network adapter (e.g., 192.168.1.100)
+
+Linux:
+  hostname -I
+  inet 192.168.1.100
+
+
+FIREWALL CONFIGURATION (Windows)
+
+If Windows Firewall blocks connections:
+1. Open Windows Defender Firewall
+2. Click "Allow an app through firewall"
+3. Click "Allow another app..."
+4. Browse to: C:\Program Files\nodejs\node.exe
+5. Add it (Private + Public)
+6. Restart agent
+
+Or via command prompt (admin):
+  netsh advfirewall firewall add rule name="Node.js" dir=in action=allow program="C:\Program Files\nodejs\node.exe" enable=yes
+
+
+TEST CONNECTIVITY
+
+From another PC on same network:
+  telnet [your-pc-ip] 5200
+
+Should show blank screen (connected successfully).
+If fails: firewall blocking or port not listening.
+
+
+═════════════════════════════════════════════════════════════════════════════
+7. DEPLOYMENT
+═════════════════════════════════════════════════════════════════════════════
+
+OPTION A: WINDOWS (Direct Node.js Execution)
+─────────────────────────────────────────────────────────────────────────────
+
+1. Open Command Prompt as Administrator
+2. Navigate to application directory:
+   cd C:\Lab\ErbaEM200Agent
+
+3. Start agent:
+   npm start
+
+4. You should see:
+   ╔═══════════════════════════════════════════════════════════════╗
+   ║       Erba EM 200 Local Agent - ASTM Protocol Bridge          ║
+   ║                    Clinical Chemistry Analyzer                 ║
+   ╚═══════════════════════════════════════════════════════════════╝
+
+   📋 Configuration:
+      TCP Port: 5200
+      Database: localhost:3306/lab_agent_db
+      VPS: http://192.168.0.119:5000
+   
+   [STARTUP] Testing database connection...
+   [STARTUP] ✓ Database connected
+   [STARTUP] ✓ Erba EM 200 TCP Server listening on 0.0.0.0:5200
+   [STARTUP] ✅ Erba EM 200 Agent is ready!
+
+KEEP THIS TERMINAL OPEN. Agent runs in foreground.
+
+
+OPTION B: WINDOWS (Run as Service with NSSM)
+─────────────────────────────────────────────────────────────────────────────
+
+This runs agent automatically when system boots.
+
+1. Download NSSM: https://nssm.cc/download
+   Extract nssm.exe to C:\nssm\
+
+2. Open Command Prompt as Administrator:
+   cd C:\nssm
+   nssm install ErbaEM200Agent "C:\Program Files\nodejs\node.exe" "C:\Lab\ErbaEM200Agent\app.js"
+
+3. Configure service:
+   nssm set ErbaEM200Agent AppDirectory C:\Lab\ErbaEM200Agent
+   nssm set ErbaEM200Agent AppStdout C:\Lab\ErbaEM200Agent\logs\out.log
+   nssm set ErbaEM200Agent AppStderr C:\Lab\ErbaEM200Agent\logs\error.log
+
+4. Create logs directory:
+   mkdir C:\Lab\ErbaEM200Agent\logs
+
+5. Start service:
+   nssm start ErbaEM200Agent
+
+6. Verify it's running:
+   nssm status ErbaEM200Agent
+   Should show: SERVICE_RUNNING
+
+7. To view logs:
+   type C:\Lab\ErbaEM200Agent\logs\out.log
+
+
+OPTION C: LINUX (systemd Service)
+─────────────────────────────────────────────────────────────────────────────
+
+1. Create systemd service file:
+   sudo nano /etc/systemd/system/erba-em200-agent.service
+
+2. Paste this content:
+
+   [Unit]
+   Description=Erba EM 200 Local Agent - ASTM Protocol Bridge
+   After=network.target mysql.service
+   
+   [Service]
+   Type=simple
+   User=root
+   WorkingDirectory=/opt/erba-em200-agent
+   ExecStart=/usr/bin/node /opt/erba-em200-agent/app.js
+   Restart=always
+   RestartSec=10
+   StandardOutput=journal
+   StandardError=journal
+   SyslogIdentifier=erba-em200
+   
+   [Install]
+   WantedBy=multi-user.target
+
+3. Save (Ctrl+X, Y, Enter)
+
+4. Enable and start service:
+   sudo systemctl daemon-reload
+   sudo systemctl enable erba-em200-agent.service
+   sudo systemctl start erba-em200-agent.service
+
+5. Verify running:
+   sudo systemctl status erba-em200-agent.service
+
+6. View logs:
+   sudo journalctl -u erba-em200-agent.service -f
+
+
+OPTION D: WINDOWS (Standalone Executable with PKG)
+─────────────────────────────────────────────────────────────────────────────
+
+Build a standalone .exe that doesn't require Node.js installed:
+
+1. From application directory:
+   npm install -g pkg
+
+2. Build executable:
+   npm run build
+
+3. Creates: dist/erba-em200-agent.exe
+
+4. Copy to deployment PC (no Node.js needed)
+
+5. Run:
+   C:\Lab\ErbaEM200Agent\dist\erba-em200-agent.exe
+
+
+═════════════════════════════════════════════════════════════════════════════
+8. TESTING & VALIDATION
+═════════════════════════════════════════════════════════════════════════════
+
+STEP 1: Verify Agent is Running
+─────────────────────────────────────────────────────────────────────────────
+
+Windows:
+  netstat -ano | find "5200"
+  Should show: TCP 0.0.0.0:5200 LISTENING
+
+Linux:
+  netstat -tlnp | grep 5200
+  Should show: LISTEN and node process
+
+
+STEP 2: Test with Simulator
+─────────────────────────────────────────────────────────────────────────────
+
+The simulator sends ASTM frames to test the agent without actual analyzer.
+
+In a new terminal (keep agent running in first terminal):
+
+  cd C:\Lab\ErbaEM200Agent
+  node simulator.js VIS001 SAM001 ALT^AST^CHOL
+
+Expected output:
+
+  ╔═════════════════════════════════════════════════════════════════╗
+  ║          Erba EM 200 ASTM Protocol Simulator                     ║
+  ╚═════════════════════════════════════════════════════════════════╝
+
+  📋 Simulation Parameters:
+     Visit ID:    VIS001
+     Sample ID:   SAM001
+     Test Codes:  ALT^AST^CHOL
+     Agent:       localhost:5200
+
+  ✓ Connected to Erba EM 200 Agent at localhost:5200
+
+  [SIMULATOR] Sending HEADER frame...
+  [SIMULATOR] ✓ Received ACK (1/6)
+  [SIMULATOR] Sending QUERY frame for sampleId=SAM001...
+  [SIMULATOR] Sending RESULT frame for ALT: 35 U/L (flag=N)
+  [SIMULATOR] ✓ Received ACK (2/6)
+  [SIMULATOR] Sending RESULT frame for AST: 28 U/L (flag=N)
+  [SIMULATOR] ✓ Received ACK (3/6)
+  [SIMULATOR] Sending RESULT frame for CHOL: 185 mg/dL (flag=N)
+  [SIMULATOR] ✓ Received ACK (4/6)
+  [SIMULATOR] Sending TERMINATOR frame...
+  [SIMULATOR] ✓ Received ACK (5/6)
+
+  ✅ All frames sent and acknowledged!
+
+
+STEP 3: Check Database
+─────────────────────────────────────────────────────────────────────────────
+
+Connect to MySQL and verify results were stored:
+
+  USE lab_agent_db;
+  SELECT * FROM pending_results ORDER BY id DESC LIMIT 1 \G
+
+Expected:
+  id: 1
+  sample_id: SAM001
+  visit_id: VIS001
+  machine_name: EM200
+  status: SYNCED (if VPS is reachable) or OFFLINE_QUEUED (if VPS down)
+  data_json: {JSON with ALT, AST, CHOL results}
+
+
+STEP 4: Test Offline Retry
+─────────────────────────────────────────────────────────────────────────────
+
+1. Temporarily disconnect network (or stop VPS backend)
+2. Run simulator:
+   node simulator.js VIS002 SAM002 ALT
+
+3. Check database:
+   SELECT * FROM pending_results WHERE sample_id='SAM002' \G
+   Status should be: OFFLINE_QUEUED
+
+4. Agent logs should show:
+   [SYNC] VPS not reachable - queueing for retry
+   [RETRY WORKER] VPS unreachable - skipping retry cycle
+
+5. Reconnect network and wait 30 seconds
+   Agent should automatically retry and mark as SYNCED
+
+
+═════════════════════════════════════════════════════════════════════════════
+9. TROUBLESHOOTING
+═════════════════════════════════════════════════════════════════════════════
+
+PROBLEM: "Port 5200 is already in use"
+──────────────────────────────────────────
+
+Solution:
+  Windows: netstat -ano | find "5200"
+           taskkill /PID [process_id] /F
+  
+  Linux:   lsof -i :5200
+           kill -9 [process_id]
+
+Or use different port:
+  Set TCP_PORT=5201 in .env
+
+
+PROBLEM: Database connection refused
+──────────────────────────────────────
+
+Check:
+  1. MySQL service is running:
+     Windows: net start MySQL80 (or your MySQL version)
+     Linux:   sudo systemctl status mysql
+
+  2. Database credentials correct in .env:
+     DB_USER, DB_PASSWORD, DB_HOST, DB_PORT
+
+  3. Database and table exist:
+     mysql -u root -p -e "USE lab_agent_db; SHOW TABLES;"
+
+  4. User has permissions:
+     mysql -u root -p -e "GRANT ALL ON lab_agent_db.* TO 'root'@'localhost';"
+
+
+PROBLEM: VPS connection timeout
+────────────────────────────────
+
+Check:
+  1. VPS URL is correct in .env:
+     curl http://192.168.0.119:5000/api/health
+
+  2. Tailscale/VPN is connected:
+     Check Tailscale status on system
+
+  3. Firewall blocking outbound HTTPS:
+     Add exception for Node.js in outbound rules
+
+  4. VPS service is running:
+     SSH to VPS and check service status
+
+
+PROBLEM: Results stuck as "OFFLINE_QUEUED"
+───────────────────────────────────────────
+
+Check:
+  1. VPS is reachable (see above)
+  2. Retry worker is running (should see logs every 30s)
+  3. Max retries (10) not exceeded:
+     SELECT * FROM pending_results WHERE status='OFFLINE_QUEUED' \G
+
+  If retry_count=10, manually fix and update:
+     UPDATE pending_results SET status='OFFLINE_QUEUED', retry_count=0 
+     WHERE id=[id_number];
+
+
+PROBLEM: Agent crashes with "Cannot find module"
+─────────────────────────────────────────────────
+
+Solution:
+  1. Reinstall dependencies:
+     npm install
+
+  2. Verify all files copied:
+     ls -la (should show app.js, package.json, etc.)
+
+  3. Delete node_modules and reinstall:
+     rm -rf node_modules package-lock.json
+     npm install
+
+
+PROBLEM: No frames received from analyzer
+──────────────────────────────────────────
+
+Check:
+  1. Analyzer configured for correct IP/port:
+     Should be your PC's IP and port 5200
+
+  2. Network connectivity:
+     telnet [pc-ip] 5200 from analyzer console
+
+  3. Firewall not blocking port 5200:
+     Add firewall exception for Node.js
+
+  4. Agent is actually listening:
+     netstat -tlnp | grep 5200 (should show LISTEN)
+
+
+PROBLEM: "E1394-97" errors in logs
+──────────────────────────────────
+
+The ASTM version in frames doesn't match expectation.
+
+Check:
+  1. Analyzer ASTM settings (should be E1381-02 for low-level, E1394-97 for high-level)
+  2. Update parser in app.js if needed for non-standard frames
+  3. Contact Erba support for protocol version
+
+
+═════════════════════════════════════════════════════════════════════════════
+10. PRODUCTION CHECKLIST
+═════════════════════════════════════════════════════════════════════════════
+
+BEFORE GOING LIVE
+──────────────────
+
+☐ Database (lab_agent_db) created and accessible
+☐ pending_results table exists with correct schema
+☐ .env file configured with correct credentials
+☐ TCP port 5200 not conflicting with other services
+☐ Analyzer network connectivity tested (telnet check passed)
+☐ VPS backend URL reachable and responding
+☐ Firewall rules allow Node.js for inbound/outbound traffic
+☐ Simulator test passed successfully
+☐ Database stores results correctly
+☐ Agent configured to run at system startup (service/autostart)
+☐ Log files monitored (or journalctl for Linux)
+
+BACKUP & RECOVERY
+──────────────────
+
+☐ Database backed up daily
+☐ .env credentials stored in secure location
+☐ Deployment documentation stored (this file)
+☐ Recovery procedure tested (restore from backup)
+
+MONITORING & MAINTENANCE
+─────────────────────────
+
+☐ Check logs daily for errors
+☐ Monitor pending_results table for FAILED status
+☐ Verify "SYNCED" count increasing regularly
+☐ Test offline retry by temporarily stopping VPS
+☐ Monthly: Clean up old synced records (>30 days)
+
+SECURITY
+─────────
+
+☐ Database user has minimal required permissions
+☐ .env file permissions restricted (not world-readable)
+☐ Node.js process runs as non-root (Linux)
+☐ VPS connection uses HTTPS (if available)
+☐ Firewall restricts port 5200 to analyzer IP only
+
+
+═════════════════════════════════════════════════════════════════════════════
+
+For support or questions, contact: development@snapsoft.in
+
+Last Updated: August 18, 2026
+Version: 1.0.0
