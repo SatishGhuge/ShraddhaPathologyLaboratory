@@ -593,28 +593,31 @@ export const getTestById = async (req, res) => {
           displayRangeText: param.displayRangeText,
           rangeText: param.rangeText,
           textContent: param.textContent,
+          maleDisplayText: param.maleDisplayText,         // ✅ NEW
+          femaleDisplayText: param.femaleDisplayText,     // ✅ NEW
+          defaultDisplayText: param.defaultDisplayText,   // ✅ NEW
           isMultipleOptions: param.isMultipleOptions,
           testMethod: param.testMethod || "",
           normalRanges: [
             {
               gender: 'Male',
-              lowValue: param.maleLowValue ? String(param.maleLowValue) : null,
-              highValue: param.maleHighValue ? String(param.maleHighValue) : null,
-              defaultValue: param.maleDefaultValue,
+              ll: param.maleLowValue ? String(param.maleLowValue) : null,
+              ul: param.maleHighValue ? String(param.maleHighValue) : null,
+              default: param.maleDefaultValue,
               isActive: param.maleActive
             },
             {
               gender: 'Female',
-              lowValue: param.femaleLowValue ? String(param.femaleLowValue) : null,
-              highValue: param.femaleHighValue ? String(param.femaleHighValue) : null,
-              defaultValue: param.femaleDefaultValue,
+              ll: param.femaleLowValue ? String(param.femaleLowValue) : null,
+              ul: param.femaleHighValue ? String(param.femaleHighValue) : null,
+              default: param.femaleDefaultValue,
               isActive: param.femaleActive
             },
             {
               gender: 'Child',
-              lowValue: param.childLowValue ? String(param.childLowValue) : null,
-              highValue: param.childHighValue ? String(param.childHighValue) : null,
-              defaultValue: param.childDefaultValue,
+              ll: param.childLowValue ? String(param.childLowValue) : null,
+              ul: param.childHighValue ? String(param.childHighValue) : null,
+              default: param.childDefaultValue,
               isActive: param.childActive
             }
           ],
@@ -672,6 +675,9 @@ export const getTestById = async (req, res) => {
           displayRangeText: "",
           rangeText: "",
           textContent: "",
+          maleDisplayText: "",         // ✅ NEW
+          femaleDisplayText: "",       // ✅ NEW
+          defaultDisplayText: "",      // ✅ NEW
           isMultipleOptions: false,
           normalRanges: [
             { gender: "Male", lowValue: "", highValue: "", defaultValue: "", isActive: true },
@@ -905,7 +911,7 @@ export const createTest = async (req, res) => {
                 machineCode: param.machineCode || null,
                 multiplyBy: param.multiplyBy || null,
                 decimal: param.decimal ? parseInt(param.decimal) : null,
-                parameterSortOrder: param.sortOrder ? parseInt(param.sortOrder) : null,
+                parameterSortOrder: param.sortOrder !== undefined && param.sortOrder !== null ? parseInt(param.sortOrder) : null,
                 isDescriptive: param.isDescriptive || false,
                 lowPanic: param.lowPanic ? parseFloat(param.lowPanic) : null,
                 highPanic: param.highPanic ? parseFloat(param.highPanic) : null,
@@ -920,19 +926,22 @@ export const createTest = async (req, res) => {
                 displayRangeText: param.displayRangeText || null,
                 rangeText: param.rangeText || null,
                 textContent: param.textContent || null,
+                maleDisplayText: param.maleDisplayText || null,
+                femaleDisplayText: param.femaleDisplayText || null,
+                defaultDisplayText: param.defaultDisplayText || null,
                 isMultipleOptions: param.isMultipleOptions || false,
                 testMethod: param.testMethod || null,
-                maleLowValue: param.normalRanges?.find(r => r.gender === 'Male')?.lowValue ? String(param.normalRanges.find(r => r.gender === 'Male').lowValue) : null,
-                maleHighValue: param.normalRanges?.find(r => r.gender === 'Male')?.highValue ? String(param.normalRanges.find(r => r.gender === 'Male').highValue) : null,
-                maleDefaultValue: param.normalRanges?.find(r => r.gender === 'Male')?.defaultValue || null,
+                maleLowValue: param.normalRanges?.find(r => r.gender === 'Male')?.ll ? String(param.normalRanges.find(r => r.gender === 'Male').ll) : null,
+                maleHighValue: param.normalRanges?.find(r => r.gender === 'Male')?.ul ? String(param.normalRanges.find(r => r.gender === 'Male').ul) : null,
+                maleDefaultValue: param.normalRanges?.find(r => r.gender === 'Male')?.default || null,
                 maleActive: param.normalRanges?.find(r => r.gender === 'Male')?.isActive || false,
-                femaleLowValue: param.normalRanges?.find(r => r.gender === 'Female')?.lowValue ? String(param.normalRanges.find(r => r.gender === 'Female').lowValue) : null,
-                femaleHighValue: param.normalRanges?.find(r => r.gender === 'Female')?.highValue ? String(param.normalRanges.find(r => r.gender === 'Female').highValue) : null,
-                femaleDefaultValue: param.normalRanges?.find(r => r.gender === 'Female')?.defaultValue || null,
+                femaleLowValue: param.normalRanges?.find(r => r.gender === 'Female')?.ll ? String(param.normalRanges.find(r => r.gender === 'Female').ll) : null,
+                femaleHighValue: param.normalRanges?.find(r => r.gender === 'Female')?.ul ? String(param.normalRanges.find(r => r.gender === 'Female').ul) : null,
+                femaleDefaultValue: param.normalRanges?.find(r => r.gender === 'Female')?.default || null,
                 femaleActive: param.normalRanges?.find(r => r.gender === 'Female')?.isActive || false,
-                childLowValue: param.normalRanges?.find(r => r.gender === 'Child')?.lowValue ? String(param.normalRanges.find(r => r.gender === 'Child').lowValue) : null,
-                childHighValue: param.normalRanges?.find(r => r.gender === 'Child')?.highValue ? String(param.normalRanges.find(r => r.gender === 'Child').highValue) : null,
-                childDefaultValue: param.normalRanges?.find(r => r.gender === 'Child')?.defaultValue || null,
+                childLowValue: param.normalRanges?.find(r => r.gender === 'Child')?.ll ? String(param.normalRanges.find(r => r.gender === 'Child').ll) : null,
+                childHighValue: param.normalRanges?.find(r => r.gender === 'Child')?.ul ? String(param.normalRanges.find(r => r.gender === 'Child').ul) : null,
+                childDefaultValue: param.normalRanges?.find(r => r.gender === 'Child')?.default || null,
                 childActive: param.normalRanges?.find(r => r.gender === 'Child')?.isActive || false,
                 ageRanges: processAgeRangesWithGender(param.ageRanges, param.parameterName),
                 rangeValues: param.rangeValues && param.rangeValues.length > 0 ? JSON.stringify(param.rangeValues) : null,
@@ -1194,7 +1203,7 @@ export const updateTest = async (req, res) => {
           machineCode: param.machineCode || null,
           multiplyBy: param.multiplyBy || null,
           decimal: param.decimal ? parseInt(param.decimal) : null,
-          parameterSortOrder: param.sortOrder ? parseInt(param.sortOrder) : null,
+          parameterSortOrder: param.sortOrder !== undefined && param.sortOrder !== null ? parseInt(param.sortOrder) : undefined,
           isDescriptive: param.isDescriptive || false,
           lowPanic: param.lowPanic ? parseFloat(param.lowPanic) : null,
           highPanic: param.highPanic ? parseFloat(param.highPanic) : null,
@@ -1209,19 +1218,22 @@ export const updateTest = async (req, res) => {
           displayRangeText: param.displayRangeText || null,
           rangeText: param.rangeText || null,
           textContent: param.textContent || null,
+          maleDisplayText: param.maleDisplayText || null,           // ✅ NEW
+          femaleDisplayText: param.femaleDisplayText || null,       // ✅ NEW
+          defaultDisplayText: param.defaultDisplayText || null,     // ✅ NEW
           isMultipleOptions: param.isMultipleOptions || false,
           testMethod: param.testMethod || null,
-          maleLowValue: maleRange?.lowValue ? String(maleRange.lowValue) : null,
-          maleHighValue: maleRange?.highValue ? String(maleRange.highValue) : null,
-          maleDefaultValue: maleRange?.defaultValue || null,
+          maleLowValue: maleRange?.ll ? String(maleRange.ll) : null,
+          maleHighValue: maleRange?.ul ? String(maleRange.ul) : null,
+          maleDefaultValue: maleRange?.default || null,
           maleActive: maleRange?.isActive || false,
-          femaleLowValue: femaleRange?.lowValue ? String(femaleRange.lowValue) : null,
-          femaleHighValue: femaleRange?.highValue ? String(femaleRange.highValue) : null,
-          femaleDefaultValue: femaleRange?.defaultValue || null,
+          femaleLowValue: femaleRange?.ll ? String(femaleRange.ll) : null,
+          femaleHighValue: femaleRange?.ul ? String(femaleRange.ul) : null,
+          femaleDefaultValue: femaleRange?.default || null,
           femaleActive: femaleRange?.isActive || false,
-          childLowValue: childRange?.lowValue ? String(childRange.lowValue) : null,
-          childHighValue: childRange?.highValue ? String(childRange.highValue) : null,
-          childDefaultValue: childRange?.defaultValue || null,
+          childLowValue: childRange?.ll ? String(childRange.ll) : null,
+          childHighValue: childRange?.ul ? String(childRange.ul) : null,
+          childDefaultValue: childRange?.default || null,
           childActive: childRange?.isActive || false,
           ageRanges: (() => {
             try {
@@ -1338,7 +1350,7 @@ export const updateTest = async (req, res) => {
                   categoryName: category.name ?? "",
                   isCategory: category.isCategory || false,
                   testMethod: category.testMethod || null,
-                  sortOrder: category.sortOrder ? parseInt(category.sortOrder) : null
+                  sortOrder: category.sortOrder !== undefined && category.sortOrder !== null ? parseInt(category.sortOrder) : undefined
                 }
               });
               console.log(`   ✅ Category updated successfully with SAME ID: ${existingCategory.id}`);
@@ -1353,7 +1365,7 @@ export const updateTest = async (req, res) => {
                   categoryName: category.name ?? "",
                   isCategory: category.isCategory || false,
                   testMethod: category.testMethod || null,
-                  sortOrder: category.sortOrder ? parseInt(category.sortOrder) : null
+                  sortOrder: category.sortOrder !== undefined && category.sortOrder !== null ? parseInt(category.sortOrder) : null
                 }
               });
               console.log(`   ✅ NEW category link created with NEW ID: ${newCat.id}`);
@@ -2057,12 +2069,9 @@ export const getOrganizations = async (req, res) => {
         mobile: true,
         email: true,
         date: true,
-        discount: true,
         isActive: true,
         createdAt: true,
         updatedAt: true,
-        sendReportsViaWhatsApp: true,
-        sendReportsViaMail: true,
         moduleAllocations: {
           select: { id: true, modules: true }
         }
@@ -2609,22 +2618,33 @@ export const getDoctorTestCharges = async (req, res) => {
     });
 
     // Format response with discount data
-    const formattedTests = tests.map(test => ({
-      id: test.id,
-      name: test.name,
-      shortName: test.testCode,
-      group: test.department?.name || '',
-      // Default charges from test_charges table
-      defaultB2C: test.charges[0]?.b2cCharge || 0,
-      defaultB2B: test.charges[0]?.b2bCharge || 0,
-      // Doctor charges - discountR (default time) and discountS (customized)
-      discountR: test.doctorTestCharges[0]?.discountR || 0,
-      discountS: test.doctorTestCharges[0]?.discountS || 0,
-      // Doctor B2C (for backward compatibility) = Default B2C - discountS
-      doctorB2C: Math.max(0, (test.charges[0]?.b2cCharge || 0) - (test.doctorTestCharges[0]?.discountS || 0)),
-      // Is customized - use the isCustomized flag if available, fallback to old logic for backward compatibility
-      isCustomized: test.doctorTestCharges.length > 0 ? (test.doctorTestCharges[0]?.isCustomized === true) : false
-    }));
+    const formattedTests = tests.map(test => {
+      const defaultB2C = test.charges[0]?.b2cCharge || 0;
+      const defaultB2B = test.charges[0]?.b2bCharge || 0;
+      
+      // If doctor has custom charges, use those; otherwise use defaults
+      const hasCustomCharges = test.doctorTestCharges.length > 0;
+      const docCharge = test.doctorTestCharges[0];
+      
+      return {
+        id: test.id,
+        name: test.name,
+        shortName: test.testCode,
+        group: test.department?.name || '',
+        // Default charges from test_charges table
+        defaultB2C: defaultB2C,
+        defaultB2B: defaultB2B,
+        // Doctor charges - discountR (default) and discountS (customized)
+        // If NO custom record exists: discountR = defaultB2C, discountS = defaultB2C (not customized)
+        // If custom record exists: use the values from DoctorTestCharge
+        discountR: hasCustomCharges ? (docCharge?.discountR || defaultB2C) : defaultB2C,
+        discountS: hasCustomCharges ? (docCharge?.discountS || defaultB2C) : defaultB2C,
+        // Doctor B2C (for backward compatibility)
+        doctorB2C: Math.max(0, hasCustomCharges ? (docCharge?.discountS || defaultB2C) : defaultB2C),
+        // Is customized - use the isCustomized flag from custom record, false if no record
+        isCustomized: hasCustomCharges ? (docCharge?.isCustomized === true) : false
+      };
+    });
 
     res.json({
       success: true,
@@ -2639,6 +2659,104 @@ export const getDoctorTestCharges = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Failed to fetch doctor test charges'
+    });
+  }
+};
+
+// ✅ Get organization test charges with comparison to defaults
+export const getOrganizationTestCharges = async (req, res) => {
+  try {
+    const { organizationId } = req.params;
+
+    if (!organizationId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Organization ID is required'
+      });
+    }
+
+    // Verify organization exists
+    const organization = await prisma.organization.findUnique({
+      where: { id: organizationId }
+    });
+
+    if (!organization) {
+      return res.status(404).json({
+        success: false,
+        message: 'Organization not found'
+      });
+    }
+
+    // Get all tests with their default and organization-specific charges
+    const tests = await prisma.test.findMany({
+      where: { isDeleted: false },
+      include: {
+        department: {
+          select: {
+            name: true
+          }
+        },
+        // Get default charges (organizationId = null)
+        charges: {
+          where: { organizationId: null },
+          select: {
+            id: true,
+            b2cCharge: true,
+            b2bCharge: true
+          }
+        },
+        // Get organization-specific charges from OrganizationTestCharge table
+        organizationTestCharges: {
+          where: { organizationId: organizationId }
+        }
+      },
+      orderBy: [
+        { name: 'asc' }
+      ]
+    });
+
+    // Format response with discount data (same structure as doctor charges)
+    const formattedTests = tests.map(test => {
+      const defaultB2C = test.charges[0]?.b2cCharge || 0;
+      const defaultB2B = test.charges[0]?.b2bCharge || 0;
+      
+      // If organization has custom charges, use those; otherwise use defaults
+      const hasCustomCharges = test.organizationTestCharges.length > 0;
+      const orgCharge = test.organizationTestCharges[0];
+      
+      return {
+        id: test.id,
+        name: test.name,
+        shortName: test.testCode,
+        group: test.department?.name || '',
+        // Default charges from test_charges table
+        defaultB2C: defaultB2C,
+        defaultB2B: defaultB2B,
+        // Organization charges - discountR (default) and discountS (customized)
+        // If NO custom record exists: discountR = defaultB2C, discountS = defaultB2C (not customized)
+        // If custom record exists: use the values from OrganizationTestCharge
+        discountR: hasCustomCharges ? (orgCharge?.discountR || defaultB2C) : defaultB2C,
+        discountS: hasCustomCharges ? (orgCharge?.discountS || defaultB2C) : defaultB2C,
+        // Organization B2C (for backward compatibility)
+        organizationB2C: Math.max(0, hasCustomCharges ? (orgCharge?.discountS || defaultB2C) : defaultB2C),
+        // Is customized - use the isCustomized flag from custom record, false if no record
+        isCustomized: hasCustomCharges ? (orgCharge?.isCustomized === true) : false
+      };
+    });
+
+    res.json({
+      success: true,
+      data: formattedTests,
+      organization: {
+        id: organization.id,
+        name: organization.name
+      }
+    });
+  } catch (error) {
+    console.error('Get organization test charges error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch organization test charges'
     });
   }
 };
@@ -2871,6 +2989,124 @@ export const deleteTestCharge = async (req, res) => {
 };
 
 // Bulk create/update test charges for an organization
+// Bulk create/update organization test charges
+export const bulkCreateOrganizationTestCharges = async (req, res) => {
+  try {
+    const { organizationId, charges } = req.body;
+
+    if (!organizationId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Organization ID is required'
+      });
+    }
+
+    if (!Array.isArray(charges) || charges.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Charges array is required'
+      });
+    }
+
+    // Verify organization exists
+    const organization = await prisma.organization.findUnique({
+      where: { id: organizationId }
+    });
+
+    if (!organization) {
+      return res.status(404).json({
+        success: false,
+        message: 'Organization not found'
+      });
+    }
+
+    const results = [];
+    const errors = [];
+    let created = 0;
+    let updated = 0;
+
+    for (const charge of charges) {
+      try {
+        const { testId, discountR, discountS } = charge;
+
+        if (!testId || (discountR === undefined && discountS === undefined)) {
+          errors.push({ testId, error: 'Test ID and at least one discount value required' });
+          continue;
+        }
+
+        // Check if test exists
+        const test = await prisma.test.findUnique({
+          where: { id: parseInt(testId) }
+        });
+
+        if (!test) {
+          errors.push({ testId, error: 'Test not found' });
+          continue;
+        }
+
+        const discountRVal = charge.discountR !== undefined ? parseFloat(charge.discountR) : 0;
+        const discountSVal = charge.discountS !== undefined ? parseFloat(charge.discountS) : 0;
+        const isCustomizedFlag = Math.abs(discountSVal - discountRVal) > 0.01; // Allow small floating point difference
+
+        const existingCharge = await prisma.organizationTestCharge.findFirst({
+          where: {
+            testId: parseInt(testId),
+            organizationId: organizationId
+          }
+        });
+
+        let result;
+        if (existingCharge) {
+          // Update existing charge
+          result = await prisma.organizationTestCharge.update({
+            where: { id: existingCharge.id },
+            data: {
+              discountR: discountRVal,
+              discountS: discountSVal,
+              isCustomized: isCustomizedFlag
+            }
+          });
+          updated++;
+        } else {
+          // Create new charge
+          result = await prisma.organizationTestCharge.create({
+            data: {
+              testId: parseInt(testId),
+              organizationId: organizationId,
+              discountR: discountRVal,
+              discountS: discountSVal,
+              isCustomized: isCustomizedFlag,
+              isActive: true
+            }
+          });
+          created++;
+        }
+        results.push(result);
+      } catch (error) {
+        errors.push({ testId: charge.testId, error: error.message });
+      }
+    }
+
+    res.json({
+      success: true,
+      message: `Processed ${results.length} charges successfully${errors.length > 0 ? ` with ${errors.length} errors` : ''}`,
+      data: {
+        created,
+        updated,
+        total: results.length,
+        errors: errors.length > 0 ? errors : null,
+        charges: results
+      }
+    });
+  } catch (error) {
+    console.error('Bulk create organization test charges error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to bulk create organization test charges'
+    });
+  }
+};
+
 export const bulkCreateTestCharges = async (req, res) => {
   try {
     const { organizationId, doctorId, charges } = req.body;
@@ -4271,6 +4507,9 @@ export const createTestParameter = async (req, res) => {
       rangeText,
       textContent,
       isMultipleOptions,
+      maleDisplayText,        // ✅ NEW
+      femaleDisplayText,      // ✅ NEW
+      defaultDisplayText,     // ✅ NEW
       normalRanges,
       ageRanges,
       rangeValues
@@ -4322,18 +4561,21 @@ export const createTestParameter = async (req, res) => {
         displayRangeText: displayRangeText || null,
         rangeText: rangeText || null,
         textContent: textContent || null,
+        maleDisplayText: maleDisplayText || null,           // ✅ NEW
+        femaleDisplayText: femaleDisplayText || null,       // ✅ NEW
+        defaultDisplayText: defaultDisplayText || null,     // ✅ NEW
         isMultipleOptions: isMultipleOptions || false,
-        maleLowValue: normalRanges?.find(r => r.gender === 'Male')?.lowValue ? String(normalRanges.find(r => r.gender === 'Male').lowValue) : null,
-        maleHighValue: normalRanges?.find(r => r.gender === 'Male')?.highValue ? String(normalRanges.find(r => r.gender === 'Male').highValue) : null,
-        maleDefaultValue: normalRanges?.find(r => r.gender === 'Male')?.defaultValue || null,
+        maleLowValue: normalRanges?.find(r => r.gender === 'Male')?.ll ? String(normalRanges.find(r => r.gender === 'Male').ll) : null,
+        maleHighValue: normalRanges?.find(r => r.gender === 'Male')?.ul ? String(normalRanges.find(r => r.gender === 'Male').ul) : null,
+        maleDefaultValue: normalRanges?.find(r => r.gender === 'Male')?.default || null,
         maleActive: normalRanges?.find(r => r.gender === 'Male')?.isActive || false,
-        femaleLowValue: normalRanges?.find(r => r.gender === 'Female')?.lowValue ? String(normalRanges.find(r => r.gender === 'Female').lowValue) : null,
-        femaleHighValue: normalRanges?.find(r => r.gender === 'Female')?.highValue ? String(normalRanges.find(r => r.gender === 'Female').highValue) : null,
-        femaleDefaultValue: normalRanges?.find(r => r.gender === 'Female')?.defaultValue || null,
+        femaleLowValue: normalRanges?.find(r => r.gender === 'Female')?.ll ? String(normalRanges.find(r => r.gender === 'Female').ll) : null,
+        femaleHighValue: normalRanges?.find(r => r.gender === 'Female')?.ul ? String(normalRanges.find(r => r.gender === 'Female').ul) : null,
+        femaleDefaultValue: normalRanges?.find(r => r.gender === 'Female')?.default || null,
         femaleActive: normalRanges?.find(r => r.gender === 'Female')?.isActive || false,
-        childLowValue: normalRanges?.find(r => r.gender === 'Child')?.lowValue ? String(normalRanges.find(r => r.gender === 'Child').lowValue) : null,
-        childHighValue: normalRanges?.find(r => r.gender === 'Child')?.highValue ? String(normalRanges.find(r => r.gender === 'Child').highValue) : null,
-        childDefaultValue: normalRanges?.find(r => r.gender === 'Child')?.defaultValue || null,
+        childLowValue: normalRanges?.find(r => r.gender === 'Child')?.ll ? String(normalRanges.find(r => r.gender === 'Child').ll) : null,
+        childHighValue: normalRanges?.find(r => r.gender === 'Child')?.ul ? String(normalRanges.find(r => r.gender === 'Child').ul) : null,
+        childDefaultValue: normalRanges?.find(r => r.gender === 'Child')?.default || null,
         childActive: normalRanges?.find(r => r.gender === 'Child')?.isActive || false,
         ageRanges: processAgeRangesWithGender(ageRanges, parameterName || "Parameter"),
         rangeValues: rangeValues && rangeValues.length > 0 ? JSON.stringify(rangeValues) : null,
@@ -4390,6 +4632,9 @@ export const createTestCategoryWithParameter = async (req, res) => {
       rangeText,
       textContent,
       isMultipleOptions,
+      maleDisplayText,        // ✅ NEW
+      femaleDisplayText,      // ✅ NEW
+      defaultDisplayText,     // ✅ NEW
       normalRanges,
       ageRanges,
       rangeValues
@@ -4456,18 +4701,21 @@ export const createTestCategoryWithParameter = async (req, res) => {
         displayRangeText: displayRangeText || null,
         rangeText: rangeText || null,
         textContent: textContent || null,
+        maleDisplayText: maleDisplayText || null,           // ✅ NEW
+        femaleDisplayText: femaleDisplayText || null,       // ✅ NEW
+        defaultDisplayText: defaultDisplayText || null,     // ✅ NEW
         isMultipleOptions: isMultipleOptions || false,
-        maleLowValue: normalRanges?.find(r => r.gender === 'Male')?.lowValue ? String(normalRanges.find(r => r.gender === 'Male').lowValue) : null,
-        maleHighValue: normalRanges?.find(r => r.gender === 'Male')?.highValue ? String(normalRanges.find(r => r.gender === 'Male').highValue) : null,
-        maleDefaultValue: normalRanges?.find(r => r.gender === 'Male')?.defaultValue || null,
+        maleLowValue: normalRanges?.find(r => r.gender === 'Male')?.ll ? String(normalRanges.find(r => r.gender === 'Male').ll) : null,
+        maleHighValue: normalRanges?.find(r => r.gender === 'Male')?.ul ? String(normalRanges.find(r => r.gender === 'Male').ul) : null,
+        maleDefaultValue: normalRanges?.find(r => r.gender === 'Male')?.default || null,
         maleActive: normalRanges?.find(r => r.gender === 'Male')?.isActive || false,
-        femaleLowValue: normalRanges?.find(r => r.gender === 'Female')?.lowValue ? String(normalRanges.find(r => r.gender === 'Female').lowValue) : null,
-        femaleHighValue: normalRanges?.find(r => r.gender === 'Female')?.highValue ? String(normalRanges.find(r => r.gender === 'Female').highValue) : null,
-        femaleDefaultValue: normalRanges?.find(r => r.gender === 'Female')?.defaultValue || null,
+        femaleLowValue: normalRanges?.find(r => r.gender === 'Female')?.ll ? String(normalRanges.find(r => r.gender === 'Female').ll) : null,
+        femaleHighValue: normalRanges?.find(r => r.gender === 'Female')?.ul ? String(normalRanges.find(r => r.gender === 'Female').ul) : null,
+        femaleDefaultValue: normalRanges?.find(r => r.gender === 'Female')?.default || null,
         femaleActive: normalRanges?.find(r => r.gender === 'Female')?.isActive || false,
-        childLowValue: normalRanges?.find(r => r.gender === 'Child')?.lowValue ? String(normalRanges.find(r => r.gender === 'Child').lowValue) : null,
-        childHighValue: normalRanges?.find(r => r.gender === 'Child')?.highValue ? String(normalRanges.find(r => r.gender === 'Child').highValue) : null,
-        childDefaultValue: normalRanges?.find(r => r.gender === 'Child')?.defaultValue || null,
+        childLowValue: normalRanges?.find(r => r.gender === 'Child')?.ll ? String(normalRanges.find(r => r.gender === 'Child').ll) : null,
+        childHighValue: normalRanges?.find(r => r.gender === 'Child')?.ul ? String(normalRanges.find(r => r.gender === 'Child').ul) : null,
+        childDefaultValue: normalRanges?.find(r => r.gender === 'Child')?.default || null,
         childActive: normalRanges?.find(r => r.gender === 'Child')?.isActive || false,
         ageRanges: processAgeRangesWithGender(ageRanges, parameterName || "Parameter"),
         rangeValues: rangeValues && rangeValues.length > 0 ? JSON.stringify(rangeValues) : null,

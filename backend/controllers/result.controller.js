@@ -189,8 +189,46 @@ export const getPatientTests = async (req, res) => {
             categories: {
               include: {
                 testParameter: {
-                  include: {
-                    unit: true
+                  select: {
+                    id: true,
+                    parameterName: true,
+                    testMethod: true,
+                    type: true,
+                    isDescriptive: true,
+                    isMultipleOptions: true,
+                    isMandatory: true,
+                    parameterSortOrder: true,
+                    textContent: true,
+                    displayRangeText: true,
+                    maleDisplayText: true,
+                    femaleDisplayText: true,
+                    defaultDisplayText: true,
+                    rangeText: true,
+                    rangeType: true,
+                    ageRanges: true,
+                    rangeValues: true,
+                    maleLowValue: true,
+                    maleHighValue: true,
+                    maleDefaultValue: true,
+                    maleActive: true,
+                    femaleLowValue: true,
+                    femaleHighValue: true,
+                    femaleDefaultValue: true,
+                    femaleActive: true,
+                    childLowValue: true,
+                    childHighValue: true,
+                    childDefaultValue: true,
+                    childActive: true,
+                    hasFormula: true,
+                    formula: true,
+                    decimal: true,
+                    lowPanic: true,
+                    highPanic: true,
+                    unit: {
+                      select: {
+                        symbol: true
+                      }
+                    }
                   }
                 }
               }
@@ -445,6 +483,9 @@ export const getPatientTestById = async (req, res) => {
             parameterSortOrder: true,
             textContent: true,
             displayRangeText: true,
+            maleDisplayText: true,
+            femaleDisplayText: true,
+            defaultDisplayText: true,
             rangeText: true,
             rangeType: true,
             // Age-specific ranges from database
@@ -579,6 +620,9 @@ export const getPatientTestById = async (req, res) => {
           // Range type and display text from database
           rangeType: category.testParameter.rangeType,
           displayRangeText: category.testParameter.displayRangeText,
+          maleDisplayText: category.testParameter.maleDisplayText,
+          femaleDisplayText: category.testParameter.femaleDisplayText,
+          defaultDisplayText: category.testParameter.defaultDisplayText,
           rangeText: category.testParameter.rangeText,
           
           // ✅ PANIC RANGES - CRITICAL FOR TEXT TYPE HIGHLIGHTING
@@ -647,6 +691,9 @@ export const getPatientTestById = async (req, res) => {
           parameterSortOrder: true,
           textContent: true,
           displayRangeText: true,
+          maleDisplayText: true,
+          femaleDisplayText: true,
+          defaultDisplayText: true,
           rangeText: true,
           rangeType: true,
           // Age-specific ranges from database
@@ -719,6 +766,9 @@ export const getPatientTestById = async (req, res) => {
           // Range type and display text from database
           rangeType: param.rangeType,
           displayRangeText: param.displayRangeText,
+          maleDisplayText: param.maleDisplayText,
+          femaleDisplayText: param.femaleDisplayText,
+          defaultDisplayText: param.defaultDisplayText,
           rangeText: param.rangeText,
           
           // ✅ PANIC RANGES - CRITICAL FOR TEXT TYPE HIGHLIGHTING
@@ -883,8 +933,21 @@ function getNormalRange(parameter, patient) {
   // Handle complex age ranges from database (for numeric parameters)
   if (parameter.ageRanges) {
     try {
-      const ageRanges = JSON.parse(parameter.ageRanges);
+      let ageRanges = JSON.parse(parameter.ageRanges);
       console.log(`\n   🔍 CHECKING ${ageRanges.length} AGE RANGES:`);
+      
+      // ✅ PRIORITY SORT: Check matching gender first, then both/other
+      // This ensures exact gender match takes priority over "Both"
+      ageRanges = ageRanges.sort((a, b) => {
+        const aGender = a.gender?.toLowerCase() || 'both';
+        const bGender = b.gender?.toLowerCase() || 'both';
+        
+        // Priority: exact match > both > no match
+        const aMatchesGender = aGender === patientGender ? 0 : (aGender === 'both' ? 1 : 2);
+        const bMatchesGender = bGender === patientGender ? 0 : (bGender === 'both' ? 1 : 2);
+        
+        return aMatchesGender - bMatchesGender;
+      });
       
       // Find matching range based on patient gender and age
       for (const range of ageRanges) {

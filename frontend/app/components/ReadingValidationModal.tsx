@@ -324,7 +324,12 @@ const ReadingValidationModal = ({
   // Get age-appropriate range based on patient age, gender, and DOB
   const getAgeAppropriateRange = (parameter: Parameter): string => {
     if (!parameter || parameter.type === 'Text' || parameter.isDescriptive) {
-      return parameter.displayRangeText || parameter.rangeText || parameter.normalRange || '';
+      // ✅ FIX: If textContent (RIGHT textarea) has a value, show ONLY that
+      if (parameter?.textContent) {
+        return parameter.textContent;
+      }
+      // Otherwise show empty
+      return '';
     }
 
     if (!patientData) return parameter.normalRange || '';

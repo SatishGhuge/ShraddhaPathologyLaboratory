@@ -562,13 +562,18 @@ export default function PatientRegistration() {
         
         const chargeMap: any = {};
         charges.forEach((charge: any, idx: number) => {
-          const testId = charge.testId || charge.test?.id;
+          const testId = charge.testId || charge.test?.id || charge.id;
           const key = String(testId); // Convert to string to ensure consistent key type
-          console.log(`   [${idx}] testId: ${testId} (key: "${key}"), B2C: ${charge.b2cCharge}, B2B: ${charge.b2bCharge}`);
+          
+          // Handle both old format (b2cCharge, b2bCharge) and new format (discountS as the custom charge)
+          const b2cCharge = charge.b2cCharge !== undefined ? charge.b2cCharge : (charge.discountS || 0);
+          const b2bCharge = charge.b2bCharge !== undefined ? charge.b2bCharge : (charge.discountS || 0);
+          
+          console.log(`   [${idx}] testId: ${testId} (key: "${key}"), B2C: ${b2cCharge}, B2B: ${b2bCharge}`);
           if (testId) {
             chargeMap[key] = {
-              b2cCharge: charge.b2cCharge,
-              b2bCharge: charge.b2bCharge
+              b2cCharge: b2cCharge,
+              b2bCharge: b2bCharge
             };
           }
         });
@@ -1646,7 +1651,13 @@ export default function PatientRegistration() {
     // Validate mobile only if provided (optional field)
     if (mobile && mobile.length !== 10) return alert("Mobile must be 10 digits");
     // Validate email only if provided (optional field)
-    if (email && !email.endsWith("@gmail.com")) return alert("Email must end with @gmail.com");
+    // Email validation regex: basic check for valid email format
+    if (email) {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(email)) {
+        return alert("Please enter a valid email address (e.g., user@example.com, user@hospital.org)");
+      }
+    }
     
     // If NO tests selected - save patient info only
     if (selectedTests.length === 0) {

@@ -5,7 +5,7 @@ import {
   getOrganizations, createOrganization, updateOrganization, deleteOrganization, getOrganizationById,
   getTests, getTestById, createTest, updateTest, deleteTest,
   getSeedDataSummary,
-  getTestCharges, getAllTestCharges, getDoctorTestCharges, createTestCharge, updateTestCharge, deleteTestCharge, bulkCreateTestCharges,
+  getTestCharges, getAllTestCharges, getDoctorTestCharges, getOrganizationTestCharges, createTestCharge, updateTestCharge, deleteTestCharge, bulkCreateTestCharges, bulkCreateOrganizationTestCharges,
   getPackages, getAllPackages, getPackageById, createPackage, updatePackage, deletePackage,
   getPackageTests, addTestToPackage, removeTestFromPackage,
   searchParameters,
@@ -91,9 +91,10 @@ router.delete('/packages/:packageId/tests/:testId', removeTestFromPackage);
 // Test charge routes — /all and /bulk before /:id
 router.get('/test-charges/all', getAllTestCharges);
 router.post('/test-charges/bulk', bulkCreateTestCharges);
+router.post('/organizations/:organizationId/charges/bulk', bulkCreateOrganizationTestCharges);
 router.get('/doctors/:doctorId/charges', getDoctorTestCharges);
+router.get('/organizations/:organizationId/charges', getOrganizationTestCharges);
 router.get('/tests/:testId/charges', getTestCharges);
-router.get('/organizations/:organizationId/charges', getTestCharges);
 router.post('/test-charges', createTestCharge);
 router.put('/test-charges/:id', updateTestCharge);
 router.delete('/test-charges/:id', deleteTestCharge);

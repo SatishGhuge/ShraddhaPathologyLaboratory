@@ -133,6 +133,9 @@ const AddTest = () => {
     p.displayRangeText= suggestion.displayRangeText || '';
     p.rangeText       = suggestion.rangeText || '';
     p.textContent     = suggestion.textContent || '';
+    p.maleDisplayText = suggestion.maleDisplayText || '';
+    p.femaleDisplayText = suggestion.femaleDisplayText || '';
+    p.defaultDisplayText = suggestion.defaultDisplayText || '';
     p.isMultipleOptions = suggestion.isMultipleOptions || false;
     p.isDescriptive   = suggestion.isDescriptive || false;
     p.lowPanic        = suggestion.lowPanic?.toString() || '';
@@ -197,6 +200,9 @@ const AddTest = () => {
       rangeText: "",
       isMultipleOptions: false,
       textContent: "",
+      maleDisplayText: "",
+      femaleDisplayText: "",
+      defaultDisplayText: "",
       normalRanges: [
         { gender: "Male", ll: "", ul: "", default: "", isActive: false },
         { gender: "Female", ll: "", ul: "", default: "", isActive: false },
@@ -410,6 +416,7 @@ const AddTest = () => {
               setCategories(testData.categories.map((category, catIdx) => {
                 console.log(`📋 Processing category ${catIdx}:`, category.name, 'with', category.parameters?.length || 0, 'parameters');
                 console.log(`   Category full data:`, JSON.stringify(category, null, 2));
+                console.log(`   Category sortOrder:`, category.sortOrder);  // ✅ DEBUG
                 return {
                   categoryId: category.categoryId || crypto.randomUUID(), // ✅ Add fallback for existing tests
                   name: category.name || "",
@@ -446,6 +453,9 @@ const AddTest = () => {
                           displayRangeText: param.displayRangeText || "",
                           rangeText: param.rangeText || "",
                           textContent: param.textContent || "",
+                          maleDisplayText: param.maleDisplayText || "",
+                          femaleDisplayText: param.femaleDisplayText || "",
+                          defaultDisplayText: param.defaultDisplayText || "",
                           isMultipleOptions: param.isMultipleOptions || false,
                           normalRanges: param.normalRanges && param.normalRanges.length > 0
                             ? param.normalRanges.map(range => ({
@@ -516,7 +526,20 @@ const AddTest = () => {
                         ]
                       }]
                 };
-              }));
+              }).sort((a, b) => {
+                // ✅ Sort categories by sortOrder (0/empty comes first)
+                const aSort = parseInt(a.sortOrder) || 0;
+                const bSort = parseInt(b.sortOrder) || 0;
+                return aSort - bSort;
+              }).map(category => ({
+                ...category,
+                parameters: category.parameters?.sort((a, b) => {
+                  // ✅ Sort parameters within each category by sortOrder
+                  const aSort = parseInt(a.sortOrder) || 0;
+                  const bSort = parseInt(b.sortOrder) || 0;
+                  return aSort - bSort;
+                })
+              })));
             }
             
             // Load linked tests if present (edit mode)
@@ -821,6 +844,14 @@ const AddTest = () => {
   const handleNormalRangeChange = (categoryIndex, parameterIndex, rangeIndex, field, value) => {
     const updatedCategories = [...categories];
     updatedCategories[categoryIndex].parameters[parameterIndex].normalRanges[rangeIndex][field] = value;
+    
+    // Auto-activate the range if any value is entered (ll, ul, or default)
+    if (field === 'll' || field === 'ul' || field === 'default') {
+      if (value && value.trim()) {
+        updatedCategories[categoryIndex].parameters[parameterIndex].normalRanges[rangeIndex].isActive = true;
+      }
+    }
+    
     setCategories(updatedCategories);
   };
 
@@ -960,7 +991,7 @@ const AddTest = () => {
         categoryId: category.categoryId, // ✅ Include unique category ID
         name: category.name ?? "",
         isCategory: category.isCategory || false,
-        sortOrder: null, // ❌ Don't use sortOrder in add/edit forms
+        sortOrder: category.sortOrder ? parseInt(category.sortOrder) : null,
         testMethod: category.testMethod || null,
         color: category.color || null,
         icon: category.icon || null,
@@ -975,7 +1006,7 @@ const AddTest = () => {
           machineCode: param.machineCode || null,
           multiplyBy: param.multiplyBy || null,
           decimal: param.decimal ? parseInt(param.decimal) : null,
-          sortOrder: null, // ❌ Don't use sortOrder in add/edit forms
+          sortOrder: param.sortOrder ? parseInt(param.sortOrder) : null,
           testMethod: param.testMethod || null,
           isDescriptive: param.isDescriptive || false,
           lowPanic: param.lowPanic ? parseFloat(param.lowPanic) : null,
@@ -991,12 +1022,15 @@ const AddTest = () => {
           displayRangeText: param.displayRangeText || null,
           rangeText: param.rangeText || null,
           textContent: param.textContent || null,
+          maleDisplayText: param.maleDisplayText || null,
+          femaleDisplayText: param.femaleDisplayText || null,
+          defaultDisplayText: param.defaultDisplayText || null,
           isMultipleOptions: param.isMultipleOptions || false,
           normalRanges: param.normalRanges ? param.normalRanges.map(range => ({
             gender: range.gender,
-            lowValue: range.ll ? String(range.ll) : null,
-            highValue: range.ul ? String(range.ul) : null,
-            defaultValue: range.default ? String(range.default) : null,
+            ll: range.ll ? String(range.ll) : null,
+            ul: range.ul ? String(range.ul) : null,
+            default: range.default ? String(range.default) : null,
             isActive: range.isActive
           })) : [],
           ageRanges: (() => {
@@ -2818,19 +2852,19 @@ const AddTest = () => {
                           </div>
                         ) : (
                           // Original By Sex Table Structure
-                          <table className="border-collapse border border-gray-300 text-xs sm:text-sm min-w-[600px]">
+                          <table className="border-collapse border border-gray-300 text-xs sm:text-sm min-w-full">
                             <thead>
                               <tr className="bg-orange-700 text-white">
-                                <th className="border border-gray-300 px-2 py-1 text-left w-24">Gender</th>
+                                <th className="border border-gray-300 px-2 py-1 text-left w-20">Gender</th>
                                 <th className="border border-gray-300 px-2 py-1 w-20">LOW</th>
                                 <th className="border border-gray-300 px-2 py-1 w-20">HIGH</th>
                                 <th className="border border-gray-300 px-2 py-1 w-20">Default</th>
-                                <th className="border border-gray-300 px-2 py-1 w-56">Display range text</th>
+                                <th className="border border-gray-300 px-2 py-1 flex-1">Display Range Text</th>
                               </tr>
                             </thead>
                             <tbody>
                               {(parameter.normalRanges || []).map((range, rangeIndex) => (
-                                <tr key={rangeIndex} className="bg-white">
+                                <tr key={rangeIndex} className="bg-white align-top">
                                   <td className="border border-gray-300 px-2 py-1">
                                     <span className="text-xs sm:text-sm">{range.gender}</span>
                                   </td>
@@ -2860,17 +2894,36 @@ const AddTest = () => {
                                       disabled={isViewMode} 
                                     />
                                   </td>
-                                  {rangeIndex === 0 && (
-                                    <td className="border border-gray-300 p-1" rowSpan={parameter.normalRanges.length}>
+                                  <td className="border border-gray-300 p-1">
+                                    {range.gender === "Male" ? (
                                       <textarea 
-                                        className="w-full h-full px-2 py-1 border border-gray-300 rounded text-xs sm:text-sm resize min-h-[3rem]" 
-                                        placeholder="Display Range"
-                                        value={parameter.displayRangeText || ""}
-                                        onChange={(e) => handleParameterChange(categoryIndex, paramIndex, 'displayRangeText', e.target.value)}
+                                        className="w-full px-1.5 py-1 border border-gray-300 rounded text-xs" 
+                                        placeholder="Male text..."
+                                        value={parameter.maleDisplayText || ""}
+                                        onChange={(e) => handleParameterChange(categoryIndex, paramIndex, 'maleDisplayText', e.target.value)}
                                         disabled={isViewMode}
+                                        style={{ minHeight: '40px', resize: 'both' }}
                                       />
-                                    </td>
-                                  )}
+                                    ) : range.gender === "Female" ? (
+                                      <textarea 
+                                        className="w-full px-1.5 py-1 border border-gray-300 rounded text-xs" 
+                                        placeholder="Female text..."
+                                        value={parameter.femaleDisplayText || ""}
+                                        onChange={(e) => handleParameterChange(categoryIndex, paramIndex, 'femaleDisplayText', e.target.value)}
+                                        disabled={isViewMode}
+                                        style={{ minHeight: '40px', resize: 'both' }}
+                                      />
+                                    ) : (
+                                      <textarea 
+                                        className="w-full px-1.5 py-1 border border-gray-300 rounded text-xs" 
+                                        placeholder="Default text..."
+                                        value={parameter.defaultDisplayText || ""}
+                                        onChange={(e) => handleParameterChange(categoryIndex, paramIndex, 'defaultDisplayText', e.target.value)}
+                                        disabled={isViewMode}
+                                        style={{ minHeight: '40px', resize: 'both' }}
+                                      />
+                                    )}
+                                  </td>
                                 </tr>
                               ))}
                             </tbody>

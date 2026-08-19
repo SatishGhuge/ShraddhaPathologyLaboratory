@@ -326,20 +326,38 @@ export default function TestReport() {
               const patientAge = parseInt(age) || 0;
               const patientGender = gender?.toLowerCase();
               
-              // Handle complex age ranges (ageRanges JSON array)
+              // ✅ PRIORITY 1: Check Display Range Text for matching gender/age
               if (parameterData.ageRanges) {
                 try {
-                  const ageRanges = JSON.parse(parameterData.ageRanges);
+                  let ageRanges = JSON.parse(parameterData.ageRanges);
+                  
+                  // Sort by gender priority
+                  ageRanges = ageRanges.sort((a, b) => {
+                    const aGender = a.gender?.toLowerCase() || 'both';
+                    const bGender = b.gender?.toLowerCase() || 'both';
+                    
+                    const aMatchesGender = aGender === patientGender ? 0 : (aGender === 'both' ? 1 : 2);
+                    const bMatchesGender = bGender === patientGender ? 0 : (bGender === 'both' ? 1 : 2);
+                    
+                    return aMatchesGender - bMatchesGender;
+                  });
+                  
                   for (const range of ageRanges) {
                     if (!range.enabled) continue;
                     const rangeGender = range.gender?.toLowerCase();
-                    if (rangeGender && rangeGender !== patientGender) continue;
+                    if (rangeGender && rangeGender !== patientGender && rangeGender !== 'both') continue;
                     
                     let ageMatches = false;
                     if (range.label?.includes('Between') && range.from != null && range.to != null) {
                       ageMatches = patientAge >= range.from && patientAge <= range.to;
                     }
                     
+                    // If age matches and display text exists, show ONLY that
+                    if (ageMatches && range.displayRangeText) {
+                      return range.displayRangeText;
+                    }
+                    
+                    // Otherwise return numeric range
                     if (ageMatches && range.ll != null && range.ul != null) {
                       return `${range.ll} - ${range.ul}`;
                     }
@@ -349,23 +367,61 @@ export default function TestReport() {
                 }
               }
               
-              // Fallback to gender and age-based ranges
+              // ✅ PRIORITY 2: For BySex ranges - check gender-specific display text first
               if (parameterData.rangeType === 'BySex' || parameterData.rangeType === 'ByGenderAndAge') {
-                if (patientAge < 18 && parameterData.childActive && parameterData.childLowValue != null && parameterData.childHighValue != null) {
-                  return `${parameterData.childLowValue} - ${parameterData.childHighValue}`;
+                if (patientAge < 18 && parameterData.childActive) {
+                  if (parameterData.defaultDisplayText) {
+                    return parameterData.defaultDisplayText;
+                  }
+                  if (parameterData.childLowValue != null && parameterData.childHighValue != null) {
+                    return `${parameterData.childLowValue} - ${parameterData.childHighValue}`;
+                  }
                 }
                 if (patientAge >= 18) {
-                  if (patientGender === 'female' && parameterData.femaleActive && parameterData.femaleLowValue != null && parameterData.femaleHighValue != null) {
-                    return `${parameterData.femaleLowValue} - ${parameterData.femaleHighValue}`;
+                  if (patientGender === 'female' && parameterData.femaleActive) {
+                    if (parameterData.femaleDisplayText) {
+                      return parameterData.femaleDisplayText;
+                    }
+                    if (parameterData.femaleLowValue != null && parameterData.femaleHighValue != null) {
+                      return `${parameterData.femaleLowValue} - ${parameterData.femaleHighValue}`;
+                    }
                   }
-                  if (patientGender === 'male' && parameterData.maleActive && parameterData.maleLowValue != null && parameterData.maleHighValue != null) {
-                    return `${parameterData.maleLowValue} - ${parameterData.maleHighValue}`;
+                  if (patientGender === 'male' && parameterData.maleActive) {
+                    if (parameterData.maleDisplayText) {
+                      return parameterData.maleDisplayText;
+                    }
+                    if (parameterData.maleLowValue != null && parameterData.maleHighValue != null) {
+                      return `${parameterData.maleLowValue} - ${parameterData.maleHighValue}`;
+                    }
                   }
                 }
               }
               
-              // Final fallback to display range text
-              return parameterData.displayRangeText || parameterData.rangeText || "-";
+              // ✅ PRIORITY 3: Final fallback with gender-specific display text
+              if (patientGender === 'female') {
+                if (parameterData.femaleDisplayText) {
+                  return parameterData.femaleDisplayText;
+                }
+                if (parameterData.femaleLowValue != null && parameterData.femaleHighValue != null) {
+                  return `${parameterData.femaleLowValue} - ${parameterData.femaleHighValue}`;
+                }
+              }
+              if (patientGender === 'male') {
+                if (parameterData.maleDisplayText) {
+                  return parameterData.maleDisplayText;
+                }
+                if (parameterData.maleLowValue != null && parameterData.maleHighValue != null) {
+                  return `${parameterData.maleLowValue} - ${parameterData.maleHighValue}`;
+                }
+              }
+              if (parameterData.childLowValue != null && parameterData.childHighValue != null) {
+                if (parameterData.defaultDisplayText) {
+                  return parameterData.defaultDisplayText;
+                }
+                return `${parameterData.childLowValue} - ${parameterData.childHighValue}`;
+              }
+              
+              return "";
             };
             
             // Try ref_interval_data first (complete parameter object from backend)
@@ -386,11 +442,9 @@ export default function TestReport() {
               console.log('✅ Using age-appropriate range:', refInterval);
             }
             
-            // Fallback to referenceRange if ref_interval_data not available
-            if (refInterval === "-" && test.referenceRange) {
-              refInterval = test.referenceRange;
-              console.log('✅ Using referenceRange from testResults:', refInterval);
-            }
+            // ✅ NO FALLBACK - Keep empty if ref_interval_data doesn't provide a value
+            // This prevents showing the old correlation text that's stored in testResults
+            // The reference range should ONLY come from the parameter's textContent or calculated age/gender ranges
             
             console.log('📋 Final Reference Interval:', { test_name: sName, age, gender, refInterval });
             

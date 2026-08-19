@@ -111,6 +111,7 @@ model Organization {
   organizationStocks     OrganizationStock[]
   stockTransactions      StockTransaction[]
   labToOrgTransfers      LabToOrgTransfer[]
+  testCharges            OrganizationTestCharge[]
 
   @@map("organizations")
 }
@@ -411,6 +412,7 @@ model Test {
 
   testparameters         testparameters[]
   doctorTestCharges      DoctorTestCharge[]
+  organizationTestCharges OrganizationTestCharge[]
   packageTests           PackageTest[]
   patientTests           PatientTest[]
   categories             TestCategory[]
@@ -509,6 +511,26 @@ model DoctorTestCharge {
   @@map("doctor_test_charges")
 }
 
+model OrganizationTestCharge {
+  id            Int           @id @default(autoincrement())
+  testId        Int
+  organizationId String
+  discountR     Float?        @default(0)
+  discountS     Float?        @default(0)
+  isCustomized  Boolean       @default(false)
+  effectiveFrom DateTime      @default(now())
+  effectiveTo   DateTime?
+  isActive      Boolean       @default(true)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  organization  Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  test          Test          @relation(fields: [testId], references: [id], onDelete: Cascade)
+
+  @@unique([testId, organizationId])
+  @@index([organizationId], map: "organization_test_charges_organizationId_fkey")
+  @@map("organization_test_charges")
+}
+
 model Doctor {
   id                     Int                @id @default(autoincrement())
   name                   String
@@ -572,6 +594,9 @@ model TestParameter {
   displayRangeText   String?          @db.Text
   rangeText          String?          @db.Text
   textContent        String?          @db.Text
+  maleDisplayText    String?          @db.Text        // ✅ NEW: Male-specific display range text
+  femaleDisplayText  String?          @db.Text        // ✅ NEW: Female-specific display range text
+  defaultDisplayText String?          @db.Text        // ✅ NEW: Default display text for both
   isMultipleOptions  Boolean          @default(false)
   maleLowValue       String?
   maleHighValue      String?
