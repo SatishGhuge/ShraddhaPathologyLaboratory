@@ -2069,12 +2069,9 @@ export const getOrganizations = async (req, res) => {
         mobile: true,
         email: true,
         date: true,
-        discount: true,
         isActive: true,
         createdAt: true,
         updatedAt: true,
-        sendReportsViaWhatsApp: true,
-        sendReportsViaMail: true,
         moduleAllocations: {
           select: { id: true, modules: true }
         }
@@ -2621,22 +2618,33 @@ export const getDoctorTestCharges = async (req, res) => {
     });
 
     // Format response with discount data
-    const formattedTests = tests.map(test => ({
-      id: test.id,
-      name: test.name,
-      shortName: test.testCode,
-      group: test.department?.name || '',
-      // Default charges from test_charges table
-      defaultB2C: test.charges[0]?.b2cCharge || 0,
-      defaultB2B: test.charges[0]?.b2bCharge || 0,
-      // Doctor charges - discountR (default time) and discountS (customized)
-      discountR: test.doctorTestCharges[0]?.discountR || 0,
-      discountS: test.doctorTestCharges[0]?.discountS || 0,
-      // Doctor B2C (for backward compatibility) = Default B2C - discountS
-      doctorB2C: Math.max(0, (test.charges[0]?.b2cCharge || 0) - (test.doctorTestCharges[0]?.discountS || 0)),
-      // Is customized - use the isCustomized flag if available, fallback to old logic for backward compatibility
-      isCustomized: test.doctorTestCharges.length > 0 ? (test.doctorTestCharges[0]?.isCustomized === true) : false
-    }));
+    const formattedTests = tests.map(test => {
+      const defaultB2C = test.charges[0]?.b2cCharge || 0;
+      const defaultB2B = test.charges[0]?.b2bCharge || 0;
+      
+      // If doctor has custom charges, use those; otherwise use defaults
+      const hasCustomCharges = test.doctorTestCharges.length > 0;
+      const docCharge = test.doctorTestCharges[0];
+      
+      return {
+        id: test.id,
+        name: test.name,
+        shortName: test.testCode,
+        group: test.department?.name || '',
+        // Default charges from test_charges table
+        defaultB2C: defaultB2C,
+        defaultB2B: defaultB2B,
+        // Doctor charges - discountR (default) and discountS (customized)
+        // If NO custom record exists: discountR = defaultB2C, discountS = defaultB2C (not customized)
+        // If custom record exists: use the values from DoctorTestCharge
+        discountR: hasCustomCharges ? (docCharge?.discountR || defaultB2C) : defaultB2C,
+        discountS: hasCustomCharges ? (docCharge?.discountS || defaultB2C) : defaultB2C,
+        // Doctor B2C (for backward compatibility)
+        doctorB2C: Math.max(0, hasCustomCharges ? (docCharge?.discountS || defaultB2C) : defaultB2C),
+        // Is customized - use the isCustomized flag from custom record, false if no record
+        isCustomized: hasCustomCharges ? (docCharge?.isCustomized === true) : false
+      };
+    });
 
     res.json({
       success: true,
@@ -2651,6 +2659,104 @@ export const getDoctorTestCharges = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Failed to fetch doctor test charges'
+    });
+  }
+};
+
+// ✅ Get organization test charges with comparison to defaults
+export const getOrganizationTestCharges = async (req, res) => {
+  try {
+    const { organizationId } = req.params;
+
+    if (!organizationId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Organization ID is required'
+      });
+    }
+
+    // Verify organization exists
+    const organization = await prisma.organization.findUnique({
+      where: { id: organizationId }
+    });
+
+    if (!organization) {
+      return res.status(404).json({
+        success: false,
+        message: 'Organization not found'
+      });
+    }
+
+    // Get all tests with their default and organization-specific charges
+    const tests = await prisma.test.findMany({
+      where: { isDeleted: false },
+      include: {
+        department: {
+          select: {
+            name: true
+          }
+        },
+        // Get default charges (organizationId = null)
+        charges: {
+          where: { organizationId: null },
+          select: {
+            id: true,
+            b2cCharge: true,
+            b2bCharge: true
+          }
+        },
+        // Get organization-specific charges from OrganizationTestCharge table
+        organizationTestCharges: {
+          where: { organizationId: organizationId }
+        }
+      },
+      orderBy: [
+        { name: 'asc' }
+      ]
+    });
+
+    // Format response with discount data (same structure as doctor charges)
+    const formattedTests = tests.map(test => {
+      const defaultB2C = test.charges[0]?.b2cCharge || 0;
+      const defaultB2B = test.charges[0]?.b2bCharge || 0;
+      
+      // If organization has custom charges, use those; otherwise use defaults
+      const hasCustomCharges = test.organizationTestCharges.length > 0;
+      const orgCharge = test.organizationTestCharges[0];
+      
+      return {
+        id: test.id,
+        name: test.name,
+        shortName: test.testCode,
+        group: test.department?.name || '',
+        // Default charges from test_charges table
+        defaultB2C: defaultB2C,
+        defaultB2B: defaultB2B,
+        // Organization charges - discountR (default) and discountS (customized)
+        // If NO custom record exists: discountR = defaultB2C, discountS = defaultB2C (not customized)
+        // If custom record exists: use the values from OrganizationTestCharge
+        discountR: hasCustomCharges ? (orgCharge?.discountR || defaultB2C) : defaultB2C,
+        discountS: hasCustomCharges ? (orgCharge?.discountS || defaultB2C) : defaultB2C,
+        // Organization B2C (for backward compatibility)
+        organizationB2C: Math.max(0, hasCustomCharges ? (orgCharge?.discountS || defaultB2C) : defaultB2C),
+        // Is customized - use the isCustomized flag from custom record, false if no record
+        isCustomized: hasCustomCharges ? (orgCharge?.isCustomized === true) : false
+      };
+    });
+
+    res.json({
+      success: true,
+      data: formattedTests,
+      organization: {
+        id: organization.id,
+        name: organization.name
+      }
+    });
+  } catch (error) {
+    console.error('Get organization test charges error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch organization test charges'
     });
   }
 };
@@ -2883,6 +2989,124 @@ export const deleteTestCharge = async (req, res) => {
 };
 
 // Bulk create/update test charges for an organization
+// Bulk create/update organization test charges
+export const bulkCreateOrganizationTestCharges = async (req, res) => {
+  try {
+    const { organizationId, charges } = req.body;
+
+    if (!organizationId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Organization ID is required'
+      });
+    }
+
+    if (!Array.isArray(charges) || charges.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Charges array is required'
+      });
+    }
+
+    // Verify organization exists
+    const organization = await prisma.organization.findUnique({
+      where: { id: organizationId }
+    });
+
+    if (!organization) {
+      return res.status(404).json({
+        success: false,
+        message: 'Organization not found'
+      });
+    }
+
+    const results = [];
+    const errors = [];
+    let created = 0;
+    let updated = 0;
+
+    for (const charge of charges) {
+      try {
+        const { testId, discountR, discountS } = charge;
+
+        if (!testId || (discountR === undefined && discountS === undefined)) {
+          errors.push({ testId, error: 'Test ID and at least one discount value required' });
+          continue;
+        }
+
+        // Check if test exists
+        const test = await prisma.test.findUnique({
+          where: { id: parseInt(testId) }
+        });
+
+        if (!test) {
+          errors.push({ testId, error: 'Test not found' });
+          continue;
+        }
+
+        const discountRVal = charge.discountR !== undefined ? parseFloat(charge.discountR) : 0;
+        const discountSVal = charge.discountS !== undefined ? parseFloat(charge.discountS) : 0;
+        const isCustomizedFlag = Math.abs(discountSVal - discountRVal) > 0.01; // Allow small floating point difference
+
+        const existingCharge = await prisma.organizationTestCharge.findFirst({
+          where: {
+            testId: parseInt(testId),
+            organizationId: organizationId
+          }
+        });
+
+        let result;
+        if (existingCharge) {
+          // Update existing charge
+          result = await prisma.organizationTestCharge.update({
+            where: { id: existingCharge.id },
+            data: {
+              discountR: discountRVal,
+              discountS: discountSVal,
+              isCustomized: isCustomizedFlag
+            }
+          });
+          updated++;
+        } else {
+          // Create new charge
+          result = await prisma.organizationTestCharge.create({
+            data: {
+              testId: parseInt(testId),
+              organizationId: organizationId,
+              discountR: discountRVal,
+              discountS: discountSVal,
+              isCustomized: isCustomizedFlag,
+              isActive: true
+            }
+          });
+          created++;
+        }
+        results.push(result);
+      } catch (error) {
+        errors.push({ testId: charge.testId, error: error.message });
+      }
+    }
+
+    res.json({
+      success: true,
+      message: `Processed ${results.length} charges successfully${errors.length > 0 ? ` with ${errors.length} errors` : ''}`,
+      data: {
+        created,
+        updated,
+        total: results.length,
+        errors: errors.length > 0 ? errors : null,
+        charges: results
+      }
+    });
+  } catch (error) {
+    console.error('Bulk create organization test charges error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to bulk create organization test charges'
+    });
+  }
+};
+
 export const bulkCreateTestCharges = async (req, res) => {
   try {
     const { organizationId, doctorId, charges } = req.body;

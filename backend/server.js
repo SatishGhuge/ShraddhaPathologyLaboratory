@@ -32,8 +32,8 @@ const allowedOrigins = [
   'http://localhost:5173',
   'http://localhost:5174',
   'http://localhost:5175',
-  'http://192.168.0.119:3000',  // ← Your phone IP
-  'http://192.168.0.119:5000',  // ← Your phone can access backend too
+  'http://192.168.0.105:3000',  // ← Your phone IP
+  'http://192.168.0.105:5000',  // ← Your phone can access backend too
 ];
 
 app.use(cors({

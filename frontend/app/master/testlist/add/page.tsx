@@ -2116,11 +2116,12 @@ const AddTest = () => {
                           )}
                         </div>
                         <input 
-                          className="px-2 py-1.5 sm:py-1 border border-gray-300 rounded text-xs sm:text-sm w-full sm:w-32" 
-                          placeholder="Machine Code" 
-                          value={parameter.machineCode || ""}
-                          onChange={(e) => handleParameterChange(categoryIndex, paramIndex, 'machineCode', e.target.value)}
-                          disabled={isViewMode} 
+                          className="px-2 py-1.5 sm:py-1 border border-orange-500 rounded text-xs sm:text-sm w-full sm:w-32 font-semibold bg-orange-50 focus:bg-white" 
+                          placeholder="Parameter Code *" 
+                          value={parameter.parameterCode || ""}
+                          onChange={(e) => handleParameterChange(categoryIndex, paramIndex, 'parameterCode', e.target.value)}
+                          disabled={isViewMode}
+                          title="Machine parameter code for test mapping (e.g., WBC, HGB, PLT)"
                         />
                         <input 
                           className="px-2 py-1.5 sm:py-1 border border-gray-300 rounded text-xs sm:text-sm w-full sm:w-24" 

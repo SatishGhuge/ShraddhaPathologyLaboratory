@@ -1,0 +1,33 @@
+{
+  "name": "biorad-d10-local-agent",
+  "version": "1.0.0",
+  "description": "Bio-Rad D-10 Hemoglobin Analyzer LIS Integration - ASTM E1381/E1394 Protocol",
+  "main": "app.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node app.js",
+    "dev": "nodemon app.js"
+  },
+  "keywords": [
+    "biorad",
+    "d10",
+    "a1c",
+    "hba1c",
+    "astm",
+    "lis",
+    "integration",
+    "local-agent"
+  ],
+  "author": "SnapSofts",
+  "license": "UNLICENSED",
+  "dependencies": {
+    "mysql2": "^3.6.5",
+    "axios": "^1.6.2"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.2"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
