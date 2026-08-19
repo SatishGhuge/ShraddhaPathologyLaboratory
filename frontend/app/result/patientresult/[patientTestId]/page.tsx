@@ -391,34 +391,32 @@ const PatientResult = () => {
 
   const getAgeAppropriateRange = (parameter, ageYears, ageMonths, ageDays, patientGender) => {
     if (!parameter) return '';
-    if (parameter.type === 'Text' || parameter.isDescriptive)
-      return parameter.textContent || parameter.normalRange || '';
     
-    // Use the new Int age fields directly - they're already calculated and accurate
     const exactAgeInYears = ageYears ?? 0;
     const exactAgeInMonths = ageMonths ?? 0;
     const exactAgeInDays = ageDays ?? 0;
-    
     const gender = patientGender?.toLowerCase();
     
-    // 🔴 DEBUG: Log ALL parameters being checked
-    console.log(`🔍 getAgeAppropriateRange DEBUG:`);
-    console.log(`   Parameter: ${parameter.parameterName}`);
-    console.log(`   Patient Age: ${exactAgeInYears}Y ${exactAgeInMonths}M ${exactAgeInDays}D`);
-    console.log(`   Patient Gender: ${gender}`);
-    console.log(`   Range Type: ${parameter.rangeType}`);
-    console.log(`   Age Ranges JSON: ${parameter.ageRanges}`);
-    
-    // ✅ Check complex age ranges first
+    // ✅ PRIORITY 1: Check Display Range Text for matching gender/age
+    // First check age ranges with display text
     if (parameter.ageRanges) {
       try {
-        const ageRanges = JSON.parse(parameter.ageRanges);
-        console.log(`   ✅ Parsed ageRanges:`, ageRanges);
+        let ageRanges = JSON.parse(parameter.ageRanges);
+        
+        // Sort by gender priority
+        ageRanges = ageRanges.sort((a, b) => {
+          const aGender = a.gender?.toLowerCase() || 'both';
+          const bGender = b.gender?.toLowerCase() || 'both';
+          const aMatchesGender = aGender === gender ? 0 : (aGender === 'both' ? 1 : 2);
+          const bMatchesGender = bGender === gender ? 0 : (bGender === 'both' ? 1 : 2);
+          return aMatchesGender - bMatchesGender;
+        });
+        
         for (const range of ageRanges) {
           if (!range.enabled) continue;
           const rangeGender = range.gender?.toLowerCase();
-          // Skip if gender doesn't match, unless it's 'both' (which applies to all)
           if (rangeGender && rangeGender !== 'both' && rangeGender !== gender) continue;
+          
           let ageMatches = false;
           if (range.label?.includes('Less Than') && range.value != null)
             ageMatches = getAgeInUnit(exactAgeInYears, exactAgeInMonths, exactAgeInDays, range.timeUnit) < range.value;
@@ -430,75 +428,78 @@ const PatientResult = () => {
           } else if (range.label?.includes('Equal To') && range.value != null)
             ageMatches = getAgeInUnit(exactAgeInYears, exactAgeInMonths, exactAgeInDays, range.timeUnit) === range.value;
           
+          // If age matches and there's a display range text, show ONLY that
+          if (ageMatches && range.displayRangeText) {
+            return range.displayRangeText;
+          }
+          
+          // Otherwise return numeric range if available
           if (ageMatches && range.ll != null && range.ul != null) {
-            console.log(`✅ Matched age range: ${range.label} (${range.ll} - ${range.ul})`);
             return `${range.ll} - ${range.ul}`;
           }
         }
       } catch (e) { console.warn('Error parsing age ranges:', e); }
     }
     
-    // ✅ Check gender and age-based ranges (BySex/ByGenderAndAge)
-    console.log(`   Checking BySex/ByGenderAndAge...`);
-    console.log(`   childActive: ${parameter.childActive}, childLowValue: ${parameter.childLowValue}, childHighValue: ${parameter.childHighValue}`);
-    console.log(`   femaleActive: ${parameter.femaleActive}, femaleLowValue: ${parameter.femaleLowValue}, femaleHighValue: ${parameter.femaleHighValue}`);
-    console.log(`   maleActive: ${parameter.maleActive}, maleLowValue: ${parameter.maleLowValue}, maleHighValue: ${parameter.maleHighValue}`);
-    
+    // ✅ PRIORITY 2: For BySex ranges - check gender-specific Display Range Text first, then numeric ranges
     if (parameter.rangeType === 'BySex' || parameter.rangeType === 'ByGenderAndAge') {
-      // Child range (age < 18) - highest priority for children
-      if (exactAgeInYears < 18 && parameter.childActive && parameter.childLowValue != null && parameter.childHighValue != null) {
-        console.log(`✅ Applied CHILD range: ${parameter.childLowValue} - ${parameter.childHighValue}`);
-        return `${parameter.childLowValue} - ${parameter.childHighValue}`;
+      if (exactAgeInYears < 18 && parameter.childActive) {
+        // Child: check default/defaultDisplayText first
+        if (parameter.defaultDisplayText) {
+          return parameter.defaultDisplayText;
+        }
+        if (parameter.childLowValue != null && parameter.childHighValue != null) {
+          return `${parameter.childLowValue} - ${parameter.childHighValue}`;
+        }
       }
       
-      // Adult ranges (age >= 18) - match by gender
       if (exactAgeInYears >= 18) {
-        // Check patient's actual gender
-        if (gender === 'female' && parameter.femaleActive && parameter.femaleLowValue != null && parameter.femaleHighValue != null) {
-          console.log(`✅ Applied FEMALE range (gender match): ${parameter.femaleLowValue} - ${parameter.femaleHighValue}`);
-          return `${parameter.femaleLowValue} - ${parameter.femaleHighValue}`;
-        }
-        if (gender === 'male' && parameter.maleActive && parameter.maleLowValue != null && parameter.maleHighValue != null) {
-          console.log(`✅ Applied MALE range (gender match): ${parameter.maleLowValue} - ${parameter.maleHighValue}`);
-          return `${parameter.maleLowValue} - ${parameter.maleHighValue}`;
-        }
-        
-        // If gender doesn't match male/female, try both with priority to male
-        if (!['male', 'female'].includes(gender)) {
-          console.log(`⚠️ Gender is "${gender}" (not male/female), checking both ranges...`);
-          if (parameter.maleActive && parameter.maleLowValue != null && parameter.maleHighValue != null) {
-            console.log(`✅ Applied MALE range (fallback for non-standard gender): ${parameter.maleLowValue} - ${parameter.maleHighValue}`);
-            return `${parameter.maleLowValue} - ${parameter.maleHighValue}`;
+        if (gender === 'female' && parameter.femaleActive) {
+          // Female: check femaleDisplayText first
+          if (parameter.femaleDisplayText) {
+            return parameter.femaleDisplayText;
           }
-          if (parameter.femaleActive && parameter.femaleLowValue != null && parameter.femaleHighValue != null) {
-            console.log(`✅ Applied FEMALE range (fallback for non-standard gender): ${parameter.femaleLowValue} - ${parameter.femaleHighValue}`);
+          if (parameter.femaleLowValue != null && parameter.femaleHighValue != null) {
             return `${parameter.femaleLowValue} - ${parameter.femaleHighValue}`;
           }
         }
+        if (gender === 'male' && parameter.maleActive) {
+          // Male: check maleDisplayText first
+          if (parameter.maleDisplayText) {
+            return parameter.maleDisplayText;
+          }
+          if (parameter.maleLowValue != null && parameter.maleHighValue != null) {
+            return `${parameter.maleLowValue} - ${parameter.maleHighValue}`;
+          }
+        }
       }
     }
     
-    // Fallback to any available range (in case rangeType is not BySex/ByGenderAndAge or conditions above didn't match)
-    console.log(`   Checking final fallback ranges...`);
-    
-    // Try gender-specific ranges first regardless of rangeType
-    if (gender === 'female' && parameter.femaleLowValue != null && parameter.femaleHighValue != null) {
-      console.log(`✅ Using FEMALE range (final fallback): ${parameter.femaleLowValue} - ${parameter.femaleHighValue}`);
-      return `${parameter.femaleLowValue} - ${parameter.femaleHighValue}`;
+    // ✅ PRIORITY 3: Final fallback - gender-specific ranges with display text first
+    if (gender === 'female') {
+      if (parameter.femaleDisplayText) {
+        return parameter.femaleDisplayText;
+      }
+      if (parameter.femaleLowValue != null && parameter.femaleHighValue != null) {
+        return `${parameter.femaleLowValue} - ${parameter.femaleHighValue}`;
+      }
     }
-    if (gender === 'male' && parameter.maleLowValue != null && parameter.maleHighValue != null) {
-      console.log(`✅ Using MALE range (final fallback): ${parameter.maleLowValue} - ${parameter.maleHighValue}`);
-      return `${parameter.maleLowValue} - ${parameter.maleHighValue}`;
+    if (gender === 'male') {
+      if (parameter.maleDisplayText) {
+        return parameter.maleDisplayText;
+      }
+      if (parameter.maleLowValue != null && parameter.maleHighValue != null) {
+        return `${parameter.maleLowValue} - ${parameter.maleHighValue}`;
+      }
     }
-    
-    // If no gender-specific range, try child range
     if (parameter.childLowValue != null && parameter.childHighValue != null) {
-      console.log(`✅ Using CHILD range (final fallback): ${parameter.childLowValue} - ${parameter.childHighValue}`);
+      if (parameter.defaultDisplayText) {
+        return parameter.defaultDisplayText;
+      }
       return `${parameter.childLowValue} - ${parameter.childHighValue}`;
     }
     
-    console.log(`❌ No matching range found, returning empty`);
-    return parameter.displayRangeText || parameter.rangeText || parameter.normalRange || '';
+    return '';
   };
 
   const parseRange = (rangeStr: any) => {
@@ -508,9 +509,88 @@ const PatientResult = () => {
     return { low: parseFloat(match[1]), high: parseFloat(match[2]) };
   };
 
+  // ✅ NEW: Get numeric range ONLY (ignore displayRangeText) for abnormal calculation
+  const getNumericRangeOnly = (parameter: any, ageYears: any, ageMonths: any, ageDays: any, patientGender: any) => {
+    if (!parameter) return '';
+    
+    const exactAgeInYears = ageYears ?? 0;
+    const exactAgeInMonths = ageMonths ?? 0;
+    const exactAgeInDays = ageDays ?? 0;
+    const gender = patientGender?.toLowerCase();
+    
+    // ✅ ONLY numeric ranges for abnormal calculation (ignore displayRangeText)
+    // Check complex age ranges first
+    if (parameter.ageRanges) {
+      try {
+        let ageRanges = JSON.parse(parameter.ageRanges);
+        
+        // Sort by gender priority
+        ageRanges = ageRanges.sort((a, b) => {
+          const aGender = a.gender?.toLowerCase() || 'both';
+          const bGender = b.gender?.toLowerCase() || 'both';
+          const aMatchesGender = aGender === gender ? 0 : (aGender === 'both' ? 1 : 2);
+          const bMatchesGender = bGender === gender ? 0 : (bGender === 'both' ? 1 : 2);
+          return aMatchesGender - bMatchesGender;
+        });
+        
+        for (const range of ageRanges) {
+          if (!range.enabled) continue;
+          const rangeGender = range.gender?.toLowerCase();
+          if (rangeGender && rangeGender !== 'both' && rangeGender !== gender) continue;
+          
+          let ageMatches = false;
+          if (range.label?.includes('Less Than') && range.value != null)
+            ageMatches = getAgeInUnit(exactAgeInYears, exactAgeInMonths, exactAgeInDays, range.timeUnit) < range.value;
+          else if (range.label?.includes('More Than') && range.value != null)
+            ageMatches = getAgeInUnit(exactAgeInYears, exactAgeInMonths, exactAgeInDays, range.timeUnit) > range.value;
+          else if (range.label?.includes('Between') && range.from != null && range.to != null) {
+            const v = getAgeInUnit(exactAgeInYears, exactAgeInMonths, exactAgeInDays, range.timeUnit);
+            ageMatches = v >= range.from && v <= range.to;
+          } else if (range.label?.includes('Equal To') && range.value != null)
+            ageMatches = getAgeInUnit(exactAgeInYears, exactAgeInMonths, exactAgeInDays, range.timeUnit) === range.value;
+          
+          // Return numeric range only (ignore displayRangeText)
+          if (ageMatches && range.ll != null && range.ul != null) {
+            return `${range.ll} - ${range.ul}`;
+          }
+        }
+      } catch (e) { console.warn('Error parsing age ranges:', e); }
+    }
+    
+    // For BySex ranges - return numeric ranges only
+    if (parameter.rangeType === 'BySex' || parameter.rangeType === 'ByGenderAndAge') {
+      if (exactAgeInYears < 18 && parameter.childActive && parameter.childLowValue != null && parameter.childHighValue != null) {
+        return `${parameter.childLowValue} - ${parameter.childHighValue}`;
+      }
+      
+      if (exactAgeInYears >= 18) {
+        if (gender === 'female' && parameter.femaleActive && parameter.femaleLowValue != null && parameter.femaleHighValue != null) {
+          return `${parameter.femaleLowValue} - ${parameter.femaleHighValue}`;
+        }
+        if (gender === 'male' && parameter.maleActive && parameter.maleLowValue != null && parameter.maleHighValue != null) {
+          return `${parameter.maleLowValue} - ${parameter.maleHighValue}`;
+        }
+      }
+    }
+    
+    // Final fallback: gender-specific ranges
+    if (gender === 'female' && parameter.femaleLowValue != null && parameter.femaleHighValue != null) {
+      return `${parameter.femaleLowValue} - ${parameter.femaleHighValue}`;
+    }
+    if (gender === 'male' && parameter.maleLowValue != null && parameter.maleHighValue != null) {
+      return `${parameter.maleLowValue} - ${parameter.maleHighValue}`;
+    }
+    if (parameter.childLowValue != null && parameter.childHighValue != null) {
+      return `${parameter.childLowValue} - ${parameter.childHighValue}`;
+    }
+    
+    return '';
+  };
+
   const isValueOutOfRange = (param: any, numericValue: any) => {
     if (param.type !== 'Numeric' || numericValue === null || numericValue === undefined || numericValue === '') return false;
-    const rangeStr = getAgeAppropriateRange(param, patientData?.patient?.ageYears, patientData?.patient?.ageMonths, patientData?.patient?.ageDays, patientData?.patient?.gender);
+    // ✅ Use numeric range only (getNumericRangeOnly) for abnormal calculation, NOT displayRangeText
+    const rangeStr = getNumericRangeOnly(param, patientData?.patient?.ageYears, patientData?.patient?.ageMonths, patientData?.patient?.ageDays, patientData?.patient?.gender);
     const range = parseRange(rangeStr);
     if (!range) return false;
     return parseFloat(numericValue) < range.low || parseFloat(numericValue) > range.high;
@@ -518,7 +598,8 @@ const PatientResult = () => {
 
   const getRangeIndicator = (param: any, numericValue: any) => {
     if (param.type !== 'Numeric' || numericValue === null || numericValue === undefined || numericValue === '') return null;
-    const rangeStr = getAgeAppropriateRange(param, patientData?.patient?.ageYears, patientData?.patient?.ageMonths, patientData?.patient?.ageDays, patientData?.patient?.gender);
+    // ✅ Use numeric range only (getNumericRangeOnly) for abnormal calculation, NOT displayRangeText
+    const rangeStr = getNumericRangeOnly(param, patientData?.patient?.ageYears, patientData?.patient?.ageMonths, patientData?.patient?.ageDays, patientData?.patient?.gender);
     const range = parseRange(rangeStr);
     if (!range) return null;
     const value = parseFloat(numericValue);
@@ -1750,8 +1831,9 @@ const PatientResult = () => {
                                 <td className="border p-2 text-xs">{param.units || '-'}</td>
                                 <td className="border p-2 text-xs">
                                   {stripHtmlTags(
-                                    getAgeAppropriateRange(param, patientData?.patient?.ageYears, patientData?.patient?.ageMonths, patientData?.patient?.ageDays, patientData?.patient?.gender) 
-                                    || param.normalRange || param.displayRangeText || param.rangeText || '-'
+                                    param.type === 'Text' || param.isDescriptive
+                                      ? (getAgeAppropriateRange(param, patientData?.patient?.ageYears, patientData?.patient?.ageMonths, patientData?.patient?.ageDays, patientData?.patient?.gender) || '')
+                                      : (getAgeAppropriateRange(param, patientData?.patient?.ageYears, patientData?.patient?.ageMonths, patientData?.patient?.ageDays, patientData?.patient?.gender) || param.normalRange || param.displayRangeText || param.rangeText || '-')
                                   )}
                                 </td>
                                 <td className="border p-2 text-center" style={{width: '40px'}}>
@@ -2037,8 +2119,7 @@ const PatientResult = () => {
                             </td>
                             <td className="border p-2">
                               {stripHtmlTags(
-                                getAgeAppropriateRange(param, patientData?.patient?.ageYears, patientData?.patient?.ageMonths, patientData?.patient?.ageDays, patientData?.patient?.gender)
-                                || param.normalRange || param.displayRangeText || param.rangeText || '-'
+                                getAgeAppropriateRange(param, patientData?.patient?.ageYears, patientData?.patient?.ageMonths, patientData?.patient?.ageDays, patientData?.patient?.gender) || ''
                               )}
                             </td>
                             <td className="border p-2 text-center" style={{width: '40px'}}>

@@ -612,6 +612,62 @@ const ProfessionalReport = React.forwardRef<HTMLDivElement, ProfessionalReportPr
       return n < parseFloat(m[1]) || n > parseFloat(m[2]);
     };
 
+    // ✅ NEW: Get display range text - prioritize textContent, then gender-specific, then numeric ranges
+    const getDisplayRangeText = (param: any, patientGender?: string): string => {
+      // For TEXT/Descriptive types, ONLY show textContent - NEVER show fallback ranges
+      if (param.type === 'Text' || param.isDescriptive) {
+        if (param.textContent?.trim() && param.textContent !== '-') {
+          return param.textContent;
+        }
+        // For TEXT types without textContent, return empty (no fallback to normalRange)
+        return '';
+      }
+      
+      // For NUMERIC types, use full priority chain
+      // PRIORITY 1: textContent (RIGHT textarea)
+      if (param.textContent?.trim() && param.textContent !== '-') {
+        return param.textContent;
+      }
+      
+      // PRIORITY 2: Gender-specific display text
+      const gender = patientGender?.toLowerCase();
+      if (gender === 'female' && param.femaleDisplayText?.trim() && param.femaleDisplayText !== '-') {
+        return param.femaleDisplayText;
+      }
+      if (gender === 'male' && param.maleDisplayText?.trim() && param.maleDisplayText !== '-') {
+        return param.maleDisplayText;
+      }
+      
+      // PRIORITY 3: Default/child display text
+      if (param.defaultDisplayText?.trim() && param.defaultDisplayText !== '-') {
+        return param.defaultDisplayText;
+      }
+      
+      // PRIORITY 4: Gender-specific numeric ranges
+      if (gender === 'female' && param.femaleLowValue != null && param.femaleHighValue != null) {
+        return `${param.femaleLowValue} - ${param.femaleHighValue}`;
+      }
+      if (gender === 'male' && param.maleLowValue != null && param.maleHighValue != null) {
+        return `${param.maleLowValue} - ${param.maleHighValue}`;
+      }
+      
+      // PRIORITY 5: Child numeric range
+      if (param.childLowValue != null && param.childHighValue != null) {
+        return `${param.childLowValue} - ${param.childHighValue}`;
+      }
+      
+      // PRIORITY 6: Fallback to normalRange or rangeText (only for Numeric types)
+      if (param.normalRange?.trim() && param.normalRange !== '-') {
+        return param.normalRange;
+      }
+      if (param.rangeText?.trim() && param.rangeText !== '-') {
+        return param.rangeText;
+      }
+      
+      // FINAL: Empty if nothing available
+      return '';
+    };
+
     const allGroupedParams = useMemo(() => {
       const tests = combinedTests.length > 0
         ? combinedTests
@@ -628,12 +684,30 @@ const ProfessionalReport = React.forwardRef<HTMLDivElement, ProfessionalReportPr
       // If forceShowReferenceRange is true, always show ranges
       if (forceShowReferenceRange) return true;
       
-      // Otherwise, use the detection logic
+      // Show range column if ANY parameter has:
+      // - For Numeric: display text or numeric ranges
+      // - For Text/Descriptive: display text (RIGHT textarea content)
       return allGroupedParams.some((cp: any) =>
         (cp as any[]).some((p: any) => {
-          if (p.type === 'Text' || p.isDescriptive) return false;
-          const r = p.normalRange || p.rangeText;
-          return r?.trim() && r !== '-';
+          // For Text/Descriptive types, check for textContent only
+          if (p.type === 'Text' || p.isDescriptive) {
+            return (p.textContent?.trim() && p.textContent !== '-');
+          }
+          
+          // For Numeric types, check display text and numeric ranges
+          const hasDisplayText = (p.textContent?.trim() && p.textContent !== '-') ||
+                                (p.maleDisplayText?.trim() && p.maleDisplayText !== '-') ||
+                                (p.femaleDisplayText?.trim() && p.femaleDisplayText !== '-') ||
+                                (p.defaultDisplayText?.trim() && p.defaultDisplayText !== '-');
+          
+          const hasNumericRanges = (p.maleLowValue != null && p.maleHighValue != null) ||
+                                   (p.femaleLowValue != null && p.femaleHighValue != null) ||
+                                   (p.childLowValue != null && p.childHighValue != null);
+          
+          const hasRangeText = (p.normalRange?.trim() && p.normalRange !== '-') ||
+                              (p.rangeText?.trim() && p.rangeText !== '-');
+          
+          return hasDisplayText || hasNumericRanges || hasRangeText;
         })
       );
     }, [allGroupedParams, forceShowReferenceRange]);
@@ -756,7 +830,7 @@ const ProfessionalReport = React.forwardRef<HTMLDivElement, ProfessionalReportPr
           )}
           {showRange && (
             <td style={{ padding: '1px 3px', ...bodyStyle, color: '#000', minHeight: '14px', fontSize: '11px' }}>
-              {strip(p.normalRange || p.rangeText || '') || '-'}
+              {strip(getDisplayRangeText(p, patient?.gender) || '') || ''}
             </td>
           )}
         </tr>

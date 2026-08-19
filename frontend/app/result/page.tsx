@@ -545,19 +545,78 @@ export default function Result() {
   const getAgeAppropriateRange = (parameterData: any, patient: any) => {
     if (!parameterData) return '-';
     
-    // 🔴 DEBUG: Log when this function is called
-    console.log(`🔴 Frontend getAgeAppropriateRange called for:`, {
-      parameterName: parameterData.parameterName,
-      patientName: patient.patient_name,
-      patientAge: `${patient.ageYears}Y ${patient.ageMonths}M ${patient.ageDays}D`,
-      gender: patient.gender
-    });
+    // ✅ PRIORITY 1: If textContent (RIGHT textarea) has a value, show ONLY that
+    if (parameterData.textContent) {
+      return parameterData.textContent;
+    }
     
-    // ✅ Use new Int age fields
+    // ✅ PRIORITY 2: If textContent is empty, calculate age/gender-based ranges
     const patientAgeYears = patient.ageYears ?? 0;
     const patientAgeMonths = patient.ageMonths ?? 0;
     const patientAgeDays = patient.ageDays ?? 0;
     const patientGender = patient.gender?.toLowerCase();
+    
+    // Check age ranges
+    if (parameterData.ageRanges) {
+      try {
+        let ageRanges = JSON.parse(parameterData.ageRanges);
+        
+        // Sort by gender priority
+        ageRanges = ageRanges.sort((a, b) => {
+          const aGender = a.gender?.toLowerCase() || 'both';
+          const bGender = b.gender?.toLowerCase() || 'both';
+          
+          const aMatchesGender = aGender === patientGender ? 0 : (aGender === 'both' ? 1 : 2);
+          const bMatchesGender = bGender === patientGender ? 0 : (bGender === 'both' ? 1 : 2);
+          
+          return aMatchesGender - bMatchesGender;
+        });
+        
+        for (const range of ageRanges) {
+          if (!range.enabled) continue;
+          const rangeGender = range.gender?.toLowerCase();
+          if (rangeGender && rangeGender !== patientGender && rangeGender !== 'both') continue;
+          
+          let ageMatches = false;
+          if (range.label?.includes('Between') && range.from != null && range.to != null) {
+            const v = getAgeInUnit(patientAgeYears, patientAgeMonths, patientAgeDays, range.timeUnit);
+            ageMatches = v >= range.from && v <= range.to;
+          }
+          
+          if (ageMatches && range.ll != null && range.ul != null) {
+            return `${range.ll} - ${range.ul}`;
+          }
+        }
+      } catch (e) { console.warn('Error parsing age ranges:', e); }
+    }
+    
+    // Fallback to gender and age-based ranges
+    if (parameterData.rangeType === 'BySex' || parameterData.rangeType === 'ByGenderAndAge') {
+      if (patientAgeYears < 18 && parameterData.childLowValue != null && parameterData.childHighValue != null) {
+        return `${parameterData.childLowValue} - ${parameterData.childHighValue}`;
+      }
+      if (patientAgeYears >= 18) {
+        if (patientGender === 'female' && parameterData.femaleLowValue != null && parameterData.femaleHighValue != null) {
+          return `${parameterData.femaleLowValue} - ${parameterData.femaleHighValue}`;
+        }
+        if (patientGender === 'male' && parameterData.maleLowValue != null && parameterData.maleHighValue != null) {
+          return `${parameterData.maleLowValue} - ${parameterData.maleHighValue}`;
+        }
+      }
+    }
+    
+    // Final fallback
+    if (patientGender === 'female' && parameterData.femaleLowValue != null && parameterData.femaleHighValue != null) {
+      return `${parameterData.femaleLowValue} - ${parameterData.femaleHighValue}`;
+    }
+    if (patientGender === 'male' && parameterData.maleLowValue != null && parameterData.maleHighValue != null) {
+      return `${parameterData.maleLowValue} - ${parameterData.maleHighValue}`;
+    }
+    if (parameterData.childLowValue != null && parameterData.childHighValue != null) {
+      return `${parameterData.childLowValue} - ${parameterData.childHighValue}`;
+    }
+    
+    return '';
     
     let exactAgeInYears = patientAgeYears;
     
