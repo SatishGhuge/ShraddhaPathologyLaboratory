@@ -3,7 +3,7 @@
 import { useRouter, useSearchParams } from "next/navigation";
 import React, { useState, useEffect, useRef } from "react";
 import ReactDOM from "react-dom/client";
-import { RefreshCcw, Download, Printer, Mail, Search, FileText, Calendar, Settings, Barcode, ChevronDown, Upload, FileCheck } from "lucide-react";
+import { RefreshCcw, Download, Printer, Mail, Search, FileText, Calendar, Settings, Barcode, ChevronDown, Upload, FileCheck, AlertTriangle } from "lucide-react";
 import JsBarcode from "jsbarcode";
 import BarcodeModal, { generateBarcodeLabels } from "@/app/components/BarcodeModal";
 import ProfessionalReport from "@/app/components/ProfessionalReport";
@@ -386,7 +386,11 @@ export default function Result() {
       const saved = localStorage.getItem('resultPageFilters');
       if (saved) {
         try {
-          return JSON.parse(saved);
+          const parsed = JSON.parse(saved);
+          return {
+            ...parsed,
+            organization: Array.isArray(parsed.organization) ? parsed.organization : []  // Ensure it's an array
+          };
         } catch (e) {
           console.warn('Failed to parse saved filters:', e);
         }
@@ -399,13 +403,14 @@ export default function Result() {
       toDate: new Date().toISOString().split('T')[0],
       searchQuery: '', // For Patient Name, ID, or Visit ID
       department: '',
-      organization: '',
+      organization: [],  // Changed to array for multiple selection
       testName: ''
     };
   });
 
   // Organizations state
   const [organizations, setOrganizations] = useState<any[]>([]);
+  const [showOrgDropdown, setShowOrgDropdown] = useState(false);  // NEW: Show/hide org dropdown
   
   // Departments state
   const [departments, setDepartments] = useState<any[]>([]);
@@ -2376,6 +2381,11 @@ export default function Result() {
       setError(null);
       
       const data = await getPatientTests(filters);
+      
+      // 🔍 DEBUG: Log first few results to check isEmergency field
+      console.log('🔍 RESULT DEBUG - First result tests:', data[0]?.tests?.[0]);
+      console.log('🔍 RESULT DEBUG - isEmergency sample:', data[0]?.tests?.[0]?.isEmergency);
+      
       setResults(data);
       
       // Calculate unique patient registration count
@@ -2436,10 +2446,22 @@ export default function Result() {
 
   // Handle filter changes
   const handleFilterChange = (key: any, value: any) => {
-    setFilters(prev => ({
-      ...prev,
-      [key]: value
-    }));
+    setFilters(prev => {
+      // Special handling for organization (array)
+      if (key === 'organization') {
+        const newOrgs = prev.organization.includes(value)
+          ? prev.organization.filter(org => org !== value)  // Remove if already selected
+          : [...prev.organization, value];  // Add if not selected
+        return {
+          ...prev,
+          organization: newOrgs
+        };
+      }
+      return {
+        ...prev,
+        [key]: value
+      };
+    });
   };
 
   // Listen for filter changes and refetch data (IMPORTANT: includes department, organization, testName filters)
@@ -2545,6 +2567,14 @@ export default function Result() {
 
   // Sort results based on sortBy selection
   const sortedAndFilteredResults = [...filteredResults].sort((a, b) => {
+    // Priority 1: Emergency patients first
+    const aHasEmergency = a.tests?.some((t: any) => t.isEmergency);
+    const bHasEmergency = b.tests?.some((t: any) => t.isEmergency);
+    
+    if (aHasEmergency && !bHasEmergency) return -1;
+    if (!aHasEmergency && bHasEmergency) return 1;
+    
+    // Priority 2: Sort by selected method
     switch (sortBy) {
       case 'date':
         // Sort by date (newest first)
@@ -2871,16 +2901,56 @@ export default function Result() {
                   ))}
                 </select>
                 
-                <select 
-                  value={filters.organization}
-                  onChange={(e) => handleFilterChange('organization', e.target.value)}
-                  className="h-8 rounded border border-gray-300 px-2 text-xs focus:outline-none focus:ring-1 focus:ring-cyan-600"
-                >
-                  <option value="">All Org</option>
-                  {organizations.map(org => (
-                    <option key={org.id} value={org.code}>{org.code || org.name}</option>
-                  ))}
-                </select>
+                {/* Organization Multi-Select Dropdown */}
+                <div className="relative">
+                  <button
+                    onClick={() => setShowOrgDropdown(!showOrgDropdown)}
+                    className="h-8 px-2 rounded border border-gray-300 text-xs focus:outline-none focus:ring-1 focus:ring-cyan-600 bg-white flex items-center gap-1 hover:bg-gray-50"
+                  >
+                    <span className="truncate">
+                      {filters.organization.length === 0 
+                        ? 'All Org' 
+                        : `${filters.organization.length} selected`}
+                    </span>
+                    <ChevronDown size={14} />
+                  </button>
+                  
+                  {showOrgDropdown && (
+                    <div className="absolute top-full left-0 mt-1 bg-white border border-gray-300 rounded shadow-lg z-50 min-w-max max-h-64 overflow-y-auto">
+                      {/* "All" option */}
+                      <label className="flex items-center gap-2 px-3 py-2 hover:bg-gray-100 cursor-pointer border-b">
+                        <input
+                          type="checkbox"
+                          checked={filters.organization.length === 0}
+                          onChange={() => setFilters(prev => ({ ...prev, organization: [] }))}
+                          className="w-4 h-4 cursor-pointer"
+                        />
+                        <span className="text-xs">All Organizations</span>
+                      </label>
+                      
+                      {/* Organization options */}
+                      {organizations.map(org => (
+                        <label key={org.id} className="flex items-center gap-2 px-3 py-2 hover:bg-gray-100 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={filters.organization.includes(org.code)}
+                            onChange={() => handleFilterChange('organization', org.code)}
+                            className="w-4 h-4 cursor-pointer"
+                          />
+                          <span className="text-xs">{org.code || org.name}</span>
+                        </label>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                
+                {/* Close dropdown when clicking outside */}
+                {showOrgDropdown && (
+                  <div
+                    className="fixed inset-0 z-40"
+                    onClick={() => setShowOrgDropdown(false)}
+                  />
+                )}
                 
                 <input 
                   type="text" 
@@ -3045,10 +3115,16 @@ export default function Result() {
                       </tr>
                     ) : (
                       paginatedResults.map((patient, patientIndex) => {
-                        return patient.tests.map((test, testIndex) => (
+                        return patient.tests.map((test, testIndex) => {
+                          const statusBgColor = getStatusBadgeColor(test.result_status);
+                          const rowClassName = test.isEmergency 
+                            ? 'bg-red-50 border-l-4 border-l-red-600 text-gray-800 border-b border-gray-300 cursor-pointer transition-all'
+                            : `${statusBgColor} border-b border-gray-300 cursor-pointer transition-all`;
+                          
+                          return (
                           <tr 
                             key={`${patient.patient_uid}-${test.test_id}`} 
-                            className={`hover:bg-opacity-80 text-gray-800 border-b border-gray-300 cursor-pointer transition-all ${getStatusBadgeColor(test.result_status)}`}
+                            className={`hover:bg-opacity-80 ${rowClassName}`}
                             style={{ height: 'auto', lineHeight: '1.2' }}
                           >
                             {/* Column 1: Checkbox */}
@@ -3095,7 +3171,10 @@ export default function Result() {
                             {/* Column 4: Patient Name with balance icon (show only on first test row) */}
                             <td className="px-1 sm:px-2 py-0.5 sm:py-1 text-[11px] font-medium border border-gray-300">
                               {testIndex === 0 && (
-                                <span className="flex items-center gap-1">
+                                <span className={`flex items-center gap-1 ${test.isEmergency ? 'text-red-700' : ''}`}>
+                                  {test.isEmergency && (
+                                    <AlertTriangle size={14} className="text-yellow-500 flex-shrink-0" />
+                                  )}
                                   <span className="truncate">{patient.patient_name}</span>
                                   {patient.balance_amount > 0 && (
                                     <span
@@ -3450,7 +3529,8 @@ export default function Result() {
                               )}
                             </td>
                           </tr>
-                        ));
+                          );
+                        });
                       })
                     )}
                   </tbody>

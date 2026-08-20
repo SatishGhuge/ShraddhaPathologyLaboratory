@@ -432,7 +432,11 @@ export const createPatient = async (req, res) => {
             patient_history,
             paymentMode: paymentMode || 'Cash',
             businessType: businessType || 'B2C',
-            billingSessionId: billingSession.id
+            billingSessionId: billingSession.id,
+            // ===== EMERGENCY FIELDS =====
+            isEmergency: test.isEmergency || false,
+            emergencySetAt: test.isEmergency ? new Date() : null,
+            emergencySetBy: createdBy || 'SYSTEM'
           };
         });
         
@@ -616,7 +620,11 @@ export const createPatient = async (req, res) => {
             patient_history,
             paymentMode: paymentMode || 'Cash',
             businessType: businessType || 'B2C',
-            billingSessionId: billingSession.id
+            billingSessionId: billingSession.id,
+            // ===== EMERGENCY FIELDS =====
+            isEmergency: test.isEmergency || false,
+            emergencySetAt: test.isEmergency ? new Date() : null,
+            emergencySetBy: createdBy || 'SYSTEM'
           };
         });
         
@@ -3052,6 +3060,70 @@ export const getVisitBill = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Failed to fetch visit bill',
+      error: error.message
+    });
+  }
+};
+
+// ===== EMERGENCY TEST MANAGEMENT =====
+
+// Toggle emergency status for a patient test
+export const toggleTestEmergency = async (req, res) => {
+  try {
+    const { patientTestId } = req.params;
+    const { isEmergency } = req.body;
+
+    if (!patientTestId) {
+      return res.status(400).json({
+        success: false,
+        message: 'patientTestId is required'
+      });
+    }
+
+    if (isEmergency === undefined || isEmergency === null) {
+      return res.status(400).json({
+        success: false,
+        message: 'isEmergency flag is required'
+      });
+    }
+
+    // Update the patient test with emergency flag
+    const updatedTest = await prisma.patientTest.update({
+      where: { id: parseInt(patientTestId) },
+      data: {
+        isEmergency: Boolean(isEmergency),
+        emergencySetAt: isEmergency ? new Date() : null,
+        emergencySetBy: req.user?.name || req.user?.username || 'SYSTEM',
+        updatedAt: new Date()
+      },
+      include: {
+        patient: true,
+        test: true,
+        department: true
+      }
+    });
+
+    console.log(`✅ Test ${patientTestId} emergency status updated to: ${isEmergency}`);
+
+    res.json({
+      success: true,
+      message: `Test marked as ${isEmergency ? 'emergency' : 'normal'}`,
+      data: {
+        id: updatedTest.id,
+        patientId: updatedTest.patientId,
+        testId: updatedTest.testId,
+        testName: updatedTest.test?.name,
+        isEmergency: updatedTest.isEmergency,
+        emergencySetAt: updatedTest.emergencySetAt,
+        emergencySetBy: updatedTest.emergencySetBy
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ Toggle emergency error:', error.message);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to update emergency status',
       error: error.message
     });
   }

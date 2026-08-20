@@ -440,6 +440,8 @@ export default function PatientRegistration() {
   const [visitType, setVisitType] = useState("");
   const [reportMode, setReportMode] = useState("WhatsApp");
   const [sampleBarcodeNo, setSampleBarcodeNo] = useState("");
+  // ===== EMERGENCY FLAG =====
+  const [isEmergency, setIsEmergency] = useState(false);
 
   const [activeTab, setActiveTab] = useState("tests");
   const [refDoctors, setRefDoctors] = useState<any[]>([]);
@@ -872,6 +874,9 @@ export default function PatientRegistration() {
           setSelectedTests(data.selectedTests);
         }
         
+        // Restore emergency flag
+        if (data.isEmergency !== undefined) setIsEmergency(data.isEmergency);
+        
         // Restore billing
         if (data.discount !== undefined) setDiscount(data.discount);
         if (data.discountPercent !== undefined) setDiscountPercent(data.discountPercent);
@@ -903,7 +908,7 @@ export default function PatientRegistration() {
           sampleBarcodeNo, refDoctor, isManualRefDoctor, manualRefDoctorName,
           selectedOrganization, selectedOrganizationCode, organizationSearch,
           selectedTests, discount, discountPercent, discountRemark,
-          paid, paymentMode, businessType,
+          paid, paymentMode, businessType, isEmergency,
           timestamp: Date.now()
         };
         localStorage.setItem(STORAGE_KEY, JSON.stringify(dataToSave));
@@ -916,7 +921,7 @@ export default function PatientRegistration() {
   }, [
     firstName, lastName, title, dob, age, babyAgeFormatted, mobile, email, address, location, locationSearch, gender, remarks,
     visitType, reportMode, sampleBarcodeNo,
-    refDoctor, isManualRefDoctor, manualRefDoctorName, selectedTests,
+    refDoctor, isManualRefDoctor, manualRefDoctorName, selectedTests, isEmergency,
     selectedOrganization, organizationSearch,
     discount, discountPercent, discountRemark, paid, paymentMode, businessType
   ]);
@@ -960,6 +965,7 @@ export default function PatientRegistration() {
     setIsManualRefDoctor(false);
     setManualRefDoctorName("");
     setSelectedTests([]);
+    setIsEmergency(false);  // Reset emergency flag
     setDiscount(0);
     setDiscountPercent(0);
     setDiscountRemark("");
@@ -1745,6 +1751,7 @@ export default function PatientRegistration() {
       const balAmt = (totalAmt - discAmt) - paidAmt;
       
       // Tests are already expanded (packages expanded on add)
+      // Mark ALL tests as emergency if the visit is marked emergency
       const expandedTests = selectedTests.map(item => ({
         id: item.id,
         departmentId: item.departmentId,
@@ -1752,7 +1759,9 @@ export default function PatientRegistration() {
         department: item.department || "General",
         sample: item.sample || "N/A",
         charge: businessType === "B2C" ? item.b2cCharge : item.b2bCharge,
-        packageName: item.fromPackage || null
+        packageName: item.fromPackage || null,
+        // ===== EMERGENCY FIELD - Applied to ALL tests if visit is emergency =====
+        isEmergency: isEmergency
       }));
       
       // Prepare patient data for backend with all fields
@@ -3476,6 +3485,18 @@ export default function PatientRegistration() {
                   <div className="flex col-span-2">
                     <span className="font-semibold w-32">Remarks:</span>
                     <span>{remarks || "N/A"}</span>
+                  </div>
+                  {/* Emergency Flag */}
+                  <div className="flex col-span-2 items-center gap-3 p-3 bg-red-50 border border-red-200 rounded">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={isEmergency}
+                        onChange={(e) => setIsEmergency(e.target.checked)}
+                        className="w-4 h-4 cursor-pointer"
+                      />
+                      <span className="font-semibold text-red-700 text-sm">Mark this visit as EMERGENCY</span>
+                    </label>
                   </div>
                 </div>
               </div>

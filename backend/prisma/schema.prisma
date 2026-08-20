@@ -293,6 +293,11 @@ model PatientTest {
   sampleBarcodeNo   String?
   patient_history   String?             @db.Text
   
+  // ===== EMERGENCY FIELDS =====
+  isEmergency       Boolean             @default(false)  // Flag to mark test as emergency
+  emergencySetAt    DateTime?                            // When marked as emergency
+  emergencySetBy    String?                              // Who marked it as emergency
+  
   // ===== MEDICAL FIELDS (No billing here anymore) =====
   paymentMode       String?
   businessType      String?
@@ -340,6 +345,7 @@ model PatientTest {
   @@index([billingSessionId])
   @@index([patientId], map: "patient_tests_patientId_fkey")
   @@index([packageId], map: "patient_tests_packageId_fkey")
+  @@index([isEmergency])
   @@map("patient_tests")
 }
 

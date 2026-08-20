@@ -13,7 +13,7 @@ import {
   Search, RotateCcw, Eye, Pencil, Trash2, Printer,
   Download, ChevronDown,
   RefreshCcw, Plus, X, RefreshCw,
-  ChevronLeft, ChevronRight, CalendarDays, AlertCircle, Barcode
+  ChevronLeft, ChevronRight, CalendarDays, AlertCircle, Barcode, AlertTriangle
 } from "lucide-react";
 import { getAllPatients, updatePayment, updatePatient, updatePatientTestDetails, getVisitBill } from "@/src/api/patient";
 import { getDoctors, getTests, getPackages, getSpecimenTypes, getOrganizations } from "@/src/api/master";
@@ -315,6 +315,7 @@ interface Test {
   charges?: any[];
   group?: string;
   department?: any;
+  isEmergency?: boolean;  // NEW: Emergency flag
 }
 
 interface Booking {
@@ -598,6 +599,7 @@ export default function BookingPage() {
           referralDoctor: t.referralDoctor || "",
           paymentMode: t.paymentMode || "Cash",
           businessType: t.businessType || "B2C",
+          isEmergency: t.isEmergency || false,  // NEW: Include emergency flag
         });
       });
 
@@ -1927,8 +1929,17 @@ export default function BookingPage() {
                 ) : filteredBookings.length === 0 ? (
                   <tr><td colSpan={6} className="px-2 py-1 text-center text-gray-400">No records found</td></tr>
                 ) : (() => {
-                  // Sort by visitId only
+                  // Sort by emergency first, then by visitId
                   const sortedBookings = [...filteredBookings].sort((a, b) => {
+                    // Check if any test in booking is emergency
+                    const aHasEmergency = a.tests?.some((t: any) => t.isEmergency);
+                    const bHasEmergency = b.tests?.some((t: any) => t.isEmergency);
+                    
+                    // Emergency tests first
+                    if (aHasEmergency && !bHasEmergency) return -1;
+                    if (!aHasEmergency && bHasEmergency) return 1;
+                    
+                    // Then by visitId
                     return (b.visitId || '').localeCompare(a.visitId || '');
                   });
                   
@@ -1937,11 +1948,16 @@ export default function BookingPage() {
                   const endIndex = startIndex + ITEMS_PER_PAGE;
                   const paginatedBookings = sortedBookings.slice(startIndex, endIndex);
                   
-                  return paginatedBookings.map((b,i) => (
-                    <tr key={i} className={`border-b hover:bg-gray-50 ${getBookingRowColor(b)}`}>
+                  return paginatedBookings.map((b,i) => {
+                    const hasEmergency = b.tests?.some((t: any) => t.isEmergency);
+                    return (
+                    <tr key={i} className={`border-b hover:bg-gray-50 ${hasEmergency ? 'bg-red-50' : ''} ${getBookingRowColor(b)}`}>
                       <td className="px-2 py-1 text-center font-medium text-xs">{startIndex + i + 1}</td>
                       <td className="px-2 py-1">
-                        <div className="font-semibold text-gray-800 flex items-center gap-2 group text-xs">
+                        <div className={`font-semibold flex items-center gap-2 group text-xs ${hasEmergency ? 'text-red-700' : 'text-gray-800'}`}>
+                          {hasEmergency && (
+                            <AlertTriangle size={16} className="text-yellow-500 flex-shrink-0" />
+                          )}
                           <span>{b.name}</span>
                           {b.balanceAmount > 0 && b.billStatus !== 'PAID' && (
                             <div className="relative inline-flex items-center cursor-help">
@@ -1974,7 +1990,8 @@ export default function BookingPage() {
                         </div>
                       </td>
                     </tr>
-                  ));
+                  );
+                  });
                 })()}
               </tbody>
             </table>

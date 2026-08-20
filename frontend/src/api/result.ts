@@ -39,8 +39,13 @@ export const getPatientTests = async (filters: Filters = {}, page: number = 1, l
   
   // Add filters to query params
   Object.keys(filters).forEach(key => {
-    if (filters[key] && filters[key] !== '' && filters[key] !== 'All') {
-      queryParams.append(key, filters[key]);
+    const value = filters[key];
+    
+    // Special handling for organization array
+    if (key === 'organization' && Array.isArray(value) && value.length > 0) {
+      value.forEach(org => queryParams.append('organization', org));
+    } else if (value && value !== '' && value !== 'All' && !Array.isArray(value)) {
+      queryParams.append(key, value);
     }
   });
   

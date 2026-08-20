@@ -24,7 +24,8 @@ import {
   cancelTest,
   getBillSummary,
   getTransactionHistory,
-  getVisitBill
+  getVisitBill,
+  toggleTestEmergency
 } from '../controllers/patient.controller.js';
 import {
   getPatientVisitReport,
@@ -62,6 +63,9 @@ router.get('/:visitId/transaction-history', getTransactionHistory);
 // Report endpoints
 router.get('/report/visit-details', getPatientVisitReport);
 router.get('/report/billing-summary', getPatientBillingSummary);
+
+// ===== EMERGENCY TEST MANAGEMENT =====
+router.patch('/test/:patientTestId/toggle-emergency', toggleTestEmergency);
 
 // Add tests to existing visit (from BookingDetailsModal)
 router.post('/add-tests-to-visit', addTestsToExistingVisit);

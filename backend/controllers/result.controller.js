@@ -145,13 +145,23 @@ export const getPatientTests = async (req, res) => {
       });
     }
 
-    // Filter by organization - match organization code from the dropdown
+    // Filter by organization - can be single string or array of organization codes
     if (organization && organization !== '') {
-      andConditions.push({ 
-        organization: {
-          code: organization
-        }
-      });
+      // Convert to array if it's a string
+      const orgCodes = Array.isArray(organization) ? organization : [organization];
+      
+      // Filter out empty values
+      const validOrgCodes = orgCodes.filter(code => code && code !== '');
+      
+      if (validOrgCodes.length > 0) {
+        andConditions.push({ 
+          organization: {
+            code: {
+              in: validOrgCodes  // Use 'in' to match any of the codes
+            }
+          }
+        });
+      }
     }
 
     // Filter by test name
@@ -331,6 +341,7 @@ export const getPatientTests = async (req, res) => {
         barcode_status: patientTest.barcode_status || 'Unprinted',
         isOutsourced: patientTest.test?.isOutsourced || false,
         outsourcedTo: patientTest.outsourcedTo || null,
+        isEmergency: patientTest.isEmergency || false,  // ✅ NEW: Include emergency flag
         approved_date: patientTest.visitDate ? (() => {
           const d = patientTest.visitDate;
           const datePart = d.toLocaleDateString('en-GB'); // DD/MM/YYYY
