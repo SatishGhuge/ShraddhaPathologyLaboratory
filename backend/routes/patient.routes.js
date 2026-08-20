@@ -24,9 +24,7 @@ import {
   cancelTest,
   getBillSummary,
   getTransactionHistory,
-  saveSettlement,
-  savePatientSettlement,
-  saveOrgSettlement
+  getVisitBill
 } from '../controllers/patient.controller.js';
 import {
   getPatientVisitReport,
@@ -51,17 +49,15 @@ router.get('/payment-transactions/:visitId', getPaymentTransactions);
 // Get tests by visitId for booking details modal
 router.get('/tests-by-visit', getTestsByVisitId);
 
+// Get fresh VisitBill data for a specific visit (used to refresh balance after settlement)
+router.get('/visit-bill/:visitId', getVisitBill);
+
 // ✅ NEW BILLING OPERATIONS - MUST be before /:id routes
 router.post('/:visitId/discount', applyDiscount);
 router.post('/:visitId/payment-record', recordPayment);
 router.post('/:visitId/cancel-test/:patientTestId', cancelTest);
 router.get('/:visitId/bill-summary', getBillSummary);
 router.get('/:visitId/transaction-history', getTransactionHistory);
-
-// ✅ Settlement endpoints for collection report
-router.post('/settle-visit', saveSettlement);
-router.post('/settle-patient-visits', savePatientSettlement);
-router.post('/settle-org-visits', saveOrgSettlement);
 
 // Report endpoints
 router.get('/report/visit-details', getPatientVisitReport);

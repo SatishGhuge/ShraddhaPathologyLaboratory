@@ -15,7 +15,7 @@ import {
   RefreshCcw, Plus, X, RefreshCw,
   ChevronLeft, ChevronRight, CalendarDays, AlertCircle, Barcode
 } from "lucide-react";
-import { getAllPatients, updatePayment, updatePatient, updatePatientTestDetails } from "@/src/api/patient";
+import { getAllPatients, updatePayment, updatePatient, updatePatientTestDetails, getVisitBill } from "@/src/api/patient";
 import { getDoctors, getTests, getPackages, getSpecimenTypes, getOrganizations } from "@/src/api/master";
 import html2pdf from "html2pdf.js";
 import { jsPDF } from "jspdf";
@@ -795,6 +795,75 @@ export default function BookingPage() {
   // When a booking is selected, pre-fill billing fields from stored amounts
   useEffect(() => {
     if (selectedBooking) {
+      // Fetch fresh VisitBill data from backend to get the latest balance
+      const refreshBookingBalance = async () => {
+        try {
+          console.log('🔍 [Search Booking] Attempting to fetch fresh VisitBill for visitId:', selectedBooking.visitId);
+          const response = await getVisitBill(selectedBooking.visitId);
+          
+          console.log('📥 [Search Booking] API Response:', response);
+          
+          if (response.success && response.data) {
+            // Update the selected booking with fresh data
+            const freshBalance = response.data.balanceAmount || 0;
+            const freshPaid = response.data.totalPaid || 0;
+            
+            console.log('✅ [Search Booking] Fresh VisitBill fetched:', {
+              visitId: selectedBooking.visitId,
+              balanceAmount: freshBalance,
+              totalPaid: freshPaid,
+              grossAmount: response.data.grossAmount,
+              status: response.data.status
+            });
+            
+            // Update the selectedBooking in the bookings array and state
+            const updatedBookings = bookings.map(b => 
+              b.visitId === selectedBooking.visitId 
+                ? {
+                    ...b,
+                    balanceAmount: freshBalance,
+                    paidAmount: freshPaid,
+                    paymentStatus: freshBalance <= 0.01 ? "Paid" : "Due"
+                  }
+                : b
+            );
+            
+            setBookings(updatedBookings);
+            
+            // Update selectedBooking state - this will trigger the setBilling below
+            const updatedSelected = updatedBookings.find(b => b.visitId === selectedBooking.visitId);
+            if (updatedSelected) {
+              console.log('🔄 [Search Booking] Updating selectedBooking with fresh data');
+              setSelectedBooking(updatedSelected);
+            }
+          } else {
+            console.warn('⚠️ [Search Booking] API response was not successful:', response);
+          }
+        } catch (error) {
+          console.error('❌ [Search Booking] Failed to refresh booking balance:', error);
+          // Continue anyway - fallback to existing data
+        }
+      };
+      
+      refreshBookingBalance();
+    } else {
+      // Reset billing when no booking is selected
+      setBilling({
+        advance: "", discount: "", discountPercent: "",
+        refund: "", balAmt: "", payment: "", remarks: "", paymentMode: "Cash"
+      });
+    }
+  }, [selectedBooking?.bookingId]); // Changed from patientId to bookingId
+
+  // Separate useEffect to update billing form with current selectedBooking data (fresh OR original)
+  useEffect(() => {
+    if (selectedBooking) {
+      console.log('📋 [Search Booking] Updating billing form with selectedBooking:', {
+        balanceAmount: selectedBooking.balanceAmount,
+        paidAmount: selectedBooking.paidAmount,
+        paymentStatus: selectedBooking.paymentStatus
+      });
+      
       setBilling(prev => ({
         ...prev,
         advance:         String(Math.round(selectedBooking.paidAmount      || 0)),
@@ -804,14 +873,8 @@ export default function BookingPage() {
         remarks:         selectedBooking.discountRemark || "",
         payment:         "",
       }));
-    } else {
-      // Reset billing when no booking is selected
-      setBilling({
-        advance: "", discount: "", discountPercent: "",
-        refund: "", balAmt: "", payment: "", remarks: "", paymentMode: "Cash"
-      });
     }
-  }, [selectedBooking?.bookingId]); // Changed from patientId to bookingId
+  }, [selectedBooking?.balanceAmount, selectedBooking?.paidAmount, selectedBooking?.bookingId]); // Re-run when balance changes
 
   const handleMobileChange = (value: any) => {
     if (/^\d{0,10}$/.test(value)) {
@@ -869,10 +932,12 @@ export default function BookingPage() {
   const discountAmount = (parseFloat(billing.discountPercent) > 0)
     ? (total * parseFloat(billing.discountPercent) / 100)
     : (parseFloat(billing.discount) || 0);
-  const netAmount = Math.max(0, total - discountAmount);
   const currentPaidAmount = selectedBooking?.paidAmount || 0;
-  // Calculate balance as: netAmount - paidAmount (not from database)
-  const currentBalanceAmount = Math.max(0, netAmount - currentPaidAmount);
+  // Use balance from database (VisitBill) directly - this is the source of truth
+  const currentBalanceAmount = selectedBooking?.balanceAmount || 0;
+  // Net Amount = currentBalanceAmount (fresh from DB after any settlement)
+  // This shows what's actually owed, not a recalculation
+  const netAmount = currentBalanceAmount;
 
   const handleBillingChange = (field: any, value: any) => setBilling(prev=>({...prev,[field]:value}));
 

@@ -1,10 +1,10 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { RotateCcw, Printer, FileSpreadsheet, DollarSign, ChevronDown, Calendar, ChevronLeft, ChevronRight, X } from "lucide-react";
+import { RotateCcw, Printer, FileSpreadsheet, ChevronDown, Calendar, ChevronLeft, ChevronRight, X } from "lucide-react";
 import Header from "@/src/components/Header";
-import SettlementModal from "@/src/components/Settlement/SettlementModal";
 import { getAllPatients, getOrganizations } from "@/src/api/patient";
+import * as XLSX from 'xlsx';
 
 /* ── Date helpers ── */
 const fmtISO = (d: any) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
@@ -152,9 +152,6 @@ export default function CollectionReport() {
   const ITEMS_PER_PAGE = 40;
   const [currentPage, setCurrentPage] = useState(1);
   const [pagination, setPagination] = useState<any>(null);
-  
-  // Settlement state - simplified, delegate to SettlementModal
-  const [showSettlement, setShowSettlement] = useState(false);
 
   const reportType = getReportType(dateFrom, dateTo);
   const reportTitle = reportType === "daily" ? "Daily Collection" : reportType === "monthly" ? "Monthly Collection" : reportType === "annual" ? "Annual Collection" : "Collection Report";
@@ -462,10 +459,6 @@ export default function CollectionReport() {
               className="flex gap-1.5 items-center bg-orange-600 hover:bg-orange-700 text-white px-2 sm:px-3 py-1.5 sm:py-2 rounded text-xs sm:text-sm">
               <Printer size={14}/> Print
             </button>
-            <button onClick={()=>setShowSettlement(true)}
-              className="flex gap-1.5 items-center bg-blue-600 hover:bg-blue-700 text-white px-2 sm:px-3 py-1.5 sm:py-2 rounded text-xs sm:text-sm">
-              <DollarSign size={14}/> Settlement
-            </button>
           </div>
         </div>
 
@@ -560,18 +553,6 @@ export default function CollectionReport() {
           </div>
         </div>
       </div>
-
-      {/* SETTLEMENT MODAL - Using New Component */}
-      <SettlementModal
-        isOpen={showSettlement}
-        onClose={() => setShowSettlement(false)}
-        data={data}
-        organizations={organizations}
-        onSaveSettlement={async (formData) => {
-          // Refresh collection report data after settlement
-          await fetchData(dateFrom, dateTo, organization, nameSearch);
-        }}
-      />
     </>
   );
 }

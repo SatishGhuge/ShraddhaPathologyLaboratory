@@ -28,7 +28,7 @@ export default function SectionButton({
 }: SectionButtonProps) {
   const variants = {
     primary:
-      "bg-[oklch(60%_0.15_45)] hover:bg-[oklch(55%_0.14_45)] text-white",
+      "bg-[oklch(55.5%_0.163_48.998)] hover:bg-[oklch(50%_0.15_48.998)] text-white",
     secondary: "bg-gray-100 hover:bg-gray-200 text-[#1E293B]",
     outline:
       "border-2 border-[oklch(45%_0.085_224.283)] text-[oklch(45%_0.085_224.283)] hover:bg-[oklch(45%_0.085_224.283)] hover:text-white",

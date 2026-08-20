@@ -63,6 +63,7 @@ const allModules: NavModule[] = [
     items: [
       { label: "Dashboard", path: "/reports/report-dashboard" },
       { label: "Collection Report", path: "/reports/collection" },
+      { label: "Organization Settlement", path: "/reports/organization-settlement" },
       { label: "Patient List", path: "/reports/patient-list" },
       { label: "Referral Doctor Revenue", path: "/reports/referral-doctor-revenue" },
       { label: "Test Report", path: "/reports/test-report" },

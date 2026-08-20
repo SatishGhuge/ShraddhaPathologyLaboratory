@@ -237,7 +237,7 @@ export const saveSettlement = async (settlementData: {
   amountPaid: number;
   remark?: string;
 }): Promise<ApiResponse> => {
-  return apiCall('/patients/settle-visit', {
+  return apiCall('/organization-settlement/settle-visit', {
     method: 'POST',
     body: JSON.stringify(settlementData)
   });
@@ -256,7 +256,7 @@ export const savePatientSettlement = async (settlementData: {
   amountPaid: number;
   remark?: string;
 }): Promise<ApiResponse> => {
-  return apiCall('/patients/settle-patient-visits', {
+  return apiCall('/organization-settlement/settle-patient-visits', {
     method: 'POST',
     body: JSON.stringify(settlementData)
   });
@@ -274,8 +274,16 @@ export const saveOrgSettlement = async (settlementData: {
   amountPaid: number;
   remark?: string;
 }): Promise<ApiResponse> => {
-  return apiCall('/patients/settle-org-visits', {
+  return apiCall('/organization-settlement/settle-org-visits', {
     method: 'POST',
     body: JSON.stringify(settlementData)
+  });
+};
+
+
+// Get fresh VisitBill data for a specific visit (used to refresh balance after settlement)
+export const getVisitBill = async (visitId: string): Promise<ApiResponse> => {
+  return apiCall(`/patients/visit-bill/${visitId}`, {
+    method: 'GET',
   });
 };

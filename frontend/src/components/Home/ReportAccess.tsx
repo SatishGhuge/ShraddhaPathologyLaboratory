@@ -17,7 +17,7 @@ export default function ReportAccess() {
             transition={{ duration: 0.5 }}
           >
             <div className="mb-4">
-              <p className="text-[oklch(60%_0.15_45)] text-sm font-semibold uppercase tracking-widest mb-3">
+              <p className="text-[oklch(55.5%_0.163_48.998)] text-sm font-semibold uppercase tracking-widest mb-3">
                 Report Access
               </p>
               <h2 className="text-3xl lg:text-4xl font-bold text-white mb-4 leading-tight">
@@ -77,7 +77,7 @@ export default function ReportAccess() {
                   </div>
                 ))}
 
-                <button className="w-full bg-[oklch(60%_0.15_45)] text-white text-xs font-semibold py-2 rounded-lg mt-2">
+                <button className="w-full bg-[oklch(55.5%_0.163_48.998)] text-white text-xs font-semibold py-2 rounded-lg mt-2">
                   Download PDF
                 </button>
               </div>
