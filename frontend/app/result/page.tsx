@@ -353,6 +353,397 @@ export default function Result() {
   const [showAuthenticateModal, setShowAuthenticateModal] = useState(false);
   const [authenticateData, setAuthenticateData] = useState<any>(null);
 
+  // State for Required Columns dropdown
+  const [showColumnsDropdown, setShowColumnsDropdown] = useState(false);
+  const [columnsFilter, setColumnsFilter] = useState('');
+  const [selectedColumns, setSelectedColumns] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('resultPageColumns');
+      if (saved) {
+        try {
+          return JSON.parse(saved);
+        } catch (e) {}
+      }
+    }
+    // Default columns - all visible
+    return {
+      visitId: true,
+      orgId: true,
+      patientName: true,
+      age: true,
+      gender: true,
+      services: true,
+      result: true,
+      unit: true,
+      refInterval: true,
+      referralDoc: true,
+      ptr: true,
+      atr: true,
+      sTaken: true,
+      barcode: true,
+      history: true
+    };
+  });
+
+  // Column definitions for the required columns section
+  const RESULT_COLUMNS = [
+    { key: 'visitId', label: 'Visit ID' },
+    { key: 'orgId', label: 'Org ID' },
+    { key: 'patientName', label: 'Patient Name' },
+    { key: 'age', label: 'Age' },
+    { key: 'gender', label: 'Gender' },
+    { key: 'services', label: 'Services' },
+    { key: 'result', label: 'Result' },
+    { key: 'unit', label: 'Unit' },
+    { key: 'refInterval', label: 'Ref. Interval' },
+    { key: 'referralDoc', label: 'Referral Doc' },
+    { key: 'ptr', label: 'PTR' },
+    { key: 'atr', label: 'ATR' },
+    { key: 'sTaken', label: 'S.Taken' },
+    { key: 'barcode', label: 'Barcode' },
+    { key: 'history', label: 'History' }
+  ];
+
+  // Update columns and save to localStorage
+  const handleColumnToggle = (columnKey: string) => {
+    const updated = {
+      ...selectedColumns,
+      [columnKey]: !selectedColumns[columnKey]
+    };
+    setSelectedColumns(updated);
+    localStorage.setItem('resultPageColumns', JSON.stringify(updated));
+  };
+
+  // Check all columns
+  const handleCheckAllColumns = () => {
+    const allChecked = Object.fromEntries(RESULT_COLUMNS.map(c => [c.key, true]));
+    setSelectedColumns(allChecked);
+    localStorage.setItem('resultPageColumns', JSON.stringify(allChecked));
+  };
+
+  // Uncheck all columns
+  const handleUncheckAllColumns = () => {
+    const allUnchecked = Object.fromEntries(RESULT_COLUMNS.map(c => [c.key, false]));
+    setSelectedColumns(allUnchecked);
+    localStorage.setItem('resultPageColumns', JSON.stringify(allUnchecked));
+  };
+
+  // Count selected columns
+  const selectedColumnCount = Object.values(selectedColumns).filter(Boolean).length;
+
+  // Handle Print Table as PDF
+  const handlePrintTablePDF = async () => {
+    try {
+      // Import jsPDF
+      const { jsPDF } = await import('jspdf');
+
+      // Prepare table data based on selected columns and visible results
+      const tableData: (string | number)[][] = [];
+      
+      // Add header row
+      const headers: string[] = [];
+      RESULT_COLUMNS.forEach(col => {
+        if (selectedColumns[col.key]) {
+          headers.push(col.label);
+        }
+      });
+
+      // Add data rows
+      paginatedResults.forEach((patient, patientIndex) => {
+        patient.tests.forEach((test, testIndex) => {
+          const row: (string | number)[] = [];
+          
+          RESULT_COLUMNS.forEach(col => {
+            if (selectedColumns[col.key]) {
+              let cellValue = '';
+              
+              // Only show on first test row for patient-level columns
+              if (['visitId', 'orgId', 'patientName', 'age', 'gender'].includes(col.key) && testIndex !== 0) {
+                cellValue = '';
+              } else {
+                switch (col.key) {
+                  case 'visitId':
+                    cellValue = patient.visit_id || '';
+                    break;
+                  case 'orgId':
+                    cellValue = patient.organizationCode || patient.organizationId || '';
+                    break;
+                  case 'patientName':
+                    cellValue = patient.patient_name || '';
+                    break;
+                  case 'age':
+                    if (patient.ageYears !== undefined && patient.ageMonths !== undefined && patient.ageDays !== undefined) {
+                      if (patient.ageYears === 0) {
+                        cellValue = `${patient.ageMonths}M ${patient.ageDays}D`;
+                      } else if (patient.ageYears < 12) {
+                        cellValue = `${patient.ageYears}Y ${patient.ageMonths}M ${patient.ageDays}D`;
+                      } else {
+                        cellValue = (patient.ageYears + patient.ageMonths / 12).toFixed(1);
+                      }
+                    }
+                    break;
+                  case 'gender':
+                    cellValue = patient.gender ? (patient.gender === 'Male' ? 'M' : patient.gender === 'Female' ? 'F' : patient.gender) : '';
+                    break;
+                  case 'services':
+                    cellValue = test.test_name || '';
+                    break;
+                  case 'result':
+                    if (test.parameter_count > 1) {
+                      cellValue = 'Parameter';
+                    } else if (test.isOutsourced) {
+                      cellValue = 'OUTSOURCING';
+                    } else {
+                      cellValue = (test.result_status === 'Entered' || test.result_status === 'Validated' || test.result_status === 'Authorized' || test.result_status === 'Delivered') ? (test.result || '-') : '-';
+                    }
+                    break;
+                  case 'unit':
+                    cellValue = test.parameter_count === 1 ? (test.unit || '') : '';
+                    break;
+                  case 'refInterval':
+                    if (test.parameter_count === 1) {
+                      cellValue = getAgeAppropriateRange(test.ref_interval_data, patient);
+                    }
+                    break;
+                  case 'referralDoc':
+                    cellValue = test.ref_by || '';
+                    break;
+                  case 'ptr':
+                    cellValue = 'View';
+                    break;
+                  case 'atr':
+                    cellValue = 'View';
+                    break;
+                  case 'sTaken':
+                    cellValue = test.sample_taken ? '✓' : '';
+                    break;
+                  case 'barcode':
+                    cellValue = '';
+                    break;
+                  case 'history':
+                    cellValue = testIndex === 0 ? (patient.patient_history || '') : '';
+                    break;
+                  default:
+                    cellValue = '';
+                }
+              }
+              
+              row.push(cellValue);
+            }
+          });
+          
+          tableData.push(row);
+        });
+      });
+
+      // Create PDF with orientation based on number of columns
+      // Use portrait for <= 5 columns, landscape for > 5 columns
+      const numColumns = headers.length;
+      const orientation = numColumns > 5 ? 'l' : 'p'; // 'l' = landscape, 'p' = portrait
+      const doc = new jsPDF(orientation, 'mm', 'a4');
+      
+      // Add title and date
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const pageHeight = doc.internal.pageSize.getHeight();
+      const currentDate = new Date().toLocaleDateString('en-IN');
+      
+      doc.setFontSize(16);
+      doc.text('SHRADDHA PATHOLOGY LABORATORY', pageWidth / 2, 15, { align: 'center' });
+      
+      doc.setFontSize(10);
+      doc.text('Result Report', pageWidth / 2, 22, { align: 'center' });
+      doc.text(`Generated: ${currentDate}`, pageWidth / 2, 28, { align: 'center' });
+      
+      // Add filter info
+      doc.setFontSize(9);
+      let filterText = `Period: ${filters.fromDate} to ${filters.toDate}`;
+      if (filters.searchQuery) filterText += ` | Search: ${filters.searchQuery}`;
+      if (filters.department) filterText += ` | Dept: ${filters.department}`;
+      if (filters.organization.length > 0) filterText += ` | Org: ${filters.organization.join(', ')}`;
+      doc.text(filterText, 14, 34);
+      
+      // Try to use autoTable if available, otherwise create simple table
+      try {
+        const pageWidth = doc.internal.pageSize.getWidth();
+        const pageHeight = doc.internal.pageSize.getHeight();
+        
+        // Dynamically check if autoTable is available
+        const autoTableAvailable = (doc as any).autoTable !== undefined;
+        
+        if (autoTableAvailable) {
+          // Use autoTable plugin
+          (doc as any).autoTable({
+            head: [headers],
+            body: tableData,
+            startY: 40,
+            margin: { top: 40, right: 10, left: 10, bottom: 10 },
+            theme: 'grid',
+            headStyles: {
+              fillColor: [30, 41, 82],
+              textColor: [255, 255, 255],
+              fontStyle: 'bold',
+              fontSize: 8,
+              halign: 'left',
+              valign: 'middle',
+            },
+            bodyStyles: {
+              fontSize: 8,
+              halign: 'left',
+              valign: 'middle',
+            },
+            alternateRowStyles: {
+              fillColor: [245, 245, 245]
+            }
+          });
+        } else {
+          // Fallback: Create professional table manually with borders
+          const margin = 10;
+          const tableWidth = pageWidth - 2 * margin;
+          
+          // Calculate column widths based on header text length
+          // Minimum width per column to prevent text overflow
+          const minColWidth = 15;
+          const maxColWidth = tableWidth / headers.length;
+          
+          // Estimate optimal column widths based on content
+          const columnWidths = headers.map((header, idx) => {
+            // Calculate average content length for this column
+            let maxContentLength = String(header).length;
+            tableData.forEach(row => {
+              const cellLength = String(row[idx] || '').length;
+              if (cellLength > maxContentLength) {
+                maxContentLength = cellLength;
+              }
+            });
+            
+            // Width proportional to content length, but not too narrow or wide
+            const estimatedWidth = Math.max(minColWidth, Math.min(maxColWidth, maxContentLength * 0.8));
+            return estimatedWidth;
+          });
+          
+          // Normalize widths to fit exactly in tableWidth
+          const totalWidth = columnWidths.reduce((sum, w) => sum + w, 0);
+          const scaleFactor = tableWidth / totalWidth;
+          const finalColumnWidths = columnWidths.map(w => w * scaleFactor);
+          
+          let yPosition = 40;
+          const rowHeight = 6;
+          
+          // Draw table header with background
+          doc.setFillColor(30, 41, 82);
+          doc.rect(margin, yPosition, tableWidth, rowHeight, 'F');
+          
+          // Draw header text
+          doc.setTextColor(255, 255, 255);
+          doc.setFont('helvetica', 'bold');
+          doc.setFontSize(8);
+          
+          let xPos = margin;
+          headers.forEach((header, idx) => {
+            const colWidth = finalColumnWidths[idx];
+            // Draw header border
+            doc.setDrawColor(200, 200, 200);
+            doc.rect(xPos, yPosition, colWidth, rowHeight);
+            // Draw text
+            doc.text(String(header).substring(0, 20), xPos + 2, yPosition + 4, { maxWidth: colWidth - 4 });
+            xPos += colWidth;
+          });
+          
+          yPosition += rowHeight;
+          
+          // Draw table rows
+          doc.setTextColor(0, 0, 0);
+          doc.setFont('helvetica', 'normal');
+          doc.setFontSize(7);
+          
+          tableData.forEach((row, rowIdx) => {
+            // Check if we need a new page
+            if (yPosition > pageHeight - 20) {
+              doc.addPage();
+              yPosition = 20;
+              
+              // Redraw header on new page
+              doc.setFillColor(30, 41, 82);
+              doc.rect(margin, yPosition, tableWidth, rowHeight, 'F');
+              
+              doc.setTextColor(255, 255, 255);
+              doc.setFont('helvetica', 'bold');
+              doc.setFontSize(8);
+              
+              let xPosHeader = margin;
+              headers.forEach((header, idx) => {
+                const colWidth = finalColumnWidths[idx];
+                doc.setDrawColor(200, 200, 200);
+                doc.rect(xPosHeader, yPosition, colWidth, rowHeight);
+                doc.text(String(header).substring(0, 20), xPosHeader + 2, yPosition + 4, { maxWidth: colWidth - 4 });
+                xPosHeader += colWidth;
+              });
+              
+              yPosition += rowHeight;
+              
+              doc.setTextColor(0, 0, 0);
+              doc.setFont('helvetica', 'normal');
+              doc.setFontSize(7);
+            }
+            
+            // Alternate row background color
+            if (rowIdx % 2 === 0) {
+              doc.setFillColor(245, 245, 245);
+              doc.rect(margin, yPosition, tableWidth, rowHeight, 'F');
+            }
+            
+            // Draw row borders and content
+            doc.setDrawColor(220, 220, 220);
+            let xPosCell = margin;
+            row.forEach((cell, cellIdx) => {
+              const colWidth = finalColumnWidths[cellIdx];
+              
+              // Draw cell border
+              doc.rect(xPosCell, yPosition, colWidth, rowHeight);
+              
+              // Draw cell content
+              doc.setTextColor(0, 0, 0);
+              doc.setFontSize(7);
+              const cellText = String(cell || '').substring(0, 25);
+              doc.text(cellText, xPosCell + 1.5, yPosition + 3.5, { maxWidth: colWidth - 3 });
+              
+              xPosCell += colWidth;
+            });
+            
+            yPosition += rowHeight;
+          });
+        }
+      } catch (tableError) {
+        console.warn('Table rendering error:', tableError);
+      }
+
+      // Save the PDF
+      const fileName = `Result_Report_${new Date().getTime()}.pdf`;
+      const pdfBlob = doc.output('blob') as Blob;
+      // @ts-ignore - URL.createObjectURL returns string that window.open expects
+      const pdfUrl = URL.createObjectURL(pdfBlob);
+      
+      // Open print dialog
+      const printWindow = window.open(pdfUrl);
+      if (printWindow) {
+        printWindow.onload = () => {
+          setTimeout(() => {
+            printWindow.print();
+          }, 250);
+        };
+      }
+      
+      alert('PDF generated! Print dialog opened.');
+    } catch (error) {
+      console.error('Error generating PDF:', error);
+      console.error('Error details:', {
+        message: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : 'No stack trace'
+      });
+      alert(`Error generating PDF: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  };
+
   // State for inline result editing
   const [editingResultId, setEditingResultId] = useState<string | null>(null);
   const [editingResultValue, setEditingResultValue] = useState<string>('');
@@ -2978,6 +3369,72 @@ export default function Result() {
                   <RefreshCcw size={14} />
                 </button>
                 
+                {/* Required Columns Button */}
+                <div className="relative">
+                  <button
+                    onClick={() => setShowColumnsDropdown(!showColumnsDropdown)}
+                    className="h-8 px-2 rounded border border-gray-300 text-xs focus:outline-none focus:ring-1 focus:ring-cyan-600 bg-white flex items-center gap-1 hover:bg-gray-50"
+                    title="Show/Hide Columns"
+                  >
+                    <span className="truncate">
+                      Columns ({selectedColumnCount})
+                    </span>
+                    <ChevronDown size={14} />
+                  </button>
+                  
+                  {showColumnsDropdown && (
+                    <div className="absolute z-50 top-full left-0 w-64 bg-white border border-gray-300 rounded shadow-lg mt-0.5">
+                      <div className="bg-blue-600 text-white px-3 py-1.5 rounded-t text-sm font-semibold">Required Columns</div>
+                      <div className="px-2 py-1.5 border-b border-gray-200 bg-gray-50">
+                        <div className="flex items-center gap-1 text-xs mb-1">
+                          <span className="font-semibold text-gray-600">Filter:</span>
+                          <input
+                            type="text"
+                            value={columnsFilter}
+                            onChange={(e) => setColumnsFilter(e.target.value)}
+                            placeholder="Keywords"
+                            className="border border-gray-400 px-1.5 py-0.5 rounded text-xs flex-1 focus:outline-none"
+                          />
+                        </div>
+                        <div className="flex gap-3 text-xs">
+                          <button
+                            onClick={handleCheckAllColumns}
+                            className="text-blue-700 font-semibold hover:underline"
+                          >
+                            ✓ Check all
+                          </button>
+                          <button
+                            onClick={handleUncheckAllColumns}
+                            className="text-blue-700 font-semibold hover:underline"
+                          >
+                            ✕ Uncheck all
+                          </button>
+                        </div>
+                      </div>
+                      <div className="max-h-56 overflow-y-auto">
+                        {RESULT_COLUMNS.filter(c =>
+                          c.label.toLowerCase().includes(columnsFilter.toLowerCase())
+                        ).map(col => (
+                          <label
+                            key={col.key}
+                            className={`flex items-center gap-2 px-3 py-1.5 text-sm cursor-pointer hover:bg-gray-50 ${
+                              selectedColumns[col.key] ? 'bg-gray-100' : ''
+                            }`}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={!!selectedColumns[col.key]}
+                              onChange={() => handleColumnToggle(col.key)}
+                              className="w-4 h-4 accent-blue-600"
+                            />
+                            <span className="font-medium text-gray-800">{col.label}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
                 <button 
                   onClick={() => setShowSortDropdown(!showSortDropdown)}
                   className="h-8 px-3 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded text-xs sm:text-sm relative"
@@ -3064,37 +3521,67 @@ export default function Result() {
                           title="Select all visible tests"
                         />
                       </th>
-                      <th className="px-1 sm:px-2 py-0.5 sm:py-1 text-left font-semibold text-[10px] whitespace-nowrap border border-gray-300">Visit ID</th>
-                      <th className="px-1 sm:px-2 py-0.5 sm:py-1 text-left font-semibold text-[10px] whitespace-nowrap border border-gray-300">Org ID</th>
-                      <th className="px-1 sm:px-2 py-0.5 sm:py-1 text-left font-semibold text-[10px] whitespace-nowrap border border-gray-300">Patient Name</th>
-                      <th className="px-1 sm:px-2 py-0.5 sm:py-1 text-left font-semibold text-[10px] whitespace-nowrap border border-gray-300">Age</th>
-                      <th className="px-0.5 sm:px-1 py-0.5 sm:py-1 text-center font-semibold text-[10px] whitespace-nowrap border border-gray-300">Gender</th>
-                      <th className="px-2 sm:px-3 py-0.5 sm:py-1 text-left font-semibold text-[10px] whitespace-nowrap border border-gray-300 min-w-[200px]">Services</th>
-                      <th className="px-1 sm:px-2 py-0.5 sm:py-1 text-left font-semibold text-[10px] whitespace-nowrap border border-gray-300">Result</th>
-                      <th className="px-1 sm:px-2 py-0.5 sm:py-1 text-left font-semibold text-[10px] whitespace-nowrap border border-gray-300">Unit</th>
-                      <th className="px-1 sm:px-2 py-0.5 sm:py-1 text-left font-semibold text-[10px] whitespace-nowrap border border-gray-300">Ref. Interval</th>
-                      <th className="px-1 sm:px-2 py-0.5 sm:py-1 text-left font-semibold text-[10px] whitespace-nowrap border border-gray-300">Referral Doc</th>
-                      <th className="px-1 sm:px-2 py-0.5 sm:py-1 text-left font-semibold text-[10px] whitespace-nowrap border border-gray-300" title="Previous Test Result">
-                        PTR
-                      </th>
-                      <th className="px-1 sm:px-2 py-0.5 sm:py-1 text-left font-semibold text-[10px] whitespace-nowrap border border-gray-300" title="All Test Results">
-                        ATR
-                      </th>
-                      <th className="px-0.5 sm:px-1 py-0.5 sm:py-1 text-center font-semibold text-[10px] whitespace-nowrap border border-gray-300">
-                        <span className="text-[9px]">S.Taken</span>
-                      </th>
-                      <th className="px-0.5 sm:px-1 py-0.5 sm:py-1 text-center font-semibold text-[10px] whitespace-nowrap border border-gray-300">
-                        <div title="Print barcode labels for selected tests">
-                          <Barcode
-                            size={16}
-                            className="mx-auto cursor-pointer hover:text-cyan-300 transition-colors"
-                            onClick={handleBarcodePrint}
-                          />
-                        </div>
-                      </th>
-                      <th className="px-1 sm:px-2 py-0.5 sm:py-1 text-center font-semibold text-[10px] whitespace-nowrap border border-gray-300">
-                        <span className="text-[9px]">History</span>
-                      </th>
+                      {selectedColumns.visitId && (
+                        <th className="px-1 sm:px-2 py-0.5 sm:py-1 text-left font-semibold text-[10px] whitespace-nowrap border border-gray-300">Visit ID</th>
+                      )}
+                      {selectedColumns.orgId && (
+                        <th className="px-1 sm:px-2 py-0.5 sm:py-1 text-left font-semibold text-[10px] whitespace-nowrap border border-gray-300">Org ID</th>
+                      )}
+                      {selectedColumns.patientName && (
+                        <th className="px-1 sm:px-2 py-0.5 sm:py-1 text-left font-semibold text-[10px] whitespace-nowrap border border-gray-300">Patient Name</th>
+                      )}
+                      {selectedColumns.age && (
+                        <th className="px-1 sm:px-2 py-0.5 sm:py-1 text-left font-semibold text-[10px] whitespace-nowrap border border-gray-300">Age</th>
+                      )}
+                      {selectedColumns.gender && (
+                        <th className="px-0.5 sm:px-1 py-0.5 sm:py-1 text-center font-semibold text-[10px] whitespace-nowrap border border-gray-300">Gender</th>
+                      )}
+                      {selectedColumns.services && (
+                        <th className="px-2 sm:px-3 py-0.5 sm:py-1 text-left font-semibold text-[10px] whitespace-nowrap border border-gray-300 min-w-[200px]">Services</th>
+                      )}
+                      {selectedColumns.result && (
+                        <th className="px-1 sm:px-2 py-0.5 sm:py-1 text-left font-semibold text-[10px] whitespace-nowrap border border-gray-300">Result</th>
+                      )}
+                      {selectedColumns.unit && (
+                        <th className="px-1 sm:px-2 py-0.5 sm:py-1 text-left font-semibold text-[10px] whitespace-nowrap border border-gray-300">Unit</th>
+                      )}
+                      {selectedColumns.refInterval && (
+                        <th className="px-1 sm:px-2 py-0.5 sm:py-1 text-left font-semibold text-[10px] whitespace-nowrap border border-gray-300">Ref. Interval</th>
+                      )}
+                      {selectedColumns.referralDoc && (
+                        <th className="px-1 sm:px-2 py-0.5 sm:py-1 text-left font-semibold text-[10px] whitespace-nowrap border border-gray-300">Referral Doc</th>
+                      )}
+                      {selectedColumns.ptr && (
+                        <th className="px-1 sm:px-2 py-0.5 sm:py-1 text-left font-semibold text-[10px] whitespace-nowrap border border-gray-300" title="Previous Test Result">
+                          PTR
+                        </th>
+                      )}
+                      {selectedColumns.atr && (
+                        <th className="px-1 sm:px-2 py-0.5 sm:py-1 text-left font-semibold text-[10px] whitespace-nowrap border border-gray-300" title="All Test Results">
+                          ATR
+                        </th>
+                      )}
+                      {selectedColumns.sTaken && (
+                        <th className="px-0.5 sm:px-1 py-0.5 sm:py-1 text-center font-semibold text-[10px] whitespace-nowrap border border-gray-300">
+                          <span className="text-[9px]">S.Taken</span>
+                        </th>
+                      )}
+                      {selectedColumns.barcode && (
+                        <th className="px-0.5 sm:px-1 py-0.5 sm:py-1 text-center font-semibold text-[10px] whitespace-nowrap border border-gray-300">
+                          <div title="Print barcode labels for selected tests">
+                            <Barcode
+                              size={16}
+                              className="mx-auto cursor-pointer hover:text-cyan-300 transition-colors"
+                              onClick={handleBarcodePrint}
+                            />
+                          </div>
+                        </th>
+                      )}
+                      {selectedColumns.history && (
+                        <th className="px-1 sm:px-2 py-0.5 sm:py-1 text-center font-semibold text-[10px] whitespace-nowrap border border-gray-300">
+                          <span className="text-[9px]">History</span>
+                        </th>
+                      )}
                     </tr>
                   </thead>
                   <tbody>
@@ -3141,101 +3628,112 @@ export default function Result() {
                             </td>
 
                             {/* Column 2: Visit ID (show only on first test row) */}
-                            <td className="px-1 sm:px-2 py-0.25 text-[11px] border border-gray-300">
-                              {testIndex === 0 ? patient.visit_id : ''}
-                            </td>
+                            {selectedColumns.visitId && (
+                              <td className="px-1 sm:px-2 py-0.25 text-[11px] border border-gray-300">
+                                {testIndex === 0 ? patient.visit_id : ''}
+                              </td>
+                            )}
 
                             {/* Column 3: Org ID with hover tooltip (show only on first test row) */}
-                            <td className="px-1 sm:px-2 py-0.25 text-[11px] border border-gray-300 relative">
-                              {testIndex === 0 && (
-                                <div 
-                                  className="cursor-help relative group"
-                                  title={(patient.organization_name || patient.organizationName) || 'N/A'}
-                                >
-                                  <span className="font-medium text-gray-900">
-                                    {(patient.organizationCode || patient.organizationId || '-')}
-                                  </span>
-                                  {/* Tooltip - only show if organization exists */}
-                                  {(patient.organizationCode || patient.organizationId) && (
-                                    <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 hidden group-hover:flex flex-col items-center z-50 pointer-events-none">
-                                      <span className="bg-gray-800 text-white text-[10px] font-semibold rounded px-2 py-1 whitespace-nowrap shadow-lg max-w-xs">
-                                        {(patient.organization_name || patient.organizationName || 'Organization')}
-                                      </span>
-                                      <span className="w-2 h-2 bg-gray-800 rotate-45 -mt-1" />
+                            {selectedColumns.orgId && (
+                              <td className="px-1 sm:px-2 py-0.25 text-[11px] border border-gray-300 relative">
+                                {testIndex === 0 && (
+                                  <div 
+                                    className="cursor-help relative group"
+                                    title={(patient.organization_name || patient.organizationName) || 'N/A'}
+                                  >
+                                    <span className="font-medium text-gray-900">
+                                      {(patient.organizationCode || patient.organizationId || '-')}
                                     </span>
-                                  )}
-                                </div>
-                              )}
-                            </td>
+                                    {/* Tooltip - only show if organization exists */}
+                                    {(patient.organizationCode || patient.organizationId) && (
+                                      <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 hidden group-hover:flex flex-col items-center z-50 pointer-events-none">
+                                        <span className="bg-gray-800 text-white text-[10px] font-semibold rounded px-2 py-1 whitespace-nowrap shadow-lg max-w-xs">
+                                          {(patient.organization_name || patient.organizationName || 'Organization')}
+                                        </span>
+                                        <span className="w-2 h-2 bg-gray-800 rotate-45 -mt-1" />
+                                      </span>
+                                    )}
+                                  </div>
+                                )}
+                              </td>
+                            )}
 
                             {/* Column 4: Patient Name with balance icon (show only on first test row) */}
-                            <td className="px-1 sm:px-2 py-0.5 sm:py-1 text-[11px] font-medium border border-gray-300">
-                              {testIndex === 0 && (
-                                <span className={`flex items-center gap-1 ${test.isEmergency ? 'text-red-700' : ''}`}>
-                                  {test.isEmergency && (
-                                    <AlertTriangle size={14} className="text-yellow-500 flex-shrink-0" />
-                                  )}
-                                  <span className="truncate">{patient.patient_name}</span>
-                                  {patient.balance_amount > 0 && (
-                                    <span
-                                      className="relative group cursor-pointer"
-                                      onClick={() => {
-                                        localStorage.setItem('searchQuery', patient.patient_uid);
-                                        router.push('/patient/search-booking');
-                                      }}
-                                    >
-                                      <span className="text-red-500 text-[11px] font-bold leading-none select-none">₹</span>
-                                      {/* Tooltip */}
-                                      <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 hidden group-hover:flex flex-col items-center z-50 pointer-events-none">
-                                        <span className="bg-red-600 text-white text-[10px] font-semibold rounded px-2 py-1 whitespace-nowrap shadow-lg">
-                                          Balance: ₹{patient.balance_amount.toLocaleString('en-IN')}
+                            {selectedColumns.patientName && (
+                              <td className="px-1 sm:px-2 py-0.5 sm:py-1 text-[11px] font-medium border border-gray-300">
+                                {testIndex === 0 && (
+                                  <span className={`flex items-center gap-1 ${test.isEmergency ? 'text-red-700' : ''}`}>
+                                    {test.isEmergency && (
+                                      <AlertTriangle size={14} className="text-yellow-500 flex-shrink-0" />
+                                    )}
+                                    <span className="truncate">{patient.patient_name}</span>
+                                    {patient.balance_amount > 0 && (
+                                      <span
+                                        className="relative group cursor-pointer"
+                                        onClick={() => {
+                                          localStorage.setItem('searchQuery', patient.patient_uid);
+                                          router.push('/patient/search-booking');
+                                        }}
+                                      >
+                                        <span className="text-red-500 text-[11px] font-bold leading-none select-none">₹</span>
+                                        {/* Tooltip */}
+                                        <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 hidden group-hover:flex flex-col items-center z-50 pointer-events-none">
+                                          <span className="bg-red-600 text-white text-[10px] font-semibold rounded px-2 py-1 whitespace-nowrap shadow-lg">
+                                            Balance: ₹{patient.balance_amount.toLocaleString('en-IN')}
+                                          </span>
+                                          <span className="w-2 h-2 bg-red-600 rotate-45 -mt-1" />
                                         </span>
-                                        <span className="w-2 h-2 bg-red-600 rotate-45 -mt-1" />
                                       </span>
-                                    </span>
-                                  )}
-                                </span>
-                              )}
-                            </td>
+                                    )}
+                                  </span>
+                                )}
+                              </td>
+                            )}
 
                             {/* Column 5: Age (show only on first test row) */}
-                            <td className="px-1 sm:px-2 py-0.5 sm:py-1 text-[11px] font-medium border border-gray-300 text-center">
-                              {testIndex === 0 && (
-                                <span className="font-semibold text-gray-900">
-                                  {(() => {
-                                    if (patient.ageYears !== undefined && patient.ageMonths !== undefined && patient.ageDays !== undefined) {
-                                      // Under 1 year: show only months and days
-                                      if (patient.ageYears === 0) {
-                                        return `${patient.ageMonths}M ${patient.ageDays}D`;
+                            {selectedColumns.age && (
+                              <td className="px-1 sm:px-2 py-0.5 sm:py-1 text-[11px] font-medium border border-gray-300 text-center">
+                                {testIndex === 0 && (
+                                  <span className="font-semibold text-gray-900">
+                                    {(() => {
+                                      if (patient.ageYears !== undefined && patient.ageMonths !== undefined && patient.ageDays !== undefined) {
+                                        // Under 1 year: show only months and days
+                                        if (patient.ageYears === 0) {
+                                          return `${patient.ageMonths}M ${patient.ageDays}D`;
+                                        }
+                                        // 1 to 12 years: show years, months, and days
+                                        else if (patient.ageYears < 12) {
+                                          return `${patient.ageYears}Y ${patient.ageMonths}M ${patient.ageDays}D`;
+                                        }
+                                        // 12 years and above: show as decimal (years.months)
+                                        else {
+                                          const decimalAge = (patient.ageYears + patient.ageMonths / 12).toFixed(1);
+                                          return decimalAge;
+                                        }
                                       }
-                                      // 1 to 12 years: show years, months, and days
-                                      else if (patient.ageYears < 12) {
-                                        return `${patient.ageYears}Y ${patient.ageMonths}M ${patient.ageDays}D`;
-                                      }
-                                      // 12 years and above: show as decimal (years.months)
-                                      else {
-                                        const decimalAge = (patient.ageYears + patient.ageMonths / 12).toFixed(1);
-                                        return decimalAge;
-                                      }
-                                    }
-                                    return patient.age || '-';
-                                  })()}
-                                </span>
-                              )}
-                            </td>
+                                      return patient.age || '-';
+                                    })()}
+                                  </span>
+                                )}
+                              </td>
+                            )}
 
                             {/* Column 6: Gender (show only on first test row) */}
-                            <td className="px-0.5 sm:px-1 py-0.5 sm:py-1 text-[11px] font-medium border border-gray-300 text-center">
-                              {testIndex === 0 && (
-                                <span className="font-semibold text-gray-900">
-                                  {patient.gender ? (patient.gender === 'Male' ? 'M' : patient.gender === 'Female' ? 'F' : patient.gender) : '-'}
-                                </span>
-                              )}
-                            </td>
+                            {selectedColumns.gender && (
+                              <td className="px-0.5 sm:px-1 py-0.5 sm:py-1 text-[11px] font-medium border border-gray-300 text-center">
+                                {testIndex === 0 && (
+                                  <span className="font-semibold text-gray-900">
+                                    {patient.gender ? (patient.gender === 'Male' ? 'M' : patient.gender === 'Female' ? 'F' : patient.gender) : '-'}
+                                  </span>
+                                )}
+                              </td>
+                            )}
 
                             {/* Column 7: Services (with icons) */}
-                            <td className="px-2 sm:px-4 py-0.5 sm:py-1 text-[11px] border border-gray-300 min-w-[280px]" title={test.test_name}>
-                              <div className="flex items-center gap-1">
+                            {selectedColumns.services && (
+                              <td className="px-2 sm:px-4 py-0.5 sm:py-1 text-[11px] border border-gray-300 min-w-[280px]" title={test.test_name}>
+                                <div className="flex items-center gap-1">
                                 <span 
                                   className="flex-1 cursor-pointer hover:text-cyan-700 hover:font-semibold transition-colors"
                                   onClick={() => handleTestNameClick(test, patient)}
@@ -3296,9 +3794,11 @@ export default function Result() {
                                   </div>
                                 )}
                               </div>
-                            </td>
+                              </td>
+                            )}
 
                             {/* Column 8: Result */}
+                            {selectedColumns.result && (
                             <td className="px-1 sm:px-2 py-0.5 sm:py-1 text-[11px] border border-gray-300 max-w-[120px]">
                               {test.parameter_count > 1 ? (
                                 <span 
@@ -3381,14 +3881,19 @@ export default function Result() {
                                 </span>
                               )}
                             </td>
+                            )}
 
                             {/* Column 9: Unit */}
+                            {selectedColumns.unit && (
                             <td className="px-1 sm:px-2 py-0.5 sm:py-1 text-[11px] border border-gray-300">
                               <span className="text-gray-700">
                                 {test.parameter_count === 1 ? (test.unit || '-') : '-'}
                               </span>
                             </td>
+                            )}
+                            
                             {/* Column 10: Ref. Interval */}
+                            {selectedColumns.refInterval && (
                             <td className="px-1 sm:px-2 py-0.5 sm:py-1 text-[11px] border border-gray-300">
                               <span className="text-gray-700">
                                 {test.parameter_count === 1 
@@ -3396,8 +3901,10 @@ export default function Result() {
                                   : '-'}
                               </span>
                             </td>
+                            )}
 
                             {/* Column 11: Referral Doc */}
+                            {selectedColumns.referralDoc && (
                             <td className="px-1 sm:px-2 py-0.5 sm:py-1 text-[11px] border border-gray-300">
                               <span>
                                 {test.ref_by === "SELF" ? (
@@ -3407,8 +3914,10 @@ export default function Result() {
                                 )}
                               </span>
                             </td>
+                            )}
 
                             {/* Column 12: Previous Test Result */}
+                            {selectedColumns.ptr && (
                             <td className="px-1 sm:px-2 py-0.5 sm:py-1 text-[11px] border border-gray-300">
                               <div className="flex items-center gap-1">
                                 <button
@@ -3421,8 +3930,10 @@ export default function Result() {
                                 </button>
                               </div>
                             </td>
+                            )}
 
                             {/* Column 13: All Test Results */}
+                            {selectedColumns.atr && (
                             <td className="px-1 sm:px-2 py-0.5 sm:py-1 text-[11px] border border-gray-300">
                               <div className="flex items-center gap-1">
                                 <button
@@ -3435,8 +3946,10 @@ export default function Result() {
                                 </button>
                               </div>
                             </td>
+                            )}
 
                             {/* Column 14: S.Taken (green tick mark + calendar & settings icons, all rows) */}
+                            {selectedColumns.sTaken && (
                             <td className="px-0.5 sm:px-1 py-0.5 sm:py-1 text-center border border-gray-300">
                               <div className="flex items-center justify-center gap-1">
                                 {test.sample_taken ? (
@@ -3499,8 +4012,10 @@ export default function Result() {
                                 />
                               </div>
                             </td>
+                            )}
                             
-                            {/* Column 16: Barcode checkbox */}
+                            {/* Column 15: Barcode checkbox */}
+                            {selectedColumns.barcode && (
                             <td className="px-0.5 sm:px-1 py-0.5 sm:py-1 text-center border border-gray-300">
                               <input
                                 type="checkbox"
@@ -3510,8 +4025,10 @@ export default function Result() {
                                 onChange={(e) => handleBarcodeSelection(test.test_id, e.target.checked, patient)}
                               />
                             </td>
+                            )}
 
-                            {/* Column 17: Patient History (Always visible with truncated text) */}
+                            {/* Column 16: Patient History */}
+                            {selectedColumns.history && (
                             <td className="px-1 sm:px-2 py-0.5 sm:py-1 text-[11px] border border-gray-300 relative group">
                               {testIndex === 0 && patient.patient_history && (
                                 <>
@@ -3528,6 +4045,7 @@ export default function Result() {
                                 <span className="text-gray-400">-</span>
                               )}
                             </td>
+                            )}
                           </tr>
                           );
                         });
@@ -3708,6 +4226,17 @@ export default function Result() {
                     </div>
                   )}
                 </div>
+
+                {/* Print Table as PDF */}
+                <button
+                  onClick={handlePrintTablePDF}
+                  disabled={loading || paginatedResults.length === 0}
+                  className="flex gap-0.5 items-center bg-purple-600 hover:bg-purple-700 text-white px-1.5 py-0.5 rounded text-[13px] transition-colors disabled:opacity-50"
+                  title="Print result table as PDF"
+                >
+                  <FileText size={11} />
+                  <span>Print Table PDF</span>
+                </button>
               </div>
             </div>
         </div>
