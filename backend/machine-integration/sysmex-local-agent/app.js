@@ -12,7 +12,7 @@ const CONFIG = {
     host: '0.0.0.0'
   },
   vps: {
-    baseUrl: process.env.VPS_TAILSCALE_URL || 'http://192.168.0.119:5000'
+    baseUrl: process.env.VPS_TAILSCALE_URL || 'http://127.0.0.1:3351'
   },
   database: {
     host: process.env.DB_HOST || 'localhost',
@@ -50,6 +50,50 @@ if (!CONFIG.database.password || !CONFIG.vps.baseUrl) {
 // ============================================================================
 
 const dbPool = mysql.createPool(CONFIG.database);
+
+// ============================================================================
+// UTILITY FUNCTIONS
+// ============================================================================
+
+/**
+ * Parse sample ID in format: VISITID-SAMPLETYPEID
+ * Example: "202608190001-3" -> { visitId: "202608190001", sampleTypeId: "3" }
+ * 
+ * @param {string} fullSampleId - Full sample ID from barcode
+ * @returns {object} { visitId, sampleTypeId } or null if format is invalid
+ */
+function parseSampleId(fullSampleId) {
+  if (!fullSampleId || typeof fullSampleId !== 'string') {
+    console.warn(`[PARSE SAMPLE ID] Invalid input: ${fullSampleId}`);
+    return null;
+  }
+
+  // Check if format contains hyphen separator
+  if (fullSampleId.includes('-')) {
+    const parts = fullSampleId.split('-');
+    if (parts.length === 2) {
+      const visitId = parts[0].trim();
+      const sampleTypeId = parts[1].trim();
+
+      if (visitId && sampleTypeId) {
+        console.log(`[PARSE SAMPLE ID] ✓ Parsed "${fullSampleId}" -> visitId="${visitId}", sampleTypeId="${sampleTypeId}"`);
+        return {
+          visitId: visitId,
+          sampleTypeId: sampleTypeId,
+          fullSampleId: fullSampleId
+        };
+      }
+    }
+  }
+
+  // Fallback: treat entire ID as visitId with no sampleTypeId
+  console.warn(`[PARSE SAMPLE ID] ⚠️ Could not parse format with hyphen, treating as visitId: ${fullSampleId}`);
+  return {
+    visitId: fullSampleId,
+    sampleTypeId: null,
+    fullSampleId: fullSampleId
+  };
+}
 
 // ============================================================================
 // ASTM FRAME UTILITIES
@@ -144,15 +188,29 @@ const ASTMParser = {
       }
     } 
     else if (recordType === 'Q') {
-      // Query frame: Q|1|visitId|sampleId
+      // Query frame: Q|1|barcode|...
       // parts[0] = "Q"
       // parts[1] = sequence number (1)
-      // parts[2] = visitId
-      // parts[3] = sampleId
+      // parts[2] = barcode (e.g., "202608060002-3")
       frameType = 'QUERY';
-      visitId = parts[2]?.trim() || null;
-      sampleId = parts[3]?.trim() || null;
-      console.log(`[ASTM PARSER] Query frame: visitId=${visitId}, sampleId=${sampleId}`);
+      const fullBarcode = parts[2]?.trim() || null;
+      
+      // Parse barcode to extract visitId and sampleTypeId
+      if (fullBarcode) {
+        const parsed = parseSampleId(fullBarcode);
+        if (parsed) {
+          visitId = parsed.visitId;
+          sampleId = parsed.sampleTypeId;
+          console.log(`[ASTM PARSER] Query frame parsed: fullBarcode="${fullBarcode}" -> visitId="${visitId}", sampleId="${sampleId}"`);
+        } else {
+          // Fallback: treat as visitId if parsing failed
+          visitId = fullBarcode;
+          sampleId = null;
+          console.log(`[ASTM PARSER] Query frame (unparsed): visitId="${visitId}"`);
+        }
+      } else {
+        console.log(`[ASTM PARSER] Query frame: No barcode provided`);
+      }
     } 
     else if (recordType === 'R') {
       // Result frame: R|seq|testCode|paramCode|value|unit|status

@@ -18,12 +18,11 @@ const ASTM = {
 // ============================================================================
 
 const CONFIG = {
-  agentHost: 'localhost',
+  agentHost: '127.0.0.1',
   agentPort: 5100,
   machineName: 'Sysmex XN-350',  // ✅ ONE field - complete machine name
-  visitId: '202608060002',           // Barcode scanned at machine
-  sampleId: '3',                     // Sample type ID
-  timestamp: '20260805180000'
+  barcode: '202608200002-1',         // ✅ Combined barcode: visitId-sampleTypeId
+  timestamp: '20260820190000'
 };
 
 // ============================================================================
@@ -51,8 +50,8 @@ class ASTMBuilder {
     return this.frame(content);
   }
 
-  static query(visitId, sampleId) {
-    const content = `Q|1|${visitId}|${sampleId}`;
+  static query(barcode) {
+    const content = `Q|1|${barcode}`;
     return this.frame(content);
   }
 
@@ -189,8 +188,7 @@ class MachineSimulator {
       log(`🏥 MACHINE SIMULATOR - PURE ASTM PROTOCOL ONLY`, 'START');
       log('═'.repeat(100), 'START');
       log(`Machine Name: ${CONFIG.machineName}`, 'CONFIG');
-      log(`Sample Barcode (visitId): ${CONFIG.visitId}`, 'CONFIG');
-      log(`Sample Type ID (sampleId): ${CONFIG.sampleId}`, 'CONFIG');
+      log(`Barcode (visitId-sampleTypeId): ${CONFIG.barcode}`, 'CONFIG');
       log(`Connecting to Local Agent: ${CONFIG.agentHost}:${CONFIG.agentPort}`, 'CONFIG');
       log('', 'CONFIG');
       log('NOTE: Machine will ONLY talk to Local Agent via ASTM protocol', 'INFO');
@@ -209,8 +207,8 @@ class MachineSimulator {
       //         Machine asks local agent: "What tests should I run for this barcode?"
       log('STEP 2: Barcode scanned at machine', 'STEP');
       log(`Action: Send QUERY frame asking agent for tests`, 'ACTION');
-      log(`        visitId=${CONFIG.visitId}, sampleId=${CONFIG.sampleId}`, 'ACTION');
-      const queryFrame = ASTMBuilder.query(CONFIG.visitId, CONFIG.sampleId);
+      log(`        barcode=${CONFIG.barcode}`, 'ACTION');
+      const queryFrame = ASTMBuilder.query(CONFIG.barcode);
       await this.sendFrame(queryFrame, 'QUERY - Machine asks "What tests to run?"');
 
       // STEP 3: Wait for agent to respond with ORDER
@@ -225,7 +223,7 @@ class MachineSimulator {
         log('Possible reasons:', 'ERROR');
         log('  1. Backend not responding', 'ERROR');
         log('  2. No tests assigned to this machine', 'ERROR');
-        log('  3. Visit/sample not found in database', 'ERROR');
+        log('  3. Barcode not found in database', 'ERROR');
         throw new Error('No test codes received from agent');
       }
 
@@ -241,13 +239,14 @@ class MachineSimulator {
       // ⚠️ IMPORTANT: Only include parameters that are configured in the database!
       const testParametersMap = {
         'HMG': [      // ✅ Hemogram (short name from backend)
-          // Only include parameters that exist in test_parameters table for HMG test
+          // All parameters configured in database for HMG test
+          { paramCode: 'RBC', value: '4.8', unit: 'M/uL' },
+          { paramCode: 'HGB', value: '14.2', unit: 'g/dL' },
+          { paramCode: 'WBC', value: '7.5', unit: 'K/uL' },
+          { paramCode: 'PLT', value: '250', unit: 'K/uL' },
           { paramCode: 'MCV', value: '87.5', unit: 'fL' },
           { paramCode: 'MCH', value: '29.5', unit: 'pg' },
           { paramCode: 'MCHC', value: '33.7', unit: 'g/dL' },
-          { paramCode: 'PLT', value: '250', unit: 'K/uL' },
-          // ⚠️ NOTE: WBC, RBC, HGB, HCT not configured in database yet
-          // Add them to test_parameters table if needed
         ],
         'HEM001': [   // Keep for backward compatibility
           { paramCode: 'WBC', value: '7.5', unit: 'K/uL' },

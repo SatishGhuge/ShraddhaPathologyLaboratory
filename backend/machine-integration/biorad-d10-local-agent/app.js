@@ -49,6 +49,50 @@ const ASTM = {
   LF: 0x0A
 };
 
+// ============================================================================
+// UTILITY FUNCTIONS
+// ============================================================================
+
+/**
+ * Parse sample ID in format: VISITID-SAMPLETYPEID
+ * Example: "202608190001-3" -> { visitId: "202608190001", sampleTypeId: "3" }
+ * 
+ * @param {string} fullSampleId - Full sample ID from barcode
+ * @returns {object} { visitId, sampleTypeId } or null if format is invalid
+ */
+function parseSampleId(fullSampleId) {
+  if (!fullSampleId || typeof fullSampleId !== 'string') {
+    console.warn(`[PARSE SAMPLE ID] Invalid input: ${fullSampleId}`);
+    return null;
+  }
+
+  // Check if format contains hyphen separator
+  if (fullSampleId.includes('-')) {
+    const parts = fullSampleId.split('-');
+    if (parts.length === 2) {
+      const visitId = parts[0].trim();
+      const sampleTypeId = parts[1].trim();
+
+      if (visitId && sampleTypeId) {
+        console.log(`[PARSE SAMPLE ID] ✓ Parsed "${fullSampleId}" -> visitId="${visitId}", sampleTypeId="${sampleTypeId}"`);
+        return {
+          visitId: visitId,
+          sampleTypeId: sampleTypeId,
+          fullSampleId: fullSampleId
+        };
+      }
+    }
+  }
+
+  // Fallback: treat entire ID as visitId with no sampleTypeId
+  console.warn(`[PARSE SAMPLE ID] ⚠️ Could not parse format with hyphen, treating as visitId: ${fullSampleId}`);
+  return {
+    visitId: fullSampleId,
+    sampleTypeId: null,
+    fullSampleId: fullSampleId
+  };
+}
+
 // Validate configuration
 if (!CONFIG.database.password || !CONFIG.vps.baseUrl) {
   console.warn('[CONFIG] Using default values for some settings');
@@ -135,15 +179,34 @@ const ASTMParser = {
     }
 
     if (recordType === 'O') {
-      // Order: O|1|202608100001|1||^^^A1C|R||||||N||||||||||||||F
-      // Field 2 = visitId (barcode scanned from tube)
-      // Field 3 = sampleId (sample type ID: 1=Blood, 2=Urine, etc.)
+      // Order: O|1|barcode|...
+      // Field 2 = barcode (e.g., "202608100001-1")
+      // Field 3 = sample type (if provided separately)
+      const fullBarcode = parts[2] || '';
+      
+      // Parse barcode to extract visitId and sampleTypeId
+      let visitId = '';
+      let sampleId = '';
+      
+      if (fullBarcode.includes('-')) {
+        const parsed = parseSampleId(fullBarcode);
+        if (parsed) {
+          visitId = parsed.visitId;
+          sampleId = parsed.sampleTypeId;
+          console.log(`[ASTM PARSER] ORDER frame parsed: fullBarcode="${fullBarcode}" -> visitId="${visitId}", sampleId="${sampleId}"`);
+        }
+      } else {
+        // Fallback: use as visitId, sampleId from field 3
+        visitId = fullBarcode;
+        sampleId = parts[3] || '';
+      }
+      
       return {
         frameType: 'ORDER',
         sequenceNum: parts[1] || '',
-        visitId: parts[2] || '',      // ✅ visitId (barcode)
-        sampleId: parts[3] || '',     // ✅ sampleId (sample type)
-        testId: parts[5] || ''        // ✅ Field 5 for test (field 4 is empty)
+        visitId: visitId,
+        sampleId: sampleId,
+        testId: parts[5] || ''
       };
     }
 
