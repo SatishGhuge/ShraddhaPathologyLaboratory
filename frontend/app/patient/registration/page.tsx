@@ -429,6 +429,7 @@ export default function PatientRegistration() {
   const [showDoctorList, setShowDoctorList] = useState(false);
   const [showBillModal, setShowBillModal] = useState(false);
   const [gender, setGender] = useState("Male");
+  const [guardianType, setGuardianType] = useState("self"); // "self" or "guardian"
   const [refDoctor, setRefDoctor] = useState("");
   const [frequentTests, setFrequentTests] = useState<any[]>([]);
   const [filterFrequent, setFilterFrequent] = useState(false);
@@ -1089,6 +1090,7 @@ export default function PatientRegistration() {
     setLocation("");
     setLocationSearch("");  // ✨ FIX: Also clear location search
     setGender("Male");
+    setGuardianType("self"); // Reset to self
     setRemarks("");
     setCreatedBy(loggedUser);
     setVisitType("");
@@ -1823,6 +1825,7 @@ export default function PatientRegistration() {
         // For adults > 12: "12.1"
         age: age !== "" && age !== null && age !== undefined ? age : null,
         gender: gender,
+        guardianType: guardianType || "self", // Add guardian type
         mobile: mobile,
         email: email || null,
         createdBy: createdBy || null,
@@ -1912,6 +1915,7 @@ export default function PatientRegistration() {
         // For adults > 12: "12.1"
         age: age !== "" && age !== null && age !== undefined ? age : null,
         gender: gender,
+        guardianType: guardianType || "self", // Add guardian type
         mobile: mobile,
         email: email || null,
         createdBy: createdBy || null,
@@ -2545,6 +2549,21 @@ export default function PatientRegistration() {
                 ]}
                 placeholder="Gender *"
               />
+
+              {/* Registration Type: Self / Guardian - With Label */}
+              <div className="col-span-1 flex items-center gap-1.5">
+                <span className="text-xs font-semibold text-gray-700 whitespace-nowrap">Type:</span>
+                <InlineSelect
+                  value={guardianType}
+                  onChange={setGuardianType}
+                  options={[
+                    { value: "self", label: "Self" },
+                    { value: "guardian", label: "Guardian" }
+                  ]}
+                  placeholder="Type"
+                  className="flex-1"
+                />
+              </div>
 
               {/* ROW 2: Organization, Location+Address (expandable), Mobile, Email */}
               

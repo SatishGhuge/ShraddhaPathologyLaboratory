@@ -184,7 +184,7 @@ export const createPatient = async (req, res) => {
       // Existing patient ID (if this is an existing patient)
       existingPatientId,
       // Patient Identity
-      title, firstName, lastName, dob, age, gender, mobile, email,
+      title, firstName, lastName, dob, age, gender, guardianType, mobile, email,
       createdBy, createdAtLocation, address, location,
       // Registration Details (will be saved with each test)
       reportMode, referralDoctor, visitDate, visitTime,
@@ -521,6 +521,7 @@ export const createPatient = async (req, res) => {
             ageMonths: (age && !dob) ? 0 : null,
             ageDays: (age && !dob) ? 0 : null,
             gender,
+            guardianType: guardianType || "self",
             mobile,
             email,
             createdBy,
@@ -758,6 +759,7 @@ export const registerPatientWithEmail = async (req, res) => {
       address,
       location,
       title,
+      guardianType = "self",
       tests = [],
       totalAmount = 0,
       discountPercent = 0,
@@ -816,6 +818,7 @@ export const registerPatientWithEmail = async (req, res) => {
         password: hashedPassword,
         dob: dob ? new Date(dob) : null,
         gender: gender || 'Male',
+        guardianType: guardianType || 'self',
         address,
         location,
         registrationType: 'direct',
@@ -1597,7 +1600,7 @@ export const getPaymentTransactions = async (req, res) => {
       });
     }
 
-    const transactions = await prisma.paymentTransaction.findMany({
+    const transactions = await prisma.payment.findMany({
       where: { visitId },
       orderBy: { createdAt: 'asc' }
     });
@@ -1606,7 +1609,13 @@ export const getPaymentTransactions = async (req, res) => {
 
     res.json({ 
       success: true, 
-      data: transactions 
+      data: transactions.map(t => ({
+        visitId: t.visitId,
+        paymentAmount: t.amount,
+        paymentMode: t.paymentMode,
+        remarks: t.remarks,
+        createdAt: t.createdAt
+      }))
     });
   } catch (error) {
     console.error('Get payment transactions error:', error);

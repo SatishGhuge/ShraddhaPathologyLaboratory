@@ -158,6 +158,9 @@ model Patient {
   isActive          Boolean       @default(true)
   registrationType  String        @default("direct") // "self", "organization", "direct"
   organizationId    String?       // If registered via organization
+  
+  // Guardian/Self Registration Type
+  guardianType      String        @default("self")   // "self" or "guardian"
 
   // Relations
   tests             PatientTest[]

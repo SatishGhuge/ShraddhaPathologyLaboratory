@@ -69,7 +69,7 @@ function Cal({ month, year, onPrev, onNext, onDay, onHover, from, to, hover, pic
 }
 
 const COLS = [
-  {key:"patientId",label:"Patient ID"},{key:"organization",label:"Organization"},{key:"mobile",label:"Mobile"},
+  {key:"patientId",label:"Patient ID"},{key:"guardianType",label:"Type (Self/Guardian)"},{key:"organization",label:"Organization"},{key:"mobile",label:"Mobile"},
   {key:"visitIdInvoice",label:"Visit ID / Invoice No"},{key:"refDoctor",label:"Ref.Dr"},
   {key:"totalBill",label:"Total Bill"},{key:"received",label:"Received"},{key:"paymentMode",label:"Payment Mode"},
   {key:"discount",label:"Discount"},{key:"refund",label:"Refund"},
@@ -168,6 +168,7 @@ export default function PatientList() {
             patientId:p.patientId||"-",
             patientName:[p.title,p.firstName,p.lastName].filter(Boolean).join(" "),
             ageGender:`${p.age||"-"} Yrs / ${p.gender||"-"}`,
+            guardianType:p.guardianType||"Self",
             tests:[],
             totalBill:0,
             received:0,
@@ -213,6 +214,7 @@ export default function PatientList() {
                 patientId:v.patientId,
                 patientName:v.patientName,
                 ageGender:v.ageGender,
+                guardianType:v.guardianType,
                 tests:v.tests,
                 testPerformed:v.tests.join(", "),
                 totalBill:Math.round(v.totalBill),
@@ -241,6 +243,7 @@ export default function PatientList() {
               patientId:v.patientId,
               patientName:v.patientName,
               ageGender:v.ageGender,
+              guardianType:v.guardianType,
               tests:v.tests,
               testPerformed:v.tests.join(", "),
               totalBill:Math.round(v.totalBill),
@@ -269,6 +272,7 @@ export default function PatientList() {
             patientId:v.patientId,
             patientName:v.patientName,
             ageGender:v.ageGender,
+            guardianType:v.guardianType,
             tests:v.tests,
             testPerformed:v.tests.join(", "),
             totalBill:Math.round(v.totalBill),
