@@ -2445,6 +2445,21 @@ const AddTest = () => {
                             <span className="text-xs sm:text-sm font-semibold">Is Mandatory</span>
                           </label>
 
+                          {/* ✅ NEW: Show preview of default value when mandatory is checked for TEXT type */}
+                          {parameter.isMandatory && parameter.type === 'Text' && parameter.rangeText && (
+                            (() => {
+                              const options = parameter.rangeText
+                                .split(/[,|]/)
+                                .map((o: string) => o.trim())
+                                .filter(Boolean);
+                              return options.length > 0 ? (
+                                <div className="text-xs text-blue-600 font-semibold bg-blue-50 px-2 py-1 rounded border border-blue-200">
+                                  Default: <strong>{options[0]}</strong>
+                                </div>
+                              ) : null;
+                            })()
+                          )}
+
                           {/* Range Type Radio Buttons - Only visible when Type is Numeric */}
                           {parameter.type === "Numeric" && (
                             <div className="flex items-center gap-3">

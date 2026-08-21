@@ -1026,7 +1026,20 @@ const PatientResult = () => {
             };
           } else {
             // Don't use "Parameter" placeholder as initial value - it's just metadata
-            const defaultTextValue = (param.textContent && param.textContent !== 'Parameter') ? param.textContent : '';
+            let defaultTextValue = (param.textContent && param.textContent !== 'Parameter') ? param.textContent : '';
+            
+            // ✅ NEW: For mandatory TEXT parameters without existing result, set first option as default
+            if (param.isMandatory && !defaultTextValue && param.type === 'Text') {
+              const rawRange = param.rangeText || param.displayRangeText || '';
+              const options = rawRange
+                ? rawRange.split(/[,|]/).map((o: string) => o.trim()).filter(Boolean)
+                : [];
+              if (options.length > 0) {
+                defaultTextValue = options[0];
+                console.log(`✅ Set mandatory default for "${param.parameterName}": "${defaultTextValue}"`);
+              }
+            }
+            
             initialResults[param.id] = { numericValue: null, textValue: defaultTextValue, selectedOption: '', isAbnormal: false, referenceRange: param.normalRange, isHighlighted: false };
           }
         });
@@ -1091,7 +1104,20 @@ const PatientResult = () => {
               };
             } else {
               // Don't use "Parameter" placeholder as initial value - it's just metadata
-              const defaultTextValue = (param.textContent && param.textContent !== 'Parameter') ? param.textContent : '';
+              let defaultTextValue = (param.textContent && param.textContent !== 'Parameter') ? param.textContent : '';
+              
+              // ✅ NEW: For mandatory TEXT parameters without existing result, set first option as default
+              if (param.isMandatory && !defaultTextValue && param.type === 'Text') {
+                const rawRange = param.rangeText || param.displayRangeText || '';
+                const options = rawRange
+                  ? rawRange.split(/[,|]/).map((o: string) => o.trim()).filter(Boolean)
+                  : [];
+                if (options.length > 0) {
+                  defaultTextValue = options[0];
+                  console.log(`✅ Set mandatory default for "${param.parameterName}": "${defaultTextValue}"`);
+                }
+              }
+              
               initialResults[paramKey] = { numericValue: null, textValue: defaultTextValue, selectedOption: '', isAbnormal: false, referenceRange: param.normalRange, isHighlighted: false };
             }
           });
@@ -2073,9 +2099,22 @@ const PatientResult = () => {
                                     const options = rawRange
                                       ? rawRange.split(/[,|]/).map(o => o.trim()).filter(Boolean)
                                       : [];
+                                    
+                                    // ✅ NEW: If mandatory and no value yet, use first option as default
+                                    let defaultValue = results[param.id]?.textValue ?? (param.textContent || '');
+                                    if (param.isMandatory && !results[param.id]?.textValue && options.length > 0) {
+                                      defaultValue = options[0];
+                                      // Auto-set the first option value in results
+                                      if (!results[param.id]?.textValue) {
+                                        setTimeout(() => {
+                                          handleResultChange(param.id, 'textValue', options[0], parameters);
+                                        }, 0);
+                                      }
+                                    }
+                                    
                                     return options.length > 0 ? (
                                       <SuggestionInput
-                                        value={results[param.id]?.textValue ?? (param.textContent || '')}
+                                        value={defaultValue}
                                         onChange={(val) => handleResultChange(param.id, 'textValue', val, parameters)}
                                         options={options}
                                         isAbnormal={results[param.id]?.isAbnormal}
@@ -2091,9 +2130,22 @@ const PatientResult = () => {
                                     const options = rawRange
                                       ? rawRange.split(/[,|]/).map(o => o.trim()).filter(Boolean)
                                       : [];
+                                    
+                                    // ✅ NEW: If mandatory and no value yet, use first option as default
+                                    let defaultValue = results[param.id]?.textValue ?? (param.textContent || '');
+                                    if (param.isMandatory && !results[param.id]?.textValue && options.length > 0) {
+                                      defaultValue = options[0];
+                                      // Auto-set the first option value in results
+                                      if (!results[param.id]?.textValue) {
+                                        setTimeout(() => {
+                                          handleResultChange(param.id, 'textValue', options[0], parameters);
+                                        }, 0);
+                                      }
+                                    }
+                                    
                                     return options.length > 0 ? (
                                       <SuggestionInput
-                                        value={results[param.id]?.textValue ?? (param.textContent || '')}
+                                        value={defaultValue}
                                         onChange={(val) => handleResultChange(param.id, 'textValue', val, parameters)}
                                         options={options}
                                         isAbnormal={results[param.id]?.isAbnormal}

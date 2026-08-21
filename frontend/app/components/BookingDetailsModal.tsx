@@ -191,7 +191,7 @@ const BookingDetailsModal: React.FC<BookingDetailsModalProps> = ({
   }, 0);
 
   // ✅ Use CURRENT test total as Grand Total (reactive to test additions/deletions)
-  let finalGrandTotal = currentTestsTotal || 0;  // Ensure it's always a number
+  let finalGrandTotal = typeof currentTestsTotal === 'number' ? currentTestsTotal : (parseFloat(currentTestsTotal) || 0);  // Ensure it's always a number
   let finalInitialDiscount, finalInitialAmount, finalNewTestTotal, finalNewDiscount, finalNetAmount, finalBalance;
   
   console.log('🔍 BILLING STATE DEBUG:', {
@@ -286,7 +286,7 @@ const BookingDetailsModal: React.FC<BookingDetailsModalProps> = ({
   const aggregateDiscountPercent = totalTestCharges > 0 ? Math.round((aggregateDiscountAmount / totalTestCharges) * 100) : 0;
   
   // ✅ For display in Grand Total (shows EXISTING state, not aggregate)
-  const displayedBalanceAmount = Math.max(0, grandTotal - advanceFromDB);
+  const displayedBalanceAmount = Math.max(0, finalGrandTotal - advanceFromDB);
   const displayedNetAmount = Math.max(0, displayedBalanceAmount - paymentAmount);
   const finalBalanceAmount = paymentAmount >= displayedBalanceAmount ? 0 : displayedBalanceAmount;
   
@@ -894,12 +894,12 @@ const BookingDetailsModal: React.FC<BookingDetailsModalProps> = ({
                   <div className="text-xs font-semibold text-gray-700 mb-1">Grand Total</div>
                   <div className="flex gap-1.5 items-end">
                     {[
-                      { label: "Grand Total", val: finalGrandTotal.toFixed(0), ro: true, color: "text-orange-600" },
+                      { label: "Grand Total", val: (finalGrandTotal || 0).toFixed(0), ro: true, color: "text-orange-600" },
                       // Only show Advance if something was paid or will be paid
                       ...(shouldShowAdvance ? [
-                        { label: "Advance", val: totalAdvancePaid.toFixed(0), ro: true, color: "text-blue-600" }
+                        { label: "Advance", val: (totalAdvancePaid || 0).toFixed(0), ro: true, color: "text-blue-600" }
                       ] : []),
-                      { label: "Dis", val: previousDiscount.toFixed(0), ro: true, color: "text-yellow-600" }, // ✅ Shows TOTAL aggregate discount from DB
+                      { label: "Dis", val: (previousDiscount || 0).toFixed(0), ro: true, color: "text-yellow-600" }, // ✅ Shows TOTAL aggregate discount from DB
                       { label: "Bal", val: (newTestsAdded 
                         ? Math.max(0, finalGrandTotal - (previousDiscount + newTestDiscountForPreview) - totalAdvancePaid)
                         : Math.max(0, finalGrandTotal - previousDiscount - totalAdvancePaid)
@@ -927,8 +927,8 @@ const BookingDetailsModal: React.FC<BookingDetailsModalProps> = ({
                     </div>
                     <div className="flex gap-1.5 items-end">
                       {[
-                        { label: "Dis%", val: discountPercent > 0 ? discountPercent.toFixed(0) : '', ro: false, color: "text-gray-600" },
-                        { label: "DisAmt", val: newTestDiscountAmount > 0 ? newTestDiscountAmount.toFixed(0) : '', ro: true, color: "text-green-600" },
+                        { label: "Dis%", val: discountPercent > 0 ? (discountPercent || 0).toFixed(0) : '', ro: false, color: "text-gray-600" },
+                        { label: "DisAmt", val: newTestDiscountAmount > 0 ? (newTestDiscountAmount || 0).toFixed(0) : '', ro: true, color: "text-green-600" },
                       ].map((item, i) => (
                         <div key={i} className="flex-1">
                           <div className={`${item.color} font-bold text-xs text-center mb-0.5`}>{item.label}</div>
