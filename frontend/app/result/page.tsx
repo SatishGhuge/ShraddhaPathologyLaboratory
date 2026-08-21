@@ -3604,9 +3604,7 @@ export default function Result() {
                       paginatedResults.map((patient, patientIndex) => {
                         return patient.tests.map((test, testIndex) => {
                           const statusBgColor = getStatusBadgeColor(test.result_status);
-                          const rowClassName = test.isEmergency 
-                            ? 'bg-red-50 border-l-4 border-l-red-600 text-gray-800 border-b border-gray-300 cursor-pointer transition-all'
-                            : `${statusBgColor} border-b border-gray-300 cursor-pointer transition-all`;
+                          const rowClassName = `${statusBgColor} border-b border-gray-300 cursor-pointer transition-all`;
                           
                           return (
                           <tr 
@@ -3663,8 +3661,8 @@ export default function Result() {
                             {selectedColumns.patientName && (
                               <td className="px-1 sm:px-2 py-0.5 sm:py-1 text-[11px] font-medium border border-gray-300">
                                 {testIndex === 0 && (
-                                  <span className={`flex items-center gap-1 ${test.isEmergency ? 'text-red-700' : ''}`}>
-                                    {test.isEmergency && (
+                                  <span className={`flex items-center gap-1 ${(test.isEmergency && test.result_status !== 'Delivered') ? 'text-red-700 font-bold' : ''}`}>
+                                    {(test.isEmergency && test.result_status !== 'Delivered') && (
                                       <AlertTriangle size={14} className="text-yellow-500 flex-shrink-0" />
                                     )}
                                     <span className="truncate">{patient.patient_name}</span>
