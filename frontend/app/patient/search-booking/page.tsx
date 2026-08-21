@@ -502,6 +502,8 @@ export default function BookingPage() {
   const [appliedMobile, setAppliedMobile] = useState("");
   const [appliedDoctor, setAppliedDoctor] = useState("");
   const [appliedOutstanding, setAppliedOutstanding] = useState(false);
+  const [showPendingBarcode, setShowPendingBarcode] = useState(false);
+  const [appliedPendingBarcode, setAppliedPendingBarcode] = useState(false);
 
   /* ===== ADD REFERRAL MODAL STATES ===== */
   const [showAddReferral, setShowAddReferral] = useState(false);
@@ -970,8 +972,14 @@ export default function BookingPage() {
     if (appliedOutstanding) {
       filtered = filtered.filter(b => b.paymentStatus === "Due");
     }
+    // Filter for pending barcode - show only bookings with at least one test with Unprinted barcode status
+    if (appliedPendingBarcode) {
+      filtered = filtered.filter(b => 
+        b.tests && b.tests.some((t: any) => t.barcode_status === "Unprinted")
+      );
+    }
     setBookings(filtered);
-  }, [dateRange, appliedPatientName, appliedMobile, appliedDoctor, appliedOutstanding, allBookings, deletedIds]);
+  }, [dateRange, appliedPatientName, appliedMobile, appliedDoctor, appliedOutstanding, appliedPendingBarcode, allBookings, deletedIds]);
 
   /* ===== BARCODE SELECTION HANDLER ===== */
   const handleBarcodeToggle = (index: number) => {
@@ -992,6 +1000,7 @@ export default function BookingPage() {
     setAppliedMobile(mobileSearch);
     setAppliedDoctor(searchBarDoctorSearch);
     setAppliedOutstanding(showOutstanding);
+    setAppliedPendingBarcode(showPendingBarcode);
     setCurrentPage(1); // Reset to first page
   };
 
@@ -1014,12 +1023,16 @@ export default function BookingPage() {
     setMobileSearch('');
     setSearchBarDoctorSearch('');
     setShowOutstanding(false);
+    setShowPendingBarcode(false);
     setShowSearchBarDoctorDropdown(false);
     setSelectedBooking(null);
     setCurrentPage(1); // Reset to first page
     // Clear applied filters
     setAppliedPatientName('');
     setAppliedMobile('');
+    setAppliedDoctor('');
+    setAppliedOutstanding(false);
+    setAppliedPendingBarcode(false);
     setAppliedDoctor('');
     setAppliedOutstanding(false);
   };
@@ -1897,6 +1910,19 @@ export default function BookingPage() {
             />
             <span className="font-semibold text-orange-700">Outstandings</span>
           </label>
+
+          <label className="flex items-center gap-2 border px-3 py-1 rounded text-sm bg-blue-50 cursor-pointer hover:bg-blue-100">
+            <input 
+              type="checkbox" 
+              checked={showPendingBarcode}
+              onChange={(e) => {
+                setShowPendingBarcode(e.target.checked);
+                setAppliedPendingBarcode(e.target.checked);
+              }}
+              className="w-4 h-4 cursor-pointer"
+            />
+            <span className="font-semibold text-blue-700">Pending Barcode</span>
+          </label>
           
           <button 
             onClick={handleReset}
@@ -1960,7 +1986,7 @@ export default function BookingPage() {
                             <AlertTriangle size={16} className="text-yellow-500 flex-shrink-0" />
                           )}
                           <span>{b.name}</span>
-                          {b.balanceAmount > 0 && b.billStatus !== 'PAID' && (
+                          {b.balanceAmount > 0 && (
                             <div className="relative inline-flex items-center cursor-help">
                               <span className="text-red-600 font-bold text-sm hover:text-red-700 transition-colors">₹</span>
                               <div className="absolute left-0 bottom-full mb-1 bg-red-600 text-white text-xs px-2 py-1 rounded whitespace-nowrap pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity z-50 shadow-lg font-semibold">
