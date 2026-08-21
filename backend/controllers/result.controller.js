@@ -1204,13 +1204,22 @@ export const updateTestStatus = async (req, res) => {
       });
     }
 
+    // Prepare update data
+    const updateData = {
+      status: properStatus,
+      updatedAt: new Date()
+    };
+
+    // If status is being set to "Delivered", unmark the emergency flag
+    if (properStatus === 'Delivered') {
+      console.log(`🚨→✅ Unmarking emergency for test ${id} as status changed to Delivered`);
+      updateData.isEmergency = false;
+      updateData.emergencySetAt = null;
+    }
+
     const updatedTest = await prisma.patientTest.update({
       where: { id: parseInt(id) },
-      data: {
-        status: properStatus,
-        // Don't update patient_history - keep existing history
-        updatedAt: new Date()
-      },
+      data: updateData,
       include: {
         patient: true,
         test: true,
@@ -1424,17 +1433,26 @@ export const bulkUpdateTestStatus = async (req, res) => {
       });
     }
 
+    // Prepare update data
+    const updateData = {
+      status: properStatus,
+      updatedAt: new Date()
+    };
+
+    // If status is being set to "Delivered", unmark the emergency flag
+    if (properStatus === 'Delivered') {
+      console.log(`🚨→✅ Unmarking emergency for ${testIds.length} tests as status changed to Delivered`);
+      updateData.isEmergency = false;
+      updateData.emergencySetAt = null;
+    }
+
     const updatedTests = await prisma.patientTest.updateMany({
       where: {
         id: {
           in: testIds.map(id => parseInt(id))
         }
       },
-      data: {
-        status: properStatus,
-        // Don't update patient_history - keep existing history
-        updatedAt: new Date()
-      }
+      data: updateData
     });
 
     res.json({

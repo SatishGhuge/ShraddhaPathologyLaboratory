@@ -1949,13 +1949,14 @@ export default function BookingPage() {
                   const paginatedBookings = sortedBookings.slice(startIndex, endIndex);
                   
                   return paginatedBookings.map((b,i) => {
-                    const hasEmergency = b.tests?.some((t: any) => t.isEmergency);
+                    // Check if any test is emergency AND NOT delivered
+                    const hasActiveEmergency = b.tests?.some((t: any) => t.isEmergency && t.status !== 'Delivered');
                     return (
-                    <tr key={i} className={`border-b hover:bg-gray-50 ${hasEmergency ? 'bg-red-50' : ''} ${getBookingRowColor(b)}`}>
+                    <tr key={i} className={`border-b hover:bg-gray-50 ${hasActiveEmergency ? 'bg-red-50' : ''} ${getBookingRowColor(b)}`}>
                       <td className="px-2 py-1 text-center font-medium text-xs">{startIndex + i + 1}</td>
                       <td className="px-2 py-1">
-                        <div className={`font-semibold flex items-center gap-2 group text-xs ${hasEmergency ? 'text-red-700' : 'text-gray-800'}`}>
-                          {hasEmergency && (
+                        <div className={`font-semibold flex items-center gap-2 group text-xs ${hasActiveEmergency ? 'text-red-700' : 'text-gray-800'}`}>
+                          {hasActiveEmergency && (
                             <AlertTriangle size={16} className="text-yellow-500 flex-shrink-0" />
                           )}
                           <span>{b.name}</span>
