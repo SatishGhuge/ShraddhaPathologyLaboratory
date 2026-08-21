@@ -49,7 +49,7 @@ import JsBarcode from "jsbarcode";
 import {RefreshCcw,Star,X,Calendar,UserPlus,ChevronDown,Printer,Download,} from "lucide-react";
 import { generateCompactBarcodePrintHtml } from "@/app/utils/barcodePrintUtils";
 import { createPatient, searchPatient } from "@/src/api/patient";
-import { getDoctors, createDoctor, getSpecimenTypes, getOrganizations, getTestCharges } from "@/src/api/master";
+import { getDoctors, createDoctor, getSpecimenTypes, getOrganizations, getTestCharges, getDoctorCharges } from "@/src/api/master";
 import { searchLocations } from "@/src/data/maharashtraLocations";
 import { generateBillPDF, printBill } from "@/src/utils/billPdfGenerator.js";
 import BillReceipt from "@/app/components/BillReceipt";
@@ -481,6 +481,7 @@ export default function PatientRegistration() {
   const [selectedOrganization, setSelectedOrganization] = useState<string>("");
   const [selectedOrganizationCode, setSelectedOrganizationCode] = useState<string>("");
   const [organizationCharges, setOrganizationCharges] = useState<any>({});
+  const [doctorCharges, setDoctorCharges] = useState<any>({});
   const [organizationSearch, setOrganizationSearch] = useState<string>("");
   const [showOrgDropdown, setShowOrgDropdown] = useState(false);
   const organizationDropdownRef = useRef<HTMLDivElement>(null);
@@ -591,16 +592,29 @@ export default function PatientRegistration() {
           const updatedTests = prevTests.map(test => {
             const key = String(test.id); // Convert test.id to string
             const orgCharge = chargeMap[key];
-            if (orgCharge) {
-              console.log(`   ✅ Test "${test.name}" (ID: ${test.id}, key: "${key}"): B2C ${test.b2cCharge}→${orgCharge.b2cCharge}, B2B ${test.b2bCharge}→${orgCharge.b2bCharge}`);
+            const isDoctorCustomized = test.isDoctorCustomized === true;
+            
+            // Organization charges apply ONLY if doctor doesn't have custom charges
+            // If doctor has custom charges (isDoctorCustomized = true), keep doctor charges
+            if (isDoctorCustomized) {
+              console.log(`   🔒 Test "${test.name}" (ID: ${test.id}): Keeping CUSTOM doctor charges (org cannot override)`);
+              return {
+                ...test,
+                isOrganizationCharge: false,
+                isDoctorCharge: true
+              };
+            } else if (orgCharge) {
+              console.log(`   ✅ Test "${test.name}" (ID: ${test.id}, key: "${key}"): Using org charges B2C ${test.b2cCharge}→${orgCharge.b2cCharge}`);
               return {
                 ...test,
                 b2cCharge: orgCharge.b2cCharge,
                 b2bCharge: orgCharge.b2bCharge,
-                isOrganizationCharge: true // Mark as organization charge for filtering
+                isOrganizationCharge: true,
+                isDoctorCharge: false,
+                isDoctorCustomized: false
               };
             } else {
-              console.log(`   ❓ Test "${test.name}" (ID: ${test.id}, key: "${key}"): No custom charge found in chargeMap keys: [${Object.keys(chargeMap).join(', ')}]`);
+              console.log(`   ❓ Test "${test.name}" (ID: ${test.id}, key: "${key}"): No org charge found`);
               return test;
             }
           });
@@ -615,8 +629,11 @@ export default function PatientRegistration() {
             tests: dept.tests.map(test => {
               const key = String(test.id);
               const orgCharge = chargeMap[key];
-              if (orgCharge) {
-                console.log(`📝 Updated left table test: ${test.name} - B2C: ${test.b2cCharge} → ${orgCharge.b2cCharge}`);
+              const isDoctorCustomized = selectedTests.find(t => t.id === test.id)?.isDoctorCustomized === true;
+              
+              // Only update with org charge if doctor doesn't have custom charges
+              if (!isDoctorCustomized && orgCharge) {
+                console.log(`📝 Updated left table test: ${test.name} - B2C: ${test.b2cCharge} → ${orgCharge.b2cCharge} (ORG)`);
                 return {
                   ...test,
                   b2cCharge: orgCharge.b2cCharge,
@@ -631,9 +648,9 @@ export default function PatientRegistration() {
         console.error('❌ Error fetching charges:', err);
       });
     } else {
-      // Clear organization charges and keep original test charges
+      // Clear organization charges and keep doctor/default charges
       setOrganizationCharges({});
-      console.log('🧹 Organization charges cleared - showing all B2C & B2B charges');
+      console.log('🧹 Organization charges cleared - showing doctor/default charges');
       
       // Remove organization charge marker when unselecting
       setSelectedTests(prevTests => 
@@ -643,9 +660,13 @@ export default function PatientRegistration() {
         }))
       );
 
-      // Restore original charges in left table by reloading departments
-      console.log('🔄 Reloading departments with original charges...');
-      fetchDepartmentsData();
+      // If doctor is selected with custom charges, keep them, otherwise reload original departments
+      if (selectedDoctorDetails?.id && !isManualRefDoctor) {
+        console.log('🔄 Doctor still selected - keeping doctor charges if any...');
+      } else {
+        console.log('🔄 Reloading departments with original charges...');
+        fetchDepartmentsData();
+      }
     }
   }, [selectedOrganization]);
 
@@ -823,6 +844,118 @@ export default function PatientRegistration() {
       setSelectedDoctorDetails(null);
     }
   }, [refDoctor, isManualRefDoctor, doctorsList, email, mobile]);
+
+  // Fetch referral doctor-specific charges when doctor is selected
+  useEffect(() => {
+    if (isManualRefDoctor || !refDoctor || !selectedDoctorDetails?.id) {
+      // Clear doctor charges if no doctor is selected
+      setDoctorCharges({});
+      console.log('🧹 Doctor charges cleared - showing organization/default charges');
+      
+      // Remove doctor charge marker from selected tests
+      setSelectedTests(prevTests => 
+        prevTests.map(test => ({
+          ...test,
+          isDoctorCharge: false
+        }))
+      );
+      return;
+    }
+
+    const doctorId = selectedDoctorDetails.id;
+    console.log('📡 Fetching charges for doctor:', {
+      doctorId,
+      doctorName: selectedDoctorDetails.name
+    });
+
+    getDoctorCharges(String(doctorId)).then((charges: any) => {
+      console.log('📥 Doctor charges response:', charges);
+      
+      if (!Array.isArray(charges)) {
+        console.error('❌ ERROR: Doctor charges response is not an array!', charges);
+        return;
+      }
+
+      const chargeMap: any = {};
+      charges.forEach((charge: any, idx: number) => {
+        const testId = charge.testId || charge.test?.id || charge.id;
+        const key = String(testId);
+        
+        // Doctor charges use discountR and discountS, with discountS as the main charge
+        const b2cCharge = charge.discountS || charge.discountR || 0;
+        const b2bCharge = charge.discountS || charge.discountR || 0;
+        const isCustomized = charge.isCustomized === true;
+        
+        console.log(`   [${idx}] testId: ${testId} (key: "${key}"), Doctor B2C: ${b2cCharge}, Doctor B2B: ${b2bCharge}, isCustomized: ${isCustomized}`);
+        if (testId) {
+          chargeMap[key] = {
+            b2cCharge: b2cCharge,
+            b2bCharge: b2bCharge,
+            isCustomized: isCustomized
+          };
+        }
+      });
+      setDoctorCharges(chargeMap);
+      console.log('💰 Doctor charges map created:', chargeMap);
+
+      // Update selected tests with doctor charges (only if doctor has custom charges)
+      setSelectedTests(prevTests => {
+        console.log(`🔄 Updating ${prevTests.length} selected tests with doctor charges...`);
+        const updatedTests = prevTests.map(test => {
+          const key = String(test.id);
+          const docCharge = chargeMap[key];
+          
+          // Only apply doctor charge if it's customized (not default)
+          // If doctor uses default charges and organization has charges, org charges will override in org effect
+          if (docCharge && docCharge.isCustomized) {
+            console.log(`   ✅ Test "${test.name}" (ID: ${test.id}): Using CUSTOM doctor charges B2C ${test.b2cCharge}→${docCharge.b2cCharge}`);
+            return {
+              ...test,
+              b2cCharge: docCharge.b2cCharge,
+              b2bCharge: docCharge.b2bCharge,
+              isDoctorCharge: true,
+              isDoctorCustomized: true
+            };
+          } else if (docCharge && !docCharge.isCustomized) {
+            console.log(`   ℹ️ Test "${test.name}" (ID: ${test.id}): Doctor uses DEFAULT charges - will use org charges if available`);
+            return {
+              ...test,
+              isDoctorCharge: false,
+              isDoctorCustomized: false
+            };
+          } else {
+            console.log(`   ❓ Test "${test.name}" (ID: ${test.id}): No charge data found`);
+            return test;
+          }
+        });
+        console.log('✅ Updated tests:', updatedTests.map(t => `${t.name}(B2C:${t.b2cCharge})`).join(', '));
+        return updatedTests;
+      });
+
+      // Update departments with doctor charges for left table display (only if customized)
+      setDepartments(prevDepts => {
+        return prevDepts.map(dept => ({
+          ...dept,
+          tests: dept.tests.map(test => {
+            const key = String(test.id);
+            const docCharge = chargeMap[key];
+            // Only update if doctor has custom charges
+            if (docCharge && docCharge.isCustomized) {
+              console.log(`📝 Updated left table test: ${test.name} - B2C: ${test.b2cCharge} → ${docCharge.b2cCharge} (CUSTOM)`);
+              return {
+                ...test,
+                b2cCharge: docCharge.b2cCharge,
+                b2bCharge: docCharge.b2bCharge
+              };
+            }
+            return test;
+          })
+        }));
+      });
+    }).catch((err) => {
+      console.error('❌ Error fetching doctor charges:', err);
+    });
+  }, [selectedDoctorDetails?.id, isManualRefDoctor]);
 
   /* ============ LOCALSTORAGE PERSISTENCE ============ */
   const STORAGE_KEY = 'patientRegistrationDraft';
