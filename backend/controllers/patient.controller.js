@@ -314,12 +314,13 @@ export const createPatient = async (req, res) => {
       let finalDiscountAmount = 0;
       let finalDiscountPercent = 0;
       
+      // ✅ FIX: Always round discount to nearest rupee to avoid floating-point issues
       if (parseFloat(discountPercent) > 0) {
-        finalDiscountAmount = totalTestCharges * (parseFloat(discountPercent) / 100);
+        finalDiscountAmount = Math.round(totalTestCharges * (parseFloat(discountPercent) / 100));
         finalDiscountPercent = parseFloat(discountPercent);
       } else if (parseFloat(discountAmount) > 0) {
-        finalDiscountAmount = parseFloat(discountAmount);
-        finalDiscountPercent = (finalDiscountAmount / totalTestCharges) * 100;
+        finalDiscountAmount = Math.round(parseFloat(discountAmount));
+        finalDiscountPercent = totalTestCharges > 0 ? (finalDiscountAmount / totalTestCharges) * 100 : 0;
       }
       
       // Ensure discount doesn't exceed total
@@ -328,9 +329,9 @@ export const createPatient = async (req, res) => {
       // Step 3: Calculate test amount (after discount)
       const testAmount = totalTestCharges - finalDiscountAmount;
       
-      // Step 4: Calculate advance and balance
+      // Step 4: Calculate advance and balance - ✅ Always round to rupees
       const finalAdvanceAmount = Math.min(parseFloat(advanceAmount) || 0, testAmount);
-      const balanceAmount = testAmount - finalAdvanceAmount;
+      const balanceAmount = Math.max(0, Math.round(testAmount - finalAdvanceAmount));
       
       console.log('💰 Billing Calculation (Existing Patient):', {
         totalTestCharges,
@@ -483,8 +484,8 @@ export const createPatient = async (req, res) => {
         finalDiscountAmount = totalTestCharges * (parseFloat(discountPercent) / 100);
         finalDiscountPercent = parseFloat(discountPercent);
       } else if (parseFloat(discountAmount) > 0) {
-        finalDiscountAmount = parseFloat(discountAmount);
-        finalDiscountPercent = (finalDiscountAmount / totalTestCharges) * 100;
+        finalDiscountAmount = Math.round(parseFloat(discountAmount));
+        finalDiscountPercent = totalTestCharges > 0 ? (finalDiscountAmount / totalTestCharges) * 100 : 0;
       }
       
       // Ensure discount doesn't exceed total
@@ -493,9 +494,9 @@ export const createPatient = async (req, res) => {
       // Step 3: Calculate test amount (after discount)
       const testAmount = totalTestCharges - finalDiscountAmount;
       
-      // Step 4: Calculate advance and balance
+      // Step 4: Calculate advance and balance - ✅ Always round to rupees
       const finalAdvanceAmount = Math.min(parseFloat(advanceAmount) || 0, testAmount);
-      const balanceAmount = testAmount - finalAdvanceAmount;
+      const balanceAmount = Math.max(0, Math.round(testAmount - finalAdvanceAmount));
       
       console.log('💰 Billing Calculation for NEW patient:', {
         totalTestCharges,
