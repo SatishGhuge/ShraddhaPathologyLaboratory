@@ -901,60 +901,75 @@ export const createTest = async (req, res) => {
       for (const category of categories) {
         if (category.parameters && category.parameters.length > 0) {
           for (const param of category.parameters) {
-            console.log(`📋 Creating parameter: ${param.parameterName} for category: ${category.name}`);
+            console.log(`📋 Processing parameter: ${param.parameterName}, ID: ${param.id}`);
             
-            // Create TestParameter
-            const testParameter = await prisma.testParameter.create({
-              data: {
-                testId: test.id, // ✅ Link parameter to test
-                parameterName: param.parameterName || 'Unnamed',
-                machineCode: param.machineCode || null,
-                multiplyBy: param.multiplyBy || null,
-                decimal: param.decimal ? parseInt(param.decimal) : null,
-                parameterSortOrder: param.sortOrder !== undefined && param.sortOrder !== null ? parseInt(param.sortOrder) : null,
-                isDescriptive: param.isDescriptive || false,
-                lowPanic: param.lowPanic ? parseFloat(param.lowPanic) : null,
-                highPanic: param.highPanic ? parseFloat(param.highPanic) : null,
-                isNABL: param.isNABL || false,
-                parameterCode: param.parameterCode || null,
-                hasFormula: param.hasFormula || false,
-                formula: param.formula || null,
-                type: param.type || 'Numeric',
-                isMandatory: param.isMandatory || false,
-                rangeType: param.rangeType || 'BySex',
-                unitId: param.unitId ? parseInt(param.unitId) : null,
-                displayRangeText: param.displayRangeText || null,
-                rangeText: param.rangeText || null,
-                textContent: param.textContent || null,
-                maleDisplayText: param.maleDisplayText || null,
-                femaleDisplayText: param.femaleDisplayText || null,
-                defaultDisplayText: param.defaultDisplayText || null,
-                isMultipleOptions: param.isMultipleOptions || false,
-                testMethod: param.testMethod || null,
-                maleLowValue: param.normalRanges?.find(r => r.gender === 'Male')?.ll ? String(param.normalRanges.find(r => r.gender === 'Male').ll) : null,
-                maleHighValue: param.normalRanges?.find(r => r.gender === 'Male')?.ul ? String(param.normalRanges.find(r => r.gender === 'Male').ul) : null,
-                maleDefaultValue: param.normalRanges?.find(r => r.gender === 'Male')?.default || null,
-                maleActive: param.normalRanges?.find(r => r.gender === 'Male')?.isActive || false,
-                femaleLowValue: param.normalRanges?.find(r => r.gender === 'Female')?.ll ? String(param.normalRanges.find(r => r.gender === 'Female').ll) : null,
-                femaleHighValue: param.normalRanges?.find(r => r.gender === 'Female')?.ul ? String(param.normalRanges.find(r => r.gender === 'Female').ul) : null,
-                femaleDefaultValue: param.normalRanges?.find(r => r.gender === 'Female')?.default || null,
-                femaleActive: param.normalRanges?.find(r => r.gender === 'Female')?.isActive || false,
-                childLowValue: param.normalRanges?.find(r => r.gender === 'Child')?.ll ? String(param.normalRanges.find(r => r.gender === 'Child').ll) : null,
-                childHighValue: param.normalRanges?.find(r => r.gender === 'Child')?.ul ? String(param.normalRanges.find(r => r.gender === 'Child').ul) : null,
-                childDefaultValue: param.normalRanges?.find(r => r.gender === 'Child')?.default || null,
-                childActive: param.normalRanges?.find(r => r.gender === 'Child')?.isActive || false,
-                ageRanges: processAgeRangesWithGender(param.ageRanges, param.parameterName),
-                rangeValues: param.rangeValues && param.rangeValues.length > 0 ? JSON.stringify(param.rangeValues) : null,
-                isActive: true
-              }
-            });
+            let testParameterId;
+            
+            // ✅ NEW: If param has an ID, it's an existing parameter - just link it
+            // If no ID, create a new parameter
+            if (param.id) {
+              // Existing parameter - just link it to the test
+              console.log(`🔗 Linking existing parameter ID: ${param.id}`);
+              testParameterId = parseInt(param.id);
+            } else {
+              // New parameter - create it
+              console.log(`✨ Creating new parameter: ${param.parameterName}`);
+              
+              // Create TestParameter
+              const testParameter = await prisma.testParameter.create({
+                data: {
+                  testId: test.id, // ✅ Link parameter to test
+                  parameterName: param.parameterName || 'Unnamed',
+                  machineCode: param.machineCode || null,
+                  multiplyBy: param.multiplyBy || null,
+                  decimal: param.decimal ? parseInt(param.decimal) : null,
+                  parameterSortOrder: param.sortOrder !== undefined && param.sortOrder !== null ? parseInt(param.sortOrder) : null,
+                  isDescriptive: param.isDescriptive || false,
+                  lowPanic: param.lowPanic ? parseFloat(param.lowPanic) : null,
+                  highPanic: param.highPanic ? parseFloat(param.highPanic) : null,
+                  isNABL: param.isNABL || false,
+                  parameterCode: param.parameterCode || null,
+                  hasFormula: param.hasFormula || false,
+                  formula: param.formula || null,
+                  type: param.type || 'Numeric',
+                  isMandatory: param.isMandatory || false,
+                  rangeType: param.rangeType || 'BySex',
+                  unitId: param.unitId ? parseInt(param.unitId) : null,
+                  displayRangeText: param.displayRangeText || null,
+                  rangeText: param.rangeText || null,
+                  textContent: param.textContent || null,
+                  maleDisplayText: param.maleDisplayText || null,
+                  femaleDisplayText: param.femaleDisplayText || null,
+                  defaultDisplayText: param.defaultDisplayText || null,
+                  isMultipleOptions: param.isMultipleOptions || false,
+                  testMethod: param.testMethod || null,
+                  maleLowValue: param.normalRanges?.find(r => r.gender === 'Male')?.ll ? String(param.normalRanges.find(r => r.gender === 'Male').ll) : null,
+                  maleHighValue: param.normalRanges?.find(r => r.gender === 'Male')?.ul ? String(param.normalRanges.find(r => r.gender === 'Male').ul) : null,
+                  maleDefaultValue: param.normalRanges?.find(r => r.gender === 'Male')?.default || null,
+                  maleActive: param.normalRanges?.find(r => r.gender === 'Male')?.isActive || false,
+                  femaleLowValue: param.normalRanges?.find(r => r.gender === 'Female')?.ll ? String(param.normalRanges.find(r => r.gender === 'Female').ll) : null,
+                  femaleHighValue: param.normalRanges?.find(r => r.gender === 'Female')?.ul ? String(param.normalRanges.find(r => r.gender === 'Female').ul) : null,
+                  femaleDefaultValue: param.normalRanges?.find(r => r.gender === 'Female')?.default || null,
+                  femaleActive: param.normalRanges?.find(r => r.gender === 'Female')?.isActive || false,
+                  childLowValue: param.normalRanges?.find(r => r.gender === 'Child')?.ll ? String(param.normalRanges.find(r => r.gender === 'Child').ll) : null,
+                  childHighValue: param.normalRanges?.find(r => r.gender === 'Child')?.ul ? String(param.normalRanges.find(r => r.gender === 'Child').ul) : null,
+                  childDefaultValue: param.normalRanges?.find(r => r.gender === 'Child')?.default || null,
+                  childActive: param.normalRanges?.find(r => r.gender === 'Child')?.isActive || false,
+                  ageRanges: processAgeRangesWithGender(param.ageRanges, param.parameterName),
+                  rangeValues: param.rangeValues && param.rangeValues.length > 0 ? JSON.stringify(param.rangeValues) : null,
+                  isActive: true
+                }
+              });
+              
+              testParameterId = testParameter.id;
+            }
 
-            // Create TestCategory linking to TestParameter
+            // Create TestCategory linking to TestParameter (existing or new)
             // Each parameter gets its own TestCategory record with the same categoryId
             await prisma.testCategory.create({
               data: {
                 testId: test.id,
-                testParameterId: testParameter.id,
+                testParameterId: testParameterId,
                 categoryId: category.categoryId, // ✅ Use unique category ID
                 categoryName: category.name ?? "",
                 isCategory: category.isCategory || false,
@@ -963,7 +978,7 @@ export const createTest = async (req, res) => {
               }
             });
 
-            console.log(`✅ Created parameter: ${param.parameterName} linked to categoryId: ${category.categoryId}`);
+            console.log(`✅ Parameter linked: ${param.parameterName} (ID: ${testParameterId})`);
           }
         }
       }
@@ -5945,6 +5960,120 @@ export const importTests = async (req, res) => {
 
 
 // ✅ DELETE PARAMETER FROM TEST - Properly removes from TestParameter, TestCategory, and TestResult
+export const updateTestParameter = async (req, res) => {
+  try {
+    const { parameterId } = req.params;
+    const paramId = parseInt(parameterId);
+
+    console.log(`📝 UPDATE PARAMETER REQUEST for ID: ${paramId}`);
+    console.log(`📥 Update data:`, JSON.stringify(req.body, null, 2));
+
+    // Check if parameter exists
+    const existingParameter = await prisma.testParameter.findUnique({
+      where: { id: paramId }
+    });
+
+    if (!existingParameter) {
+      return res.status(404).json({
+        success: false,
+        message: 'Parameter not found'
+      });
+    }
+
+    console.log(`📋 Updating parameter: ${existingParameter.parameterName}`);
+
+    // Build update data from request body
+    const updateData = {
+      parameterName: req.body.parameterName !== undefined ? req.body.parameterName : undefined,
+      machineCode: req.body.machineCode !== undefined ? req.body.machineCode : undefined,
+      multiplyBy: req.body.multiplyBy !== undefined ? req.body.multiplyBy : undefined,
+      decimal: req.body.decimal !== undefined ? parseInt(req.body.decimal) : undefined,
+      parameterSortOrder: req.body.parameterSortOrder !== undefined ? parseInt(req.body.parameterSortOrder) : undefined,
+      isDescriptive: req.body.isDescriptive !== undefined ? req.body.isDescriptive : undefined,
+      lowPanic: req.body.lowPanic !== undefined ? parseFloat(req.body.lowPanic) : undefined,
+      highPanic: req.body.highPanic !== undefined ? parseFloat(req.body.highPanic) : undefined,
+      isNABL: req.body.isNABL !== undefined ? req.body.isNABL : undefined,
+      parameterCode: req.body.parameterCode !== undefined ? req.body.parameterCode : undefined,
+      hasFormula: req.body.hasFormula !== undefined ? req.body.hasFormula : undefined,
+      formula: req.body.formula !== undefined ? req.body.formula : undefined,
+      type: req.body.type !== undefined ? req.body.type : undefined,
+      isMandatory: req.body.isMandatory !== undefined ? req.body.isMandatory : undefined,
+      rangeType: req.body.rangeType !== undefined ? req.body.rangeType : undefined,
+      unitId: req.body.unitId !== undefined ? parseInt(req.body.unitId) : undefined,
+      displayRangeText: req.body.displayRangeText !== undefined ? req.body.displayRangeText : undefined,
+      rangeText: req.body.rangeText !== undefined ? req.body.rangeText : undefined,
+      textContent: req.body.textContent !== undefined ? req.body.textContent : undefined,
+      maleDisplayText: req.body.maleDisplayText !== undefined ? req.body.maleDisplayText : undefined,
+      femaleDisplayText: req.body.femaleDisplayText !== undefined ? req.body.femaleDisplayText : undefined,
+      defaultDisplayText: req.body.defaultDisplayText !== undefined ? req.body.defaultDisplayText : undefined,
+      isMultipleOptions: req.body.isMultipleOptions !== undefined ? req.body.isMultipleOptions : undefined,
+      maleLowValue: req.body.maleLowValue !== undefined ? String(req.body.maleLowValue) : undefined,
+      maleHighValue: req.body.maleHighValue !== undefined ? String(req.body.maleHighValue) : undefined,
+      maleDefaultValue: req.body.maleDefaultValue !== undefined ? req.body.maleDefaultValue : undefined,
+      maleActive: req.body.maleActive !== undefined ? req.body.maleActive : undefined,
+      femaleLowValue: req.body.femaleLowValue !== undefined ? String(req.body.femaleLowValue) : undefined,
+      femaleHighValue: req.body.femaleHighValue !== undefined ? String(req.body.femaleHighValue) : undefined,
+      femaleDefaultValue: req.body.femaleDefaultValue !== undefined ? req.body.femaleDefaultValue : undefined,
+      femaleActive: req.body.femaleActive !== undefined ? req.body.femaleActive : undefined,
+      childLowValue: req.body.childLowValue !== undefined ? String(req.body.childLowValue) : undefined,
+      childHighValue: req.body.childHighValue !== undefined ? String(req.body.childHighValue) : undefined,
+      childDefaultValue: req.body.childDefaultValue !== undefined ? req.body.childDefaultValue : undefined,
+      childActive: req.body.childActive !== undefined ? req.body.childActive : undefined,
+      ageRanges: req.body.ageRanges !== undefined ? JSON.stringify(processAgeRangesWithGender(req.body.ageRanges, req.body.parameterName)) : undefined,
+      rangeValues: req.body.rangeValues !== undefined ? JSON.stringify(req.body.rangeValues) : undefined,
+      isActive: req.body.isActive !== undefined ? req.body.isActive : undefined
+    };
+
+    // Remove undefined values to only update provided fields
+    Object.keys(updateData).forEach(key => updateData[key] === undefined && delete updateData[key]);
+
+    console.log(`📤 Prepared update data:`, Object.keys(updateData));
+
+    // ✅ UPDATE PARAMETER - This will propagate to ALL tests using this parameter
+    const updatedParameter = await prisma.testParameter.update({
+      where: { id: paramId },
+      data: updateData
+    });
+
+    console.log(`✅ Parameter updated successfully: ${updatedParameter.parameterName}`);
+
+    // Count how many tests are using this parameter
+    const testCategories = await prisma.testCategory.findMany({
+      where: { testParameterId: paramId },
+      select: { testId: true },
+      distinct: ['testId']
+    });
+
+    const uniqueTestCount = testCategories.length;
+    console.log(`📊 This parameter is used in ${uniqueTestCount} test(s) - all have been updated!`);
+
+    res.json({
+      success: true,
+      message: `Parameter updated successfully and propagated to ${uniqueTestCount} test(s)`,
+      data: {
+        parameter: updatedParameter,
+        affectedTestsCount: uniqueTestCount,
+        testsUpdated: testCategories.map(tc => tc.testId)
+      }
+    });
+  } catch (error) {
+    console.error('❌ Update parameter error:', error);
+    
+    if (error.code === 'P2002') {
+      return res.status(400).json({
+        success: false,
+        message: 'Parameter code already exists'
+      });
+    }
+
+    res.status(500).json({
+      success: false,
+      message: 'Failed to update parameter',
+      error: error.message
+    });
+  }
+}
+
 export const deleteTestParameter = async (req, res) => {
   try {
     const { parameterId } = req.params;

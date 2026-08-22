@@ -127,6 +127,8 @@ const AddTest = () => {
     const key = `${catIdx}-${paramIdx}`;
     const updatedCategories = [...categories];
     const p = updatedCategories[catIdx].parameters[paramIdx];
+    // ✅ NEW: Store the existing parameter ID to link to it instead of creating new
+    p.id              = suggestion.id || undefined;  // Link to existing parameter if ID exists
     p.parameterName   = suggestion.parameterName;
     p.machineCode     = suggestion.machineCode || '';
     p.multiplyBy      = suggestion.multiplyBy || '';
@@ -2687,11 +2689,13 @@ const AddTest = () => {
                                     />
                                   </td>
                                   <td className="border border-gray-300 p-1">
-                                    <input 
+                                    <textarea 
                                       className="w-full px-2 py-1 border border-gray-300 rounded text-xs sm:text-sm" 
                                       value={ageRange.default || ""}
                                       onChange={(e) => handleAgeRangeChange(categoryIndex, paramIndex, ageIndex, 'default', e.target.value)}
-                                      disabled={isViewMode} 
+                                      disabled={isViewMode}
+                                      rows={2}
+                                      style={{ minHeight: '2.5rem', maxHeight: '5rem', resize: 'both', overflow: 'auto' }}
                                     />
                                   </td>
                                   <td className="border border-gray-300 p-1">
