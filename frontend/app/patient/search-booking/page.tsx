@@ -609,7 +609,7 @@ export default function BookingPage() {
 
       visits.forEach((visit: any) => {
         const visitDate = visit.visitDate || p.createdAt;
-        const paymentStatus = visit.balanceAmount > 0 ? "Due" : "Paid";
+        const paymentStatus = visit.balanceAmount > 0.01 ? "Due" : "Paid";
         
         console.log('🔍 VISIT DATA:', {
           visitId: visit.visitId,
@@ -1986,7 +1986,7 @@ export default function BookingPage() {
                             <AlertTriangle size={16} className="text-yellow-500 flex-shrink-0" />
                           )}
                           <span>{b.name}</span>
-                          {b.balanceAmount > 0 && (
+                          {b.balanceAmount > 0.01 && (
                             <div className="relative inline-flex items-center cursor-help">
                               <span className="text-red-600 font-bold text-sm hover:text-red-700 transition-colors">₹</span>
                               <div className="absolute left-0 bottom-full mb-1 bg-red-600 text-white text-xs px-2 py-1 rounded whitespace-nowrap pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity z-50 shadow-lg font-semibold">
@@ -1994,6 +1994,9 @@ export default function BookingPage() {
                                 <div className="absolute top-full left-1/2 -translate-x-1/2 w-0 h-0 border-l-3 border-r-3 border-t-3 border-l-transparent border-r-transparent border-t-red-600"></div>
                               </div>
                             </div>
+                          )}
+                          {b.balanceAmount <= 0.01 && (
+                            <span className="text-green-600 font-bold text-xs bg-green-50 px-2 py-0.5 rounded">✓ PAID</span>
                           )}
                         </div>
                       </td>
