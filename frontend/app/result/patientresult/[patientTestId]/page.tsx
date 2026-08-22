@@ -428,9 +428,9 @@ const PatientResult = () => {
           } else if (range.label?.includes('Equal To') && range.value != null)
             ageMatches = getAgeInUnit(exactAgeInYears, exactAgeInMonths, exactAgeInDays, range.timeUnit) === range.value;
           
-          // If age matches and there's a display range text, show ONLY that
-          if (ageMatches && range.displayRangeText) {
-            return range.displayRangeText;
+          // If age matches and there's a default text in textarea, show ONLY that
+          if (ageMatches && range.default?.trim()) {
+            return range.default;
           }
           
           // Otherwise return numeric range if available
