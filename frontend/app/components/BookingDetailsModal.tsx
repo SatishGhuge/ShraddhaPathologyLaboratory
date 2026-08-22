@@ -75,6 +75,8 @@ const BookingDetailsModal: React.FC<BookingDetailsModalProps> = ({
   // Track if new tests have been added (to enable/disable discount fields)
   const [newTestsAdded, setNewTestsAdded] = useState(false);
   const [initialTestCount] = useState(booking?.tests?.length || 0);
+  // ✅ Track total charge of deleted tests to subtract from grand total
+  const [deletedTestsChargeTotal, setDeletedTestsChargeTotal] = useState(0);
 
   // Fetch tests from backend when modal opens
   // This MUST be before the early return to avoid React hooks violation
@@ -156,6 +158,7 @@ const BookingDetailsModal: React.FC<BookingDetailsModalProps> = ({
       setTests([]);
       setBillingSummary(null);
       setNewTestsAdded(false);
+      setDeletedTestsChargeTotal(0); // ✅ Reset deleted tests tracker
     }
   }, [isOpen]);
 
@@ -236,6 +239,17 @@ const BookingDetailsModal: React.FC<BookingDetailsModalProps> = ({
     const charge = businessType === "B2C" ? (t.b2cCharge || t.charge || 0) : (t.b2bCharge || t.charge || 0);
     return sum + charge;
   }, 0);
+  
+  // ✅ HANDLE DELETED EXISTING TESTS
+  // Use the tracked state of deleted tests charges
+  finalGrandTotal = Math.max(0, finalGrandTotal - deletedTestsChargeTotal);
+  finalBalance = Math.max(0, finalBalance - deletedTestsChargeTotal);
+  
+  console.log('📊 Test Deletion Debug:', {
+    deletedTestsChargeTotal,
+    adjustedFinalGrandTotal: finalGrandTotal,
+    adjustedFinalBalance: finalBalance,
+  });
   
   // ✅ NEW LOGIC: Discount applies to BALANCE AMOUNT (not just new tests)
   // New total balance = existing balance + new test charges
@@ -343,11 +357,13 @@ const BookingDetailsModal: React.FC<BookingDetailsModalProps> = ({
 
   const handleDeleteTest = (testName: string) => {
     const testToDelete = tests.find(t => t.name === testName);
-    if (testToDelete && testToDelete.isExisting) {
-      // If deleting existing test, subtract from balance
+    if (testToDelete) {
+      // Calculate the charge of the test being deleted
       const testCharge = businessType === "B2C" ? (testToDelete.b2cCharge || testToDelete.charge || 0) : (testToDelete.b2bCharge || testToDelete.charge || 0);
-      console.log(`Deleting existing test: ${testName}, charge: ${testCharge}`);
-      // This will trigger recalculation on next render
+      console.log(`Deleting test: ${testName}, charge: ${testCharge}`);
+      
+      // ✅ Track deleted tests charge for grand total adjustment
+      setDeletedTestsChargeTotal(prev => prev + testCharge);
     }
     
     const updatedTests = tests.filter(t => t.name !== testName);
@@ -850,8 +866,8 @@ const BookingDetailsModal: React.FC<BookingDetailsModalProps> = ({
                       ...(shouldShowAdvance ? [
                         { label: "Advance", val: totalAdvancePaid.toFixed(0), ro: true, color: "text-blue-600" }
                       ] : []),
-                      { label: "Dis", val: previousDiscount.toFixed(0), ro: true, color: "text-yellow-600" }, // ✅ Shows TOTAL aggregate discount from DB
-                      { label: "Bal", val: finalBalance.toFixed(0), ro: true, color: "text-red-600" }, // ✅ Use fresh balance from backend,
+                      { label: "Dis", val: Math.round(previousDiscount).toFixed(0), ro: true, color: "text-yellow-600" }, // ✅ Shows ONLY PREVIOUS discount from DB
+                      { label: "Bal", val: Math.round(Math.max(0, (finalGrandTotal + newTestsChargeTotal) - previousDiscount - newTestDiscountForPreview - totalAdvancePaid)).toFixed(0), ro: true, color: "text-red-600" }, // ✅ Balance = Grand Total - Previous Discount - New Test Discount - Advance
                     ].map((item, i) => (
                       <div key={i} className="flex-1">
                         <div className={`${item.color} font-bold text-xs text-center mb-0.5`}>{item.label}</div>
@@ -911,11 +927,11 @@ const BookingDetailsModal: React.FC<BookingDetailsModalProps> = ({
                   <div className="flex gap-1.5 items-end">
                     {[
                       // Only show Total Dis if new test was added and there's a discount
-                      ...(newTestsAdded && (previousDiscount + newTestDiscountForPreview) > 0 ? [
+                      ...(newTestsAdded && newTestDiscountForPreview > 0 ? [
                         { label: "Total Dis", val: (previousDiscount + newTestDiscountForPreview).toFixed(0), ro: true, color: "text-red-600" }
                       ] : []),
-                      { label: "Net Amt", val: (newTestsAdded ? remainingBalanceAfterNewDiscount : remainingBalance).toFixed(0), ro: true, color: "text-purple-600" },
-                      { label: "Payment", val: paymentAmount > 0 ? paymentAmount.toFixed(0) : '', ro: false, color: paymentExceeds ? "text-red-700" : "text-green-700" },
+                      { label: "Net Amt", val: Math.round(Math.max(0, (finalGrandTotal + newTestsChargeTotal) - previousDiscount - newTestDiscountForPreview - totalAdvancePaid)).toFixed(0), ro: true, color: "text-purple-600" },
+                      { label: "Payment", val: paymentAmount > 0 ? Math.round(paymentAmount).toFixed(0) : '', ro: false, color: paymentExceeds ? "text-red-700" : "text-green-700" },
                     ].map((item, i) => (
                       <div key={i} className="flex-1">
                         <div className={`${item.color} font-bold text-xs text-center mb-0.5`}>{item.label}</div>
@@ -935,7 +951,7 @@ const BookingDetailsModal: React.FC<BookingDetailsModalProps> = ({
                     ))}
                   </div>
                   {paymentExceeds && (
-                    <div className="text-xs text-red-600 font-semibold mt-1">⚠️ Exceed amount: ₹{(paymentAmount - (newTestsAdded ? remainingBalanceAfterNewDiscount : remainingBalance)).toFixed(0)}</div>
+                    <div className="text-xs text-red-600 font-semibold mt-1">⚠️ Exceed amount: ₹{Math.round(paymentAmount - (newTestsAdded ? remainingBalanceAfterNewDiscount : remainingBalance)).toFixed(0)}</div>
                   )}
                 </div>
 
