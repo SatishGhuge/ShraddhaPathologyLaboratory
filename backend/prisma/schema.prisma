@@ -158,6 +158,9 @@ model Patient {
   isActive          Boolean       @default(true)
   registrationType  String        @default("direct") // "self", "organization", "direct"
   organizationId    String?       // If registered via organization
+  
+  // Guardian/Self Registration Type
+  guardianType      String        @default("self")   // "self" or "guardian"
 
   // Relations
   tests             PatientTest[]
@@ -293,6 +296,11 @@ model PatientTest {
   sampleBarcodeNo   String?
   patient_history   String?             @db.Text
   
+  // ===== EMERGENCY FIELDS =====
+  isEmergency       Boolean             @default(false)  // Flag to mark test as emergency
+  emergencySetAt    DateTime?                            // When marked as emergency
+  emergencySetBy    String?                              // Who marked it as emergency
+  
   // ===== MEDICAL FIELDS (No billing here anymore) =====
   paymentMode       String?
   businessType      String?
@@ -340,6 +348,7 @@ model PatientTest {
   @@index([billingSessionId])
   @@index([patientId], map: "patient_tests_patientId_fkey")
   @@index([packageId], map: "patient_tests_packageId_fkey")
+  @@index([isEmergency])
   @@map("patient_tests")
 }
 
@@ -1295,4 +1304,47 @@ model ReportFormatting {
   updatedAt               DateTime  @updatedAt
 
   @@map("report_formatting")
+}
+
+// ============================================
+// ORGANIZATION SETTLEMENT MODULE
+// ============================================
+
+model OrganizationSettlement {
+  id                      String              @id @default(cuid())
+  
+  // Organization & Visit Info
+  organizationId          String
+  visitIds                String              @db.LongText  // JSON array of visitIds
+  
+  // Discount Configuration
+  applyOrgDiscount        Boolean             @default(true)
+  orgDiscountPercent      Float               @default(0)
+  orgDiscountAmount       Decimal             @db.Decimal(12, 2)
+  
+  tdsPercent              Float               @default(10)
+  tdsAmount               Decimal             @db.Decimal(12, 2)
+  
+  otherDiscountPercent    Float               @default(0)
+  otherDiscountAmount     Decimal             @db.Decimal(12, 2)
+  
+  totalDiscount           Decimal             @db.Decimal(12, 2)  // Sum of all discounts
+  
+  // Payment Info
+  amountPaid              Decimal             @db.Decimal(12, 2)
+  remainingBalance        Decimal             @db.Decimal(12, 2)
+  
+  // Settlement Details
+  status                  String              @default("SETTLED")  // PENDING, SETTLED, PARTIAL
+  remarks                 String?             @db.Text
+  
+  // Audit Trail
+  createdBy               Int?
+  createdAt               DateTime            @default(now())
+  updatedAt               DateTime            @updatedAt
+  
+  @@index([organizationId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("organization_settlements")
 }

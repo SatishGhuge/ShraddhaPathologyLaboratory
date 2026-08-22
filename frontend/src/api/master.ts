@@ -300,16 +300,22 @@ export const updateOrganization = async (id: string, d: ApiData): Promise<any> =
 export const deleteOrganization = async (id: string): Promise<ApiResponse> => apiCall(`/master/organizations/${id}`, { method: 'DELETE' });
 
 // ==================== TEST CHARGES ====================
-export const getTestCharges = async (testId?: string, organizationId?: string): Promise<any[]> => {
+export const getTestCharges = async (testId?: string, organizationId?: string, doctorId?: string): Promise<any[]> => {
   let endpoint = '/master/test-charges/all';
   if (testId) endpoint = `/master/tests/${testId}/charges`;
   if (organizationId) endpoint = `/master/organizations/${organizationId}/charges`;
+  if (doctorId) endpoint = `/master/doctors/${doctorId}/charges`;
   const r = await apiCall(endpoint, { method: 'GET' });
   return extractDataArray(r);
 };
 
 export const getOrganizationCharges = async (organizationId: string): Promise<any[]> => {
   const r = await apiCall(`/master/organizations/${organizationId}/charges`, { method: 'GET' });
+  return extractDataArray(r);
+};
+
+export const getDoctorCharges = async (doctorId: string): Promise<any[]> => {
+  const r = await apiCall(`/master/doctors/${doctorId}/charges`, { method: 'GET' });
   return extractDataArray(r);
 };
 

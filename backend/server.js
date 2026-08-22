@@ -17,6 +17,7 @@ import machineConfigRoutes from './routes/machine-config.routes.js';
 import inventoryRoutes from './routes/inventory.routes.js';
 import reportSettingsRoutes from './routes/report-settings.routes.js';
 import reportQRRoutes from './routes/report-qr.routes.js';
+import organizationSettlementRoutes from './routes/organization-settlement.routes.js';
 import { emailService } from './services/notification.service.js';
 
 // Load environment variables
@@ -63,6 +64,7 @@ app.use('/api/machine/v1', machineRoutes);
 app.use('/api/inventory', inventoryRoutes);
 app.use('/api/report-settings', reportSettingsRoutes);
 app.use('/api/report-qr', reportQRRoutes);
+app.use('/api/organization-settlement', organizationSettlementRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {

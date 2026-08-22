@@ -13,9 +13,9 @@ import {
   Search, RotateCcw, Eye, Pencil, Trash2, Printer,
   Download, ChevronDown,
   RefreshCcw, Plus, X, RefreshCw,
-  ChevronLeft, ChevronRight, CalendarDays, AlertCircle, Barcode
+  ChevronLeft, ChevronRight, CalendarDays, AlertCircle, Barcode, AlertTriangle
 } from "lucide-react";
-import { getAllPatients, updatePayment, updatePatient, updatePatientTestDetails } from "@/src/api/patient";
+import { getAllPatients, updatePayment, updatePatient, updatePatientTestDetails, getVisitBill } from "@/src/api/patient";
 import { getDoctors, getTests, getPackages, getSpecimenTypes, getOrganizations } from "@/src/api/master";
 import html2pdf from "html2pdf.js";
 import { jsPDF } from "jspdf";
@@ -315,6 +315,7 @@ interface Test {
   charges?: any[];
   group?: string;
   department?: any;
+  isEmergency?: boolean;  // NEW: Emergency flag
 }
 
 interface Booking {
@@ -501,6 +502,8 @@ export default function BookingPage() {
   const [appliedMobile, setAppliedMobile] = useState("");
   const [appliedDoctor, setAppliedDoctor] = useState("");
   const [appliedOutstanding, setAppliedOutstanding] = useState(false);
+  const [showPendingBarcode, setShowPendingBarcode] = useState(false);
+  const [appliedPendingBarcode, setAppliedPendingBarcode] = useState(false);
 
   /* ===== ADD REFERRAL MODAL STATES ===== */
   const [showAddReferral, setShowAddReferral] = useState(false);
@@ -598,6 +601,7 @@ export default function BookingPage() {
           referralDoctor: t.referralDoctor || "",
           paymentMode: t.paymentMode || "Cash",
           businessType: t.businessType || "B2C",
+          isEmergency: t.isEmergency || false,  // NEW: Include emergency flag
         });
       });
 
@@ -795,6 +799,75 @@ export default function BookingPage() {
   // When a booking is selected, pre-fill billing fields from stored amounts
   useEffect(() => {
     if (selectedBooking) {
+      // Fetch fresh VisitBill data from backend to get the latest balance
+      const refreshBookingBalance = async () => {
+        try {
+          console.log('🔍 [Search Booking] Attempting to fetch fresh VisitBill for visitId:', selectedBooking.visitId);
+          const response = await getVisitBill(selectedBooking.visitId);
+          
+          console.log('📥 [Search Booking] API Response:', response);
+          
+          if (response.success && response.data) {
+            // Update the selected booking with fresh data
+            const freshBalance = response.data.balanceAmount || 0;
+            const freshPaid = response.data.totalPaid || 0;
+            
+            console.log('✅ [Search Booking] Fresh VisitBill fetched:', {
+              visitId: selectedBooking.visitId,
+              balanceAmount: freshBalance,
+              totalPaid: freshPaid,
+              grossAmount: response.data.grossAmount,
+              status: response.data.status
+            });
+            
+            // Update the selectedBooking in the bookings array and state
+            const updatedBookings = bookings.map(b => 
+              b.visitId === selectedBooking.visitId 
+                ? {
+                    ...b,
+                    balanceAmount: freshBalance,
+                    paidAmount: freshPaid,
+                    paymentStatus: freshBalance <= 0.01 ? "Paid" : "Due"
+                  }
+                : b
+            );
+            
+            setBookings(updatedBookings);
+            
+            // Update selectedBooking state - this will trigger the setBilling below
+            const updatedSelected = updatedBookings.find(b => b.visitId === selectedBooking.visitId);
+            if (updatedSelected) {
+              console.log('🔄 [Search Booking] Updating selectedBooking with fresh data');
+              setSelectedBooking(updatedSelected);
+            }
+          } else {
+            console.warn('⚠️ [Search Booking] API response was not successful:', response);
+          }
+        } catch (error) {
+          console.error('❌ [Search Booking] Failed to refresh booking balance:', error);
+          // Continue anyway - fallback to existing data
+        }
+      };
+      
+      refreshBookingBalance();
+    } else {
+      // Reset billing when no booking is selected
+      setBilling({
+        advance: "", discount: "", discountPercent: "",
+        refund: "", balAmt: "", payment: "", remarks: "", paymentMode: "Cash"
+      });
+    }
+  }, [selectedBooking?.bookingId]); // Changed from patientId to bookingId
+
+  // Separate useEffect to update billing form with current selectedBooking data (fresh OR original)
+  useEffect(() => {
+    if (selectedBooking) {
+      console.log('📋 [Search Booking] Updating billing form with selectedBooking:', {
+        balanceAmount: selectedBooking.balanceAmount,
+        paidAmount: selectedBooking.paidAmount,
+        paymentStatus: selectedBooking.paymentStatus
+      });
+      
       setBilling(prev => ({
         ...prev,
         advance:         String(Math.round(selectedBooking.paidAmount      || 0)),
@@ -804,14 +877,8 @@ export default function BookingPage() {
         remarks:         selectedBooking.discountRemark || "",
         payment:         "",
       }));
-    } else {
-      // Reset billing when no booking is selected
-      setBilling({
-        advance: "", discount: "", discountPercent: "",
-        refund: "", balAmt: "", payment: "", remarks: "", paymentMode: "Cash"
-      });
     }
-  }, [selectedBooking?.bookingId]); // Changed from patientId to bookingId
+  }, [selectedBooking?.balanceAmount, selectedBooking?.paidAmount, selectedBooking?.bookingId]); // Re-run when balance changes
 
   const handleMobileChange = (value: any) => {
     if (/^\d{0,10}$/.test(value)) {
@@ -869,10 +936,12 @@ export default function BookingPage() {
   const discountAmount = (parseFloat(billing.discountPercent) > 0)
     ? (total * parseFloat(billing.discountPercent) / 100)
     : (parseFloat(billing.discount) || 0);
-  const netAmount = Math.max(0, total - discountAmount);
   const currentPaidAmount = selectedBooking?.paidAmount || 0;
-  // Calculate balance as: netAmount - paidAmount (not from database)
-  const currentBalanceAmount = Math.max(0, netAmount - currentPaidAmount);
+  // Use balance from database (VisitBill) directly - this is the source of truth
+  const currentBalanceAmount = selectedBooking?.balanceAmount || 0;
+  // Net Amount = currentBalanceAmount (fresh from DB after any settlement)
+  // This shows what's actually owed, not a recalculation
+  const netAmount = currentBalanceAmount;
 
   const handleBillingChange = (field: any, value: any) => setBilling(prev=>({...prev,[field]:value}));
 
@@ -903,8 +972,14 @@ export default function BookingPage() {
     if (appliedOutstanding) {
       filtered = filtered.filter(b => b.paymentStatus === "Due");
     }
+    // Filter for pending barcode - show only bookings with at least one test with Unprinted barcode status
+    if (appliedPendingBarcode) {
+      filtered = filtered.filter(b => 
+        b.tests && b.tests.some((t: any) => t.barcode_status === "Unprinted")
+      );
+    }
     setBookings(filtered);
-  }, [dateRange, appliedPatientName, appliedMobile, appliedDoctor, appliedOutstanding, allBookings, deletedIds]);
+  }, [dateRange, appliedPatientName, appliedMobile, appliedDoctor, appliedOutstanding, appliedPendingBarcode, allBookings, deletedIds]);
 
   /* ===== BARCODE SELECTION HANDLER ===== */
   const handleBarcodeToggle = (index: number) => {
@@ -925,6 +1000,7 @@ export default function BookingPage() {
     setAppliedMobile(mobileSearch);
     setAppliedDoctor(searchBarDoctorSearch);
     setAppliedOutstanding(showOutstanding);
+    setAppliedPendingBarcode(showPendingBarcode);
     setCurrentPage(1); // Reset to first page
   };
 
@@ -947,12 +1023,16 @@ export default function BookingPage() {
     setMobileSearch('');
     setSearchBarDoctorSearch('');
     setShowOutstanding(false);
+    setShowPendingBarcode(false);
     setShowSearchBarDoctorDropdown(false);
     setSelectedBooking(null);
     setCurrentPage(1); // Reset to first page
     // Clear applied filters
     setAppliedPatientName('');
     setAppliedMobile('');
+    setAppliedDoctor('');
+    setAppliedOutstanding(false);
+    setAppliedPendingBarcode(false);
     setAppliedDoctor('');
     setAppliedOutstanding(false);
   };
@@ -1830,6 +1910,19 @@ export default function BookingPage() {
             />
             <span className="font-semibold text-orange-700">Outstandings</span>
           </label>
+
+          <label className="flex items-center gap-2 border px-3 py-1 rounded text-sm bg-blue-50 cursor-pointer hover:bg-blue-100">
+            <input 
+              type="checkbox" 
+              checked={showPendingBarcode}
+              onChange={(e) => {
+                setShowPendingBarcode(e.target.checked);
+                setAppliedPendingBarcode(e.target.checked);
+              }}
+              className="w-4 h-4 cursor-pointer"
+            />
+            <span className="font-semibold text-blue-700">Pending Barcode</span>
+          </label>
           
           <button 
             onClick={handleReset}
@@ -1862,8 +1955,17 @@ export default function BookingPage() {
                 ) : filteredBookings.length === 0 ? (
                   <tr><td colSpan={6} className="px-2 py-1 text-center text-gray-400">No records found</td></tr>
                 ) : (() => {
-                  // Sort by visitId only
+                  // Sort by emergency first, then by visitId
                   const sortedBookings = [...filteredBookings].sort((a, b) => {
+                    // Check if any test in booking is emergency
+                    const aHasEmergency = a.tests?.some((t: any) => t.isEmergency);
+                    const bHasEmergency = b.tests?.some((t: any) => t.isEmergency);
+                    
+                    // Emergency tests first
+                    if (aHasEmergency && !bHasEmergency) return -1;
+                    if (!aHasEmergency && bHasEmergency) return 1;
+                    
+                    // Then by visitId
                     return (b.visitId || '').localeCompare(a.visitId || '');
                   });
                   
@@ -1872,13 +1974,19 @@ export default function BookingPage() {
                   const endIndex = startIndex + ITEMS_PER_PAGE;
                   const paginatedBookings = sortedBookings.slice(startIndex, endIndex);
                   
-                  return paginatedBookings.map((b,i) => (
+                  return paginatedBookings.map((b,i) => {
+                    // Check if any test is emergency AND NOT delivered
+                    const hasActiveEmergency = b.tests?.some((t: any) => t.isEmergency && t.status !== 'Delivered');
+                    return (
                     <tr key={i} className={`border-b hover:bg-gray-50 ${getBookingRowColor(b)}`}>
                       <td className="px-2 py-1 text-center font-medium text-xs">{startIndex + i + 1}</td>
                       <td className="px-2 py-1">
-                        <div className="font-semibold text-gray-800 flex items-center gap-2 group text-xs">
+                        <div className={`font-semibold flex items-center gap-2 group text-xs ${hasActiveEmergency ? 'text-red-700 font-bold' : 'text-gray-800'}`}>
+                          {hasActiveEmergency && (
+                            <AlertTriangle size={16} className="text-yellow-500 flex-shrink-0" />
+                          )}
                           <span>{b.name}</span>
-                          {b.balanceAmount > 0 && b.billStatus !== 'PAID' && (
+                          {b.balanceAmount > 0 && (
                             <div className="relative inline-flex items-center cursor-help">
                               <span className="text-red-600 font-bold text-sm hover:text-red-700 transition-colors">₹</span>
                               <div className="absolute left-0 bottom-full mb-1 bg-red-600 text-white text-xs px-2 py-1 rounded whitespace-nowrap pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity z-50 shadow-lg font-semibold">
@@ -1909,7 +2017,8 @@ export default function BookingPage() {
                         </div>
                       </td>
                     </tr>
-                  ));
+                  );
+                  });
                 })()}
               </tbody>
             </table>
