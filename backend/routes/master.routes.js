@@ -17,6 +17,7 @@ import {
   getUsers, getUserById, createUser, updateUser, deleteUser,
   exportTests,
   importTests,
+  updateTestParameter,
   deleteTestParameter,
 } from '../controllers/master.controller.js';
 
@@ -111,6 +112,7 @@ router.delete('/units/:id', deleteUnit);
 
 // Test parameter routes
 router.post('/test-parameters', createTestParameter);
+router.put('/test-parameters/:parameterId', updateTestParameter);
 router.delete('/test-parameters/:parameterId', deleteTestParameter);
 
 // Test category routes

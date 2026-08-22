@@ -613,7 +613,7 @@ const ProfessionalReport = React.forwardRef<HTMLDivElement, ProfessionalReportPr
     };
 
     // ✅ NEW: Get display range text - prioritize textContent, then gender-specific, then numeric ranges
-    const getDisplayRangeText = (param: any, patientGender?: string): string => {
+    const getDisplayRangeText = (param: any, patientGender?: string, ageYears?: number, ageMonths?: number, ageDays?: number): string => {
       // For TEXT/Descriptive types, ONLY show textContent - NEVER show fallback ranges
       if (param.type === 'Text' || param.isDescriptive) {
         if (param.textContent?.trim() && param.textContent !== '-') {
@@ -621,6 +621,58 @@ const ProfessionalReport = React.forwardRef<HTMLDivElement, ProfessionalReportPr
         }
         // For TEXT types without textContent, return empty (no fallback to normalRange)
         return '';
+      }
+      
+      // For NUMERIC types with AGE RANGES - check age-specific default values first
+      if (param.rangeType === 'ByAge' && param.ageRanges && (ageYears !== undefined || ageMonths !== undefined || ageDays !== undefined)) {
+        try {
+          const age = { years: ageYears ?? 0, months: ageMonths ?? 0, days: ageDays ?? 0 };
+          let ageRanges = JSON.parse(param.ageRanges);
+          const gender = patientGender?.toLowerCase();
+          
+          // Sort by gender priority
+          ageRanges = ageRanges.sort((a, b) => {
+            const aGender = a.gender?.toLowerCase() || 'both';
+            const bGender = b.gender?.toLowerCase() || 'both';
+            const aMatchesGender = aGender === gender ? 0 : (aGender === 'both' ? 1 : 2);
+            const bMatchesGender = bGender === gender ? 0 : (bGender === 'both' ? 1 : 2);
+            return aMatchesGender - bMatchesGender;
+          });
+          
+          for (const range of ageRanges) {
+            if (!range.enabled) continue;
+            const rangeGender = range.gender?.toLowerCase();
+            if (rangeGender && rangeGender !== 'both' && rangeGender !== gender) continue;
+            
+            let ageMatches = false;
+            const ageInUnit = (years, months, days, unit) => {
+              if (unit?.includes('Year')) return years;
+              if (unit?.includes('Month')) return years * 12 + months;
+              return years * 365 + months * 30 + days;
+            };
+            
+            if (range.label?.includes('Less Than') && range.value != null)
+              ageMatches = ageInUnit(age.years, age.months, age.days, range.timeUnit) < range.value;
+            else if (range.label?.includes('More Than') && range.value != null)
+              ageMatches = ageInUnit(age.years, age.months, age.days, range.timeUnit) > range.value;
+            else if (range.label?.includes('Between') && range.from != null && range.to != null) {
+              const v = ageInUnit(age.years, age.months, age.days, range.timeUnit);
+              ageMatches = v >= range.from && v <= range.to;
+            }
+            
+            // If age matches and there's a default text in textarea, show ONLY that
+            if (ageMatches && range.default?.trim()) {
+              return range.default;
+            }
+            
+            // Otherwise return numeric range if available
+            if (ageMatches && range.ll != null && range.ul != null) {
+              return `${range.ll} - ${range.ul}`;
+            }
+          }
+        } catch (e) {
+          console.warn('Error parsing age ranges in report:', e);
+        }
       }
       
       // For NUMERIC types, use full priority chain
@@ -830,7 +882,7 @@ const ProfessionalReport = React.forwardRef<HTMLDivElement, ProfessionalReportPr
           )}
           {showRange && (
             <td style={{ padding: '1px 3px', ...bodyStyle, color: '#000', minHeight: '14px', fontSize: '11px' }}>
-              {strip(getDisplayRangeText(p, patient?.gender) || '') || ''}
+              {strip(getDisplayRangeText(p, patient?.gender, patient?.ageYears, patient?.ageMonths, patient?.ageDays) || '') || ''}
             </td>
           )}
         </tr>

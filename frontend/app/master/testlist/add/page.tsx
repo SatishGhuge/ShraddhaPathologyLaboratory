@@ -122,6 +122,8 @@ const AddTest = () => {
     const key = `${catIdx}-${paramIdx}`;
     const updatedCategories = [...categories];
     const p = updatedCategories[catIdx].parameters[paramIdx];
+    // ✅ NEW: Store the existing parameter ID to link to it instead of creating new
+    p.id              = suggestion.id || undefined;  // Link to existing parameter if ID exists
     p.parameterName   = (suggestion.parameterName || '').toUpperCase();
     p.machineCode     = suggestion.machineCode || '';
     p.multiplyBy      = suggestion.multiplyBy || '';
@@ -2445,6 +2447,21 @@ const AddTest = () => {
                             <span className="text-xs sm:text-sm font-semibold">Is Mandatory</span>
                           </label>
 
+                          {/* ✅ NEW: Show preview of default value when mandatory is checked for TEXT type */}
+                          {parameter.isMandatory && parameter.type === 'Text' && parameter.rangeText && (
+                            (() => {
+                              const options = parameter.rangeText
+                                .split(/[,|]/)
+                                .map((o: string) => o.trim())
+                                .filter(Boolean);
+                              return options.length > 0 ? (
+                                <div className="text-xs text-blue-600 font-semibold bg-blue-50 px-2 py-1 rounded border border-blue-200">
+                                  Default: <strong>{options[0]}</strong>
+                                </div>
+                              ) : null;
+                            })()
+                          )}
+
                           {/* Range Type Radio Buttons - Only visible when Type is Numeric */}
                           {parameter.type === "Numeric" && (
                             <div className="flex items-center gap-3">
@@ -2728,11 +2745,13 @@ const AddTest = () => {
                                     />
                                   </td>
                                   <td className="border border-gray-300 p-1">
-                                    <input 
+                                    <textarea 
                                       className="w-full px-2 py-1 border border-gray-300 rounded text-xs sm:text-sm" 
                                       value={ageRange.default || ""}
                                       onChange={(e) => handleAgeRangeChange(categoryIndex, paramIndex, ageIndex, 'default', e.target.value)}
-                                      disabled={isViewMode} 
+                                      disabled={isViewMode}
+                                      rows={2}
+                                      style={{ minHeight: '2.5rem', maxHeight: '5rem', resize: 'both', overflow: 'auto' }}
                                     />
                                   </td>
                                   <td className="border border-gray-300 p-1">
