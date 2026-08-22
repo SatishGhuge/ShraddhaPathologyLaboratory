@@ -182,21 +182,33 @@ function buildContentBlocks(
     blocks.push({ kind: 'test-title', testData: testItem });
     blocks.push({ kind: 'thead' });
 
-    Object.entries(testItem.groupedParameters || {}).forEach(
-      ([catName, catParams]: [string, any]) => {
-        const visible = (catParams as any[]).filter(p => {
-          const nv = results[p.id]?.numericValue;
-          const tv = results[p.id]?.textValue;
-          // Exclude parameters that only have placeholder text "Parameter"
-          const hasValidText = tv?.trim() && tv.trim() !== 'Parameter';
-          return (nv != null && nv !== '') || hasValidText;
-        });
-        if (!visible.length) return;
-        if (catName !== 'NO_CATEGORY_HEADER' && catParams[0]?.showCategoryHeader)
-          blocks.push({ kind: 'category', catName });
-        visible.forEach(p => blocks.push({ kind: 'param', param: p }));
-      }
-    );
+    // ✅ Sort categories by their order and sort parameters within each category
+    const sortedEntries = Object.entries(testItem.groupedParameters || {})
+      .map(([catName, catParams]: [string, any]) => ({
+        catName,
+        catParams,
+        sortOrder: catParams[0]?.categoryDisplayOrder ?? catParams[0]?.sortOrder ?? 999
+      }))
+      .sort((a, b) => a.sortOrder - b.sortOrder);
+
+    sortedEntries.forEach(({ catName, catParams }) => {
+      // ✅ Sort parameters within category by sortOrder
+      const sortedParams = [...(catParams as any[])].sort((a, b) => 
+        (a.sortOrder ?? 999) - (b.sortOrder ?? 999)
+      );
+      
+      const visible = sortedParams.filter(p => {
+        const nv = results[p.id]?.numericValue;
+        const tv = results[p.id]?.textValue;
+        // Exclude parameters that only have placeholder text "Parameter"
+        const hasValidText = tv?.trim() && tv.trim() !== 'Parameter';
+        return (nv != null && nv !== '') || hasValidText;
+      });
+      if (!visible.length) return;
+      if (catName !== 'NO_CATEGORY_HEADER' && catParams[0]?.showCategoryHeader)
+        blocks.push({ kind: 'category', catName });
+      visible.forEach(p => blocks.push({ kind: 'param', param: p }));
+    });
 
     // ✅ Add comments as table row right after parameters - use per-test comments from testItem
     const testComments = (testItem as any).comments || '';
@@ -838,6 +850,12 @@ const ProfessionalReport = React.forwardRef<HTMLDivElement, ProfessionalReportPr
         val = String(nv);
       }
 
+      // ✅ FILTER: Hide parameters with no meaningful value (empty string or only "-")
+      if (val === '-' || (typeof val === 'string' && val.trim() === '')) {
+        console.log(`🚫 Hiding parameter ${p.parameterName} with value: "${val}"`);
+        return null; // Return null to skip rendering
+      }
+
       // ✅ Get styling from field configuration
       const paramStyle = getFieldStyle('parameter_name');
       const bodyStyle = getFormattingStyle('body');
@@ -869,8 +887,12 @@ const ProfessionalReport = React.forwardRef<HTMLDivElement, ProfessionalReportPr
             minHeight: '14px',
             fontSize: '11px',
           }}>
-            {p.isDescriptive && val !== '-' && hasHtml(val) ? (
-              <div dangerouslySetInnerHTML={{ __html: safe(val) }} style={{ whiteSpace: 'normal', textAlign: 'left', fontWeight: 'normal' }} />
+            {(p.isDescriptive || hasHtml(val)) && val !== '-' ? (
+              // ✅ For any text with HTML or descriptive fields: Convert <b> tags to bold CSS styling
+              <div 
+                dangerouslySetInnerHTML={{ __html: safe(val).replace(/<b>/g, '<span style="font-weight:bold;">').replace(/<\/b>/g, '</span>') }} 
+                style={{ whiteSpace: 'normal', textAlign: 'left', fontWeight: 'normal' }} 
+              />
             ) : (
               <>{val}{(isabn || isHighlighted) && val !== '-' ? ' *' : ''}</>
             )}
@@ -1162,7 +1184,10 @@ const ProfessionalReport = React.forwardRef<HTMLDivElement, ProfessionalReportPr
             break;
 
           case 'param':
-            tableRows.push(renderParamRow(block.param, `p-${bi}`));
+            const paramRow = renderParamRow(block.param, `p-${bi}`);
+            if (paramRow !== null) {
+              tableRows.push(paramRow);
+            }
             break;
 
           case 'comments':

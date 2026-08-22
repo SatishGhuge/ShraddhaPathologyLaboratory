@@ -8,14 +8,20 @@ import { parseHtmlText, HtmlPart } from '@/src/utils/htmlParser';
 const getAllOptionsFromParameter = (param: Parameter): string[] => {
   const allOptions = new Set<string>();
   
-  // 1. Add all options from textContent (primary source)
+  // 1. Add all options from textContent (primary source - textarea with newline-separated values)
   if (param.textContent) {
     try {
       let options: any[] = [];
       try {
         options = JSON.parse(param.textContent);
       } catch {
-        options = param.textContent.split(',').map((o: string) => o.trim());
+        // Split by newlines first, then try commas
+        const byNewline = param.textContent.split('\n').map((o: string) => o.trim()).filter(Boolean);
+        if (byNewline.length > 1) {
+          options = byNewline;
+        } else {
+          options = param.textContent.split(',').map((o: string) => o.trim()).filter(Boolean);
+        }
       }
       
       options.forEach((option: any) => {
@@ -257,9 +263,19 @@ const ReadingValidationModal = ({
             isHighlighted: (initialResults[param.id] as any).isHighlighted
           });
         } else {
+          // ✅ NEW: For text fields with no saved value, show first available option as default
+          let defaultTextValue = '';
+          if ((param.type === 'Text' || param.isMultipleOptions) && !param.isDescriptive) {
+            const availableOptions = getAllOptionsFromParameter(param);
+            if (availableOptions.length > 0) {
+              defaultTextValue = availableOptions[0]; // Show first option as default
+              console.log(`📌 DEFAULT: Param ${param.id} (${param.parameterName}) set to first option: "${defaultTextValue}"`);
+            }
+          }
+          
           initialResults[param.id] = {
             numericValue: null,
-            textValue: '',
+            textValue: defaultTextValue,
             selectedOption: '',
             isAbnormal: false,
             referenceRange: param.normalRange,
@@ -458,7 +474,8 @@ const ReadingValidationModal = ({
         testParameterId: parameterId,
         testCategoryId: param.categoryId,
         numericValue: field === 'numericValue' ? (value || null) : (results[parameterId]?.numericValue || null),
-        textValue: field === 'textValue' ? (value || null) : (results[parameterId]?.textValue || null),
+        // ✅ Allow empty text values to be saved (convert empty string to actual empty string, not null)
+        textValue: field === 'textValue' ? (value !== null && value !== undefined ? value : '') : (results[parameterId]?.textValue || ''),
         selectedOption: field === 'selectedOption' ? (value || null) : (results[parameterId]?.selectedOption || null),
         isAbnormal: results[parameterId]?.isAbnormal || false,
         referenceRange: results[parameterId]?.referenceRange || param.normalRange
@@ -546,7 +563,8 @@ const ReadingValidationModal = ({
         })
         .filter((r) => {
           const hasNumeric = r.numericValue !== null && r.numericValue !== undefined && r.numericValue !== '';
-          const hasText = r.textValue && typeof r.textValue === 'string' && r.textValue.trim() !== '';
+          // ✅ Allow empty text values to be saved (empty string should not filter it out)
+          const hasText = r.textValue !== null && r.textValue !== undefined; // Just check it exists, not if it's non-empty
           const hasOption =
             r.selectedOption && typeof r.selectedOption === 'string' && r.selectedOption.trim() !== '';
           return hasNumeric || hasText || hasOption;
