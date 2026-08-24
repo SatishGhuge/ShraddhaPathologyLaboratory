@@ -1029,8 +1029,9 @@ const PatientResult = () => {
             let defaultTextValue = '';
             
             if ((param.type === 'Text' || param.isMultipleOptions) && !param.isDescriptive) {
-              // Get all available options from various sources
-              const allOptions = new Set<string>();
+              // Get all available options from various sources - PRESERVE ORDER
+              const allOptions: string[] = [];  // Use array instead of Set to preserve order
+              const seenOptions = new Set<string>();
               
               // From textContent (primary source - textarea with newline-separated values)
               if (param.textContent && param.textContent !== 'Parameter') {
@@ -1049,8 +1050,10 @@ const PatientResult = () => {
                   }
                   options.forEach((option: any) => {
                     const optionValue = typeof option === 'object' ? option.value || option.name : option;
-                    if (optionValue && optionValue.toString().trim()) {
-                      allOptions.add(optionValue.toString().trim());
+                    const trimmedValue = optionValue?.toString().trim();
+                    if (trimmedValue && !seenOptions.has(trimmedValue)) {
+                      allOptions.push(trimmedValue);
+                      seenOptions.add(trimmedValue);
                     }
                   });
                 } catch (e) {
@@ -1059,29 +1062,30 @@ const PatientResult = () => {
               }
               
               // From rangeText (if no textContent)
-              if (allOptions.size === 0 && param.rangeText) {
+              if (allOptions.length === 0 && param.rangeText) {
                 param.rangeText.split(/[,|]/).map((o: string) => o.trim()).forEach(opt => {
-                  if (opt && opt.trim()) allOptions.add(opt.trim());
+                  if (opt && opt.trim() && !seenOptions.has(opt)) {
+                    allOptions.push(opt.trim());
+                    seenOptions.add(opt);
+                  }
                 });
               }
               
               // From displayRangeText (if still no options)
-              if (allOptions.size === 0 && param.displayRangeText) {
+              if (allOptions.length === 0 && param.displayRangeText) {
                 param.displayRangeText.split(/[,|]/).map((o: string) => o.trim()).forEach(opt => {
-                  if (opt && opt.trim()) allOptions.add(opt.trim());
+                  if (opt && opt.trim() && !seenOptions.has(opt)) {
+                    allOptions.push(opt.trim());
+                    seenOptions.add(opt);
+                  }
                 });
               }
               
-              // Get first option as default, skip "-" if it's the first
-              const optionsArray = Array.from(allOptions).sort();
-              if (optionsArray.length > 0) {
-                // Skip "-" and get the first non-dash option
-                defaultTextValue = optionsArray.find(opt => opt !== '-' && opt.trim() !== '') || '';
-                if (!defaultTextValue && optionsArray.length > 0) {
-                  // If all options are dash/empty, just use empty string
-                  defaultTextValue = '';
-                }
-                console.log(`📌 DEFAULT: Param ${param.id} (${param.parameterName}) set to first option: "${defaultTextValue}" (from options: ${JSON.stringify(optionsArray)})`);
+              // Get first option as default, skip "-" if it's the first - PRESERVE ORIGINAL ORDER
+              if (allOptions.length > 0) {
+                // Find first non-dash option, preserving original order
+                defaultTextValue = allOptions.find(opt => opt !== '-' && opt.trim() !== '') || '';
+                console.log(`📌 DEFAULT: Param ${param.id} (${param.parameterName}) set to FIRST option: "${defaultTextValue}" (all options in order: ${JSON.stringify(allOptions)})`);
               }
             }
             
@@ -1152,8 +1156,9 @@ const PatientResult = () => {
               let defaultTextValue = '';
               
               if ((param.type === 'Text' || param.isMultipleOptions) && !param.isDescriptive) {
-                // Get all available options from various sources
-                const allOptions = new Set<string>();
+                // Get all available options from various sources - PRESERVE ORDER
+                const allOptions: string[] = [];  // Use array instead of Set to preserve order
+                const seenOptions = new Set<string>();
                 
                 // From textContent (primary source - textarea with newline-separated values)
                 if (param.textContent && param.textContent !== 'Parameter') {
@@ -1172,8 +1177,10 @@ const PatientResult = () => {
                     }
                     options.forEach((option: any) => {
                       const optionValue = typeof option === 'object' ? option.value || option.name : option;
-                      if (optionValue && optionValue.toString().trim()) {
-                        allOptions.add(optionValue.toString().trim());
+                      const trimmedValue = optionValue?.toString().trim();
+                      if (trimmedValue && !seenOptions.has(trimmedValue)) {
+                        allOptions.push(trimmedValue);
+                        seenOptions.add(trimmedValue);
                       }
                     });
                   } catch (e) {
@@ -1182,29 +1189,30 @@ const PatientResult = () => {
                 }
                 
                 // From rangeText (if no textContent)
-                if (allOptions.size === 0 && param.rangeText) {
+                if (allOptions.length === 0 && param.rangeText) {
                   param.rangeText.split(/[,|]/).map((o: string) => o.trim()).forEach(opt => {
-                    if (opt && opt.trim()) allOptions.add(opt.trim());
+                    if (opt && opt.trim() && !seenOptions.has(opt)) {
+                      allOptions.push(opt.trim());
+                      seenOptions.add(opt);
+                    }
                   });
                 }
                 
                 // From displayRangeText (if still no options)
-                if (allOptions.size === 0 && param.displayRangeText) {
+                if (allOptions.length === 0 && param.displayRangeText) {
                   param.displayRangeText.split(/[,|]/).map((o: string) => o.trim()).forEach(opt => {
-                    if (opt && opt.trim()) allOptions.add(opt.trim());
+                    if (opt && opt.trim() && !seenOptions.has(opt)) {
+                      allOptions.push(opt.trim());
+                      seenOptions.add(opt);
+                    }
                   });
                 }
                 
-                // Get first option as default, skip "-" if it's the first
-                const optionsArray = Array.from(allOptions).sort();
-                if (optionsArray.length > 0) {
-                  // Skip "-" and get the first non-dash option
-                  defaultTextValue = optionsArray.find(opt => opt !== '-' && opt.trim() !== '') || '';
-                  if (!defaultTextValue && optionsArray.length > 0) {
-                    // If all options are dash/empty, just use empty string
-                    defaultTextValue = '';
-                  }
-                  console.log(`📌 DEFAULT: Param ${param.id} (${param.parameterName}) set to first option: "${defaultTextValue}" (from options: ${JSON.stringify(optionsArray)})`);
+                // Get first option as default, skip "-" if it's the first - PRESERVE ORIGINAL ORDER
+                if (allOptions.length > 0) {
+                  // Find first non-dash option, preserving original order
+                  defaultTextValue = allOptions.find(opt => opt !== '-' && opt.trim() !== '') || '';
+                  console.log(`📌 DEFAULT: Param ${param.id} (${param.parameterName}) set to FIRST option: "${defaultTextValue}" (all options in order: ${JSON.stringify(allOptions)})`);
                 }
               }
               
