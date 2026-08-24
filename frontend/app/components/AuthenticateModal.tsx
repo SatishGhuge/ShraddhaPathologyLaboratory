@@ -7,14 +7,20 @@ import { deleteCommentFromHistory } from '@/src/api/result';
 const getAllOptionsFromParameter = (param: Parameter): string[] => {
   const allOptions = new Set<string>();
   
-  // 1. Add all options from textContent (primary source)
+  // 1. Add all options from textContent (primary source - textarea with newline-separated values)
   if (param.textContent) {
     try {
       let options: any[] = [];
       try {
         options = JSON.parse(param.textContent);
       } catch {
-        options = param.textContent.split(',').map((o: string) => o.trim());
+        // Split by newlines first, then try commas
+        const byNewline = param.textContent.split('\n').map((o: string) => o.trim()).filter(Boolean);
+        if (byNewline.length > 1) {
+          options = byNewline;
+        } else {
+          options = param.textContent.split(',').map((o: string) => o.trim()).filter(Boolean);
+        }
       }
       
       options.forEach((option: any) => {
@@ -240,9 +246,20 @@ const AuthenticateModal = ({
           };
         } else {
           console.log(`⭕ AUTH MODAL - NO SAVED VALUE - Param: ${param.parameterName} (ID: ${param.id})`);
+          
+          // ✅ NEW: For text fields with no saved value, show first available option as default
+          let defaultTextValue = '';
+          if ((param.type === 'Text' || param.isMultipleOptions) && !param.isDescriptive) {
+            const availableOptions = getAllOptionsFromParameter(param);
+            if (availableOptions.length > 0) {
+              defaultTextValue = availableOptions[0]; // Show first option as default
+              console.log(`📌 AUTH MODAL DEFAULT: Param ${param.id} (${param.parameterName}) set to first option: "${defaultTextValue}"`);
+            }
+          }
+          
           initialResults[param.id] = {
             numericValue: null,
-            textValue: '',
+            textValue: defaultTextValue,
             selectedOption: '',
             isAbnormal: false,
             isHighlighted: false,
