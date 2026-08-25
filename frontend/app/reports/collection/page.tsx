@@ -99,13 +99,13 @@ const AVAILABLE_COLS = [
   { id: "srNo", label: "Sr. No" },
   { id: "date", label: "Date" },
   { id: "billNo", label: "Bill No." },
-  { id: "center", label: "Center" },
+  { id: "organization", label: "Organization" },
   { id: "patient", label: "Patient" },
   { id: "mobile", label: "Mobile" },
   { id: "referralDr", label: "Referral Doctor" },
-  { id: "corporate", label: "Corporate" },
   { id: "cash", label: "Cash" },
-  { id: "card", label: "Card" },
+  { id: "debitCard", label: "Debit Card" },
+  { id: "creditCard", label: "Credit Card" },
   { id: "upi", label: "UPI" },
   { id: "cheque", label: "Cheque" },
   { id: "netBanking", label: "Net Banking" },
@@ -146,7 +146,7 @@ export default function CollectionReport() {
   const [organizations, setOrganizations] = useState<any[]>([]);
   const [colOpen, setColOpen]     = useState(false);
   const [colFilter, setColFilter] = useState("");
-  const [selectedColumns, setSelectedColumns] = useState(["date", "billNo", "patient", "mobile", "cash", "card", "upi", "discount", "netAmount", "total", "balance"]);
+  const [selectedColumns, setSelectedColumns] = useState(["date", "billNo", "patient", "mobile", "cash", "debitCard", "creditCard", "upi", "discount", "netAmount", "total", "balance"]);
 
   // Pagination state
   const ITEMS_PER_PAGE = 40;
@@ -235,56 +235,119 @@ export default function CollectionReport() {
         try {
           const d = toLocalYMD(t.visitDate || t.createdAt || p.createdAt);
           if (selFrom && d && (d < selFrom || d > (selTo||selFrom))) continue;
-          if (selOrg && t.organization?.id !== selOrg) continue;
+          
+          // ✅ Get organization name from patient registration or billing
+          const orgId = t.organizationId || p.organizationId || "-";
+          const orgName = organizations.find(o => o.id === orgId)?.name || orgId || "-";
+          
+          if (selOrg && orgId !== selOrg) continue;
           
           const patName = [p.title, p.firstName, p.lastName].filter(Boolean).join(" ");
           if (selName && !patName.toLowerCase().includes(selName.toLowerCase()) && !(p.mobile||"").includes(selName)) continue;
 
           if (!visitMap.has(t.visitId)) {
+            // ✅ FIX: Only aggregate payment data ONCE per visitId
+            // Each test in the same visit has same paidAmount, so we must NOT multiply it
+            let cash = 0, debitCard = 0, creditCard = 0, upi = 0, cheque = 0, netBanking = 0;
+            
+            // Use paymentsByMode breakdown from backend (aggregated by visit, not per-test)
+            if (t.paymentsByMode) {
+              cash = parseFloat(t.paymentsByMode.cash) || 0;
+              debitCard = parseFloat(t.paymentsByMode.debitCard) || 0;
+              creditCard = parseFloat(t.paymentsByMode.creditCard) || 0;
+              upi = parseFloat(t.paymentsByMode.upi) || 0;
+              cheque = parseFloat(t.paymentsByMode.cheque) || 0;
+              netBanking = parseFloat(t.paymentsByMode.netBanking) || 0;
+              
+              console.log(`💳 [${t.visitId}] Payment breakdown:`, {
+                cash, debitCard, creditCard, upi, cheque, netBanking,
+                total: cash + debitCard + creditCard + upi + cheque + netBanking
+              });
+              
+              // ✅ DEBUG: Log payment sequence
+              if (t.paymentSequence && t.paymentSequence.length > 0) {
+                console.log(`📊 [${t.visitId}] Payment Sequence:`, t.paymentSequence.map(p => ({
+                  amount: p.amount,
+                  mode: p.mode,
+                  order: p.remarks
+                })));
+              }
+            } else {
+              // Fallback to single payment mode
+              const mode = (t.paymentMode || "").toLowerCase();
+              const paid = parseFloat(t.paidAmount) || 0;
+              
+              console.warn(`⚠️ [${t.visitId}] Using fallback mode: ${mode}, amount: ${paid}`);
+              
+              if (mode === "cash") cash = paid;
+              else if (mode === "debit card" || mode === "debit") debitCard = paid;
+              else if (mode === "credit card" || mode === "credit") creditCard = paid;
+              else if (mode === "upi") upi = paid;
+              else if (mode === "cheque") cheque = paid;
+              else if (mode === "net banking") netBanking = paid;
+              else cash = paid;
+            }
+            
             visitMap.set(t.visitId, {
               srNo: srNo++,
               date: toLocalDT(t.visitDate || t.createdAt || p.createdAt),
               billNo: t.visitId || "-",
-              center: p.createdAtLocation || "-",
-              corporate: t.businessType || "-",
+              organization: orgName,
+              organizationId: orgId,
               patient: patName,
               patientId: p.patientId || "-",
-              orgId: t.organization?.id || selOrg || "-",
               mobile: p.mobile || "-",
               remark: t.remarks || "",
               referralDr: t.referralDoctor || "-",
-              cash: 0, card: 0, upi: 0, cheque: 0, netBanking: 0,
-              discount: 0, refund: 0,
-              netAmount: 0, total: 0, balance: 0,
+              cash: cash,
+              debitCard: debitCard,
+              creditCard: creditCard,
+              upi: upi,
+              cheque: cheque,
+              netBanking: netBanking,
+              discount: 0,
+              refund: 0,
+              netAmount: 0,
+              total: 0,
+              balance: 0,
               paymentMode: t.paymentMode || "",
-              billStatus: t.billStatus || "PENDING",  // ✅ NEW
+              billStatus: t.billStatus || "PENDING",
+              visitId: t.visitId,  // ✅ Track visitId to avoid duplicate aggregation
+              _aggregated: false  // ✅ Flag to prevent duplicate aggregation
             });
           }
           
           const v = visitMap.get(t.visitId);
           if (!v) continue;
           
-          const mode = (t.paymentMode || "").toLowerCase();
-          const paid = parseFloat(t.paidAmount) || 0;
-          
-          if (mode === "cash") v.cash += paid;
-          else if (mode === "debit card" || mode === "card") v.card += paid;
-          else if (mode === "credit card") v.card += paid;
-          else if (mode === "upi") v.upi += paid;
-          else if (mode === "cheque") v.cheque += paid;
-          else if (mode === "net banking") v.netBanking += paid;
-          else v.cash += paid;
-          
-          v.discount += parseFloat(t.discountAmount) || 0;
-          v.balance += parseFloat(t.balanceAmount) || 0;
-          v.total += parseFloat(t.totalAmount) || 0;
-          v.netAmount += paid;
+          // ✅ ONLY aggregate test amounts once per visitId
+          // Check if we've already aggregated this visit's amounts
+          if (!v._aggregated) {
+            // ✅ Use correct fields from VisitBill model (includes new tests added in booking modal)
+            // ✅ Round to nearest integer to avoid decimal/rounding errors
+            v.discount = Math.round(parseFloat(t.discount || t.discountAmount || 0) || 0);
+            v.total = Math.round(parseFloat(t.grossAmount || t.totalAmount || 0) || 0);  // ✅ Updated when new tests added
+            v.balance = Math.round(parseFloat(t.balanceAmount || 0) || 0);  // ✅ Recalculated after new tests
+            v.netAmount = Math.round(parseFloat(t.paidAmount) || 0);  // Total paid for this visit
+            
+            v._aggregated = true;  // ✅ Mark as aggregated to prevent duplication
+            
+            console.log(`📌 Visit ${t.visitId} aggregated:`, {
+              total: v.total,
+              paid: v.netAmount,
+              balance: v.balance,
+              discount: v.discount,
+              hasNewTests: !!t.paymentSequence?.length
+            });
+          }
         } catch (err) {
           console.error('Error processing test:', err);
         }
       }
       
       for (const v of visitMap.values()) {
+        // Clean up internal flags before returning
+        delete v._aggregated;
         rows.push(v);
       }
     }
@@ -351,7 +414,7 @@ export default function CollectionReport() {
     const t = fmtISO(today0());
     setDateFrom(t); setDateTo(t); setPreset("Today"); setCustom(false);
     setOrganization(""); setNameSearch(""); setErrors({});
-    setSelectedColumns(["date", "billNo", "patient", "mobile", "cash", "card", "upi", "discount", "netAmount", "total", "balance"]);
+    setSelectedColumns(["date", "billNo", "patient", "mobile", "cash", "debitCard", "creditCard", "upi", "discount", "netAmount", "total", "balance"]);
     fetchData(t, t, "", "");
   };
 
@@ -471,13 +534,13 @@ export default function CollectionReport() {
                   {has("srNo") && <TH>Sr.No</TH>}
                   {has("date") && <TH>Date</TH>}
                   {has("billNo") && <TH>Bill No.</TH>}
-                  {has("center") && <TH>Center</TH>}
+                  {has("organization") && <TH>Organization</TH>}
                   {has("patient") && <TH>Patient</TH>}
                   {has("mobile") && <TH>Mobile</TH>}
                   {has("referralDr") && <TH>Referral Dr.</TH>}
-                  {has("corporate") && <TH>Corporate</TH>}
                   {has("cash") && <TH right>Cash</TH>}
-                  {has("card") && <TH right>Card</TH>}
+                  {has("debitCard") && <TH right>Debit Card</TH>}
+                  {has("creditCard") && <TH right>Credit Card</TH>}
                   {has("upi") && <TH right>UPI</TH>}
                   {has("cheque") && <TH right>Cheque</TH>}
                   {has("netBanking") && <TH right>Net Banking</TH>}
@@ -506,20 +569,20 @@ export default function CollectionReport() {
                       {has("srNo") && <TD>{row.srNo}</TD>}
                       {has("date") && <TD>{row.date}</TD>}
                       {has("billNo") && <TD>{row.billNo}</TD>}
-                      {has("center") && <TD>{row.center}</TD>}
+                      {has("organization") && <TD>{row.organization}</TD>}
                       {has("patient") && <TD>{row.patient}</TD>}
                       {has("mobile") && <TD>{row.mobile}</TD>}
                       {has("referralDr") && <TD>{row.referralDr}</TD>}
-                      {has("corporate") && <TD>{row.corporate}</TD>}
                       {has("cash") && <TD right>{row.cash||0}</TD>}
-                      {has("card") && <TD right>{row.card||0}</TD>}
+                      {has("debitCard") && <TD right>{row.debitCard||0}</TD>}
+                      {has("creditCard") && <TD right>{row.creditCard||0}</TD>}
                       {has("upi") && <TD right>{row.upi||0}</TD>}
                       {has("cheque") && <TD right>{row.cheque||0}</TD>}
                       {has("netBanking") && <TD right>{row.netBanking||0}</TD>}
-                      {has("discount") && <TD right>{row.discount||0}</TD>}
+                      {has("discount") && <TD right>{row.discount?.toFixed?.(2) ?? row.discount ?? 0}</TD>}
                       {has("netAmount") && <TD right>{row.netAmount?.toFixed(2)}</TD>}
                       {has("total") && <TD right>{row.total?.toFixed(2)}</TD>}
-                      {has("balance") && <TD right>{row.balance?.toFixed(2)}</TD>}
+                      {has("balance") && <TD right>{row.balance?.toFixed?.(2) ?? row.balance ?? 0}</TD>}
                       {has("remark") && <TD>{row.remark}</TD>}
                     </tr>
                   ))
@@ -531,13 +594,13 @@ export default function CollectionReport() {
                     {has("srNo") && <td className="px-2 py-1.5 border border-gray-300"/>}
                     {has("date") && <td className="px-2 py-1.5 border border-gray-300"/>}
                     {has("billNo") && <td className="px-2 py-1.5 border border-gray-300"/>}
-                    {has("center") && <td className="px-2 py-1.5 border border-gray-300"/>}
+                    {has("organization") && <td className="px-2 py-1.5 border border-gray-300"/>}
                     {has("patient") && <td className="px-2 py-1.5 text-right text-xs border border-gray-300 font-semibold">TOTAL</td>}
                     {has("mobile") && <td className="px-2 py-1.5 border border-gray-300"/>}
                     {has("referralDr") && <td className="px-2 py-1.5 border border-gray-300"/>}
-                    {has("corporate") && <td className="px-2 py-1.5 border border-gray-300"/>}
                     {has("cash") && <td className="px-2 py-1.5 text-right text-xs border border-gray-300">{sum("cash").toFixed(2)}</td>}
-                    {has("card") && <td className="px-2 py-1.5 text-right text-xs border border-gray-300">{sum("card").toFixed(2)}</td>}
+                    {has("debitCard") && <td className="px-2 py-1.5 text-right text-xs border border-gray-300">{sum("debitCard").toFixed(2)}</td>}
+                    {has("creditCard") && <td className="px-2 py-1.5 text-right text-xs border border-gray-300">{sum("creditCard").toFixed(2)}</td>}
                     {has("upi") && <td className="px-2 py-1.5 text-right text-xs border border-gray-300">{sum("upi").toFixed(2)}</td>}
                     {has("cheque") && <td className="px-2 py-1.5 text-right text-xs border border-gray-300">{sum("cheque").toFixed(2)}</td>}
                     {has("netBanking") && <td className="px-2 py-1.5 text-right text-xs border border-gray-300">{sum("netBanking").toFixed(2)}</td>}

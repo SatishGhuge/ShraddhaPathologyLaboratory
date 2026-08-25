@@ -794,6 +794,8 @@ enum BillingSessionType {
 enum PaymentMode {
   CASH
   CARD
+  DEBIT_CARD
+  CREDIT_CARD
   UPI
   CHEQUE
   BANK_TRANSFER

@@ -394,11 +394,14 @@ export const createPatient = async (req, res) => {
         
         // Step 4: Create Payment if advance > 0
         if (finalAdvanceAmount > 0) {
-          const payMode = paymentMode === 'Cash' ? 'CASH' : 
-                         paymentMode === 'Card' ? 'CARD' : 
-                         paymentMode === 'UPI' ? 'UPI' :
-                         paymentMode === 'Cheque' ? 'CHEQUE' :
-                         paymentMode === 'Bank Transfer' ? 'BANK_TRANSFER' : 'OTHER';
+          const mode = paymentMode || "";
+          const payMode = mode === 'Cash' ? 'CASH' : 
+                         mode === 'Debit Card' || mode === 'Debit' ? 'DEBIT_CARD' : 
+                         mode === 'Credit Card' || mode === 'Credit' ? 'CREDIT_CARD' :
+                         mode === 'Card' ? 'CARD' : 
+                         mode === 'UPI' ? 'UPI' :
+                         mode === 'Cheque' ? 'CHEQUE' :
+                         mode === 'Bank Transfer' ? 'BANK_TRANSFER' : 'OTHER';
           
           await tx.payment.create({
             data: {
@@ -583,11 +586,14 @@ export const createPatient = async (req, res) => {
         
         // Step 5: Create Payment if advance > 0
         if (finalAdvanceAmount > 0) {
-          const payMode = paymentMode === 'Cash' ? 'CASH' : 
-                         paymentMode === 'Card' ? 'CARD' : 
-                         paymentMode === 'UPI' ? 'UPI' :
-                         paymentMode === 'Cheque' ? 'CHEQUE' :
-                         paymentMode === 'Bank Transfer' ? 'BANK_TRANSFER' : 'OTHER';
+          const mode = paymentMode || "";
+          const payMode = mode === 'Cash' ? 'CASH' : 
+                         mode === 'Debit Card' || mode === 'Debit' ? 'DEBIT_CARD' : 
+                         mode === 'Credit Card' || mode === 'Credit' ? 'CREDIT_CARD' :
+                         mode === 'Card' ? 'CARD' : 
+                         mode === 'UPI' ? 'UPI' :
+                         mode === 'Cheque' ? 'CHEQUE' :
+                         mode === 'Bank Transfer' ? 'BANK_TRANSFER' : 'OTHER';
           
           await tx.payment.create({
             data: {
@@ -966,14 +972,16 @@ export const getAllPatients = async (req, res) => {
     }));
 
     // 🔧 FIX: Fetch balance amounts from VisitBill for each visit
+    // ✅ ALSO fetch individual Payment records by mode
     const patientsWithBalance = await Promise.all(patientsWithFormattedAge.map(async (patient) => {
       // Group tests by visitId to get unique visits
       const visitIds = new Set(patient.tests.map(t => t.visitId).filter(Boolean));
+      const visitIdArray = Array.from(visitIds);
       
       // Fetch VisitBill for each unique visit
       const visitBills = await prisma.visitBill.findMany({
         where: {
-          visitId: { in: Array.from(visitIds) }
+          visitId: { in: visitIdArray }
         },
         select: {
           visitId: true,
@@ -985,19 +993,88 @@ export const getAllPatients = async (req, res) => {
         }
       });
 
+      // ✅ NEW: Fetch individual Payment records by mode for each visit (ORDERED by creation time)
+      const payments = await prisma.payment.findMany({
+        where: {
+          visitId: { in: visitIdArray }
+        },
+        select: {
+          visitId: true,
+          amount: true,
+          paymentMode: true,
+          createdAt: true,
+          remarks: true
+        },
+        orderBy: {
+          createdAt: 'asc'  // ✅ CHRONOLOGICAL ORDER (first payment first)
+        }
+      });
+
+      console.log('💳 Raw Payment Records from DB:', payments.map(p => ({
+        visitId: p.visitId,
+        amount: p.amount,
+        paymentMode: p.paymentMode,
+        remarks: p.remarks
+      })));
+
+      // Create a map of visitId -> payment breakdown by mode
+      const paymentMap = {};
+      payments.forEach(payment => {
+        if (!paymentMap[payment.visitId]) {
+          paymentMap[payment.visitId] = {
+            cash: 0, debitCard: 0, creditCard: 0, upi: 0, cheque: 0, netBanking: 0, other: 0,
+            paymentSequence: []  // ✅ Track payment order
+          };
+        }
+        const amount = payment.amount?.toNumber?.() || Number(payment.amount) || 0;
+        const mode = (payment.paymentMode || "").toUpperCase();
+        
+        console.log(`💳 Processing payment: amount=${amount}, rawMode="${payment.paymentMode}", processedMode="${mode}"`);
+        
+        // ✅ Track payment chronologically
+        paymentMap[payment.visitId].paymentSequence.push({
+          amount: amount,
+          mode: mode,
+          timestamp: payment.createdAt,
+          remarks: payment.remarks
+        });
+        
+        // ✅ HANDLE ALL VARIATIONS: Cash, Debit Card, Credit Card, UPI, Cheque, etc.
+        if (mode === "CASH") paymentMap[payment.visitId].cash += amount;
+        else if (mode === "DEBIT_CARD" || mode === "DEBIT") {
+          paymentMap[payment.visitId].debitCard += amount;
+        }
+        else if (mode === "CREDIT_CARD" || mode === "CREDIT") {
+          paymentMap[payment.visitId].creditCard += amount;
+        }
+        else if (mode === "CARD") {
+          // If just "CARD" without debit/credit designation, put in credit card
+          paymentMap[payment.visitId].creditCard += amount;
+        }
+        else if (mode === "UPI") paymentMap[payment.visitId].upi += amount;
+        else if (mode === "CHEQUE" || mode === "CHECK") paymentMap[payment.visitId].cheque += amount;
+        else if (mode === "BANK_TRANSFER" || mode === "NET BANKING" || mode === "NEFT" || mode === "RTGS") paymentMap[payment.visitId].netBanking += amount;
+        else {
+          console.warn(`⚠️ Unknown payment mode: "${mode}", defaulting to other`);
+          paymentMap[payment.visitId].other += amount;
+        }
+      });
+
+      console.log('💰 Final Payment Map:', paymentMap);
+
       // Create a map of visitId -> balance data
       const balanceMap = {};
       visitBills.forEach(bill => {
         balanceMap[bill.visitId] = {
-          balanceAmount: bill.balanceAmount?.toNumber?.() || Number(bill.balanceAmount) || 0,
-          paidAmount: bill.totalPaid?.toNumber?.() || Number(bill.totalPaid) || 0,
-          discountAmount: bill.totalDiscount?.toNumber?.() || Number(bill.totalDiscount) || 0,
-          grossAmount: bill.grossAmount?.toNumber?.() || Number(bill.grossAmount) || 0,
+          balanceAmount: Math.round(bill.balanceAmount?.toNumber?.() || Number(bill.balanceAmount) || 0),
+          paidAmount: Math.round(bill.totalPaid?.toNumber?.() || Number(bill.totalPaid) || 0),
+          discountAmount: Math.round(bill.totalDiscount?.toNumber?.() || Number(bill.totalDiscount) || 0),
+          grossAmount: Math.round(bill.grossAmount?.toNumber?.() || Number(bill.grossAmount) || 0),
           status: bill.status || 'PENDING'
         };
       });
 
-      // Add balance amounts and status to tests
+      // Add balance amounts, payment breakdown, and status to tests
       return {
         ...patient,
         tests: patient.tests.map(test => ({
@@ -1006,7 +1083,14 @@ export const getAllPatients = async (req, res) => {
           paidAmount: balanceMap[test.visitId]?.paidAmount || 0,
           discountAmount: balanceMap[test.visitId]?.discountAmount || 0,
           totalAmount: balanceMap[test.visitId]?.grossAmount || 0,
-          billStatus: balanceMap[test.visitId]?.status || 'PENDING'
+          billStatus: balanceMap[test.visitId]?.status || 'PENDING',
+          // ✅ NEW: Add payment breakdown by mode (split debit/credit card)
+          paymentsByMode: paymentMap[test.visitId] || {
+            cash: 0, debitCard: 0, creditCard: 0, upi: 0, cheque: 0, netBanking: 0, other: 0,
+            paymentSequence: []
+          },
+          // ✅ NEW: Track chronological payment order (shows which was paid first)
+          paymentSequence: paymentMap[test.visitId]?.paymentSequence || []
         }))
       };
     }));
@@ -1285,7 +1369,7 @@ export const updatePayment = async (req, res) => {
     const payment       = parseFloat(paymentAmount)  || 0;
 
     const newPaidAmount    = existingPaid + payment;
-    const newBalanceAmount = Math.max(0, totalAmount - discount - newPaidAmount);
+    const newBalanceAmount = Math.max(0, Math.round(totalAmount - discount - newPaidAmount));
 
     // Update all rows for this visit
     await prisma.patientTest.updateMany({
@@ -1519,7 +1603,7 @@ export const addTestToVisit = async (req, res) => {
     const totalAmount = allTests.reduce((sum, t) => sum + (t.totalAmount || 0), 0);
     const paidAmount = existingTest.paidAmount || 0;
     const discountAmount = existingTest.discountAmount || 0;
-    const newBalanceAmount = Math.max(0, totalAmount - discountAmount - paidAmount);
+    const newBalanceAmount = Math.max(0, Math.round(totalAmount - discountAmount - paidAmount));
 
     // Update all tests with the new balance
     await prisma.patientTest.updateMany({
@@ -2090,7 +2174,7 @@ export const applyDiscount = async (req, res) => {
 
     // Update VisitBill with new discount total
     const newTotalDiscount = visitBill.totalDiscount.toNumber() + discountAmount;
-    const newBalance = visitBill.grossAmount.toNumber() - newTotalDiscount - visitBill.totalPaid.toNumber();
+    const newBalance = Math.round(visitBill.grossAmount.toNumber() - newTotalDiscount - visitBill.totalPaid.toNumber());
 
     const updatedBill = await prisma.visitBill.update({
       where: { visitId },
@@ -2154,10 +2238,13 @@ export const recordPayment = async (req, res) => {
     }
 
     // Convert PaymentMode
-    const payMode = paymentMode === 'Cash' ? 'CASH' : 
-                   paymentMode === 'Card' ? 'CARD' : 
-                   paymentMode === 'UPI' ? 'UPI' :
-                   paymentMode === 'Cheque' ? 'CHEQUE' :
+    const mode = paymentMode || "";
+    const payMode = mode === 'Cash' ? 'CASH' : 
+                   mode === 'Debit Card' || mode === 'Debit' ? 'DEBIT_CARD' : 
+                   mode === 'Credit Card' || mode === 'Credit' ? 'CREDIT_CARD' :
+                   mode === 'Card' ? 'CARD' : 
+                   mode === 'UPI' ? 'UPI' :
+                   mode === 'Cheque' ? 'CHEQUE' :
                    paymentMode === 'Bank Transfer' ? 'BANK_TRANSFER' : 'OTHER';
 
     // Create new BillingSession for PAYMENT
@@ -2183,7 +2270,7 @@ export const recordPayment = async (req, res) => {
     // Update VisitBill with new payment total
     const newTotalPaid = visitBill.totalPaid.toNumber() + parseFloat(amount);
     const netAmount = visitBill.grossAmount.toNumber() - visitBill.totalDiscount.toNumber();
-    const newBalance = Math.max(0, netAmount - newTotalPaid);
+    const newBalance = Math.max(0, Math.round(netAmount - newTotalPaid));
 
     const updatedBill = await prisma.visitBill.update({
       where: { visitId },
@@ -2357,7 +2444,7 @@ export const cancelTest = async (req, res) => {
       const newAmountDue = newGrossAmount - newDiscount;
       
       // New balance (how much patient still owes)
-      const newBalance = Math.max(0, newAmountDue - oldPaid);
+      const newBalance = Math.max(0, Math.round(newAmountDue - oldPaid));
       
       // Check if patient overpaid
       const overpaymentAmount = Math.max(0, oldPaid - newAmountDue);
@@ -2639,7 +2726,8 @@ export const addTestsToExistingVisit = async (req, res) => {
     newTotalPaid += paymentAmount;
     
     // ✅ Calculate final balance using formula: grossAmount - totalDiscount - totalPaid
-    const finalBalance = Math.max(0, totalTestCharges - totalDiscountAmount - newTotalPaid);
+    // ✅ ROUND to nearest rupee to avoid decimal precision issues (e.g., 1.00 instead of 0)
+    const finalBalance = Math.max(0, Math.round(totalTestCharges - totalDiscountAmount - newTotalPaid));
     
     console.log('💰 Billing calculation for ADD_TEST:', {
       existingGross: visitBill.grossAmount.toNumber(),
@@ -2699,11 +2787,14 @@ export const addTestsToExistingVisit = async (req, res) => {
 
       // Step 3: Create Payment record if payment > 0
       if (paymentAmount > 0) {
-        const payMode = payment?.paymentMode === 'Cash' ? 'CASH' : 
-                       payment?.paymentMode === 'Card' ? 'CARD' : 
-                       payment?.paymentMode === 'UPI' ? 'UPI' :
-                       payment?.paymentMode === 'Cheque' ? 'CHEQUE' :
-                       payment?.paymentMode === 'Bank Transfer' ? 'BANK_TRANSFER' : 'OTHER';
+        const mode = payment?.paymentMode || "";
+        const payMode = mode === 'Cash' ? 'CASH' : 
+                       mode === 'Debit Card' || mode === 'Debit' ? 'DEBIT_CARD' : 
+                       mode === 'Credit Card' || mode === 'Credit' ? 'CREDIT_CARD' :
+                       mode === 'Card' ? 'CARD' : 
+                       mode === 'UPI' ? 'UPI' :
+                       mode === 'Cheque' ? 'CHEQUE' :
+                       mode === 'Bank Transfer' ? 'BANK_TRANSFER' : 'OTHER';
         
         await tx.payment.create({
           data: {
@@ -2893,7 +2984,8 @@ export const addPaymentToVisit = async (req, res) => {
     let newTotalPaid = visitBill.totalPaid.toNumber() + paymentAmount;
     
     // ✅ Calculate final balance using formula: grossAmount - totalDiscount - totalPaid
-    const finalBalance = Math.max(0, totalTestCharges - totalDiscountAmount - newTotalPaid);
+    // ✅ ROUND to nearest rupee to avoid decimal precision issues (e.g., 1.00 instead of 0)
+    const finalBalance = Math.max(0, Math.round(totalTestCharges - totalDiscountAmount - newTotalPaid));
 
     console.log('💰 Payment/Discount calculation:', {
       existingGross: visitBill.grossAmount.toNumber(),
@@ -2947,11 +3039,14 @@ export const addPaymentToVisit = async (req, res) => {
 
       // Step 3: Create Payment record if payment > 0
       if (paymentAmount > 0) {
-        const payMode = payment?.paymentMode === 'Cash' ? 'CASH' : 
-                       payment?.paymentMode === 'Card' ? 'CARD' : 
-                       payment?.paymentMode === 'UPI' ? 'UPI' :
-                       payment?.paymentMode === 'Cheque' ? 'CHEQUE' :
-                       payment?.paymentMode === 'Bank Transfer' ? 'BANK_TRANSFER' : 'OTHER';
+        const mode = payment?.paymentMode || "";
+        const payMode = mode === 'Cash' ? 'CASH' : 
+                       mode === 'Debit Card' || mode === 'Debit' ? 'DEBIT_CARD' : 
+                       mode === 'Credit Card' || mode === 'Credit' ? 'CREDIT_CARD' :
+                       mode === 'Card' ? 'CARD' : 
+                       mode === 'UPI' ? 'UPI' :
+                       mode === 'Cheque' ? 'CHEQUE' :
+                       mode === 'Bank Transfer' ? 'BANK_TRANSFER' : 'OTHER';
         
         await tx.payment.create({
           data: {
