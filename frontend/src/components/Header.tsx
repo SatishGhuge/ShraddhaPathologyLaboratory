@@ -165,6 +165,9 @@ const Header = () => {
     try {
       const accessible = getAccessibleModules(moduleAllocation);
       console.log('🔍 Header - accessible (parsed):', JSON.stringify(accessible, null, 2));
+      console.log('🔍 Header - Configuration:', accessible.configuration);
+      console.log('🔍 Header - Reports:', accessible.reports);
+      console.log('🔍 Header - Inventory:', (accessible as any).inventory);
         
         const filteredModules = allModules.map(module => {
           if (module.id === "patient") {
@@ -194,7 +197,7 @@ const Header = () => {
                 if (item.path.includes("userlist")) return accessible.masters.userlist;
                 if (item.path.includes("charges")) return accessible.masters.charges;
                 if (item.path.includes("organization")) return accessible.masters.organization;
-                if (item.path.includes("outsourcing")) return (accessible.masters as any)?.outsourcing !== false;
+                if (item.path.includes("outsourcing")) return (accessible.masters as any)?.outsourcing === true;
                 return false;
               })
             };
@@ -205,12 +208,13 @@ const Header = () => {
             const filtered = {
               ...module,
               items: module.items.filter(item => {
-                if (item.path.includes("report-dashboard")) return accessible.reports.dashboard;
-                if (item.path.includes("/collection")) return accessible.reports.collectionReport;
-                if (item.path.includes("patient-list")) return accessible.reports.patientList;
-                if (item.path.includes("referral-doctor-revenue")) return accessible.reports.referralDoctorRevenue;
-                if (item.path.includes("test-report")) return accessible.reports.testReport;
-                if (item.path.includes("turn-around-time")) return (accessible?.reports as any)?.turnAroundTime;
+                if (item.path.includes("report-dashboard")) return accessible.reports.dashboard === true;
+                if (item.path.includes("/collection")) return accessible.reports.collectionReport === true;
+                if (item.path.includes("organization-settlement")) return (accessible.reports as any)?.organizationSettlement === true;
+                if (item.path.includes("patient-list")) return accessible.reports.patientList === true;
+                if (item.path.includes("referral-doctor-revenue")) return accessible.reports.referralDoctorRevenue === true;
+                if (item.path.includes("test-report")) return accessible.reports.testReport === true;
+                if (item.path.includes("turn-around-time")) return (accessible.reports as any)?.turnAroundTime === true;
                 return false;
               })
             };
@@ -221,11 +225,26 @@ const Header = () => {
             const filtered = {
               ...module,
               items: module.items.filter(item => {
-                if (item.label === "Signature") return accessible.configuration.signature;
-                if (item.label === "Machines") return accessible.configuration.machines;
+                console.log(`🔍 Configuration item: "${item.label}", checking...`);
+                if (item.label === "Signature") {
+                  const result = (accessible.configuration as any)?.signature === true;
+                  console.log(`  ✓ Signature: ${result}`);
+                  return result;
+                }
+                if (item.label === "Machines") {
+                  const result = (accessible.configuration as any)?.machines === true;
+                  console.log(`  ✓ Machines: ${result}`);
+                  return result;
+                }
+                if (item.label === "Report Settings") {
+                  const result = (accessible.configuration as any)?.reportSettings === true;
+                  console.log(`  ✓ Report Settings: ${result}, reportSettings value:`, (accessible.configuration as any)?.reportSettings);
+                  return result;
+                }
                 return false;
               })
             };
+            console.log(`🔍 Configuration filtered items count: ${filtered.items.length}`);
             return filtered;
           }
           
@@ -246,14 +265,24 @@ const Header = () => {
             return accessible.result ? module : { ...module, items: [] };
           }
           
-          // Inventory — always visible
           if (module.id === "inventory") {
-            return module;
+            const filtered = {
+              ...module,
+              items: module.items.filter(item => {
+                if (item.path.includes("stock-transactions")) return (accessible as any).inventory?.stockTransactions === true;
+                if (item.path.includes("/item")) return (accessible as any).inventory?.item === true;
+                if (item.path.includes("supplier")) return (accessible as any).inventory?.supplier === true;
+                if (item.path.includes("stock-entry")) return (accessible as any).inventory?.stockEntry === true;
+                if (item.path.includes("org-transfer")) return (accessible as any).inventory?.orgTransfer === true;
+                return false;
+              })
+            };
+            return filtered;
           }
           
           return module;
         }).filter(module => {
-          const shouldHide = module.items.length === 0 && ["patient", "master", "report", "configuration", "help"].includes(module.id);
+          const shouldHide = module.items.length === 0 && ["patient", "master", "report", "configuration", "help", "inventory"].includes(module.id);
           if (shouldHide) {
             console.log(`🔍 Header - Hiding empty module: ${module.id}`);
           }

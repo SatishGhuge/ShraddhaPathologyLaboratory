@@ -5,7 +5,7 @@ import { useRouter, useParams, usePathname } from "next/navigation";
 import {
   Save, ArrowLeft, Building2, MapPin, Hash, Phone,
   CalendarDays, Eye, Mail, CheckCircle, XCircle, X,
-  ChevronDown, User, Settings, BarChart3, HelpCircle, ClipboardCheck, Lock
+  ChevronDown, User, Settings, BarChart3, HelpCircle, ClipboardCheck, Lock, Package
 } from "lucide-react";
 import Header from "@/src/components/Header";
 import { updateOrganization, getOrganizationById, createOrganizationWithCredentials } from "@/src/api/master";
@@ -207,23 +207,33 @@ const defaultModuleAllocation = {
     organization: false,
     specimenType: false,
     units: false,
+    outsourcing: false,
   },
   reports: {
     dashboard: false,
     collectionReport: false,
+    organizationSettlement: false,
     patientList: false,
     referralDoctorRevenue: false,
     testReport: false,
     turnAroundTime: false,
   },
   configuration: {
-    letterhead: false,
     signature: false,
+    machines: false,
+    reportSettings: false,
   },
   help: {
     userManual: false,
     ultraviewer: false,
     anydesk: false,
+  },
+  inventory: {
+    stockTransactions: false,
+    item: false,
+    supplier: false,
+    stockEntry: false,
+    orgTransfer: false,
   },
   result: false,
 };
@@ -341,8 +351,11 @@ const AddOrganization = () => {
       const keys = item.key.split('.');
       let current = newAllocation;
       
-      // Navigate to parent
+      // Navigate to parent, create objects if they don't exist
       for (let i = 0; i < keys.length - 1; i++) {
+        if (!current[keys[i]]) {
+          current[keys[i]] = {};
+        }
         current = current[keys[i]];
       }
       
@@ -618,8 +631,9 @@ const AddOrganization = () => {
                       { key: 'masters.userlist', label: 'Users' },
                       { key: 'masters.referralDoctorList', label: 'Referral Doctors' },
                       { key: 'masters.organization', label: 'Organization' },
-                      { key: 'masters.sampleType', label: 'Sample Type' },
+                      { key: 'masters.specimenType', label: 'Sample Type' },
                       { key: 'masters.units', label: 'Units' },
+                      { key: 'masters.outsourcing', label: 'Outsourcing' },
                     ]}
                     moduleAllocation={moduleAllocation}
                     toggleModule={toggleModule}
@@ -635,6 +649,7 @@ const AddOrganization = () => {
                     items={[
                       { key: 'reports.dashboard', label: 'Dashboard' },
                       { key: 'reports.collectionReport', label: 'Collection Report' },
+                      { key: 'reports.organizationSettlement', label: 'Organization Settlement' },
                       { key: 'reports.patientList', label: 'Patient List' },
                       { key: 'reports.referralDoctorRevenue', label: 'Referral Doctor Revenue' },
                       { key: 'reports.testReport', label: 'Test Report' },
@@ -652,8 +667,9 @@ const AddOrganization = () => {
                     title="Configuration"
                     icon={Lock}
                     items={[
-                      { key: 'configuration.letterhead', label: 'Letterhead' },
                       { key: 'configuration.signature', label: 'Signature' },
+                      { key: 'configuration.machines', label: 'Machines' },
+                      { key: 'configuration.reportSettings', label: 'Report Settings' },
                     ]}
                     moduleAllocation={moduleAllocation}
                     toggleModule={toggleModule}
@@ -670,6 +686,24 @@ const AddOrganization = () => {
                       { key: 'help.userManual', label: 'User Manual' },
                       { key: 'help.ultraviewer', label: 'Download Ultraviewer' },
                       { key: 'help.anydesk', label: 'Download Anydesk' },
+                    ]}
+                    moduleAllocation={moduleAllocation}
+                    toggleModule={toggleModule}
+                    onToggleAll={toggleSelectAll}
+                    activeModule={activeModule}
+                    onModuleChange={(module: string) => setActiveModule(module === activeModule ? null : module)}
+                  />
+
+                  {/* Inventory Module */}
+                  <ModuleAccordion
+                    title="Inventory"
+                    icon={Package}
+                    items={[
+                      { key: 'inventory.stockTransactions', label: 'Stock Transactions' },
+                      { key: 'inventory.item', label: 'Item' },
+                      { key: 'inventory.supplier', label: 'Supplier' },
+                      { key: 'inventory.stockEntry', label: 'Stock Entry' },
+                      { key: 'inventory.orgTransfer', label: 'Organization Transfer' },
                     ]}
                     moduleAllocation={moduleAllocation}
                     toggleModule={toggleModule}
