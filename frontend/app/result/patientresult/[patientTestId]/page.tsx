@@ -1025,18 +1025,67 @@ const PatientResult = () => {
               isHighlighted: param.existingResult.isHighlighted || false
             };
           } else {
-            // Don't use "Parameter" placeholder as initial value - it's just metadata
-            let defaultTextValue = (param.textContent && param.textContent !== 'Parameter') ? param.textContent : '';
+            // ✅ For TEXT fields with no saved value, show first available option as default
+            let defaultTextValue = '';
             
-            // ✅ NEW: For mandatory TEXT parameters without existing result, set first option as default
-            if (param.isMandatory && !defaultTextValue && param.type === 'Text') {
-              const rawRange = param.rangeText || param.displayRangeText || '';
-              const options = rawRange
-                ? rawRange.split(/[,|]/).map((o: string) => o.trim()).filter(Boolean)
-                : [];
-              if (options.length > 0) {
-                defaultTextValue = options[0];
-                console.log(`✅ Set mandatory default for "${param.parameterName}": "${defaultTextValue}"`);
+            if ((param.type === 'Text' || param.isMultipleOptions) && !param.isDescriptive) {
+              // Get all available options from various sources - PRESERVE ORDER
+              const allOptions: string[] = [];  // Use array instead of Set to preserve order
+              const seenOptions = new Set<string>();
+              
+              // From textContent (primary source - textarea with newline-separated values)
+              if (param.textContent && param.textContent !== 'Parameter') {
+                try {
+                  let options: any[] = [];
+                  try {
+                    options = JSON.parse(param.textContent);
+                  } catch {
+                    // Split by newlines first, then try commas
+                    const byNewline = param.textContent.split('\n').map((o: string) => o.trim()).filter(Boolean);
+                    if (byNewline.length > 1) {
+                      options = byNewline;
+                    } else {
+                      options = param.textContent.split(',').map((o: string) => o.trim()).filter(Boolean);
+                    }
+                  }
+                  options.forEach((option: any) => {
+                    const optionValue = typeof option === 'object' ? option.value || option.name : option;
+                    const trimmedValue = optionValue?.toString().trim();
+                    if (trimmedValue && !seenOptions.has(trimmedValue)) {
+                      allOptions.push(trimmedValue);
+                      seenOptions.add(trimmedValue);
+                    }
+                  });
+                } catch (e) {
+                  console.warn(`Error parsing textContent for parameter ${param.id}:`, e);
+                }
+              }
+              
+              // From rangeText (if no textContent)
+              if (allOptions.length === 0 && param.rangeText) {
+                param.rangeText.split(/[,|]/).map((o: string) => o.trim()).forEach(opt => {
+                  if (opt && opt.trim() && !seenOptions.has(opt)) {
+                    allOptions.push(opt.trim());
+                    seenOptions.add(opt);
+                  }
+                });
+              }
+              
+              // From displayRangeText (if still no options)
+              if (allOptions.length === 0 && param.displayRangeText) {
+                param.displayRangeText.split(/[,|]/).map((o: string) => o.trim()).forEach(opt => {
+                  if (opt && opt.trim() && !seenOptions.has(opt)) {
+                    allOptions.push(opt.trim());
+                    seenOptions.add(opt);
+                  }
+                });
+              }
+              
+              // Get first option as default, skip "-" if it's the first - PRESERVE ORIGINAL ORDER
+              if (allOptions.length > 0) {
+                // Find first non-dash option, preserving original order
+                defaultTextValue = allOptions.find(opt => opt !== '-' && opt.trim() !== '') || '';
+                console.log(`📌 DEFAULT: Param ${param.id} (${param.parameterName}) set to FIRST option: "${defaultTextValue}" (all options in order: ${JSON.stringify(allOptions)})`);
               }
             }
             
@@ -1103,18 +1152,67 @@ const PatientResult = () => {
                 isHighlighted: param.existingResult.isHighlighted || false
               };
             } else {
-              // Don't use "Parameter" placeholder as initial value - it's just metadata
-              let defaultTextValue = (param.textContent && param.textContent !== 'Parameter') ? param.textContent : '';
+              // ✅ For TEXT fields with no saved value, show first available option as default
+              let defaultTextValue = '';
               
-              // ✅ NEW: For mandatory TEXT parameters without existing result, set first option as default
-              if (param.isMandatory && !defaultTextValue && param.type === 'Text') {
-                const rawRange = param.rangeText || param.displayRangeText || '';
-                const options = rawRange
-                  ? rawRange.split(/[,|]/).map((o: string) => o.trim()).filter(Boolean)
-                  : [];
-                if (options.length > 0) {
-                  defaultTextValue = options[0];
-                  console.log(`✅ Set mandatory default for "${param.parameterName}": "${defaultTextValue}"`);
+              if ((param.type === 'Text' || param.isMultipleOptions) && !param.isDescriptive) {
+                // Get all available options from various sources - PRESERVE ORDER
+                const allOptions: string[] = [];  // Use array instead of Set to preserve order
+                const seenOptions = new Set<string>();
+                
+                // From textContent (primary source - textarea with newline-separated values)
+                if (param.textContent && param.textContent !== 'Parameter') {
+                  try {
+                    let options: any[] = [];
+                    try {
+                      options = JSON.parse(param.textContent);
+                    } catch {
+                      // Split by newlines first, then try commas
+                      const byNewline = param.textContent.split('\n').map((o: string) => o.trim()).filter(Boolean);
+                      if (byNewline.length > 1) {
+                        options = byNewline;
+                      } else {
+                        options = param.textContent.split(',').map((o: string) => o.trim()).filter(Boolean);
+                      }
+                    }
+                    options.forEach((option: any) => {
+                      const optionValue = typeof option === 'object' ? option.value || option.name : option;
+                      const trimmedValue = optionValue?.toString().trim();
+                      if (trimmedValue && !seenOptions.has(trimmedValue)) {
+                        allOptions.push(trimmedValue);
+                        seenOptions.add(trimmedValue);
+                      }
+                    });
+                  } catch (e) {
+                    console.warn(`Error parsing textContent for parameter ${param.id}:`, e);
+                  }
+                }
+                
+                // From rangeText (if no textContent)
+                if (allOptions.length === 0 && param.rangeText) {
+                  param.rangeText.split(/[,|]/).map((o: string) => o.trim()).forEach(opt => {
+                    if (opt && opt.trim() && !seenOptions.has(opt)) {
+                      allOptions.push(opt.trim());
+                      seenOptions.add(opt);
+                    }
+                  });
+                }
+                
+                // From displayRangeText (if still no options)
+                if (allOptions.length === 0 && param.displayRangeText) {
+                  param.displayRangeText.split(/[,|]/).map((o: string) => o.trim()).forEach(opt => {
+                    if (opt && opt.trim() && !seenOptions.has(opt)) {
+                      allOptions.push(opt.trim());
+                      seenOptions.add(opt);
+                    }
+                  });
+                }
+                
+                // Get first option as default, skip "-" if it's the first - PRESERVE ORIGINAL ORDER
+                if (allOptions.length > 0) {
+                  // Find first non-dash option, preserving original order
+                  defaultTextValue = allOptions.find(opt => opt !== '-' && opt.trim() !== '') || '';
+                  console.log(`📌 DEFAULT: Param ${param.id} (${param.parameterName}) set to FIRST option: "${defaultTextValue}" (all options in order: ${JSON.stringify(allOptions)})`);
                 }
               }
               
@@ -1189,6 +1287,16 @@ const PatientResult = () => {
   const handleResultChange = (parameterId, field, value, allParams) => {
     setResults(prev => {
       const updated = { ...prev, [parameterId]: { ...prev[parameterId], [field]: value } };
+      
+      // ✅ Track if user manually cleared a text field (set empty after having a value)
+      if (field === 'textValue') {
+        if (value === '') {
+          updated[parameterId].wasManuallyCleared = true;
+          console.log(`🗑️ Field ${parameterId} marked as manually cleared`);
+        } else if (value !== '') {
+          updated[parameterId].wasManuallyCleared = false;
+        }
+      }
       
       // Find the parameter to check for panic ranges
       const parameter = (allParams || parameters).find(p => p.id === parameterId);
@@ -1414,7 +1522,10 @@ const PatientResult = () => {
               testParameterId: param.id,
               testCategoryId: param.categoryId,
               numericValue: results[paramKey]?.numericValue || null,
-              textValue: results[paramKey]?.textValue || null,
+              // ✅ Strip leading "- " from text values before saving
+              textValue: results[paramKey]?.textValue 
+                ? results[paramKey].textValue.replace(/^-\s*/, '').trim() || null
+                : null,
               selectedOption: results[paramKey]?.selectedOption || null,
               isAbnormal: results[paramKey]?.isAbnormal || false,
               isHighlighted: results[paramKey]?.isHighlighted || false,
@@ -1422,7 +1533,9 @@ const PatientResult = () => {
             };
           }).filter(r => {
             const hasNumeric = r.numericValue !== null && r.numericValue !== undefined && r.numericValue !== '';
-            const hasText = r.textValue && typeof r.textValue === 'string' && r.textValue.trim() !== '' && r.textValue.trim() !== 'Parameter';
+            // ✅ Save text if: (1) not empty after stripping, OR (2) manually cleared (wasManuallyCleared flag)
+            const hasText = r.textValue !== null && r.textValue !== undefined && 
+                           (r.textValue !== '' || results[r.testParameterId]?.wasManuallyCleared);
             const hasOption = r.selectedOption && typeof r.selectedOption === 'string' && r.selectedOption.trim() !== '';
             return hasNumeric || hasText || hasOption;
           });
@@ -1493,14 +1606,19 @@ const PatientResult = () => {
         testParameterId: param.id,
         testCategoryId: param.categoryId,
         numericValue: results[param.id]?.numericValue || null,
-        textValue: results[param.id]?.textValue || null,
+        // ✅ Strip leading "- " from text values before saving
+        textValue: results[param.id]?.textValue 
+          ? results[param.id].textValue.replace(/^-\s*/, '').trim() || null
+          : null,
         selectedOption: results[param.id]?.selectedOption || null,
         isAbnormal: results[param.id]?.isAbnormal || false,
         isHighlighted: results[param.id]?.isHighlighted || false,
         referenceRange: results[param.id]?.referenceRange || param.normalRange
       })).filter(r => {
         const hasNumeric = r.numericValue !== null && r.numericValue !== undefined && r.numericValue !== '';
-        const hasText = r.textValue && typeof r.textValue === 'string' && r.textValue.trim() !== '' && r.textValue.trim() !== 'Parameter';
+        // ✅ Save text if: (1) not empty after stripping, OR (2) manually cleared (wasManuallyCleared flag)
+        const hasText = r.textValue !== null && r.textValue !== undefined && 
+                       (r.textValue !== '' || results[r.testParameterId]?.wasManuallyCleared);
         const hasOption = r.selectedOption && typeof r.selectedOption === 'string' && r.selectedOption.trim() !== '';
         return hasNumeric || hasText || hasOption;
       });
@@ -1569,14 +1687,19 @@ const PatientResult = () => {
         testParameterId: param.id,
         testCategoryId: param.categoryId,
         numericValue: results[param.id]?.numericValue || null,
-        textValue: results[param.id]?.textValue || null,
+        // ✅ Strip leading "- " from text values before saving
+        textValue: results[param.id]?.textValue 
+          ? results[param.id].textValue.replace(/^-\s*/, '').trim() || null
+          : null,
         selectedOption: results[param.id]?.selectedOption || null,
         isAbnormal: results[param.id]?.isAbnormal || false,
         isHighlighted: results[param.id]?.isHighlighted || false,
         referenceRange: results[param.id]?.referenceRange || param.normalRange
       })).filter(r => {
         const hasNumeric = r.numericValue !== null && r.numericValue !== undefined && r.numericValue !== '';
-        const hasText = r.textValue && typeof r.textValue === 'string' && r.textValue.trim() !== '' && r.textValue.trim() !== 'Parameter';
+        // ✅ Save text if: (1) not empty after stripping, OR (2) manually cleared (wasManuallyCleared flag)
+        const hasText = r.textValue !== null && r.textValue !== undefined && 
+                       (r.textValue !== '' || results[r.testParameterId]?.wasManuallyCleared);
         const hasOption = r.selectedOption && typeof r.selectedOption === 'string' && r.selectedOption.trim() !== '';
         return hasNumeric || hasText || hasOption;
       });
