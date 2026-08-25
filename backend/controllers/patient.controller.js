@@ -1455,21 +1455,202 @@ export const getPatientStatistics = async (req, res) => {
       where: dateFilter
     });
 
-    // Get paginated patients
+    // Get location statistics
     const patients = await prisma.patient.findMany({
       where: dateFilter,
-      skip,
-      take: limit,
-      orderBy: { createdAt: 'desc' }
+      select: {
+        location: true
+      }
     });
 
-    res.json(buildPaginatedResponse(patients, total, page, limit));
+    // Group by location
+    const locationStats = {};
+    patients.forEach(patient => {
+      const location = patient.location || 'Not Specified';
+      locationStats[location] = (locationStats[location] || 0) + 1;
+    });
+
+    // Convert to array and sort by count
+    const locationStatsArray = Object.entries(locationStats)
+      .map(([location, count]) => ({ location, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 5); // Top 5 locations
+
+    res.json({
+      success: true,
+      data: {
+        total,
+        locationStats: locationStatsArray
+      }
+    });
 
   } catch (error) {
     console.error('Get patient statistics error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to fetch patient statistics'
+    });
+  }
+};
+
+// Get organization type statistics for dashboard
+export const getOrganizationTypeStatistics = async (req, res) => {
+  try {
+    const { fromDate, toDate } = req.query;
+
+    console.log('📊 getOrganizationTypeStatistics called with:', { fromDate, toDate });
+
+    // Build date filter for patient tests
+    const dateFilter = {};
+    if (fromDate && toDate) {
+      const start = new Date(fromDate);
+      start.setHours(0, 0, 0, 0);
+      const end = new Date(toDate);
+      end.setHours(23, 59, 59, 999);
+      dateFilter.createdAt = { gte: start, lte: end };
+    } else if (fromDate) {
+      const start = new Date(fromDate);
+      start.setHours(0, 0, 0, 0);
+      dateFilter.createdAt = { gte: start };
+    } else if (toDate) {
+      const end = new Date(toDate);
+      end.setHours(23, 59, 59, 999);
+      dateFilter.createdAt = { lte: end };
+    }
+
+    console.log('📅 Date filter:', dateFilter);
+
+    // Get all patient tests with their organization data
+    const patientTests = await prisma.patientTest.findMany({
+      where: {
+        ...dateFilter,
+        organizationId: { not: null }
+      },
+      include: {
+        organization: {
+          select: {
+            id: true,
+            name: true,
+            isHomeCollection: true,
+            isOPD: true,
+            isIPD: true
+          }
+        }
+      }
+    });
+
+    console.log('🧪 Total patient tests found:', patientTests.length);
+
+    // Use Sets to count unique patients per organization type
+    const homeCollectionPatients = new Set();
+    const opdPatients = new Set();
+    const ipdPatients = new Set();
+
+    patientTests.forEach(test => {
+      if (test.organization) {
+        if (test.organization.isHomeCollection) {
+          homeCollectionPatients.add(test.patientId);
+        }
+        if (test.organization.isOPD) {
+          opdPatients.add(test.patientId);
+        }
+        if (test.organization.isIPD) {
+          ipdPatients.add(test.patientId);
+        }
+      }
+    });
+
+    const stats = {
+      homeCollection: homeCollectionPatients.size,
+      opd: opdPatients.size,
+      ipd: ipdPatients.size
+    };
+
+    console.log('✅ Final stats (unique patients):', stats);
+
+    res.json({
+      success: true,
+      data: stats
+    });
+
+  } catch (error) {
+    console.error('❌ Get organization type statistics error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch organization type statistics'
+    });
+  }
+};
+
+// Get weekly organization type statistics for dashboard
+export const getWeeklyOrganizationTypeStatistics = async (req, res) => {
+  try {
+    console.log('📊 getWeeklyOrganizationTypeStatistics called');
+
+    // Get last 7 days data
+    const weeklyData = [];
+    const today = new Date();
+    
+    for (let i = 6; i >= 0; i--) {
+      const date = new Date(today);
+      date.setDate(date.getDate() - i);
+      date.setHours(0, 0, 0, 0);
+      
+      const endDate = new Date(date);
+      endDate.setHours(23, 59, 59, 999);
+
+      // Get patient tests for this day
+      const patientTests = await prisma.patientTest.findMany({
+        where: {
+          createdAt: { gte: date, lte: endDate },
+          organizationId: { not: null }
+        },
+        include: {
+          organization: {
+            select: {
+              isHomeCollection: true,
+              isOPD: true,
+              isIPD: true
+            }
+          }
+        }
+      });
+
+      // Count unique patients per type
+      const homeCollectionPatients = new Set();
+      const opdPatients = new Set();
+      const ipdPatients = new Set();
+
+      patientTests.forEach(test => {
+        if (test.organization) {
+          if (test.organization.isHomeCollection) homeCollectionPatients.add(test.patientId);
+          if (test.organization.isOPD) opdPatients.add(test.patientId);
+          if (test.organization.isIPD) ipdPatients.add(test.patientId);
+        }
+      });
+
+      const dayName = date.toLocaleDateString('en-US', { weekday: 'short' });
+      weeklyData.push({
+        day: dayName,
+        date: date.toISOString().split('T')[0],
+        homeCollection: homeCollectionPatients.size,
+        opd: opdPatients.size,
+        ipd: ipdPatients.size
+      });
+    }
+
+    console.log('✅ Weekly stats:', weeklyData);
+
+    res.json({
+      success: true,
+      data: weeklyData
+    });
+
+  } catch (error) {
+    console.error('❌ Get weekly organization type statistics error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch weekly organization type statistics'
     });
   }
 };

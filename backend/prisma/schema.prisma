@@ -101,6 +101,11 @@ model Organization {
   updatedAt              DateTime           @updatedAt
   sendReportsViaMail     Boolean            @default(false)
   sendReportsViaWhatsApp Boolean            @default(false)
+  
+  // ✅ Organization Type Flags
+  isHomeCollection       Boolean            @default(false)
+  isOPD                  Boolean            @default(false)
+  isIPD                  Boolean            @default(false)
 
   // Relations
   admins                 Admin[]

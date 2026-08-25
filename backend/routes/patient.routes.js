@@ -11,6 +11,8 @@ import {
   updatePayment,
   getPatientStatistics,
   getPatientLocationStatistics,
+  getOrganizationTypeStatistics,
+  getWeeklyOrganizationTypeStatistics,
   addTestToVisit,
   createPaymentTransaction,
   getPaymentTransactions,
@@ -42,6 +44,12 @@ router.get('/statistics', getPatientStatistics);
 
 // Get patient location-wise statistics
 router.get('/statistics/location', getPatientLocationStatistics);
+
+// Get organization type statistics (today's count)
+router.get('/statistics/organization-type', getOrganizationTypeStatistics);
+
+// Get weekly organization type statistics (last 7 days)
+router.get('/statistics/organization-type/weekly', getWeeklyOrganizationTypeStatistics);
 
 // Payment transaction routes — MUST be before /:id routes
 router.post('/payment-transaction', createPaymentTransaction);
