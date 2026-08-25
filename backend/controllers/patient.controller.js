@@ -185,6 +185,8 @@ export const createPatient = async (req, res) => {
       existingPatientId,
       // Patient Identity
       title, firstName, lastName, dob, age, gender, guardianType, mobile, email,
+      // ✅ NEW: Track if email was manually filled (for sending credentials)
+      emailWasManuallyFilled,
       createdBy, createdAtLocation, address, location,
       // Registration Details (will be saved with each test)
       reportMode, referralDoctor, visitDate, visitTime,
@@ -663,8 +665,8 @@ export const createPatient = async (req, res) => {
       }
     }
 
-    // Send email with credentials if patient has an email
-    if (email && patient.patientId) {
+    // Send email with credentials if patient has an email AND email was manually filled (not auto-filled from doctor)
+    if (email && patient.patientId && emailWasManuallyFilled !== false) {
       try {
         // Generate random password for patients
         const randomPassword = crypto.randomBytes(8).toString('hex').slice(0, 8);
@@ -684,11 +686,13 @@ export const createPatient = async (req, res) => {
           randomPassword,
           'direct'
         );
-        console.log(`✅ Credentials email sent to ${email} for patient ${patient.patientId}`);
+        console.log(`✅ Credentials email sent to ${email} for patient ${patient.patientId} (emailWasManuallyFilled: ${emailWasManuallyFilled})`);
       } catch (emailError) {
         console.warn('⚠️ Failed to send credentials email:', emailError.message);
         // Don't fail the registration if email fails
       }
+    } else if (email && emailWasManuallyFilled === false) {
+      console.log(`⏭️ SKIPPED: Email credentials NOT sent (email was auto-filled from referral doctor). Email: ${email}, Patient: ${patient.patientId}`);
     }
 
     // 🔍 DEBUG: Log what we're returning to frontend
