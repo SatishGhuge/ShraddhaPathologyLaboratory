@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { X, Plus, RefreshCcw, Pencil, Eye, Trash2 } from "lucide-react";
+import { X, Plus, RefreshCcw, Pencil, Eye, Trash2, AlertCircle } from "lucide-react";
 
 /*
  * ============================================================================
@@ -46,6 +46,7 @@ interface BookingDetailsModalProps {
   allTests?: any[];
   packagesList?: any[];
   onBookingUpdate?: (updatedBooking: any) => void;
+  onTestCancelled?: () => void;  // ✅ NEW: Callback to refresh modal after test cancellation
 }
 
 const BookingDetailsModal: React.FC<BookingDetailsModalProps> = ({
@@ -55,7 +56,8 @@ const BookingDetailsModal: React.FC<BookingDetailsModalProps> = ({
   businessType = "B2C",
   allTests = [],
   packagesList = [],
-  onBookingUpdate
+  onBookingUpdate,
+  onTestCancelled  // ✅ NEW: Add callback prop
 }) => {
   const [testView, setTestView] = useState("all");
   const [searchTest, setSearchTest] = useState("");
@@ -77,11 +79,52 @@ const BookingDetailsModal: React.FC<BookingDetailsModalProps> = ({
   const [initialTestCount] = useState(booking?.tests?.length || 0);
   // ✅ Track total charge of deleted tests to subtract from grand total
   const [deletedTestsChargeTotal, setDeletedTestsChargeTotal] = useState(0);
+  
+  // ✅ NEW: Add state for confirmation dialog
+  const [showConfirmDelete, setShowConfirmDelete] = useState<any>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  
+  // ✅ NEW: Add state for success message after cancellation
+  const [successMessage, setSuccessMessage] = useState<string>("");
 
   // Fetch tests from backend when modal opens
   // This MUST be before the early return to avoid React hooks violation
   const [billingSummary, setBillingSummary] = useState<any>(null);
   
+  // ✅ NEW: Track previous session amounts (snapshot from DB at modal open time)
+  // Used to distinguish between previous session amounts vs current session changes
+  const [previousSessionBilling, setPreviousSessionBilling] = useState<any>(null);
+  
+  // ✅ NEW: Public method to refresh modal data (can be called via ref or callback)
+  const refreshModalData = async () => {
+    if (!booking?.visitId) {
+      console.log('⚠️ No visitId available for refresh');
+      return;
+    }
+    
+    try {
+      const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || '/api';
+      console.log('🔄 Refreshing modal data for visitId:', booking.visitId);
+      
+      const response = await fetch(`${API_BASE_URL}/patients/tests-by-visit?visitId=${booking.visitId}`);
+      const result = await response.json();
+      
+      if (result.success && result.data) {
+        if (Array.isArray(result.data)) {
+          setTests(result.data);
+        } else if (result.data.tests) {
+          setTests(result.data.tests);
+          if (result.data.billingSummary) {
+            setBillingSummary(result.data.billingSummary);
+            console.log('✅ Modal refreshed with new billing summary:', result.data.billingSummary);
+          }
+        }
+      }
+    } catch (error) {
+      console.error('❌ Error refreshing modal data:', error);
+    }
+  };
+
   useEffect(() => {
     const fetchTests = async () => {
       if (!booking?.visitId) {
@@ -109,11 +152,35 @@ const BookingDetailsModal: React.FC<BookingDetailsModalProps> = ({
           } else if (result.data.tests) {
             // New format with tests and billingSummary
             console.log('📋 Using object format with tests array, setting', result.data.tests.length, 'tests');
-            setTests(result.data.tests);
+            
+            // ✅ VERIFICATION: Filter out any cancelled tests just to be safe
+            const activTests = result.data.tests.filter((t: any) => t.status !== 'Cancelled' && t.status !== 'CANCELLED');
+            if (activTests.length < result.data.tests.length) {
+              console.warn('⚠️ Found and filtered out cancelled tests:', result.data.tests.length - activTests.length);
+            }
+            
+            setTests(activTests);
             if (result.data.billingSummary) {
               console.log('💰 RAW Billing Summary from backend:', JSON.stringify(result.data.billingSummary));
               setBillingSummary(result.data.billingSummary);
+              
+              // ✅ NEW: Store previous session billing as snapshot
+              // This is the state of the VisitBill at modal open time
+              setPreviousSessionBilling({
+                grossAmount: result.data.billingSummary.grossAmount,
+                totalDiscount: result.data.billingSummary.totalDiscount,
+                totalPaid: result.data.billingSummary.totalPaid,
+                balanceAmount: result.data.billingSummary.balanceAmount,
+                status: result.data.billingSummary.status,
+                discountType: result.data.billingSummary.discountType,
+                discountValue: result.data.billingSummary.discountValue,
+                discountRemark: result.data.billingSummary.discountRemark,
+                paymentMode: result.data.billingSummary.paymentMode,
+                totalDiscountPercent: result.data.billingSummary.totalDiscountPercent
+              });
+              
               console.log('✅ billingSummary state set with totalDiscount:', result.data.billingSummary.totalDiscount);
+              console.log('✅ previousSessionBilling snapshot created for comparison');
             }
           } else {
             console.warn('⚠️ Unexpected response structure:', result.data);
@@ -157,8 +224,11 @@ const BookingDetailsModal: React.FC<BookingDetailsModalProps> = ({
       setPaymentAmount(0);
       setTests([]);
       setBillingSummary(null);
+      setPreviousSessionBilling(null); // ✅ Clear previous session snapshot too
       setNewTestsAdded(false);
       setDeletedTestsChargeTotal(0); // ✅ Reset deleted tests tracker
+      setShowConfirmDelete(null); // ✅ Reset confirmation dialog
+      setSuccessMessage(""); // ✅ Reset success message
     }
   }, [isOpen]);
 
@@ -179,6 +249,19 @@ const BookingDetailsModal: React.FC<BookingDetailsModalProps> = ({
   // ============================================================================
   // BILLING CALCULATION LOGIC - Map to new VisitBill/BillDiscount/Payment structure
   // ============================================================================
+  
+  // ✅ KEY CONCEPT FOR PERSISTENCE:
+  // - previousSessionBilling: Snapshot of VisitBill data at modal open time (persists from DB)
+  // - billingSummary: Current state (may be updated after test cancellation)
+  // - discount/discountPercent: Current session input (reset when modal closes)
+  // - paymentAmount: Current session input (reset when modal closes)
+  //
+  // When modal reopens:
+  // 1. Backend fetches fresh VisitBill data
+  // 2. billingSummary is set to fresh data
+  // 3. previousSessionBilling captures the fresh data as baseline
+  // 4. All current session inputs reset to 0
+  // This ensures amounts persist correctly across sessions!
   
   // Use backend summary if available, otherwise calculate locally
   let finalGrandTotal, finalInitialDiscount, finalInitialAmount, finalNewTestTotal, finalNewDiscount, finalNetAmount, finalBalance;
@@ -358,26 +441,116 @@ const BookingDetailsModal: React.FC<BookingDetailsModalProps> = ({
   const handleDeleteTest = (testName: string) => {
     const testToDelete = tests.find(t => t.name === testName);
     if (testToDelete) {
-      // Calculate the charge of the test being deleted
-      const testCharge = businessType === "B2C" ? (testToDelete.b2cCharge || testToDelete.charge || 0) : (testToDelete.b2bCharge || testToDelete.charge || 0);
-      console.log(`Deleting test: ${testName}, charge: ${testCharge}`);
+      // ✅ NEW: Show confirmation dialog instead of deleting immediately
+      setShowConfirmDelete(testToDelete);
+    }
+  };
+
+  // ✅ NEW: Handle confirmation for test deletion
+  const handleConfirmDeleteTest = async () => {
+    if (!showConfirmDelete || !booking?.visitId) return;
+    
+    const testToDelete = showConfirmDelete;
+    setIsDeleting(true);
+    
+    try {
+      // Check if this is an existing test that needs backend API call
+      if (testToDelete.isExisting && testToDelete.id) {
+        console.log('🟢 Calling backend cancelTest API for existing test:', {
+          visitId: booking.visitId,
+          patientTestId: testToDelete.id,
+          testName: testToDelete.name
+        });
+        
+        const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || '/api';
+        const response = await fetch(`${API_BASE_URL}/patients/${booking.visitId}/cancel-test/${testToDelete.id}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ remarks: 'User cancelled from modal' })
+        });
+        
+        const result = await response.json();
+        console.log('📦 Backend cancelTest response:', result);
+        
+        if (!response.ok || !result.success) {
+          throw new Error(result.message || 'Failed to cancel test');
+        }
+        
+        // ✅ NEW: Update modal state immediately with response data
+        console.log('✅ Test cancelled successfully - updating modal state');
+        setShowConfirmDelete(null);
+        
+        // Step 1: Remove the cancelled test from local state immediately
+        const updatedTests = tests.filter(t => !(t.id === testToDelete.id));
+        
+        // ✅ VERIFICATION: Double-check no cancelled tests remain
+        const stillCancelled = updatedTests.filter(t => t.status === 'Cancelled' || t.status === 'CANCELLED');
+        if (stillCancelled.length > 0) {
+          console.warn('⚠️ Found cancelled tests still in list:', stillCancelled);
+        }
+        
+        setTests(updatedTests);
+        console.log('✅ Removed test from modal, remaining:', updatedTests.length);
+        
+        // Step 2: Update billing state with fresh data from backend response
+        if (result.data?.updatedBill) {
+          const freshBill = result.data.updatedBill;
+          setBillingSummary(freshBill);
+          console.log('💰 Updated billing summary:', {
+            grossAmount: freshBill.grossAmount,
+            totalDiscount: freshBill.totalDiscount,
+            balanceAmount: freshBill.balanceAmount
+          });
+        }
+        
+        // Step 3: Trigger parent callback to sync parent state as well
+        if (onTestCancelled) {
+          console.log('🔄 Calling onTestCancelled callback to sync parent state');
+          onTestCancelled();
+        } else {
+          console.log('⚠️ No onTestCancelled callback - modal state updated only');
+        }
+        
+        // Step 4: Show success message
+        setSuccessMessage(`✅ Test "${testToDelete.name}" cancelled successfully! Balance updated.`);
+        setTimeout(() => setSuccessMessage(""), 3000);
+        
+      } else {
+        // ✅ For new tests (not yet saved), just remove locally
+        console.log('📝 Removing new (unsaved) test locally:', testToDelete.name);
+        
+        const testCharge = businessType === "B2C" 
+          ? (testToDelete.b2cCharge || testToDelete.charge || 0) 
+          : (testToDelete.b2bCharge || testToDelete.charge || 0);
+        
+        setDeletedTestsChargeTotal(prev => prev + testCharge);
+        
+        const updatedTests = tests.filter(t => t.name !== testToDelete.name);
+        setTests(updatedTests);
+        
+        // Reset discount when test is deleted
+        setDiscountPercent(0);
+        setDiscount(0);
+        
+        // If no new tests left, reset newTestsAdded flag
+        const remainingNewTests = updatedTests.filter(t => !t.isExisting);
+        if (remainingNewTests.length === 0) {
+          setNewTestsAdded(false);
+        }
+        
+        setShowConfirmDelete(null);
+      }
       
-      // ✅ Track deleted tests charge for grand total adjustment
-      setDeletedTestsChargeTotal(prev => prev + testCharge);
+    } catch (error) {
+      console.error('❌ Error during test deletion:', error);
+      alert(`Failed to cancel test: ${(error as Error).message}`);
+    } finally {
+      setIsDeleting(false);
     }
-    
-    const updatedTests = tests.filter(t => t.name !== testName);
-    setTests(updatedTests);
-    
-    // ✅ Reset discount when test is deleted
-    setDiscountPercent(0);
-    setDiscount(0);
-    
-    // ✅ If no new tests left, reset newTestsAdded flag
-    const remainingNewTests = updatedTests.filter(t => !t.isExisting);
-    if (remainingNewTests.length === 0) {
-      setNewTestsAdded(false);
-    }
+  };
+
+  const handleCancelDelete = () => {
+    setShowConfirmDelete(null);
   };
 
   const handleSaveCharge = (testName: string) => {
@@ -632,7 +805,65 @@ const BookingDetailsModal: React.FC<BookingDetailsModalProps> = ({
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      {/* ✅ NEW: Confirmation Dialog for Test Deletion */}
+      {showConfirmDelete && (
+        <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-[60] p-4">
+          <div className="bg-white rounded-lg shadow-2xl max-w-sm w-full p-6 animate-in fade-in zoom-in-95">
+            <div className="flex items-start gap-3 mb-4">
+              <div className="w-10 h-10 bg-yellow-100 rounded-full flex items-center justify-center flex-shrink-0">
+                <AlertCircle className="text-yellow-600" size={20} />
+              </div>
+              <div className="flex-1">
+                <h3 className="font-bold text-base text-gray-900 mb-1">Cancel Test?</h3>
+                <p className="text-sm text-gray-600">
+                  Are you sure you want to cancel <strong>{showConfirmDelete.name}</strong>?
+                </p>
+                <p className="text-xs text-gray-500 mt-2">
+                  Charge: ₹{businessType === "B2C" ? (showConfirmDelete.b2cCharge || showConfirmDelete.charge || 0) : (showConfirmDelete.b2bCharge || showConfirmDelete.charge || 0)}
+                </p>
+              </div>
+            </div>
+            
+            <div className="bg-yellow-50 border border-yellow-200 rounded p-2 mb-4 text-xs text-yellow-800">
+              <p>The billing amount will be updated automatically. If patient has paid, a refund may be generated.</p>
+            </div>
+            
+            <div className="flex gap-2 justify-end">
+              <button
+                onClick={handleCancelDelete}
+                disabled={isDeleting}
+                className="px-4 py-2 rounded font-semibold text-sm border border-gray-300 text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+              >
+                Keep Test
+              </button>
+              <button
+                onClick={handleConfirmDeleteTest}
+                disabled={isDeleting}
+                className="px-4 py-2 rounded font-semibold text-sm bg-red-500 hover:bg-red-600 text-white disabled:opacity-50 flex items-center gap-2"
+              >
+                {isDeleting ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    Cancelling...
+                  </>
+                ) : (
+                  'Cancel Test'
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Main Modal */}
       <div className="bg-white rounded-lg shadow-2xl w-full max-w-6xl max-h-[95vh] overflow-hidden flex flex-col">
+        {/* ✅ NEW: Success Message Toast */}
+        {successMessage && (
+          <div className="bg-green-100 border-l-4 border-green-500 text-green-700 px-4 py-3 animate-in fade-in" role="alert">
+            <p className="font-medium text-sm">{successMessage}</p>
+          </div>
+        )}
+        
         {/* HEADER */}
         <div className="bg-cyan-900 text-white p-3 flex justify-between items-center flex-shrink-0">
           <div className="flex-1">

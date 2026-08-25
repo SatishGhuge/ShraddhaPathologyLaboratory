@@ -15,7 +15,7 @@ import {
   RefreshCcw, Plus, X, RefreshCw,
   ChevronLeft, ChevronRight, CalendarDays, AlertCircle, Barcode, AlertTriangle
 } from "lucide-react";
-import { getAllPatients, updatePayment, updatePatient, updatePatientTestDetails, getVisitBill } from "@/src/api/patient";
+import { getAllPatients, updatePayment, updatePatient, updatePatientTestDetails, getVisitBill, cancelTest } from "@/src/api/patient";
 import { getDoctors, getTests, getPackages, getSpecimenTypes, getOrganizations } from "@/src/api/master";
 import html2pdf from "html2pdf.js";
 import { jsPDF } from "jspdf";
@@ -554,9 +554,16 @@ export default function BookingPage() {
     patients.forEach((p) => {
       const patientTests = p.tests || [];
 
-      // Group tests by visitId
+      // Group tests by visitId - FILTER OUT CANCELLED TESTS
       const visitMap: any = {};
       patientTests.forEach((t: any) => {
+        // Skip cancelled tests - they should not appear in the booking
+        // ✅ Check for both 'Cancelled' and 'CANCELLED' to handle any format
+        if (t.status === 'Cancelled' || t.status === 'CANCELLED') {
+          console.log('⏭️ Skipping cancelled test:', { testId: t.id, testName: t.test?.name, status: t.status });
+          return;
+        }
+        
         const vid = t.visitId || "";
         if (!visitMap[vid]) {
           visitMap[vid] = {
@@ -1312,24 +1319,139 @@ export default function BookingPage() {
     }
   };
 
-  const handleDeleteTest = (testToDelete: any) => {
+  const handleDeleteTest = async (testToDelete: any) => {
     if (!selectedBooking) return;
-    if (window.confirm(`Delete ${testToDelete.name}?`)) {
-      const updated = bookings.map(b=>
-        b.bookingId===selectedBooking.bookingId
-          ? {...b, tests: b.tests.filter(t => !(t.name===testToDelete.name && !!t.isExisting===!!testToDelete.isExisting))} : b
+    console.log('👉 [X Button Clicked] Test to delete:', testToDelete);
+    
+    if (!window.confirm(`Delete ${testToDelete.name}?`)) {
+      console.log('❌ User cancelled deletion');
+      return;
+    }
+    
+    console.log('✅ User confirmed deletion');
+    
+    try {
+      // ONLY call backend if it's an existing test with an ID
+      if (!testToDelete.isExisting || !testToDelete.id) {
+        console.log('⚠️ Not an existing test or no ID, removing locally:', {
+          isExisting: testToDelete.isExisting,
+          hasId: !!testToDelete.id
+        });
+        
+        // For new tests (not yet saved to DB), just remove from local state
+        const updated = bookings.map(b =>
+          b.bookingId === selectedBooking.bookingId
+            ? { ...b, tests: b.tests.filter(t => !(t.name === testToDelete.name && !!t.isExisting === !!testToDelete.isExisting)) }
+            : b
+        );
+        setBookings(updated);
+        const updatedBooking = updated.find(b => b.bookingId === selectedBooking.bookingId);
+        if (updatedBooking) {
+          setSelectedBooking(updatedBooking);
+        }
+        
+        // Clear discount when test is removed
+        setBilling(prev => ({
+          ...prev,
+          discount: "0",
+          discountPercent: "0"
+        }));
+        
+        setSuccessPopup(`Test "${testToDelete.name}" removed`);
+        setTimeout(() => setSuccessPopup(""), 3000);
+        return;
+      }
+      
+      // ✅ EXISTING TEST - CALL BACKEND API
+      console.log('🌐 Calling backend cancelTest API:', {
+        visitId: selectedBooking.visitId,
+        patientTestId: testToDelete.id,
+        testName: testToDelete.name
+      });
+      
+      const response = await cancelTest(selectedBooking.visitId, testToDelete.id);
+      
+      console.log('📦 Backend response received:', response);
+      
+      if (!response?.success) {
+        const errorMsg = response?.message || 'Unknown error';
+        console.error('❌ Backend returned error:', errorMsg);
+        alert(`Failed to cancel test: ${errorMsg}`);
+        return;
+      }
+      
+      console.log('✅ Backend successfully cancelled test');
+      console.log('📋 Response data:', response.data);
+      
+      // Extract updated bill from response
+      if (!response.data?.updatedBill) {
+        console.error('❌ No updatedBill in response');
+        alert('Test cancelled but billing update failed');
+        return;
+      }
+      
+      const freshBill = response.data.updatedBill;
+      console.log('💰 Fresh billing data:', {
+        grossAmount: freshBill.grossAmount,
+        totalDiscount: freshBill.totalDiscount,
+        totalPaid: freshBill.totalPaid,
+        balanceAmount: freshBill.balanceAmount,
+        totalDiscountPercent: freshBill.totalDiscountPercent
+      });
+      
+      // Update bookings with new test list (without cancelled test) and fresh amounts
+      const updatedBookings = bookings.map(b => 
+        b.bookingId === selectedBooking.bookingId
+          ? {
+              ...b,
+              tests: b.tests.filter(t => !(t.id === testToDelete.id)),  // Remove by ID, not by name
+              totalAmount: freshBill.grossAmount,
+              paidAmount: freshBill.totalPaid,
+              balanceAmount: freshBill.balanceAmount,
+              discountAmount: freshBill.totalDiscount,
+              discountPercent: freshBill.totalDiscountPercent,
+              paymentStatus: freshBill.balanceAmount <= 0 ? "Paid" : "Due"
+            }
+          : b
       );
-      setBookings(updated);
-      const updatedBooking = updated.find(b=>b.bookingId===selectedBooking.bookingId);
+      
+      console.log('📝 Updated bookings, new test count:', updatedBookings.find(b => b.bookingId === selectedBooking.bookingId)?.tests.length);
+      
+      setBookings(updatedBookings);
+      setAllBookings(updatedBookings);
+      
+      const updatedBooking = updatedBookings.find(b => b.bookingId === selectedBooking.bookingId);
       if (updatedBooking) {
+        console.log('🔄 Setting selectedBooking with new state:', {
+          testsCount: updatedBooking.tests.length,
+          totalAmount: updatedBooking.totalAmount,
+          balanceAmount: updatedBooking.balanceAmount
+        });
         setSelectedBooking(updatedBooking);
       }
-      // Clear discount when test is removed
-      setBilling(prev => ({
-        ...prev,
-        discount: "0",
-        discountPercent: "0"
-      }));
+      
+      // Update billing form with fresh amounts
+      setBilling(prev => {
+        const newBilling = {
+          ...prev,
+          advance: String(Math.round(freshBill.totalPaid || 0)),
+          balAmt: String(Math.round(freshBill.balanceAmount || 0)),
+          discount: String(Math.round(freshBill.totalDiscount || 0)),
+          discountPercent: String(Math.round(freshBill.totalDiscountPercent || 0)),
+          payment: ""
+        };
+        console.log('📊 Updated billing form:', newBilling);
+        return newBilling;
+      });
+      
+      setSuccessPopup(`✅ Test "${testToDelete.name}" cancelled successfully!`);
+      setTimeout(() => setSuccessPopup(""), 3000);
+      
+      console.log('🎉 Test cancellation complete!');
+      
+    } catch (error) {
+      console.error('❌ EXCEPTION during test cancellation:', error);
+      alert(`Error: ${(error as Error).message}`);
     }
   };
 
@@ -2284,6 +2406,15 @@ export default function BookingPage() {
                   {/* MERGED — all tests (new + existing) */}
                   {(() => {
                     const allTests = selectedBooking.tests;
+                    console.log('📋 Rendering tests table with allTests:', {
+                      count: allTests.length,
+                      tests: allTests.map(t => ({
+                        name: t.name,
+                        id: t.id,
+                        isExisting: t.isExisting,
+                        status: t.status
+                      }))
+                    });
                     return (
                       <div className="bg-white rounded shadow flex flex-col flex-1 overflow-hidden">
                         <div className="bg-slate-900 text-white px-1 py-0.5 font-semibold text-xs flex justify-between items-center">
@@ -2358,7 +2489,10 @@ export default function BookingPage() {
                                       </div>
                                     </td>
                                     <td className="p-1 text-center">
-                                      <button onClick={()=>handleDeleteTest(t)} className="text-red-600 hover:text-red-800"><X size={12}/></button>
+                                      <button onClick={()=>{
+                                        console.log('🔴 X BUTTON CLICKED - Test object:', t);
+                                        handleDeleteTest(t);
+                                      }} className="text-red-600 hover:text-red-800"><X size={12}/></button>
                                     </td>
                                   </tr>
                                 );
@@ -3430,6 +3564,74 @@ export default function BookingPage() {
           balanceAmount: updatedBooking.balanceAmount,
           discountAmount: updatedBooking.discountAmount
         });
+      }}
+      onTestCancelled={async () => {
+        // ✅ NEW: Callback when test is cancelled in modal
+        // Refresh the selected booking from backend to get fresh test list and billing
+        console.log('🔄 [onTestCancelled] Refreshing booking data after test cancellation');
+        
+        if (!selectedBookingForModal?.visitId) {
+          console.warn('⚠️ No visitId available, cannot refresh');
+          return;
+        }
+        
+        try {
+          const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || '/api';
+          
+          // Fetch fresh billing summary
+          const billResponse = await fetch(`${API_BASE_URL}/patients/visit-bill/${selectedBookingForModal.visitId}`);
+          const billResult = await billResponse.json();
+          
+          console.log('💰 Fresh bill data:', billResult.data);
+          
+          // Fetch fresh test list
+          const testsResponse = await fetch(`${API_BASE_URL}/patients/tests-by-visit?visitId=${selectedBookingForModal.visitId}`);
+          const testsResult = await testsResponse.json();
+          
+          console.log('📋 Fresh tests data:', testsResult.data);
+          
+          // Update selected booking with fresh data
+          const refreshedBooking = {
+            ...selectedBookingForModal,
+            // ✅ Filter out any cancelled tests just to be safe
+            tests: (testsResult.data?.tests || testsResult.data || []).filter((t: any) => t.status !== 'Cancelled' && t.status !== 'CANCELLED'),
+            billing: billResult.data,
+            totalAmount: billResult.data?.grossAmount,
+            paidAmount: billResult.data?.totalPaid,
+            balanceAmount: billResult.data?.balanceAmount,
+            discountAmount: billResult.data?.totalDiscount,
+            discountPercent: billResult.data?.totalDiscountPercent,
+            paymentStatus: billResult.data?.balanceAmount <= 0 ? "Paid" : "Due"
+          };
+          
+          console.log('✅ Refreshed booking:', {
+            testCount: refreshedBooking.tests?.length,
+            grossAmount: refreshedBooking.totalAmount,
+            balanceAmount: refreshedBooking.balanceAmount
+          });
+          
+          // Update state
+          setSelectedBookingForModal(refreshedBooking);
+          
+          // Update in bookings list
+          setAllBookings(prevBookings =>
+            prevBookings.map(b =>
+              b.bookingId === refreshedBooking.bookingId ? refreshedBooking : b
+            )
+          );
+          
+          setBookings(prevBookings =>
+            prevBookings.map(b =>
+              b.bookingId === refreshedBooking.bookingId ? refreshedBooking : b
+            )
+          );
+          
+          console.log('🎉 Booking refreshed successfully after test cancellation');
+          
+        } catch (error) {
+          console.error('❌ Error refreshing booking after test cancellation:', error);
+          alert('Error refreshing booking data. Please close and reopen the modal.');
+        }
       }}
     />
     </>

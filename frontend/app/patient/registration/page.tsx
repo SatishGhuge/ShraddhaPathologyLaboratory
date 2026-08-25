@@ -3222,7 +3222,19 @@ export default function PatientRegistration() {
               </div>
             </div>
 
-            <div className="flex gap-2 p-2 bg-gray-100">
+            <div className="flex gap-2 p-2 bg-gray-100 items-center">
+              {/* ✅ NEW: Emergency Checkbox */}
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input 
+                  type="checkbox"
+                  checked={isEmergency}
+                  onChange={(e) => setIsEmergency(e.target.checked)}
+                  className="w-4 h-4 accent-red-600 cursor-pointer"
+                  title="Mark this visit as EMERGENCY"
+                />
+                <span className="text-xs font-semibold text-red-600">Emergency</span>
+              </label>
+
               <button 
                 onClick={handleClearForm} 
                 className="bg-red-600 hover:bg-red-800 text-white text-xs px-4 py-1 rounded font-semibold flex items-center gap-2"
