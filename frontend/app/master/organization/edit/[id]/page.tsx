@@ -243,6 +243,9 @@ const EditOrganization = () => {
     sendReportsViaMail: false,
     discountPercent: "",
     discountAmount: "",
+    isHomeCollection: false,
+    isOPD: false,
+    isIPD: false,
   });
 
   const [toast, setToast] = useState<any>(null); // { type, message, credentials }
@@ -282,6 +285,9 @@ const EditOrganization = () => {
             sendReportsViaMail: organization.sendReportsViaMail || false,
             discountPercent: organization.discount || "",
             discountAmount: organization.discount || "",
+            isHomeCollection: organization.isHomeCollection || false,
+            isOPD: organization.isOPD || false,
+            isIPD: organization.isIPD || false,
           });
           
           if (organization.moduleAllocation) {
@@ -390,6 +396,9 @@ const EditOrganization = () => {
         sendReportsViaWhatsApp: formData.sendReportsViaWhatsApp,
         sendReportsViaMail: formData.sendReportsViaMail,
         discount: parseFloat(formData.discountPercent) || parseFloat(formData.discountAmount) || 0,
+        isHomeCollection: formData.isHomeCollection,
+        isOPD: formData.isOPD,
+        isIPD: formData.isIPD,
       };
 
       if (isEditMode) {
@@ -549,6 +558,28 @@ const EditOrganization = () => {
                   <input type="checkbox" name="sendReportsViaMail" checked={formData.sendReportsViaMail} onChange={handleChange}
                     disabled={isViewMode} className="w-4 h-4 accent-cyan-600" />
                   <span className="text-sm text-gray-700">Send via Email</span>
+                </label>
+              </div>
+            </div>
+
+            {/* Organization Type Section */}
+            <div className="border-t border-gray-300 pt-4 mt-4 pb-4">
+              <p className="font-semibold text-gray-700 text-sm mb-3">🏥 Organization Type</p>
+              <div className="flex items-center gap-6 ml-1">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input type="checkbox" name="isHomeCollection" checked={formData.isHomeCollection} onChange={handleChange}
+                    disabled={isViewMode} className="w-4 h-4 accent-blue-600" />
+                  <span className="text-sm text-gray-700">Home Collection</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input type="checkbox" name="isOPD" checked={formData.isOPD} onChange={handleChange}
+                    disabled={isViewMode} className="w-4 h-4 accent-purple-600" />
+                  <span className="text-sm text-gray-700">OPD</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input type="checkbox" name="isIPD" checked={formData.isIPD} onChange={handleChange}
+                    disabled={isViewMode} className="w-4 h-4 accent-orange-600" />
+                  <span className="text-sm text-gray-700">IPD</span>
                 </label>
               </div>
             </div>
