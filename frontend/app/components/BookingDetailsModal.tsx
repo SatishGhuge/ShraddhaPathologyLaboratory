@@ -627,6 +627,9 @@ const BookingDetailsModal: React.FC<BookingDetailsModalProps> = ({
     btn: "px-3 py-1 rounded text-xs font-semibold flex items-center gap-1"
   };
 
+  // Mode options matching patient registration
+  const modeOptions = ["Cash", "Debit Card", "Credit Card", "UPI", "Other"];
+
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-lg shadow-2xl w-full max-w-6xl max-h-[95vh] overflow-hidden flex flex-col">
@@ -950,9 +953,6 @@ const BookingDetailsModal: React.FC<BookingDetailsModalProps> = ({
                       </div>
                     ))}
                   </div>
-                  {paymentExceeds && (
-                    <div className="text-xs text-red-600 font-semibold mt-1">⚠️ Exceed amount: ₹{Math.round(paymentAmount - (newTestsAdded ? remainingBalanceAfterNewDiscount : remainingBalance)).toFixed(0)}</div>
-                  )}
                 </div>
 
                 {/* Payment Mode & Discount Remark on same line */}
@@ -964,10 +964,9 @@ const BookingDetailsModal: React.FC<BookingDetailsModalProps> = ({
                       onChange={e => setPaymentMode(e.target.value)}
                       className={`${style.input} w-full bg-white text-xs h-6`}
                     >
-                      <option>Cash</option>
-                      <option>Card</option>
-                      <option>UPI</option>
-                      <option>Other</option>
+                      {modeOptions.map(mode => (
+                        <option key={mode} value={mode}>{mode}</option>
+                      ))}
                     </select>
                   </div>
                   <div className="flex-1">
