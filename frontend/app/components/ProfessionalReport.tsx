@@ -120,13 +120,16 @@ interface ReportPage {
 // ─────────────────────────────────────────────────────────────────────────────
 
 const HEADER_SPACE_MM = 30;
-const FOOTER_SPACE_MM = 12;
+const FOOTER_SPACE_MM = 20;  // ✅ Footer space (3mm minimum as requested)
 const PAD_LEFT_MM = 10;
 const PAD_RIGHT_MM = 10;
 const PAD_TOP_MM = 3;
 const PAD_BOT_MM = 3;
 
-const CONTENT_MM = 297 - HEADER_SPACE_MM - FOOTER_SPACE_MM - PAD_TOP_MM - PAD_BOT_MM;
+// ✅ CRITICAL FIX: Reserve aggressive buffer to prevent any overlap with footer
+// Available: 297 - 30 - 20 - 3 - 3 = 241mm
+// But use only 220mm to ensure aggressive page breaks before footer
+const CONTENT_MM = 220;  // Aggressive buffer to prevent footer overlap
 
 const ROW_PARAM_MM = 5.5;  // Increased for better readability (was 5mm)
 const ROW_CAT_MM = 4.5;
