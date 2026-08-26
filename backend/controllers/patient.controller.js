@@ -1521,10 +1521,14 @@ export const getOrganizationTypeStatistics = async (req, res) => {
     console.log('📅 Date filter:', dateFilter);
 
     // Get all patient tests with their organization data
+    // ✅ Exclude cancelled tests from statistics
     const patientTests = await prisma.patientTest.findMany({
       where: {
         ...dateFilter,
-        organizationId: { not: null }
+        organizationId: { not: null },
+        status: { 
+          notIn: ['Cancelled', 'CANCELLED', 'cancelled']  // ✅ Use notIn
+        }
       },
       include: {
         organization: {
@@ -1600,10 +1604,14 @@ export const getWeeklyOrganizationTypeStatistics = async (req, res) => {
       endDate.setHours(23, 59, 59, 999);
 
       // Get patient tests for this day
+      // ✅ Exclude cancelled tests from statistics
       const patientTests = await prisma.patientTest.findMany({
         where: {
           createdAt: { gte: date, lte: endDate },
-          organizationId: { not: null }
+          organizationId: { not: null },
+          status: { 
+            notIn: ['Cancelled', 'CANCELLED', 'cancelled']  // ✅ Use notIn
+          }
         },
         include: {
           organization: {
@@ -1949,11 +1957,23 @@ export const getPatientTests = async (req, res) => {
   try {
     const { page, limit, skip } = getPaginationParams(req.query);
 
-    // Get total count of patient tests
-    const total = await prisma.patientTest.count();
+    // ✅ Get total count of ACTIVE (non-cancelled) patient tests
+    const total = await prisma.patientTest.count({
+      where: {
+        status: { 
+          notIn: ['Cancelled', 'CANCELLED', 'cancelled']  // ✅ Use notIn
+        }
+      }
+    });
 
-    // Fetch patient tests with patient, test, and department details
+    // ✅ Fetch ACTIVE patient tests with patient, test, and department details
+    // Exclude cancelled tests from display
     const patientTests = await prisma.patientTest.findMany({
+      where: {
+        status: { 
+          notIn: ['Cancelled', 'CANCELLED', 'cancelled']  // ✅ Use notIn instead of not.in
+        }
+      },
       include: {
         patient: true,
         test: true,
@@ -1966,6 +1986,9 @@ export const getPatientTests = async (req, res) => {
       skip,
       take: limit
     });
+
+    console.log('🔍 Result Page - Tests fetched:', patientTests.length);
+    console.log('✅ Cancelled tests filtered out from result page');
 
     res.json(buildPaginatedResponse(patientTests, total, page, limit));
 
@@ -2018,7 +2041,9 @@ export const getTestsByVisitId = async (req, res) => {
     const tests = await prisma.patientTest.findMany({
       where: { 
         visitId,
-        status: { not: 'Cancelled' }  // ✅ Filter out cancelled tests
+        status: { 
+          notIn: ['Cancelled', 'CANCELLED', 'cancelled']  // ✅ Use notIn
+        }
       },
       include: {
         test: {

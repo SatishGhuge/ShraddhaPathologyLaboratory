@@ -2773,9 +2773,7 @@ export default function Result() {
       
       const data = await getPatientTests(filters);
       
-      // 🔍 DEBUG: Log first few results to check isEmergency field
-      console.log('🔍 RESULT DEBUG - First result tests:', data[0]?.tests?.[0]);
-      console.log('🔍 RESULT DEBUG - isEmergency sample:', data[0]?.tests?.[0]?.isEmergency);
+      console.log('🔍 Result page - Cancelled tests should be filtered by backend');
       
       setResults(data);
       
