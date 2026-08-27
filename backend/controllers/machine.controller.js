@@ -300,6 +300,9 @@ export const submitResults = async (req, res) => {
         for (const patientTest of patientTests) {
           console.log(`[MACHINE API RESULTS] Processing patientTestId=${patientTest.id}`);
           
+          // Declare array to store all parameter upserts for this test
+          const valuesToUpsert = [];
+          
           // Store each parameter as a TestResult
           for (const [paramCode, value] of Object.entries(parameters)) {
             console.log(`[MACHINE API RESULTS] Looking for parameter: ${paramCode}`);
@@ -386,28 +389,42 @@ export const submitResults = async (req, res) => {
 
             console.log(`[MACHINE API RESULTS] Found testParameterId=${testParam.id}, storing value: ${value}`);
 
-            // Create or update TestResult
-            await prisma.testResult.upsert({
-              where: {
-                patientTestId_testParameterId: {
-                  patientTestId: patientTest.id,
-                  testParameterId: testParam.id
-                }
-              },
-              create: {
-                patientTestId: patientTest.id,
-                testParameterId: testParam.id,
-                numericValue: value,
-                textValue: value,
-                enteredBy: 'MACHINE',
-                enteredAt: new Date()
-              },
-              update: {
-                numericValue: value,
-                textValue: value,
-                enteredAt: new Date()
-              }
+            // Store for batch upsert
+            valuesToUpsert.push({
+              patientTestId: patientTest.id,
+              testParameterId: testParam.id,
+              numericValue: value,
+              textValue: value
             });
+          }
+
+          // Batch upsert all values for this test in a transaction
+          if (valuesToUpsert.length > 0) {
+            await prisma.$transaction(
+              valuesToUpsert.map(item =>
+                prisma.testResult.upsert({
+                  where: {
+                    patientTestId_testParameterId: {
+                      patientTestId: item.patientTestId,
+                      testParameterId: item.testParameterId
+                    }
+                  },
+                  create: {
+                    patientTestId: item.patientTestId,
+                    testParameterId: item.testParameterId,
+                    numericValue: item.numericValue,
+                    textValue: item.textValue,
+                    enteredBy: 'MACHINE',
+                    enteredAt: new Date()
+                  },
+                  update: {
+                    numericValue: item.numericValue,
+                    textValue: item.textValue,
+                    enteredAt: new Date()
+                  }
+                })
+              )
+            );
           }
 
           // ✅ Update PatientTest status to "Entered" AND save the machine ID
