@@ -119,25 +119,25 @@ interface ReportPage {
 // Constants
 // ─────────────────────────────────────────────────────────────────────────────
 
-const HEADER_SPACE_MM = 30;
-const FOOTER_SPACE_MM = 20;  // ✅ Footer space (3mm minimum as requested)
+const HEADER_SPACE_MM = 20;  // ✅ OPTIMIZED: Reduced from 30mm to 20mm for more content space
+const FOOTER_SPACE_MM = 14;  // ✅ OPTIMIZED: Reduced from 20mm to 14mm to minimize empty footer space
 const PAD_LEFT_MM = 10;
 const PAD_RIGHT_MM = 10;
 const PAD_TOP_MM = 3;
 const PAD_BOT_MM = 3;
 
-// ✅ CRITICAL FIX: Reserve aggressive buffer to prevent any overlap with footer
-// Available: 297 - 30 - 20 - 3 - 3 = 241mm
-// But use only 220mm to ensure aggressive page breaks before footer
-const CONTENT_MM = 220;  // Aggressive buffer to prevent footer overlap
+// ✅ CRITICAL: Conservative content area to ensure parameters don't get hidden
+// Available: 297 - 20 - 14 - 3 - 3 - 4 (extra top shift) = 253mm
+// Using 209mm for safe content + 44mm buffer (content expanded by 6mm due to reduced footer)
+const CONTENT_MM = 209;  // ✅ INCREASED: More space available due to reduced footer (203 + 6)
 
 const ROW_PARAM_MM = 5.5;  // Increased for better readability (was 5mm)
 const ROW_CAT_MM = 4.5;
 const PATIENT_MM = 14;
 const TITLE_MM = 6.5;
 const THEAD_MM = 3.5;  // Reduced (was 4mm) to give more space to parameters
-const INTERP_MM = 15;
-const SIG_MM = 15;
+const INTERP_MM = 18;  // ✅ ADJUSTED: Interpretation with wrap buffer
+const SIG_MM = 18;     // ✅ ADJUSTED: Signature area buffer
 const TEST_GAP_MM = 2;  // Increased from 4 to match new margin (3+4+2=9)
 
 function blockHeight(block: ContentBlock): number {
@@ -147,8 +147,8 @@ function blockHeight(block: ContentBlock): number {
     case 'thead': return THEAD_MM;
     case 'category': return ROW_CAT_MM;
     case 'param': return ROW_PARAM_MM;
-    case 'comments': return ROW_PARAM_MM;  // ✅ Same height as param row
-    case 'instrument': return ROW_PARAM_MM;  // ✅ Same height as param row
+    case 'comments': return ROW_PARAM_MM * 1.5;  // ✅ INCREASED: Comments wrap text, estimate 1.5x
+    case 'instrument': return ROW_PARAM_MM * 1.5;  // ✅ INCREASED: Instrument wraps, estimate 1.5x
     case 'interpretation': return INTERP_MM;
     case 'signature': return SIG_MM;
     case 'test-gap': return TEST_GAP_MM;
@@ -172,6 +172,20 @@ function buildContentBlocks(
     hasComments: !!comments,
     hasCommentsMap: !!commentsMap && Object.keys(commentsMap || {}).length > 0
   });
+  
+  // 🔍 DEBUG: Log incoming test data structure
+  console.log('📦 buildContentBlocks - Incoming tests:', testsToRender.length);
+  testsToRender.forEach((testItem, idx) => {
+    console.log(`  Test ${idx}: "${testItem.name}"`);
+    console.log(`    groupedParameters categories: ${Object.keys(testItem.groupedParameters || {}).length}`);
+    Object.entries(testItem.groupedParameters || {}).forEach(([catName, catParams]: [string, any]) => {
+      const firstParam = (catParams as any[])[0];
+      console.log(`      Category: "${catName}" - categorySortOrder=${firstParam?.categorySortOrder}, paramCount=${(catParams as any[]).length}`);
+      (catParams as any[]).forEach((p, pidx) => {
+        console.log(`        Param ${pidx}: "${p.parameterName}" - sortOrder=${p.sortOrder}`);
+      });
+    });
+  });
 
   testsToRender.forEach((testItem, idx) => {
     if (printOption === 'pagebreak' && idx > 0) {
@@ -186,27 +200,70 @@ function buildContentBlocks(
     blocks.push({ kind: 'thead' });
 
     // ✅ Sort categories by their order and sort parameters within each category
+    // IMPORTANT: Use categorySortOrder field from backend (category.sortOrder)
     const sortedEntries = Object.entries(testItem.groupedParameters || {})
-      .map(([catName, catParams]: [string, any]) => ({
-        catName,
-        catParams,
-        sortOrder: catParams[0]?.categoryDisplayOrder ?? catParams[0]?.sortOrder ?? 999
-      }))
-      .sort((a, b) => a.sortOrder - b.sortOrder);
+      .map(([catName, catParams]: [string, any]) => {
+        // Get category sort order from backend field 'categorySortOrder'
+        // This comes from testCategory.sortOrder in the database
+        let catSortOrder = 999;
+        if (catParams && catParams.length > 0) {
+          const firstParam = catParams[0];
+          // Use categorySortOrder (primary source - comes from testCategory.sortOrder in DB)
+          if (typeof firstParam.categorySortOrder === 'number') {
+            catSortOrder = firstParam.categorySortOrder;
+          }
+          // Fallback to sortOrder if categorySortOrder missing (for backward compatibility)
+          else if (typeof firstParam.sortOrder === 'number') {
+            catSortOrder = firstParam.sortOrder;
+          }
+        }
+        
+        console.log(`📊 [Sort] Category "${catName}": categorySortOrder=${catParams[0]?.categorySortOrder}, paramSortOrder=${catParams[0]?.sortOrder}, resolved=${catSortOrder}`);
+        
+        return {
+          catName,
+          catParams,
+          sortOrder: catSortOrder
+        };
+      })
+      .sort((a, b) => {
+        const diff = a.sortOrder - b.sortOrder;
+        console.log(`🔢 [Sort] Comparing categories: "${a.catName}" (order=${a.sortOrder}) vs "${b.catName}" (order=${b.sortOrder}) = ${diff}`);
+        return diff;
+      });
+    
+    // ✅ Log final category order after sorting
+    console.log(`✅ [Sort] Final category order for test "${testItem.name}": ${sortedEntries.map(e => `${e.catName}(${e.sortOrder})`).join(' → ')}`);
+
 
     sortedEntries.forEach(({ catName, catParams }) => {
       // ✅ Sort parameters within category by sortOrder
-      const sortedParams = [...(catParams as any[])].sort((a, b) => 
-        (a.sortOrder ?? 999) - (b.sortOrder ?? 999)
-      );
+      const sortedParams = [...(catParams as any[])].sort((a, b) => {
+        const aOrder = a.sortOrder ?? 999;
+        const bOrder = b.sortOrder ?? 999;
+        const diff = aOrder - bOrder;
+        console.log(`  📍 [Sort] Param in "${catName}": "${a.parameterName}" (${aOrder}) vs "${b.parameterName}" (${bOrder}) = ${diff}`);
+        return diff;
+      });
+      
+      // ✅ After sorting, log final order
+      console.log(`  ✅ [Sort] Final parameter order in "${catName}": ${sortedParams.map(p => `${p.parameterName}(${p.sortOrder})`).join(' → ')}`);
       
       const visible = sortedParams.filter(p => {
         const nv = results[p.id]?.numericValue;
         const tv = results[p.id]?.textValue;
         // Exclude parameters that only have placeholder text "Parameter"
         const hasValidText = tv?.trim() && tv.trim() !== 'Parameter';
-        return (nv != null && nv !== '') || hasValidText;
+        const isVisible = (nv != null && nv !== '') || hasValidText;
+        if (!isVisible) {
+          console.log(`    ⭕ Filtered out "${p.parameterName}" (no value) - numericValue=${nv}, textValue=${tv}`);
+        } else {
+          console.log(`    ✅ VISIBLE "${p.parameterName}" - numericValue=${nv}, textValue=${tv}`);
+        }
+        return isVisible;
       });
+      console.log(`  📊 [Sort] Category "${catName}" visible params: ${visible.length}/${sortedParams.length}`);
+      
       if (!visible.length) return;
       if (catName !== 'NO_CATEGORY_HEADER' && catParams[0]?.showCategoryHeader)
         blocks.push({ kind: 'category', catName });
@@ -248,7 +305,13 @@ function buildContentBlocks(
   });
 
   blocks.push({ kind: 'signature' });
-  console.log('📦 buildContentBlocks - Total blocks:', blocks.length, 'with comments:', blocks.filter(b => b.kind === 'comments').length);
+  console.log('📦 buildContentBlocks - Final summary:');
+  console.log(`  Total blocks: ${blocks.length}`);
+  console.log(`  Breakdown: patient=${blocks.filter(b=>b.kind==='patient').length}, test-title=${blocks.filter(b=>b.kind==='test-title').length}, param=${blocks.filter(b=>b.kind==='param').length}, comments=${blocks.filter(b=>b.kind==='comments').length}, signature=${blocks.filter(b=>b.kind==='signature').length}`);
+  console.log(`  Param blocks detail:`);
+  blocks.filter(b => b.kind === 'param').forEach((b, idx) => {
+    console.log(`    ${idx+1}. ${b.param.parameterName} (ID: ${b.param.id})`);
+  });
   return blocks;
 }
 
@@ -256,9 +319,11 @@ function paginateBlocks(blocks: ContentBlock[]): ReportPage[] {
   const pages: ReportPage[] = [];
   let cur: ContentBlock[] = [];
   let used = 0;
+  let lastTestTitle: any = null;  // ✅ Track last test to re-add on continuation
 
   const flush = () => {
     if (cur.length === 0) return;
+    console.log(`📄 [Pagination] Flushing page with ${cur.length} blocks, total height: ${used}mm (limit: ${CONTENT_MM}mm)`);
     pages.push({
       blocks: [...cur],
       pageNo: pages.length,
@@ -277,6 +342,11 @@ function paginateBlocks(blocks: ContentBlock[]): ReportPage[] {
       continue;
     }
 
+    // ✅ Track test titles for continuation pages
+    if (block.kind === 'test-title') {
+      lastTestTitle = block;
+    }
+
     const h = blockHeight(block);
 
     // Reserve trailing signature space on every page except when placing signature itself
@@ -287,26 +357,62 @@ function paginateBlocks(blocks: ContentBlock[]): ReportPage[] {
     }
 
     // Reserve interpretation when still packing params for a test that has one
-    if (block.kind === 'category' || block.kind === 'param') {
+    if (block.kind === 'category' || block.kind === 'param' || block.kind === 'comments' || block.kind === 'instrument') {
       let j = i + 1;
+      let hasInterpretation = false;
+      let hasComments = false;
+      let hasInstrument = false;
+      
       while (j < blocks.length) {
         const next = blocks[j];
-        if (next.kind === 'interpretation') { reserve += INTERP_MM; break; }
+        if (next.kind === 'interpretation') { 
+          hasInterpretation = true;
+          break;
+        }
+        if (next.kind === 'comments') hasComments = true;
+        if (next.kind === 'instrument') hasInstrument = true;
         if (next.kind === 'test-title' || next.kind === 'force-break' || next.kind === 'signature') break;
         j++;
       }
+      
+      if (hasInterpretation) reserve += INTERP_MM;
+      // ✅ Reserve extra space for comments and instrument since they can wrap text
+      if (hasComments) reserve += ROW_PARAM_MM * 2;  // Comments can be long, reserve 2x height
+      if (hasInstrument) reserve += ROW_PARAM_MM;     // Instrument can wrap, reserve 1x height
     }   
 
-    if (cur.length > 0 && used + h + reserve > CONTENT_MM) {
+    const wouldExceed = cur.length > 0 && used + h + reserve > CONTENT_MM;
+    
+    if (wouldExceed) {
+      console.log(`📄 [Pagination] Page break triggered: used=${used}mm + block=${h}mm + reserve=${reserve}mm = ${used + h + reserve}mm > ${CONTENT_MM}mm limit`);
+      console.log(`📄 [Pagination] Block type: ${block.kind}, current page has ${cur.length} blocks`);
       flush();
-      if (block.kind === 'category' || block.kind === 'param') {
+      
+      // ✅ On continuation, add context blocks (test-title, thead) to continue the test
+      if (block.kind === 'category' || block.kind === 'param' || block.kind === 'comments' || block.kind === 'instrument') {
+        // Re-add test title on continuation for context
+        if (lastTestTitle) {
+          cur.push(lastTestTitle);
+          used += TITLE_MM;
+          console.log(`📄 [Pagination] Added TEST-TITLE (continuation) for "${lastTestTitle.testData.name}" (${TITLE_MM}mm)`);
+        }
+        
+        // Always add table header for parameters
         cur.push({ kind: 'thead' });
         used += THEAD_MM;
+        console.log(`📄 [Pagination] Added THEAD to continuation page (${THEAD_MM}mm)`);
       }
+    } else if (cur.length === 0) {
+      console.log(`📄 [Pagination] Starting new page with block type: ${block.kind} (${h}mm)`);
     }
 
     cur.push(block);
     used += h;
+    if (block.kind === 'param') {
+      console.log(`📄 [Pagination] Added PARAM: "${block.param.parameterName}" (${h}mm), page total: ${used}mm`);
+    } else {
+      console.log(`📄 [Pagination] Added ${block.kind} block (${h}mm), page total: ${used}mm`);
+    }
   }
 
   flush();
@@ -320,6 +426,15 @@ function paginateBlocks(blocks: ContentBlock[]): ReportPage[] {
     p.isLastPage = idx === pages.length - 1;
   });
 
+  console.log(`📊 [Pagination] Total pages: ${pages.length}, total blocks: ${blocks.length}`);
+  console.log('📋 [Pagination] Final page breakdown:');
+  pages.forEach((page, idx) => {
+    const paramBlocks = page.blocks.filter(b => b.kind === 'param');
+    console.log(`  Page ${idx + 1}: ${page.blocks.length} blocks, ${paramBlocks.length} parameters`);
+    paramBlocks.forEach(b => {
+      console.log(`    - ${b.param.parameterName} (ID: ${b.param.id})`);
+    });
+  });
   return pages;
 }
 
@@ -1115,7 +1230,7 @@ const ProfessionalReport = React.forwardRef<HTMLDivElement, ProfessionalReportPr
             const showQRInReport = formatConfig?.showQRCode !== false;
             
             segments.push(
-              <div key={`pat-${bi}`} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '3mm', gap: '2mm', flexShrink: 0 }}>
+              <div key={`pat-${bi}`} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '6mm', gap: '2mm', flexShrink: 0 }}>
                 {/* Left side: Patient info using field visibility settings */}
                 <table style={{ flex: 1, borderCollapse: 'collapse', fontSize: `${formatConfig?.fontSizeBody || 11}px`, backgroundColor: 'transparent', flexShrink: 0, fontFamily: getFontFamily(formatConfig?.fontFamily || 'Bookman Old Text') }}>
                   <tbody>{patientRows}</tbody>
@@ -1292,17 +1407,18 @@ const ProfessionalReport = React.forwardRef<HTMLDivElement, ProfessionalReportPr
           <div
             style={{
               position: 'absolute',
-              top: `${HEADER_SPACE_MM + PAD_TOP_MM}mm`,
+              top: `${HEADER_SPACE_MM + PAD_TOP_MM + 4}mm`,
               left: `${PAD_LEFT_MM}mm`,
               right: `${PAD_RIGHT_MM}mm`,
               bottom: `${FOOTER_SPACE_MM + PAD_BOT_MM}mm`,
               zIndex: 1,
-              overflow: 'visible',
+              overflow: 'hidden',  // ✅ CRITICAL: Prevent any overflow beyond footer boundary
               display: 'flex',
               flexDirection: 'column',
               fontSize: `${formatConfig?.fontSizeBody || 11}px`,
               fontFamily: getFontFamily(formatConfig?.fontFamily || 'Bookman Old Text'),
               lineHeight: formatConfig?.lineHeight || 1.4,
+              maxHeight: `${CONTENT_MM}mm`,  // ✅ Max height with safety margin
             }}
           >
             {segments}

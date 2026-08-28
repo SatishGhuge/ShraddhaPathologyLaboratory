@@ -7,19 +7,20 @@ import { deleteCommentFromHistory } from '@/src/api/result';
 const getAllOptionsFromParameter = (param: Parameter): string[] => {
   const allOptions = new Set<string>();
   
-  // 1. Add all options from textContent (primary source - textarea with newline-separated values)
+  // 1. Add all options from textContent (primary source - textarea with newline or pipe-separated values)
   if (param.textContent) {
     try {
       let options: any[] = [];
       try {
         options = JSON.parse(param.textContent);
       } catch {
-        // Split by newlines first, then try commas
+        // Split by newlines first
         const byNewline = param.textContent.split('\n').map((o: string) => o.trim()).filter(Boolean);
         if (byNewline.length > 1) {
           options = byNewline;
         } else {
-          options = param.textContent.split(',').map((o: string) => o.trim()).filter(Boolean);
+          // Split by pipes ONLY (not commas - commas are part of the continuous value)
+          options = param.textContent.split('|').map((o: string) => o.trim()).filter(Boolean);
         }
       }
       
@@ -39,30 +40,31 @@ const getAllOptionsFromParameter = (param: Parameter): string[] => {
   if (param.femaleDefaultValue?.trim()) allOptions.add(param.femaleDefaultValue.trim());
   if (param.childDefaultValue?.trim()) allOptions.add(param.childDefaultValue.trim());
   
-  // 3. Add from displayRangeText
+  // 3. Add from displayRangeText (split by pipe only)
   if (param.displayRangeText?.trim()) {
-    param.displayRangeText.split(',').forEach(opt => {
+    param.displayRangeText.split('|').forEach(opt => {
       const trimmed = opt.trim();
       if (trimmed) allOptions.add(trimmed);
     });
   }
   
-  // 4. Add from rangeText
+  // 4. Add from rangeText (split by pipe only)
   if (param.rangeText?.trim()) {
-    param.rangeText.split(',').forEach(opt => {
+    param.rangeText.split('|').forEach(opt => {
       const trimmed = opt.trim();
       if (trimmed) allOptions.add(trimmed);
     });
   }
   
-  // 5. Add from rangeValues (JSON or comma-separated)
+  // 5. Add from rangeValues (JSON or pipe-separated)
   if (param.rangeValues?.trim()) {
     try {
       let rangeValues: any[] = [];
       try {
         rangeValues = JSON.parse(param.rangeValues);
       } catch {
-        rangeValues = param.rangeValues.split(',').map((o: string) => o.trim());
+        // Split by pipes ONLY
+        rangeValues = param.rangeValues.split('|').map((o: string) => o.trim());
       }
       
       rangeValues.forEach((val: any) => {
@@ -605,7 +607,7 @@ const AuthenticateModal = ({
                               <div className="w-full">
                                 {/* Display saved readings as plain black text with minimal size - read-only */}
                                 <div className="flex flex-wrap gap-1.5 text-xs">
-                                  {(results[param.id]?.textValue || '').split(',').map((tag: string, idx: number) => {
+                                  {(results[param.id]?.textValue || '').split('|').map((tag: string, idx: number) => {
                                     const trimmedTag = tag.trim();
                                     return trimmedTag ? (
                                       <span
@@ -624,66 +626,101 @@ const AuthenticateModal = ({
                             ) : param.type === 'Text' || param.isMultipleOptions ? (
                               // TEXT/DROPDOWN - EDITABLE with all options from database
                               <div className="w-full space-y-1">
-                                {/* Show previously selected values */}
-                                <div className="flex flex-wrap items-center gap-0 text-xs">
-                                  {(results[param.id]?.textValue || '').split(',').map((option: string, idx: number) => {
-                                    const trimmedOption = option.trim();
-                                    return trimmedOption ? (
-                                      <div
-                                        key={idx}
-                                        className="inline-flex items-center text-xs font-medium text-gray-900"
-                                      >
-                                        <span className="text-xs">{trimmedOption}</span>
-                                        <button
-                                          type="button"
-                                          onClick={() => {
-                                            const options = (results[param.id]?.textValue || '').split(',').map((o: string) => o.trim()).filter(Boolean);
-                                            const newOptions = options.filter((_: string, i: number) => i !== idx);
-                                            const newResults = { ...results };
-                                            newResults[param.id] = { ...newResults[param.id], textValue: newOptions.join(', ') };
-                                            setResults(newResults);
+                                {/* ✅ Only pipe (|) separator splits into separate items. Commas (,) show as continuous text */}
+                                {(() => {
+                                  const textValue = results[param.id]?.textValue || '';
+                                  const hasPipe = textValue.includes('|');
+                                  
+                                  if (hasPipe) {
+                                    // PIPE separator: Split and show as separate items
+                                    const items = textValue.split('|').map((o: string) => o.trim()).filter(Boolean);
+                                    return (
+                                      <>
+                                        <div className="flex flex-col gap-1 text-xs">
+                                          {items.map((option: string, idx: number) => (
+                                            <div
+                                              key={idx}
+                                              className="inline-flex items-center text-xs font-medium text-gray-900 bg-blue-50 px-2 py-1 rounded"
+                                            >
+                                              <span className="text-xs flex-1">{option}</span>
+                                              <button
+                                                type="button"
+                                                onClick={() => {
+                                                  const newItems = items.filter((_: string, i: number) => i !== idx);
+                                                  const newResults = { ...results };
+                                                  newResults[param.id] = { ...newResults[param.id], textValue: newItems.join('|') };
+                                                  setResults(newResults);
+                                                }}
+                                                className="text-gray-500 hover:text-gray-700 font-bold cursor-pointer ml-1"
+                                                title="Remove this selection"
+                                              >
+                                                ×
+                                              </button>
+                                            </div>
+                                          ))}
+                                        </div>
+                                        {/* Dropdown to add more items */}
+                                        <select
+                                          value=""
+                                          onChange={(e) => {
+                                            if (e.target.value) {
+                                              const existing = results[param.id]?.textValue || '';
+                                              const options = existing ? existing.split('|').map((o: string) => o.trim()).filter(Boolean) : [];
+                                              if (!options.includes(e.target.value)) {
+                                                options.push(e.target.value);
+                                                const newResults = { ...results };
+                                                newResults[param.id] = { ...newResults[param.id], textValue: options.join('|') };
+                                                setResults(newResults);
+                                              }
+                                              e.target.value = '';
+                                            }
                                           }}
-                                          className="text-gray-500 hover:text-gray-700 font-bold cursor-pointer ml-0.5"
-                                          title="Remove this selection"
+                                          className="w-full border border-gray-300 px-1.5 py-0.5 rounded text-xs focus:outline-none focus:ring-1 focus:ring-gray-400 bg-white text-gray-700 cursor-pointer"
                                         >
-                                          ×
-                                        </button>
-                                        {idx < (results[param.id]?.textValue || '').split(',').filter((o: string) => o.trim()).length - 1 && (
-                                          <span className="mx-1 text-gray-400">,</span>
+                                          <option value="">➕ Add...</option>
+                                          {getAllOptionsFromParameter(param).map((optionValue: string) => (
+                                            <option key={optionValue} value={optionValue}>
+                                              {optionValue}
+                                            </option>
+                                          ))}
+                                        </select>
+                                      </>
+                                    );
+                                  } else {
+                                    // NO PIPE: Show as single continuous text value (including comma-separated values)
+                                    return (
+                                      <>
+                                        {textValue && (
+                                          <div className="text-xs font-medium text-gray-900 px-2 py-1 border border-gray-200 rounded bg-gray-50">
+                                            {textValue}
+                                          </div>
                                         )}
-                                      </div>
-                                    ) : null;
-                                  })}
-                                </div>
-
-                                {/* Dropdown to add/select options - editable */}
-                                <select
-                                  value=""
-                                  onChange={(e) => {
-                                    if (e.target.value) {
-                                      const existing = results[param.id]?.textValue || '';
-                                      const options = existing ? existing.split(',').map((o: string) => o.trim()).filter(Boolean) : [];
-                                      
-                                      // Avoid duplicates
-                                      if (!options.includes(e.target.value)) {
-                                        options.push(e.target.value);
-                                        const newResults = { ...results };
-                                        newResults[param.id] = { ...newResults[param.id], textValue: options.join(', ') };
-                                        setResults(newResults);
-                                      }
-                                      // Reset dropdown
-                                      e.target.value = '';
-                                    }
-                                  }}
-                                  className="w-full border border-gray-300 px-1.5 py-0.5 rounded text-xs focus:outline-none focus:ring-1 focus:ring-gray-400 bg-white text-gray-700 cursor-pointer"
-                                >
-                                  <option value="">➕ Add...</option>
-                                  {getAllOptionsFromParameter(param).map((optionValue: string) => (
-                                    <option key={optionValue} value={optionValue}>
-                                      {optionValue}
-                                    </option>
-                                  ))}
-                                </select>
+                                        {/* Dropdown - use pipe separator for new additions */}
+                                        <select
+                                          value=""
+                                          onChange={(e) => {
+                                            if (e.target.value) {
+                                              const existing = results[param.id]?.textValue || '';
+                                              // For new additions to non-pipe values, append with pipe to indicate new format
+                                              const newResults = { ...results };
+                                              newResults[param.id] = { ...newResults[param.id], textValue: existing ? `${existing}|${e.target.value}` : e.target.value };
+                                              setResults(newResults);
+                                              e.target.value = '';
+                                            }
+                                          }}
+                                          className="w-full border border-gray-300 px-1.5 py-0.5 rounded text-xs focus:outline-none focus:ring-1 focus:ring-gray-400 bg-white text-gray-700 cursor-pointer"
+                                        >
+                                          <option value="">➕ Add...</option>
+                                          {getAllOptionsFromParameter(param).map((optionValue: string) => (
+                                            <option key={optionValue} value={optionValue}>
+                                              {optionValue}
+                                            </option>
+                                          ))}
+                                        </select>
+                                      </>
+                                    );
+                                  }
+                                })()}
                               </div>
                             ) : (
                               <div className="relative">
