@@ -2,6 +2,8 @@
 
 import React, { useState, useEffect } from "react";
 import { X, Plus, RefreshCcw, Pencil, Eye, Trash2, AlertCircle } from "lucide-react";
+import { generateBillPDF, printBill } from "@/src/utils/billPdfGenerator.js";
+import BillReceipt from "@/app/components/BillReceipt";
 
 /*
  * ============================================================================
@@ -87,7 +89,8 @@ const BookingDetailsModal: React.FC<BookingDetailsModalProps> = ({
   // ✅ NEW: Add state for success message after cancellation
   const [successMessage, setSuccessMessage] = useState<string>("");
 
-  // Fetch tests from backend when modal opens
+  // ✅ NEW: Add state for bill preview modal
+  const [showBillModal, setShowBillModal] = useState(false);
   // This MUST be before the early return to avoid React hooks violation
   const [billingSummary, setBillingSummary] = useState<any>(null);
   
@@ -871,7 +874,12 @@ const BookingDetailsModal: React.FC<BookingDetailsModalProps> = ({
             <p className="text-xs text-yellow-300">UID: {booking.patientId} | Visit: {booking.visitId || booking.bookingId}</p>
           </div>
           <div className="flex gap-2">
-            <button className="bg-orange-100 text-black px-3 py-1 rounded text-xs font-semibold hover:bg-orange-200">Bill</button>
+            <button 
+              onClick={() => setShowBillModal(true)}
+              className="bg-orange-100 text-black px-3 py-1 rounded text-xs font-semibold hover:bg-orange-200"
+            >
+              Bill
+            </button>
             <button className="bg-orange-100 text-black px-3 py-1 rounded text-xs font-semibold hover:bg-orange-200">Refund</button>
             <button onClick={onClose} className="bg-red-500 p-1 rounded hover:bg-red-600 text-white">
               <X size={18} />
@@ -1230,6 +1238,120 @@ const BookingDetailsModal: React.FC<BookingDetailsModalProps> = ({
             </div>
           </div>
         </div>
+
+        {/* ✅ NEW: BILL RECEIPT MODAL */}
+        {showBillModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-lg w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col shadow-2xl">
+              {/* Header */}
+              <div className="bg-cyan-800 text-white p-4 flex justify-between items-center shrink-0">
+                <h2 className="text-lg font-bold">Bill Receipt</h2>
+                <button 
+                  onClick={() => setShowBillModal(false)}
+                  className="text-white hover:text-gray-200"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+
+              {/* Bill Content */}
+              <div id="bill-modal-content" className="overflow-y-auto flex-1">
+                <BillReceipt
+                  booking={{
+                    bookingId: booking.bookingId || `BK-${Date.now()}`,
+                    visitId: booking.visitId || `VIS-${Date.now()}`,
+                    patientId: booking.patientId,
+                    name: booking.name,
+                    date: new Date().toLocaleDateString("en-GB"),
+                    tests: tests.map(t => ({
+                      name: t.name,
+                      sample: t.sample,
+                      charge: businessType === "B2C" ? (t.b2cCharge || t.charge) : (t.b2bCharge || t.charge),
+                      b2cCharge: t.b2cCharge || t.charge,
+                      b2bCharge: t.b2bCharge || t.charge
+                    })),
+                    patientData: {
+                      title: booking.patientData?.title || '',
+                      firstName: booking.patientData?.firstName || booking.name,
+                      lastName: booking.patientData?.lastName || '',
+                      age: booking.age,
+                      gender: booking.gender,
+                      mobile: booking.mobile,
+                      referralDoctor: booking.referralDoctor || '',
+                      remark: booking.remarks || ''
+                    }
+                  }}
+                  billing={{
+                    discount: String(aggregateDiscountAmount || 0),
+                    discountPercent: String(aggregateDiscountPercent || 0),
+                    remarks: discountRemark || '',
+                    paymentMode: paymentMode || 'Cash',
+                    advance: String(totalAdvancePaid || 0),
+                    grossAmount: String(grandTotal),
+                    totalDiscount: String(aggregateDiscountAmount),
+                    totalPaid: String(totalAdvancePaid),
+                    balanceAmount: String(remainingBalanceAfterNewDiscount)
+                  }}
+                  businessType={businessType}
+                  numberToWords={(n) => {
+                    // Simple number to words conversion
+                    const ones = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine'];
+                    const teens = ['Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'];
+                    const tens = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
+                    const scales = ['', 'Thousand', 'Lakh', 'Crore'];
+                    
+                    if (n === 0) return 'Zero';
+                    let words = '';
+                    let scaleIndex = 0;
+                    
+                    while (n > 0) {
+                      let chunk = n % 1000;
+                      if (chunk > 0) {
+                        words = convertChunk(chunk) + (scales[scaleIndex] ? ' ' + scales[scaleIndex] : '') + ' ' + words;
+                      }
+                      n = Math.floor(n / 1000);
+                      scaleIndex++;
+                    }
+                    
+                    function convertChunk(num: number): string {
+                      let result = '';
+                      let hundreds = Math.floor(num / 100);
+                      if (hundreds > 0) result += ones[hundreds] + ' Hundred ';
+                      
+                      let remainder = num % 100;
+                      if (remainder >= 20) {
+                        result += tens[Math.floor(remainder / 10)] + ' ' + ones[remainder % 10];
+                      } else if (remainder >= 10) {
+                        result += teens[remainder - 10];
+                      } else if (remainder > 0) {
+                        result += ones[remainder];
+                      }
+                      return result.trim();
+                    }
+                    
+                    return words.trim();
+                  }}
+                />
+              </div>
+
+              {/* Footer with Print Button */}
+              <div className="bg-gray-100 px-4 py-3 flex justify-end gap-2 shrink-0 border-t">
+                <button
+                  onClick={() => window.print()}
+                  className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded font-semibold text-sm"
+                >
+                  🖨️ Print Bill
+                </button>
+                <button
+                  onClick={() => setShowBillModal(false)}
+                  className="bg-gray-400 hover:bg-gray-500 text-white px-4 py-2 rounded font-semibold text-sm"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
