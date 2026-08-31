@@ -69,7 +69,7 @@ export default function Navbar() {
             ))}
           </nav>
 
-          {/* Right: Login + Phone */}
+          {/* Right: Patient & Admin Login + Phone */}
             <a
               href="tel:+919876543210"
               className="flex items-center gap-2 bg-[oklch(45%_0.085_224.283)] hover:bg-[oklch(40%_0.075_224.283)] text-white text-sm font-semibold px-4 py-2 rounded-full transition-colors whitespace-nowrap"
@@ -79,11 +79,24 @@ export default function Navbar() {
             </a>
             <div className="hidden lg:flex items-center gap-2 flex-shrink-0">
             <Link
-              href="/login"
+              href="/patient-auth/register"
               className="flex items-center gap-1.5 bg-[oklch(45%_0.085_224.283)] hover:bg-[oklch(40%_0.075_224.283)] text-white text-sm font-semibold px-4 py-2 rounded-full transition-colors whitespace-nowrap"
             >
               <LogIn size={14} />
-              Login
+              Patient Register
+            </Link>
+            <Link
+              href="/patient-auth/login"
+              className="flex items-center gap-1.5 bg-[oklch(45%_0.085_224.283)] hover:bg-[oklch(40%_0.075_224.283)] text-white text-sm font-semibold px-4 py-2 rounded-full transition-colors whitespace-nowrap"
+            >
+              <LogIn size={14} />
+              Patient Login
+            </Link>
+            <Link
+              href="/login"
+              className="text-[oklch(45%_0.085_224.283)] hover:text-[oklch(40%_0.075_224.283)] text-sm font-semibold transition-colors whitespace-nowrap"
+            >
+              Lab Login
             </Link>
           </div>
 
@@ -112,10 +125,22 @@ export default function Navbar() {
           ))}
           <div className="pt-3 border-t border-gray-100 flex flex-col gap-2">
             <Link
-              href="/login"
+              href="/patient-auth/register"
               className="flex items-center gap-2 bg-[oklch(45%_0.085_224.283)] hover:bg-[oklch(40%_0.075_224.283)] text-white text-sm font-semibold px-4 py-2 rounded-full w-fit transition-colors"
             >
-              <LogIn size={14} /> Login
+              <LogIn size={14} /> Patient Register
+            </Link>
+            <Link
+              href="/patient-auth/login"
+              className="flex items-center gap-2 bg-[oklch(45%_0.085_224.283)] hover:bg-[oklch(40%_0.075_224.283)] text-white text-sm font-semibold px-4 py-2 rounded-full w-fit transition-colors"
+            >
+              <LogIn size={14} /> Patient Login
+            </Link>
+            <Link
+              href="/login"
+              className="text-[oklch(45%_0.085_224.283)] hover:text-[oklch(40%_0.075_224.283)] text-sm font-semibold transition-colors"
+            >
+              Lab Login
             </Link>
             <a
               href="tel:+919876543210"

@@ -150,9 +150,17 @@ export const patientSelfRegister = async (req, res) => {
       message: 'Patient registered successfully. Please check your email to verify.',
       data: {
         patientId: patient.patientId,
+        title: patient.title,
         firstName: patient.firstName,
+        lastName: patient.lastName,
         email: patient.email,
-        registrationType: patient.registrationType
+        mobile: patient.mobile,
+        dob: patient.dob,
+        gender: patient.gender,
+        address: patient.address,
+        location: patient.location,
+        registrationType: patient.registrationType,
+        createdAt: patient.createdAt
       },
       token,
       requiresEmailVerification: true
