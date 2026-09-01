@@ -58,6 +58,7 @@ const urlPathMap: { [key: string]: string } = {
   "reports/report-dashboard": "Reports / Dashboard",
   "reports/collection": "Reports / Collection",
   "reports/organization-settlement": "Reports / Organization Settlement",
+  "reports/referral-doctor-settlement": "Reports / Referral Doctor Settlement",
   "reports/patient-list": "Reports / Patient List",
   "reports/referral-doctor-revenue": "Reports / Referral Doctor Revenue",
   "reports/center-wise-cost-report": "Reports / Center Wise Cost Report",

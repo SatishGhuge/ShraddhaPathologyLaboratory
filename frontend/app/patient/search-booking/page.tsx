@@ -286,6 +286,7 @@ interface PatientData {
   organizationCode: string;
   organizationId?: string;
   remark?: string;
+  isEmergency?: boolean;
 }
 
 interface Test {
