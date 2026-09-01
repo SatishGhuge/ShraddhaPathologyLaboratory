@@ -765,35 +765,48 @@ const ReadingValidationModal = ({
                 </tr>
               </thead>
               <tbody>
-                {Object.entries(groupedParameters || {}).map(([categoryName, categoryParams]: [string, any]) => (
-                  <Fragment key={categoryName}>
-                    {categoryName !== 'NO_CATEGORY_HEADER' && categoryParams[0]?.showCategoryHeader && (
-                      <tr className="bg-gray-200 font-semibold">
-                        <td colSpan={5} className="p-1">
-                          {categoryName.toUpperCase()}
-                        </td>
-                      </tr>
-                    )}
-                    {(categoryParams as Parameter[]).map((param) => {
-                      const outOfRange = isValueOutOfRange(param, results[param.id]?.numericValue);
-                      const rangeStr = getAgeAppropriateRange(param);
-                      // ✅ Truncate long biological range text - keep only first 30 chars + default note
-                      const truncatedRange = rangeStr && rangeStr.length > 35 
-                        ? rangeStr.substring(0, 35) + '...' 
-                        : rangeStr;
-                      const inputClass = outOfRange
-                        ? 'border-2 border-red-500 bg-red-50 px-2 py-1 rounded focus:outline-none focus:ring-2 focus:ring-red-500 text-xs'
-                        : 'border border-gray-300 px-2 py-1 rounded focus:outline-none focus:ring-2 focus:ring-cyan-500 text-xs';
+                {(() => {
+                  // ✅ Sort categories by categorySortOrder (from first param in category)
+                  const sortedCategories = Object.entries(groupedParameters || {})
+                    .map(([categoryName, categoryParams]: [string, any]) => ({
+                      categoryName,
+                      categoryParams,
+                      sortOrder: (categoryParams as Parameter[])[0]?.categorySortOrder ?? (categoryParams as Parameter[])[0]?.sortOrder ?? 999
+                    }))
+                    .sort((a, b) => a.sortOrder - b.sortOrder);
 
-                      return (
-                        <tr key={param.id} className={(outOfRange || results[param.id]?.isHighlighted) ? 'bg-red-50' : 'bg-white hover:bg-gray-50'} style={{height: '28px'}}>
-                          <td className="border p-1.5">
-                            <span className="font-medium text-gray-900 text-xs">
-                              {(() => {
-                                const paramNameParts = parseHtmlText(param.parameterName);
-                                if (typeof paramNameParts === 'string') {
-                                  return paramNameParts;
-                                }
+                  return sortedCategories.map(({ categoryName, categoryParams }) => (
+                    <Fragment key={categoryName}>
+                      {categoryName !== 'NO_CATEGORY_HEADER' && categoryParams[0]?.showCategoryHeader && (
+                        <tr className="bg-gray-200 font-semibold">
+                          <td colSpan={5} className="p-1">
+                            {categoryName.toUpperCase()}
+                          </td>
+                        </tr>
+                      )}
+                      {(() => {
+                        // ✅ Sort parameters within category by sortOrder
+                        const sortedParams = [...(categoryParams as Parameter[])].sort((a, b) => (a.sortOrder ?? 999) - (b.sortOrder ?? 999));
+                        return sortedParams.map((param) => {
+                          const outOfRange = isValueOutOfRange(param, results[param.id]?.numericValue);
+                          const rangeStr = getAgeAppropriateRange(param);
+                          // ✅ Truncate long biological range text - keep only first 30 chars + default note
+                          const truncatedRange = rangeStr && rangeStr.length > 35 
+                            ? rangeStr.substring(0, 35) + '...' 
+                            : rangeStr;
+                          const inputClass = outOfRange
+                            ? 'border-2 border-red-500 bg-red-50 px-2 py-1 rounded focus:outline-none focus:ring-2 focus:ring-red-500 text-xs'
+                            : 'border border-gray-300 px-2 py-1 rounded focus:outline-none focus:ring-2 focus:ring-cyan-500 text-xs';
+
+                          return (
+                            <tr key={param.id} className={(outOfRange || results[param.id]?.isHighlighted) ? 'bg-red-50' : 'bg-white hover:bg-gray-50'} style={{height: '28px'}}>
+                              <td className="border p-1.5">
+                                <span className="font-medium text-gray-900 text-xs">
+                                  {(() => {
+                                    const paramNameParts = parseHtmlText(param.parameterName);
+                                    if (typeof paramNameParts === 'string') {
+                                      return paramNameParts;
+                                    }
                                 return (paramNameParts as HtmlPart[]).map((part: HtmlPart, i: number) => (
                                   <span key={i} style={{ fontWeight: part.bold ? 'bold' : 'normal', fontStyle: part.italic ? 'italic' : 'normal' }}>
                                     {part.text}
@@ -998,9 +1011,11 @@ const ReadingValidationModal = ({
                           </td>
                         </tr>
                       );
-                    })}
-                  </Fragment>
-                ))}
+                        });
+                      })()}
+                    </Fragment>
+                  ));
+                })()}
               </tbody>
             </table>
           </div>

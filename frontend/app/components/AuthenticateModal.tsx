@@ -565,117 +565,130 @@ const AuthenticateModal = ({
                 </tr>
               </thead>
               <tbody>
-                {Object.entries(groupedParameters || {}).map(([categoryName, categoryParams]: [string, any]) => (
-                  <Fragment key={categoryName}>
-                    {categoryName !== 'NO_CATEGORY_HEADER' && categoryParams[0]?.showCategoryHeader && (
-                      <tr className="bg-gray-200 font-semibold">
-                        <td colSpan={5} className="p-2">
-                          {categoryName.toUpperCase()}
-                        </td>
-                      </tr>
-                    )}
-                    {(categoryParams as Parameter[]).map((param) => {
-                      const outOfRange = isValueOutOfRange(param, results[param.id]?.numericValue);
-                      const rangeStr = getAgeAppropriateRange(param);
-                      const inputClass = outOfRange
-                        ? 'border-2 border-red-500 bg-red-50 px-2 py-1 rounded focus:outline-none focus:ring-2 focus:ring-red-500 text-xs'
-                        : 'border border-gray-300 px-2 py-1 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-xs';
+                {(() => {
+                  // ✅ Sort categories by categorySortOrder (from first param in category)
+                  const sortedCategories = Object.entries(groupedParameters || {})
+                    .map(([categoryName, categoryParams]: [string, any]) => ({
+                      categoryName,
+                      categoryParams,
+                      sortOrder: (categoryParams as Parameter[])[0]?.categorySortOrder ?? (categoryParams as Parameter[])[0]?.sortOrder ?? 999
+                    }))
+                    .sort((a, b) => a.sortOrder - b.sortOrder);
 
-                      return (
-                        <tr key={param.id} className={(outOfRange || results[param.id]?.isHighlighted) ? 'bg-red-50' : 'bg-white hover:bg-gray-50'} style={{height: '28px'}}>
-                          <td className="border p-1.5">
-                            <span className="font-medium text-gray-900 text-xs">{param.parameterName}</span>
-                            {param.isMandatory && <span className="text-red-500 ml-1">*</span>}
+                  return sortedCategories.map(({ categoryName, categoryParams }) => (
+                    <Fragment key={categoryName}>
+                      {categoryName !== 'NO_CATEGORY_HEADER' && categoryParams[0]?.showCategoryHeader && (
+                        <tr className="bg-gray-200 font-semibold">
+                          <td colSpan={5} className="p-2">
+                            {categoryName.toUpperCase()}
                           </td>
-                          <td className="border p-1.5 text-center">
-                            {param.type === 'Numeric' ? (
-                              <div className="relative">
-                                <input
-                                  type="text"
-                                  value={results[param.id]?.numericValue ?? ''}
-                                  onChange={(e) => {
-                                    const newResults = { ...results };
-                                    if (!newResults[param.id]) newResults[param.id] = {};
-                                    newResults[param.id].numericValue = e.target.value === '' ? null : e.target.value;
-                                    setResults(newResults);
-                                  }}
-                                  className="w-full text-center bg-transparent text-xs border-none focus:outline-none focus:ring-0 placeholder-gray-400"
-                                  placeholder="0"
-                                />
-                              </div>
-                            ) : param.isDescriptive ? (
-                              <div className="w-full">
-                                {/* Display saved readings as plain black text with minimal size - read-only */}
-                                <div className="flex flex-wrap gap-1.5 text-xs">
-                                  {(results[param.id]?.textValue || '').split('|').map((tag: string, idx: number) => {
-                                    const trimmedTag = tag.trim();
-                                    return trimmedTag ? (
-                                      <span
-                                        key={idx}
-                                        className="inline-block text-gray-900 font-medium px-1.5 py-0.5"
-                                      >
-                                        {trimmedTag}{idx < (results[param.id]?.textValue || '').split(',').filter((t: string) => t.trim()).length - 1 ? ',' : ''}
-                                      </span>
-                                    ) : null;
-                                  })}
-                                </div>
-                                {!results[param.id]?.textValue || results[param.id]?.textValue.trim() === '' ? (
-                                  <span className="text-gray-400 text-xs">No readings saved</span>
-                                ) : null}
-                              </div>
-                            ) : param.type === 'Text' || param.isMultipleOptions ? (
-                              // TEXT/DROPDOWN - EDITABLE with all options from database
-                              <div className="w-full space-y-1">
-                                {/* ✅ Only pipe (|) separator splits into separate items. Commas (,) show as continuous text */}
-                                {(() => {
-                                  const textValue = results[param.id]?.textValue || '';
-                                  const hasPipe = textValue.includes('|');
-                                  
-                                  if (hasPipe) {
-                                    // PIPE separator: Split and show as separate items
-                                    const items = textValue.split('|').map((o: string) => o.trim()).filter(Boolean);
-                                    return (
-                                      <>
-                                        <div className="flex flex-col gap-1 text-xs">
-                                          {items.map((option: string, idx: number) => (
-                                            <div
-                                              key={idx}
-                                              className="inline-flex items-center text-xs font-medium text-gray-900 bg-blue-50 px-2 py-1 rounded"
-                                            >
-                                              <span className="text-xs flex-1">{option}</span>
-                                              <button
-                                                type="button"
-                                                onClick={() => {
-                                                  const newItems = items.filter((_: string, i: number) => i !== idx);
-                                                  const newResults = { ...results };
-                                                  newResults[param.id] = { ...newResults[param.id], textValue: newItems.join('|') };
-                                                  setResults(newResults);
-                                                }}
-                                                className="text-gray-500 hover:text-gray-700 font-bold cursor-pointer ml-1"
-                                                title="Remove this selection"
-                                              >
-                                                ×
-                                              </button>
+                        </tr>
+                      )}
+                      {(() => {
+                        // ✅ Sort parameters within category by sortOrder
+                        const sortedParams = [...(categoryParams as Parameter[])].sort((a, b) => (a.sortOrder ?? 999) - (b.sortOrder ?? 999));
+                        return sortedParams.map((param) => {
+                          const outOfRange = isValueOutOfRange(param, results[param.id]?.numericValue);
+                          const rangeStr = getAgeAppropriateRange(param);
+                          const inputClass = outOfRange
+                            ? 'border-2 border-red-500 bg-red-50 px-2 py-1 rounded focus:outline-none focus:ring-2 focus:ring-red-500 text-xs'
+                            : 'border border-gray-300 px-2 py-1 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-xs';
+
+                          return (
+                            <tr key={param.id} className={(outOfRange || results[param.id]?.isHighlighted) ? 'bg-red-50' : 'bg-white hover:bg-gray-50'} style={{height: '28px'}}>
+                              <td className="border p-1.5">
+                                <span className="font-medium text-gray-900 text-xs">{param.parameterName}</span>
+                                {param.isMandatory && <span className="text-red-500 ml-1">*</span>}
+                              </td>
+                              <td className="border p-1.5 text-center">
+                                {param.type === 'Numeric' ? (
+                                  <div className="relative">
+                                    <input
+                                      type="text"
+                                      value={results[param.id]?.numericValue ?? ''}
+                                      onChange={(e) => {
+                                        const newResults = { ...results };
+                                        if (!newResults[param.id]) newResults[param.id] = {};
+                                        newResults[param.id].numericValue = e.target.value === '' ? null : e.target.value;
+                                        setResults(newResults);
+                                      }}
+                                      className="w-full text-center bg-transparent text-xs border-none focus:outline-none focus:ring-0 placeholder-gray-400"
+                                      placeholder="0"
+                                    />
+                                  </div>
+                                ) : param.isDescriptive ? (
+                                  <div className="w-full">
+                                    {/* Display saved readings as plain black text with minimal size - read-only */}
+                                    <div className="flex flex-wrap gap-1.5 text-xs">
+                                      {(results[param.id]?.textValue || '').split('|').map((tag: string, idx: number) => {
+                                        const trimmedTag = tag.trim();
+                                        return trimmedTag ? (
+                                          <span
+                                            key={idx}
+                                            className="inline-block text-gray-900 font-medium px-1.5 py-0.5"
+                                          >
+                                            {trimmedTag}{idx < (results[param.id]?.textValue || '').split(',').filter((t: string) => t.trim()).length - 1 ? ',' : ''}
+                                          </span>
+                                        ) : null;
+                                      })}
+                                    </div>
+                                    {!results[param.id]?.textValue || results[param.id]?.textValue.trim() === '' ? (
+                                      <span className="text-gray-400 text-xs">No readings saved</span>
+                                    ) : null}
+                                  </div>
+                                ) : param.type === 'Text' || param.isMultipleOptions ? (
+                                  // TEXT/DROPDOWN - EDITABLE with all options from database
+                                  <div className="w-full space-y-1">
+                                    {/* ✅ Only pipe (|) separator splits into separate items. Commas (,) show as continuous text */}
+                                    {(() => {
+                                      const textValue = results[param.id]?.textValue || '';
+                                      const hasPipe = textValue.includes('|');
+                                      
+                                      if (hasPipe) {
+                                        // PIPE separator: Split and show as separate items
+                                        const items = textValue.split('|').map((o: string) => o.trim()).filter(Boolean);
+                                        return (
+                                          <>
+                                            <div className="flex flex-col gap-1 text-xs">
+                                              {items.map((option: string, idx: number) => (
+                                                <div
+                                                  key={idx}
+                                                  className="inline-flex items-center text-xs font-medium text-gray-900 bg-blue-50 px-2 py-1 rounded"
+                                                >
+                                                  <span className="text-xs flex-1">{option}</span>
+                                                  <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                      const newItems = items.filter((_: string, i: number) => i !== idx);
+                                                      const newResults = { ...results };
+                                                      newResults[param.id] = { ...newResults[param.id], textValue: newItems.join('|') };
+                                                      setResults(newResults);
+                                                    }}
+                                                    className="text-gray-500 hover:text-gray-700 font-bold cursor-pointer ml-1"
+                                                    title="Remove this selection"
+                                                  >
+                                                    ×
+                                                  </button>
+                                                </div>
+                                              ))}
                                             </div>
-                                          ))}
-                                        </div>
-                                        {/* Dropdown to add more items */}
-                                        <select
-                                          value=""
-                                          onChange={(e) => {
-                                            if (e.target.value) {
-                                              const existing = results[param.id]?.textValue || '';
-                                              const options = existing ? existing.split('|').map((o: string) => o.trim()).filter(Boolean) : [];
-                                              if (!options.includes(e.target.value)) {
-                                                options.push(e.target.value);
-                                                const newResults = { ...results };
-                                                newResults[param.id] = { ...newResults[param.id], textValue: options.join('|') };
-                                                setResults(newResults);
-                                              }
-                                              e.target.value = '';
-                                            }
-                                          }}
-                                          className="w-full border border-gray-300 px-1.5 py-0.5 rounded text-xs focus:outline-none focus:ring-1 focus:ring-gray-400 bg-white text-gray-700 cursor-pointer"
+                                            {/* Dropdown to add more items */}
+                                            <select
+                                              value=""
+                                              onChange={(e) => {
+                                                if (e.target.value) {
+                                                  const existing = results[param.id]?.textValue || '';
+                                                  const options = existing ? existing.split('|').map((o: string) => o.trim()).filter(Boolean) : [];
+                                                  if (!options.includes(e.target.value)) {
+                                                    options.push(e.target.value);
+                                                    const newResults = { ...results };
+                                                    newResults[param.id] = { ...newResults[param.id], textValue: options.join('|') };
+                                                    setResults(newResults);
+                                                  }
+                                                  e.target.value = '';
+                                                }
+                                              }}
+                                              className="w-full border border-gray-300 px-1.5 py-0.5 rounded text-xs focus:outline-none focus:ring-1 focus:ring-gray-400 bg-white text-gray-700 cursor-pointer"
                                         >
                                           <option value="">➕ Add...</option>
                                           {getAllOptionsFromParameter(param).map((optionValue: string) => (
@@ -738,32 +751,34 @@ const AuthenticateModal = ({
                                 />
                               </div>
                             )}
-                          </td>
-                          <td className="border p-1.5 text-center text-gray-600 text-xs">
-                            {param.units || '-'}
-                          </td>
-                          <td className="border p-1.5 text-center text-gray-600 text-xs max-w-xs truncate" title={rangeStr}>
-                            {rangeStr && rangeStr.length > 35 ? rangeStr.substring(0, 35) + '...' : rangeStr}
-                          </td>
-                          <td className="border p-1.5 text-center">
-                            <input
-                              type="checkbox"
-                              checked={results[param.id]?.isHighlighted || false}
-                              onChange={(e) => {
-                                const newResults = { ...results };
-                                if (!newResults[param.id]) newResults[param.id] = {};
-                                newResults[param.id].isHighlighted = e.target.checked;
-                                setResults(newResults);
-                              }}
-                              className="w-4 h-4 cursor-pointer"
-                              title="Highlight this value"
-                            />
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </Fragment>
-                ))}
+                              </td>
+                              <td className="border p-1.5 text-center text-gray-600 text-xs">
+                                {param.units || '-'}
+                              </td>
+                              <td className="border p-1.5 text-center text-gray-600 text-xs max-w-xs truncate" title={rangeStr}>
+                                {rangeStr && rangeStr.length > 35 ? rangeStr.substring(0, 35) + '...' : rangeStr}
+                              </td>
+                              <td className="border p-1.5 text-center">
+                                <input
+                                  type="checkbox"
+                                  checked={results[param.id]?.isHighlighted || false}
+                                  onChange={(e) => {
+                                    const newResults = { ...results };
+                                    if (!newResults[param.id]) newResults[param.id] = {};
+                                    newResults[param.id].isHighlighted = e.target.checked;
+                                    setResults(newResults);
+                                  }}
+                                  className="w-4 h-4 cursor-pointer"
+                                  title="Highlight this value"
+                                />
+                              </td>
+                            </tr>
+                          );
+                        });
+                      })()}
+                    </Fragment>
+                  ));
+                })()}
               </tbody>
             </table>
           </div>
