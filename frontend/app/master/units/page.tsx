@@ -19,13 +19,14 @@ export default function ResultUnits() {
 
   useEffect(() => {
     fetchUnits();
-  }, []);
+  }, [currentPage]);
 
   const fetchUnits = async () => {
     try {
       setLoading(true);
-      const response = await getUnits();
-      setData(response);
+      const response = await getUnits(currentPage, ITEMS_PER_PAGE);
+      setData(response.data || []);
+      setPagination(response.pagination || null);
     } catch (error) {
       console.error('Error fetching units:', error);
     } finally {
@@ -63,11 +64,17 @@ export default function ResultUnits() {
               type="text"
               placeholder="Search By Units"
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              onChange={(e) => {
+                setSearch(e.target.value);
+                setCurrentPage(1);
+              }}
               className="border border-gray-300 bg-white rounded px-3 py-2 w-64 text-sm placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500"
             />
             <button
-              onClick={() => setSearch("")}
+              onClick={() => {
+                setSearch("");
+                setCurrentPage(1);
+              }}
               className="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded text-sm transition-colors flex items-center gap-1"
             >
               <RotateCcw size={18} />
@@ -98,52 +105,35 @@ export default function ResultUnits() {
                     Loading units...
                   </td>
                 </tr>
-              ) : (() => {
-                const filtered = data.filter((item) => item.symbol.toLowerCase().includes(search.toLowerCase()));
-                const totalPages = Math.ceil(filtered.length / ITEMS_PER_PAGE);
-                const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
-                const endIndex = startIndex + ITEMS_PER_PAGE;
-                const paginatedData = filtered.slice(startIndex, endIndex);
-
-                // Update pagination state
-                if (pagination?.total !== filtered.length || pagination?.totalPages !== totalPages) {
-                  setPagination({
-                    total: filtered.length,
-                    totalPages: totalPages,
-                    currentPage: currentPage
-                  });
-                }
-
-                return paginatedData.length > 0 ? (
-                  paginatedData.map((item) => (
-                    <tr key={item.id} className="hover:bg-gray-50 border-b border-gray-200">
-                      <td className="border border-gray-300 px-3 py-1">{item.symbol}</td>
-                      <td className="border border-gray-300 px-3 py-1">
-                        <div className="flex justify-center gap-1 flex-wrap">
-                          <button
-                            onClick={() => { setEditingUnit(item); setShowModal(true); }}
-                            className="bg-blue-600 text-white px-2 py-1 rounded text-xs hover:bg-blue-700 transition-colors"
-                          >
-                            Edit
-                          </button>
-                          <button
-                            onClick={() => handleDelete(item.id)}
-                            className="bg-red-500 text-white px-2 py-1 rounded text-xs hover:bg-red-600 transition-colors"
-                          >
-                            Delete
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td colSpan={2} className="text-center py-4 text-gray-500 border border-gray-300">
-                      No records found
+              ) : data.length > 0 ? (
+                data.map((item) => (
+                  <tr key={item.id} className="hover:bg-gray-50 border-b border-gray-200">
+                    <td className="border border-gray-300 px-3 py-1">{item.symbol}</td>
+                    <td className="border border-gray-300 px-3 py-1">
+                      <div className="flex justify-center gap-1 flex-wrap">
+                        <button
+                          onClick={() => { setEditingUnit(item); setShowModal(true); }}
+                          className="bg-blue-600 text-white px-2 py-1 rounded text-xs hover:bg-blue-700 transition-colors"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          onClick={() => handleDelete(item.id)}
+                          className="bg-red-500 text-white px-2 py-1 rounded text-xs hover:bg-red-600 transition-colors"
+                        >
+                          Delete
+                        </button>
+                      </div>
                     </td>
                   </tr>
-                );
-              })()}
+                ))
+              ) : (
+                <tr>
+                  <td colSpan={2} className="text-center py-4 text-gray-500 border border-gray-300">
+                    No records found
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
 
@@ -158,10 +148,7 @@ export default function ResultUnits() {
 
               <div className="flex gap-2 items-center flex-wrap">
                 <button
-                  onClick={() => {
-                    const newPage = Math.max(1, currentPage - 1);
-                    setCurrentPage(newPage);
-                  }}
+                  onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
                   disabled={currentPage === 1}
                   className={`flex items-center gap-1 px-3 py-1 rounded ${currentPage === 1 ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-orange-500 text-white hover:bg-orange-600'}`}
                 >
@@ -173,10 +160,7 @@ export default function ResultUnits() {
                 </span>
 
                 <button
-                  onClick={() => {
-                    const newPage = Math.min(pagination.totalPages, currentPage + 1);
-                    setCurrentPage(newPage);
-                  }}
+                  onClick={() => setCurrentPage(Math.min(pagination.totalPages, currentPage + 1))}
                   disabled={currentPage === pagination.totalPages}
                   className={`flex items-center gap-1 px-3 py-1 rounded ${currentPage === pagination.totalPages ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-orange-500 text-white hover:bg-orange-600'}`}
                 >

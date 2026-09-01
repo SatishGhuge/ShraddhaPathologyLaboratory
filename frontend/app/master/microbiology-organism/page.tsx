@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Plus, Pencil, Trash2, ArrowLeft, Microscope, RotateCcw } from "lucide-react";
 
 const initialData = [
@@ -38,6 +38,16 @@ export default function MicrobiologyOrganism() {
     setSearch("");
     setCurrentPage(1);
   };
+
+  useEffect(() => {
+    // Update pagination when filtered data changes
+    const totalPages = Math.ceil(filteredData.length / ITEMS_PER_PAGE);
+    setPagination({
+      total: filteredData.length,
+      totalPages: totalPages,
+      currentPage: currentPage
+    });
+  }, [filteredData, currentPage]);
 
   const handleDelete = (id: any) => {
     if (window.confirm("Are you sure you want to delete this organism?")) {
@@ -139,15 +149,6 @@ export default function MicrobiologyOrganism() {
                 const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
                 const endIndex = startIndex + ITEMS_PER_PAGE;
                 const paginatedData = filteredData.slice(startIndex, endIndex);
-
-                // Update pagination state
-                if (pagination?.total !== filteredData.length || pagination?.totalPages !== totalPages) {
-                  setPagination({
-                    total: filteredData.length,
-                    totalPages: totalPages,
-                    currentPage: currentPage
-                  });
-                }
 
                 return paginatedData.length > 0 ? (
                   paginatedData.map((item, index) => (

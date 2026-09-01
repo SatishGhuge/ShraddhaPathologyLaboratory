@@ -11,42 +11,41 @@ const OrganizationList = () => {
 
   const [searchName, setSearchName] = useState("");
   const [searchLocation, setSearchLocation] = useState("");
-  const [showInactive, setShowInactive] = useState(false); // Checkbox for showing inactive
+  const [showInactive, setShowInactive] = useState(false);
   const [organizations, setOrganizations] = useState<any[]>([]);
-  const [filteredOrganizations, setFilteredOrganizations] = useState<any[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [pagination, setPagination] = useState<any>(null);
   const ITEMS_PER_PAGE = 20;
 
   useEffect(() => {
-    getOrganizations()
-      .then((res: any) => {
-        setOrganizations(res);
-        setFilteredOrganizations(res);
-      })
-      .catch(console.error);
-  }, []);
+    fetchOrganizations();
+  }, [currentPage, searchName, searchLocation, showInactive]);
 
-  // Apply filters whenever search or showInactive changes
-  useEffect(() => {
-    const filtered = organizations.filter((o) => {
-      const nameMatch = o.name.toLowerCase().includes(searchName.toLowerCase());
-      const locationMatch = (o.location || "").toLowerCase().includes(searchLocation.toLowerCase());
-      
-      // If showInactive is false, show only active organizations
-      // If showInactive is true, show only inactive organizations
-      const statusMatch = showInactive ? o.isActive === false : o.isActive === true;
-      
-      return nameMatch && locationMatch && statusMatch;
-    });
-    setFilteredOrganizations(filtered);
-    setCurrentPage(1); // Reset to page 1 when filters change
-  }, [searchName, searchLocation, showInactive, organizations]);
+  const fetchOrganizations = async () => {
+    try {
+      // For client-side filtering, fetch all data on first load
+      if (organizations.length === 0 && currentPage === 1 && !searchName && !searchLocation) {
+        const response = await getOrganizations(1, 1000); // Fetch all
+        let allOrgs = Array.isArray(response) ? response : response.data || [];
+        setOrganizations(allOrgs);
+      }
+    } catch (error) {
+      console.error('Error fetching organizations:', error);
+    }
+  };
+
+  const filteredOrganizations = organizations.filter((o) => {
+    const nameMatch = o.name.toLowerCase().includes(searchName.toLowerCase());
+    const locationMatch = (o.location || "").toLowerCase().includes(searchLocation.toLowerCase());
+    const statusMatch = showInactive ? o.isActive === false : o.isActive === true;
+    return nameMatch && locationMatch && statusMatch;
+  });
 
   const handleReset = () => {
     setSearchName("");
     setSearchLocation("");
     setShowInactive(false);
+    setCurrentPage(1);
   };
 
   /* DELETE HANDLER */
@@ -149,13 +148,11 @@ const OrganizationList = () => {
                 const paginatedData = filteredOrganizations.slice(startIndex, endIndex);
 
                 // Update pagination state
-                if (pagination?.total !== filteredOrganizations.length || pagination?.totalPages !== totalPages) {
-                  setPagination({
-                    total: filteredOrganizations.length,
-                    totalPages: totalPages,
-                    currentPage: currentPage
-                  });
-                }
+                setPagination({
+                  total: filteredOrganizations.length,
+                  totalPages: totalPages,
+                  currentPage: currentPage
+                });
 
                 return paginatedData.length > 0 ? (
                   paginatedData.map((o) => (

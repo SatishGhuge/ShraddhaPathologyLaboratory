@@ -22,7 +22,7 @@ const OutsourcingList = () => {
   // Fetch labs on mount
   useEffect(() => {
     fetchLabs();
-  }, []);
+  }, [currentPage]);
 
   const fetchLabs = async () => {
     try {
@@ -46,6 +46,7 @@ const OutsourcingList = () => {
 
   const handleSearch = () => {
     setHasSearched(true);
+    setCurrentPage(1);
 
     const filtered = labs.filter((lab) => {
       const matchName = lab.labName
@@ -171,13 +172,11 @@ const OutsourcingList = () => {
                 const paginatedData = filteredLabs.slice(startIndex, endIndex);
 
                 // Update pagination state
-                if (pagination?.total !== filteredLabs.length || pagination?.totalPages !== totalPages) {
-                  setPagination({
-                    total: filteredLabs.length,
-                    totalPages: totalPages,
-                    currentPage: currentPage
-                  });
-                }
+                setPagination({
+                  total: filteredLabs.length,
+                  totalPages: totalPages,
+                  currentPage: currentPage
+                });
 
                 return paginatedData.length > 0 ? (
                   paginatedData.map((lab) => (
