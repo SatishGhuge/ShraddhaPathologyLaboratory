@@ -185,6 +185,8 @@ export const createPatient = async (req, res) => {
       existingPatientId,
       // Patient Identity
       title, firstName, lastName, dob, age, gender, guardianType, mobile, email,
+      // ✅ NEW: Track if email was manually filled (for sending credentials)
+      emailWasManuallyFilled,
       createdBy, createdAtLocation, address, location,
       // Registration Details (will be saved with each test)
       reportMode, referralDoctor, visitDate, visitTime,
@@ -484,7 +486,8 @@ export const createPatient = async (req, res) => {
       let finalDiscountPercent = 0;
       
       if (parseFloat(discountPercent) > 0) {
-        finalDiscountAmount = totalTestCharges * (parseFloat(discountPercent) / 100);
+        // ✅ FIX: Round discount to nearest rupee for percentage discounts
+        finalDiscountAmount = Math.round(totalTestCharges * (parseFloat(discountPercent) / 100));
         finalDiscountPercent = parseFloat(discountPercent);
       } else if (parseFloat(discountAmount) > 0) {
         finalDiscountAmount = Math.round(parseFloat(discountAmount));
@@ -669,8 +672,8 @@ export const createPatient = async (req, res) => {
       }
     }
 
-    // Send email with credentials if patient has an email
-    if (email && patient.patientId) {
+    // Send email with credentials if patient has an email AND email was manually filled (not auto-filled from doctor)
+    if (email && patient.patientId && emailWasManuallyFilled !== false) {
       try {
         // Generate random password for patients
         const randomPassword = crypto.randomBytes(8).toString('hex').slice(0, 8);
@@ -690,11 +693,13 @@ export const createPatient = async (req, res) => {
           randomPassword,
           'direct'
         );
-        console.log(`✅ Credentials email sent to ${email} for patient ${patient.patientId}`);
+        console.log(`✅ Credentials email sent to ${email} for patient ${patient.patientId} (emailWasManuallyFilled: ${emailWasManuallyFilled})`);
       } catch (emailError) {
         console.warn('⚠️ Failed to send credentials email:', emailError.message);
         // Don't fail the registration if email fails
       }
+    } else if (email && emailWasManuallyFilled === false) {
+      console.log(`⏭️ SKIPPED: Email credentials NOT sent (email was auto-filled from referral doctor). Email: ${email}, Patient: ${patient.patientId}`);
     }
 
     // 🔍 DEBUG: Log what we're returning to frontend
@@ -1073,21 +1078,23 @@ export const getAllPatients = async (req, res) => {
       // Add balance amounts, payment breakdown, and status to tests
       return {
         ...patient,
-        tests: patient.tests.map(test => ({
-          ...test,
-          balanceAmount: balanceMap[test.visitId]?.balanceAmount || 0,
-          paidAmount: balanceMap[test.visitId]?.paidAmount || 0,
-          discountAmount: balanceMap[test.visitId]?.discountAmount || 0,
-          totalAmount: balanceMap[test.visitId]?.grossAmount || 0,
-          billStatus: balanceMap[test.visitId]?.status || 'PENDING',
-          // ✅ NEW: Add payment breakdown by mode (split debit/credit card)
-          paymentsByMode: paymentMap[test.visitId] || {
-            cash: 0, debitCard: 0, creditCard: 0, upi: 0, cheque: 0, netBanking: 0, other: 0,
-            paymentSequence: []
-          },
-          // ✅ NEW: Track chronological payment order (shows which was paid first)
-          paymentSequence: paymentMap[test.visitId]?.paymentSequence || []
-        }))
+        tests: patient.tests
+          .filter(test => test.status !== 'Cancelled' && test.status !== 'CANCELLED')  // ✅ Filter out cancelled tests
+          .map(test => ({
+            ...test,
+            balanceAmount: balanceMap[test.visitId]?.balanceAmount || 0,
+            paidAmount: balanceMap[test.visitId]?.paidAmount || 0,
+            discountAmount: balanceMap[test.visitId]?.discountAmount || 0,
+            totalAmount: balanceMap[test.visitId]?.grossAmount || 0,
+            billStatus: balanceMap[test.visitId]?.status || 'PENDING',
+            // ✅ NEW: Add payment breakdown by mode (split debit/credit card)
+            paymentsByMode: paymentMap[test.visitId] || {
+              cash: 0, debitCard: 0, creditCard: 0, upi: 0, cheque: 0, netBanking: 0, other: 0,
+              paymentSequence: []
+            },
+            // ✅ NEW: Track chronological payment order (shows which was paid first)
+            paymentSequence: paymentMap[test.visitId]?.paymentSequence || []
+          }))
       };
     }));
 
@@ -1147,9 +1154,15 @@ export const getPatientById = async (req, res) => {
       });
     }
 
+    // ✅ Filter out cancelled tests
+    const patientWithActiveTests = {
+      ...patient,
+      tests: patient.tests.filter(test => test.status !== 'Cancelled' && test.status !== 'CANCELLED')
+    };
+
     res.json({
       success: true,
-      data: patient
+      data: patientWithActiveTests
     });
 
   } catch (error) {
@@ -1235,15 +1248,21 @@ export const searchPatient = async (req, res) => {
       age: formatAgeFromComponents(patient.ageYears, patient.ageMonths, patient.ageDays)
     }));
 
+    // ✅ Filter out cancelled tests from all patients
+    const patientsWithActiveTests = patientsWithFormattedAge.map(patient => ({
+      ...patient,
+      tests: patient.tests.filter(test => test.status !== 'Cancelled' && test.status !== 'CANCELLED')
+    }));
+
     console.log('✅ searchPatient - Sample patient with formatted age:', {
-      patientId: patientsWithFormattedAge[0]?.patientId,
-      ageYears: patientsWithFormattedAge[0]?.ageYears,
-      ageMonths: patientsWithFormattedAge[0]?.ageMonths,
-      ageDays: patientsWithFormattedAge[0]?.ageDays,
-      age: patientsWithFormattedAge[0]?.age
+      patientId: patientsWithActiveTests[0]?.patientId,
+      ageYears: patientsWithActiveTests[0]?.ageYears,
+      ageMonths: patientsWithActiveTests[0]?.ageMonths,
+      ageDays: patientsWithActiveTests[0]?.ageDays,
+      age: patientsWithActiveTests[0]?.age
     });
 
-    res.json(buildPaginatedResponse(patientsWithFormattedAge, total, page, limit));
+    res.json(buildPaginatedResponse(patientsWithActiveTests, total, page, limit));
 
   } catch (error) {
     console.error('Search patient error:', error);
@@ -1291,7 +1310,7 @@ export const updatePatientTestDetails = async (req, res) => {
 export const updatePatient = async (req, res) => {
   try {
     const { patientId } = req.params;
-    const { title, firstName, lastName, dob, age, gender, mobile, email, address } = req.body;
+    const { title, firstName, lastName, dob, age, gender, mobile, email, address, isEmergency, visitId } = req.body;
 
     const existing = await prisma.patient.findUnique({ where: { patientId } });
     if (!existing) return res.status(404).json({ success: false, message: 'Patient not found' });
@@ -1323,6 +1342,26 @@ export const updatePatient = async (req, res) => {
       where: { patientId },
       data: updateData
     });
+
+    // ✅ If emergency flag is being updated, update all tests for this visit
+    if (isEmergency !== undefined && visitId) {
+      console.log(`🚨 Updating emergency status for visitId: ${visitId}, isEmergency: ${isEmergency}`);
+      
+      const updatedTests = await prisma.patientTest.updateMany({
+        where: { 
+          patientId: patientId,
+          visitId: visitId 
+        },
+        data: {
+          isEmergency: Boolean(isEmergency),
+          emergencySetAt: isEmergency ? new Date() : null,
+          emergencySetBy: 'SYSTEM',
+          updatedAt: new Date()
+        }
+      });
+      
+      console.log(`✅ Updated ${updatedTests.count} tests as emergency for visit ${visitId}`);
+    }
 
     // ✅ Calculate and save age fields if DOB was updated (takes precedence over manual age)
     if (dob) {
@@ -1365,7 +1404,10 @@ export const updatePayment = async (req, res) => {
     const payment       = parseFloat(paymentAmount)  || 0;
 
     const newPaidAmount    = existingPaid + payment;
-    const newBalanceAmount = Math.max(0, Math.round(totalAmount - discount - newPaidAmount));
+    // ✅ FIX: Use proper rounding to avoid 1 rupee remaining
+    // First calculate the net amount (after discount), then subtract payments
+    const netAmount = Math.round(totalAmount - discount);
+    const newBalanceAmount = Math.max(0, netAmount - newPaidAmount);
 
     // Update all rows for this visit
     await prisma.patientTest.updateMany({
@@ -1503,10 +1545,14 @@ export const getOrganizationTypeStatistics = async (req, res) => {
     console.log('📅 Date filter:', dateFilter);
 
     // Get all patient tests with their organization data
+    // ✅ Exclude cancelled tests from statistics
     const patientTests = await prisma.patientTest.findMany({
       where: {
         ...dateFilter,
-        organizationId: { not: null }
+        organizationId: { not: null },
+        status: { 
+          notIn: ['Cancelled', 'CANCELLED', 'cancelled']  // ✅ Use notIn
+        }
       },
       include: {
         organization: {
@@ -1582,10 +1628,14 @@ export const getWeeklyOrganizationTypeStatistics = async (req, res) => {
       endDate.setHours(23, 59, 59, 999);
 
       // Get patient tests for this day
+      // ✅ Exclude cancelled tests from statistics
       const patientTests = await prisma.patientTest.findMany({
         where: {
           createdAt: { gte: date, lte: endDate },
-          organizationId: { not: null }
+          organizationId: { not: null },
+          status: { 
+            notIn: ['Cancelled', 'CANCELLED', 'cancelled']  // ✅ Use notIn
+          }
         },
         include: {
           organization: {
@@ -1780,7 +1830,9 @@ export const addTestToVisit = async (req, res) => {
     const totalAmount = allTests.reduce((sum, t) => sum + (t.totalAmount || 0), 0);
     const paidAmount = existingTest.paidAmount || 0;
     const discountAmount = existingTest.discountAmount || 0;
-    const newBalanceAmount = Math.max(0, Math.round(totalAmount - discountAmount - paidAmount));
+    // ✅ FIX: Proper rounding to avoid 1 rupee remaining
+    const netAmount = Math.round(totalAmount - discountAmount);
+    const newBalanceAmount = Math.max(0, netAmount - paidAmount);
 
     // Update all tests with the new balance
     await prisma.patientTest.updateMany({
@@ -1931,11 +1983,23 @@ export const getPatientTests = async (req, res) => {
   try {
     const { page, limit, skip } = getPaginationParams(req.query);
 
-    // Get total count of patient tests
-    const total = await prisma.patientTest.count();
+    // ✅ Get total count of ACTIVE (non-cancelled) patient tests
+    const total = await prisma.patientTest.count({
+      where: {
+        status: { 
+          notIn: ['Cancelled', 'CANCELLED', 'cancelled']  // ✅ Use notIn
+        }
+      }
+    });
 
-    // Fetch patient tests with patient, test, and department details
+    // ✅ Fetch ACTIVE patient tests with patient, test, and department details
+    // Exclude cancelled tests from display
     const patientTests = await prisma.patientTest.findMany({
+      where: {
+        status: { 
+          notIn: ['Cancelled', 'CANCELLED', 'cancelled']  // ✅ Use notIn instead of not.in
+        }
+      },
       include: {
         patient: true,
         test: true,
@@ -1948,6 +2012,9 @@ export const getPatientTests = async (req, res) => {
       skip,
       take: limit
     });
+
+    console.log('🔍 Result Page - Tests fetched:', patientTests.length);
+    console.log('✅ Cancelled tests filtered out from result page');
 
     res.json(buildPaginatedResponse(patientTests, total, page, limit));
 
@@ -2001,9 +2068,15 @@ export const getTestsByVisitId = async (req, res) => {
       updatedAt: visitBill?.updatedAt
     });
 
-    // Find all tests for this visit
+    // Find all ACTIVE (non-cancelled) tests for this visit
+    // ✅ IMPORTANT: Exclude cancelled tests from display
     const tests = await prisma.patientTest.findMany({
-      where: { visitId },
+      where: { 
+        visitId,
+        status: { 
+          notIn: ['Cancelled', 'CANCELLED', 'cancelled']  // ✅ Use notIn
+        }
+      },
       include: {
         test: {
           select: {
@@ -2054,7 +2127,14 @@ export const getTestsByVisitId = async (req, res) => {
       }
     });
 
-    console.log(`✅ Found ${tests.length} test(s) for visitId: ${visitId}`);
+    console.log(`✅ Found ${tests.length} test(s) for visitId: ${visitId} (cancelled tests already filtered)`);
+
+    // ✅ VERIFICATION: Ensure no cancelled tests in response
+    const cancelledCount = tests.filter(t => t.status === 'Cancelled' || t.status === 'CANCELLED').length;
+    if (cancelledCount > 0) {
+      console.warn(`⚠️ WARNING: Found ${cancelledCount} cancelled tests that weren't filtered!`);
+    }
+    console.log(`🔍 Cancelled test verification: ${cancelledCount} cancelled tests found (should be 0)`);
 
     // If VisitBill doesn't exist, calculate totals from PatientTest records
     if (!visitBill && tests.length > 0) {
@@ -2507,8 +2587,17 @@ export const cancelTest = async (req, res) => {
     const { visitId, patientTestId } = req.params;
     const { remarks, cancelledBy } = req.body;
 
+    console.log('🟡 [cancelTest] START - Received request:', {
+      visitId,
+      patientTestId,
+      remarks,
+      url: req.originalUrl,
+      method: req.method
+    });
+
     // Validate inputs
     if (!visitId || !patientTestId) {
+      console.error('❌ [cancelTest] Missing required params:', { visitId, patientTestId });
       return res.status(400).json({
         success: false,
         message: 'visitId and patientTestId are required'
@@ -2520,7 +2609,16 @@ export const cancelTest = async (req, res) => {
       where: { id: parseInt(patientTestId) }
     });
 
+    console.log('🔍 [cancelTest] PatientTest lookup:', {
+      patientTestId,
+      found: !!patientTest,
+      testId: patientTest?.testId,
+      status: patientTest?.status,
+      charge: patientTest?.charge
+    });
+
     if (!patientTest) {
+      console.error('❌ [cancelTest] Test not found:', { patientTestId });
       return res.status(404).json({
         success: false,
         message: 'Test not found'
@@ -2528,6 +2626,7 @@ export const cancelTest = async (req, res) => {
     }
 
     if (patientTest.status === 'Cancelled') {
+      console.warn('⚠️ [cancelTest] Test already cancelled:', { patientTestId });
       return res.status(400).json({
         success: false,
         message: 'Test is already cancelled'
@@ -2539,7 +2638,16 @@ export const cancelTest = async (req, res) => {
       where: { visitId }
     });
 
+    console.log('💰 [cancelTest] VisitBill lookup:', {
+      visitId,
+      found: !!visitBill,
+      grossAmount: visitBill?.grossAmount?.toString?.(),
+      totalPaid: visitBill?.totalPaid?.toString?.(),
+      balanceAmount: visitBill?.balanceAmount?.toString?.()
+    });
+
     if (!visitBill) {
+      console.error('❌ [cancelTest] VisitBill not found:', { visitId });
       return res.status(404).json({
         success: false,
         message: 'Visit bill not found'
@@ -2548,7 +2656,7 @@ export const cancelTest = async (req, res) => {
 
     const testCharge = parseFloat(patientTest.charge || 0);
     
-    console.log('📝 Cancelling test:', {
+    console.log('📝 [cancelTest] Cancelling test:', {
       patientTestId,
       visitId,
       testName: patientTest.testId,
@@ -2563,12 +2671,14 @@ export const cancelTest = async (req, res) => {
     
     await prisma.$transaction(async (tx) => {
       // Step 1: Mark PatientTest as Cancelled
+      // ✅ Note: cancelledAt and cancelledReason fields don't exist in schema
+      // Use updatedAt and comments fields instead
       updatedTest = await tx.patientTest.update({
         where: { id: parseInt(patientTestId) },
         data: { 
           status: 'Cancelled',
-          cancelledAt: new Date(),
-          cancelledReason: remarks || 'User cancelled'
+          updatedAt: new Date(),
+          comments: remarks || 'User cancelled'
         }
       });
       
@@ -2679,11 +2789,15 @@ export const cancelTest = async (req, res) => {
     
     console.log(`✅ Transaction completed successfully for CANCEL_TEST`);
 
-    res.json({
+    const responseData = {
       success: true,
       message: 'Test cancelled successfully',
       data: {
-        updatedTest,
+        updatedTest: {
+          id: updatedTest.id,
+          status: updatedTest.status,
+          testId: updatedTest.testId
+        },
         updatedBill: {
           ...updatedBill,
           grossAmount: updatedBill.grossAmount.toNumber(),
@@ -2697,10 +2811,23 @@ export const cancelTest = async (req, res) => {
           amount: refundRecord.amount.toNumber()
         } : null
       }
+    };
+    
+    console.log('✅ [cancelTest] SUCCESS - Sending response:', {
+      visitId,
+      patientTestId,
+      grossAmount: responseData.data.updatedBill.grossAmount,
+      balanceAmount: responseData.data.updatedBill.balanceAmount
     });
 
+    res.json(responseData);
+
   } catch (error) {
-    console.error('Cancel test error:', error);
+    console.error('❌ [cancelTest] EXCEPTION:', {
+      message: error.message,
+      stack: error.stack,
+      code: error.code
+    });
     res.status(500).json({
       success: false,
       message: 'Failed to cancel test',

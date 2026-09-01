@@ -175,10 +175,18 @@ export const getPatientTests = async (req, res) => {
       });
     }
 
+    // Exclude cancelled tests from all queries - case-insensitive matching
+    andConditions.push({
+      status: {
+        notIn: ['Cancelled', 'CANCELLED', 'cancelled']
+      }
+    });
+
     const whereCondition = andConditions.length > 0 ? { AND: andConditions } : {};
 
     // 🔴 DEBUG: Log the where condition
     console.log('🔴 WHERE condition:', JSON.stringify(whereCondition, null, 2));
+    console.log('🔴 Filter applied: Excluding tests with status IN [Cancelled, CANCELLED, cancelled]');
 
     // Get total count for pagination
     const total = await prisma.patientTest.count({
@@ -256,6 +264,15 @@ export const getPatientTests = async (req, res) => {
         { visitTime: 'desc' }
       ]
     });
+
+    // 🔴 DEBUG: Log test statuses to verify filter is working
+    console.log(`🔴 Query returned ${patientTests.length} tests`);
+    const testStatuses = patientTests.map(t => ({ id: t.id, status: t.status }));
+    console.log('🔴 Test Statuses:', JSON.stringify(testStatuses, null, 2));
+    const cancelledInResults = patientTests.filter(t => t.status && t.status.toLowerCase() === 'cancelled');
+    if (cancelledInResults.length > 0) {
+      console.warn(`🔴 WARNING: Found ${cancelledInResults.length} cancelled tests in results! Filter not working!`);
+    }
 
     // Group tests by patient and visitId for display
     const groupedResults = {};
@@ -1832,7 +1849,12 @@ export const sendReport = async (req, res) => {
 
     // Fetch all selected patient tests with full data
     const patientTests = await prisma.patientTest.findMany({
-      where: { id: { in: testIds.map(Number) } },
+      where: { 
+        id: { in: testIds.map(Number) },
+        status: {
+          notIn: ['Cancelled', 'CANCELLED', 'cancelled']
+        }
+      },
       include: {
         patient: true,
         test: true,
@@ -2036,7 +2058,10 @@ export const getAllTestResults = async (req, res) => {
     const allResults = await prisma.patientTest.findMany({
       where: {
         patientId: String(patientId), // patientId is a String, not Int
-        testId: parseInt(testId)
+        testId: parseInt(testId),
+        status: {
+          notIn: ['Cancelled', 'CANCELLED', 'cancelled']
+        }
       },
       include: {
         testResults: {
@@ -2331,6 +2356,9 @@ export const getCommentHistory = async (req, res) => {
       where: {
         comments: {
           not: null
+        },
+        status: {
+          notIn: ['Cancelled', 'CANCELLED', 'cancelled']
         }
       },
       select: {

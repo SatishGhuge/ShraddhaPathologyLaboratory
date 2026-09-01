@@ -347,3 +347,12 @@ export const saveBulkReferralDoctorSettlement = async (settlementData: {
     body: JSON.stringify(settlementData)
   });
 };
+
+// Cancel a test from a visit - marks it as Cancelled and updates billing
+export const cancelTest = async (visitId: string, patientTestId: string | number, remarks?: string): Promise<ApiResponse> => {
+  console.log('🗑️ API: Calling cancelTest endpoint', { visitId, patientTestId, endpoint: `/patients/${visitId}/cancel-test/${patientTestId}` });
+  return apiCall(`/patients/${visitId}/cancel-test/${patientTestId}`, {
+    method: 'POST',
+    body: JSON.stringify({ remarks: remarks || 'User cancelled' }),
+  });
+};

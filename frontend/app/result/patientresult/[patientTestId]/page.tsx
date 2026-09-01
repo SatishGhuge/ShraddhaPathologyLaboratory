@@ -15,17 +15,138 @@ import ClassicEditor from '@ckeditor/ckeditor5-build-classic';
 import { parseHtmlText, stripHtmlTags, HtmlPart } from '@/src/utils/htmlParser';
 const LetterHead = "/LetterHead.jpeg";
 
+// ✅ Helper function to extract ALL available options from a parameter (from ALL database fields)
+const getAllOptionsFromParameter = (param: any): string[] => {
+  const allOptions: string[] = [];  // Use array to maintain order
+  const seenOptions = new Set<string>();
+  
+  // 1. Add all options from textContent (primary source - textarea with newline or pipe-separated values)
+  // IMPORTANT: Keep order as entered (first line = first option)
+  if (param.textContent) {
+    try {
+      let options: any[] = [];
+      try {
+        options = JSON.parse(param.textContent);
+      } catch {
+        // Split by newlines first to get lines in order
+        const byNewline = param.textContent.split('\n').map((o: string) => o.trim()).filter(Boolean);
+        console.log(`📋 ${param.parameterName} - Raw textContent:`, param.textContent);
+        console.log(`📋 ${param.parameterName} - Split by newline:`, byNewline);
+        if (byNewline.length > 1) {
+          options = byNewline;
+        } else {
+          // If only one line, split by pipes ONLY (not commas - commas are part of the continuous value)
+          options = param.textContent.split('|').map((o: string) => o.trim()).filter(Boolean);
+          console.log(`📋 ${param.parameterName} - Split by pipe (single line):`, options);
+        }
+      }
+      
+      console.log(`🔍 ${param.parameterName} - Options before processing:`, options);
+      
+      options.forEach((option: any) => {
+        const optionValue = typeof option === 'object' ? option.value || option.name : option;
+        const trimmed = optionValue?.toString().trim();
+        console.log(`  → Option: "${optionValue}" → Trimmed: "${trimmed}"`);
+        // Include even if it's just a dash "-" or empty (they are valid values)
+        if (trimmed !== null && trimmed !== undefined && !seenOptions.has(trimmed)) {
+          allOptions.push(trimmed);
+          seenOptions.add(trimmed);
+          console.log(`    ✅ Added: "${trimmed}"`);
+        }
+      });
+    } catch (e) {
+      console.warn(`Error parsing textContent for parameter ${param.id}:`, e);
+    }
+  }
+  
+  console.log(`✅ Final allOptions for ${param.parameterName}:`, allOptions);
+  
+  // 2. Add gender-specific default values (same as validation module)
+  if (param.maleDefaultValue?.trim() && !seenOptions.has(param.maleDefaultValue.trim())) {
+    allOptions.push(param.maleDefaultValue.trim());
+    seenOptions.add(param.maleDefaultValue.trim());
+  }
+  if (param.femaleDefaultValue?.trim() && !seenOptions.has(param.femaleDefaultValue.trim())) {
+    allOptions.push(param.femaleDefaultValue.trim());
+    seenOptions.add(param.femaleDefaultValue.trim());
+  }
+  if (param.childDefaultValue?.trim() && !seenOptions.has(param.childDefaultValue.trim())) {
+    allOptions.push(param.childDefaultValue.trim());
+    seenOptions.add(param.childDefaultValue.trim());
+  }
+  
+  // 3. Add from displayRangeText (split by pipe only)
+  if (param.displayRangeText?.trim()) {
+    param.displayRangeText.split('|').forEach((opt: string) => {
+      const trimmed = opt.trim();
+      if (trimmed !== null && trimmed !== undefined && !seenOptions.has(trimmed)) {
+        allOptions.push(trimmed);
+        seenOptions.add(trimmed);
+      }
+    });
+  }
+  
+  // 4. Add from rangeText (split by pipe only)
+  if (param.rangeText?.trim()) {
+    param.rangeText.split('|').forEach((opt: string) => {
+      const trimmed = opt.trim();
+      if (trimmed !== null && trimmed !== undefined && !seenOptions.has(trimmed)) {
+        allOptions.push(trimmed);
+        seenOptions.add(trimmed);
+      }
+    });
+  }
+  
+  // 5. Add from rangeValues (JSON or pipe-separated)
+  if (param.rangeValues?.trim()) {
+    try {
+      let rangeValues: any[] = [];
+      try {
+        rangeValues = JSON.parse(param.rangeValues);
+      } catch {
+        // Split by pipes ONLY
+        rangeValues = param.rangeValues.split('|').map((o: string) => o.trim());
+      }
+      
+      rangeValues.forEach((val: any) => {
+        const value = typeof val === 'object' ? val.value || val.name : val;
+        const trimmed = value?.toString().trim();
+        if (trimmed !== null && trimmed !== undefined && !seenOptions.has(trimmed)) {
+          allOptions.push(trimmed);
+          seenOptions.add(trimmed);
+        }
+      });
+    } catch (e) {
+      console.warn(`Error parsing rangeValues for parameter ${param.id}:`, e);
+    }
+  }
+  
+  // Return in order (first option from textContent will be first in array)
+  return allOptions.filter(opt => opt !== null && opt !== undefined);
+};
+
+// ✅ Helper function to get the first text option (default value for text parameters)
+const getFirstTextOption = (param: any): string | null => {
+  const options = getAllOptionsFromParameter(param);
+  console.log(`🎯 getFirstTextOption for ${param.parameterName}:`, {
+    totalOptions: options.length,
+    firstOption: options[0],
+    allOptions: options
+  });
+  return options.length > 0 ? options[0] : null;
+};
+
 // Plain text area with suggestion dropdown and formatting support
 // Text can be edited directly, formatted with Ctrl+B for bold
 // Shows [bold text] with visual formatting in report
 // Ctrl+B to make selected text bold
 // Resizable with drag handle - arrow on right side indicates panic direction
-const SuggestionInput = ({ value, onChange, options, isAbnormal, panicInfo }) => {
+const SuggestionInput = ({ value, onChange, options, isAbnormal, panicInfo, fullWidth = false }) => {
   const [show, setShow] = useState(false);
   const [showTooltip, setShowTooltip] = useState(false);
   const [searchInput, setSearchInput] = useState('');
   const [isResizing, setIsResizing] = useState(false);
-  const [customSize, setCustomSize] = useState({ width: 150, height: 30 });
+  const [customSize, setCustomSize] = useState({ width: fullWidth ? 500 : 150, height: fullWidth ? 70 : 30 });
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const containerRef = useRef(null);
   const ref = useRef(null);
@@ -76,7 +197,8 @@ const SuggestionInput = ({ value, onChange, options, isAbnormal, panicInfo }) =>
   // Handle selecting option from dropdown
   const addOption = (opt: any) => {
     const currentValue = value ? value.trim() : '';
-    const newValue = currentValue ? `${currentValue}, ${opt}` : opt;
+    // Use pipe separator for new options (instead of comma) so they can be split properly
+    const newValue = currentValue ? `${currentValue}|${opt}` : opt;
     onChange(newValue);
     setSearchInput('');
     setShow(false);
@@ -85,9 +207,12 @@ const SuggestionInput = ({ value, onChange, options, isAbnormal, panicInfo }) =>
 
   // Handle input change
   const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    const newValue = e.target.value;
-    onChange(newValue);
-    setSearchInput(newValue.split(',').pop()?.trim() || '');
+    const displayValue = e.target.value;
+    // Keep pipes internally, but handle user input with spaces
+    const internalValue = displayValue.replace(/\s+/g, '|');
+    onChange(internalValue);
+    // For search input, use the last part after space/pipe
+    setSearchInput(displayValue.split(/[\s|]/).pop()?.trim() || '');
     // Show suggestions if there's any input
     setShow(true);
   };
@@ -143,13 +268,13 @@ const SuggestionInput = ({ value, onChange, options, isAbnormal, panicInfo }) =>
   };
 
   return (
-    <div ref={ref} className="relative flex items-center gap-1">
+    <div ref={ref} className={`relative ${fullWidth ? 'w-full flex items-start gap-1' : 'flex items-center gap-1'}`}>
       {/* Resizable container */}
       <div 
         ref={containerRef}
-        className={`border rounded relative ${isAbnormal ? "border-red-500 bg-red-50" : "border-gray-300 bg-white"}`}
+        className={`border rounded relative flex-1 ${isAbnormal ? "border-red-500 bg-red-50" : "border-gray-300 bg-white"}`}
         style={{
-          width: `${customSize.width}px`,
+          width: fullWidth ? '100%' : `${customSize.width}px`,
           height: `${customSize.height}px`,
           overflow: 'hidden',
           display: 'flex',
@@ -159,7 +284,7 @@ const SuggestionInput = ({ value, onChange, options, isAbnormal, panicInfo }) =>
       >
         <textarea
           ref={textareaRef}
-          value={value || ''}
+          value={value ? value.replace(/\|/g, ' ') : ''}
           onChange={handleInputChange}
           onKeyDown={handleKeyDown}
           onFocus={() => setShow(true)}
@@ -213,7 +338,7 @@ const SuggestionInput = ({ value, onChange, options, isAbnormal, panicInfo }) =>
 
       {/* Dropdown with option suggestions */}
       {show && filtered.length > 0 && (
-        <ul className="absolute z-50 left-0 top-full mt-1 bg-white border border-gray-300 rounded shadow-lg max-h-48 overflow-y-auto text-sm" style={{ width: `${customSize.width}px` }}>
+        <ul className="absolute z-50 left-0 top-full mt-1 bg-white border border-gray-300 rounded shadow-lg max-h-48 overflow-y-auto text-sm" style={{ width: fullWidth ? '100%' : `${customSize.width}px` }}>
           {filtered.map(opt => (
             <li
               key={opt}
@@ -1009,6 +1134,7 @@ const PatientResult = () => {
           name: p.parameterName,
           units: p.units,
           type: p.type,
+          isDescriptive: p.isDescriptive,
           lowPanic: p.lowPanic,
           highPanic: p.highPanic,
           category: p.categoryName
@@ -1029,63 +1155,12 @@ const PatientResult = () => {
             let defaultTextValue = '';
             
             if ((param.type === 'Text' || param.isMultipleOptions) && !param.isDescriptive) {
-              // Get all available options from various sources - PRESERVE ORDER
-              const allOptions: string[] = [];  // Use array instead of Set to preserve order
-              const seenOptions = new Set<string>();
-              
-              // From textContent (primary source - textarea with newline-separated values)
-              if (param.textContent && param.textContent !== 'Parameter') {
-                try {
-                  let options: any[] = [];
-                  try {
-                    options = JSON.parse(param.textContent);
-                  } catch {
-                    // Split by newlines first, then try commas
-                    const byNewline = param.textContent.split('\n').map((o: string) => o.trim()).filter(Boolean);
-                    if (byNewline.length > 1) {
-                      options = byNewline;
-                    } else {
-                      options = param.textContent.split(',').map((o: string) => o.trim()).filter(Boolean);
-                    }
-                  }
-                  options.forEach((option: any) => {
-                    const optionValue = typeof option === 'object' ? option.value || option.name : option;
-                    const trimmedValue = optionValue?.toString().trim();
-                    if (trimmedValue && !seenOptions.has(trimmedValue)) {
-                      allOptions.push(trimmedValue);
-                      seenOptions.add(trimmedValue);
-                    }
-                  });
-                } catch (e) {
-                  console.warn(`Error parsing textContent for parameter ${param.id}:`, e);
-                }
-              }
-              
-              // From rangeText (if no textContent)
-              if (allOptions.length === 0 && param.rangeText) {
-                param.rangeText.split(/[,|]/).map((o: string) => o.trim()).forEach(opt => {
-                  if (opt && opt.trim() && !seenOptions.has(opt)) {
-                    allOptions.push(opt.trim());
-                    seenOptions.add(opt);
-                  }
-                });
-              }
-              
-              // From displayRangeText (if still no options)
-              if (allOptions.length === 0 && param.displayRangeText) {
-                param.displayRangeText.split(/[,|]/).map((o: string) => o.trim()).forEach(opt => {
-                  if (opt && opt.trim() && !seenOptions.has(opt)) {
-                    allOptions.push(opt.trim());
-                    seenOptions.add(opt);
-                  }
-                });
-              }
-              
-              // Get first option as default, skip "-" if it's the first - PRESERVE ORIGINAL ORDER
+              // Use the same getAllOptionsFromParameter function to extract options
+              // This ensures consistent parsing across all components
+              const allOptions = getAllOptionsFromParameter(param);
               if (allOptions.length > 0) {
-                // Find first non-dash option, preserving original order
-                defaultTextValue = allOptions.find(opt => opt !== '-' && opt.trim() !== '') || '';
-                console.log(`📌 DEFAULT: Param ${param.id} (${param.parameterName}) set to FIRST option: "${defaultTextValue}" (all options in order: ${JSON.stringify(allOptions)})`);
+                defaultTextValue = allOptions[0]; // Get first option as default
+                console.log(`📌 Init Default: Param ${param.id} (${param.parameterName}) = "${defaultTextValue}"`);
               }
             }
             
@@ -1913,14 +1988,28 @@ const PatientResult = () => {
                             const outOfRange = isValueOutOfRange(param, results[paramKey]?.numericValue);
                             const isFormula = param.hasFormula && param.formula;
                             const inputClass = outOfRange ? "border-2 border-red-500 bg-red-50 px-2 py-1 w-24 rounded" : "border border-gray-300 px-2 py-1 w-24 rounded";
-                            const rawRange = param.rangeText || param.displayRangeText || '';
-                            const options = rawRange
-                              ? rawRange.split(/[,|]/).map(o => o.trim()).filter(Boolean)
-                              : [];
+                            // ✅ Use getAllOptionsFromParameter to get options from textContent, rangeText, displayRangeText, etc.
+                            const options = getAllOptionsFromParameter(param);
+                            // Determine if this is a text/dropdown parameter (not numeric, not descriptive)
+                            const isTextDropdown = param.type === 'Text' && !param.isDescriptive;
+                            
+                            // 🔴 DEBUG: Log parameter type info
+                            if (param.type === 'Text') {
+                              console.log(`DEBUG: param.parameterName="${param.parameterName}", type="${param.type}", isDescriptive=${param.isDescriptive}, isTextDropdown=${isTextDropdown}`);
+                            }
+                            
+                            // 🔴 DEBUG: Also log ALL descriptive parameters
+                            if (param.isDescriptive) {
+                              console.log(`🎨 DESCRIPTIVE PARAM: ${param.parameterName} - should render CKEditor`);
+                            }
+                            
+                            // 🔴 DEBUG: Log which branch each parameter takes
+                            console.log(`📊 PARAM ${param.parameterName}: type=${param.type}, isDescriptive=${param.isDescriptive}, branch=${ param.type === 'Numeric' ? 'NUMERIC' : param.isDescriptive ? 'DESCRIPTIVE(CKEDITOR)' : param.type === 'Text' ? 'TEXT' : 'OTHER'}`);
+                            
                             return (
                               <tr key={param.id} className="bg-purple-100">
                                 <td className="border p-2">{(param.parameterName || '').toUpperCase()}</td>
-                                <td className="border p-2">
+                                <td className="border p-2" colSpan={isTextDropdown ? 3 : undefined}>
                                   <div className="flex items-center gap-2">
                                     {param.type === 'Numeric' ? (
                                       <input
@@ -1931,43 +2020,125 @@ const PatientResult = () => {
                                         className={`${results[paramKey]?.isHighlighted ? 'border-2 border-red-500 bg-red-50' : inputClass} px-2 py-1 w-24 rounded`}
                                       />
                                     ) : param.isDescriptive ? (
-                                      <div className="border border-gray-300 rounded min-h-[150px]">
-                                        <CKEditor
-                                          editor={ClassicEditor as any}
-                                          data={results[paramKey]?.textValue || ''}
-                                          onChange={(_, editor) => {
-                                            const data = editor.getData();
-                                            handleResultChange(paramKey, 'textValue', data, testData.parameters);
-                                          }}
-                                          config={{
-                                            toolbar: [
-                                              'heading', '|',
-                                              'bold', 'italic', 'underline', '|',
-                                              'fontSize', 'fontColor', '|',
-                                              'bulletedList', 'numberedList', '|',
-                                              'link', 'blockQuote', '|',
-                                              'undo', 'redo'
-                                            ]
-                                          }}
-                                        />
-                                      </div>
+                                      (() => {
+                                        console.log(`✅ RENDERING CKEDITOR for ${param.parameterName} (id: ${param.id})`);
+                                        return (
+                                          <div className="border border-gray-300 rounded min-h-[150px] w-full">
+                                            <CKEditor
+                                              editor={ClassicEditor as any}
+                                              data={results[paramKey]?.textValue || ''}
+                                              onChange={(_, editor) => {
+                                                const data = editor.getData();
+                                                handleResultChange(paramKey, 'textValue', data, testData.parameters);
+                                              }}
+                                              config={{
+                                                toolbar: [
+                                                  'heading', '|',
+                                                  'bold', 'italic', 'underline', '|',
+                                                  'fontSize', 'fontColor', '|',
+                                                  'bulletedList', 'numberedList', '|',
+                                                  'link', 'blockQuote', '|',
+                                                  'undo', 'redo'
+                                                ]
+                                              }}
+                                            />
+                                          </div>
+                                        );
+                                      })()
                                     ) : param.type === 'Text' ? (
-                                      options.length > 0 ? (
-                                        <SuggestionInput
-                                          value={results[paramKey]?.textValue || ''}
-                                          onChange={(val) => handleResultChange(paramKey, 'textValue', val, testData.parameters)}
-                                          options={options}
-                                          isAbnormal={results[paramKey]?.isAbnormal || false}
-                                          panicInfo={results[paramKey]?.panicInfo}
-                                        />
-                                      ) : (
-                                        <input
-                                          type="text"
-                                          value={results[paramKey]?.textValue || ''}
-                                          onChange={(e) => handleResultChange(paramKey, 'textValue', e.target.value, testData.parameters)}
-                                          className={`border px-2 py-1 w-32 rounded ${results[paramKey]?.isAbnormal ? "border-red-500 bg-red-50" : "border-gray-300"}`}
-                                        />
-                                      )
+                                      // ✅ TEXT/DROPDOWN - Same logic as Validation & Authentication modules
+                                      <div className="w-full space-y-1">
+                                        {/* ✅ Only pipe (|) separator splits into separate items. Commas (,) show as continuous text */}
+                                        {(() => {
+                                          const textValue = results[paramKey]?.textValue || '';
+                                          const hasPipe = textValue.includes('|');
+                                          
+                                          if (hasPipe) {
+                                            // PIPE separator: Split and show as separate items
+                                            const items = textValue.split('|').map((o: string) => o.trim()).filter(Boolean);
+                                            return (
+                                              <>
+                                                <div className="flex flex-col gap-1 text-xs">
+                                                  {items.map((option: string, idx: number) => (
+                                                    <div
+                                                      key={idx}
+                                                      className="inline-flex items-center text-xs font-medium text-gray-900 bg-blue-50 px-2 py-1 rounded"
+                                                    >
+                                                      <span className="text-xs flex-1">{option}</span>
+                                                      <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                          const newItems = items.filter((_: string, i: number) => i !== idx);
+                                                          handleResultChange(paramKey, 'textValue', newItems.join('|'), testData.parameters);
+                                                        }}
+                                                        className="text-gray-500 hover:text-gray-700 font-bold cursor-pointer ml-1"
+                                                        title="Remove this selection"
+                                                      >
+                                                        ×
+                                                      </button>
+                                                    </div>
+                                                  ))}
+                                                </div>
+                                                {/* Dropdown to add more items */}
+                                                <select
+                                                  value=""
+                                                  onChange={(e) => {
+                                                    if (e.target.value) {
+                                                      const existing = results[paramKey]?.textValue || '';
+                                                      const currentOptions = existing ? existing.split('|').map((o: string) => o.trim()).filter(Boolean) : [];
+                                                      if (!currentOptions.includes(e.target.value)) {
+                                                        currentOptions.push(e.target.value);
+                                                        handleResultChange(paramKey, 'textValue', currentOptions.join('|'), testData.parameters);
+                                                      }
+                                                      e.target.value = '';
+                                                    }
+                                                  }}
+                                                  className="w-full border border-gray-300 px-1.5 py-0.5 rounded text-xs focus:outline-none focus:ring-1 focus:ring-gray-400 bg-white text-gray-700 cursor-pointer"
+                                                >
+                                                  <option value="">➕ Add...</option>
+                                                  {options.map((optionValue: string) => (
+                                                    <option key={optionValue} value={optionValue}>
+                                                      {optionValue}
+                                                    </option>
+                                                  ))}
+                                                </select>
+                                              </>
+                                            );
+                                          } else {
+                                            // NO PIPE: Show as single continuous text value (including comma-separated values)
+                                            return (
+                                              <>
+                                                {textValue && (
+                                                  <div className="text-xs font-medium text-gray-900 px-2 py-1 border border-gray-200 rounded bg-gray-50">
+                                                    {textValue}
+                                                  </div>
+                                                )}
+                                                {/* Dropdown - use pipe separator for new additions */}
+                                                <select
+                                                  value=""
+                                                  onChange={(e) => {
+                                                    if (e.target.value) {
+                                                      const existing = results[paramKey]?.textValue || '';
+                                                      // For new additions to non-pipe values, append with pipe to indicate new format
+                                                      const newText = existing ? `${existing}|${e.target.value}` : e.target.value;
+                                                      handleResultChange(paramKey, 'textValue', newText, testData.parameters);
+                                                      e.target.value = '';
+                                                    }
+                                                  }}
+                                                  className="w-full border border-gray-300 px-1.5 py-0.5 rounded text-xs focus:outline-none focus:ring-1 focus:ring-gray-400 bg-white text-gray-700 cursor-pointer"
+                                                >
+                                                  <option value="">➕ Add...</option>
+                                                  {options.map((optionValue: string) => (
+                                                    <option key={optionValue} value={optionValue}>
+                                                      {optionValue}
+                                                    </option>
+                                                  ))}
+                                                </select>
+                                              </>
+                                            );
+                                          }
+                                        })()}
+                                      </div>
                                     ) : (
                                       <div className="text-xs italic text-gray-600">{param.type} Parameter</div>
                                     )}
@@ -1977,14 +2148,16 @@ const PatientResult = () => {
                                     })()}
                                   </div>
                                 </td>
-                                <td className="border p-2 text-xs">{param.units || '-'}</td>
-                                <td className="border p-2 text-xs">
-                                  {stripHtmlTags(
-                                    param.type === 'Text' || param.isDescriptive
-                                      ? (getAgeAppropriateRange(param, patientData?.patient?.ageYears, patientData?.patient?.ageMonths, patientData?.patient?.ageDays, patientData?.patient?.gender) || '')
-                                      : (getAgeAppropriateRange(param, patientData?.patient?.ageYears, patientData?.patient?.ageMonths, patientData?.patient?.ageDays, patientData?.patient?.gender) || param.normalRange || param.displayRangeText || param.rangeText || '-')
-                                  )}
-                                </td>
+                                {!isTextDropdown && !param.isDescriptive && (
+                                  <>
+                                    <td className="border p-2 text-xs">{param.units || '-'}</td>
+                                    <td className="border p-2 text-xs">
+                                      {stripHtmlTags(
+                                        getAgeAppropriateRange(param, patientData?.patient?.ageYears, patientData?.patient?.ageMonths, patientData?.patient?.ageDays, patientData?.patient?.gender) || param.normalRange || param.displayRangeText || param.rangeText || '-'
+                                      )}
+                                    </td>
+                                  </>
+                                )}
                                 <td className="border p-2 text-center" style={{width: '40px'}}>
                                   <input 
                                     type="checkbox" 
@@ -2131,8 +2304,8 @@ const PatientResult = () => {
                         return (
                           <tr key={param.id} className="bg-purple-100">
                             <td className="border p-2">{renderStyledText((param.parameterName || '').toUpperCase(), false)}{param.isMandatory && <span className="text-red-500">*</span>}</td>
-                            <td className="border p-2">
-                              <div className="flex items-center gap-2">
+                            <td className="border p-2" colSpan={param.type === 'Text' && !param.isDescriptive ? 3 : undefined}>
+                              <div className={`${param.type === 'Text' && !param.isDescriptive ? 'w-full flex flex-col' : 'flex items-center gap-2'}`}>
                                 {isFormula ? (
                                   <div className="flex items-center gap-1">
                                     {editingFormulaFields.has(param.id) ? (
@@ -2218,30 +2391,32 @@ const PatientResult = () => {
                                   </div>
                                 ) : param.type === 'Text' ? (
                                   (() => {
-                                    const rawRange = param.rangeText || param.displayRangeText || '';
-                                    const options = rawRange
-                                      ? rawRange.split(/[,|]/).map(o => o.trim()).filter(Boolean)
-                                      : [];
+                                    // ✅ Use getAllOptionsFromParameter to get all options (includes textContent, rangeText, displayRangeText, etc.)
+                                    const options = getAllOptionsFromParameter(param);
+                                    const firstOption = getFirstTextOption(param);
                                     
-                                    // ✅ NEW: If mandatory and no value yet, use first option as default
-                                    let defaultValue = results[param.id]?.textValue ?? (param.textContent || '');
-                                    if (param.isMandatory && !results[param.id]?.textValue && options.length > 0) {
-                                      defaultValue = options[0];
+                                    // ✅ DEBUG: Log to verify this is being called
+                                    console.log(`DEBUG TEXT PARAM: ${param.parameterName}, firstOption="${firstOption}", currentValue="${results[param.id]?.textValue}", options=[${options.join(', ')}]`);
+                                    
+                                    // ✅ NEW: Set first option as default if no existing value
+                                    let displayValue = results[param.id]?.textValue;
+                                    if (!displayValue && firstOption) {
+                                      displayValue = firstOption;
+                                      console.log(`  → Setting default to: "${firstOption}"`);
                                       // Auto-set the first option value in results
-                                      if (!results[param.id]?.textValue) {
-                                        setTimeout(() => {
-                                          handleResultChange(param.id, 'textValue', options[0], parameters);
-                                        }, 0);
-                                      }
+                                      setTimeout(() => {
+                                        handleResultChange(param.id, 'textValue', firstOption, parameters);
+                                      }, 0);
                                     }
                                     
                                     return options.length > 0 ? (
                                       <SuggestionInput
-                                        value={defaultValue}
+                                        value={displayValue || ''}
                                         onChange={(val) => handleResultChange(param.id, 'textValue', val, parameters)}
                                         options={options}
                                         isAbnormal={results[param.id]?.isAbnormal}
                                         panicInfo={results[param.id]?.panicInfo}
+                                        fullWidth={true}
                                       />
                                     ) : (
                                       <input type="text" value={results[param.id]?.textValue || ''} onChange={(e) => handleResultChange(param.id, 'textValue', e.target.value, parameters)} className={`border px-2 py-1 w-32 rounded ${results[param.id]?.isAbnormal ? "border-red-500 bg-red-50" : "border-gray-300"}`} />
@@ -2249,30 +2424,28 @@ const PatientResult = () => {
                                   })()
                                 ) : (
                                   (() => {
-                                    const rawRange = param.rangeText || param.displayRangeText || '';
-                                    const options = rawRange
-                                      ? rawRange.split(/[,|]/).map(o => o.trim()).filter(Boolean)
-                                      : [];
+                                    // ✅ Use getAllOptionsFromParameter for multi-option parameters
+                                    const options = getAllOptionsFromParameter(param);
+                                    const firstOption = getFirstTextOption(param);
                                     
-                                    // ✅ NEW: If mandatory and no value yet, use first option as default
-                                    let defaultValue = results[param.id]?.textValue ?? (param.textContent || '');
-                                    if (param.isMandatory && !results[param.id]?.textValue && options.length > 0) {
-                                      defaultValue = options[0];
+                                    // ✅ NEW: Set first option as default if no existing value
+                                    let displayValue = results[param.id]?.textValue;
+                                    if (!displayValue && firstOption) {
+                                      displayValue = firstOption;
                                       // Auto-set the first option value in results
-                                      if (!results[param.id]?.textValue) {
-                                        setTimeout(() => {
-                                          handleResultChange(param.id, 'textValue', options[0], parameters);
-                                        }, 0);
-                                      }
+                                      setTimeout(() => {
+                                        handleResultChange(param.id, 'textValue', firstOption, parameters);
+                                      }, 0);
                                     }
                                     
                                     return options.length > 0 ? (
                                       <SuggestionInput
-                                        value={defaultValue}
+                                        value={displayValue || ''}
                                         onChange={(val) => handleResultChange(param.id, 'textValue', val, parameters)}
                                         options={options}
                                         isAbnormal={results[param.id]?.isAbnormal}
                                         panicInfo={results[param.id]?.panicInfo}
+                                        fullWidth={true}
                                       />
                                     ) : (
                                       <input type="text" value={results[param.id]?.textValue || ''} onChange={(e) => handleResultChange(param.id, 'textValue', e.target.value, parameters)} className={`border px-2 py-1 w-32 rounded ${results[param.id]?.isAbnormal ? "border-red-500 bg-red-50" : "border-gray-300"}`} />
@@ -2285,18 +2458,22 @@ const PatientResult = () => {
                                 })()}
                               </div>
                             </td>
-                            <td className="border p-2 text-xs">
-                              {(() => {
-                                const unitValue = stripHtmlTags(param.units || '') || '-';
-                                console.log(`🔍 Rendering UNITS for ${param.parameterName}: "${unitValue}"`);
-                                return unitValue;
-                              })()}
-                            </td>
-                            <td className="border p-2">
-                              {stripHtmlTags(
-                                getAgeAppropriateRange(param, patientData?.patient?.ageYears, patientData?.patient?.ageMonths, patientData?.patient?.ageDays, patientData?.patient?.gender) || ''
-                              )}
-                            </td>
+                            {param.type !== 'Text' && !param.isDescriptive && (
+                              <>
+                                <td className="border p-2 text-xs">
+                                  {(() => {
+                                    const unitValue = stripHtmlTags(param.units || '') || '-';
+                                    console.log(`🔍 Rendering UNITS for ${param.parameterName}: "${unitValue}"`);
+                                    return unitValue;
+                                  })()}
+                                </td>
+                                <td className="border p-2">
+                                  {stripHtmlTags(
+                                    getAgeAppropriateRange(param, patientData?.patient?.ageYears, patientData?.patient?.ageMonths, patientData?.patient?.ageDays, patientData?.patient?.gender) || ''
+                                  )}
+                                </td>
+                              </>
+                            )}
                             <td className="border p-2 text-center" style={{width: '40px'}}>
                               <input 
                                 type="checkbox" 
