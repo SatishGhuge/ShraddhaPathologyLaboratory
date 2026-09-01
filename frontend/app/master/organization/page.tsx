@@ -14,6 +14,9 @@ const OrganizationList = () => {
   const [showInactive, setShowInactive] = useState(false); // Checkbox for showing inactive
   const [organizations, setOrganizations] = useState<any[]>([]);
   const [filteredOrganizations, setFilteredOrganizations] = useState<any[]>([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pagination, setPagination] = useState<any>(null);
+  const ITEMS_PER_PAGE = 20;
 
   useEffect(() => {
     getOrganizations()
@@ -37,6 +40,7 @@ const OrganizationList = () => {
       return nameMatch && locationMatch && statusMatch;
     });
     setFilteredOrganizations(filtered);
+    setCurrentPage(1); // Reset to page 1 when filters change
   }, [searchName, searchLocation, showInactive, organizations]);
 
   const handleReset = () => {
@@ -138,8 +142,23 @@ const OrganizationList = () => {
             </thead>
 
             <tbody>
-              {filteredOrganizations.length > 0 ? (
-                filteredOrganizations.map((o) => (
+              {(() => {
+                const totalPages = Math.ceil(filteredOrganizations.length / ITEMS_PER_PAGE);
+                const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+                const endIndex = startIndex + ITEMS_PER_PAGE;
+                const paginatedData = filteredOrganizations.slice(startIndex, endIndex);
+
+                // Update pagination state
+                if (pagination?.total !== filteredOrganizations.length || pagination?.totalPages !== totalPages) {
+                  setPagination({
+                    total: filteredOrganizations.length,
+                    totalPages: totalPages,
+                    currentPage: currentPage
+                  });
+                }
+
+                return paginatedData.length > 0 ? (
+                  paginatedData.map((o) => (
                   <tr key={o.id} className="hover:bg-gray-50 border-b border-gray-200">
                     <td className="border border-gray-300 px-3 py-1">{o.id}</td>
                     <td className="border border-gray-300 px-3 py-1 font-medium">{o.name}</td>
@@ -190,16 +209,48 @@ const OrganizationList = () => {
                     </td>
                   </tr>
                 ))
-             ) : (
+              ) : (
                 <tr>
                   <td colSpan={9} className="text-center py-4 text-gray-500 border border-gray-300">
                     No organizations found
                   </td>
                 </tr>
-              )}
+              );
+              })()}
             </tbody>
           </table>
         </div>
+
+        {/* Pagination Controls */}
+        {pagination && pagination.totalPages > 1 && (
+          <div className="mt-4 flex items-center justify-between bg-white p-3 rounded shadow-md">
+            <div className="text-sm text-gray-600">
+              Showing {Math.min((currentPage - 1) * ITEMS_PER_PAGE + 1, pagination.total)} to{" "}
+              {Math.min(currentPage * ITEMS_PER_PAGE, pagination.total)} of {pagination.total} records
+            </div>
+            <div className="flex gap-2 items-center">
+              <button
+                onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                disabled={currentPage === 1}
+                className="bg-orange-500 hover:bg-orange-600 disabled:bg-gray-400 text-white px-4 py-2 rounded text-sm transition-colors"
+              >
+                Previous
+              </button>
+              
+              <span className="text-sm text-gray-700 font-semibold">
+                Page {currentPage} of {pagination.totalPages}
+              </span>
+              
+              <button
+                onClick={() => setCurrentPage(Math.min(pagination.totalPages, currentPage + 1))}
+                disabled={currentPage === pagination.totalPages}
+                className="bg-orange-500 hover:bg-orange-600 disabled:bg-gray-400 text-white px-4 py-2 rounded text-sm transition-colors"
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </>
   );

@@ -15,6 +15,7 @@ export default function ResultUnits() {
   const [successMsg, setSuccessMsg] = useState("");
 
   const ITEMS_PER_PAGE = 20;
+  const [pagination, setPagination] = useState<any>(null);
 
   useEffect(() => {
     fetchUnits();
@@ -97,37 +98,97 @@ export default function ResultUnits() {
                     Loading units...
                   </td>
                 </tr>
-              ) : (data.filter((item) => item.symbol.toLowerCase().includes(search.toLowerCase()))).length > 0 ? (
-                (data.filter((item) => item.symbol.toLowerCase().includes(search.toLowerCase()))).map((item) => (
-                  <tr key={item.id} className="hover:bg-gray-50 border-b border-gray-200">
-                    <td className="border border-gray-300 px-3 py-1">{item.symbol}</td>
-                    <td className="border border-gray-300 px-3 py-1">
-                      <div className="flex justify-center gap-1 flex-wrap">
-                        <button
-                          onClick={() => { setEditingUnit(item); setShowModal(true); }}
-                          className="bg-blue-600 text-white px-2 py-1 rounded text-xs hover:bg-blue-700 transition-colors"
-                        >
-                          Edit
-                        </button>
-                        <button
-                          onClick={() => handleDelete(item.id)}
-                          className="bg-red-500 text-white px-2 py-1 rounded text-xs hover:bg-red-600 transition-colors"
-                        >
-                          Delete
-                        </button>
-                      </div>
+              ) : (() => {
+                const filtered = data.filter((item) => item.symbol.toLowerCase().includes(search.toLowerCase()));
+                const totalPages = Math.ceil(filtered.length / ITEMS_PER_PAGE);
+                const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+                const endIndex = startIndex + ITEMS_PER_PAGE;
+                const paginatedData = filtered.slice(startIndex, endIndex);
+
+                // Update pagination state
+                if (pagination?.total !== filtered.length || pagination?.totalPages !== totalPages) {
+                  setPagination({
+                    total: filtered.length,
+                    totalPages: totalPages,
+                    currentPage: currentPage
+                  });
+                }
+
+                return paginatedData.length > 0 ? (
+                  paginatedData.map((item) => (
+                    <tr key={item.id} className="hover:bg-gray-50 border-b border-gray-200">
+                      <td className="border border-gray-300 px-3 py-1">{item.symbol}</td>
+                      <td className="border border-gray-300 px-3 py-1">
+                        <div className="flex justify-center gap-1 flex-wrap">
+                          <button
+                            onClick={() => { setEditingUnit(item); setShowModal(true); }}
+                            className="bg-blue-600 text-white px-2 py-1 rounded text-xs hover:bg-blue-700 transition-colors"
+                          >
+                            Edit
+                          </button>
+                          <button
+                            onClick={() => handleDelete(item.id)}
+                            className="bg-red-500 text-white px-2 py-1 rounded text-xs hover:bg-red-600 transition-colors"
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={2} className="text-center py-4 text-gray-500 border border-gray-300">
+                      No records found
                     </td>
                   </tr>
-                ))
-              ) : (
-                <tr>
-                  <td colSpan={2} className="text-center py-4 text-gray-500 border border-gray-300">
-                    No records found
-                  </td>
-                </tr>
-              )}
+                );
+              })()}
             </tbody>
           </table>
+
+          {/* ✅ PAGINATION CONTROLS */}
+          {pagination && pagination.total > 0 && (
+            <div className="mt-3 bg-white rounded shadow-md p-3 flex items-center justify-between text-xs flex-wrap gap-3">
+              <div className="text-gray-600">
+                Showing {(currentPage - 1) * ITEMS_PER_PAGE + 1} to{' '}
+                {Math.min(currentPage * ITEMS_PER_PAGE, pagination.total)} of{' '}
+                {pagination.total} records
+              </div>
+
+              <div className="flex gap-2 items-center flex-wrap">
+                <button
+                  onClick={() => {
+                    const newPage = Math.max(1, currentPage - 1);
+                    setCurrentPage(newPage);
+                  }}
+                  disabled={currentPage === 1}
+                  className={`flex items-center gap-1 px-3 py-1 rounded ${currentPage === 1 ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-orange-500 text-white hover:bg-orange-600'}`}
+                >
+                  <ChevronLeft size={14} /> Previous
+                </button>
+
+                <span className="px-3 py-1 text-gray-700 font-medium">
+                  Page {currentPage} of {pagination.totalPages}
+                </span>
+
+                <button
+                  onClick={() => {
+                    const newPage = Math.min(pagination.totalPages, currentPage + 1);
+                    setCurrentPage(newPage);
+                  }}
+                  disabled={currentPage === pagination.totalPages}
+                  className={`flex items-center gap-1 px-3 py-1 rounded ${currentPage === pagination.totalPages ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-orange-500 text-white hover:bg-orange-600'}`}
+                >
+                  Next <ChevronRight size={14} />
+                </button>
+              </div>
+
+              <div className="text-gray-600">
+                Total: {pagination.total} records
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
