@@ -12,7 +12,7 @@ const CONFIG = {
     host: '0.0.0.0'
   },
   vps: {
-    baseUrl: process.env.VPS_TAILSCALE_URL || 'http://127.0.0.1:3351'
+    baseUrl: process.env.VPS_TAILSCALE_URL || 'https://shraddha.snapsofts.com'
   },
   database: {
     host: process.env.DB_HOST || 'localhost',
@@ -27,7 +27,7 @@ const CONFIG = {
   retry: {
     intervalMs: 30000,
     batchSize: 50,
-    timeoutMs: 5000
+    maxRetries: 10
   }
 };
 
@@ -37,13 +37,11 @@ const ASTM = {
   ACK: 0x06,
   NAK: 0x15,
   STX: 0x02,
-  ETX: 0x03
+  ETX: 0x03,
+  EOT: 0x04,
+  CR: 0x0D,
+  LF: 0x0A
 };
-
-// Validate configuration
-if (!CONFIG.database.password || !CONFIG.vps.baseUrl) {
-  console.warn('[CONFIG] Using default values for some settings');
-}
 
 // ============================================================================
 // DATABASE POOL
@@ -52,270 +50,329 @@ if (!CONFIG.database.password || !CONFIG.vps.baseUrl) {
 const dbPool = mysql.createPool(CONFIG.database);
 
 // ============================================================================
-// UTILITY FUNCTIONS
-// ============================================================================
-
-/**
- * Parse sample ID in format: VISITID-SAMPLETYPEID
- * Example: "202608190001-3" -> { visitId: "202608190001", sampleTypeId: "3" }
- * 
- * @param {string} fullSampleId - Full sample ID from barcode
- * @returns {object} { visitId, sampleTypeId } or null if format is invalid
- */
-function parseSampleId(fullSampleId) {
-  if (!fullSampleId || typeof fullSampleId !== 'string') {
-    console.warn(`[PARSE SAMPLE ID] Invalid input: ${fullSampleId}`);
-    return null;
-  }
-
-  // Check if format contains hyphen separator
-  if (fullSampleId.includes('-')) {
-    const parts = fullSampleId.split('-');
-    if (parts.length === 2) {
-      const visitId = parts[0].trim();
-      const sampleTypeId = parts[1].trim();
-
-      if (visitId && sampleTypeId) {
-        console.log(`[PARSE SAMPLE ID] ✓ Parsed "${fullSampleId}" -> visitId="${visitId}", sampleTypeId="${sampleTypeId}"`);
-        return {
-          visitId: visitId,
-          sampleTypeId: sampleTypeId,
-          fullSampleId: fullSampleId
-        };
-      }
-    }
-  }
-
-  // Fallback: treat entire ID as visitId with no sampleTypeId
-  console.warn(`[PARSE SAMPLE ID] ⚠️ Could not parse format with hyphen, treating as visitId: ${fullSampleId}`);
-  return {
-    visitId: fullSampleId,
-    sampleTypeId: null,
-    fullSampleId: fullSampleId
-  };
-}
-
-// ============================================================================
-// ASTM FRAME UTILITIES
-// ============================================================================
-
-const ASTMFrame = {
-  // ✅ FIX 1: Modulo-256 additive checksum per ASTM E1381 standard (not XOR)
-  checksum(content) {
-    let sum = 0;
-    for (let i = 0; i < content.length; i++) {
-      sum += content.charCodeAt(i);  // ✅ CHANGED: Additive sum (was XOR)
-    }
-    return (sum % 256).toString(16).padStart(2, '0').toUpperCase();  // ✅ CHANGED: Modulo-256
-  },
-
-  build(content) {
-    const checksum = this.checksum(content);
-    const frame = `${String.fromCharCode(ASTM.STX)}${content}${String.fromCharCode(ASTM.ETX)}${checksum}`;
-    return Buffer.from(frame, 'utf8');
-  },
-
-  order(data) {
-    const {
-      visitId = '',
-      patientId = '',
-      patientName = '',
-      priority = 'N',
-      testCodes = '',
-      sequenceNumber = '1'
-    } = data;
-
-    const record = `O|${sequenceNumber}|${visitId}|${patientId}|${patientName}||${priority}|||||${testCodes}`;
-    return this.build(record);
-  },
-
-  terminator() {
-    return this.build('L|1|N');
-  }
-};
-
-// ============================================================================
-// ASTM PARSER
+// ASTM FRAME PARSER (Unidirectional Mode - Receive Only)
 // ============================================================================
 
 const ASTMParser = {
   /**
-   * Parse ASTM frame content (already cleaned of STX/ETX/checksum)
-   * Input example: "H|\^&|||Sysmex^XN-350|||||||P|1|20260729183000"
-   * Input example: "Q|1|202607290001|5"
-   * ✅ FIX 2: Handle frame sequence number (FN digit 0-7 before record type)
+   * Extract clean record content from raw ASTM frame
+   * Handles: STX + frameSeq + record + CR + ETX + checksum + CR + LF
+   * Returns: Clean record string (e.g., "H|\\^&|||XN-350...")
    */
-  parse(frameContent) {
-    console.log(`[ASTM PARSER] Input: "${frameContent}"`);
-    
-    let frameType = null;
-    let visitId = null;
-    let sampleId = null;
-    let testCode = null;
-    let analyzer = null;
-    let parameters = {};
+  extractRecordFromFrame(rawFrame) {
+    try {
+      // Find STX (0x02)
+      const stxIndex = rawFrame.indexOf(String.fromCharCode(ASTM.STX));
+      if (stxIndex === -1) return null;
 
-    // ✅ FIX 2: Strip leading frame sequence number (0-7) if present
-    // Real ASTM machines send: "1H|..." or "2Q|..." 
-    // We need to extract just the record type
-    let contentToParse = frameContent;
-    if (frameContent.length > 0 && /^\d/.test(frameContent[0])) {
-      // First character is a digit (frame number 0-7), skip it
-      contentToParse = frameContent.substring(1);
-      console.log(`[ASTM PARSER] Stripped FN digit, now parsing: "${contentToParse}"`);
+      // Skip STX and frame sequence digit (0-7)
+      let contentStart = stxIndex + 1;
+      if (rawFrame.length > contentStart && /^[0-7]$/.test(rawFrame[contentStart])) {
+        contentStart++; // Skip frame number
+      }
+
+      // Find CR before ETX
+      const crIndex = rawFrame.indexOf(String.fromCharCode(ASTM.CR), contentStart);
+      if (crIndex === -1) return null;
+
+      // Extract record content between frameSeq and CR
+      const record = rawFrame.substring(contentStart, crIndex);
+      
+      return record.trim();
+    } catch (err) {
+      console.error(`[PARSER ERROR] Failed to extract record: ${err.message}`);
+      return null;
+    }
+  },
+
+  /**
+   * Parse ASTM record into structured data
+   * Handles: H, P, O, R, L record types
+   */
+  parseRecord(record) {
+    if (!record || typeof record !== 'string') {
+      return null;
     }
 
-    // Split by pipe separator
-    const parts = contentToParse.split('|');
-    console.log(`[ASTM PARSER] Split into ${parts.length} parts: [${parts.map((p, i) => `${i}:"${p}"`).join(', ')}]`);
+    const fields = record.split('|');
+    const recordType = fields[0];
 
-    const recordType = parts[0];  // ✅ Now correctly "H", "Q", "R", or "L"
-    console.log(`[ASTM PARSER] Record type: ${recordType}`);
-
-    // Handle different frame types
-    if (recordType === 'H') {
-      // Header frame: H|\\^&|||Sysmex^XN-350|||||||P|1|20260729183000
-      frameType = 'HEADER';
-      
-      // parts[0] = "H"
-      // parts[1] = field separator "\\^&"
-      // parts[2] = reserved
-      // parts[3] = reserved
-      // parts[4] = instrument identifier (e.g., "Sysmex^XN-350")
-      if (parts[4]) {
-        analyzer = parts[4].trim();
-        console.log(`[ASTM PARSER] Extracted analyzer from parts[4]: ${analyzer}`);
-      }
-    } 
-    else if (recordType === 'Q') {
-      // Query frame: Q|1|barcode|...
-      // parts[0] = "Q"
-      // parts[1] = sequence number (1)
-      // parts[2] = barcode (e.g., "202608060002-3")
-      frameType = 'QUERY';
-      const fullBarcode = parts[2]?.trim() || null;
-      
-      // Parse barcode to extract visitId and sampleTypeId
-      if (fullBarcode) {
-        const parsed = parseSampleId(fullBarcode);
-        if (parsed) {
-          visitId = parsed.visitId;
-          sampleId = parsed.sampleTypeId;
-          console.log(`[ASTM PARSER] Query frame parsed: fullBarcode="${fullBarcode}" -> visitId="${visitId}", sampleId="${sampleId}"`);
-        } else {
-          // Fallback: treat as visitId if parsing failed
-          visitId = fullBarcode;
-          sampleId = null;
-          console.log(`[ASTM PARSER] Query frame (unparsed): visitId="${visitId}"`);
-        }
-      } else {
-        console.log(`[ASTM PARSER] Query frame: No barcode provided`);
-      }
-    } 
-    else if (recordType === 'R') {
-      // Result frame: R|seq|testCode|paramCode|value|unit|status
-      frameType = 'RESULT';
-      if (parts.length >= 5) {
-        testCode = parts[2]?.trim() || '';
-        const paramCode = parts[3]?.trim() || '';
-        const value = parts[4]?.trim() || '';
-        const key = `${testCode}_${paramCode}`;
-        parameters[key] = value;
-      }
-    } 
-    else if (recordType === 'L') {
-      // Terminator frame: L|1|N
-      frameType = 'TERMINATOR';
-    }
-
-    const result = {
-      frameType: frameType || 'UNKNOWN',
-      visitId,
-      sampleId,
-      analyzer,
-      testCode,
-      timestamp: new Date().toISOString(),
-      parameters
+    const parsed = {
+      type: recordType,
+      raw: record,
+      fields: fields,
+      data: {}
     };
-    
-    console.log(`[ASTM PARSER] Result:`, result);
-    return result;
+
+    // ✅ DEBUG: Log all fields for inspection
+    console.log(`[PARSER DEBUG] Record type: ${recordType}, Total fields: ${fields.length}`);
+    console.log(`[PARSER DEBUG] Field array:`, JSON.stringify(fields));
+
+    try {
+      switch (recordType) {
+        case 'H':
+          // Header: H|\^&|||MachineName^Serial^Version||||Protocol
+          parsed.data.delimiter = fields[1] || '\\^&';
+          parsed.data.analyzer = this.extractAnalyzerName(fields[4] || '');
+          parsed.data.protocol = fields[12] || '';
+          console.log(`[H FRAME] Analyzer: ${parsed.data.analyzer}, Protocol: ${parsed.data.protocol}`);
+          break;
+
+        case 'P':
+          // Patient: Sysmex sends barcode in field[4], name in field[5]
+          // P|1||||||barcode|^PatientName|...
+          parsed.data.sequence = fields[1] || '';
+          parsed.data.patientId = this.cleanField(fields[2] || 'UNKNOWN');
+          parsed.data.patientName = this.cleanField(fields[5] || '');
+          parsed.data.barcode = this.extractBarcode(fields[4] || '');
+          console.log(`[P DEBUG] Field[4]="${fields[4]}", Field[5]="${fields[5]}"`);
+          console.log(`[P FRAME] Patient ID: ${parsed.data.patientId}, Name: ${parsed.data.patientName}, Barcode: ${parsed.data.barcode}`);
+          break;
+
+        case 'O':
+          // Order: Sysmex sends barcode in field[3], test codes in field[4]
+          // O|1||barcode||testCodes|...
+          parsed.data.sequence = fields[1] || '';
+          parsed.data.specimenId = this.cleanField(fields[2] || '');
+          parsed.data.barcode = this.extractBarcode(fields[3] || '');
+          parsed.data.testCode = this.cleanField(fields[4] || '');
+          console.log(`[O DEBUG] Field[3]="${fields[3]}", Field[4]="${fields[4]}"`);
+          console.log(`[O DEBUG] Total fields: ${fields.length}, All: ${JSON.stringify(fields)}`);
+          console.log(`[O FRAME] Barcode: ${parsed.data.barcode}, Test: ${parsed.data.testCode}`);
+          break;
+
+        case 'R':
+          // Result: R|seq|^^^ParamCode|Value|Units|RefRange|Flag|...
+          parsed.data.sequence = fields[1] || '';
+          parsed.data.testId = this.cleanField(fields[2] || '');
+          parsed.data.paramCode = this.extractParamCode(fields[2] || '');
+          
+          // ✅ FIX: Parse numeric values correctly, fallback to string
+          const rawValue = this.cleanField(fields[3] || '');
+          const parsedNum = parseFloat(rawValue);
+          parsed.data.value = !isNaN(parsedNum) ? parsedNum : rawValue;
+          
+          parsed.data.units = this.cleanField(fields[4] || '');
+          parsed.data.referenceRange = this.cleanField(fields[5] || '');
+          parsed.data.abnormalFlag = this.cleanField(fields[6] || '');
+          console.log(`[R FRAME] ${parsed.data.paramCode} = ${parsed.data.value} ${parsed.data.units} [${parsed.data.abnormalFlag}]`);
+          break;
+
+        case 'L':
+          // Terminator: L|1|N
+          parsed.data.sequence = fields[1] || '';
+          parsed.data.terminationCode = fields[2] || '';
+          console.log(`[L FRAME] Terminator received, code: ${parsed.data.terminationCode}`);
+          break;
+
+        case 'C':
+          // Comment Record: C|seq|comment
+          parsed.data.sequence = fields[1] || '';
+          parsed.data.comment = this.cleanField(fields[2] || '');
+          console.log(`[C FRAME] Comment: ${parsed.data.comment}`);
+          break;
+
+        default:
+          console.warn(`[PARSER] Unknown record type: ${recordType}`);
+      }
+    } catch (err) {
+      console.error(`[PARSER ERROR] Failed to parse ${recordType} record: ${err.message}`);
+    }
+
+    return parsed;
+  },
+
+  /**
+   * Extract analyzer name from Sysmex format
+   * Example: "    XN-350^00-24^15567^^^^AW618382" -> "XN-350"
+   */
+  extractAnalyzerName(field) {
+    if (!field) return 'UNKNOWN';
+    const cleaned = field.trim();
+    const parts = cleaned.split('^');
+    return parts[0].trim() || 'UNKNOWN';
+  },
+
+  /**
+   * Extract barcode from Sysmex format
+   * Example: "^^        202608310002-1^M" -> "202608310002-1"
+   */
+  extractBarcode(field) {
+    if (!field) return '';
+    return field
+      .replace(/^\^\^/, '')      // Remove leading ^^
+      .replace(/\^M$/, '')       // Remove trailing ^M
+      .replace(/\^/g, '')        // Remove remaining ^ chars
+      .trim();
+  },
+
+  /**
+   * Extract parameter code from Universal Test ID
+   * Example: "^^^WBC" -> "WBC", "WBC" -> "WBC"
+   */
+  extractParamCode(field) {
+    if (!field) return '';
+    const cleaned = field.replace(/^\^+/, '').trim();
+    return cleaned || '';
+  },
+
+  /**
+   * Clean field by removing ASTM markers and extra whitespace
+   */
+  cleanField(field) {
+    if (!field) return '';
+    return field
+      .replace(/^\^+/, '')
+      .replace(/\^+$/, '')
+      .trim();
+  },
+
+  /**
+   * Parse barcode into visitId and sampleTypeId
+   * Format: "202608310002-1" -> {visitId: "202608310002", sampleTypeId: "1"}
+   */
+  parseBarcodeComponents(barcode) {
+    if (!barcode || !barcode.includes('-')) {
+      return { visitId: barcode, sampleTypeId: null };
+    }
+
+    const parts = barcode.split('-');
+    return {
+      visitId: parts[0].trim(),
+      sampleTypeId: parts[1].trim()
+    };
   }
 };
+
+// ============================================================================
+// SESSION STATE MANAGEMENT
+// ============================================================================
+
+class TransmissionSession {
+  constructor(socketId) {
+    this.socketId = socketId;
+    this.createdAt = new Date();
+    this.machineName = null;
+    this.patientId = null;
+    this.patientName = null;
+    this.barcode = null;
+    this.visitId = null;
+    this.sampleTypeId = null;
+    this.testCode = null;
+    this.results = [];
+    this.frameCount = 0;
+  }
+
+  updateFromHeader(data) {
+    this.machineName = data.analyzer;
+  }
+
+  updateFromPatient(data) {
+    this.patientId = data.patientId;
+    this.patientName = data.patientName;
+    
+    // ✅ CRITICAL: Extract barcode from P frame (field[4])
+    if (data.barcode) {
+      this.barcode = data.barcode;
+      const { visitId, sampleTypeId } = ASTMParser.parseBarcodeComponents(data.barcode);
+      this.visitId = visitId;
+      this.sampleTypeId = sampleTypeId || '1';
+      console.log(`[SESSION] Updated from P frame: visitId=${this.visitId}, sampleTypeId=${this.sampleTypeId}, barcode=${this.barcode}`);
+    }
+  }
+
+  updateFromOrder(data) {
+    this.barcode = data.barcode;
+    this.testCode = data.testCode;
+
+    // Parse barcode components
+    const { visitId, sampleTypeId } = ASTMParser.parseBarcodeComponents(data.barcode);
+    this.visitId = visitId;
+    // ✅ FIX: Default to '1' if barcode lacks hyphenated sampleTypeId (prevents data loss)
+    this.sampleTypeId = sampleTypeId || '1';
+  }
+
+  addResult(data) {
+    if (data.paramCode && data.value) {
+      this.results.push({
+        paramCode: data.paramCode,
+        value: data.value,
+        units: data.units,
+        referenceRange: data.referenceRange,
+        abnormalFlag: data.abnormalFlag
+      });
+    }
+  }
+
+  isComplete() {
+    // ✅ FIX: Remove sampleTypeId check (defaults to '1' above, always truthy)
+    return Boolean(this.visitId && this.results.length > 0);
+  }
+
+  getPayload() {
+    // Build results array grouped by test
+    const testMap = {};
+    
+    for (const result of this.results) {
+      const testCode = this.testCode || 'CBC'; // Default to CBC if not specified
+      
+      if (!testMap[testCode]) {
+        testMap[testCode] = {
+          testCode: testCode,
+          parameters: {}
+        };
+      }
+      
+      // ✅ CRITICAL: Clean parameter code
+      // Remove ^1, ^2, etc. and _RESEARCH suffix
+      // Example: "WBC^1" → "WBC", "RDW-SD_RESEARCH^1" → "RDW-SD"
+      let cleanParamCode = result.paramCode
+        .replace(/\^[\d]+$/g, '')  // Remove ^1, ^2, etc. from end
+        .replace(/_RESEARCH$/i, ''); // Remove _RESEARCH suffix
+      
+      testMap[testCode].parameters[cleanParamCode] = result.value;
+    }
+
+    const resultsArray = Object.values(testMap);
+
+    return {
+      visitId: this.visitId,
+      sampleId: this.sampleTypeId,
+      machineName: this.machineName || 'XN-350',
+      results: resultsArray,
+      timestamp: new Date().toISOString(),
+      source: 'MACHINE',
+      patientId: this.patientId,
+      barcode: this.barcode
+    };
+  }
+
+  getSummary() {
+    return {
+      socketId: this.socketId,
+      machine: this.machineName,
+      visitId: this.visitId,
+      sampleId: this.sampleTypeId,
+      barcode: this.barcode,
+      resultCount: this.results.length,
+      frameCount: this.frameCount,
+      duration: Date.now() - this.createdAt.getTime()
+    };
+  }
+}
 
 // ============================================================================
 // DATABASE OPERATIONS
 // ============================================================================
 
 const Database = {
-  // ✅ NEW: Calculate checksum for duplicate detection
-  calculateChecksum(data) {
-    const str = JSON.stringify(data);
-    let hash = 0;
-    for (let i = 0; i < str.length; i++) {
-      const char = str.charCodeAt(i);
-      hash = ((hash << 5) - hash) + char;
-      hash = hash & hash; // Convert to 32bit integer
-    }
-    return Math.abs(hash).toString(16);
-  },
-
-  // ✅ UPDATED: Store complete payload with visitId/sampleId/machine info
-  async saveResult(visitId, sampleId, machineName, rawAstm, parsedData) {
+  async saveResult(visitId, sampleId, machineName, rawData, payload) {
     try {
-      // ✅ Validate critical data before storing
-      if (!visitId || !sampleId || !parsedData || !parsedData.parameters) {
-        throw new Error('Missing required result data: visitId, sampleId, or parameters');
+      if (!visitId || !sampleId || !payload || !payload.results) {
+        throw new Error('Missing required result data');
       }
 
-      console.log(`[DB] 📥 Received parsedData.parameters:`, JSON.stringify(parsedData.parameters));
-
-      // ✅ Build results array from parameters
-      const results = [];
-      const testMap = {};
-
-      for (const [key, value] of Object.entries(parsedData.parameters || {})) {
-        console.log(`[DB] Processing key="${key}", value="${value}"`);
-        const [testCode, paramCode] = key.split('_');
-        
-        console.log(`[DB] Split result: testCode="${testCode}", paramCode="${paramCode}"`);
-        
-        if (!testCode || !paramCode) {
-          console.log(`[DB] ⚠️ Skipping - missing testCode or paramCode`);
-          continue;
-        }
-
-        if (!testMap[testCode]) {
-          testMap[testCode] = {
-            testCode: testCode,
-            parameters: {}
-          };
-        }
-
-        testMap[testCode].parameters[paramCode] = value;
-      }
-
-      console.log(`[DB] ✅ Built testMap:`, JSON.stringify(testMap));
-
-      for (const [testCode, data] of Object.entries(testMap)) {
-        results.push({
-          testCode: data.testCode,
-          parameters: data.parameters
-        });
-      }
-
-      console.log(`[DB] ✅ Final results array:`, JSON.stringify(results));
-
-      // ✅ Build COMPLETE payload NOW (not later during sync)
-      const completePayload = {
-        visitId: visitId,
-        sampleId: sampleId,
-        results: results,  // ✅ NOW HAS RESULTS ARRAY
-        timestamp: new Date().toISOString(),
-        checksum: this.calculateChecksum(parsedData),
-        source: 'MACHINE',
-        machineName: machineName  // ✅ Single machine name field
-      };
+      console.log(`[DB] Saving result: visitId=${visitId}, sampleId=${sampleId}, machine=${machineName}, parameters=${payload.results.length}`);
 
       const query = `
         INSERT INTO pending_results 
@@ -326,12 +383,12 @@ const Database = {
       const [result] = await dbPool.execute(query, [
         sampleId,
         visitId,
-        machineName,  // ✅ Store machine name as-is
-        rawAstm,
-        JSON.stringify(completePayload)
+        machineName,
+        JSON.stringify(rawData),
+        JSON.stringify(payload)
       ]);
 
-      console.log(`[DB SUCCESS] Result stored: id=${result.insertId}, visitId=${visitId}, sampleId=${sampleId}, machine=${machineName}`);
+      console.log(`[DB] ✓ Result stored: id=${result.insertId}`);
       return result.insertId;
     } catch (err) {
       console.error(`[DB ERROR] Failed to save result: ${err.message}`);
@@ -339,7 +396,6 @@ const Database = {
     }
   },
 
-  // ✅ UPDATED: Mark as synced with timestamp
   async markSynced(recordId) {
     try {
       const [result] = await dbPool.execute(
@@ -348,7 +404,7 @@ const Database = {
          WHERE id = ?`,
         [recordId]
       );
-      console.log(`[DB] Result ${recordId} marked as SYNCED`);
+      console.log(`[DB] ✓ Result ${recordId} marked as SYNCED`);
       return result.affectedRows > 0;
     } catch (err) {
       console.error(`[DB ERROR] Failed to mark synced: ${err.message}`);
@@ -356,7 +412,6 @@ const Database = {
     }
   },
 
-  // ✅ UPDATED: Mark as offline queued with error tracking
   async markOfflineQueued(recordId, errorMessage = null) {
     try {
       const [result] = await dbPool.execute(
@@ -368,7 +423,7 @@ const Database = {
          WHERE id = ?`,
         [errorMessage, recordId]
       );
-      console.log(`[DB] Result ${recordId} marked as OFFLINE_QUEUED (attempt ${recordId} recorded), error: ${errorMessage}`);
+      console.log(`[DB] Result ${recordId} marked as OFFLINE_QUEUED, error: ${errorMessage}`);
       return result.affectedRows > 0;
     } catch (err) {
       console.error(`[DB ERROR] Failed to mark offline queued: ${err.message}`);
@@ -376,7 +431,6 @@ const Database = {
     }
   },
 
-  // ✅ NEW: Mark as permanently failed after max retries
   async markFailed(recordId, errorMessage) {
     try {
       const [result] = await dbPool.execute(
@@ -393,137 +447,30 @@ const Database = {
     }
   },
 
-  // ✅ UPDATED: Smart retry - fetch every 30 seconds, no backoff delays
   async getPendingOffline() {
     try {
-      // Get ALL offline records regardless of retry count
-      // Retry every 30 seconds until max 10 retries
       const [rows] = await dbPool.execute(
-        `SELECT 
-           id, 
-           data_json, 
-           retry_count, 
-           sample_id,
-           visit_id,
-           machine_name
+        `SELECT id, data_json, retry_count, sample_id, visit_id, machine_name
          FROM pending_results 
          WHERE status = 'OFFLINE_QUEUED' 
-         AND retry_count < 10
+         AND retry_count < ?
          ORDER BY retry_count ASC, id ASC
          LIMIT ?`,
-        [CONFIG.retry.batchSize]
+        [CONFIG.retry.maxRetries, CONFIG.retry.batchSize]
       );
-
-      console.log(`[DB] Found ${rows.length} offline records to retry`);
       return rows;
     } catch (err) {
       console.error(`[DB ERROR] Failed to get pending offline records: ${err.message}`);
       return [];
     }
-  },
-
-  // ✅ NEW: Get failed records for monitoring
-  async getFailedRecords(limit = 100) {
-    try {
-      const [rows] = await dbPool.execute(
-        `SELECT id, sample_id, visit_id, machine_name, retry_count, error_message, created_at
-         FROM pending_results 
-         WHERE status = 'FAILED'
-         ORDER BY id DESC
-         LIMIT ?`,
-        [limit]
-      );
-      return rows;
-    } catch (err) {
-      console.error(`[DB ERROR] Failed to get failed records: ${err.message}`);
-      return [];
-    }
-  },
-
-  // ✅ NEW: Get sync statistics
-  async getStats() {
-    try {
-      const [stats] = await dbPool.execute(
-        `SELECT 
-           status,
-           COUNT(*) as count,
-           AVG(retry_count) as avg_retries,
-           MAX(retry_count) as max_retries
-         FROM pending_results
-         GROUP BY status`
-      );
-      return stats;
-    } catch (err) {
-      console.error(`[DB ERROR] Failed to get stats: ${err.message}`);
-      return [];
-    }
-  },
-
-  // ✅ NEW: Look up machine ID from database by full machine name
-  async getMachineByName(machineName) {
-    try {
-      if (!machineName) {
-        throw new Error('Machine name is required');
-      }
-
-      const connection = await dbPool.getConnection();
-      const [rows] = await connection.execute(
-        'SELECT id, name FROM machines WHERE name = ? LIMIT 1',
-        [machineName]
-      );
-      connection.release();
-
-      if (rows.length > 0) {
-        return rows[0];
-      }
-
-      console.warn(`[DB] Machine not found: "${machineName}"`);
-      return null;
-    } catch (err) {
-      console.error(`[DB ERROR] Failed to lookup machine: ${err.message}`);
-      return null;
-    }
   }
 };
 
 // ============================================================================
-// CLOUD OPERATIONS
+// CLOUD API
 // ============================================================================
 
 const CloudAPI = {
-  async fetchOrder(visitId, sampleId, analyzer) {
-    try {
-      if (!visitId || !sampleId || !analyzer) {
-        throw new Error('Missing visitId, sampleId, or analyzer');
-      }
-
-      const url = `${CONFIG.vps.baseUrl}/api/machine/v1/query?visitId=${encodeURIComponent(visitId)}&sampleId=${encodeURIComponent(sampleId)}&analyzer=${encodeURIComponent(analyzer)}`;
-      
-      console.log(`[CLOUD] Querying: ${url}`);
-      const response = await axios.get(url, { timeout: CONFIG.retry.timeoutMs });
-      
-      if (!response.data || !response.data.data || !response.data.data.patientTests) {
-        throw new Error('Invalid response structure from backend');
-      }
-      
-      console.log(`[CLOUD] Fetched order for ${analyzer}/${visitId}/${sampleId}: ${response.data.data.patientTests.length} tests`);
-      return response.data.data;
-    } catch (err) {
-      if (err.code === 'ECONNREFUSED') {
-        console.error(`[CLOUD ERROR] Connection refused: VPS unreachable at ${CONFIG.vps.baseUrl}`);
-      } else if (err.response?.status === 404) {
-        console.error(`[CLOUD ERROR] Sample not found: ${visitId}/${sampleId}`);
-      } else if (err.response?.status === 400) {
-        console.error(`[CLOUD ERROR] Bad request: ${err.response.data?.message || err.message}`);
-      } else if (err.code === 'ECONNABORTED') {
-        console.error(`[CLOUD ERROR] Request timeout (${CONFIG.retry.timeoutMs}ms): ${visitId}/${sampleId}`);
-      } else {
-        console.error(`[CLOUD ERROR] ${err.message}`);
-      }
-      throw err;
-    }
-  },
-
   async sendResult(payload) {
     try {
       if (!payload.visitId || !payload.sampleId) {
@@ -534,38 +481,26 @@ const CloudAPI = {
         throw new Error('Missing or empty results array in payload');
       }
 
-      // Validate result structure
-      for (const result of payload.results) {
-        if (!result.testCode) {
-          throw new Error('Each result must have testCode');
-        }
-        if (!result.parameters || typeof result.parameters !== 'object') {
-          throw new Error('Each result must have parameters object');
-        }
-      }
-
       const url = `${CONFIG.vps.baseUrl}/api/machine/v1/results`;
       
       console.log(`[CLOUD] Posting results to: ${url}`);
-      const response = await axios.post(url, payload, { timeout: CONFIG.retry.timeoutMs });
+      console.log(`[CLOUD] Payload:`, JSON.stringify(payload, null, 2));
+      
+      const response = await axios.post(url, payload, { timeout: 5000 });
       
       if (!response.data || !response.data.success) {
         throw new Error('Backend did not confirm success');
       }
       
-      console.log(`[CLOUD] Result sent for ${payload.visitId}: ${payload.results.length} test(s) processed`);
+      console.log(`[CLOUD] ✓ Result sent for ${payload.visitId}/${payload.sampleId}: ${payload.results.length} test(s)`);
       return response.data;
     } catch (err) {
       if (err.code === 'ECONNREFUSED') {
-        console.error(`[CLOUD ERROR] Connection refused: VPS unreachable at ${CONFIG.vps.baseUrl}`);
+        console.error(`[CLOUD ERROR] Connection refused: VPS unreachable`);
       } else if (err.response?.status === 400) {
         console.error(`[CLOUD ERROR] Bad request: ${err.response.data?.message || err.message}`);
       } else if (err.response?.status === 500) {
-        console.error(`[CLOUD ERROR] Server error: ${err.response.data?.message || 'Internal server error'}`);
-      } else if (err.code === 'ECONNABORTED') {
-        console.error(`[CLOUD ERROR] Request timeout (${CONFIG.retry.timeoutMs}ms) while posting results`);
-      } else if (err.message.includes('Missing') || err.message.includes('Invalid')) {
-        console.error(`[CLOUD ERROR] Payload validation failed: ${err.message}`);
+        console.error(`[CLOUD ERROR] Server error: ${err.response.data?.message || 'Internal error'}`);
       } else {
         console.error(`[CLOUD ERROR] ${err.message}`);
       }
@@ -573,25 +508,12 @@ const CloudAPI = {
     }
   },
 
-  // ✅ NEW: Check if VPS is reachable before attempting sync
   async checkVpsHealth() {
     try {
       const url = `${CONFIG.vps.baseUrl}/api/health`;
       const response = await axios.get(url, { timeout: 3000 });
-      
-      if (response.status === 200) {
-        console.log(`[VPS HEALTH] ✓ VPS is reachable`);
-        return true;
-      }
-      return false;
+      return response.status === 200;
     } catch (err) {
-      if (err.code === 'ECONNREFUSED') {
-        console.warn(`[VPS HEALTH] ✗ VPS unreachable - ${CONFIG.vps.baseUrl}`);
-      } else if (err.code === 'ECONNABORTED') {
-        console.warn(`[VPS HEALTH] ✗ VPS timeout (>3s) - ${CONFIG.vps.baseUrl}`);
-      } else {
-        console.warn(`[VPS HEALTH] ✗ VPS check failed: ${err.message}`);
-      }
       return false;
     }
   }
@@ -604,12 +526,10 @@ const CloudAPI = {
 const ResultSync = {
   async sync(recordId, payload) {
     try {
-      // ✅ NEW: Check if VPS is reachable BEFORE trying to sync
       const isVpsReachable = await CloudAPI.checkVpsHealth();
       
       if (!isVpsReachable) {
         console.warn(`[SYNC] VPS not reachable - queueing for retry`);
-        // ✅ FIX: Mark as OFFLINE_QUEUED so retry worker will pick it up later
         await Database.markOfflineQueued(recordId, 'VPS unreachable');
         return;
       }
@@ -621,14 +541,12 @@ const ResultSync = {
     }
   },
 
-  // ✅ UPDATED: Check VPS health before retrying
   async retryOfflineRecords() {
-    // ✅ NEW: Check VPS health first - if down, skip entire retry cycle
     const isVpsReachable = await CloudAPI.checkVpsHealth();
     
     if (!isVpsReachable) {
-      console.warn(`[RETRY WORKER] VPS unreachable - skipping retry cycle, will try again in 30s`);
-      return;  // Exit without processing any records - no retry_count increment
+      console.warn(`[RETRY WORKER] VPS unreachable - skipping retry cycle`);
+      return;
     }
 
     const records = await Database.getPendingOffline();
@@ -645,35 +563,23 @@ const ResultSync = {
           ? JSON.parse(record.data_json) 
           : record.data_json;
 
-        // ✅ Validate payload has required fields
         if (!payload.visitId || !payload.sampleId) {
-          console.error(`[RETRY ERROR] Record ${record.id}: Missing visitId or sampleId in payload`);
-          await Database.markFailed(
-            record.id,
-            'Payload missing visitId or sampleId'
-          );
+          console.error(`[RETRY ERROR] Record ${record.id}: Missing visitId or sampleId`);
+          await Database.markFailed(record.id, 'Payload missing visitId or sampleId');
           continue;
         }
 
-        console.log(`[RETRY] Attempting sync for record ${record.id} (visitId=${payload.visitId}, attempt=${record.retry_count + 1}/10)`);
+        console.log(`[RETRY] Attempting sync for record ${record.id} (attempt=${record.retry_count + 1}/${CONFIG.retry.maxRetries})`);
         
         await this.sync(record.id, payload);
         
       } catch (err) {
         console.error(`[RETRY ERROR] Record ${record.id}: ${err.message}`);
         
-        // ✅ Get updated retry count from database
-        const [checkRecord] = await dbPool.execute(
-          `SELECT retry_count FROM pending_results WHERE id = ?`,
-          [record.id]
-        );
-
-        if (checkRecord && checkRecord[0] && checkRecord[0].retry_count >= 10) {
-          // ✅ Max retries reached - mark as failed
+        if (record.retry_count >= CONFIG.retry.maxRetries - 1) {
           await Database.markFailed(record.id, `Max retries exceeded: ${err.message}`);
-          console.error(`[ALERT] Record ${record.id} permanently failed after 10 retries`);
+          console.error(`[ALERT] Record ${record.id} permanently failed`);
         } else {
-          // ✅ Mark for retry with error message
           await Database.markOfflineQueued(record.id, err.message);
         }
       }
@@ -684,272 +590,201 @@ const ResultSync = {
 };
 
 // ============================================================================
-// QUERY HANDLER
+// RESULT PROCESSOR
 // ============================================================================
 
-const QueryHandler = {
-  async handle(visitId, sampleId, analyzer, socket) {
+const ResultProcessor = {
+  /**
+   * Query the backend API to get the correct testCode and test information
+   * This solves the problem of machine sending malformed test codes
+   */
+  async queryTestCode(visitId, sampleTypeId, machineName) {
     try {
-      if (!visitId || !sampleId) {
-        console.error(`[QUERY ERROR] Missing visitId or sampleId`);
-        console.log(`[DEBUG] visitId: ${visitId}, sampleId: ${sampleId}`);
-        socket.write(Buffer.from([ASTM.NAK]));
-        return;
-      }
-
-      if (!analyzer) {
-        console.error(`[QUERY ERROR] Missing analyzer name from ASTM header`);
-        socket.write(Buffer.from([ASTM.NAK]));
-        return;
-      }
-
-      console.log(`[QUERY HANDLER] Fetching order data for: visitId=${visitId}, sampleId=${sampleId}, analyzer=${analyzer}`);
-      const orderData = await CloudAPI.fetchOrder(visitId, sampleId, analyzer);
-      console.log(`[QUERY HANDLER] ✓ Got order data:`, orderData);
-
-      if (!orderData.patientTests || !Array.isArray(orderData.patientTests)) {
-        console.error(`[QUERY ERROR] Invalid response - no patientTests array`);
-        throw new Error('Backend response missing patientTests array');
-      }
-
-      if (orderData.patientTests.length === 0) {
-        console.error(`[QUERY ERROR] No patient tests found`);
-        socket.write(Buffer.from([ASTM.NAK]));
-        return;
-      }
-
-      const testCodes = orderData.patientTests
-        .map(t => t.testCode)
-        .filter(code => code)
-        .join('^');
-
-      console.log(`[QUERY HANDLER] ✓ Extracted machine test codes (shortNames): ${testCodes}`);
-
-      if (!testCodes) {
-        console.error(`[QUERY] Could not extract test codes from response`);
-        socket.write(Buffer.from([ASTM.NAK]));
-        return;
-      }
-
-      const orderFrame = ASTMFrame.order({
-        visitId: orderData.visitId || visitId,
-        patientId: orderData.patientId || '',
-        patientName: orderData.patientName || '',
-        priority: orderData.priority || 'N',
-        testCodes: testCodes
+      const url = `${CONFIG.vps.baseUrl}/api/machine/v1/query`;
+      const analyzer = machineName || 'XN-350'; // Default to XN-350 if not specified
+      
+      const queryParams = new URLSearchParams({
+        visitId: visitId,
+        sampleId: sampleTypeId,
+        analyzer: analyzer
       });
 
-      console.log(`[QUERY HANDLER] ✓ Sending ORDER frame to machine`);
-      socket.write(orderFrame);
-      socket.write(Buffer.from([ASTM.ACK]));
+      console.log(`[PROCESSOR] Querying testCode from API: ${url}?${queryParams}`);
 
-      const terminator = ASTMFrame.terminator();
-      socket.write(terminator);
-      socket.write(Buffer.from([ASTM.ACK]));
+      const response = await axios.get(`${url}?${queryParams}`, { timeout: 5000 });
 
-    } catch (err) {
-      console.error(`[QUERY ERROR] Failed to process query: ${err.message}`);
-      console.error(`[QUERY ERROR] Stack:`, err.stack);
-      socket.write(Buffer.from([ASTM.NAK]));
-    }
-  }
-};
-
-// ============================================================================
-// RESULT HANDLER
-// ============================================================================
-
-const ResultHandler = {
-  async handle(visitId, sampleId, rawAstm, parsedData, machineName) {
-    try {
-      if (!visitId || !sampleId) {
-        console.error(`[RESULT ERROR] Missing visitId or sampleId`);
-        return;
+      if (!response.data || !response.data.success) {
+        console.warn(`[PROCESSOR] API query failed: ${response.data?.message || 'Unknown error'}`);
+        return null;
       }
 
-      // ✅ Pass machine name to saveResult
-      const recordId = await Database.saveResult(visitId, sampleId, machineName, rawAstm, parsedData);
-      const payload = this.buildPayload(visitId, sampleId, parsedData, machineName);
-      await ResultSync.sync(recordId, payload);
+      const { data } = response.data;
+
+      if (!data.patientTests || data.patientTests.length === 0) {
+        console.warn(`[PROCESSOR] No tests found for visitId=${visitId}, sampleTypeId=${sampleTypeId}`);
+        return null;
+      }
+
+      // Extract test codes from the response
+      const testCodes = data.patientTests.map(t => t.testCode);
+      console.log(`[PROCESSOR] ✓ Query successful: Found ${testCodes.length} test(s) - ${testCodes.join(', ')}`);
+
+      // Return the first test code (or could combine multiple if needed)
+      return testCodes[0] || null;
+
     } catch (err) {
-      console.error(`[RESULT ERROR] ${err.message}`);
+      if (err.code === 'ECONNREFUSED') {
+        console.error(`[PROCESSOR ERROR] API unreachable: ${err.message}`);
+      } else {
+        console.error(`[PROCESSOR ERROR] Failed to query testCode: ${err.message}`);
+      }
+      return null;
     }
   },
 
-  buildPayload(visitId, sampleId, parsedData, machineName) {
-    const results = [];
-    const testMap = {};
-
-    for (const [key, value] of Object.entries(parsedData.parameters || {})) {
-      const [testCode, paramCode] = key.split('_');
-      
-      if (!testCode || !paramCode) {
-        continue;
+  async processSession(session) {
+    try {
+      if (!session.isComplete()) {
+        console.warn(`[PROCESSOR] Session incomplete: visitId=${session.visitId}, results=${session.results.length}`);
+        return;
       }
 
-      if (!testMap[testCode]) {
-        testMap[testCode] = {
-          testCode: testCode,
-          parameters: {}
-        };
+      const summary = session.getSummary();
+      console.log(`[PROCESSOR] Processing session:`, JSON.stringify(summary, null, 2));
+
+      // ✅ CRITICAL: Query API to get correct testCode instead of using malformed machine data
+      const correctTestCode = await this.queryTestCode(
+        session.visitId,
+        session.sampleTypeId,
+        session.machineName
+      );
+
+      if (correctTestCode) {
+        console.log(`[PROCESSOR] ✓ Using correct testCode from API: ${correctTestCode}`);
+        session.testCode = correctTestCode; // Override with API-provided test code
+      } else {
+        console.warn(`[PROCESSOR] ⚠️ Could not fetch testCode from API, using default: CBC`);
+        session.testCode = 'CBC'; // Fallback to CBC
       }
 
-      testMap[testCode].parameters[paramCode] = value;
-    }
+      const payload = session.getPayload();
+      console.log(`[PROCESSOR] Payload generated:`, JSON.stringify(payload, null, 2));
 
-    for (const [testCode, data] of Object.entries(testMap)) {
-      results.push({
-        testCode: data.testCode,
-        parameters: data.parameters
-      });
-    }
+      // Save to database
+      const recordId = await Database.saveResult(
+        session.visitId,
+        session.sampleTypeId,
+        session.machineName,
+        session,
+        payload
+      );
 
-    return {
-      visitId: visitId,
-      sampleId: sampleId,
-      machineName: machineName,
-      results: results,
-      timestamp: new Date().toISOString()
-    };
+      // Sync to cloud
+      await ResultSync.sync(recordId, payload);
+
+      console.log(`[PROCESSOR] ✓ Session processed successfully: recordId=${recordId}`);
+    } catch (err) {
+      console.error(`[PROCESSOR ERROR] Failed to process session: ${err.message}`);
+      console.error(err.stack);
+    }
   }
 };
 
 // ============================================================================
-// TCP SERVER
+// TCP SERVER (Unidirectional Mode)
 // ============================================================================
 
 function createTcpServer() {
   return net.createServer(socket => {
-    console.log(`[TCP] Connected: ${socket.remoteAddress}`);
+    const socketId = `${socket.remoteAddress}:${socket.remotePort}`;
+    console.log(`[TCP] ✓ Connection opened: ${socketId}`);
+
     let buffer = '';
-    let machineAnalyzer = null; // Store analyzer from HEADER frame
-    let currentVisitId = null; // Store visitId from QUERY frame
-    let currentSampleId = null; // Store sampleId from QUERY frame
-    let accumulatedResults = {}; // Accumulate RESULT frames
+    let session = new TransmissionSession(socketId);
+    let transmissionActive = false;
 
-    socket.on('data', async data => {
-      if (data.length === 1 && data[0] === ASTM.ENQ) {
-        console.log('[TCP] Received ENQ, sending ACK');
-        socket.write(Buffer.from([ASTM.ACK]));
-        return;
-      }
-
-      // Add to buffer
-      buffer += data.toString('utf8');
-      console.log(`[TCP RAW] Received (${data.length} bytes): ${data.toString('hex')}`);
-      console.log(`[TCP BUFFER] Total buffer length: ${buffer.length}, content: "${buffer}"`);
-      
-      // ✅ FIX 4: Do NOT send ACK immediately - validate frame first
-
-      // Process frames one by one (each frame starts with STX and ends with ETX+checksum)
-      while (buffer.includes(String.fromCharCode(ASTM.STX))) {
-        const stxIndex = buffer.indexOf(String.fromCharCode(ASTM.STX));
-        const etxIndex = buffer.indexOf(String.fromCharCode(ASTM.ETX), stxIndex);
-        
-        if (etxIndex === -1) {
-          console.log(`[TCP FRAME] Incomplete frame (no ETX), waiting for more data...`);
-          break;
+    socket.on('data', async chunk => {
+      try {
+        // ✅ CRITICAL FIX: Detect ENQ byte anywhere inside incoming chunk
+        // This handles new transmission initiation when ENQ arrives with other data
+        if (chunk.includes(Buffer.from([ASTM.ENQ]))) {
+          console.log(`[TCP] Received ENQ from ${socketId} - Starting new transmission`);
+          socket.write(Buffer.from([ASTM.ACK]));
+          buffer = '';
+          session = new TransmissionSession(socketId);
+          transmissionActive = true;
         }
 
-        // ✅ FIX 3: Verify checksum bytes are available before extraction
-        const requiredLength = etxIndex + 3;  // ETX + 2 hex checksum characters
-        if (buffer.length < requiredLength) {
-          console.log(`[TCP FRAME] Incomplete checksum (have ${buffer.length} bytes, need ${requiredLength}), waiting for more data...`);
-          break;  // ✅ CHANGED: Wait for next packet instead of truncating
-        }
+        // Accumulate data into buffer
+        buffer += chunk.toString('utf8');
+        console.log(`[TCP] Received ${chunk.length} bytes, buffer size: ${buffer.length}`);
 
-        // Extract the frame from STX to ETX (inclusive) plus 2 checksum hex chars
-        const frameEnd = requiredLength;
-        const rawFrame = buffer.substring(stxIndex, frameEnd);
-        console.log(`[TCP FRAME] Raw frame (with STX/ETX): "${rawFrame}" (hex: ${Buffer.from(rawFrame).toString('hex')})`);
+        // Process complete frames (terminated by CR+LF)
+        while (buffer.includes('\r\n')) {
+          const crlfIndex = buffer.indexOf('\r\n');
+          const rawFrame = buffer.substring(0, crlfIndex);
+          buffer = buffer.substring(crlfIndex + 2);
 
-        // Clean frame content: remove STX, ETX, checksum
-        let frameContent = rawFrame.substring(1); // Remove STX
-        
-        const innerEtxIndex = frameContent.indexOf(String.fromCharCode(ASTM.ETX));
-        let checksumFromFrame = '';
-        if (innerEtxIndex !== -1) {
-          checksumFromFrame = frameContent.substring(innerEtxIndex + 1);  // Extract checksum
-          frameContent = frameContent.substring(0, innerEtxIndex);
-        }
-        
-        console.log(`[TCP FRAME] Cleaned frame content: "${frameContent}"`);
-        console.log(`[TCP FRAME] Frame checksum: ${checksumFromFrame}`);
+          // Send ACK for received frame
+          socket.write(Buffer.from([ASTM.ACK]));
 
-        // ✅ FIX 4: Validate checksum before processing
-        const calculatedChecksum = ASTMFrame.checksum(frameContent);
-        const isValidChecksum = checksumFromFrame.toUpperCase() === calculatedChecksum;
-        console.log(`[TCP FRAME] Checksum validation: calculated=${calculatedChecksum}, received=${checksumFromFrame.toUpperCase()}, valid=${isValidChecksum}`);
-
-        if (!isValidChecksum) {
-          console.error(`[TCP FRAME] ❌ INVALID CHECKSUM - Sending NAK`);
-          socket.write(Buffer.from([ASTM.NAK]));
-          // Skip this frame and move buffer pointer forward
-          buffer = buffer.substring(frameEnd);
-          console.log(`[TCP BUFFER] Remaining buffer after bad frame (${buffer.length} bytes): "${buffer}"`);
-          continue;
-        }
-
-        // ✅ Checksum valid, now parse the frame
-        // Parse the frame 
-        const parsed = ASTMParser.parse(frameContent);
-        console.log(`[TCP FRAME] Parsed: frameType=${parsed.frameType}, visitId=${parsed.visitId}, sampleId=${parsed.sampleId}, analyzer=${parsed.analyzer}`);
-
-        // ✅ FIX 4: Send ACK only AFTER successful validation and parsing
-        console.log(`[TCP] Frame valid, sending ACK`);
-        socket.write(Buffer.from([ASTM.ACK]));
-
-        // Store analyzer from HEADER frame
-        if (parsed.frameType === 'HEADER' && parsed.analyzer) {
-          machineAnalyzer = parsed.analyzer;
-          console.log(`[TCP] Stored analyzer for this connection: ${machineAnalyzer}`);
-        }
-
-        // Handle QUERY frames immediately (use stored analyzer if not in frame)
-        if (parsed.frameType === 'QUERY' && parsed.visitId && parsed.sampleId) {
-          const analyzer = parsed.analyzer || machineAnalyzer;
-          currentVisitId = parsed.visitId;
-          currentSampleId = parsed.sampleId;
-          accumulatedResults = {}; // Reset accumulated results for new query
-          console.log(`[QUERY] ✓ Processing query: visitId=${parsed.visitId}, sampleId=${parsed.sampleId}, analyzer=${analyzer}`);
-          await QueryHandler.handle(parsed.visitId, parsed.sampleId, analyzer, socket);
-        }
-
-        // Accumulate RESULT frames
-        if (parsed.frameType === 'RESULT') {
-          console.log(`[RESULT FRAME] Accumulated: ${JSON.stringify(parsed.parameters)}`);
-          // Merge parameters into accumulated results
-          accumulatedResults = { ...accumulatedResults, ...parsed.parameters };
-        }
-
-        // Handle TERMINATOR frame - process all accumulated results
-        if (parsed.frameType === 'TERMINATOR') {
-          console.log(`[TERMINATOR] Received, processing ${Object.keys(accumulatedResults).length} accumulated parameters`);
-          if (currentVisitId && currentSampleId && Object.keys(accumulatedResults).length > 0) {
-            console.log(`[RESULT] Processing all results for ${currentVisitId}/${currentSampleId} from machine: ${machineAnalyzer}`);
-            
-            // ✅ Send full machine name "Sysmex XN-550" to VPS for lookup
-            console.log(`[RESULT] Machine name to send: ${machineAnalyzer}`);
-            
-            await ResultHandler.handle(currentVisitId, currentSampleId, frameContent, { 
-              frameType: 'RESULT',
-              parameters: accumulatedResults,
-              timestamp: new Date().toISOString()
-            }, machineAnalyzer);
-          } else {
-            console.log(`[TERMINATOR] Skipping - missing visitId/sampleId or no results accumulated`);
+          // Extract and parse record
+          const record = ASTMParser.extractRecordFromFrame(rawFrame);
+          if (!record) {
+            console.warn(`[TCP] Failed to extract record from frame`);
+            continue;
           }
-          accumulatedResults = {};
+
+          const parsed = ASTMParser.parseRecord(record);
+          if (!parsed) {
+            console.warn(`[TCP] Failed to parse record`);
+            continue;
+          }
+
+          session.frameCount++;
+
+          // Update session based on record type
+          switch (parsed.type) {
+            case 'H':
+              session.updateFromHeader(parsed.data);
+              break;
+            case 'P':
+              session.updateFromPatient(parsed.data);
+              break;
+            case 'O':
+              session.updateFromOrder(parsed.data);
+              break;
+            case 'R':
+              session.addResult(parsed.data);
+              break;
+            case 'L':
+              console.log(`[TCP] Terminator received - ${session.results.length} results collected`);
+              break;
+          }
         }
 
-        // Remove processed frame from buffer
-        buffer = buffer.substring(frameEnd);
-        console.log(`[TCP BUFFER] Remaining buffer (${buffer.length} bytes): "${buffer}"`);
+        // ✅ CRITICAL FIX: Detect EOT byte anywhere inside incoming chunk
+        // Machine frequently sends final L frame + EOT in same TCP packet
+        // Old check (chunk.length === 1) would fail on combined buffers → data loss
+        // New check uses buffer.includes() which is safe and production-ready
+        if (chunk.includes(Buffer.from([ASTM.EOT]))) {
+          console.log(`[TCP] Received EOT from ${socketId} - Processing complete session`);
+          transmissionActive = false;
+          await ResultProcessor.processSession(session);
+        }
+      } catch (err) {
+        console.error(`[TCP ERROR] ${socketId}: ${err.message}`);
+        console.error(err.stack);
       }
     });
 
-    socket.on('end', () => console.log(`[TCP] Disconnected: ${socket.remoteAddress}`));
-    socket.on('error', err => console.error(`[TCP ERROR] ${err.message}`));
+    socket.on('end', () => {
+      console.log(`[TCP] Connection closed: ${socketId}`);
+    });
+
+    socket.on('error', err => {
+      console.error(`[TCP ERROR] ${socketId}: ${err.message}`);
+    });
   });
 }
 
@@ -960,13 +795,14 @@ function createTcpServer() {
 let tcpServer = null;
 
 async function startup() {
-  console.log('\n' + '='.repeat(70));
-  console.log('SYSMEX LOCAL AGENT - STARTING');
-  console.log('='.repeat(70));
-  console.log(`TCP Server:       0.0.0.0:${CONFIG.tcp.port}`);
+  console.log('\n' + '='.repeat(80));
+  console.log('SYSMEX LOCAL AGENT - UNIDIRECTIONAL MODE');
+  console.log('='.repeat(80));
+  console.log(`TCP Server:       ${CONFIG.tcp.host}:${CONFIG.tcp.port}`);
   console.log(`Database:         ${CONFIG.database.host}:${CONFIG.database.port}/${CONFIG.database.database}`);
   console.log(`VPS Backend:      ${CONFIG.vps.baseUrl}`);
-  console.log('='.repeat(70) + '\n');
+  console.log(`Mode:             UNIDIRECTIONAL (Receive Only)`);
+  console.log('='.repeat(80) + '\n');
 
   // Test database connection
   try {
@@ -975,17 +811,16 @@ async function startup() {
     connection.release();
   } catch (err) {
     console.error(`[DB] ✗ Database connection failed: ${err.message}`);
-    console.error('[DB] Make sure MySQL is running and pending_results table exists');
     process.exit(1);
   }
 
   // Start TCP server
   tcpServer = createTcpServer();
   tcpServer.listen(CONFIG.tcp.port, CONFIG.tcp.host, () => {
-    console.log(`[TCP] ✓ Listening on port ${CONFIG.tcp.port} for Sysmex machine`);
+    console.log(`[TCP] ✓ Listening on port ${CONFIG.tcp.port} (Unidirectional Mode)`);
   });
 
-  tcpServer.on('error', (err) => {
+  tcpServer.on('error', err => {
     if (err.code === 'EADDRINUSE') {
       console.error(`[TCP] ✗ Port ${CONFIG.tcp.port} already in use`);
     } else {
@@ -998,89 +833,34 @@ async function startup() {
   const retryWorker = setInterval(() => ResultSync.retryOfflineRecords(), CONFIG.retry.intervalMs);
   console.log(`[WORKER] ✓ Retry job scheduled every ${CONFIG.retry.intervalMs}ms\n`);
 
-  // ✅ UPDATED: Enhanced health check with stats and failed record alerts
-  async function healthCheck() {
-    try {
-      // Get overall statistics
-      const stats = await Database.getStats();
-      
-      if (stats && stats.length > 0) {
-        console.log(`[HEALTH] ═══════════════════════════════════════`);
-        for (const stat of stats) {
-          console.log(`[HEALTH] ${stat.status}: ${stat.count} record(s) (avg retries: ${Math.round(stat.avg_retries || 0)}, max: ${stat.max_retries || 0})`);
-        }
-        console.log(`[HEALTH] ═══════════════════════════════════════`);
-      }
-
-      // Check for permanently failed records
-      const failedRecords = await Database.getFailedRecords(5);
-      if (failedRecords && failedRecords.length > 0) {
-        console.error(`[HEALTH] ⚠️ ALERT: ${failedRecords.length} permanently failed record(s) - manual intervention needed!`);
-        for (const record of failedRecords.slice(0, 3)) {
-          console.error(`[HEALTH]   • Record ${record.id}: visitId=${record.visit_id}, retries=${record.retry_count}, error: ${record.error_message}`);
-        }
-      }
-
-      // Check for records stuck in retry loop
-      const [stuckRecords] = await dbPool.execute(
-        `SELECT COUNT(*) as count FROM pending_results 
-         WHERE status = 'OFFLINE_QUEUED' AND retry_count > 5`
-      );
-      if (stuckRecords && stuckRecords[0] && stuckRecords[0].count > 0) {
-        console.warn(`[HEALTH] ⚠️ WARNING: ${stuckRecords[0].count} record(s) in high-retry loop (>5 attempts)`);
-      }
-
-    } catch (err) {
-      console.error(`[HEALTH] Database check failed: ${err.message}`);
-    }
-  }
-
-  // Run health check every 5 minutes
-  const healthCheckInterval = setInterval(healthCheck, 5 * 60 * 1000);
-
   // Graceful shutdown
-  process.on('SIGTERM', () => {
-    console.log('\n[SHUTDOWN] SIGTERM received, starting graceful shutdown...');
-    shutdown(retryWorker, healthCheckInterval);
-  });
+  process.on('SIGTERM', () => shutdown(retryWorker));
+  process.on('SIGINT', () => shutdown(retryWorker));
 
-  process.on('SIGINT', () => {
-    console.log('\n[SHUTDOWN] SIGINT received, starting graceful shutdown...');
-    shutdown(retryWorker, healthCheckInterval);
-  });
-
-  console.log('[AGENT] ✓ Ready to accept connections\n');
+  console.log('[AGENT] ✓ Ready to receive transmissions from Sysmex XN-350\n');
 }
 
-async function shutdown(retryWorker, healthCheckInterval) {
-  console.log('[SHUTDOWN] Stopping services...');
+async function shutdown(retryWorker) {
+  console.log('\n[SHUTDOWN] Graceful shutdown initiated...');
 
-  // Clear intervals
   clearInterval(retryWorker);
-  clearInterval(healthCheckInterval);
-  console.log('[SHUTDOWN] ✓ Intervals cleared');
-
-  // Close TCP server
+  
   if (tcpServer) {
     tcpServer.close(() => {
       console.log('[SHUTDOWN] ✓ TCP server closed');
     });
   }
 
-  // Try to flush pending offline records before closing
   try {
-    console.log('[SHUTDOWN] Attempting to sync pending records...');
     await ResultSync.retryOfflineRecords();
     console.log('[SHUTDOWN] ✓ Pending records processed');
   } catch (err) {
     console.warn(`[SHUTDOWN] Could not sync pending records: ${err.message}`);
   }
 
-  // Close database connection pool
   await dbPool.end();
   console.log('[SHUTDOWN] ✓ Database connections closed');
-
-  console.log('[SHUTDOWN] ✓ Graceful shutdown complete\n');
+  console.log('[SHUTDOWN] ✓ Shutdown complete\n');
   process.exit(0);
 }
 

@@ -157,12 +157,18 @@ class MachineSimulator {
         ascii = ascii.substring(0, etxIndex);
       }
       
-      // Parse ORDER frame: O|1|visitId|patientId|patientName||priority|||||testCodes
+      // ✅ FIXED: Parse ORDER frame - Original Sysmex format
+      // Format: O|seq|visitId|patientId|patientName||priority|||||testCodes
+      // Test codes are at Field 11 (index 11), separated by ^
       if (ascii.includes('O|')) {
         const parts = ascii.split('|');
-        // Test codes are at position 11
+        
+        // Test codes are at position 11, separated by ^
         const testCodesStr = (parts[11] || '').trim();
-        this.testCodes = testCodesStr.split('^').filter(t => t.trim());
+        this.testCodes = testCodesStr
+          .split('^')
+          .map(code => code.trim())
+          .filter(code => code.length > 0);
         
         if (this.testCodes.length > 0) {
           log('✓ Extracted test codes from ORDER frame:', 'RESPONSE');
