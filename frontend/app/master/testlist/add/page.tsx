@@ -8,7 +8,7 @@ import PageHeader from "@/src/components/BreadCrumb";
 import UnitModal from "@/src/components/UnitModal";
 import { CKEditor } from "@ckeditor/ckeditor5-react";
 import ClassicEditor from "@ckeditor/ckeditor5-build-classic";
-import { getTestById, createTest, updateTest, getDepartments, getUnits, getTests, getSampleTypes } from "@/src/api/master";
+import { getTestById, createTest, updateTest, getDepartments, getUnits, getAllUnits, getTests, getSampleTypes } from "@/src/api/master";
 import { getMachinesDropdown } from "@/src/api/machines";
 
 const baseInputClass =
@@ -86,11 +86,28 @@ const AddTest = () => {
 
   // Unit modal
   const [showUnitModal, setShowUnitModal] = useState(false);
+  const [unitBeingAddedFor, setUnitBeingAddedFor] = useState<{ catIdx: number; paramIdx: number } | null>(null);
 
-  // Refresh units list when unit is added
-  const handleUnitAdded = async () => {
+  // Refresh units list when unit is added and auto-select it
+  const handleUnitAdded = async (newUnit?: any) => {
     try {
-      setUnits(await getUnits());
+      const updatedUnits = await getAllUnits();
+      setUnits(updatedUnits);
+      console.log('✅ Units refreshed from API:', updatedUnits.length, 'units');
+      
+      // ✅ NEW: If a new unit was just created and we know which parameter it's for,
+      // automatically select it in that parameter's unitId field
+      if (newUnit && unitBeingAddedFor) {
+        const { catIdx, paramIdx } = unitBeingAddedFor;
+        // Extract the unit ID from the response
+        const unitId = newUnit.data?.id || newUnit.id;
+        if (unitId) {
+          console.log(`✅ Auto-selecting newly created unit ID ${unitId} for parameter at [${catIdx}][${paramIdx}]`);
+          console.log('New unit details:', { id: unitId, symbol: newUnit.data?.symbol || newUnit.symbol });
+          handleParameterChange(catIdx, paramIdx, 'unitId', unitId.toString());
+        }
+        setUnitBeingAddedFor(null);
+      }
     } catch (err) {
       console.error('Error refreshing units:', err);
     }
@@ -252,9 +269,9 @@ const AddTest = () => {
     const fetchUnits = async () => {
       try {
         console.log("📡 Fetching units from API...");
-        const unitsResponse = await getUnits();
+        const unitsResponse = await getAllUnits();
         console.log("✅ Units loaded:", unitsResponse);
-        // Extract data array from response
+        // getAllUnits returns array directly
         setUnits(unitsResponse);
       } catch (err) {
         console.error('❌ Error fetching units:', err);
@@ -796,8 +813,13 @@ const AddTest = () => {
     setCategories(updatedCategories);
   };
 
-  // Open add unit modal
-  const openAddUnitModal = () => setShowUnitModal(true);
+  // Open add unit modal for specific parameter
+  const openAddUnitModal = (categoryIndex?: number, parameterIndex?: number) => {
+    if (categoryIndex !== undefined && parameterIndex !== undefined) {
+      setUnitBeingAddedFor({ catIdx: categoryIndex, paramIdx: parameterIndex });
+    }
+    setShowUnitModal(true);
+  };
 
   const deleteParameter = (categoryIndex: any, parameterIndex: any) => {
     const updatedCategories = [...categories];
@@ -1999,7 +2021,7 @@ const AddTest = () => {
                             </select>
                             {!isViewMode && (
                               <button
-                                onClick={() => openAddUnitModal()}
+                                onClick={() => openAddUnitModal(categoryIndex, paramIndex)}
                                 type="button"
                                 className="px-2 py-1.5 sm:py-1 bg-orange-500 hover:bg-orange-600 text-white rounded text-xs font-bold transition-colors"
                                 title="Add new unit"
