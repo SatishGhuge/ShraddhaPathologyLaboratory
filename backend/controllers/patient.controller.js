@@ -1309,7 +1309,7 @@ export const updatePatientTestDetails = async (req, res) => {
 export const updatePatient = async (req, res) => {
   try {
     const { patientId } = req.params;
-    const { title, firstName, lastName, dob, age, gender, mobile, email, address } = req.body;
+    const { title, firstName, lastName, dob, age, gender, mobile, email, address, isEmergency, visitId } = req.body;
 
     const existing = await prisma.patient.findUnique({ where: { patientId } });
     if (!existing) return res.status(404).json({ success: false, message: 'Patient not found' });
@@ -1341,6 +1341,26 @@ export const updatePatient = async (req, res) => {
       where: { patientId },
       data: updateData
     });
+
+    // ✅ If emergency flag is being updated, update all tests for this visit
+    if (isEmergency !== undefined && visitId) {
+      console.log(`🚨 Updating emergency status for visitId: ${visitId}, isEmergency: ${isEmergency}`);
+      
+      const updatedTests = await prisma.patientTest.updateMany({
+        where: { 
+          patientId: patientId,
+          visitId: visitId 
+        },
+        data: {
+          isEmergency: Boolean(isEmergency),
+          emergencySetAt: isEmergency ? new Date() : null,
+          emergencySetBy: 'SYSTEM',
+          updatedAt: new Date()
+        }
+      });
+      
+      console.log(`✅ Updated ${updatedTests.count} tests as emergency for visit ${visitId}`);
+    }
 
     // ✅ Calculate and save age fields if DOB was updated (takes precedence over manual age)
     if (dob) {

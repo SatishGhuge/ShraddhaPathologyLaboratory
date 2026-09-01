@@ -240,6 +240,43 @@ export default function Result() {
   const router = useRouter();
   const searchParams = useSearchParams();
   
+  // ✅ Helper function to detect if a patient is a repeat (based on PATIENT UID - count their visits)
+  // Show "R" only if this is NOT the patient's first (earliest) visit
+  const isRepeatPatientInResult = (patient: any, allPatientsData: any[]): boolean => {
+    if (!patient || !patient.patient_uid || allPatientsData.length <= 1) return false;
+    
+    // Get all records for this PATIENT
+    const patientRecords = allPatientsData.filter(p => {
+      return p.patient_uid === patient.patient_uid;  // Same patient UID only
+    });
+    
+    // If patient has only 1 record, it's their first visit → NO "R"
+    if (patientRecords.length <= 1) return false;
+    
+    // Sort patient's records by date (ascending - oldest first)
+    const sortedRecords = [...patientRecords].sort((a, b) => {
+      const dateA = new Date(a.order_date || a.visit_date || 0).getTime();
+      const dateB = new Date(b.order_date || b.visit_date || 0).getTime();
+      return dateA - dateB;  // Ascending order (oldest first)
+    });
+    
+    // Get the earliest (first) record
+    const firstRecord = sortedRecords[0];
+    
+    // Show "R" only if this patient record is NOT the first visit
+    const isRepeat = patient.patient_uid === firstRecord.patient_uid && 
+                     patient.visit_id !== firstRecord.visit_id;
+    
+    // ✅ DEBUG: Log repeat patient detection
+    if (isRepeat) {
+      console.log(`🔄 REPEAT PATIENT: "${patient.patient_name}" | Patient UID: ${patient.patient_uid} | This is visit #${patientRecords.length}`);
+    } else {
+      console.log(`✅ FIRST VISIT: "${patient.patient_name}" | Patient UID: ${patient.patient_uid}`);
+    }
+    
+    return isRepeat;
+  };
+  
   const queryStatus = (searchParams?.get('status') || 'All') as string;
   const [selectedStatus, setSelectedStatus] = useState(queryStatus);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -3664,6 +3701,10 @@ export default function Result() {
                                       <AlertTriangle size={14} className="text-yellow-500 flex-shrink-0" />
                                     )}
                                     <span className="truncate">{patient.patient_name}</span>
+                                    {/* ✅ NEW: Show 'R' badge for repeat patients (from 2nd visit onwards) - BLUE color */}
+                                    {isRepeatPatientInResult(patient, sortedAndFilteredResults) && (
+                                      <span className="text-blue-600 font-bold text-sm" title="Repeat Patient - Has previous test reports">R</span>
+                                    )}
                                     {patient.balance_amount > 0 && (
                                       <span
                                         className="relative group cursor-pointer"

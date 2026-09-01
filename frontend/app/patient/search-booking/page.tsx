@@ -354,6 +354,7 @@ interface FormDataType {
   address: string;
   organizationCode: string;
   dob?: string;
+  isEmergency?: boolean;  // ✅ NEW: Emergency flag for visit
 }
 
 interface BillingData {
@@ -547,6 +548,42 @@ export default function BookingPage() {
     setDateRange({ start: sevenDaysAgo, end: today });
   }, []);
 
+  // Helper function to detect if a patient is a repeat (based on PATIENT ID - count their visits)
+  // ✅ FIXED: Show "R" only if this visit is NOT the patient's first (earliest) visit
+  const isRepeatPatient = (booking: Booking, allBookingsData: Booking[]): boolean => {
+    if (!booking.patientId || !booking || allBookingsData.length <= 1) return false;
+    
+    // Get all visits for this PATIENT
+    const patientVisits = allBookingsData.filter(b => {
+      return b.patientId === booking.patientId;  // Same patient ID only
+    });
+    
+    // If patient has only 1 visit, it's their first visit → NO "R"
+    if (patientVisits.length <= 1) return false;
+    
+    // Sort patient's visits by date (ascending - oldest first)
+    const sortedVisits = [...patientVisits].sort((a, b) => {
+      const dateA = new Date(a.rawDate || a.date).getTime();
+      const dateB = new Date(b.rawDate || b.date).getTime();
+      return dateA - dateB;  // Ascending order (oldest first)
+    });
+    
+    // Get the earliest (first) visit
+    const firstVisit = sortedVisits[0];
+    
+    // Show "R" only if this booking is NOT the first visit
+    const isRepeat = booking.bookingId !== firstVisit.bookingId;
+    
+    // ✅ DEBUG: Log repeat patient detection
+    if (isRepeat) {
+      console.log(`🔄 REPEAT PATIENT: "${booking.name}" | Patient ID: ${booking.patientId} | This is visit #${patientVisits.length} | Date: ${booking.date}`);
+    } else {
+      console.log(`✅ FIRST VISIT: "${booking.name}" | Patient ID: ${booking.patientId} | Date: ${booking.date}`);
+    }
+    
+    return isRepeat;
+  };
+
   // Helper function to transform patients data to bookings format
   const transformPatientsToBookings = (patients: any[], orgs: any[]): Booking[] => {
     const mapped: Booking[] = [];
@@ -618,6 +655,17 @@ export default function BookingPage() {
         const visitDate = visit.visitDate || p.createdAt;
         const paymentStatus = visit.balanceAmount > 0 ? "Due" : "Paid";
         
+        const patientFullName = `${p.title || ""} ${p.firstName || ""} ${p.lastName || ""}`.trim().toUpperCase();
+        const patientPhone = p.mobile || "";
+        
+        // ✅ LOG: Patient data being transformed
+        console.log('📝 TRANSFORM BOOKING:', {
+          patientName: patientFullName,
+          patientPhone: patientPhone,
+          visitId: visit.visitId,
+          testCount: visit.tests.length
+        });
+        
         console.log('🔍 VISIT DATA:', {
           visitId: visit.visitId,
           balanceAmount: visit.balanceAmount,
@@ -628,7 +676,7 @@ export default function BookingPage() {
         
         mapped.push({
           bookingId: `${p.patientId}-${visit.visitId}`,
-          name: `${p.title || ""} ${p.firstName || ""} ${p.lastName || ""}`.trim().toUpperCase(),
+          name: patientFullName,
           patientId: p.patientId,
           date: visitDate
             ? new Date(visitDate).toLocaleDateString("en-GB")
@@ -648,7 +696,7 @@ export default function BookingPage() {
             title: p.title || "MR",
             firstName: p.firstName || "",
             lastName: p.lastName || "",
-            mobile: p.mobile || "",
+            mobile: patientPhone,
             email: p.email || "",
             age: String(p.age || ""),
             gender: p.gender || "Male",
@@ -661,6 +709,7 @@ export default function BookingPage() {
             visitDate: visitDate || "",
             organizationId: visit.organizationId || "",
             organizationCode: "",
+            isEmergency: visit.tests.some((t: any) => t.isEmergency) || false,  // ✅ NEW: Check if ANY test is marked as emergency
           },
         });
       });
@@ -1196,6 +1245,8 @@ export default function BookingPage() {
         mobile:    formData.mobile,
         email:     formData.email,
         address:   formData.address,
+        isEmergency: formData.isEmergency || false,  // ✅ Send emergency flag to backend
+        visitId: editingPatient.visitId,  // ✅ NEW: Send visitId to apply emergency to all tests in this visit
       });
       if (!res.success) { alert('Failed to update patient: ' + res.message); return; }
 
@@ -2108,6 +2159,10 @@ export default function BookingPage() {
                             <AlertTriangle size={16} className="text-yellow-500 flex-shrink-0" />
                           )}
                           <span>{b.name}</span>
+                          {/* ✅ NEW: Show 'R' badge for repeat patients (from 2nd visit onwards) - simple text only, BLUE color */}
+                          {isRepeatPatient(b, allBookings) && (
+                            <span className="text-blue-600 font-bold text-sm" title="Repeat Patient - Has previous test reports">R</span>
+                          )}
                           {b.balanceAmount > 0 && (
                             <div className="relative inline-flex items-center cursor-help">
                               <span className="text-red-600 font-bold text-sm hover:text-red-700 transition-colors">₹</span>
@@ -2743,6 +2798,18 @@ export default function BookingPage() {
               <div className={style.formGrid}>
                 <label className="col-span-3 font-semibold text-xs">Address</label>
                 <textarea name="address" value={formData.address} onChange={handleInputChange} rows={2} className="col-span-9 border border-gray-300 rounded px-2 py-1 text-xs bg-white" placeholder="Address"/>
+              </div>
+              <div className={style.formGrid}>
+                <label className="col-span-3 font-semibold text-xs">Emergency</label>
+                <div className="col-span-9 flex items-center gap-2">
+                  <input 
+                    type="checkbox" 
+                    checked={formData.isEmergency || false} 
+                    onChange={(e) => setFormData(prev => ({...prev, isEmergency: e.target.checked}))}
+                    className="w-4 h-4 accent-red-500 cursor-pointer"
+                  />
+                  <span className="text-xs text-gray-600">Mark this visit as Emergency</span>
+                </div>
               </div>
             </div>
             <div className="p-4 border-t flex justify-end gap-2">
