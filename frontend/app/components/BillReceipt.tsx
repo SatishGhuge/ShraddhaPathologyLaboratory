@@ -114,32 +114,32 @@ const BillReceipt: React.FC<BillReceiptProps> = ({ booking, billing, businessTyp
         {/* Patient Details - Single Row Header */}
         <div className="flex justify-between items-start text-xs mb-4" style={{ pageBreakInside: 'avoid' }}>
           <div>
-            <div className="flex mb-1">
-              <span className="w-32 font-semibold">Visit ID :</span>
+            <div className="flex gap-1 mb-0.5">
+              <span className="font-semibold">Visit ID :</span>
               <span className="font-bold text-blue-600">{booking.visitId || 'N/A'}</span>
             </div>
-            <div className="flex mb-1">
-              <span className="w-32 font-semibold">Payment Mode :</span>
+            <div className="flex gap-1">
+              <span className="font-semibold">Payment Mode :</span>
               <span>{paymentMode || 'CASH'}</span>
             </div>
           </div>
           <div>
-            <div className="flex mb-1">
-              <span className="w-32 font-semibold">Name :</span>
+            <div className="flex gap-1 mb-0.5">
+              <span className="font-semibold">Name :</span>
               <span>{patientName} (ID: {booking.patientData?.id || 'N/A'})</span>
             </div>
-            <div className="flex mb-1">
-              <span className="w-32 font-semibold">Referral :</span>
+            <div className="flex gap-1">
+              <span className="font-semibold">Referral :</span>
               <span>{booking.patientData?.referralDoctor || 'N/A'}</span>
             </div>
           </div>
           <div>
-            <div className="flex mb-1">
-              <span className="w-24 font-semibold">Sex / Age :</span>
+            <div className="flex gap-1 mb-0.5">
+              <span className="font-semibold">Sex / Age :</span>
               <span>{booking.patientData?.gender?.charAt(0) || 'M'} / {booking.patientData?.age || '—'} years</span>
             </div>
-            <div className="flex mb-1">
-              <span className="w-24 font-semibold">Date & Time :</span>
+            <div className="flex gap-1">
+              <span className="font-semibold">Date & Time :</span>
               <span>{booking.date}</span>
             </div>
           </div>

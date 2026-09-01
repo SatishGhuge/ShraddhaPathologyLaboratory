@@ -56,10 +56,11 @@ export const login = async (req, res) => {
           // Organization admin with no allocation - get default (all modules disabled)
           moduleAllocation = JSON.stringify({
             patient: { registration: false, tests: false },
-            masters: { testlist: false, testTemplates: false, departmentlist: false, packagelist: false, charges: false, rolelist: false, userlist: false, referralDoctorList: false, organization: false, specimenType: false, units: false },
-            reports: { dashboard: false, collectionReport: false, patientList: false, referralDoctorRevenue: false, centerWiseCostReport: false, b2bTestwiseCostReport: false, discountReport: false, testReport: false },
-            configuration: { signature: false, machines: false },
+            masters: { testlist: false, testTemplates: false, departmentlist: false, packagelist: false, charges: false, rolelist: false, userlist: false, referralDoctorList: false, organization: false, specimenType: false, units: false, outsourcing: false },
+            reports: { dashboard: false, collectionReport: false, organizationSettlement: false, patientList: false, referralDoctorRevenue: false, testReport: false, turnAroundTime: false },
+            configuration: { signature: false, machines: false, reportSettings: false },
             help: { userManual: false, ultraviewer: false, anydesk: false },
+            inventory: { stockTransactions: false, item: false, supplier: false, stockEntry: false, orgTransfer: false },
             result: false
           });
         }

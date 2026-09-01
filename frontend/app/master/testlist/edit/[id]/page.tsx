@@ -8,7 +8,7 @@ import PageHeader from "@/src/components/BreadCrumb";
 import UnitModal from "@/src/components/UnitModal";
 import { CKEditor } from "@ckeditor/ckeditor5-react";
 import ClassicEditor from "@ckeditor/ckeditor5-build-classic";
-import { getTestById, createTest, updateTest, getDepartments, getUnits, getTests, getSampleTypes } from "@/src/api/master.js";
+import { getTestById, createTest, updateTest, getDepartments, getAllUnits, getTests, getSampleTypes } from "@/src/api/master.js";
 import { getMachinesDropdown } from "@/src/api/machines";
 
 const baseInputClass =
@@ -88,15 +88,15 @@ const AddTest = () => {
 
   // Unit modal callback handler
   const handleUnitAdded = () => {
-    const fetchUnits = async () => {
+    const fetchUnitsForModal = async () => {
       try {
-        const unitsData = await getUnits();
+        const unitsData = await getAllUnits();
         setUnits(unitsData);
       } catch (err) {
         console.error('❌ Error fetching units:', err);
       }
     };
-    fetchUnits();
+    fetchUnitsForModal();
     setSuccessMsg("Unit Added/Updated Successfully!");
     setTimeout(() => setSuccessMsg(""), 2000);
   };
@@ -250,7 +250,7 @@ const AddTest = () => {
     const fetchUnits = async () => {
       try {
         console.log("📡 Fetching units from API...");
-        const unitsData = await getUnits();
+        const unitsData = await getAllUnits();
         console.log("✅ Units loaded:", unitsData);
         setUnits(unitsData);
       } catch (err) {

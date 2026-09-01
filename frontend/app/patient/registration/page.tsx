@@ -403,6 +403,7 @@ export default function PatientRegistration() {
   const [babyAgeFormatted, setBabyAgeFormatted] = useState<string>(""); // "1 month 3 days" format for babies < 1 year
   const [mobile, setMobile] = useState("");
   const [email, setEmail] = useState("");
+  const [emailAutoFilledFromDoctor, setEmailAutoFilledFromDoctor] = useState(false); // ✅ Track if email was auto-filled from doctor
   const [address, setAddress] = useState("");
   const [location, setLocation] = useState("");
   const [locationSearch, setLocationSearch] = useState("");
@@ -834,6 +835,8 @@ export default function PatientRegistration() {
       if (!email && selectedDoc.email) {
         console.log('📧 Auto-filling patient email from doctor:', selectedDoc.email);
         setEmail(selectedDoc.email);
+        // ✅ Mark email as auto-filled from doctor (NOT for sending credentials)
+        setEmailAutoFilledFromDoctor(true);
       }
 
       // Auto-populate patient mobile from doctor if patient mobile is empty
@@ -1918,6 +1921,8 @@ export default function PatientRegistration() {
         guardianType: guardianType || "self", // Add guardian type
         mobile: mobile,
         email: email || null,
+        // ✅ NEW: Track if email was manually filled (true = send credentials, false = don't send)
+        emailWasManuallyFilled: !emailAutoFilledFromDoctor,
         createdBy: createdBy || null,
         address: address || null,
         location: location || null,  // Add location field
@@ -2742,7 +2747,15 @@ export default function PatientRegistration() {
               </div>
               
               {/* Email */}
-              <input className={input} placeholder="Email" value={email} onChange={(e) => handleEmailChange(e.target.value)} />
+              <input className={input} placeholder="Email" value={email} onChange={(e) => {
+                const newEmail = e.target.value;
+                setEmail(newEmail);
+                // ✅ User manually changed email - clear the auto-fill flag
+                if (newEmail && newEmail.trim()) {
+                  setEmailAutoFilledFromDoctor(false);
+                  console.log('📧 Email manually changed by user - auto-fill flag cleared');
+                }
+              }} />
             </div>
           </div>
 
@@ -3209,7 +3222,19 @@ export default function PatientRegistration() {
               </div>
             </div>
 
-            <div className="flex gap-2 p-2 bg-gray-100">
+            <div className="flex gap-2 p-2 bg-gray-100 items-center">
+              {/* ✅ NEW: Emergency Checkbox */}
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input 
+                  type="checkbox"
+                  checked={isEmergency}
+                  onChange={(e) => setIsEmergency(e.target.checked)}
+                  className="w-4 h-4 accent-red-600 cursor-pointer"
+                  title="Mark this visit as EMERGENCY"
+                />
+                <span className="text-xs font-semibold text-red-600">Emergency</span>
+              </label>
+
               <button 
                 onClick={handleClearForm} 
                 className="bg-red-600 hover:bg-red-800 text-white text-xs px-4 py-1 rounded font-semibold flex items-center gap-2"

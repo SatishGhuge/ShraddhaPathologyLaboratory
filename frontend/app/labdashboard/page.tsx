@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import React, { useEffect, useState, useContext } from "react";
 import { createAdmin } from "@/src/api/admin";
 import { getTestStatistics } from "@/src/api/result";
-import { getPatientStatistics } from "@/src/api/patient";
+import { getPatientStatistics, getOrganizationTypeStatistics, getWeeklyOrganizationTypeStatistics } from "@/src/api/patient";
 import { colorTheme } from "@/config/colorTheme";
 import { SidebarContext } from "@/app/layout-wrapper";
 import {
@@ -15,7 +15,7 @@ import {
 import {
   Rocket, FileText, Package, UserPlus,
   Search, TestTube, DollarSign, Users, FlaskConical,
-  CheckCircle, Truck, ChevronLeft, ChevronRight,
+  CheckCircle, Truck, ChevronLeft, ChevronRight, TrendingUp,
 } from "lucide-react";
 
 /* ─── Colors & Config ───────────────────────────────────────── */
@@ -139,6 +139,12 @@ const Dashboard = () => {
   const [yesterdayRegistered,    setYesterdayRegistered]    = useState(0);
   const [yesterdayAuthenticated, setYesterdayAuthenticated] = useState(0);
   const [yesterdayDelivered,     setYesterdayDelivered]     = useState(0);
+  const [organizationTypeData,   setOrganizationTypeData]   = useState<any[]>([
+    { name: "Home Collection", value: 0 },
+    { name: "OPD", value: 0 },
+    { name: "IPD", value: 0 },
+  ]);
+  const [weeklyOrgTypeData,      setWeeklyOrgTypeData]      = useState<any[]>([]);
 
   useEffect(() => {
     const today     = new Date().toISOString().split("T")[0];
@@ -148,7 +154,9 @@ const Dashboard = () => {
       getPatientStatistics({ fromDate:today,  toDate:today     }),
       getTestStatistics({ fromDate:yesterday, toDate:yesterday }),
       getPatientStatistics({ fromDate:yesterday, toDate:yesterday }),
-    ]).then(([todayTest, todayPat, _yestTest, _yestPat]) => {
+      getOrganizationTypeStatistics({ fromDate:today, toDate:today }),
+      getWeeklyOrganizationTypeStatistics(),
+    ]).then(([todayTest, todayPat, _yestTest, _yestPat, orgTypeStats, weeklyOrgStats]) => {
       setTodayAuthenticated(todayTest.byStatus?.AUTHENTICATED || 0);
       setTodayDelivered(todayTest.byStatus?.DELIVERED         || 0);
       setTodayRegistered(todayTest.byStatus?.REGISTERED       || 0);
@@ -162,7 +170,35 @@ const Dashboard = () => {
         setLocationData(todayPat.locationStats.slice(0,5).map((l: any) => ({ name: l.location || "Not Specified", value: l.count })));
       if (todayTest.byDepartment)
         setDepartmentData(Object.entries(todayTest.byDepartment).map(([name, value]) => ({ name, value })));
-    }).catch(console.error);
+      
+      // Set organization type data for bar graph (today's data)
+      console.log('📊 Organization Type Stats Response:', orgTypeStats);
+      if (orgTypeStats.success && orgTypeStats.data) {
+        console.log('✅ Setting organization type data:', orgTypeStats.data);
+        const chartData = [
+          { name: "Home Collection", value: orgTypeStats.data.homeCollection || 0 },
+          { name: "OPD", value: orgTypeStats.data.opd || 0 },
+          { name: "IPD", value: orgTypeStats.data.ipd || 0 },
+        ];
+        console.log('📈 Chart data:', chartData);
+        setOrganizationTypeData(chartData);
+      } else {
+        console.warn('⚠️ No organization type data received or failed:', orgTypeStats);
+        setOrganizationTypeData([
+          { name: "Home Collection", value: 0 },
+          { name: "OPD", value: 0 },
+          { name: "IPD", value: 0 },
+        ]);
+      }
+
+      // Set weekly organization type data
+      console.log('📊 Weekly Organization Type Stats:', weeklyOrgStats);
+      if (weeklyOrgStats.success && weeklyOrgStats.data) {
+        setWeeklyOrgTypeData(weeklyOrgStats.data);
+      }
+    }).catch(err => {
+      console.error('❌ Dashboard data fetch error:', err);
+    });
   }, []);
 
   const statValues = { Total:todayTotal, Registered:todayRegistered, Collected:0, Authenticated:todayAuthenticated, Delivered:todayDelivered };
@@ -200,33 +236,60 @@ const Dashboard = () => {
       {/* Row 2: Main content - 3 columns */}
       <div className="grid grid-cols-[1.2fr_2fr_1.3fr] gap-3 flex-1 min-h-0">
         
-        {/* LEFT COLUMN: Yesterday Summary + Calendar */}
+        {/* LEFT COLUMN: Weekly Organization Type + Calendar */}
         <div className="flex flex-col gap-3 min-h-0">
-          {/* Yesterday Summary Card */}
+          {/* Weekly Organization Type Grouped Bar Chart */}
           <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden flex-shrink-0">
-            <div className="p-3">
-              <p className="text-[12px] font-bold text-gray-800 mb-4">Yesterday Summary</p>
-              <div className="flex flex-col gap-3">
-                {[
-                  { label:"Total",         value: yesterdayTotal,         color:"#C8651A" },
-                  { label:"Registered",    value: yesterdayRegistered,    color:"#3B82F6" },
-                  { label:"Authenticated", value: yesterdayAuthenticated, color:"#10B981" },
-                  { label:"Delivered",     value: yesterdayDelivered,     color:"#F59E0B" },
-                ].map(bar => {
-                  const maxVal = Math.max(yesterdayTotal, yesterdayRegistered, yesterdayAuthenticated, yesterdayDelivered, 1);
-                  return (
-                    <div key={bar.label}>
-                      <div className="flex justify-between text-[11px] mb-1">
-                        <span className="text-gray-600 font-medium">{bar.label}</span>
-                        <span className="font-bold text-gray-800">{bar.value}</span>
-                      </div>
-                      <div className="h-1.5 bg-gray-150 rounded-full overflow-hidden">
-                        <div className="h-full rounded-full transition-all duration-700"
-                          style={{ width:`${Math.min((bar.value / maxVal) * 100, 100)}%`, background: bar.color }} />
-                      </div>
-                    </div>
-                  );
-                })}
+            <div className="p-3 h-52 flex flex-col">
+              <div className="flex items-center justify-between mb-2">
+                <TrendingUp size={16} className="text-blue-600"/>
+                {weeklyOrgTypeData.length > 0 && (
+                  <div className="flex gap-2 text-[9px]">
+                    <span className="flex items-center gap-1 px-2 py-1 rounded bg-blue-50">
+                      <span className="w-1.5 h-1.5 rounded-full bg-[#3B82F6]"/>
+                      <span className="font-medium text-gray-600">HC:</span>
+                      <span className="font-bold text-[#3B82F6]">
+                        {weeklyOrgTypeData.reduce((sum, day) => sum + day.homeCollection, 0)}
+                      </span>
+                    </span>
+                    <span className="flex items-center gap-1 px-2 py-1 rounded bg-purple-50">
+                      <span className="w-1.5 h-1.5 rounded-full bg-[#8B5CF6]"/>
+                      <span className="font-medium text-gray-600">OPD:</span>
+                      <span className="font-bold text-[#8B5CF6]">
+                        {weeklyOrgTypeData.reduce((sum, day) => sum + day.opd, 0)}
+                      </span>
+                    </span>
+                    <span className="flex items-center gap-1 px-2 py-1 rounded bg-orange-50">
+                      <span className="w-1.5 h-1.5 rounded-full bg-[#F59E0B]"/>
+                      <span className="font-medium text-gray-600">IPD:</span>
+                      <span className="font-bold text-[#F59E0B]">
+                        {weeklyOrgTypeData.reduce((sum, day) => sum + day.ipd, 0)}
+                      </span>
+                    </span>
+                  </div>
+                )}
+              </div>
+              <div className="flex-1 min-h-0 w-full">
+                {weeklyOrgTypeData.length > 0 ? (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={weeklyOrgTypeData} margin={{top:5,right:10,bottom:5,left:-20}}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#f5f5f5"/>
+                      <XAxis dataKey="day" tick={{fontSize:9}} tickLine={false} axisLine={false}/>
+                      <YAxis tick={{fontSize:9}} tickLine={false} axisLine={false}/>
+                      <Tooltip content={<ChartTooltip/>}/>
+                      <Bar dataKey="homeCollection" fill="#3B82F6" radius={[4,4,0,0]} name="Home Collection"/>
+                      <Bar dataKey="opd" fill="#8B5CF6" radius={[4,4,0,0]} name="OPD"/>
+                      <Bar dataKey="ipd" fill="#F59E0B" radius={[4,4,0,0]} name="IPD"/>
+                    </BarChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="flex items-center justify-center h-full text-gray-400 text-xs">Loading weekly data...</div>
+                )}
+              </div>
+              <div className="flex gap-3 mt-1 flex-shrink-0 justify-center">
+                <span className="flex items-center gap-1 text-[9px]"><span className="w-2 h-2 rounded-full bg-[#3B82F6]"/><span className="text-gray-600">Home Collection</span></span>
+                <span className="flex items-center gap-1 text-[9px]"><span className="w-2 h-2 rounded-full bg-[#8B5CF6]"/><span className="text-gray-600">OPD</span></span>
+                <span className="flex items-center gap-1 text-[9px]"><span className="w-2 h-2 rounded-full bg-[#F59E0B]"/><span className="text-gray-600">IPD</span></span>
               </div>
             </div>
           </div>

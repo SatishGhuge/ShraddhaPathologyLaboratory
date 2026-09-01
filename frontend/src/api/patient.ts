@@ -217,6 +217,31 @@ export const getPatientStatistics = async (filters: Filters = {}, page: number =
   return response;
 };
 
+// Get organization type statistics for dashboard
+export const getOrganizationTypeStatistics = async (filters: Filters = {}): Promise<ApiResponse<{homeCollection: number, opd: number, ipd: number}>> => {
+  const queryParams = new URLSearchParams();
+  
+  // Add filters to query params (typically fromDate and toDate)
+  Object.keys(filters).forEach(key => {
+    if (filters[key] && filters[key] !== '') {
+      queryParams.append(key, filters[key]);
+    }
+  });
+  
+  const url = `/patients/statistics/organization-type${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
+  
+  return apiCall(url, {
+    method: 'GET',
+  });
+};
+
+// Get weekly organization type statistics for dashboard
+export const getWeeklyOrganizationTypeStatistics = async (): Promise<ApiResponse<Array<{day: string, date: string, homeCollection: number, opd: number, ipd: number}>>> => {
+  return apiCall('/patients/statistics/organization-type/weekly', {
+    method: 'GET',
+  });
+};
+
 // Add test to existing patient visit
 export const addTestToVisit = async (patientId: string, visitId: string, testData: any): Promise<ApiResponse> => {
   return apiCall(`/patients/${patientId}/visits/${visitId}/tests`, {
@@ -285,5 +310,49 @@ export const saveOrgSettlement = async (settlementData: {
 export const getVisitBill = async (visitId: string): Promise<ApiResponse> => {
   return apiCall(`/patients/visit-bill/${visitId}`, {
     method: 'GET',
+  });
+};
+
+// Save referral doctor settlement - single visit
+export const saveReferralDoctorSettlement = async (settlementData: {
+  visitId: string;
+  referralDoctorId: number;
+  referralDoctorName: string;
+  doctorDiscount: number;
+  tdsChecked: boolean;
+  tdsPercent: number;
+  otherDiscountPercent: number;
+  otherDiscountAmount: number;
+  amountPaid: number;
+  remark?: string;
+}): Promise<ApiResponse> => {
+  return apiCall('/referral-doctor-settlement/save-settlement', {
+    method: 'POST',
+    body: JSON.stringify(settlementData)
+  });
+};
+
+// Save bulk referral doctor settlement (multiple visits for one doctor)
+export const saveBulkReferralDoctorSettlement = async (settlementData: {
+  visitIds: string[];
+  applyDoctorDiscount: boolean;
+  tdsPercent: number;
+  otherDiscountPercent: number;
+  otherDiscountAmount: number;
+  amountPaid: number;
+  remark?: string;
+}): Promise<ApiResponse> => {
+  return apiCall('/referral-doctor-settlement/save-bulk-settlement', {
+    method: 'POST',
+    body: JSON.stringify(settlementData)
+  });
+};
+
+// Cancel a test from a visit - marks it as Cancelled and updates billing
+export const cancelTest = async (visitId: string, patientTestId: string | number, remarks?: string): Promise<ApiResponse> => {
+  console.log('🗑️ API: Calling cancelTest endpoint', { visitId, patientTestId, endpoint: `/patients/${visitId}/cancel-test/${patientTestId}` });
+  return apiCall(`/patients/${visitId}/cancel-test/${patientTestId}`, {
+    method: 'POST',
+    body: JSON.stringify({ remarks: remarks || 'User cancelled' }),
   });
 };

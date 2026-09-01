@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { ArrowLeft, User, Hospital, Mail, Phone, MapPin, GraduationCap, AlertCircle } from "lucide-react";
+import { ArrowLeft, User, Hospital, Mail, Phone, MapPin, GraduationCap, AlertCircle, DollarSign } from "lucide-react";
 
 interface ReferralDoctorModalProps {
   isOpen: boolean;
@@ -23,6 +23,7 @@ export default function ReferralDoctorModal({
     mobile: "",
     email: "",
     address: "",
+    discount: "",
     sendReportsViaWhatsApp: false,
     sendReportsViaMail: false,
   });
@@ -44,6 +45,7 @@ export default function ReferralDoctorModal({
           mobile: editingDoctor.mobile || "",
           email: editingDoctor.email || "",
           address: editingDoctor.address || "",
+          discount: editingDoctor.discount !== undefined && editingDoctor.discount !== null ? String(editingDoctor.discount) : "",
           sendReportsViaWhatsApp: editingDoctor.sendReportsViaWhatsApp || false,
           sendReportsViaMail: editingDoctor.sendReportsViaMail || false,
         });
@@ -55,6 +57,7 @@ export default function ReferralDoctorModal({
           mobile: "",
           email: "",
           address: "",
+          discount: "",
           sendReportsViaWhatsApp: false,
           sendReportsViaMail: false,
         });
@@ -73,6 +76,9 @@ export default function ReferralDoctorModal({
 
     // Mobile: only digits, max 10
     if (name === "mobile" && !/^\d*$/.test(value)) return;
+
+    // Discount: only numbers with optional decimal
+    if (name === "discount" && value && !/^\d*\.?\d*$/.test(value)) return;
 
     setFormData({ ...formData, [name]: inputType === "checkbox" ? checked : value });
     if (errors[name]) setErrors((prev) => ({ ...prev, [name]: "" }));
@@ -108,6 +114,7 @@ export default function ReferralDoctorModal({
         mobile: formData.mobile || null,
         email: formData.email || null,
         address: formData.address || null,
+        discount: parseFloat(formData.discount) || 0,
         sendReportsViaWhatsApp: formData.sendReportsViaWhatsApp,
         sendReportsViaMail: formData.sendReportsViaMail,
       };
@@ -159,6 +166,7 @@ export default function ReferralDoctorModal({
       mobile: "",
       email: "",
       address: "",
+      discount: "",
       sendReportsViaWhatsApp: false,
       sendReportsViaMail: false,
     });
@@ -254,6 +262,24 @@ export default function ReferralDoctorModal({
               <MapPin size={16} className="text-cyan-600 mt-2 mr-2 flex-shrink-0" />
               <textarea name="address" value={formData.address} onChange={handleChange} rows={2} placeholder="Address" className="w-full py-2 outline-none resize-none bg-transparent" disabled={loading} />
             </div>
+          </div>
+
+          {/* Discount */}
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-1">Discount (%)</label>
+            <div className="flex items-center border border-gray-300 rounded px-2 bg-white">
+              <span className="text-cyan-600 mr-2 text-sm font-semibold">%</span>
+              <input 
+                type="text" 
+                name="discount" 
+                value={formData.discount} 
+                onChange={handleChange} 
+                placeholder="0" 
+                className="w-full py-2 outline-none bg-transparent" 
+                disabled={loading} 
+              />
+            </div>
+            <p className="text-xs text-gray-500 mt-1">Default discount percentage for this referral doctor</p>
           </div>
 
           {/* Report Delivery Preferences */}

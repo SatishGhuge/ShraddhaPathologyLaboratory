@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeft, ChevronDown, User, Settings, BarChart3, HelpCircle, ClipboardCheck, Lock } from "lucide-react";
+import { ArrowLeft, ChevronDown, User, Settings, BarChart3, HelpCircle, ClipboardCheck, Lock, Package } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useRouter, useParams, usePathname } from "next/navigation";
 
@@ -172,32 +172,45 @@ const defaultModuleAllocation = {
     organization: false,
     specimenType: false,
     units: false,
+    outsourcing: false,
   },
   reports: {
     dashboard: false,
     collectionReport: false,
+    organizationSettlement: false,
+    referralDoctorSettlement: false,
     patientList: false,
     referralDoctorRevenue: false,
     testReport: false,
     turnAroundTime: false,
   },
   configuration: {
-    letterhead: false,
     signature: false,
+    machines: false,
+    reportSettings: false,
   },
   help: {
     userManual: false,
     ultraviewer: false,
     anydesk: false,
   },
+  inventory: {
+    stockTransactions: false,
+    item: false,
+    supplier: false,
+    stockEntry: false,
+    orgTransfer: false,
+  },
   result: false,
 };
 
 export default function AddUserForm() {
   const router = useRouter();
-  const { id } = useParams();
+  const params = useParams();
   const pathname = usePathname();
-  const isEditMode = pathname.includes("/edit/");
+  
+  const id = params?.id ? (Array.isArray(params.id) ? params.id[0] : params.id) : null;
+  const isEditMode = pathname ? pathname.includes("/edit/") : false;
 
   const [successMessage, setSuccessMessage] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
@@ -308,8 +321,11 @@ export default function AddUserForm() {
       const keys = item.key.split('.');
       let current = newAllocation;
       
-      // Navigate to parent
+      // Navigate to parent, create objects if they don't exist
       for (let i = 0; i < keys.length - 1; i++) {
+        if (!current[keys[i]]) {
+          current[keys[i]] = {};
+        }
         current = current[keys[i]];
       }
       
@@ -472,8 +488,9 @@ export default function AddUserForm() {
                   { key: 'masters.userlist', label: 'Users' },
                   { key: 'masters.referralDoctorList', label: 'Referral Doctors' },
                   { key: 'masters.organization', label: 'Organization' },
-                  { key: 'masters.specimenType', label: 'Specimen Type' },
+                  { key: 'masters.specimenType', label: 'Sample Type' },
                   { key: 'masters.units', label: 'Units' },
+                  { key: 'masters.outsourcing', label: 'Outsourcing' },
                 ]}
                 moduleAllocation={moduleAllocation}
                 toggleModule={toggleModule}
@@ -489,6 +506,8 @@ export default function AddUserForm() {
                 items={[
                   { key: 'reports.dashboard', label: 'Dashboard' },
                   { key: 'reports.collectionReport', label: 'Collection Report' },
+                  { key: 'reports.organizationSettlement', label: 'Organization Settlement' },
+                  { key: 'reports.referralDoctorSettlement', label: 'Referral Doctor Settlement' },
                   { key: 'reports.patientList', label: 'Patient List' },
                   { key: 'reports.referralDoctorRevenue', label: 'Referral Doctor Revenue' },
                   { key: 'reports.testReport', label: 'Test Report' },
@@ -506,8 +525,9 @@ export default function AddUserForm() {
                 title="Configuration"
                 icon={Lock}
                 items={[
-                  { key: 'configuration.letterhead', label: 'Letterhead' },
                   { key: 'configuration.signature', label: 'Signature' },
+                  { key: 'configuration.machines', label: 'Machines' },
+                  { key: 'configuration.reportSettings', label: 'Report Settings' },
                 ]}
                 moduleAllocation={moduleAllocation}
                 toggleModule={toggleModule}
@@ -524,6 +544,24 @@ export default function AddUserForm() {
                   { key: 'help.userManual', label: 'User Manual' },
                   { key: 'help.ultraviewer', label: 'Download Ultraviewer' },
                   { key: 'help.anydesk', label: 'Download Anydesk' },
+                ]}
+                moduleAllocation={moduleAllocation}
+                toggleModule={toggleModule}
+                onToggleAll={toggleSelectAll}
+                activeModule={activeModule}
+                onModuleChange={(module: string) => setActiveModule(module === activeModule ? null : module)}
+              />
+
+              {/* Inventory Module */}
+              <ModuleAccordion
+                title="Inventory"
+                icon={Package}
+                items={[
+                  { key: 'inventory.stockTransactions', label: 'Stock Transactions' },
+                  { key: 'inventory.item', label: 'Item' },
+                  { key: 'inventory.supplier', label: 'Supplier' },
+                  { key: 'inventory.stockEntry', label: 'Stock Entry' },
+                  { key: 'inventory.orgTransfer', label: 'Organization Transfer' },
                 ]}
                 moduleAllocation={moduleAllocation}
                 toggleModule={toggleModule}

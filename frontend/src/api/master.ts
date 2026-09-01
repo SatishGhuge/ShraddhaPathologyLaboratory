@@ -95,13 +95,24 @@ export const getDepartments = async (page: number = 1, limit: number = 20): Prom
 };
 
 // ==================== UNITS ====================
-export const getUnits = async (page: number = 1, limit: number = 20): Promise<any[]> => { 
+export const getUnits = async (page: number = 1, limit: number = 20): Promise<any> => { 
   const params = new URLSearchParams();
   params.append('page', page.toString());
   params.append('limit', limit.toString());
   const r = await apiCall(`/master/units?${params.toString()}`, { method: 'GET' }); 
-  return extractDataArray(r); 
+  // Return full response with pagination data
+  return {
+    data: r.data || [],
+    pagination: r.pagination || { page, limit, total: 0, totalPages: 0, hasMore: false }
+  };
 };
+
+// ✅ NEW: Get ALL units without pagination (for dropdown/select fields)
+export const getAllUnits = async (): Promise<any[]> => { 
+  const r = await apiCall(`/master/units?page=1&limit=1000`, { method: 'GET' }); 
+  return r.data || [];
+};
+
 export const getUnitById = async (id: string): Promise<any | null> => { const r = await apiCall(`/master/units/${id}`, { method: 'GET' }); return r.data || null; };
 export const createUnit = async (d: ApiData): Promise<any> => { const r = await apiCall('/master/units', { method: 'POST', body: JSON.stringify(d) }); return r.data || r; };
 export const updateUnit = async (id: string, d: ApiData): Promise<any> => { const r = await apiCall(`/master/units/${id}`, { method: 'PUT', body: JSON.stringify(d) }); return r.data || r; };

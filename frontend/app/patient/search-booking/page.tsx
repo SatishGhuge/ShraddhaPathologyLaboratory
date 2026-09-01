@@ -15,7 +15,7 @@ import {
   RefreshCcw, Plus, X, RefreshCw,
   ChevronLeft, ChevronRight, CalendarDays, AlertCircle, Barcode, AlertTriangle
 } from "lucide-react";
-import { getAllPatients, updatePayment, updatePatient, updatePatientTestDetails, getVisitBill } from "@/src/api/patient";
+import { getAllPatients, updatePayment, updatePatient, updatePatientTestDetails, getVisitBill, cancelTest } from "@/src/api/patient";
 import { getDoctors, getTests, getPackages, getSpecimenTypes, getOrganizations } from "@/src/api/master";
 import html2pdf from "html2pdf.js";
 import { jsPDF } from "jspdf";
@@ -286,6 +286,7 @@ interface PatientData {
   organizationCode: string;
   organizationId?: string;
   remark?: string;
+  isEmergency?: boolean;
 }
 
 interface Test {
@@ -354,6 +355,7 @@ interface FormDataType {
   address: string;
   organizationCode: string;
   dob?: string;
+  isEmergency?: boolean;  // ✅ NEW: Emergency flag for visit
 }
 
 interface BillingData {
@@ -547,6 +549,42 @@ export default function BookingPage() {
     setDateRange({ start: sevenDaysAgo, end: today });
   }, []);
 
+  // Helper function to detect if a patient is a repeat (based on PATIENT ID - count their visits)
+  // ✅ FIXED: Show "R" only if this visit is NOT the patient's first (earliest) visit
+  const isRepeatPatient = (booking: Booking, allBookingsData: Booking[]): boolean => {
+    if (!booking.patientId || !booking || allBookingsData.length <= 1) return false;
+    
+    // Get all visits for this PATIENT
+    const patientVisits = allBookingsData.filter(b => {
+      return b.patientId === booking.patientId;  // Same patient ID only
+    });
+    
+    // If patient has only 1 visit, it's their first visit → NO "R"
+    if (patientVisits.length <= 1) return false;
+    
+    // Sort patient's visits by date (ascending - oldest first)
+    const sortedVisits = [...patientVisits].sort((a, b) => {
+      const dateA = new Date(a.rawDate || a.date).getTime();
+      const dateB = new Date(b.rawDate || b.date).getTime();
+      return dateA - dateB;  // Ascending order (oldest first)
+    });
+    
+    // Get the earliest (first) visit
+    const firstVisit = sortedVisits[0];
+    
+    // Show "R" only if this booking is NOT the first visit
+    const isRepeat = booking.bookingId !== firstVisit.bookingId;
+    
+    // ✅ DEBUG: Log repeat patient detection
+    if (isRepeat) {
+      console.log(`🔄 REPEAT PATIENT: "${booking.name}" | Patient ID: ${booking.patientId} | This is visit #${patientVisits.length} | Date: ${booking.date}`);
+    } else {
+      console.log(`✅ FIRST VISIT: "${booking.name}" | Patient ID: ${booking.patientId} | Date: ${booking.date}`);
+    }
+    
+    return isRepeat;
+  };
+
   // Helper function to transform patients data to bookings format
   const transformPatientsToBookings = (patients: any[], orgs: any[]): Booking[] => {
     const mapped: Booking[] = [];
@@ -554,9 +592,16 @@ export default function BookingPage() {
     patients.forEach((p) => {
       const patientTests = p.tests || [];
 
-      // Group tests by visitId
+      // Group tests by visitId - FILTER OUT CANCELLED TESTS
       const visitMap: any = {};
       patientTests.forEach((t: any) => {
+        // Skip cancelled tests - they should not appear in the booking
+        // ✅ Check for both 'Cancelled' and 'CANCELLED' to handle any format
+        if (t.status === 'Cancelled' || t.status === 'CANCELLED') {
+          console.log('⏭️ Skipping cancelled test:', { testId: t.id, testName: t.test?.name, status: t.status });
+          return;
+        }
+        
         const vid = t.visitId || "";
         if (!visitMap[vid]) {
           visitMap[vid] = {
@@ -611,6 +656,17 @@ export default function BookingPage() {
         const visitDate = visit.visitDate || p.createdAt;
         const paymentStatus = visit.balanceAmount > 0 ? "Due" : "Paid";
         
+        const patientFullName = `${p.title || ""} ${p.firstName || ""} ${p.lastName || ""}`.trim().toUpperCase();
+        const patientPhone = p.mobile || "";
+        
+        // ✅ LOG: Patient data being transformed
+        console.log('📝 TRANSFORM BOOKING:', {
+          patientName: patientFullName,
+          patientPhone: patientPhone,
+          visitId: visit.visitId,
+          testCount: visit.tests.length
+        });
+        
         console.log('🔍 VISIT DATA:', {
           visitId: visit.visitId,
           balanceAmount: visit.balanceAmount,
@@ -621,7 +677,7 @@ export default function BookingPage() {
         
         mapped.push({
           bookingId: `${p.patientId}-${visit.visitId}`,
-          name: `${p.title || ""} ${p.firstName || ""} ${p.lastName || ""}`.trim().toUpperCase(),
+          name: patientFullName,
           patientId: p.patientId,
           date: visitDate
             ? new Date(visitDate).toLocaleDateString("en-GB")
@@ -641,7 +697,7 @@ export default function BookingPage() {
             title: p.title || "MR",
             firstName: p.firstName || "",
             lastName: p.lastName || "",
-            mobile: p.mobile || "",
+            mobile: patientPhone,
             email: p.email || "",
             age: String(p.age || ""),
             gender: p.gender || "Male",
@@ -654,6 +710,7 @@ export default function BookingPage() {
             visitDate: visitDate || "",
             organizationId: visit.organizationId || "",
             organizationCode: "",
+            isEmergency: visit.tests.some((t: any) => t.isEmergency) || false,  // ✅ NEW: Check if ANY test is marked as emergency
           },
         });
       });
@@ -1189,6 +1246,8 @@ export default function BookingPage() {
         mobile:    formData.mobile,
         email:     formData.email,
         address:   formData.address,
+        isEmergency: formData.isEmergency || false,  // ✅ Send emergency flag to backend
+        visitId: editingPatient.visitId,  // ✅ NEW: Send visitId to apply emergency to all tests in this visit
       });
       if (!res.success) { alert('Failed to update patient: ' + res.message); return; }
 
@@ -1312,24 +1371,139 @@ export default function BookingPage() {
     }
   };
 
-  const handleDeleteTest = (testToDelete: any) => {
+  const handleDeleteTest = async (testToDelete: any) => {
     if (!selectedBooking) return;
-    if (window.confirm(`Delete ${testToDelete.name}?`)) {
-      const updated = bookings.map(b=>
-        b.bookingId===selectedBooking.bookingId
-          ? {...b, tests: b.tests.filter(t => !(t.name===testToDelete.name && !!t.isExisting===!!testToDelete.isExisting))} : b
+    console.log('👉 [X Button Clicked] Test to delete:', testToDelete);
+    
+    if (!window.confirm(`Delete ${testToDelete.name}?`)) {
+      console.log('❌ User cancelled deletion');
+      return;
+    }
+    
+    console.log('✅ User confirmed deletion');
+    
+    try {
+      // ONLY call backend if it's an existing test with an ID
+      if (!testToDelete.isExisting || !testToDelete.id) {
+        console.log('⚠️ Not an existing test or no ID, removing locally:', {
+          isExisting: testToDelete.isExisting,
+          hasId: !!testToDelete.id
+        });
+        
+        // For new tests (not yet saved to DB), just remove from local state
+        const updated = bookings.map(b =>
+          b.bookingId === selectedBooking.bookingId
+            ? { ...b, tests: b.tests.filter(t => !(t.name === testToDelete.name && !!t.isExisting === !!testToDelete.isExisting)) }
+            : b
+        );
+        setBookings(updated);
+        const updatedBooking = updated.find(b => b.bookingId === selectedBooking.bookingId);
+        if (updatedBooking) {
+          setSelectedBooking(updatedBooking);
+        }
+        
+        // Clear discount when test is removed
+        setBilling(prev => ({
+          ...prev,
+          discount: "0",
+          discountPercent: "0"
+        }));
+        
+        setSuccessPopup(`Test "${testToDelete.name}" removed`);
+        setTimeout(() => setSuccessPopup(""), 3000);
+        return;
+      }
+      
+      // ✅ EXISTING TEST - CALL BACKEND API
+      console.log('🌐 Calling backend cancelTest API:', {
+        visitId: selectedBooking.visitId,
+        patientTestId: testToDelete.id,
+        testName: testToDelete.name
+      });
+      
+      const response = await cancelTest(selectedBooking.visitId, testToDelete.id);
+      
+      console.log('📦 Backend response received:', response);
+      
+      if (!response?.success) {
+        const errorMsg = response?.message || 'Unknown error';
+        console.error('❌ Backend returned error:', errorMsg);
+        alert(`Failed to cancel test: ${errorMsg}`);
+        return;
+      }
+      
+      console.log('✅ Backend successfully cancelled test');
+      console.log('📋 Response data:', response.data);
+      
+      // Extract updated bill from response
+      if (!response.data?.updatedBill) {
+        console.error('❌ No updatedBill in response');
+        alert('Test cancelled but billing update failed');
+        return;
+      }
+      
+      const freshBill = response.data.updatedBill;
+      console.log('💰 Fresh billing data:', {
+        grossAmount: freshBill.grossAmount,
+        totalDiscount: freshBill.totalDiscount,
+        totalPaid: freshBill.totalPaid,
+        balanceAmount: freshBill.balanceAmount,
+        totalDiscountPercent: freshBill.totalDiscountPercent
+      });
+      
+      // Update bookings with new test list (without cancelled test) and fresh amounts
+      const updatedBookings = bookings.map(b => 
+        b.bookingId === selectedBooking.bookingId
+          ? {
+              ...b,
+              tests: b.tests.filter(t => !(t.id === testToDelete.id)),  // Remove by ID, not by name
+              totalAmount: freshBill.grossAmount,
+              paidAmount: freshBill.totalPaid,
+              balanceAmount: freshBill.balanceAmount,
+              discountAmount: freshBill.totalDiscount,
+              discountPercent: freshBill.totalDiscountPercent,
+              paymentStatus: freshBill.balanceAmount <= 0 ? "Paid" : "Due"
+            }
+          : b
       );
-      setBookings(updated);
-      const updatedBooking = updated.find(b=>b.bookingId===selectedBooking.bookingId);
+      
+      console.log('📝 Updated bookings, new test count:', updatedBookings.find(b => b.bookingId === selectedBooking.bookingId)?.tests.length);
+      
+      setBookings(updatedBookings);
+      setAllBookings(updatedBookings);
+      
+      const updatedBooking = updatedBookings.find(b => b.bookingId === selectedBooking.bookingId);
       if (updatedBooking) {
+        console.log('🔄 Setting selectedBooking with new state:', {
+          testsCount: updatedBooking.tests.length,
+          totalAmount: updatedBooking.totalAmount,
+          balanceAmount: updatedBooking.balanceAmount
+        });
         setSelectedBooking(updatedBooking);
       }
-      // Clear discount when test is removed
-      setBilling(prev => ({
-        ...prev,
-        discount: "0",
-        discountPercent: "0"
-      }));
+      
+      // Update billing form with fresh amounts
+      setBilling(prev => {
+        const newBilling = {
+          ...prev,
+          advance: String(Math.round(freshBill.totalPaid || 0)),
+          balAmt: String(Math.round(freshBill.balanceAmount || 0)),
+          discount: String(Math.round(freshBill.totalDiscount || 0)),
+          discountPercent: String(Math.round(freshBill.totalDiscountPercent || 0)),
+          payment: ""
+        };
+        console.log('📊 Updated billing form:', newBilling);
+        return newBilling;
+      });
+      
+      setSuccessPopup(`✅ Test "${testToDelete.name}" cancelled successfully!`);
+      setTimeout(() => setSuccessPopup(""), 3000);
+      
+      console.log('🎉 Test cancellation complete!');
+      
+    } catch (error) {
+      console.error('❌ EXCEPTION during test cancellation:', error);
+      alert(`Error: ${(error as Error).message}`);
     }
   };
 
@@ -1986,6 +2160,10 @@ export default function BookingPage() {
                             <AlertTriangle size={16} className="text-yellow-500 flex-shrink-0" />
                           )}
                           <span>{b.name}</span>
+                          {/* ✅ NEW: Show 'R' badge for repeat patients (from 2nd visit onwards) - simple text only, BLUE color */}
+                          {isRepeatPatient(b, allBookings) && (
+                            <span className="text-blue-600 font-bold text-sm" title="Repeat Patient - Has previous test reports">R</span>
+                          )}
                           {b.balanceAmount > 0 && (
                             <div className="relative inline-flex items-center cursor-help">
                               <span className="text-red-600 font-bold text-sm hover:text-red-700 transition-colors">₹</span>
@@ -2284,6 +2462,15 @@ export default function BookingPage() {
                   {/* MERGED — all tests (new + existing) */}
                   {(() => {
                     const allTests = selectedBooking.tests;
+                    console.log('📋 Rendering tests table with allTests:', {
+                      count: allTests.length,
+                      tests: allTests.map(t => ({
+                        name: t.name,
+                        id: t.id,
+                        isExisting: t.isExisting,
+                        status: t.status
+                      }))
+                    });
                     return (
                       <div className="bg-white rounded shadow flex flex-col flex-1 overflow-hidden">
                         <div className="bg-slate-900 text-white px-1 py-0.5 font-semibold text-xs flex justify-between items-center">
@@ -2358,7 +2545,10 @@ export default function BookingPage() {
                                       </div>
                                     </td>
                                     <td className="p-1 text-center">
-                                      <button onClick={()=>handleDeleteTest(t)} className="text-red-600 hover:text-red-800"><X size={12}/></button>
+                                      <button onClick={()=>{
+                                        console.log('🔴 X BUTTON CLICKED - Test object:', t);
+                                        handleDeleteTest(t);
+                                      }} className="text-red-600 hover:text-red-800"><X size={12}/></button>
                                     </td>
                                   </tr>
                                 );
@@ -2609,6 +2799,18 @@ export default function BookingPage() {
               <div className={style.formGrid}>
                 <label className="col-span-3 font-semibold text-xs">Address</label>
                 <textarea name="address" value={formData.address} onChange={handleInputChange} rows={2} className="col-span-9 border border-gray-300 rounded px-2 py-1 text-xs bg-white" placeholder="Address"/>
+              </div>
+              <div className={style.formGrid}>
+                <label className="col-span-3 font-semibold text-xs">Emergency</label>
+                <div className="col-span-9 flex items-center gap-2">
+                  <input 
+                    type="checkbox" 
+                    checked={formData.isEmergency || false} 
+                    onChange={(e) => setFormData(prev => ({...prev, isEmergency: e.target.checked}))}
+                    className="w-4 h-4 accent-red-500 cursor-pointer"
+                  />
+                  <span className="text-xs text-gray-600">Mark this visit as Emergency</span>
+                </div>
               </div>
             </div>
             <div className="p-4 border-t flex justify-end gap-2">
@@ -3430,6 +3632,74 @@ export default function BookingPage() {
           balanceAmount: updatedBooking.balanceAmount,
           discountAmount: updatedBooking.discountAmount
         });
+      }}
+      onTestCancelled={async () => {
+        // ✅ NEW: Callback when test is cancelled in modal
+        // Refresh the selected booking from backend to get fresh test list and billing
+        console.log('🔄 [onTestCancelled] Refreshing booking data after test cancellation');
+        
+        if (!selectedBookingForModal?.visitId) {
+          console.warn('⚠️ No visitId available, cannot refresh');
+          return;
+        }
+        
+        try {
+          const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || '/api';
+          
+          // Fetch fresh billing summary
+          const billResponse = await fetch(`${API_BASE_URL}/patients/visit-bill/${selectedBookingForModal.visitId}`);
+          const billResult = await billResponse.json();
+          
+          console.log('💰 Fresh bill data:', billResult.data);
+          
+          // Fetch fresh test list
+          const testsResponse = await fetch(`${API_BASE_URL}/patients/tests-by-visit?visitId=${selectedBookingForModal.visitId}`);
+          const testsResult = await testsResponse.json();
+          
+          console.log('📋 Fresh tests data:', testsResult.data);
+          
+          // Update selected booking with fresh data
+          const refreshedBooking = {
+            ...selectedBookingForModal,
+            // ✅ Filter out any cancelled tests just to be safe
+            tests: (testsResult.data?.tests || testsResult.data || []).filter((t: any) => t.status !== 'Cancelled' && t.status !== 'CANCELLED'),
+            billing: billResult.data,
+            totalAmount: billResult.data?.grossAmount,
+            paidAmount: billResult.data?.totalPaid,
+            balanceAmount: billResult.data?.balanceAmount,
+            discountAmount: billResult.data?.totalDiscount,
+            discountPercent: billResult.data?.totalDiscountPercent,
+            paymentStatus: billResult.data?.balanceAmount <= 0 ? "Paid" : "Due"
+          };
+          
+          console.log('✅ Refreshed booking:', {
+            testCount: refreshedBooking.tests?.length,
+            grossAmount: refreshedBooking.totalAmount,
+            balanceAmount: refreshedBooking.balanceAmount
+          });
+          
+          // Update state
+          setSelectedBookingForModal(refreshedBooking);
+          
+          // Update in bookings list
+          setAllBookings(prevBookings =>
+            prevBookings.map(b =>
+              b.bookingId === refreshedBooking.bookingId ? refreshedBooking : b
+            )
+          );
+          
+          setBookings(prevBookings =>
+            prevBookings.map(b =>
+              b.bookingId === refreshedBooking.bookingId ? refreshedBooking : b
+            )
+          );
+          
+          console.log('🎉 Booking refreshed successfully after test cancellation');
+          
+        } catch (error) {
+          console.error('❌ Error refreshing booking after test cancellation:', error);
+          alert('Error refreshing booking data. Please close and reopen the modal.');
+        }
       }}
     />
     </>

@@ -15,16 +15,18 @@ export default function ResultUnits() {
   const [successMsg, setSuccessMsg] = useState("");
 
   const ITEMS_PER_PAGE = 20;
+  const [pagination, setPagination] = useState<any>(null);
 
   useEffect(() => {
     fetchUnits();
-  }, []);
+  }, [currentPage]);
 
   const fetchUnits = async () => {
     try {
       setLoading(true);
-      const response = await getUnits();
-      setData(response);
+      const response = await getUnits(currentPage, ITEMS_PER_PAGE);
+      setData(response.data || []);
+      setPagination(response.pagination || null);
     } catch (error) {
       console.error('Error fetching units:', error);
     } finally {
@@ -62,11 +64,17 @@ export default function ResultUnits() {
               type="text"
               placeholder="Search By Units"
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              onChange={(e) => {
+                setSearch(e.target.value);
+                setCurrentPage(1);
+              }}
               className="border border-gray-300 bg-white rounded px-3 py-2 w-64 text-sm placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500"
             />
             <button
-              onClick={() => setSearch("")}
+              onClick={() => {
+                setSearch("");
+                setCurrentPage(1);
+              }}
               className="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded text-sm transition-colors flex items-center gap-1"
             >
               <RotateCcw size={18} />
@@ -97,8 +105,8 @@ export default function ResultUnits() {
                     Loading units...
                   </td>
                 </tr>
-              ) : (data.filter((item) => item.symbol.toLowerCase().includes(search.toLowerCase()))).length > 0 ? (
-                (data.filter((item) => item.symbol.toLowerCase().includes(search.toLowerCase()))).map((item) => (
+              ) : data.length > 0 ? (
+                data.map((item) => (
                   <tr key={item.id} className="hover:bg-gray-50 border-b border-gray-200">
                     <td className="border border-gray-300 px-3 py-1">{item.symbol}</td>
                     <td className="border border-gray-300 px-3 py-1">
@@ -128,6 +136,43 @@ export default function ResultUnits() {
               )}
             </tbody>
           </table>
+
+          {/* ✅ PAGINATION CONTROLS */}
+          {pagination && pagination.total > 0 && (
+            <div className="mt-3 bg-white rounded shadow-md p-3 flex items-center justify-between text-xs flex-wrap gap-3">
+              <div className="text-gray-600">
+                Showing {(currentPage - 1) * ITEMS_PER_PAGE + 1} to{' '}
+                {Math.min(currentPage * ITEMS_PER_PAGE, pagination.total)} of{' '}
+                {pagination.total} records
+              </div>
+
+              <div className="flex gap-2 items-center flex-wrap">
+                <button
+                  onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                  disabled={currentPage === 1}
+                  className={`flex items-center gap-1 px-3 py-1 rounded ${currentPage === 1 ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-orange-500 text-white hover:bg-orange-600'}`}
+                >
+                  <ChevronLeft size={14} /> Previous
+                </button>
+
+                <span className="px-3 py-1 text-gray-700 font-medium">
+                  Page {currentPage} of {pagination.totalPages}
+                </span>
+
+                <button
+                  onClick={() => setCurrentPage(Math.min(pagination.totalPages, currentPage + 1))}
+                  disabled={currentPage === pagination.totalPages}
+                  className={`flex items-center gap-1 px-3 py-1 rounded ${currentPage === pagination.totalPages ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-orange-500 text-white hover:bg-orange-600'}`}
+                >
+                  Next <ChevronRight size={14} />
+                </button>
+              </div>
+
+              <div className="text-gray-600">
+                Total: {pagination.total} records
+              </div>
+            </div>
+          )}
         </div>
       </div>
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Plus, Pencil, Trash2, ArrowLeft, Microscope, RotateCcw } from "lucide-react";
 
 const initialData = [
@@ -19,6 +19,9 @@ const initialData = [
 export default function MicrobiologyOrganism() {
   const [data, setData] = useState(initialData);
   const [search, setSearch] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pagination, setPagination] = useState<any>(null);
+  const ITEMS_PER_PAGE = 20;
 
   const [showModal, setShowModal] = useState(false);
   const [editId, setEditId] = useState<any>(null);
@@ -31,7 +34,20 @@ export default function MicrobiologyOrganism() {
     item.name.toLowerCase().includes(search.toLowerCase())
   );
 
-  const handleReset = () => setSearch("");
+  const handleReset = () => {
+    setSearch("");
+    setCurrentPage(1);
+  };
+
+  useEffect(() => {
+    // Update pagination when filtered data changes
+    const totalPages = Math.ceil(filteredData.length / ITEMS_PER_PAGE);
+    setPagination({
+      total: filteredData.length,
+      totalPages: totalPages,
+      currentPage: currentPage
+    });
+  }, [filteredData, currentPage]);
 
   const handleDelete = (id: any) => {
     if (window.confirm("Are you sure you want to delete this organism?")) {
@@ -128,7 +144,14 @@ export default function MicrobiologyOrganism() {
             </thead>
 
             <tbody>
-              {filteredData.map((item, index) => (
+              {(() => {
+                const totalPages = Math.ceil(filteredData.length / ITEMS_PER_PAGE);
+                const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+                const endIndex = startIndex + ITEMS_PER_PAGE;
+                const paginatedData = filteredData.slice(startIndex, endIndex);
+
+                return paginatedData.length > 0 ? (
+                  paginatedData.map((item, index) => (
                 <tr key={item.id} className="hover:bg-gray-50 border-b border-gray-200">
                   <td className="border border-gray-300 px-3 py-1 text-center">{index + 1}</td>
                   <td className="border border-gray-300 px-3 py-1">{item.name}</td>
@@ -150,18 +173,49 @@ export default function MicrobiologyOrganism() {
                     </div>
                   </td>
                 </tr>
-              ))}
-
-              {filteredData.length === 0 && (
-                <tr>
-                  <td colSpan={3} className="text-center py-4 text-gray-500 border border-gray-300">
-                    No records found
-                  </td>
-                </tr>
-              )}
+              ))
+            ) : (
+              <tr>
+                <td colSpan={3} className="text-center py-4 text-gray-500 border border-gray-300">
+                  No records found
+                </td>
+              </tr>
+            );
+            })()}
             </tbody>
           </table>
         </div>
+
+        {/* Pagination Controls */}
+        {pagination && pagination.totalPages > 1 && (
+          <div className="mt-4 flex items-center justify-between bg-white p-3 rounded shadow-md">
+            <div className="text-sm text-gray-600">
+              Showing {Math.min((currentPage - 1) * ITEMS_PER_PAGE + 1, pagination.total)} to{" "}
+              {Math.min(currentPage * ITEMS_PER_PAGE, pagination.total)} of {pagination.total} records
+            </div>
+            <div className="flex gap-2 items-center">
+              <button
+                onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                disabled={currentPage === 1}
+                className="bg-orange-500 hover:bg-orange-600 disabled:bg-gray-400 text-white px-4 py-2 rounded text-sm transition-colors"
+              >
+                Previous
+              </button>
+              
+              <span className="text-sm text-gray-700 font-semibold">
+                Page {currentPage} of {pagination.totalPages}
+              </span>
+              
+              <button
+                onClick={() => setCurrentPage(Math.min(pagination.totalPages, currentPage + 1))}
+                disabled={currentPage === pagination.totalPages}
+                className="bg-orange-500 hover:bg-orange-600 disabled:bg-gray-400 text-white px-4 py-2 rounded text-sm transition-colors"
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Modal */}

@@ -185,6 +185,8 @@ export const createPatient = async (req, res) => {
       existingPatientId,
       // Patient Identity
       title, firstName, lastName, dob, age, gender, guardianType, mobile, email,
+      // ✅ NEW: Track if email was manually filled (for sending credentials)
+      emailWasManuallyFilled,
       createdBy, createdAtLocation, address, location,
       // Registration Details (will be saved with each test)
       reportMode, referralDoctor, visitDate, visitTime,
@@ -392,11 +394,14 @@ export const createPatient = async (req, res) => {
         
         // Step 4: Create Payment if advance > 0
         if (finalAdvanceAmount > 0) {
-          const payMode = paymentMode === 'Cash' ? 'CASH' : 
-                         paymentMode === 'Card' ? 'CARD' : 
-                         paymentMode === 'UPI' ? 'UPI' :
-                         paymentMode === 'Cheque' ? 'CHEQUE' :
-                         paymentMode === 'Bank Transfer' ? 'BANK_TRANSFER' : 'OTHER';
+          const mode = paymentMode || "";
+          const payMode = mode === 'Cash' ? 'CASH' : 
+                         mode === 'Debit Card' || mode === 'Debit' ? 'DEBIT_CARD' : 
+                         mode === 'Credit Card' || mode === 'Credit' ? 'CREDIT_CARD' :
+                         mode === 'Card' ? 'CARD' : 
+                         mode === 'UPI' ? 'UPI' :
+                         mode === 'Cheque' ? 'CHEQUE' :
+                         mode === 'Bank Transfer' ? 'BANK_TRANSFER' : 'OTHER';
           
           await tx.payment.create({
             data: {
@@ -481,7 +486,8 @@ export const createPatient = async (req, res) => {
       let finalDiscountPercent = 0;
       
       if (parseFloat(discountPercent) > 0) {
-        finalDiscountAmount = totalTestCharges * (parseFloat(discountPercent) / 100);
+        // ✅ FIX: Round discount to nearest rupee for percentage discounts
+        finalDiscountAmount = Math.round(totalTestCharges * (parseFloat(discountPercent) / 100));
         finalDiscountPercent = parseFloat(discountPercent);
       } else if (parseFloat(discountAmount) > 0) {
         finalDiscountAmount = Math.round(parseFloat(discountAmount));
@@ -581,11 +587,14 @@ export const createPatient = async (req, res) => {
         
         // Step 5: Create Payment if advance > 0
         if (finalAdvanceAmount > 0) {
-          const payMode = paymentMode === 'Cash' ? 'CASH' : 
-                         paymentMode === 'Card' ? 'CARD' : 
-                         paymentMode === 'UPI' ? 'UPI' :
-                         paymentMode === 'Cheque' ? 'CHEQUE' :
-                         paymentMode === 'Bank Transfer' ? 'BANK_TRANSFER' : 'OTHER';
+          const mode = paymentMode || "";
+          const payMode = mode === 'Cash' ? 'CASH' : 
+                         mode === 'Debit Card' || mode === 'Debit' ? 'DEBIT_CARD' : 
+                         mode === 'Credit Card' || mode === 'Credit' ? 'CREDIT_CARD' :
+                         mode === 'Card' ? 'CARD' : 
+                         mode === 'UPI' ? 'UPI' :
+                         mode === 'Cheque' ? 'CHEQUE' :
+                         mode === 'Bank Transfer' ? 'BANK_TRANSFER' : 'OTHER';
           
           await tx.payment.create({
             data: {
@@ -663,8 +672,8 @@ export const createPatient = async (req, res) => {
       }
     }
 
-    // Send email with credentials if patient has an email
-    if (email && patient.patientId) {
+    // Send email with credentials if patient has an email AND email was manually filled (not auto-filled from doctor)
+    if (email && patient.patientId && emailWasManuallyFilled !== false) {
       try {
         // Generate random password for patients
         const randomPassword = crypto.randomBytes(8).toString('hex').slice(0, 8);
@@ -684,11 +693,13 @@ export const createPatient = async (req, res) => {
           randomPassword,
           'direct'
         );
-        console.log(`✅ Credentials email sent to ${email} for patient ${patient.patientId}`);
+        console.log(`✅ Credentials email sent to ${email} for patient ${patient.patientId} (emailWasManuallyFilled: ${emailWasManuallyFilled})`);
       } catch (emailError) {
         console.warn('⚠️ Failed to send credentials email:', emailError.message);
         // Don't fail the registration if email fails
       }
+    } else if (email && emailWasManuallyFilled === false) {
+      console.log(`⏭️ SKIPPED: Email credentials NOT sent (email was auto-filled from referral doctor). Email: ${email}, Patient: ${patient.patientId}`);
     }
 
     // 🔍 DEBUG: Log what we're returning to frontend
@@ -962,14 +973,16 @@ export const getAllPatients = async (req, res) => {
     }));
 
     // 🔧 FIX: Fetch balance amounts from VisitBill for each visit
+    // ✅ ALSO fetch individual Payment records by mode
     const patientsWithBalance = await Promise.all(patientsWithFormattedAge.map(async (patient) => {
       // Group tests by visitId to get unique visits
       const visitIds = new Set(patient.tests.map(t => t.visitId).filter(Boolean));
+      const visitIdArray = Array.from(visitIds);
       
       // Fetch VisitBill for each unique visit
       const visitBills = await prisma.visitBill.findMany({
         where: {
-          visitId: { in: Array.from(visitIds) }
+          visitId: { in: visitIdArray }
         },
         select: {
           visitId: true,
@@ -981,29 +994,107 @@ export const getAllPatients = async (req, res) => {
         }
       });
 
+      // ✅ NEW: Fetch individual Payment records by mode for each visit (ORDERED by creation time)
+      const payments = await prisma.payment.findMany({
+        where: {
+          visitId: { in: visitIdArray }
+        },
+        select: {
+          visitId: true,
+          amount: true,
+          paymentMode: true,
+          createdAt: true,
+          remarks: true
+        },
+        orderBy: {
+          createdAt: 'asc'  // ✅ CHRONOLOGICAL ORDER (first payment first)
+        }
+      });
+
+      console.log('💳 Raw Payment Records from DB:', payments.map(p => ({
+        visitId: p.visitId,
+        amount: p.amount,
+        paymentMode: p.paymentMode,
+        remarks: p.remarks
+      })));
+
+      // Create a map of visitId -> payment breakdown by mode
+      const paymentMap = {};
+      payments.forEach(payment => {
+        if (!paymentMap[payment.visitId]) {
+          paymentMap[payment.visitId] = {
+            cash: 0, debitCard: 0, creditCard: 0, upi: 0, cheque: 0, netBanking: 0, other: 0,
+            paymentSequence: []  // ✅ Track payment order
+          };
+        }
+        const amount = payment.amount?.toNumber?.() || Number(payment.amount) || 0;
+        const mode = (payment.paymentMode || "").toUpperCase();
+        
+        console.log(`💳 Processing payment: amount=${amount}, rawMode="${payment.paymentMode}", processedMode="${mode}"`);
+        
+        // ✅ Track payment chronologically
+        paymentMap[payment.visitId].paymentSequence.push({
+          amount: amount,
+          mode: mode,
+          timestamp: payment.createdAt,
+          remarks: payment.remarks
+        });
+        
+        // ✅ HANDLE ALL VARIATIONS: Cash, Debit Card, Credit Card, UPI, Cheque, etc.
+        if (mode === "CASH") paymentMap[payment.visitId].cash += amount;
+        else if (mode === "DEBIT_CARD" || mode === "DEBIT") {
+          paymentMap[payment.visitId].debitCard += amount;
+        }
+        else if (mode === "CREDIT_CARD" || mode === "CREDIT") {
+          paymentMap[payment.visitId].creditCard += amount;
+        }
+        else if (mode === "CARD") {
+          // If just "CARD" without debit/credit designation, put in credit card
+          paymentMap[payment.visitId].creditCard += amount;
+        }
+        else if (mode === "UPI") paymentMap[payment.visitId].upi += amount;
+        else if (mode === "CHEQUE" || mode === "CHECK") paymentMap[payment.visitId].cheque += amount;
+        else if (mode === "BANK_TRANSFER" || mode === "NET BANKING" || mode === "NEFT" || mode === "RTGS") paymentMap[payment.visitId].netBanking += amount;
+        else {
+          console.warn(`⚠️ Unknown payment mode: "${mode}", defaulting to other`);
+          paymentMap[payment.visitId].other += amount;
+        }
+      });
+
+      console.log('💰 Final Payment Map:', paymentMap);
+
       // Create a map of visitId -> balance data
       const balanceMap = {};
       visitBills.forEach(bill => {
         balanceMap[bill.visitId] = {
-          balanceAmount: bill.balanceAmount?.toNumber?.() || Number(bill.balanceAmount) || 0,
-          paidAmount: bill.totalPaid?.toNumber?.() || Number(bill.totalPaid) || 0,
-          discountAmount: bill.totalDiscount?.toNumber?.() || Number(bill.totalDiscount) || 0,
-          grossAmount: bill.grossAmount?.toNumber?.() || Number(bill.grossAmount) || 0,
+          balanceAmount: Math.round(bill.balanceAmount?.toNumber?.() || Number(bill.balanceAmount) || 0),
+          paidAmount: Math.round(bill.totalPaid?.toNumber?.() || Number(bill.totalPaid) || 0),
+          discountAmount: Math.round(bill.totalDiscount?.toNumber?.() || Number(bill.totalDiscount) || 0),
+          grossAmount: Math.round(bill.grossAmount?.toNumber?.() || Number(bill.grossAmount) || 0),
           status: bill.status || 'PENDING'
         };
       });
 
-      // Add balance amounts and status to tests
+      // Add balance amounts, payment breakdown, and status to tests
       return {
         ...patient,
-        tests: patient.tests.map(test => ({
-          ...test,
-          balanceAmount: balanceMap[test.visitId]?.balanceAmount || 0,
-          paidAmount: balanceMap[test.visitId]?.paidAmount || 0,
-          discountAmount: balanceMap[test.visitId]?.discountAmount || 0,
-          totalAmount: balanceMap[test.visitId]?.grossAmount || 0,
-          billStatus: balanceMap[test.visitId]?.status || 'PENDING'
-        }))
+        tests: patient.tests
+          .filter(test => test.status !== 'Cancelled' && test.status !== 'CANCELLED')  // ✅ Filter out cancelled tests
+          .map(test => ({
+            ...test,
+            balanceAmount: balanceMap[test.visitId]?.balanceAmount || 0,
+            paidAmount: balanceMap[test.visitId]?.paidAmount || 0,
+            discountAmount: balanceMap[test.visitId]?.discountAmount || 0,
+            totalAmount: balanceMap[test.visitId]?.grossAmount || 0,
+            billStatus: balanceMap[test.visitId]?.status || 'PENDING',
+            // ✅ NEW: Add payment breakdown by mode (split debit/credit card)
+            paymentsByMode: paymentMap[test.visitId] || {
+              cash: 0, debitCard: 0, creditCard: 0, upi: 0, cheque: 0, netBanking: 0, other: 0,
+              paymentSequence: []
+            },
+            // ✅ NEW: Track chronological payment order (shows which was paid first)
+            paymentSequence: paymentMap[test.visitId]?.paymentSequence || []
+          }))
       };
     }));
 
@@ -1063,9 +1154,15 @@ export const getPatientById = async (req, res) => {
       });
     }
 
+    // ✅ Filter out cancelled tests
+    const patientWithActiveTests = {
+      ...patient,
+      tests: patient.tests.filter(test => test.status !== 'Cancelled' && test.status !== 'CANCELLED')
+    };
+
     res.json({
       success: true,
-      data: patient
+      data: patientWithActiveTests
     });
 
   } catch (error) {
@@ -1151,15 +1248,21 @@ export const searchPatient = async (req, res) => {
       age: formatAgeFromComponents(patient.ageYears, patient.ageMonths, patient.ageDays)
     }));
 
+    // ✅ Filter out cancelled tests from all patients
+    const patientsWithActiveTests = patientsWithFormattedAge.map(patient => ({
+      ...patient,
+      tests: patient.tests.filter(test => test.status !== 'Cancelled' && test.status !== 'CANCELLED')
+    }));
+
     console.log('✅ searchPatient - Sample patient with formatted age:', {
-      patientId: patientsWithFormattedAge[0]?.patientId,
-      ageYears: patientsWithFormattedAge[0]?.ageYears,
-      ageMonths: patientsWithFormattedAge[0]?.ageMonths,
-      ageDays: patientsWithFormattedAge[0]?.ageDays,
-      age: patientsWithFormattedAge[0]?.age
+      patientId: patientsWithActiveTests[0]?.patientId,
+      ageYears: patientsWithActiveTests[0]?.ageYears,
+      ageMonths: patientsWithActiveTests[0]?.ageMonths,
+      ageDays: patientsWithActiveTests[0]?.ageDays,
+      age: patientsWithActiveTests[0]?.age
     });
 
-    res.json(buildPaginatedResponse(patientsWithFormattedAge, total, page, limit));
+    res.json(buildPaginatedResponse(patientsWithActiveTests, total, page, limit));
 
   } catch (error) {
     console.error('Search patient error:', error);
@@ -1207,7 +1310,7 @@ export const updatePatientTestDetails = async (req, res) => {
 export const updatePatient = async (req, res) => {
   try {
     const { patientId } = req.params;
-    const { title, firstName, lastName, dob, age, gender, mobile, email, address } = req.body;
+    const { title, firstName, lastName, dob, age, gender, mobile, email, address, isEmergency, visitId } = req.body;
 
     const existing = await prisma.patient.findUnique({ where: { patientId } });
     if (!existing) return res.status(404).json({ success: false, message: 'Patient not found' });
@@ -1239,6 +1342,26 @@ export const updatePatient = async (req, res) => {
       where: { patientId },
       data: updateData
     });
+
+    // ✅ If emergency flag is being updated, update all tests for this visit
+    if (isEmergency !== undefined && visitId) {
+      console.log(`🚨 Updating emergency status for visitId: ${visitId}, isEmergency: ${isEmergency}`);
+      
+      const updatedTests = await prisma.patientTest.updateMany({
+        where: { 
+          patientId: patientId,
+          visitId: visitId 
+        },
+        data: {
+          isEmergency: Boolean(isEmergency),
+          emergencySetAt: isEmergency ? new Date() : null,
+          emergencySetBy: 'SYSTEM',
+          updatedAt: new Date()
+        }
+      });
+      
+      console.log(`✅ Updated ${updatedTests.count} tests as emergency for visit ${visitId}`);
+    }
 
     // ✅ Calculate and save age fields if DOB was updated (takes precedence over manual age)
     if (dob) {
@@ -1281,7 +1404,10 @@ export const updatePayment = async (req, res) => {
     const payment       = parseFloat(paymentAmount)  || 0;
 
     const newPaidAmount    = existingPaid + payment;
-    const newBalanceAmount = Math.max(0, totalAmount - discount - newPaidAmount);
+    // ✅ FIX: Use proper rounding to avoid 1 rupee remaining
+    // First calculate the net amount (after discount), then subtract payments
+    const netAmount = Math.round(totalAmount - discount);
+    const newBalanceAmount = Math.max(0, netAmount - newPaidAmount);
 
     // Update all rows for this visit
     await prisma.patientTest.updateMany({
@@ -1353,21 +1479,210 @@ export const getPatientStatistics = async (req, res) => {
       where: dateFilter
     });
 
-    // Get paginated patients
+    // Get location statistics
     const patients = await prisma.patient.findMany({
       where: dateFilter,
-      skip,
-      take: limit,
-      orderBy: { createdAt: 'desc' }
+      select: {
+        location: true
+      }
     });
 
-    res.json(buildPaginatedResponse(patients, total, page, limit));
+    // Group by location
+    const locationStats = {};
+    patients.forEach(patient => {
+      const location = patient.location || 'Not Specified';
+      locationStats[location] = (locationStats[location] || 0) + 1;
+    });
+
+    // Convert to array and sort by count
+    const locationStatsArray = Object.entries(locationStats)
+      .map(([location, count]) => ({ location, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 5); // Top 5 locations
+
+    res.json({
+      success: true,
+      data: {
+        total,
+        locationStats: locationStatsArray
+      }
+    });
 
   } catch (error) {
     console.error('Get patient statistics error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to fetch patient statistics'
+    });
+  }
+};
+
+// Get organization type statistics for dashboard
+export const getOrganizationTypeStatistics = async (req, res) => {
+  try {
+    const { fromDate, toDate } = req.query;
+
+    console.log('📊 getOrganizationTypeStatistics called with:', { fromDate, toDate });
+
+    // Build date filter for patient tests
+    const dateFilter = {};
+    if (fromDate && toDate) {
+      const start = new Date(fromDate);
+      start.setHours(0, 0, 0, 0);
+      const end = new Date(toDate);
+      end.setHours(23, 59, 59, 999);
+      dateFilter.createdAt = { gte: start, lte: end };
+    } else if (fromDate) {
+      const start = new Date(fromDate);
+      start.setHours(0, 0, 0, 0);
+      dateFilter.createdAt = { gte: start };
+    } else if (toDate) {
+      const end = new Date(toDate);
+      end.setHours(23, 59, 59, 999);
+      dateFilter.createdAt = { lte: end };
+    }
+
+    console.log('📅 Date filter:', dateFilter);
+
+    // Get all patient tests with their organization data
+    // ✅ Exclude cancelled tests from statistics
+    const patientTests = await prisma.patientTest.findMany({
+      where: {
+        ...dateFilter,
+        organizationId: { not: null },
+        status: { 
+          notIn: ['Cancelled', 'CANCELLED', 'cancelled']  // ✅ Use notIn
+        }
+      },
+      include: {
+        organization: {
+          select: {
+            id: true,
+            name: true,
+            isHomeCollection: true,
+            isOPD: true,
+            isIPD: true
+          }
+        }
+      }
+    });
+
+    console.log('🧪 Total patient tests found:', patientTests.length);
+
+    // Use Sets to count unique patients per organization type
+    const homeCollectionPatients = new Set();
+    const opdPatients = new Set();
+    const ipdPatients = new Set();
+
+    patientTests.forEach(test => {
+      if (test.organization) {
+        if (test.organization.isHomeCollection) {
+          homeCollectionPatients.add(test.patientId);
+        }
+        if (test.organization.isOPD) {
+          opdPatients.add(test.patientId);
+        }
+        if (test.organization.isIPD) {
+          ipdPatients.add(test.patientId);
+        }
+      }
+    });
+
+    const stats = {
+      homeCollection: homeCollectionPatients.size,
+      opd: opdPatients.size,
+      ipd: ipdPatients.size
+    };
+
+    console.log('✅ Final stats (unique patients):', stats);
+
+    res.json({
+      success: true,
+      data: stats
+    });
+
+  } catch (error) {
+    console.error('❌ Get organization type statistics error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch organization type statistics'
+    });
+  }
+};
+
+// Get weekly organization type statistics for dashboard
+export const getWeeklyOrganizationTypeStatistics = async (req, res) => {
+  try {
+    console.log('📊 getWeeklyOrganizationTypeStatistics called');
+
+    // Get last 7 days data
+    const weeklyData = [];
+    const today = new Date();
+    
+    for (let i = 6; i >= 0; i--) {
+      const date = new Date(today);
+      date.setDate(date.getDate() - i);
+      date.setHours(0, 0, 0, 0);
+      
+      const endDate = new Date(date);
+      endDate.setHours(23, 59, 59, 999);
+
+      // Get patient tests for this day
+      // ✅ Exclude cancelled tests from statistics
+      const patientTests = await prisma.patientTest.findMany({
+        where: {
+          createdAt: { gte: date, lte: endDate },
+          organizationId: { not: null },
+          status: { 
+            notIn: ['Cancelled', 'CANCELLED', 'cancelled']  // ✅ Use notIn
+          }
+        },
+        include: {
+          organization: {
+            select: {
+              isHomeCollection: true,
+              isOPD: true,
+              isIPD: true
+            }
+          }
+        }
+      });
+
+      // Count unique patients per type
+      const homeCollectionPatients = new Set();
+      const opdPatients = new Set();
+      const ipdPatients = new Set();
+
+      patientTests.forEach(test => {
+        if (test.organization) {
+          if (test.organization.isHomeCollection) homeCollectionPatients.add(test.patientId);
+          if (test.organization.isOPD) opdPatients.add(test.patientId);
+          if (test.organization.isIPD) ipdPatients.add(test.patientId);
+        }
+      });
+
+      const dayName = date.toLocaleDateString('en-US', { weekday: 'short' });
+      weeklyData.push({
+        day: dayName,
+        date: date.toISOString().split('T')[0],
+        homeCollection: homeCollectionPatients.size,
+        opd: opdPatients.size,
+        ipd: ipdPatients.size
+      });
+    }
+
+    console.log('✅ Weekly stats:', weeklyData);
+
+    res.json({
+      success: true,
+      data: weeklyData
+    });
+
+  } catch (error) {
+    console.error('❌ Get weekly organization type statistics error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch weekly organization type statistics'
     });
   }
 };
@@ -1515,7 +1830,9 @@ export const addTestToVisit = async (req, res) => {
     const totalAmount = allTests.reduce((sum, t) => sum + (t.totalAmount || 0), 0);
     const paidAmount = existingTest.paidAmount || 0;
     const discountAmount = existingTest.discountAmount || 0;
-    const newBalanceAmount = Math.max(0, totalAmount - discountAmount - paidAmount);
+    // ✅ FIX: Proper rounding to avoid 1 rupee remaining
+    const netAmount = Math.round(totalAmount - discountAmount);
+    const newBalanceAmount = Math.max(0, netAmount - paidAmount);
 
     // Update all tests with the new balance
     await prisma.patientTest.updateMany({
@@ -1666,11 +1983,23 @@ export const getPatientTests = async (req, res) => {
   try {
     const { page, limit, skip } = getPaginationParams(req.query);
 
-    // Get total count of patient tests
-    const total = await prisma.patientTest.count();
+    // ✅ Get total count of ACTIVE (non-cancelled) patient tests
+    const total = await prisma.patientTest.count({
+      where: {
+        status: { 
+          notIn: ['Cancelled', 'CANCELLED', 'cancelled']  // ✅ Use notIn
+        }
+      }
+    });
 
-    // Fetch patient tests with patient, test, and department details
+    // ✅ Fetch ACTIVE patient tests with patient, test, and department details
+    // Exclude cancelled tests from display
     const patientTests = await prisma.patientTest.findMany({
+      where: {
+        status: { 
+          notIn: ['Cancelled', 'CANCELLED', 'cancelled']  // ✅ Use notIn instead of not.in
+        }
+      },
       include: {
         patient: true,
         test: true,
@@ -1683,6 +2012,9 @@ export const getPatientTests = async (req, res) => {
       skip,
       take: limit
     });
+
+    console.log('🔍 Result Page - Tests fetched:', patientTests.length);
+    console.log('✅ Cancelled tests filtered out from result page');
 
     res.json(buildPaginatedResponse(patientTests, total, page, limit));
 
@@ -1725,14 +2057,26 @@ export const getTestsByVisitId = async (req, res) => {
       }
     });
 
-    // If VisitBill doesn't exist, create one from existing PatientTest data
-    if (!visitBill) {
-      console.log(`⚠️ VisitBill not found for visitId: ${visitId}, will calculate from PatientTest data`);
-    }
+    console.log('🔍 VisitBill fetched from DB:', {
+      visitId,
+      exists: !!visitBill,
+      grossAmount: visitBill?.grossAmount,
+      totalDiscount: visitBill?.totalDiscount,
+      totalPaid: visitBill?.totalPaid,
+      balanceAmount: visitBill?.balanceAmount,
+      status: visitBill?.status,
+      updatedAt: visitBill?.updatedAt
+    });
 
-    // Find all tests for this visit
+    // Find all ACTIVE (non-cancelled) tests for this visit
+    // ✅ IMPORTANT: Exclude cancelled tests from display
     const tests = await prisma.patientTest.findMany({
-      where: { visitId },
+      where: { 
+        visitId,
+        status: { 
+          notIn: ['Cancelled', 'CANCELLED', 'cancelled']  // ✅ Use notIn
+        }
+      },
       include: {
         test: {
           select: {
@@ -1783,7 +2127,14 @@ export const getTestsByVisitId = async (req, res) => {
       }
     });
 
-    console.log(`✅ Found ${tests.length} test(s) for visitId: ${visitId}`);
+    console.log(`✅ Found ${tests.length} test(s) for visitId: ${visitId} (cancelled tests already filtered)`);
+
+    // ✅ VERIFICATION: Ensure no cancelled tests in response
+    const cancelledCount = tests.filter(t => t.status === 'Cancelled' || t.status === 'CANCELLED').length;
+    if (cancelledCount > 0) {
+      console.warn(`⚠️ WARNING: Found ${cancelledCount} cancelled tests that weren't filtered!`);
+    }
+    console.log(`🔍 Cancelled test verification: ${cancelledCount} cancelled tests found (should be 0)`);
 
     // If VisitBill doesn't exist, calculate totals from PatientTest records
     if (!visitBill && tests.length > 0) {
@@ -2086,7 +2437,7 @@ export const applyDiscount = async (req, res) => {
 
     // Update VisitBill with new discount total
     const newTotalDiscount = visitBill.totalDiscount.toNumber() + discountAmount;
-    const newBalance = visitBill.grossAmount.toNumber() - newTotalDiscount - visitBill.totalPaid.toNumber();
+    const newBalance = Math.round(visitBill.grossAmount.toNumber() - newTotalDiscount - visitBill.totalPaid.toNumber());
 
     const updatedBill = await prisma.visitBill.update({
       where: { visitId },
@@ -2150,10 +2501,13 @@ export const recordPayment = async (req, res) => {
     }
 
     // Convert PaymentMode
-    const payMode = paymentMode === 'Cash' ? 'CASH' : 
-                   paymentMode === 'Card' ? 'CARD' : 
-                   paymentMode === 'UPI' ? 'UPI' :
-                   paymentMode === 'Cheque' ? 'CHEQUE' :
+    const mode = paymentMode || "";
+    const payMode = mode === 'Cash' ? 'CASH' : 
+                   mode === 'Debit Card' || mode === 'Debit' ? 'DEBIT_CARD' : 
+                   mode === 'Credit Card' || mode === 'Credit' ? 'CREDIT_CARD' :
+                   mode === 'Card' ? 'CARD' : 
+                   mode === 'UPI' ? 'UPI' :
+                   mode === 'Cheque' ? 'CHEQUE' :
                    paymentMode === 'Bank Transfer' ? 'BANK_TRANSFER' : 'OTHER';
 
     // Create new BillingSession for PAYMENT
@@ -2179,7 +2533,7 @@ export const recordPayment = async (req, res) => {
     // Update VisitBill with new payment total
     const newTotalPaid = visitBill.totalPaid.toNumber() + parseFloat(amount);
     const netAmount = visitBill.grossAmount.toNumber() - visitBill.totalDiscount.toNumber();
-    const newBalance = Math.max(0, netAmount - newTotalPaid);
+    const newBalance = Math.max(0, Math.round(netAmount - newTotalPaid));
 
     const updatedBill = await prisma.visitBill.update({
       where: { visitId },
@@ -2233,8 +2587,17 @@ export const cancelTest = async (req, res) => {
     const { visitId, patientTestId } = req.params;
     const { remarks, cancelledBy } = req.body;
 
+    console.log('🟡 [cancelTest] START - Received request:', {
+      visitId,
+      patientTestId,
+      remarks,
+      url: req.originalUrl,
+      method: req.method
+    });
+
     // Validate inputs
     if (!visitId || !patientTestId) {
+      console.error('❌ [cancelTest] Missing required params:', { visitId, patientTestId });
       return res.status(400).json({
         success: false,
         message: 'visitId and patientTestId are required'
@@ -2246,7 +2609,16 @@ export const cancelTest = async (req, res) => {
       where: { id: parseInt(patientTestId) }
     });
 
+    console.log('🔍 [cancelTest] PatientTest lookup:', {
+      patientTestId,
+      found: !!patientTest,
+      testId: patientTest?.testId,
+      status: patientTest?.status,
+      charge: patientTest?.charge
+    });
+
     if (!patientTest) {
+      console.error('❌ [cancelTest] Test not found:', { patientTestId });
       return res.status(404).json({
         success: false,
         message: 'Test not found'
@@ -2254,6 +2626,7 @@ export const cancelTest = async (req, res) => {
     }
 
     if (patientTest.status === 'Cancelled') {
+      console.warn('⚠️ [cancelTest] Test already cancelled:', { patientTestId });
       return res.status(400).json({
         success: false,
         message: 'Test is already cancelled'
@@ -2265,7 +2638,16 @@ export const cancelTest = async (req, res) => {
       where: { visitId }
     });
 
+    console.log('💰 [cancelTest] VisitBill lookup:', {
+      visitId,
+      found: !!visitBill,
+      grossAmount: visitBill?.grossAmount?.toString?.(),
+      totalPaid: visitBill?.totalPaid?.toString?.(),
+      balanceAmount: visitBill?.balanceAmount?.toString?.()
+    });
+
     if (!visitBill) {
+      console.error('❌ [cancelTest] VisitBill not found:', { visitId });
       return res.status(404).json({
         success: false,
         message: 'Visit bill not found'
@@ -2274,7 +2656,7 @@ export const cancelTest = async (req, res) => {
 
     const testCharge = parseFloat(patientTest.charge || 0);
     
-    console.log('📝 Cancelling test:', {
+    console.log('📝 [cancelTest] Cancelling test:', {
       patientTestId,
       visitId,
       testName: patientTest.testId,
@@ -2289,12 +2671,14 @@ export const cancelTest = async (req, res) => {
     
     await prisma.$transaction(async (tx) => {
       // Step 1: Mark PatientTest as Cancelled
+      // ✅ Note: cancelledAt and cancelledReason fields don't exist in schema
+      // Use updatedAt and comments fields instead
       updatedTest = await tx.patientTest.update({
         where: { id: parseInt(patientTestId) },
         data: { 
           status: 'Cancelled',
-          cancelledAt: new Date(),
-          cancelledReason: remarks || 'User cancelled'
+          updatedAt: new Date(),
+          comments: remarks || 'User cancelled'
         }
       });
       
@@ -2353,7 +2737,7 @@ export const cancelTest = async (req, res) => {
       const newAmountDue = newGrossAmount - newDiscount;
       
       // New balance (how much patient still owes)
-      const newBalance = Math.max(0, newAmountDue - oldPaid);
+      const newBalance = Math.max(0, Math.round(newAmountDue - oldPaid));
       
       // Check if patient overpaid
       const overpaymentAmount = Math.max(0, oldPaid - newAmountDue);
@@ -2405,11 +2789,15 @@ export const cancelTest = async (req, res) => {
     
     console.log(`✅ Transaction completed successfully for CANCEL_TEST`);
 
-    res.json({
+    const responseData = {
       success: true,
       message: 'Test cancelled successfully',
       data: {
-        updatedTest,
+        updatedTest: {
+          id: updatedTest.id,
+          status: updatedTest.status,
+          testId: updatedTest.testId
+        },
         updatedBill: {
           ...updatedBill,
           grossAmount: updatedBill.grossAmount.toNumber(),
@@ -2423,10 +2811,23 @@ export const cancelTest = async (req, res) => {
           amount: refundRecord.amount.toNumber()
         } : null
       }
+    };
+    
+    console.log('✅ [cancelTest] SUCCESS - Sending response:', {
+      visitId,
+      patientTestId,
+      grossAmount: responseData.data.updatedBill.grossAmount,
+      balanceAmount: responseData.data.updatedBill.balanceAmount
     });
 
+    res.json(responseData);
+
   } catch (error) {
-    console.error('Cancel test error:', error);
+    console.error('❌ [cancelTest] EXCEPTION:', {
+      message: error.message,
+      stack: error.stack,
+      code: error.code
+    });
     res.status(500).json({
       success: false,
       message: 'Failed to cancel test',
@@ -2635,7 +3036,8 @@ export const addTestsToExistingVisit = async (req, res) => {
     newTotalPaid += paymentAmount;
     
     // ✅ Calculate final balance using formula: grossAmount - totalDiscount - totalPaid
-    const finalBalance = Math.max(0, totalTestCharges - totalDiscountAmount - newTotalPaid);
+    // ✅ ROUND to nearest rupee to avoid decimal precision issues (e.g., 1.00 instead of 0)
+    const finalBalance = Math.max(0, Math.round(totalTestCharges - totalDiscountAmount - newTotalPaid));
     
     console.log('💰 Billing calculation for ADD_TEST:', {
       existingGross: visitBill.grossAmount.toNumber(),
@@ -2695,11 +3097,14 @@ export const addTestsToExistingVisit = async (req, res) => {
 
       // Step 3: Create Payment record if payment > 0
       if (paymentAmount > 0) {
-        const payMode = payment?.paymentMode === 'Cash' ? 'CASH' : 
-                       payment?.paymentMode === 'Card' ? 'CARD' : 
-                       payment?.paymentMode === 'UPI' ? 'UPI' :
-                       payment?.paymentMode === 'Cheque' ? 'CHEQUE' :
-                       payment?.paymentMode === 'Bank Transfer' ? 'BANK_TRANSFER' : 'OTHER';
+        const mode = payment?.paymentMode || "";
+        const payMode = mode === 'Cash' ? 'CASH' : 
+                       mode === 'Debit Card' || mode === 'Debit' ? 'DEBIT_CARD' : 
+                       mode === 'Credit Card' || mode === 'Credit' ? 'CREDIT_CARD' :
+                       mode === 'Card' ? 'CARD' : 
+                       mode === 'UPI' ? 'UPI' :
+                       mode === 'Cheque' ? 'CHEQUE' :
+                       mode === 'Bank Transfer' ? 'BANK_TRANSFER' : 'OTHER';
         
         await tx.payment.create({
           data: {
@@ -2889,7 +3294,8 @@ export const addPaymentToVisit = async (req, res) => {
     let newTotalPaid = visitBill.totalPaid.toNumber() + paymentAmount;
     
     // ✅ Calculate final balance using formula: grossAmount - totalDiscount - totalPaid
-    const finalBalance = Math.max(0, totalTestCharges - totalDiscountAmount - newTotalPaid);
+    // ✅ ROUND to nearest rupee to avoid decimal precision issues (e.g., 1.00 instead of 0)
+    const finalBalance = Math.max(0, Math.round(totalTestCharges - totalDiscountAmount - newTotalPaid));
 
     console.log('💰 Payment/Discount calculation:', {
       existingGross: visitBill.grossAmount.toNumber(),
@@ -2943,11 +3349,14 @@ export const addPaymentToVisit = async (req, res) => {
 
       // Step 3: Create Payment record if payment > 0
       if (paymentAmount > 0) {
-        const payMode = payment?.paymentMode === 'Cash' ? 'CASH' : 
-                       payment?.paymentMode === 'Card' ? 'CARD' : 
-                       payment?.paymentMode === 'UPI' ? 'UPI' :
-                       payment?.paymentMode === 'Cheque' ? 'CHEQUE' :
-                       payment?.paymentMode === 'Bank Transfer' ? 'BANK_TRANSFER' : 'OTHER';
+        const mode = payment?.paymentMode || "";
+        const payMode = mode === 'Cash' ? 'CASH' : 
+                       mode === 'Debit Card' || mode === 'Debit' ? 'DEBIT_CARD' : 
+                       mode === 'Credit Card' || mode === 'Credit' ? 'CREDIT_CARD' :
+                       mode === 'Card' ? 'CARD' : 
+                       mode === 'UPI' ? 'UPI' :
+                       mode === 'Cheque' ? 'CHEQUE' :
+                       mode === 'Bank Transfer' ? 'BANK_TRANSFER' : 'OTHER';
         
         await tx.payment.create({
           data: {

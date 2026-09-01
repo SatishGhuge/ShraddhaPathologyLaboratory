@@ -6,7 +6,7 @@ import { useRouter, useParams, usePathname } from "next/navigation";
 import {
   Save, ArrowLeft, Building2, MapPin, Hash, Phone,
   CalendarDays, Eye, Mail, CheckCircle, XCircle, X,
-  Plus, Trash2, DollarSign, ChevronDown, User, Settings, BarChart3, HelpCircle, ClipboardCheck, Lock
+  Plus, Trash2, DollarSign, ChevronDown, User, Settings, BarChart3, HelpCircle, ClipboardCheck, Lock, Package
 } from "lucide-react";
 import Header from "@/src/components/Header";
 import { updateOrganization, getOrganizationById, createOrganizationWithCredentials } from "@/src/api/master";
@@ -176,23 +176,34 @@ const defaultModuleAllocation = {
     organization: false,
     specimenType: false,
     units: false,
+    outsourcing: false,
   },
   reports: {
     dashboard: false,
     collectionReport: false,
+    organizationSettlement: false,
+    referralDoctorSettlement: false,
     patientList: false,
     referralDoctorRevenue: false,
     testReport: false,
     turnAroundTime: false,
   },
   configuration: {
-    letterhead: false,
     signature: false,
+    machines: false,
+    reportSettings: false,
   },
   help: {
     userManual: false,
     ultraviewer: false,
     anydesk: false,
+  },
+  inventory: {
+    stockTransactions: false,
+    item: false,
+    supplier: false,
+    stockEntry: false,
+    orgTransfer: false,
   },
   result: false,
 };
@@ -230,11 +241,12 @@ const Toast = ({ type, message, credentials, onClose }: { type: string; message:
 
 const EditOrganization = () => {
   const router = useRouter();
-  const { id } = useParams();
+  const params = useParams();
   const pathname = usePathname();
 
-  const isViewMode = pathname.includes("/view/");
-  const isEditMode = pathname.includes("/edit/");
+  const id = params?.id ? (Array.isArray(params.id) ? params.id[0] : params.id) : null;
+  const isViewMode = pathname ? pathname.includes("/view/") : false;
+  const isEditMode = pathname ? pathname.includes("/edit/") : false;
 
   const [formData, setFormData] = useState({
     name: "", organizationType: "", address: "", code: "",
@@ -243,6 +255,9 @@ const EditOrganization = () => {
     sendReportsViaMail: false,
     discountPercent: "",
     discountAmount: "",
+    isHomeCollection: false,
+    isOPD: false,
+    isIPD: false,
   });
 
   const [toast, setToast] = useState<any>(null); // { type, message, credentials }
@@ -282,6 +297,9 @@ const EditOrganization = () => {
             sendReportsViaMail: organization.sendReportsViaMail || false,
             discountPercent: organization.discount || "",
             discountAmount: organization.discount || "",
+            isHomeCollection: organization.isHomeCollection || false,
+            isOPD: organization.isOPD || false,
+            isIPD: organization.isIPD || false,
           });
           
           if (organization.moduleAllocation) {
@@ -344,8 +362,11 @@ const EditOrganization = () => {
       const keys = item.key.split('.');
       let current = newAllocation;
       
-      // Navigate to parent
+      // Navigate to parent, create objects if they don't exist
       for (let i = 0; i < keys.length - 1; i++) {
+        if (!current[keys[i]]) {
+          current[keys[i]] = {};
+        }
         current = current[keys[i]];
       }
       
@@ -390,6 +411,9 @@ const EditOrganization = () => {
         sendReportsViaWhatsApp: formData.sendReportsViaWhatsApp,
         sendReportsViaMail: formData.sendReportsViaMail,
         discount: parseFloat(formData.discountPercent) || parseFloat(formData.discountAmount) || 0,
+        isHomeCollection: formData.isHomeCollection,
+        isOPD: formData.isOPD,
+        isIPD: formData.isIPD,
       };
 
       if (isEditMode) {
@@ -553,6 +577,28 @@ const EditOrganization = () => {
               </div>
             </div>
 
+            {/* Organization Type Section */}
+            <div className="border-t border-gray-300 pt-4 mt-4 pb-4">
+              <p className="font-semibold text-gray-700 text-sm mb-3">🏥 Organization Type</p>
+              <div className="flex items-center gap-6 ml-1">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input type="checkbox" name="isHomeCollection" checked={formData.isHomeCollection} onChange={handleChange}
+                    disabled={isViewMode} className="w-4 h-4 accent-blue-600" />
+                  <span className="text-sm text-gray-700">Home Collection</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input type="checkbox" name="isOPD" checked={formData.isOPD} onChange={handleChange}
+                    disabled={isViewMode} className="w-4 h-4 accent-purple-600" />
+                  <span className="text-sm text-gray-700">OPD</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input type="checkbox" name="isIPD" checked={formData.isIPD} onChange={handleChange}
+                    disabled={isViewMode} className="w-4 h-4 accent-orange-600" />
+                  <span className="text-sm text-gray-700">IPD</span>
+                </label>
+              </div>
+            </div>
+
             {/* Module Allocation Section */}
             {!isViewMode && (
               <div className="border-t border-gray-300 pt-4 mt-4">
@@ -588,8 +634,9 @@ const EditOrganization = () => {
                       { key: 'masters.userlist', label: 'Users' },
                       { key: 'masters.referralDoctorList', label: 'Referral Doctors' },
                       { key: 'masters.organization', label: 'Organization' },
-                      { key: 'masters.sampleType', label: 'Sample Type' },
+                      { key: 'masters.specimenType', label: 'Sample Type' },
                       { key: 'masters.units', label: 'Units' },
+                      { key: 'masters.outsourcing', label: 'Outsourcing' },
                     ]}
                     moduleAllocation={moduleAllocation}
                     toggleModule={toggleModule}
@@ -605,6 +652,8 @@ const EditOrganization = () => {
                     items={[
                       { key: 'reports.dashboard', label: 'Dashboard' },
                       { key: 'reports.collectionReport', label: 'Collection Report' },
+                      { key: 'reports.organizationSettlement', label: 'Organization Settlement' },
+                      { key: 'reports.referralDoctorSettlement', label: 'Referral Doctor Settlement' },
                       { key: 'reports.patientList', label: 'Patient List' },
                       { key: 'reports.referralDoctorRevenue', label: 'Referral Doctor Revenue' },
                       { key: 'reports.testReport', label: 'Test Report' },
@@ -622,8 +671,9 @@ const EditOrganization = () => {
                     title="Configuration"
                     icon={Lock}
                     items={[
-                      { key: 'configuration.letterhead', label: 'Letterhead' },
                       { key: 'configuration.signature', label: 'Signature' },
+                      { key: 'configuration.machines', label: 'Machines' },
+                      { key: 'configuration.reportSettings', label: 'Report Settings' },
                     ]}
                     moduleAllocation={moduleAllocation}
                     toggleModule={toggleModule}
@@ -640,6 +690,24 @@ const EditOrganization = () => {
                       { key: 'help.userManual', label: 'User Manual' },
                       { key: 'help.ultraviewer', label: 'Download Ultraviewer' },
                       { key: 'help.anydesk', label: 'Download Anydesk' },
+                    ]}
+                    moduleAllocation={moduleAllocation}
+                    toggleModule={toggleModule}
+                    onToggleAll={toggleSelectAll}
+                    activeModule={activeModule}
+                    onModuleChange={(module: string) => setActiveModule(module === activeModule ? null : module)}
+                  />
+
+                  {/* Inventory Module */}
+                  <ModuleAccordion
+                    title="Inventory"
+                    icon={Package}
+                    items={[
+                      { key: 'inventory.stockTransactions', label: 'Stock Transactions' },
+                      { key: 'inventory.item', label: 'Item' },
+                      { key: 'inventory.supplier', label: 'Supplier' },
+                      { key: 'inventory.stockEntry', label: 'Stock Entry' },
+                      { key: 'inventory.orgTransfer', label: 'Organization Transfer' },
                     ]}
                     moduleAllocation={moduleAllocation}
                     toggleModule={toggleModule}

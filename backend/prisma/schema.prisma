@@ -7,10 +7,6 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// ============================================
-// CORE USER & AUTHENTICATION MODULE
-// ============================================
-
 model Admin {
   id             Int             @id @default(autoincrement())
   username       String          @unique
@@ -87,31 +83,32 @@ model Role {
 }
 
 model Organization {
-  id                     String             @id
-  name                   String             @unique
+  id                     String                   @id
+  name                   String                   @unique
   code                   String?
   location               String?
-  address                String?            @db.Text
+  address                String?                  @db.Text
   mobile                 String?
   email                  String?
   date                   DateTime?
-  discount               Float?             @default(0)    // ✅ NEW: Organization discount field
-  isActive               Boolean            @default(true)
-  createdAt              DateTime           @default(now())
-  updatedAt              DateTime           @updatedAt
-  sendReportsViaMail     Boolean            @default(false)
-  sendReportsViaWhatsApp Boolean            @default(false)
-
-  // Relations
+  isActive               Boolean                  @default(true)
+  createdAt              DateTime                 @default(now())
+  updatedAt              DateTime                 @updatedAt
+  sendReportsViaMail     Boolean                  @default(false)
+  sendReportsViaWhatsApp Boolean                  @default(false)
+  discount               Float?                   @default(0)
+  isHomeCollection       Boolean                  @default(false)
+  isIPD                  Boolean                  @default(false)
+  isOPD                  Boolean                  @default(false)
   admins                 Admin[]
-  users                  User[]
-  moduleAllocations      ModuleAllocation[]
-  patientTest            PatientTest[]
-  testcharge             TestCharge[]
-  organizationStocks     OrganizationStock[]
-  stockTransactions      StockTransaction[]
   labToOrgTransfers      LabToOrgTransfer[]
+  moduleAllocations      ModuleAllocation?
+  organizationStocks     OrganizationStock[]
   testCharges            OrganizationTestCharge[]
+  patientTest            PatientTest[]
+  stockTransactions      StockTransaction[]
+  testcharge             TestCharge[]
+  users                  User[]
 
   @@map("organizations")
 }
@@ -131,19 +128,12 @@ model ModuleAllocation {
   @@map("module_allocations")
 }
 
-// ============================================
-// PATIENT & HOME VISIT MODULE
-// ============================================
-
 model Patient {
   patientId         String              @id
   title             String?
   firstName         String?
   lastName          String?
   dob               DateTime?
-  ageYears          Int?     @db.Int       // Renamed from 'age' - stores years component
-  ageMonths         Int?     @default(0)   // Months component (0-11)
-  ageDays           Int?     @default(0)   // Days component (0-30)
   gender            String?
   mobile            String?
   email             String?
@@ -151,25 +141,21 @@ model Patient {
   createdAtLocation String?
   address           String?             @db.Text
   location          String?
-
-  // Authentication & Registration
-  password          String?       // Hashed password for direct patient login
-  isEmailVerified   Boolean       @default(false)
-  isActive          Boolean       @default(true)
-  registrationType  String        @default("direct") // "self", "organization", "direct"
-  organizationId    String?       // If registered via organization
-  
-  // Guardian/Self Registration Type
-  guardianType      String        @default("self")   // "self" or "guardian"
-
-  // Relations
-  tests             PatientTest[]
-  auth              PatientAuth?
+  password          String?
+  isEmailVerified   Boolean             @default(false)
+  isActive          Boolean             @default(true)
+  registrationType  String              @default("direct")
+  organizationId    String?
+  createdAt         DateTime?           @default(now())
+  updatedAt         DateTime            @updatedAt
+  ageDays           Int?                @default(0)
+  ageMonths         Int?                @default(0)
+  ageYears          Int?
+  guardianType      String              @default("self")
   homeVisits        HomeVisitTracking[]
-  bills              VisitBill[]         // NEW: Billing relation
-
-  createdAt         DateTime?     @default(now())
-  updatedAt         DateTime      @updatedAt
+  auth              PatientAuth?
+  tests             PatientTest[]
+  bills             VisitBill[]
 
   @@index([mobile])
   @@index([email])
@@ -181,32 +167,23 @@ model Patient {
 }
 
 model PatientAuth {
-  id        String  @id @default(cuid())
-  patientId String  @unique
-  patient   Patient @relation(fields: [patientId], references: [patientId], onDelete: Cascade)
-
-  // Credentials
-  email        String @unique
-  passwordHash String
-
-  // Verification
+  id                      String    @id @default(cuid())
+  patientId               String    @unique
+  email                   String    @unique
+  passwordHash            String
   emailVerificationToken  String?
   emailVerificationExpiry DateTime?
   isEmailVerified         Boolean   @default(false)
-
-  // Password reset
-  passwordResetToken  String?
-  passwordResetExpiry DateTime?
-
-  // Login tracking
-  lastLoginAt   DateTime?
-  lastLoginIp   String?
-  loginAttempts Int       @default(0)
-  isLocked      Boolean   @default(false)
-  lockedUntil   DateTime?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  passwordResetToken      String?
+  passwordResetExpiry     DateTime?
+  lastLoginAt             DateTime?
+  lastLoginIp             String?
+  loginAttempts           Int       @default(0)
+  isLocked                Boolean   @default(false)
+  lockedUntil             DateTime?
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
+  patient                 Patient   @relation(fields: [patientId], references: [patientId], onDelete: Cascade)
 
   @@index([email])
   @@index([isEmailVerified])
@@ -214,43 +191,36 @@ model PatientAuth {
 }
 
 model Runner {
-  id               String @id @default(cuid())
+  id               String              @id @default(cuid())
   name             String
-  aadharCard       String @unique
-  phone            String @unique
-  email            String @unique
+  aadharCard       String              @unique
+  phone            String              @unique
+  email            String              @unique
   address          String
-  assignedLocation String // Location where runner operates
-
-  homeVisits HomeVisitTracking[]
-  locations  RunnerLocation[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  assignedLocation String
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+  homeVisits       HomeVisitTracking[]
+  locations        RunnerLocation[]
 
   @@map("runners")
 }
 
 model HomeVisitTracking {
-  id            String      @id @default(cuid())
-  patientTestId Int         @unique // Link to existing PatientTest - one-to-one
-  patientTest   PatientTest @relation(fields: [patientTestId], references: [id], onDelete: Cascade)
-
-  patientId String // For quick lookup
-  patient   Patient @relation(fields: [patientId], references: [patientId], onDelete: Cascade)
-
-  runnerId String
-  runner   Runner @relation(fields: [runnerId], references: [id])
-
+  id             String           @id @default(cuid())
+  patientTestId  Int              @unique
+  patientId      String
+  runnerId       String
   visitDate      DateTime
-  visitTime      String // "09:30"
-  patientAddress String   @db.Text
-  status         String   @default("Scheduled") // Scheduled, RunnerArrived, SampleReceived, Completed
-
-  locations RunnerLocation[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  visitTime      String
+  patientAddress String           @db.Text
+  status         String           @default("Scheduled")
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+  patient        Patient          @relation(fields: [patientId], references: [patientId], onDelete: Cascade)
+  patientTest    PatientTest      @relation(fields: [patientTestId], references: [id], onDelete: Cascade)
+  runner         Runner           @relation(fields: [runnerId], references: [id])
+  locations      RunnerLocation[]
 
   @@index([patientTestId])
   @@index([patientId])
@@ -262,15 +232,13 @@ model HomeVisitTracking {
 model RunnerLocation {
   id                  String            @id @default(cuid())
   homeVisitTrackingId String
+  runnerId            String
+  latitude            Float
+  longitude           Float
+  accuracy            Float?
+  timestamp           DateTime          @default(now())
   homeVisit           HomeVisitTracking @relation(fields: [homeVisitTrackingId], references: [id], onDelete: Cascade)
-
-  runnerId String
-  runner   Runner @relation(fields: [runnerId], references: [id])
-
-  latitude  Float
-  longitude Float
-  accuracy  Float?
-  timestamp DateTime @default(now())
+  runner              Runner            @relation(fields: [runnerId], references: [id])
 
   @@index([homeVisitTrackingId])
   @@index([runnerId])
@@ -279,62 +247,53 @@ model RunnerLocation {
 }
 
 model PatientTest {
-  id                Int                 @id @default(autoincrement())
-  patientId         String
-  visitId           String
-  testId            Int
-  packageId         Int?
-  departmentId      Int
-  usedMachineId     Int?                // Machine that performed this test
-  sample            String
-  charge            Decimal             @db.Decimal(10, 2)
-  status            String              @default("Registered")  // Registered, Completed, Cancelled
-  reportMode        String?
-  referralDoctor    String?
-  visitDate         DateTime?
-  visitTime         String?
-  sampleBarcodeNo   String?
-  patient_history   String?             @db.Text
-  
-  // ===== EMERGENCY FIELDS =====
-  isEmergency       Boolean             @default(false)  // Flag to mark test as emergency
-  emergencySetAt    DateTime?                            // When marked as emergency
-  emergencySetBy    String?                              // Who marked it as emergency
-  
-  // ===== MEDICAL FIELDS (No billing here anymore) =====
-  paymentMode       String?
-  businessType      String?
-  sampleReceived    DateTime?
-  sampleTaken       DateTime?
-  resultDate        DateTime?
-  isExcluded        Boolean             @default(false)
-  attachmentPath    String?
-  organizationId    String?
-  lastUpdatedBy     String?
+  id                 Int                 @id @default(autoincrement())
+  patientId          String
+  visitId            String
+  testId             Int
+  packageId          Int?
+  departmentId       Int
+  sample             String
+  charge             Decimal             @db.Decimal(10, 2)
+  status             String              @default("Registered")
+  reportMode         String?
+  referralDoctor     String?
+  visitDate          DateTime?
+  visitTime          String?
+  sampleBarcodeNo    String?
+  patient_history    String?             @db.Text
+  paymentMode        String?
+  businessType       String?
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  sampleReceived     DateTime?
+  sampleTaken        DateTime?
+  resultDate         DateTime?
+  isExcluded         Boolean             @default(false)
+  attachmentPath     String?
+  organizationId     String?
+  lastUpdatedBy      String?
   lastStatusUpdateAt DateTime?
-  barcode_status    String              @default("Unprinted")
-  comments          String?             @db.Text
-  outsourcedTo      String?
-  
-  // ===== BILLING SESSION REFERENCE =====
-  billingSessionId  Int?
-  billingSession    BillingSession?     @relation(fields: [billingSessionId], references: [id], onDelete: SetNull)
-  
-  createdAt         DateTime            @default(now())
-  updatedAt         DateTime            @updatedAt
-
-  // Relations
-  homeVisitTracking HomeVisitTracking?
-  outsourcingReport OutsourcingReport?
-  department        Department          @relation(fields: [departmentId], references: [id])
-  organization      Organization?       @relation(fields: [organizationId], references: [id])
-  package           Package?            @relation(fields: [packageId], references: [id], onDelete: Cascade)
-  patient           Patient             @relation(fields: [patientId], references: [patientId], onDelete: Cascade)
-  test              Test                @relation(fields: [testId], references: [id])
-  usedMachine       Machine?            @relation(fields: [usedMachineId], references: [id], onDelete: SetNull)
-  testResults       TestResult[]
-  statusHistory     TestStatusHistory[]
+  barcode_status     String              @default("Unprinted")
+  comments           String?             @db.Text
+  outsourcedTo       String?
+  usedMachineId      Int?
+  billingSessionId   Int?
+  emergencySetAt     DateTime?
+  emergencySetBy     String?
+  isEmergency        Boolean             @default(false)
+  homeVisitTracking  HomeVisitTracking?
+  outsourcingReport  OutsourcingReport?
+  billingSession     BillingSession?     @relation(fields: [billingSessionId], references: [id])
+  department         Department          @relation(fields: [departmentId], references: [id])
+  organization       Organization?       @relation(fields: [organizationId], references: [id])
+  package            Package?            @relation(fields: [packageId], references: [id], onDelete: Cascade)
+  patient            Patient             @relation(fields: [patientId], references: [patientId], onDelete: Cascade)
+  test               Test                @relation(fields: [testId], references: [id])
+  usedMachine        Machine?            @relation(fields: [usedMachineId], references: [id])
   reportQRToken      ReportQRToken?
+  testResults        TestResult[]
+  statusHistory      TestStatusHistory[]
 
   @@index([departmentId], map: "patient_tests_departmentId_fkey")
   @@index([testId], map: "patient_tests_testId_fkey")
@@ -367,9 +326,6 @@ model TestStatusHistory {
   @@index([changedAt])
   @@map("test_status_history")
 }
-// ============================================
-// LABORATORY & TEST MANAGEMENT MODULE
-// ============================================
 
 model Department {
   id           Int           @id @default(autoincrement())
@@ -388,53 +344,51 @@ model Department {
 }
 
 model Test {
-  id                     Int                 @id @default(autoincrement())
-  name                   String
-  shortName              String?
-  testCode               String?             @unique
-  departmentId           Int
-  testParameterId        Int?
-  testCategoryId         Int?
-  sampleTypeId           Int?
-  group                  String?
-  reportHeader           String?
-  preparationTime        String?
-  preparationType        String?
-  instructionPreparation String?             @db.Text
-  instructionPatient     String?             @db.Text
-  interpretationLabel    String?
-  interpretation         String?             @db.Text
-  outsourceLab           String?
-  attachFile             Boolean             @default(false)
-  imageSize              String?            @default("800|600")
-  profileTest            Boolean             @default(false)
-  isHeader               Boolean            @default(true)
-  showTestName           Boolean            @default(true)
-  isNABL                 Boolean            @default(false)
-  lineHeight             Float?             @default(1.4)
-  isActive               Boolean            @default(true)
-  isDeleted              Boolean            @default(false)
-  createdAt              DateTime           @default(now())
-  updatedAt              DateTime           @updatedAt
-  linkedTestIds          String?            @db.Text
-  isOutsourced           Boolean            @default(false)
-
-  testparameters         testparameters[]
-  doctorTestCharges      DoctorTestCharge[]
+  id                      Int                      @id @default(autoincrement())
+  name                    String
+  shortName               String?
+  testCode                String?                  @unique
+  departmentId            Int
+  testParameterId         Int?
+  testCategoryId          Int?
+  sampleTypeId            Int?
+  group                   String?
+  reportHeader            String?
+  preparationTime         String?
+  preparationType         String?
+  instructionPreparation  String?                  @db.Text
+  instructionPatient      String?                  @db.Text
+  interpretationLabel     String?
+  interpretation          String?                  @db.Text
+  outsourceLab            String?
+  attachFile              Boolean                  @default(false)
+  imageSize               String?                  @default("800|600")
+  profileTest             Boolean                  @default(false)
+  isHeader                Boolean                  @default(true)
+  showTestName            Boolean                  @default(true)
+  isNABL                  Boolean                  @default(false)
+  lineHeight              Float?                   @default(1.4)
+  isActive                Boolean                  @default(true)
+  isDeleted               Boolean                  @default(false)
+  createdAt               DateTime                 @default(now())
+  updatedAt               DateTime                 @updatedAt
+  linkedTestIds           String?                  @db.Text
+  isOutsourced            Boolean                  @default(false)
+  testparameters          testparameters[]
+  doctorTestCharges       DoctorTestCharge[]
   organizationTestCharges OrganizationTestCharge[]
-  packageTests           PackageTest[]
-  patientTests           PatientTest[]
-  categories             TestCategory[]
-  charges                TestCharge[]
-  ownedParameters        TestParameter[]    @relation("ParameterOwner")
-  templates              TestTemplate[]
-  testMachines           TestMachine[]
-  department             Department          @relation(fields: [departmentId], references: [id], onDelete: Cascade)
-  testCategory           TestCategory?       @relation("PrimaryTestCategory", fields: [testCategoryId], references: [id])
-  testParameter          TestParameter?      @relation("PrimaryTestParameter", fields: [testParameterId], references: [id])
-  sample_type            sample_type?        @relation(fields: [sampleTypeId], references: [id])
-  outsourcingLabTests    OutsourcingLabTest[] @relation("OutsourcingTests")
-
+  outsourcingLabTests     OutsourcingLabTest[]     @relation("OutsourcingTests")
+  packageTests            PackageTest[]
+  patientTests            PatientTest[]
+  categories              TestCategory[]
+  charges                 TestCharge[]
+  testMachines            TestMachine[]
+  ownedParameters         TestParameter[]          @relation("ParameterOwner")
+  templates               TestTemplate[]
+  department              Department               @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+  sample_type             sample_type?             @relation(fields: [sampleTypeId], references: [id])
+  testCategory            TestCategory?            @relation("PrimaryTestCategory", fields: [testCategoryId], references: [id])
+  testParameter           TestParameter?           @relation("PrimaryTestParameter", fields: [testParameterId], references: [id])
 
   @@unique([name, departmentId])
   @@index([departmentId], map: "tests_departmentId_fkey")
@@ -458,8 +412,8 @@ model Package {
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
   packageTests PackageTest[]
+  department   Department?   @relation(fields: [departmentId], references: [id])
   patientTests PatientTest[]
-  department   Department?   @relation(fields: [departmentId], references: [id], onDelete: SetNull)
 
   @@index([departmentId], map: "packages_departmentId_fkey")
   @@map("packages")
@@ -521,19 +475,19 @@ model DoctorTestCharge {
 }
 
 model OrganizationTestCharge {
-  id            Int           @id @default(autoincrement())
-  testId        Int
+  id             Int          @id @default(autoincrement())
+  testId         Int
   organizationId String
-  discountR     Float?        @default(0)
-  discountS     Float?        @default(0)
-  isCustomized  Boolean       @default(false)
-  effectiveFrom DateTime      @default(now())
-  effectiveTo   DateTime?
-  isActive      Boolean       @default(true)
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
-  organization  Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  test          Test          @relation(fields: [testId], references: [id], onDelete: Cascade)
+  discountR      Float?       @default(0)
+  discountS      Float?       @default(0)
+  isCustomized   Boolean      @default(false)
+  effectiveFrom  DateTime     @default(now())
+  effectiveTo    DateTime?
+  isActive       Boolean      @default(true)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  test           Test         @relation(fields: [testId], references: [id], onDelete: Cascade)
 
   @@unique([testId, organizationId])
   @@index([organizationId], map: "organization_test_charges_organizationId_fkey")
@@ -554,6 +508,7 @@ model Doctor {
   type                   String             @default("Doctor")
   sendReportsViaMail     Boolean            @default(false)
   sendReportsViaWhatsApp Boolean            @default(false)
+  discount               Float?             @default(0)
   mergedTo               DoctorMerge[]      @relation("SourceDoctor")
   mergedFrom             DoctorMerge[]      @relation("TargetDoctor")
   testCharges            DoctorTestCharge[]
@@ -603,9 +558,6 @@ model TestParameter {
   displayRangeText   String?          @db.Text
   rangeText          String?          @db.Text
   textContent        String?          @db.Text
-  maleDisplayText    String?          @db.Text        // ✅ NEW: Male-specific display range text
-  femaleDisplayText  String?          @db.Text        // ✅ NEW: Female-specific display range text
-  defaultDisplayText String?          @db.Text        // ✅ NEW: Default display text for both
   isMultipleOptions  Boolean          @default(false)
   maleLowValue       String?
   maleHighValue      String?
@@ -624,7 +576,9 @@ model TestParameter {
   isActive           Boolean          @default(true)
   createdAt          DateTime         @default(now())
   updatedAt          DateTime         @updatedAt
-
+  defaultDisplayText String?          @db.Text
+  femaleDisplayText  String?          @db.Text
+  maleDisplayText    String?          @db.Text
   testparameters     testparameters[]
   testCategories     TestCategory[]
   testOwner          Test?            @relation("ParameterOwner", fields: [testId], references: [id], onDelete: Cascade)
@@ -710,23 +664,19 @@ model sample_type {
   @@map("sample_types")
 }
 
-// ============================================
-// PATIENT TEST EXECUTION & RESULTS
-// ============================================
-
 model TestResult {
   id              Int           @id @default(autoincrement())
   patientTestId   Int
   testParameterId Int
   testCategoryId  Int?
-  numericValue    String?       // Store numeric value with optional symbols: "<7.5", ">140", "7.5", etc.
+  numericValue    String?
   textValue       String?
   selectedOption  String?
-  isHighlighted   Boolean       @default(false) // Checkbox to highlight/bold this value in reports
   enteredBy       String?
   verifiedBy      String?
   enteredAt       DateTime      @default(now())
   verifiedAt      DateTime?
+  isHighlighted   Boolean       @default(false)
   patientTest     PatientTest   @relation(fields: [patientTestId], references: [id], onDelete: Cascade)
   testCategory    TestCategory? @relation(fields: [testCategoryId], references: [id])
   testParameter   TestParameter @relation(fields: [testParameterId], references: [id])
@@ -739,26 +689,25 @@ model TestResult {
 }
 
 model Machine {
-  id          Int       @id @default(autoincrement())
-  name        String    @unique
-  description String?   @db.Text
-  isActive    Boolean   @default(true)
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  testMachines TestMachine[]
+  id           Int           @id @default(autoincrement())
+  name         String        @unique
+  isActive     Boolean       @default(true)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  description  String?       @db.Text
   patientTests PatientTest[]
+  testMachines TestMachine[]
 
   @@map("machines")
 }
 
 model TestMachine {
-  id        Int       @id @default(autoincrement())
+  id        Int      @id @default(autoincrement())
   testId    Int
   machineId Int
-  createdAt DateTime  @default(now())
-  
-  test      Test      @relation(fields: [testId], references: [id], onDelete: Cascade)
-  machine   Machine   @relation(fields: [machineId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  machine   Machine  @relation(fields: [machineId], references: [id], onDelete: Cascade)
+  test      Test     @relation(fields: [testId], references: [id], onDelete: Cascade)
 
   @@unique([testId, machineId])
   @@index([testId])
@@ -766,171 +715,90 @@ model TestMachine {
   @@map("test_machines")
 }
 
-
-// ============================================
-// BILLING & INVOICE MODULE (NORMALIZED)
-// ============================================
-
-// Enums for Billing
-enum BillStatus {
-  PENDING
-  PARTIAL
-  PAID
-  CANCELLED
-  OVERPAID
-}
-
-enum BillingSessionType {
-  REGISTRATION
-  ADD_TEST
-  PAYMENT
-  DISCOUNT
-  REFUND
-  CANCEL_TEST
-  EDIT_TEST
-  SETTLEMENT
-}
-
-enum PaymentMode {
-  CASH
-  CARD
-  UPI
-  CHEQUE
-  BANK_TRANSFER
-  OTHER
-}
-
-enum DiscountType {
-  PERCENTAGE
-  FLAT
-  WRITEOFF
-}
-
-enum TransactionType {
-  INITIAL_BILL
-  ADD_TEST
-  CANCEL_TEST
-  DISCOUNT
-  PAYMENT
-  REFUND
-  WRITE_OFF
-  EDIT_CHARGE
-}
-
-// Master Bill Record - One per Visit
 model VisitBill {
-  id                Int             @id @default(autoincrement())
-  visitId           String          @unique
-  patientId         String
-  
-  // Financial Summary
-  grossAmount       Decimal         @db.Decimal(12, 2)  // Sum of all test charges
-  totalDiscount     Decimal         @db.Decimal(12, 2)  // Total discount applied (in rupees)
-  totalDiscountPercent Float        @default(0)        // Average discount percentage
-  totalPaid         Decimal         @db.Decimal(12, 2)  // Total payment received
-  totalRefund       Decimal         @db.Decimal(12, 2)  // Total refund given
-  balanceAmount     Decimal         @db.Decimal(12, 2)  // Outstanding balance
-  
-  // Status
-  status            BillStatus      @default(PENDING)
-  
-  // Timestamps
-  createdAt         DateTime        @default(now())
-  updatedAt         DateTime        @updatedAt
-  
-  // Relations
-  patient           Patient         @relation(fields: [patientId], references: [patientId], onDelete: Cascade)
-  billingSessions   BillingSession[]
-  discounts         BillDiscount[]
-  payments          Payment[]
-  refunds           Refund[]
-  
+  id                   Int              @id @default(autoincrement())
+  visitId              String           @unique
+  patientId            String
+  grossAmount          Decimal          @db.Decimal(12, 2)
+  totalDiscount        Decimal          @db.Decimal(12, 2)
+  totalDiscountPercent Float            @default(0)
+  totalPaid            Decimal          @db.Decimal(12, 2)
+  totalRefund          Decimal          @db.Decimal(12, 2)
+  balanceAmount        Decimal          @db.Decimal(12, 2)
+  status               BillStatus       @default(PENDING)
+  createdAt            DateTime         @default(now())
+  updatedAt            DateTime         @updatedAt
+  discounts            BillDiscount[]
+  billingSessions      BillingSession[]
+  payments             Payment[]
+  refunds              Refund[]
+  patient              Patient          @relation(fields: [patientId], references: [patientId], onDelete: Cascade)
+
   @@index([patientId])
   @@index([status])
   @@index([createdAt])
   @@map("visit_bills")
 }
 
-// Billing Session - Groups related activities
 model BillingSession {
-  id                Int                 @id @default(autoincrement())
-  visitId           String
-  visitBill         VisitBill           @relation(fields: [visitId], references: [visitId], onDelete: Cascade)
-  
-  sequence          Int                 // Order of sessions (1, 2, 3, etc.)
-  sessionType       BillingSessionType
-  remarks           String?             @db.Text
-  createdBy         Int?
-  createdAt         DateTime            @default(now())
-  
-  // Relations
-  patientTests      PatientTest[]
-  discounts         BillDiscount[]
-  payments          Payment[]
-  refunds           Refund[]
-  
+  id           Int                @id @default(autoincrement())
+  visitId      String
+  sequence     Int
+  sessionType  BillingSessionType
+  remarks      String?            @db.Text
+  createdBy    Int?
+  createdAt    DateTime           @default(now())
+  discounts    BillDiscount[]
+  visitBill    VisitBill          @relation(fields: [visitId], references: [visitId], onDelete: Cascade)
+  patientTests PatientTest[]
+  payments     Payment[]
+  refunds      Refund[]
+
+  @@unique([visitId, sequence])
   @@index([visitId])
   @@index([sessionType])
   @@index([createdAt])
-  @@unique([visitId, sequence])
   @@map("billing_sessions")
 }
 
-// Discount Records - Never overwritten
 model BillDiscount {
-  id                Int             @id @default(autoincrement())
-  visitId           String
-  visitBill         VisitBill       @relation(fields: [visitId], references: [visitId], onDelete: Cascade)
-  
-  billingSessionId  Int
-  billingSession    BillingSession  @relation(fields: [billingSessionId], references: [id], onDelete: Cascade)
-  
-  // Discount Details
-  discountType      DiscountType    // PERCENTAGE or FLAT
-  discountValue     Decimal         @db.Decimal(10, 2)  // Either % value or flat amount
-  discountAmount    Decimal         @db.Decimal(12, 2)  // Actual discount in rupees
-  appliedOnAmount   Decimal         @db.Decimal(12, 2)  // Amount on which discount was applied
-  
-  remarks           String?         @db.Text
-  createdBy         Int?
-  createdAt         DateTime        @default(now())
-  
+  id               Int            @id @default(autoincrement())
+  visitId          String
+  billingSessionId Int
+  discountType     DiscountType
+  discountValue    Decimal        @db.Decimal(10, 2)
+  discountAmount   Decimal        @db.Decimal(12, 2)
+  appliedOnAmount  Decimal        @db.Decimal(12, 2)
+  remarks          String?        @db.Text
+  createdBy        Int?
+  createdAt        DateTime       @default(now())
+  billingSession   BillingSession @relation(fields: [billingSessionId], references: [id], onDelete: Cascade)
+  visitBill        VisitBill      @relation(fields: [visitId], references: [visitId], onDelete: Cascade)
+
   @@index([visitId])
   @@index([billingSessionId])
   @@map("bill_discounts")
 }
 
-// Payment Records - COMBINED (Payment + PaymentTransaction + BillTransaction for payments)
-// Never overwritten, contains full audit trail
 model Payment {
-  id                Int             @id @default(autoincrement())
+  id                Int            @id @default(autoincrement())
   visitId           String
-  visitBill         VisitBill       @relation(fields: [visitId], references: [visitId], onDelete: Cascade)
-  
   billingSessionId  Int
-  billingSession    BillingSession  @relation(fields: [billingSessionId], references: [id], onDelete: Cascade)
-  
-  // Payment Details
-  amount            Decimal         @db.Decimal(12, 2)      // Amount received
-  paymentMode       PaymentMode                              // CASH, CARD, UPI, etc.
-  
-  // Transaction Details (previously in PaymentTransaction)
-  transactionId     String?                                  // Bank/gateway transaction ID
-  transactionStatus String          @default("SUCCESS")     // SUCCESS, FAILED, PENDING
-  
-  // Audit Trail (previously in BillTransaction)
-  remarks           String?         @db.Text
-  receivedBy        Int?                                     // User who received payment
-  paymentDate       DateTime        @default(now())         // When payment was received
-  
-  // Reconciliation
-  isReconciled      Boolean         @default(false)
+  amount            Decimal        @db.Decimal(12, 2)
+  paymentMode       PaymentMode
+  transactionId     String?
+  transactionStatus String         @default("SUCCESS")
+  remarks           String?        @db.Text
+  receivedBy        Int?
+  paymentDate       DateTime       @default(now())
+  isReconciled      Boolean        @default(false)
   reconciledBy      Int?
   reconciledAt      DateTime?
-  
-  createdAt         DateTime        @default(now())
-  updatedAt         DateTime        @default(now()) @updatedAt
-  
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @default(now()) @updatedAt
+  billingSession    BillingSession @relation(fields: [billingSessionId], references: [id], onDelete: Cascade)
+  visitBill         VisitBill      @relation(fields: [visitId], references: [visitId], onDelete: Cascade)
+
   @@index([visitId])
   @@index([billingSessionId])
   @@index([paymentDate])
@@ -938,21 +806,17 @@ model Payment {
   @@map("payments")
 }
 
-// Refund Records - Never overwritten
 model Refund {
-  id                Int             @id @default(autoincrement())
-  visitId           String
-  visitBill         VisitBill       @relation(fields: [visitId], references: [visitId], onDelete: Cascade)
-  
-  billingSessionId  Int
-  billingSession    BillingSession  @relation(fields: [billingSessionId], references: [id], onDelete: Cascade)
-  
-  // Refund Details
-  amount            Decimal         @db.Decimal(12, 2)
-  reason            String?         @db.Text
-  refundedBy        Int?
-  createdAt         DateTime        @default(now())
-  
+  id               Int            @id @default(autoincrement())
+  visitId          String
+  billingSessionId Int
+  amount           Decimal        @db.Decimal(12, 2)
+  reason           String?        @db.Text
+  refundedBy       Int?
+  createdAt        DateTime       @default(now())
+  billingSession   BillingSession @relation(fields: [billingSessionId], references: [id], onDelete: Cascade)
+  visitBill        VisitBill      @relation(fields: [visitId], references: [visitId], onDelete: Cascade)
+
   @@index([visitId])
   @@index([billingSessionId])
   @@map("refunds")
@@ -972,10 +836,6 @@ model Signature {
 
   @@map("signatures")
 }
-
-// ============================================
-// INVENTORY MODULE
-// ============================================
 
 model OutsourcingLab {
   id        Int                  @id @default(autoincrement())
@@ -1027,108 +887,100 @@ model OutsourcingReport {
   @@map("outsourcing_reports")
 }
 
-// ============================================
-// QR CODE REPORT VERIFICATION MODULE
-// ============================================
-
 model ReportQRToken {
-  id                 Int         @id @default(autoincrement())
-  reportQRTokenHash  String      @unique
-  patientTestId      Int         @unique
-  createdAt          DateTime    @default(now())
-  expiresAt          DateTime?
-  isDisabled         Boolean     @default(false)
-  accessCount        Int         @default(0)
-  lastAccessedAt     DateTime?
-  
-  patientTest        PatientTest @relation(fields: [patientTestId], references: [id], onDelete: Cascade)
+  id                Int         @id @default(autoincrement())
+  reportQRTokenHash String      @unique
+  patientTestId     Int         @unique
+  createdAt         DateTime    @default(now())
+  expiresAt         DateTime?
+  isDisabled        Boolean     @default(false)
+  accessCount       Int         @default(0)
+  lastAccessedAt    DateTime?
+  patientTest       PatientTest @relation(fields: [patientTestId], references: [id], onDelete: Cascade)
 
   @@index([reportQRTokenHash])
   @@index([isDisabled])
   @@index([createdAt])
   @@map("report_qr_tokens")
 }
+
 model HSNCode {
-  id        Int      @id @default(autoincrement())
-  hsnCode   String   @unique
+  id        Int             @id @default(autoincrement())
+  hsnCode   String          @unique
   category  String
   gstRate   Float
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  items InventoryItem[]
+  isActive  Boolean         @default(true)
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+  items     InventoryItem[]
 
   @@map("hsn_codes")
 }
 
 model InventoryItem {
-  id        Int      @id @default(autoincrement())
-  itemName  String   @unique
-  itemCode  String   @unique
-  hsnCodeId Int
-  unit      String
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
+  id              Int                    @id @default(autoincrement())
+  itemName        String                 @unique
+  itemCode        String                 @unique
+  hsnCodeId       Int
+  unit            String
+  isActive        Boolean                @default(true)
+  createdAt       DateTime               @default(now())
+  updatedAt       DateTime               @updatedAt
   hsnCode         HSNCode                @relation(fields: [hsnCodeId], references: [id])
-  stockEntryItems StockEntryItem[]
   labStocks       LabStock[]
-  orgStocks       OrganizationStock[]
-  transactions    StockTransaction[]
   transferItems   LabToOrgTransferItem[]
+  orgStocks       OrganizationStock[]
+  stockEntryItems StockEntryItem[]
+  transactions    StockTransaction[]
 
   @@index([hsnCodeId])
   @@map("inventory_items")
 }
 
 model Supplier {
-  id           Int      @id @default(autoincrement())
-  supplierName String   @unique
+  id           Int          @id @default(autoincrement())
+  supplierName String       @unique
   email        String?
-  phone        String?   @unique
-  address      String?  @db.Text
+  phone        String?      @unique
+  address      String?      @db.Text
   city         String?
   state        String?
   pinCode      String?
-  gstNumber    String?   @unique
-  isActive     Boolean  @default(true)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-
+  gstNumber    String?      @unique
+  isActive     Boolean      @default(true)
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
   stockEntries StockEntry[]
 
   @@map("suppliers")
 }
 
 model StockEntry {
-  id               Int      @id @default(autoincrement())
-  entryId          String   @unique
+  id               Int              @id @default(autoincrement())
+  entryId          String           @unique
   supplierId       Int
   invoiceNo        String
   invoiceDate      DateTime
-  igstPercent      Float    @default(0)
-  totalBasicAmount Float    @default(0)
-  totalCGST        Float    @default(0)
-  totalSGST        Float    @default(0)
-  totalIGST        Float    @default(0)
-  grandTotal       Float    @default(0)
-  status           String   @default("Active")
-  remarks          String?  @db.Text
+  igstPercent      Float            @default(0)
+  totalBasicAmount Float            @default(0)
+  totalCGST        Float            @default(0)
+  totalSGST        Float            @default(0)
+  totalIGST        Float            @default(0)
+  grandTotal       Float            @default(0)
+  status           String           @default("Active")
+  remarks          String?          @db.Text
   createdBy        String?
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
-
-  supplier Supplier         @relation(fields: [supplierId], references: [id])
-  items    StockEntryItem[]
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+  supplier         Supplier         @relation(fields: [supplierId], references: [id])
+  items            StockEntryItem[]
 
   @@index([supplierId])
   @@map("stock_entries")
 }
 
 model StockEntryItem {
-  id           Int      @id @default(autoincrement())
+  id           Int           @id @default(autoincrement())
   stockEntryId Int
   itemId       Int
   batchNo      String
@@ -1143,10 +995,9 @@ model StockEntryItem {
   igstPercent  Float
   igstAmount   Float
   totalAmount  Float
-  createdAt    DateTime @default(now())
-
-  stockEntry StockEntry    @relation(fields: [stockEntryId], references: [id], onDelete: Cascade)
-  item       InventoryItem @relation(fields: [itemId], references: [id])
+  createdAt    DateTime      @default(now())
+  item         InventoryItem @relation(fields: [itemId], references: [id])
+  stockEntry   StockEntry    @relation(fields: [stockEntryId], references: [id], onDelete: Cascade)
 
   @@unique([stockEntryId, itemId, batchNo])
   @@index([stockEntryId])
@@ -1155,16 +1006,15 @@ model StockEntryItem {
 }
 
 model LabStock {
-  id                Int      @id @default(autoincrement())
+  id                Int           @id @default(autoincrement())
   itemId            Int
   batchNo           String
   expiryDate        DateTime
   quantityAvailable Int
-  lastStockUpdate   DateTime @default(now())
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
-
-  item InventoryItem @relation(fields: [itemId], references: [id])
+  lastStockUpdate   DateTime      @default(now())
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+  item              InventoryItem @relation(fields: [itemId], references: [id])
 
   @@unique([itemId, batchNo])
   @@index([itemId])
@@ -1172,18 +1022,17 @@ model LabStock {
 }
 
 model OrganizationStock {
-  id                Int      @id @default(autoincrement())
+  id                Int           @id @default(autoincrement())
   organizationId    String
   itemId            Int
   batchNo           String
   expiryDate        DateTime
   quantityAvailable Int
-  lastStockUpdate   DateTime @default(now())
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
-
-  item         InventoryItem @relation(fields: [itemId], references: [id])
-  organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  lastStockUpdate   DateTime      @default(now())
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+  item              InventoryItem @relation(fields: [itemId], references: [id])
+  organization      Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   @@unique([organizationId, itemId, batchNo])
   @@index([organizationId])
@@ -1192,20 +1041,19 @@ model OrganizationStock {
 }
 
 model StockTransaction {
-  id              Int      @id @default(autoincrement())
-  transactionId   String   @unique
+  id              Int           @id @default(autoincrement())
+  transactionId   String        @unique
   itemId          Int
   organizationId  String?
   batchNo         String
   quantity        Int
   transactionType String?
-  reason          String?  @db.Text
+  reason          String?       @db.Text
   approvedBy      String?
   createdBy       String?
-  createdAt       DateTime @default(now())
-
-  item         InventoryItem @relation(fields: [itemId], references: [id])
-  organization Organization? @relation(fields: [organizationId], references: [id])
+  createdAt       DateTime      @default(now())
+  item            InventoryItem @relation(fields: [itemId], references: [id])
+  organization    Organization? @relation(fields: [organizationId], references: [id])
 
   @@index([itemId])
   @@index([organizationId])
@@ -1215,20 +1063,19 @@ model StockTransaction {
 }
 
 model LabToOrgTransfer {
-  id             Int      @id @default(autoincrement())
-  transferId     String   @unique
+  id             Int                    @id @default(autoincrement())
+  transferId     String                 @unique
   organizationId String?
   transferDate   DateTime
-  status         String   @default("Pending")
-  remarks        String?  @db.Text
+  status         String                 @default("Pending")
+  remarks        String?                @db.Text
   createdBy      String?
   approvedBy     String?
   receivedBy     String?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
-
-  items        LabToOrgTransferItem[]
-  organization Organization?         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdAt      DateTime               @default(now())
+  updatedAt      DateTime               @updatedAt
+  items          LabToOrgTransferItem[]
+  organization   Organization?          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   @@index([organizationId])
   @@index([status])
@@ -1236,16 +1083,15 @@ model LabToOrgTransfer {
 }
 
 model LabToOrgTransferItem {
-  id         Int      @id @default(autoincrement())
+  id         Int              @id @default(autoincrement())
   transferId Int
   itemId     Int
   batchNo    String
   quantity   Int
   expiryDate DateTime
-  createdAt  DateTime @default(now())
-
-  transfer LabToOrgTransfer @relation(fields: [transferId], references: [id], onDelete: Cascade)
-  item     InventoryItem    @relation(fields: [itemId], references: [id])
+  createdAt  DateTime         @default(now())
+  item       InventoryItem    @relation(fields: [itemId], references: [id])
+  transfer   LabToOrgTransfer @relation(fields: [transferId], references: [id], onDelete: Cascade)
 
   @@unique([transferId, itemId, batchNo])
   @@index([transferId])
@@ -1253,24 +1099,19 @@ model LabToOrgTransferItem {
   @@map("lab_to_org_transfer_items")
 }
 
-
-// ============================================
-// REPORT SETTINGS MODULE
-// ============================================
-
 model ReportFieldConfiguration {
-  id              Int       @id @default(autoincrement())
-  fieldKey        String    @unique
-  fieldLabel      String
-  isVisible       Boolean   @default(true)
-  isBold          Boolean   @default(false)
-  isItalic        Boolean   @default(false)
-  isUnderline     Boolean   @default(false)
-  displayOrder    Int
-  sectionName     String
-  customLabel     String?
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  id           Int      @id @default(autoincrement())
+  fieldKey     String   @unique
+  fieldLabel   String
+  isVisible    Boolean  @default(true)
+  isBold       Boolean  @default(false)
+  isItalic     Boolean  @default(false)
+  isUnderline  Boolean  @default(false)
+  displayOrder Int
+  sectionName  String
+  customLabel  String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
   @@index([sectionName])
   @@index([displayOrder])
@@ -1278,73 +1119,119 @@ model ReportFieldConfiguration {
 }
 
 model ReportFormatting {
-  id                      Int       @id @default(autoincrement())
-  fontFamily              String    @default("Bookman Old Text")
-  fontSizeHeader          Float     @default(14)
-  fontSizeBody            Float     @default(11)
-  fontSizeFooter          Float     @default(9)
-  paperSize               String    @default("A4")
-  orientation             String    @default("Portrait")
-  topMargin               Float     @default(10)
-  bottomMargin            Float     @default(10)
-  leftMargin              Float     @default(10)
-  rightMargin             Float     @default(10)
-  lineHeight              Float     @default(1.4)
-  showHeader              Boolean   @default(true)
-  showFooter              Boolean   @default(true)
-  showWatermark           Boolean   @default(false)
-  showQRCode              Boolean   @default(true)
-  showBarcode             Boolean   @default(true)
-  showPrimarySignature    Boolean   @default(true)
-  showSecondarySignature  Boolean   @default(false)
-  signaturePosition       String    @default("Bottom Right")
-  footerText              String?   @db.Text
-  watermarkText           String?
-  createdAt               DateTime  @default(now())
-  updatedAt               DateTime  @updatedAt
+  id                     Int      @id @default(autoincrement())
+  fontFamily             String   @default("Bookman Old Text")
+  fontSizeHeader         Float    @default(14)
+  fontSizeBody           Float    @default(11)
+  fontSizeFooter         Float    @default(9)
+  paperSize              String   @default("A4")
+  orientation            String   @default("Portrait")
+  topMargin              Float    @default(10)
+  bottomMargin           Float    @default(10)
+  leftMargin             Float    @default(10)
+  rightMargin            Float    @default(10)
+  lineHeight             Float    @default(1.4)
+  showHeader             Boolean  @default(true)
+  showFooter             Boolean  @default(true)
+  showWatermark          Boolean  @default(false)
+  showQRCode             Boolean  @default(true)
+  showPrimarySignature   Boolean  @default(true)
+  showSecondarySignature Boolean  @default(false)
+  signaturePosition      String   @default("Bottom Right")
+  footerText             String?  @db.Text
+  watermarkText          String?
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+  showBarcode            Boolean  @default(true)
 
   @@map("report_formatting")
 }
 
-// ============================================
-// ORGANIZATION SETTLEMENT MODULE
-// ============================================
-
 model OrganizationSettlement {
-  id                      String              @id @default(cuid())
-  
-  // Organization & Visit Info
-  organizationId          String
-  visitIds                String              @db.LongText  // JSON array of visitIds
-  
-  // Discount Configuration
-  applyOrgDiscount        Boolean             @default(true)
-  orgDiscountPercent      Float               @default(0)
-  orgDiscountAmount       Decimal             @db.Decimal(12, 2)
-  
-  tdsPercent              Float               @default(10)
-  tdsAmount               Decimal             @db.Decimal(12, 2)
-  
-  otherDiscountPercent    Float               @default(0)
-  otherDiscountAmount     Decimal             @db.Decimal(12, 2)
-  
-  totalDiscount           Decimal             @db.Decimal(12, 2)  // Sum of all discounts
-  
-  // Payment Info
-  amountPaid              Decimal             @db.Decimal(12, 2)
-  remainingBalance        Decimal             @db.Decimal(12, 2)
-  
-  // Settlement Details
-  status                  String              @default("SETTLED")  // PENDING, SETTLED, PARTIAL
-  remarks                 String?             @db.Text
-  
-  // Audit Trail
-  createdBy               Int?
-  createdAt               DateTime            @default(now())
-  updatedAt               DateTime            @updatedAt
-  
+  id                   String   @id @default(cuid())
+  organizationId       String
+  visitIds             String   @db.LongText
+  applyOrgDiscount     Boolean  @default(true)
+  orgDiscountPercent   Float    @default(0)
+  orgDiscountAmount    Decimal  @db.Decimal(12, 2)
+  tdsPercent           Float    @default(10)
+  tdsAmount            Decimal  @db.Decimal(12, 2)
+  otherDiscountPercent Float    @default(0)
+  otherDiscountAmount  Decimal  @db.Decimal(12, 2)
+  totalDiscount        Decimal  @db.Decimal(12, 2)
+  amountPaid           Decimal  @db.Decimal(12, 2)
+  remainingBalance     Decimal  @db.Decimal(12, 2)
+  status               String   @default("SETTLED")
+  remarks              String?  @db.Text
+  createdBy            Int?
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
   @@index([organizationId])
   @@index([status])
   @@index([createdAt])
   @@map("organization_settlements")
+}
+
+model ReferralDoctorSettlement {
+  id                    String   @id @default(cuid())
+  referralDoctorId      Int
+  referralDoctorName    String
+  visitIds              String   @db.LongText
+  applyDoctorDiscount   Boolean  @default(true)
+  doctorDiscountPercent Float    @default(0)
+  doctorDiscountAmount  Decimal  @db.Decimal(12, 2)
+  tdsPercent            Float    @default(10)
+  tdsAmount             Decimal  @db.Decimal(12, 2)
+  otherDiscountPercent  Float    @default(0)
+  otherDiscountAmount   Decimal  @db.Decimal(12, 2)
+  totalDiscount         Decimal  @db.Decimal(12, 2)
+  amountPaid            Decimal  @db.Decimal(12, 2)
+  remainingBalance      Decimal  @db.Decimal(12, 2)
+  status                String   @default("SETTLED")
+  remarks               String?  @db.Text
+  createdBy             Int?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  @@index([referralDoctorName])
+  @@index([status])
+  @@index([createdAt])
+  @@map("referral_doctor_settlements")
+}
+
+enum BillStatus {
+  PENDING
+  PARTIAL
+  PAID
+  CANCELLED
+  OVERPAID
+}
+
+enum BillingSessionType {
+  REGISTRATION
+  ADD_TEST
+  PAYMENT
+  DISCOUNT
+  REFUND
+  CANCEL_TEST
+  EDIT_TEST
+  SETTLEMENT
+}
+
+enum PaymentMode {
+  CASH
+  CARD
+  DEBIT_CARD
+  CREDIT_CARD
+  UPI
+  CHEQUE
+  BANK_TRANSFER
+  OTHER
+}
+
+enum DiscountType {
+  PERCENTAGE
+  FLAT
+  WRITEOFF
 }

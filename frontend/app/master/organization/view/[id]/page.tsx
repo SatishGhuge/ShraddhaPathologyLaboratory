@@ -156,15 +156,23 @@ const SingleToggleView = ({ title, icon: Icon, color, moduleKey, moduleAllocatio
 
 const AddOrganization = () => {
   const router = useRouter();
-  const { id } = useParams();
+  const params = useParams();
   const pathname = usePathname();
 
-  const isViewMode = pathname.includes("/view/");
-  const isEditMode = pathname.includes("/edit/");
+  const id = params?.id ? (Array.isArray(params.id) ? params.id[0] : params.id) : null;
+  const isViewMode = pathname ? pathname.includes("/view/") : false;
+  const isEditMode = pathname ? pathname.includes("/edit/") : false;
 
   const [formData, setFormData] = useState({
     name: "", organizationType: "", address: "", code: "",
     location: "", mobile: "", email: "", date: "", active: "Yes",
+    sendReportsViaWhatsApp: false,
+    sendReportsViaMail: false,
+    discountPercent: "",
+    discountAmount: "",
+    isHomeCollection: false,
+    isOPD: false,
+    isIPD: false,
   });
 
   const [toast, setToast] = useState<any>(null); // { type, message, credentials }
@@ -185,6 +193,13 @@ const AddOrganization = () => {
             email: organization.email || "",
             date: organization.date ? new Date(organization.date).toISOString().split("T")[0] : "",
             active: organization.isActive ? "Yes" : "No",
+            sendReportsViaWhatsApp: organization.sendReportsViaWhatsApp || false,
+            sendReportsViaMail: organization.sendReportsViaMail || false,
+            discountPercent: organization.discount || "",
+            discountAmount: organization.discount || "",
+            isHomeCollection: organization.isHomeCollection || false,
+            isOPD: organization.isOPD || false,
+            isIPD: organization.isIPD || false,
           });
           if (organization.moduleAllocation) {
             try {
@@ -357,6 +372,27 @@ const AddOrganization = () => {
                 disabled={isViewMode} rows={2} required={!isViewMode}
                 className="w-full border border-cyan-600 rounded px-2 py-1.5 text-sm disabled:bg-gray-50 bg-cyan-50" />
             </div>
+
+            {/* Organization Type Display in View Mode */}
+            {isViewMode && (
+              <div className="md:col-span-2 border-t border-gray-300 pt-4 mt-4 pb-4">
+                <p className="font-semibold text-gray-700 text-sm mb-3">🏥 Organization Type</p>
+                <div className="flex items-center gap-6 ml-1">
+                  <label className="flex items-center gap-2">
+                    <input type="checkbox" checked={formData.isHomeCollection} disabled className="w-4 h-4 accent-blue-600" />
+                    <span className="text-sm text-gray-700">Home Collection</span>
+                  </label>
+                  <label className="flex items-center gap-2">
+                    <input type="checkbox" checked={formData.isOPD} disabled className="w-4 h-4 accent-purple-600" />
+                    <span className="text-sm text-gray-700">OPD</span>
+                  </label>
+                  <label className="flex items-center gap-2">
+                    <input type="checkbox" checked={formData.isIPD} disabled className="w-4 h-4 accent-orange-600" />
+                    <span className="text-sm text-gray-700">IPD</span>
+                  </label>
+                </div>
+              </div>
+            )}
 
             {/* Module Allocation Section - Read-only in View Mode */}
             {isViewMode && moduleAllocation && (

@@ -1662,7 +1662,7 @@ export const getDoctorById = async (req, res) => {
 // Create doctor
 export const createDoctor = async (req, res) => {
   try {
-    const { name, type, degree, mobile, email, address, sendReportsViaWhatsApp, sendReportsViaMail } = req.body;
+    const { name, type, degree, mobile, email, address, discount, sendReportsViaWhatsApp, sendReportsViaMail } = req.body;
     if (!name || !name.trim()) {
       return res.status(400).json({ success: false, message: 'Name is required' });
     }
@@ -1674,6 +1674,7 @@ export const createDoctor = async (req, res) => {
         mobile: mobile || null,
         email: email || null,
         address: address || null,
+        discount: discount !== undefined ? parseFloat(discount) : 0,
         sendReportsViaWhatsApp: sendReportsViaWhatsApp || false,
         sendReportsViaMail: sendReportsViaMail || false,
         isActive: true,
@@ -1690,7 +1691,7 @@ export const createDoctor = async (req, res) => {
 export const updateDoctor = async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, type, degree, mobile, email, address, sendReportsViaWhatsApp, sendReportsViaMail } = req.body;
+    const { name, type, degree, mobile, email, address, discount, sendReportsViaWhatsApp, sendReportsViaMail } = req.body;
     const existing = await prisma.doctor.findUnique({ where: { id: parseInt(id) } });
     if (!existing) return res.status(404).json({ success: false, message: 'Doctor not found' });
     const doctor = await prisma.doctor.update({
@@ -1702,6 +1703,7 @@ export const updateDoctor = async (req, res) => {
         mobile: mobile !== undefined ? mobile : existing.mobile,
         email: email !== undefined ? email : existing.email,
         address: address !== undefined ? address : existing.address,
+        discount: discount !== undefined ? parseFloat(discount) : existing.discount,
         sendReportsViaWhatsApp: sendReportsViaWhatsApp !== undefined ? sendReportsViaWhatsApp : existing.sendReportsViaWhatsApp,
         sendReportsViaMail: sendReportsViaMail !== undefined ? sendReportsViaMail : existing.sendReportsViaMail,
       }
@@ -2085,6 +2087,9 @@ export const getOrganizations = async (req, res) => {
         email: true,
         date: true,
         isActive: true,
+        isHomeCollection: true,
+        isOPD: true,
+        isIPD: true,
         createdAt: true,
         updatedAt: true,
         moduleAllocations: {
@@ -2120,6 +2125,9 @@ export const getOrganizationById = async (req, res) => {
         updatedAt: true,
         sendReportsViaWhatsApp: true,
         sendReportsViaMail: true,
+        isHomeCollection: true,
+        isOPD: true,
+        isIPD: true,
         moduleAllocations: {
           select: { modules: true }
         }
@@ -2139,6 +2147,9 @@ export const getOrganizationById = async (req, res) => {
       orgId: organization.id,
       orgName: organization.name,
       discount: organization.discount,
+      isHomeCollection: organization.isHomeCollection,
+      isOPD: organization.isOPD,
+      isIPD: organization.isIPD,
       hasModuleAllocations: !!organization.moduleAllocations,
       moduleAllocationsCount: organization.moduleAllocations?.length,
       modulesValue: organization.moduleAllocations?.[0]?.modules ? 'EXISTS' : 'NULL',
@@ -2150,6 +2161,9 @@ export const getOrganizationById = async (req, res) => {
           id: response.id,
           name: response.name,
           discount: response.discount,
+          isHomeCollection: response.isHomeCollection,
+          isOPD: response.isOPD,
+          isIPD: response.isIPD,
           moduleAllocation: response.moduleAllocation ? '...JSON STRING...' : null
         }
       }
@@ -2165,7 +2179,7 @@ export const getOrganizationById = async (req, res) => {
 // Create organization
 export const createOrganization = async (req, res) => {
   try {
-    const { name, code, location, address, mobile, email, date, isActive, adminName, testCharges, moduleAllocation, sendReportsViaWhatsApp, sendReportsViaMail, discount } = req.body;
+    const { name, code, location, address, mobile, email, date, isActive, adminName, testCharges, moduleAllocation, sendReportsViaWhatsApp, sendReportsViaMail, discount, isHomeCollection, isOPD, isIPD } = req.body;
     if (!name) return res.status(400).json({ success: false, message: 'Name is required' });
 
     const newId = await generateOrganizationId();
@@ -2173,7 +2187,7 @@ export const createOrganization = async (req, res) => {
     const username = newId;           // ORG-AAA
     const plainPassword = `${suffix}@123`;  // AAA@123
 
-    console.log('Creating organization:', { newId, name, email, adminName, discount });
+    console.log('Creating organization:', { newId, name, email, adminName, discount, isHomeCollection, isOPD, isIPD });
 
     // Check if organization already exists
     const existingOrg = await prisma.organization.findUnique({ where: { id: newId } });
@@ -2195,6 +2209,9 @@ export const createOrganization = async (req, res) => {
         sendReportsViaWhatsApp: sendReportsViaWhatsApp || false,
         sendReportsViaMail: sendReportsViaMail || false,
         discount: discount ? parseFloat(discount) : null,
+        isHomeCollection: isHomeCollection || false,
+        isOPD: isOPD || false,
+        isIPD: isIPD || false,
       },
     });
 
@@ -2319,7 +2336,7 @@ export const createOrganization = async (req, res) => {
 export const updateOrganization = async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, code, location, address, mobile, email, date, isActive, moduleAllocation, sendReportsViaWhatsApp, sendReportsViaMail, discount } = req.body;
+    const { name, code, location, address, mobile, email, date, isActive, moduleAllocation, sendReportsViaWhatsApp, sendReportsViaMail, discount, isHomeCollection, isOPD, isIPD } = req.body;
     const existing = await prisma.organization.findUnique({ where: { id } });
     if (!existing) return res.status(404).json({ success: false, message: 'Organization not found' });
 
@@ -2337,6 +2354,9 @@ export const updateOrganization = async (req, res) => {
         sendReportsViaWhatsApp: sendReportsViaWhatsApp !== undefined ? sendReportsViaWhatsApp : undefined,
         sendReportsViaMail: sendReportsViaMail !== undefined ? sendReportsViaMail : undefined,
         discount: discount !== undefined ? (discount ? parseFloat(discount) : null) : undefined,
+        isHomeCollection: isHomeCollection !== undefined ? isHomeCollection : undefined,
+        isOPD: isOPD !== undefined ? isOPD : undefined,
+        isIPD: isIPD !== undefined ? isIPD : undefined,
       },
     });
 

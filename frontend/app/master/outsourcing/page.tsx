@@ -15,11 +15,14 @@ const OutsourcingList = () => {
   const [hasSearched, setHasSearched] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pagination, setPagination] = useState<any>(null);
+  const ITEMS_PER_PAGE = 20;
 
   // Fetch labs on mount
   useEffect(() => {
     fetchLabs();
-  }, []);
+  }, [currentPage]);
 
   const fetchLabs = async () => {
     try {
@@ -43,6 +46,7 @@ const OutsourcingList = () => {
 
   const handleSearch = () => {
     setHasSearched(true);
+    setCurrentPage(1);
 
     const filtered = labs.filter((lab) => {
       const matchName = lab.labName
@@ -58,6 +62,7 @@ const OutsourcingList = () => {
     setSearchName("");
     setFilteredLabs(labs);
     setHasSearched(false);
+    setCurrentPage(1);
   };
 
   const handleDelete = async (lab: any) => {
@@ -160,8 +165,21 @@ const OutsourcingList = () => {
             </thead>
 
             <tbody>
-              {filteredLabs.length > 0 ? (
-                filteredLabs.map((lab) => (
+              {(() => {
+                const totalPages = Math.ceil(filteredLabs.length / ITEMS_PER_PAGE);
+                const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+                const endIndex = startIndex + ITEMS_PER_PAGE;
+                const paginatedData = filteredLabs.slice(startIndex, endIndex);
+
+                // Update pagination state
+                setPagination({
+                  total: filteredLabs.length,
+                  totalPages: totalPages,
+                  currentPage: currentPage
+                });
+
+                return paginatedData.length > 0 ? (
+                  paginatedData.map((lab) => (
                   <tr key={lab.id} className="hover:bg-gray-50 border-b border-gray-200">
                     <td className="border border-gray-300 px-3 py-1">{lab.id}</td>
                     <td className="border border-gray-300 px-3 py-1 font-medium">{lab.labName}</td>
@@ -203,10 +221,42 @@ const OutsourcingList = () => {
                     No outsourcing labs found
                   </td>
                 </tr>
-              )}
+              );
+              })()}
             </tbody>
           </table>
         </div>
+
+        {/* Pagination Controls */}
+        {pagination && pagination.totalPages > 1 && (
+          <div className="mt-4 flex items-center justify-between bg-white p-3 rounded shadow-md">
+            <div className="text-sm text-gray-600">
+              Showing {Math.min((currentPage - 1) * ITEMS_PER_PAGE + 1, pagination.total)} to{" "}
+              {Math.min(currentPage * ITEMS_PER_PAGE, pagination.total)} of {pagination.total} records
+            </div>
+            <div className="flex gap-2 items-center">
+              <button
+                onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                disabled={currentPage === 1}
+                className="bg-orange-500 hover:bg-orange-600 disabled:bg-gray-400 text-white px-4 py-2 rounded text-sm transition-colors"
+              >
+                Previous
+              </button>
+              
+              <span className="text-sm text-gray-700 font-semibold">
+                Page {currentPage} of {pagination.totalPages}
+              </span>
+              
+              <button
+                onClick={() => setCurrentPage(Math.min(pagination.totalPages, currentPage + 1))}
+                disabled={currentPage === pagination.totalPages}
+                className="bg-orange-500 hover:bg-orange-600 disabled:bg-gray-400 text-white px-4 py-2 rounded text-sm transition-colors"
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </>
   );
