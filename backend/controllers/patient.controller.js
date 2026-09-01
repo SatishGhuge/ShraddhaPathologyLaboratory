@@ -1990,10 +1990,16 @@ export const getTestsByVisitId = async (req, res) => {
       }
     });
 
-    // If VisitBill doesn't exist, create one from existing PatientTest data
-    if (!visitBill) {
-      console.log(`⚠️ VisitBill not found for visitId: ${visitId}, will calculate from PatientTest data`);
-    }
+    console.log('🔍 VisitBill fetched from DB:', {
+      visitId,
+      exists: !!visitBill,
+      grossAmount: visitBill?.grossAmount,
+      totalDiscount: visitBill?.totalDiscount,
+      totalPaid: visitBill?.totalPaid,
+      balanceAmount: visitBill?.balanceAmount,
+      status: visitBill?.status,
+      updatedAt: visitBill?.updatedAt
+    });
 
     // Find all tests for this visit
     const tests = await prisma.patientTest.findMany({

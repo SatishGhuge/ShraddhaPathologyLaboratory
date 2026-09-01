@@ -312,3 +312,38 @@ export const getVisitBill = async (visitId: string): Promise<ApiResponse> => {
     method: 'GET',
   });
 };
+
+// Save referral doctor settlement - single visit
+export const saveReferralDoctorSettlement = async (settlementData: {
+  visitId: string;
+  referralDoctorId: number;
+  referralDoctorName: string;
+  doctorDiscount: number;
+  tdsChecked: boolean;
+  tdsPercent: number;
+  otherDiscountPercent: number;
+  otherDiscountAmount: number;
+  amountPaid: number;
+  remark?: string;
+}): Promise<ApiResponse> => {
+  return apiCall('/referral-doctor-settlement/save-settlement', {
+    method: 'POST',
+    body: JSON.stringify(settlementData)
+  });
+};
+
+// Save bulk referral doctor settlement (multiple visits for one doctor)
+export const saveBulkReferralDoctorSettlement = async (settlementData: {
+  visitIds: string[];
+  applyDoctorDiscount: boolean;
+  tdsPercent: number;
+  otherDiscountPercent: number;
+  otherDiscountAmount: number;
+  amountPaid: number;
+  remark?: string;
+}): Promise<ApiResponse> => {
+  return apiCall('/referral-doctor-settlement/save-bulk-settlement', {
+    method: 'POST',
+    body: JSON.stringify(settlementData)
+  });
+};

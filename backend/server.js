@@ -18,6 +18,7 @@ import inventoryRoutes from './routes/inventory.routes.js';
 import reportSettingsRoutes from './routes/report-settings.routes.js';
 import reportQRRoutes from './routes/report-qr.routes.js';
 import organizationSettlementRoutes from './routes/organization-settlement.routes.js';
+import referralDoctorSettlementRoutes from './routes/referral-doctor-settlement.routes.js';
 import { emailService } from './services/notification.service.js';
 
 // Load environment variables
@@ -65,6 +66,7 @@ app.use('/api/inventory', inventoryRoutes);
 app.use('/api/report-settings', reportSettingsRoutes);
 app.use('/api/report-qr', reportQRRoutes);
 app.use('/api/organization-settlement', organizationSettlementRoutes);
+app.use('/api/referral-doctor-settlement', referralDoctorSettlementRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {

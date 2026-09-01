@@ -156,11 +156,12 @@ const SingleToggleView = ({ title, icon: Icon, color, moduleKey, moduleAllocatio
 
 const AddOrganization = () => {
   const router = useRouter();
-  const { id } = useParams();
+  const params = useParams();
   const pathname = usePathname();
 
-  const isViewMode = pathname.includes("/view/");
-  const isEditMode = pathname.includes("/edit/");
+  const id = params?.id ? (Array.isArray(params.id) ? params.id[0] : params.id) : null;
+  const isViewMode = pathname ? pathname.includes("/view/") : false;
+  const isEditMode = pathname ? pathname.includes("/edit/") : false;
 
   const [formData, setFormData] = useState({
     name: "", organizationType: "", address: "", code: "",

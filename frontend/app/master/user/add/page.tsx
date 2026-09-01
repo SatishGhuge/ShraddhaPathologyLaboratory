@@ -178,6 +178,7 @@ const defaultModuleAllocation = {
     dashboard: false,
     collectionReport: false,
     organizationSettlement: false,
+    referralDoctorSettlement: false,
     patientList: false,
     referralDoctorRevenue: false,
     testReport: false,
@@ -205,10 +206,12 @@ const defaultModuleAllocation = {
 
 export default function AddUserForm() {
   const router = useRouter();
-  const { id } = useParams();
+  const params = useParams();
   const pathname = usePathname();
-  const isViewMode = pathname.includes("/view/");
-  const isEditMode = pathname.includes("/edit/");
+  
+  const id = params?.id ? (Array.isArray(params.id) ? params.id[0] : params.id) : null;
+  const isViewMode = pathname ? pathname.includes("/view/") : false;
+  const isEditMode = pathname ? pathname.includes("/edit/") : false;
 
   const [successMessage, setSuccessMessage] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
@@ -525,6 +528,7 @@ export default function AddUserForm() {
                   { key: 'reports.dashboard', label: 'Dashboard' },
                   { key: 'reports.collectionReport', label: 'Collection Report' },
                   { key: 'reports.organizationSettlement', label: 'Organization Settlement' },
+                  { key: 'reports.referralDoctorSettlement', label: 'Referral Doctor Settlement' },
                   { key: 'reports.patientList', label: 'Patient List' },
                   { key: 'reports.referralDoctorRevenue', label: 'Referral Doctor Revenue' },
                   { key: 'reports.testReport', label: 'Test Report' },

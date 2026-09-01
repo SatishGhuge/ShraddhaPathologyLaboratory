@@ -78,9 +78,19 @@ const BookingDetailsModal: React.FC<BookingDetailsModalProps> = ({
   // ✅ Track total charge of deleted tests to subtract from grand total
   const [deletedTestsChargeTotal, setDeletedTestsChargeTotal] = useState(0);
 
+  // ✅ FORCE FRESH FETCH: Add a timestamp to force re-fetch even if booking object is the same
+  const [refetchTrigger, setRefetchTrigger] = useState(0);
+  
   // Fetch tests from backend when modal opens
   // This MUST be before the early return to avoid React hooks violation
   const [billingSummary, setBillingSummary] = useState<any>(null);
+  
+  useEffect(() => {
+    // Every time isOpen changes to true, increment the trigger to force a fresh fetch
+    if (isOpen) {
+      setRefetchTrigger(prev => prev + 1);
+    }
+  }, [isOpen]);
   
   useEffect(() => {
     const fetchTests = async () => {
@@ -111,9 +121,16 @@ const BookingDetailsModal: React.FC<BookingDetailsModalProps> = ({
             console.log('📋 Using object format with tests array, setting', result.data.tests.length, 'tests');
             setTests(result.data.tests);
             if (result.data.billingSummary) {
-              console.log('💰 RAW Billing Summary from backend:', JSON.stringify(result.data.billingSummary));
+              console.log('💰 ⭐ FRESH BILLING SUMMARY FETCHED:', {
+                grossAmount: result.data.billingSummary.grossAmount,
+                totalDiscount: result.data.billingSummary.totalDiscount,
+                balanceAmount: result.data.billingSummary.balanceAmount,
+                status: result.data.billingSummary.status,
+                totalPaid: result.data.billingSummary.totalPaid,
+                fullData: JSON.stringify(result.data.billingSummary)
+              });
               setBillingSummary(result.data.billingSummary);
-              console.log('✅ billingSummary state set with totalDiscount:', result.data.billingSummary.totalDiscount);
+              console.log('✅ billingSummary state updated with balanceAmount:', result.data.billingSummary.balanceAmount);
             }
           } else {
             console.warn('⚠️ Unexpected response structure:', result.data);
@@ -136,9 +153,13 @@ const BookingDetailsModal: React.FC<BookingDetailsModalProps> = ({
     };
     
     if (isOpen) {
+      console.log('🔄 Modal opened, forcing fresh fetch for visitId:', booking?.visitId, 'refetchTrigger:', refetchTrigger);
+      // ✅ Clear old data to force re-fetch
+      setBillingSummary(null);
+      setTests([]);
       fetchTests();
     }
-  }, [isOpen, booking?.visitId]);
+  }, [isOpen, booking?.visitId, refetchTrigger]);
 
   // ✅ Cleanup: Clear all form states when modal closes
   useEffect(() => {
@@ -210,6 +231,16 @@ const BookingDetailsModal: React.FC<BookingDetailsModalProps> = ({
       status: billingSummary.status,
       rawBillingSummary: JSON.stringify(billingSummary)
     });
+  } else if (billingSummary?.balanceAmount !== undefined) {
+    // ✅ FALLBACK: If billingSummary exists but grossAmount is not set, use balanceAmount directly
+    console.log('⚠️ billingSummary exists but missing grossAmount, using available data:', billingSummary);
+    finalBalance = parseFloat(billingSummary.balanceAmount) || 0;
+    finalGrandTotal = parseFloat(billingSummary.grossAmount) || 0;
+    finalInitialDiscount = parseFloat(billingSummary.totalDiscount) || 0;
+    finalNetAmount = finalBalance;
+    finalInitialAmount = finalGrandTotal - finalInitialDiscount;
+    finalNewTestTotal = 0;
+    finalNewDiscount = 0;
   } else {
     // Local fallback calculation using old field names
     const advanceFromDB = parseFloat(booking?.billing?.paidAmount) || parseFloat(booking?.paidAmount) || 0;
