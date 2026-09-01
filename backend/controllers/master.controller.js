@@ -1662,7 +1662,7 @@ export const getDoctorById = async (req, res) => {
 // Create doctor
 export const createDoctor = async (req, res) => {
   try {
-    const { name, type, degree, mobile, email, address, sendReportsViaWhatsApp, sendReportsViaMail } = req.body;
+    const { name, type, degree, mobile, email, address, discount, sendReportsViaWhatsApp, sendReportsViaMail } = req.body;
     if (!name || !name.trim()) {
       return res.status(400).json({ success: false, message: 'Name is required' });
     }
@@ -1674,6 +1674,7 @@ export const createDoctor = async (req, res) => {
         mobile: mobile || null,
         email: email || null,
         address: address || null,
+        discount: discount !== undefined ? parseFloat(discount) : 0,
         sendReportsViaWhatsApp: sendReportsViaWhatsApp || false,
         sendReportsViaMail: sendReportsViaMail || false,
         isActive: true,
@@ -1690,7 +1691,7 @@ export const createDoctor = async (req, res) => {
 export const updateDoctor = async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, type, degree, mobile, email, address, sendReportsViaWhatsApp, sendReportsViaMail } = req.body;
+    const { name, type, degree, mobile, email, address, discount, sendReportsViaWhatsApp, sendReportsViaMail } = req.body;
     const existing = await prisma.doctor.findUnique({ where: { id: parseInt(id) } });
     if (!existing) return res.status(404).json({ success: false, message: 'Doctor not found' });
     const doctor = await prisma.doctor.update({
@@ -1702,6 +1703,7 @@ export const updateDoctor = async (req, res) => {
         mobile: mobile !== undefined ? mobile : existing.mobile,
         email: email !== undefined ? email : existing.email,
         address: address !== undefined ? address : existing.address,
+        discount: discount !== undefined ? parseFloat(discount) : existing.discount,
         sendReportsViaWhatsApp: sendReportsViaWhatsApp !== undefined ? sendReportsViaWhatsApp : existing.sendReportsViaWhatsApp,
         sendReportsViaMail: sendReportsViaMail !== undefined ? sendReportsViaMail : existing.sendReportsViaMail,
       }

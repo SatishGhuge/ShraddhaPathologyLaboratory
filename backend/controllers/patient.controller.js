@@ -486,7 +486,8 @@ export const createPatient = async (req, res) => {
       let finalDiscountPercent = 0;
       
       if (parseFloat(discountPercent) > 0) {
-        finalDiscountAmount = totalTestCharges * (parseFloat(discountPercent) / 100);
+        // ✅ FIX: Round discount to nearest rupee for percentage discounts
+        finalDiscountAmount = Math.round(totalTestCharges * (parseFloat(discountPercent) / 100));
         finalDiscountPercent = parseFloat(discountPercent);
       } else if (parseFloat(discountAmount) > 0) {
         finalDiscountAmount = Math.round(parseFloat(discountAmount));
@@ -1403,7 +1404,10 @@ export const updatePayment = async (req, res) => {
     const payment       = parseFloat(paymentAmount)  || 0;
 
     const newPaidAmount    = existingPaid + payment;
-    const newBalanceAmount = Math.max(0, Math.round(totalAmount - discount - newPaidAmount));
+    // ✅ FIX: Use proper rounding to avoid 1 rupee remaining
+    // First calculate the net amount (after discount), then subtract payments
+    const netAmount = Math.round(totalAmount - discount);
+    const newBalanceAmount = Math.max(0, netAmount - newPaidAmount);
 
     // Update all rows for this visit
     await prisma.patientTest.updateMany({
@@ -1826,7 +1830,9 @@ export const addTestToVisit = async (req, res) => {
     const totalAmount = allTests.reduce((sum, t) => sum + (t.totalAmount || 0), 0);
     const paidAmount = existingTest.paidAmount || 0;
     const discountAmount = existingTest.discountAmount || 0;
-    const newBalanceAmount = Math.max(0, Math.round(totalAmount - discountAmount - paidAmount));
+    // ✅ FIX: Proper rounding to avoid 1 rupee remaining
+    const netAmount = Math.round(totalAmount - discountAmount);
+    const newBalanceAmount = Math.max(0, netAmount - paidAmount);
 
     // Update all tests with the new balance
     await prisma.patientTest.updateMany({
@@ -2051,10 +2057,16 @@ export const getTestsByVisitId = async (req, res) => {
       }
     });
 
-    // If VisitBill doesn't exist, create one from existing PatientTest data
-    if (!visitBill) {
-      console.log(`⚠️ VisitBill not found for visitId: ${visitId}, will calculate from PatientTest data`);
-    }
+    console.log('🔍 VisitBill fetched from DB:', {
+      visitId,
+      exists: !!visitBill,
+      grossAmount: visitBill?.grossAmount,
+      totalDiscount: visitBill?.totalDiscount,
+      totalPaid: visitBill?.totalPaid,
+      balanceAmount: visitBill?.balanceAmount,
+      status: visitBill?.status,
+      updatedAt: visitBill?.updatedAt
+    });
 
     // Find all ACTIVE (non-cancelled) tests for this visit
     // ✅ IMPORTANT: Exclude cancelled tests from display
