@@ -1,0 +1,266 @@
+================================================================================
+ABBOTT ARCHITECT i1000SR - LOCAL AGENT DEPLOYMENT GUIDE
+================================================================================
+
+PURPOSE:
+  Local agent runs on the lab computer connected to Abbott Architect i1000SR
+  Receives ASTM frames via TCP/IP port 5300
+  Caches results locally if VPS is down
+  Syncs results to backend VPS when available
+
+================================================================================
+STEP 1: HARDWARE SETUP
+================================================================================
+
+1. Identify the lab computer with Abbott Architect i1000SR
+2. Ensure TCP/IP networking is configured on the analyzer
+3. Note the IP address of the lab computer (where this agent will run)
+4. Ensure firewall allows TCP connections on port 5300
+
+================================================================================
+STEP 2: SOFTWARE INSTALLATION
+================================================================================
+
+1. Install Node.js v18+ on the lab computer
+   - Download from: https://nodejs.org/
+   - Verify: node --version
+
+2. Copy abbott-architect-local-agent folder to lab computer
+   - C:\Lab\agents\abbott-architect-local-agent\ (recommended path)
+
+3. Install dependencies:
+   cd C:\Lab\agents\abbott-architect-local-agent
+   npm install
+
+4. Ensure MySQL is accessible from lab computer
+   - Same computer: localhost:3306
+   - Network: check DB credentials in .env
+
+================================================================================
+STEP 3: CONFIGURATION
+================================================================================
+
+1. Create .env file (copy from .env.example):
+   
+   TCP_PORT=5300
+   TCP_HOST=0.0.0.0
+   DB_HOST=192.168.x.x        (or 'localhost' if MySQL on same computer)
+   DB_USER=root
+   DB_PASSWORD=root
+   DB_NAME=lab_agent_db
+   VPS_TAILSCALE_URL=http://your-vps-ip:3351
+
+2. Configure Abbott Analyzer:
+   - Set analyzer TCP/IP to point to: <lab-computer-ip>:5300
+   - Example: If lab computer is 192.168.1.100, set analyzer to 192.168.1.100:5300
+
+3. Test connectivity:
+   ping <lab-computer-ip>
+   telnet <lab-computer-ip> 5300  (should fail gracefully - agent not running yet)
+
+================================================================================
+STEP 4: DATABASE SETUP
+================================================================================
+
+1. Create lab_agent_db database (if not exists):
+   mysql -u root -p
+   CREATE DATABASE lab_agent_db;
+   USE lab_agent_db;
+
+2. Create pending_results table:
+   CREATE TABLE pending_results (
+     id INT AUTO_INCREMENT PRIMARY KEY,
+     sample_id VARCHAR(50),
+     visit_id VARCHAR(50),
+     machine_name VARCHAR(100),
+     raw_astm LONGTEXT,
+     data_json LONGTEXT,
+     status ENUM('PENDING', 'SYNCED', 'OFFLINE_QUEUED', 'FAILED') DEFAULT 'PENDING',
+     retry_count INT DEFAULT 0,
+     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+     synced_at TIMESTAMP NULL,
+     last_retry_at TIMESTAMP NULL,
+     error_message LONGTEXT,
+     INDEX(status),
+     INDEX(visit_id),
+     INDEX(sample_id)
+   );
+
+3. Verify connection:
+   mysql -u root -p -h 192.168.x.x lab_agent_db
+
+================================================================================
+STEP 5: STARTUP & TESTING
+================================================================================
+
+1. Start the local agent:
+   cd C:\Lab\agents\abbott-architect-local-agent
+   npm start
+
+   Expected output:
+   [TCP] ✓ Listening on port 5300 for Abbott Architect
+   [AGENT] ✓ Ready to accept connections
+
+2. Configure Abbott analyzer to send samples:
+   - Set analyzer query address: <lab-computer-ip>:5300
+   - Send a test sample through analyzer
+
+3. Monitor logs:
+   - Should see QUERY frame received
+   - Should see ORDER frame sent back
+   - Should see RESULT frames received
+   - Should see sync confirmation to VPS
+
+4. Check database:
+   SELECT * FROM pending_results;
+   (Should show SYNCED status records)
+
+================================================================================
+STEP 6: PRODUCTION DEPLOYMENT
+================================================================================
+
+Option A: Run as Background Service (Windows)
+-------------------------------------------
+1. Install NSSM (Non-Sucking Service Manager):
+   - Download: https://nssm.cc/
+   - Extract to: C:\nssm\
+
+2. Register as service:
+   C:\nssm\nssm.exe install AbbottArchitectAgent ^
+     C:\nodejs\node.exe ^
+     C:\Lab\agents\abbott-architect-local-agent\app.js
+
+3. Configure service:
+   C:\nssm\nssm.exe set AbbottArchitectAgent AppDirectory C:\Lab\agents\abbott-architect-local-agent
+   C:\nssm\nssm.exe set AbbottArchitectAgent AppStdout C:\Lab\logs\abbott-agent.log
+   C:\nssm\nssm.exe set AbbottArchitectAgent AppStderr C:\Lab\logs\abbott-agent.log
+
+4. Start service:
+   net start AbbottArchitectAgent
+   net stop AbbottArchitectAgent (to stop)
+
+Option B: Run as Task Scheduler Job
+-----------------------------------
+1. Create batch script: C:\Lab\start-abbott-agent.bat
+   @echo off
+   cd C:\Lab\agents\abbott-architect-local-agent
+   node app.js
+
+2. Open Task Scheduler
+3. Create Basic Task
+4. Set trigger: On Startup or On Schedule
+5. Set action: Run start-abbott-agent.bat
+
+Option C: Run Manually (Development)
+-----------------------------------
+1. Open Command Prompt or PowerShell
+2. cd C:\Lab\agents\abbott-architect-local-agent
+3. npm start
+4. Keep window open or redirect to log file
+
+================================================================================
+STEP 7: MONITORING & TROUBLESHOOTING
+================================================================================
+
+Log File Location:
+  Redirect output: npm start > C:\Lab\logs\abbott-agent.log 2>&1
+
+Common Issues:
+
+1. Port 5300 Already in Use
+   - Find process: netstat -ano | findstr :5300
+   - Kill process: taskkill /PID <PID> /F
+   - Change port in .env to different number (e.g., 5301)
+
+2. Database Connection Failed
+   - Check MySQL running: services.msc
+   - Verify credentials in .env
+   - Test connection: mysql -u root -p -h <DB_HOST> lab_agent_db
+
+3. VPS Unreachable
+   - Results are cached locally
+   - Check VPS_TAILSCALE_URL in .env
+   - Verify VPS is running: curl http://your-vps-ip:3351/api/health
+
+4. Analyzer Not Connecting
+   - Verify firewall allows port 5300 on lab computer
+   - Check analyzer network settings
+   - Ping lab computer from analyzer network: ping <lab-computer-ip>
+
+5. Results Not Syncing
+   - Check backend VPS is running
+   - Verify all test codes are configured in backend database
+   - Check parameter mappings (parameterCode must match what analyzer sends)
+
+================================================================================
+STEP 8: HEALTH CHECK
+================================================================================
+
+Daily Monitoring:
+
+1. Check service status:
+   net start | findstr AbbottArchitectAgent (if using service)
+
+2. Verify database:
+   SELECT status, COUNT(*) FROM pending_results GROUP BY status;
+   - Should see mostly SYNCED records
+   - If many OFFLINE_QUEUED: VPS is down
+
+3. Check logs for errors:
+   - OFFLINE_QUEUED with error messages = retrying
+   - FAILED status = manual intervention needed
+
+4. Test connectivity to VPS:
+   curl http://your-vps-ip:3351/api/health
+
+================================================================================
+STEP 9: SUPPORT & DIAGNOSTICS
+================================================================================
+
+Collect diagnostic info:
+
+1. Last 100 log lines:
+   tail -n 100 C:\Lab\logs\abbott-agent.log
+
+2. Database state:
+   SELECT * FROM pending_results ORDER BY id DESC LIMIT 20;
+
+3. Network connectivity:
+   ping <vps-ip>
+   telnet <lab-computer-ip> 5300
+
+4. System info:
+   node --version
+   npm --version
+   mysql --version
+
+Provide to support team with description of issue.
+
+================================================================================
+REFERENCE: ASTM PROTOCOL DETAILS
+================================================================================
+
+Frame Structure:
+  [STX][Content][ETX][Checksum]
+  0x02           0x03  2 hex digits
+
+Supported Record Types:
+  H = Header (machine identification)
+  Q = Query (barcode scan request)
+  O = Order (test order response)
+  R = Result (test result)
+  L = Terminator (end of transmission)
+
+Control Characters:
+  ENQ (0x05) = Start session
+  ACK (0x06) = Acknowledge
+  NAK (0x15) = Negative acknowledge
+  EOT (0x04) = End transmission
+
+Barcode Format:
+  VISITID-SAMPLETYPEID
+  Example: 202608200001-2
+
+================================================================================
+END OF DEPLOYMENT GUIDE
+================================================================================

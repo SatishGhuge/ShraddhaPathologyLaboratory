@@ -106,6 +106,13 @@ export const getUnits = async (page: number = 1, limit: number = 20): Promise<an
     pagination: r.pagination || { page, limit, total: 0, totalPages: 0, hasMore: false }
   };
 };
+
+// ✅ NEW: Get ALL units without pagination (for dropdown/select fields)
+export const getAllUnits = async (): Promise<any[]> => { 
+  const r = await apiCall(`/master/units?page=1&limit=1000`, { method: 'GET' }); 
+  return r.data || [];
+};
+
 export const getUnitById = async (id: string): Promise<any | null> => { const r = await apiCall(`/master/units/${id}`, { method: 'GET' }); return r.data || null; };
 export const createUnit = async (d: ApiData): Promise<any> => { const r = await apiCall('/master/units', { method: 'POST', body: JSON.stringify(d) }); return r.data || r; };
 export const updateUnit = async (id: string, d: ApiData): Promise<any> => { const r = await apiCall(`/master/units/${id}`, { method: 'PUT', body: JSON.stringify(d) }); return r.data || r; };

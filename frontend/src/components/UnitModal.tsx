@@ -78,7 +78,9 @@ export default function UnitModal({
         if (!response.ok) throw new Error("Failed to create unit");
 
         const newUnit = await response.json();
+        console.log('✅ New unit created:', newUnit);
         setSuccessMsg("Unit Added Successfully!");
+        // ✅ Pass the new unit data to the callback so it can be auto-selected
         onUnitAdded?.(newUnit.data || newUnit);
       }
 
