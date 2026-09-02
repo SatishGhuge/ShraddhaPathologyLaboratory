@@ -8,7 +8,7 @@ import PageHeader from "@/src/components/BreadCrumb";
 import UnitModal from "@/src/components/UnitModal";
 import { CKEditor } from "@ckeditor/ckeditor5-react";
 import ClassicEditor from "@ckeditor/ckeditor5-build-classic";
-import { getTestById, createTest, updateTest, getDepartments, getAllUnits, getTests, getSampleTypes } from "@/src/api/master.js";
+import { getTestById, createTest, updateTest, getDepartments, getAllUnits, getTests, getSampleTypes } from "@/src/api/master";
 import { getMachinesDropdown } from "@/src/api/machines";
 
 const baseInputClass =

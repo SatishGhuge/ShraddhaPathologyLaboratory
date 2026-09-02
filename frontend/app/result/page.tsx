@@ -255,23 +255,25 @@ export default function Result() {
     
     // Sort patient's records by date (ascending - oldest first)
     const sortedRecords = [...patientRecords].sort((a, b) => {
-      const dateA = new Date(a.order_date || a.visit_date || 0).getTime();
-      const dateB = new Date(b.order_date || b.visit_date || 0).getTime();
+      const dateA = new Date(a.order_date || a.visit_date || a.registration_date || 0).getTime();
+      const dateB = new Date(b.order_date || b.visit_date || b.registration_date || 0).getTime();
       return dateA - dateB;  // Ascending order (oldest first)
     });
     
     // Get the earliest (first) record
     const firstRecord = sortedRecords[0];
     
-    // Show "R" only if this patient record is NOT the first visit
-    const isRepeat = patient.patient_uid === firstRecord.patient_uid && 
-                     patient.visit_id !== firstRecord.visit_id;
+    // Show "R" only if this patient record is NOT the first (earliest) visit by DATE
+    // Compare by order_date/visit_date, not by visit_id
+    const currentDate = new Date(patient.order_date || patient.visit_date || patient.registration_date || 0).getTime();
+    const firstDate = new Date(firstRecord.order_date || firstRecord.visit_date || firstRecord.registration_date || 0).getTime();
+    const isRepeat = currentDate > firstDate;  // Only true if current date is AFTER first date
     
     // ✅ DEBUG: Log repeat patient detection
     if (isRepeat) {
-      console.log(`🔄 REPEAT PATIENT: "${patient.patient_name}" | Patient UID: ${patient.patient_uid} | This is visit #${patientRecords.length}`);
+      console.log(`🔄 REPEAT PATIENT: "${patient.patient_name}" | Patient UID: ${patient.patient_uid} | Current Date: ${new Date(currentDate).toLocaleDateString()} | First Date: ${new Date(firstDate).toLocaleDateString()}`);
     } else {
-      console.log(`✅ FIRST VISIT: "${patient.patient_name}" | Patient UID: ${patient.patient_uid}`);
+      console.log(`✅ FIRST VISIT: "${patient.patient_name}" | Patient UID: ${patient.patient_uid} | Date: ${new Date(currentDate).toLocaleDateString()}`);
     }
     
     return isRepeat;
@@ -501,6 +503,10 @@ export default function Result() {
                 switch (col.key) {
                   case 'visitId':
                     cellValue = patient.visit_id || '';
+                    // ✅ Add 'R' for repeat patients
+                    if (isRepeatPatientInResult(patient, sortedAndFilteredResults)) {
+                      cellValue += ' R';
+                    }
                     break;
                   case 'orgId':
                     cellValue = patient.organizationCode || patient.organizationId || '';
@@ -3663,7 +3669,15 @@ export default function Result() {
                             {/* Column 2: Visit ID (show only on first test row) */}
                             {selectedColumns.visitId && (
                               <td className="px-1 sm:px-2 py-0.25 text-[11px] border border-gray-300">
-                                {testIndex === 0 ? patient.visit_id : ''}
+                                {testIndex === 0 ? (
+                                  <span className="flex items-center gap-1">
+                                    <span className="font-medium">{patient.visit_id}</span>
+                                    {/* ✅ Show 'R' badge for repeat patients on Visit ID */}
+                                    {isRepeatPatientInResult(patient, sortedAndFilteredResults) && (
+                                      <span className="text-blue-600 font-bold text-sm" title="Repeat Patient - Has previous test reports">R</span>
+                                    )}
+                                  </span>
+                                ) : ''}
                               </td>
                             )}
 
