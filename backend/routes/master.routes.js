@@ -17,6 +17,8 @@ import {
   getUsers, getUserById, createUser, updateUser, deleteUser,
   exportTests,
   importTests,
+  exportDoctors,
+  importDoctors,
   updateTestParameter,
   deleteTestParameter,
 } from '../controllers/master.controller.js';
@@ -54,6 +56,8 @@ router.delete('/departments/:id', deleteDepartment);
 
 // Doctor routes
 router.get('/doctors', getDoctors);
+router.get('/doctors/export', exportDoctors);
+router.post('/doctors/import', excelUpload.single('file'), importDoctors);
 router.get('/doctors/find-duplicates', findDuplicateDoctors);
 router.post('/doctors/merge', mergeDoctors);
 router.get('/doctors/:id', getDoctorById);
