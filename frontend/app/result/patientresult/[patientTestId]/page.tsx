@@ -2284,10 +2284,10 @@ const PatientResult = () => {
                         const isFormula = param.hasFormula && param.formula;
                         const inputClass = outOfRange ? "border-2 border-red-500 bg-red-50 px-2 py-1 w-24 rounded" : "border border-gray-300 px-2 py-1 w-24 rounded";
                         return (
-                          <tr key={param.id} className="bg-purple-100">
+                          <tr key={param.id} className={`${param.isDescriptive ? 'bg-purple-100 h-auto' : 'bg-purple-100'}`}>
                             <td className="border p-2">{renderStyledText((param.parameterName || '').toUpperCase(), false)}{param.isMandatory && <span className="text-red-500">*</span>}</td>
-                            <td className="border p-2" colSpan={param.type === 'Text' && !param.isDescriptive ? 3 : undefined}>
-                              <div className={`${param.type === 'Text' && !param.isDescriptive ? 'w-full flex flex-col' : 'flex items-center gap-2'}`}>
+                            <td className={`border p-2 ${param.isDescriptive ? 'p-0 py-1' : ''}`} colSpan={param.type === 'Text' && !param.isDescriptive && param.rangeText?.trim() ? 3 : undefined}>
+                              <div className={`${param.type === 'Text' && !param.isDescriptive && param.rangeText?.trim() ? 'w-full flex flex-col' : param.isDescriptive ? 'flex items-center gap-0' : 'flex items-center gap-2'}`} style={param.isDescriptive ? { margin: 0, padding: 0 } : {}}>
                                 {isFormula ? (
                                   <div className="flex items-center gap-1">
                                     {editingFormulaFields.has(param.id) ? (
@@ -2446,6 +2446,38 @@ const PatientResult = () => {
                                       return formatMultiLineText(param.textContent);
                                     } else {
                                       return formatMultiLineText(rangeValue);
+                                    }
+                                  })()}
+                                </td>
+                              </>
+                            )}
+                            {(param.type === 'Text' || param.isDescriptive) && !param.isDescriptive && (
+                              <>
+                                <td className="border p-2 text-xs"></td>
+                                <td className="border p-2 text-xs whitespace-pre-wrap break-words">
+                                  {(() => {
+                                    const hasTextContent = !!param.textContent && param.textContent.trim() !== '';
+                                    
+                                    if (hasTextContent) {
+                                      return formatMultiLineText(param.textContent);
+                                    } else {
+                                      return '-';
+                                    }
+                                  })()}
+                                </td>
+                              </>
+                            )}
+                            {param.isDescriptive && (
+                              <>
+                                <td className="border p-2 text-xs"></td>
+                                <td className="border p-2 text-xs whitespace-pre-wrap break-words">
+                                  {(() => {
+                                    const hasTextContent = !!param.textContent && param.textContent.trim() !== '';
+                                    
+                                    if (hasTextContent) {
+                                      return formatMultiLineText(param.textContent);
+                                    } else {
+                                      return '-';
                                     }
                                   })()}
                                 </td>
