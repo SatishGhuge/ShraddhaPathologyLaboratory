@@ -8,7 +8,7 @@ import PageHeader from "@/src/components/BreadCrumb";
 import UnitModal from "@/src/components/UnitModal";
 import { CKEditor } from "@ckeditor/ckeditor5-react";
 import ClassicEditor from "@ckeditor/ckeditor5-build-classic";
-import { getTestById, createTest, updateTest, getDepartments, getUnits, getAllUnits, getTests, getSampleTypes } from "@/src/api/master";
+import { getTestById, createTest, updateTest, getDepartments, getAllUnits, getTests, getSampleTypes } from "@/src/api/master";
 import { getMachinesDropdown } from "@/src/api/machines";
 
 const baseInputClass =
@@ -21,14 +21,12 @@ const AddTest = () => {
   
   // Determine mode based on route - more robust detection
   const isEditMode = pathname.toLowerCase().includes('/edit/') || pathname.toLowerCase().includes('/edit');
-  const isViewMode = pathname.toLowerCase().includes('/view/') || pathname.toLowerCase().includes('/view');
-  const isAddMode = !isEditMode && !isViewMode;
+  const isAddMode = !isEditMode;
 
   console.log('🔍 Mode Detection:', {
     pathname: location.pathname,
     isAddMode,
     isEditMode,
-    isViewMode,
     id
   });
 
@@ -63,6 +61,7 @@ const AddTest = () => {
   /* ================= LOADING & ERROR STATE ================= */
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<any>(null);
+  const [successMsg, setSuccessMsg] = useState("");
   const [departments, setDepartments] = useState<any[]>([]);
   const [units, setUnits] = useState<any[]>([]);
   const [sampleTypes, setSampleTypes] = useState<any[]>([]);
@@ -137,36 +136,48 @@ const AddTest = () => {
 
   const applyParamSuggestion = (catIdx: any, paramIdx: any, suggestion: any) => {
     const key = `${catIdx}-${paramIdx}`;
-    const updatedCategories = [...categories];
-    const p = updatedCategories[catIdx].parameters[paramIdx];
-    // ✅ NEW: Store the existing parameter ID to link to it instead of creating new
-    p.id              = suggestion.id || undefined;  // Link to existing parameter if ID exists
-    p.parameterName   = (suggestion.parameterName || '').toUpperCase();
-    p.machineCode     = suggestion.machineCode || '';
-    p.multiplyBy      = suggestion.multiplyBy || '';
-    p.decimal         = suggestion.decimal?.toString() || '';
-    p.type            = suggestion.type || 'Numeric';
-    p.rangeType       = suggestion.rangeType || 'BySex';
-    p.unitId          = suggestion.unitId?.toString() || '';
-    p.unit            = suggestion.unit || null;
-    p.displayRangeText= suggestion.displayRangeText || '';
-    p.rangeText       = suggestion.rangeText || '';
-    p.textContent     = suggestion.textContent || '';
-    p.maleDisplayText = suggestion.maleDisplayText || '';
-    p.femaleDisplayText = suggestion.femaleDisplayText || '';
-    p.defaultDisplayText = suggestion.defaultDisplayText || '';
-    p.isMultipleOptions = suggestion.isMultipleOptions || false;
-    p.isDescriptive   = suggestion.isDescriptive || false;
-    p.lowPanic        = suggestion.lowPanic?.toString() || '';
-    p.highPanic       = suggestion.highPanic?.toString() || '';
-    p.isNABL          = suggestion.isNABL || false;
-    p.isMandatory     = suggestion.isMandatory || false;
-    p.hasFormula      = suggestion.hasFormula || false;
-    p.formula         = suggestion.formula || '';
-    p.parameterCode   = suggestion.parameterCode || '';
-    if (suggestion.normalRanges?.length) p.normalRanges = suggestion.normalRanges;
-    if (suggestion.ageRanges?.length)    p.ageRanges    = suggestion.ageRanges;
-    if (suggestion.rangeValues?.length)  p.rangeValues  = suggestion.rangeValues;
+    const updatedCategories = categories.map((category, cIdx) =>
+      cIdx === catIdx
+        ? {
+            ...category,
+            parameters: category.parameters.map((param, pIdx) =>
+              pIdx === paramIdx
+                ? {
+                    ...param,
+                    id: suggestion.id || undefined,
+                    parameterName: (suggestion.parameterName || '').toUpperCase(),
+                    machineCode: suggestion.machineCode || '',
+                    multiplyBy: suggestion.multiplyBy || '',
+                    decimal: suggestion.decimal?.toString() || '',
+                    type: suggestion.type || 'Numeric',
+                    rangeType: suggestion.rangeType || 'BySex',
+                    unitId: suggestion.unitId?.toString() || '',
+                    unit: suggestion.unit || null,
+                    displayRangeText: suggestion.displayRangeText || '',
+                    rangeText: suggestion.rangeText || '',
+                    textContent: suggestion.textContent || '',
+                    maleDisplayText: suggestion.maleDisplayText || '',
+                    femaleDisplayText: suggestion.femaleDisplayText || '',
+                    defaultDisplayText: suggestion.defaultDisplayText || '',
+                    isMultipleOptions: suggestion.isMultipleOptions || false,
+                    isDescriptive: suggestion.isDescriptive || false,
+                    descriptiveText: suggestion.descriptiveText || '',
+                    lowPanic: suggestion.lowPanic?.toString() || '',
+                    highPanic: suggestion.highPanic?.toString() || '',
+                    isNABL: suggestion.isNABL || false,
+                    isMandatory: suggestion.isMandatory || false,
+                    hasFormula: suggestion.hasFormula || false,
+                    formula: suggestion.formula || '',
+                    parameterCode: suggestion.parameterCode || '',
+                    normalRanges: suggestion.normalRanges?.length ? suggestion.normalRanges : param.normalRanges,
+                    ageRanges: suggestion.ageRanges?.length ? suggestion.ageRanges : param.ageRanges,
+                    rangeValues: suggestion.rangeValues?.length ? suggestion.rangeValues : param.rangeValues
+                  }
+                : param
+            )
+          }
+        : category
+    );
     setCategories(updatedCategories);
     setParamSuggestionsOpen(prev => ({ ...prev, [key]: false }));
     setParamSuggestions(prev => ({ ...prev, [key]: [] }));
@@ -204,6 +215,7 @@ const AddTest = () => {
       sortOrder: "",
       testMethod: "",
       isDescriptive: false,
+      descriptiveText: "",
       lowPanic: "",
       highPanic: "",
       isNABL: false,
@@ -269,10 +281,9 @@ const AddTest = () => {
     const fetchUnits = async () => {
       try {
         console.log("📡 Fetching units from API...");
-        const unitsResponse = await getAllUnits();
-        console.log("✅ Units loaded:", unitsResponse);
-        // getAllUnits returns array directly
-        setUnits(unitsResponse);
+        const unitsData = await getAllUnits();
+        console.log("✅ Units loaded:", unitsData);
+        setUnits(unitsData);
       } catch (err) {
         console.error('❌ Error fetching units:', err);
         console.error('Units error details:', {
@@ -342,11 +353,10 @@ const AddTest = () => {
   // Load test data for edit/view mode
   useEffect(() => {
     const fetchTestData = async () => {
-      if ((isEditMode || isViewMode) && id) {
+      if (isEditMode && id) {
         console.log('🔍 Edit Mode Detected!');
         console.log('Test ID:', id);
         console.log('Is Edit Mode:', isEditMode);
-        console.log('Is View Mode:', isViewMode);
         
         try {
           setLoading(true);
@@ -458,6 +468,7 @@ const AddTest = () => {
                           sortOrder: param.sortOrder ? param.sortOrder.toString() : "",
                           testMethod: param.testMethod || "",
                           isDescriptive: param.isDescriptive || false,
+                          descriptiveText: param.descriptiveText || "",
                           lowPanic: param.lowPanic?.toString() || "",
                           highPanic: param.highPanic?.toString() || "",
                           isNABL: param.isNABL || false,
@@ -604,14 +615,13 @@ const AddTest = () => {
       } else {
         console.log('ℹ️ Not in edit/view mode or no ID');
         console.log('Is Edit Mode:', isEditMode);
-        console.log('Is View Mode:', isViewMode);
         console.log('ID:', id);
         setDataLoaded(true);
       }
     };
     
     fetchTestData();
-  }, [id, isEditMode, isViewMode]);
+  }, [id, isEditMode]);
 
   // Resolve test names after tests are loaded
   useEffect(() => {
@@ -740,10 +750,21 @@ const AddTest = () => {
   };
 
   const handleParameterChange = (categoryIndex, parameterIndex, field, value) => {
-    const updatedCategories = [...categories];
     // Convert testMethod and parameterName to uppercase
     const finalValue = (field === 'testMethod' || field === 'parameterName') ? (value || '').toUpperCase() : value;
-    updatedCategories[categoryIndex].parameters[parameterIndex][field] = finalValue;
+    
+    const updatedCategories = categories.map((category, cIdx) => 
+      cIdx === categoryIndex
+        ? {
+            ...category,
+            parameters: category.parameters.map((param, pIdx) =>
+              pIdx === parameterIndex
+                ? { ...param, [field]: finalValue }
+                : param
+            )
+          }
+        : category
+    );
     
     // If range type is changed, ensure proper initialization
     if (field === 'rangeType') {
@@ -781,6 +802,7 @@ const AddTest = () => {
       sortOrder: "",
       testMethod: "",
       isDescriptive: false,
+      descriptiveText: "",
       lowPanic: "",
       highPanic: "",
       isNABL: false,
@@ -834,6 +856,7 @@ const AddTest = () => {
         sortOrder: "",
         testMethod: "",
         isDescriptive: false,
+        descriptiveText: "",
         lowPanic: "",
         highPanic: "",
         isNABL: false,
@@ -1033,6 +1056,7 @@ const AddTest = () => {
           sortOrder: param.sortOrder ? parseInt(param.sortOrder) : null,
           testMethod: param.testMethod || null,
           isDescriptive: param.isDescriptive || false,
+          descriptiveText: param.descriptiveText || null,
           lowPanic: param.lowPanic ? parseFloat(param.lowPanic) : null,
           highPanic: param.highPanic ? parseFloat(param.highPanic) : null,
           isNABL: param.isNABL || false,
@@ -1119,12 +1143,19 @@ const AddTest = () => {
         console.log("🆕 Creating new test...");
         const response = await createTest(completeTestData);
         console.log("✅ Test created successfully:", response);
-        router.push("/master/testlist");
+        const testId = response.id || response._id;
+        setSuccessMsg(`✅ Test created successfully!`);
+        setTimeout(() => {
+          router.push("/master/testlist");
+        }, 2000);
       } else if (isEditMode) {
         console.log("✏️ Updating existing test with ID:", id);
         const response = await updateTest((Array.isArray(id) ? id[0] : id) as string, completeTestData);
         console.log("✅ Test updated successfully:", response);
-        router.push("/master/testlist");
+        setSuccessMsg(`✅ Test updated successfully!`);
+        setTimeout(() => {
+          router.push("/master/testlist");
+        }, 2000);
       }
     } catch (err) {
       console.error("❌ Error saving test:", err);
@@ -1136,14 +1167,18 @@ const AddTest = () => {
       });
       
       let errorMessage = "Failed to save test";
-      if (err.response?.data?.message) {
-        errorMessage += ": " + err.response.data.message;
+      
+      // Check for duplicate test error
+      if (err.response?.data?.message && err.response.data.message.includes('already exists')) {
+        errorMessage = "⚠️ A test with this name already exists in this department. Please use a different name or select a different department.";
+      } else if (err.response?.data?.message) {
+        errorMessage = err.response.data.message;
       } else if (err.message) {
-        errorMessage += ": " + err.message;
+        errorMessage = err.message;
       }
       
       setError(errorMessage);
-      alert(`❌ ${errorMessage}\n\nPlease check the console for more details.`);
+      // Don't show alert - let the UI display the error message
     } finally {
       setLoading(false);
     }
@@ -1154,7 +1189,7 @@ const AddTest = () => {
   };
 
   // Show loading spinner while data is being fetched
-  if ((isEditMode || isViewMode) && !dataLoaded) {
+  if (isEditMode && !dataLoaded) {
     return (
       <>
         <Header />
@@ -1186,14 +1221,14 @@ const AddTest = () => {
 
        <div className="p-3 sm:p-4 md:p-6 bg-white min-h-screen">
         {/* TOP BAR */}
-        {isEditMode || isViewMode ? (
+        {isEditMode ? (
           <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-3 bg-white border rounded shadow-sm p-3 gap-3">
             <h2 className="text-base sm:text-lg font-semibold text-slate-800">
-              {isViewMode ? `View Test - ID: ${id}` : `Edit Test - ID: ${id}`}
+              {`Edit Test - ID: ${id}`}
             </h2>
             
             <div className="flex flex-wrap items-center gap-2 sm:gap-3 w-full lg:w-auto">
-              {!isViewMode && (
+              {(
                 <button
                   onClick={handlePreview}
                   className="bg-orange-500 text-white px-3 sm:px-4 py-1.5 rounded text-xs sm:text-sm hover:bg-orange-600 transition-colors"
@@ -1239,7 +1274,7 @@ const AddTest = () => {
                     value={formData.name}
                     onChange={handleChange}
                     required 
-                    disabled={isViewMode}
+                    
                     style={{ textTransform: 'uppercase' }}
                   />
                   <Select 
@@ -1252,7 +1287,7 @@ const AddTest = () => {
                       label: dept.name
                     }))}
                     required 
-                    disabled={isViewMode} 
+                     
                   />
 
                   <Input 
@@ -1270,7 +1305,7 @@ const AddTest = () => {
                     name="shortName"
                     value={formData.shortName}
                     onChange={handleChange}
-                    disabled={isViewMode}
+                    
                     required={false}
                   />
 
@@ -1279,7 +1314,7 @@ const AddTest = () => {
                     name="attachFile" 
                     checked={formData.attachFile}
                     onChange={handleChange}
-                    disabled={isViewMode} 
+                     
                   />
 
                   {/* Image size field — only when Attach File = true */}
@@ -1294,7 +1329,7 @@ const AddTest = () => {
                         name="imageSize"
                         value={formData.imageSize || ''}
                         onChange={handleChange}
-                        disabled={isViewMode}
+                        
                       required={false}/>
                     </div>
                   )}
@@ -1305,7 +1340,7 @@ const AddTest = () => {
                       name="preparationTime"
                       value={formData.preparationTime}
                       onChange={handleChange}
-                      disabled={isViewMode}
+                      
                       required={false}
                     />
                     <Select 
@@ -1314,7 +1349,7 @@ const AddTest = () => {
                       value={formData.preparationType}
                       onChange={handleChange}
                       options={["Hours", "Days", "Minutes"]}
-                      disabled={isViewMode}
+                      
                       required={false}
                     />
                   </div>
@@ -1326,7 +1361,7 @@ const AddTest = () => {
                       name="isNABL"
                       checked={formData.isNABL}
                       onChange={handleChange}
-                      disabled={isViewMode} 
+                       
                     />
                     <div className="flex items-center gap-2">
                       <label className="font-semibold text-gray-700 text-xs sm:text-sm">
@@ -1339,7 +1374,7 @@ const AddTest = () => {
                         value={formData.lineHeight}
                         onChange={handleChange}
                         className="w-20 px-2 py-1.5 sm:py-1 border border-gray-300 rounded text-xs sm:text-sm bg-white" 
-                        disabled={isViewMode} 
+                         
                       required={false}/>
                     </div>
                   </div>
@@ -1351,7 +1386,7 @@ const AddTest = () => {
                       name="instructionPreparation"
                       value={formData.instructionPreparation}
                       onChange={handleChange}
-                      disabled={isViewMode}
+                      
                       required={false}
                     />
                     <Input 
@@ -1359,7 +1394,7 @@ const AddTest = () => {
                       name="instructionPatient"
                       value={formData.instructionPatient}
                       onChange={handleChange}
-                      disabled={isViewMode}
+                      
                       required={false}
                     />
                   </div>
@@ -1373,7 +1408,7 @@ const AddTest = () => {
                     name="profileTest" 
                     checked={formData.profileTest}
                     onChange={handleChange}
-                    disabled={isViewMode} 
+                     
                   />
 
                   {/* Test to add - Only show when Profile Test is true */}
@@ -1386,7 +1421,7 @@ const AddTest = () => {
                         {selectedTestsToAdd.map(t => (
                           <span key={t.id} className="flex items-center gap-0.5 bg-orange-200 text-orange-900 text-xs px-1.5 py-0.5 rounded-full whitespace-nowrap">
                             {t.name || `Test #${t.id}`}
-                            {!isViewMode && (
+                            {(
                               <button
                                 type="button"
                                 onClick={() => setSelectedTestsToAdd(prev => prev.filter(x => x.id !== t.id))}
@@ -1396,7 +1431,7 @@ const AddTest = () => {
                           </span>
                         ))}
                         {/* Inline select — grows to fill remaining space */}
-                        {!isViewMode && (
+                        {(
                           <select
                             value=""
                             onChange={(e) => {
@@ -1430,7 +1465,7 @@ const AddTest = () => {
                     name="reportHeader"
                     value={formData.reportHeader}
                     onChange={handleChange}
-                    disabled={isViewMode}
+                    
                     required={false}
                   />
                   {/* Sample Type - Custom dropdown with colored test tube */}
@@ -1438,7 +1473,7 @@ const AddTest = () => {
                     <label className="font-semibold text-gray-700 text-xs sm:text-sm">Sample Type</label>
                     <button
                       type="button"
-                      disabled={isViewMode}
+                      
                       onClick={() => setShowSampleTypeDropdown(v => !v)}
                       className="w-full px-2 py-1.5 border border-gray-300 rounded text-xs sm:text-sm bg-white focus:outline-none focus:ring-2 focus:ring-orange-500 disabled:bg-gray-100 disabled:cursor-not-allowed text-left flex items-center gap-2"
                     >
@@ -1455,7 +1490,7 @@ const AddTest = () => {
                         <span className="text-gray-400">Please Select</span>
                       )}
                     </button>
-                    {showSampleTypeDropdown && !isViewMode && (
+                    {showSampleTypeDropdown && (
                       <div className="absolute z-50 top-full left-0 right-0 bg-white border border-gray-300 rounded shadow-lg mt-1 max-h-48 overflow-y-auto">
                         <div
                           className="px-3 py-2 text-xs text-gray-400 hover:bg-gray-50 cursor-pointer border-b"
@@ -1494,7 +1529,7 @@ const AddTest = () => {
                       {selectedMachines.map(m => (
                         <span key={m.id} className="flex items-center gap-0.5 bg-blue-200 text-blue-900 text-xs px-1.5 py-0.5 rounded-full whitespace-nowrap">
                           {m.name}
-                          {!isViewMode && (
+                          {(
                             <button
                               type="button"
                               onClick={() => setSelectedMachines(prev => prev.filter(x => x.id !== m.id))}
@@ -1504,7 +1539,7 @@ const AddTest = () => {
                         </span>
                       ))}
                       {/* Inline select — grows to fill remaining space */}
-                      {!isViewMode && (
+                      {(
                         <select
                           value=""
                           onChange={(e) => {
@@ -1536,14 +1571,14 @@ const AddTest = () => {
                     name="isHeader"
                     checked={formData.isHeader}
                     onChange={handleChange}
-                    disabled={isViewMode} 
+                     
                   />
                   <Checkbox 
                     label="Show Test Name" 
                     name="showTestName"
                     checked={formData.showTestName}
                     onChange={handleChange}
-                    disabled={isViewMode} 
+                     
                   />
 
                   <Select 
@@ -1552,7 +1587,7 @@ const AddTest = () => {
                     value={formData.outsourceLab}
                     onChange={handleChange}
                     options={["Lab A", "Lab B", "Lab C"]}
-                    disabled={isViewMode}
+                    
                     required={false}
                   />
 
@@ -1562,7 +1597,7 @@ const AddTest = () => {
                       name="testCode"
                       value={formData.testCode}
                       onChange={handleChange}
-                      disabled={isViewMode}
+                      
                       required={false}
                     />
                   </div>
@@ -1583,7 +1618,7 @@ const AddTest = () => {
                   name="interpretationLabel"
                   value={formData.interpretationLabel}
                   onChange={handleChange}
-                  disabled={isViewMode}
+                  
                   required={false}
                 />
                 
@@ -1593,7 +1628,7 @@ const AddTest = () => {
                     <label className="font-semibold text-gray-700 text-xs sm:text-sm">
                       Interpretation
                     </label>
-                    {!isViewMode && (
+                    {(
                       <div className="flex gap-2">
                         <button
                           type="button"
@@ -1653,7 +1688,7 @@ const AddTest = () => {
                       </div>
                     )}
                   </div>
-                  {!isViewMode ? (
+                  {(
                     <div id="interpretation-editor" className="border border-gray-300 rounded bg-white p-2 min-h-[400px]">
                       {editorLoaded ? (
                         <CKEditor
@@ -1721,11 +1756,6 @@ const AddTest = () => {
                         </div>
                       )}
                     </div>
-                  ) : (
-                    <div 
-                      className="w-full px-3 py-1.5 border border-gray-300 rounded h-96 overflow-y-auto bg-gray-100 text-xs sm:text-sm"
-                      dangerouslySetInnerHTML={{ __html: formData.interpretation }}
-                    />
                   )}
                 </div>
               </div>
@@ -1743,7 +1773,7 @@ const AddTest = () => {
                 Category {categoryIndex + 1}{category.isCategory && category.name ? `: ${category.name.toUpperCase()}` : ''}
               </span>
 
-              {categories.length > 1 && !isViewMode && (
+              {categories.length > 1 && (
                 <button
                   onClick={() => deleteCategory(categoryIndex)}
                   className="bg-red-600 text-white px-3 py-1 rounded hover:bg-red-700 transition-colors text-xs flex items-center gap-1"
@@ -1766,7 +1796,7 @@ const AddTest = () => {
                       className="w-4 h-4" 
                       checked={category.isCategory || false}
                       onChange={(e) => handleCategoryChange(categoryIndex, 'isCategory', e.target.checked)}
-                      disabled={isViewMode} 
+                       
                     />
                     <span className="text-xs sm:text-sm">Is Category?</span>
                   </label>
@@ -1786,10 +1816,10 @@ const AddTest = () => {
                             placeholder="Category name..."
                             value={category.name || ""}
                             onChange={(e) => handleCategoryChange(categoryIndex, 'name', e.target.value)}
-                            disabled={isViewMode} 
+                             
                           />
                           {/* Formatting Buttons - Below Input */}
-                          {!isViewMode && (
+                          {(
                             <div className="flex gap-1">
                               {/* Bold Button */}
                               <button
@@ -1881,9 +1911,9 @@ const AddTest = () => {
                           placeholder="Category test method..." 
                           value={category.testMethod || ""}
                           onChange={(e) => handleCategoryChange(categoryIndex, 'testMethod', e.target.value)}
-                          disabled={isViewMode} 
+                           
                         />
-                        {!isViewMode && (
+                        {(
                           <div className="flex gap-1 mt-1">
                             {/* Bold Button */}
                             <button
@@ -1965,7 +1995,7 @@ const AddTest = () => {
                           type="number"
                           value={category.sortOrder || ""}
                           onChange={(e) => handleCategoryChange(categoryIndex, 'sortOrder', e.target.value)}
-                          disabled={isViewMode} 
+                           
                         />
                       </div>
                     </div>
@@ -1976,7 +2006,7 @@ const AddTest = () => {
                 <div className="flex-1 space-y-3">
                   <div className="flex justify-between items-center mb-4">
                     <h3 className="font-semibold text-gray-700 text-xs sm:text-sm">Parameters</h3>
-                    {!isViewMode && (
+                    {(
                       <button
                         onClick={() => addParameter(categoryIndex)}
                         className="bg-green-600 text-white px-3 py-1 rounded text-xs hover:bg-green-700 transition-colors"
@@ -1995,7 +2025,7 @@ const AddTest = () => {
                         </h4>
                         <div className="flex items-center gap-2">
                           {/* Delete Parameter Button */}
-                          {category.parameters.length > 1 && !isViewMode && (
+                          {category.parameters.length > 1 && (
                             <button
                               onClick={() => deleteParameter(categoryIndex, paramIndex)}
                               className="text-red-600 text-xs hover:underline bg-red-50 px-2 py-1 rounded border border-red-200"
@@ -2009,7 +2039,7 @@ const AddTest = () => {
                               className="px-2 py-1.5 sm:py-1 border border-gray-300 rounded text-xs sm:text-sm w-32 bg-white focus:outline-none focus:ring-2 focus:ring-orange-500" 
                               value={parameter.unitId || ""}
                               onChange={(e) => handleParameterChange(categoryIndex, paramIndex, 'unitId', e.target.value)}
-                              disabled={isViewMode}
+                              
                               title="Select unit - linked to Unit column in preview table"
                             >
                               <option value="">Select Unit 🔗</option>
@@ -2019,7 +2049,7 @@ const AddTest = () => {
                                 </option>
                               ))}
                             </select>
-                            {!isViewMode && (
+                            {(
                               <button
                                 onClick={() => openAddUnitModal(categoryIndex, paramIndex)}
                                 type="button"
@@ -2048,7 +2078,7 @@ const AddTest = () => {
                                 setTimeout(() => setParamSuggestionsOpen(prev => ({ ...prev, [key]: false })), 150);
                               }}
                               autoComplete="off"
-                              disabled={isViewMode} 
+                               
                             />
                             {/* Autocomplete dropdown */}
                             {paramSuggestionsOpen[`${categoryIndex}-${paramIndex}`] && (
@@ -2067,7 +2097,7 @@ const AddTest = () => {
                               </ul>
                             )}
                           </div>
-                          {!isViewMode && (
+                          {(
                             <div className="flex gap-1">
                               {/* Bold Button */}
                               <button
@@ -2144,7 +2174,7 @@ const AddTest = () => {
                           placeholder="Parameter Code *" 
                           value={parameter.parameterCode || ""}
                           onChange={(e) => handleParameterChange(categoryIndex, paramIndex, 'parameterCode', e.target.value)}
-                          disabled={isViewMode}
+                          
                           title="Machine parameter code for test mapping (e.g., WBC, HGB, PLT)"
                         />
                         <input 
@@ -2153,7 +2183,7 @@ const AddTest = () => {
                           type="text"
                           value={parameter.multiplyBy || ""}
                           onChange={(e) => handleParameterChange(categoryIndex, paramIndex, 'multiplyBy', e.target.value)}
-                          disabled={isViewMode} 
+                           
                         />
                         <input 
                           className="px-2 py-1.5 sm:py-1 border border-gray-300 rounded text-xs sm:text-sm w-full sm:w-20" 
@@ -2161,7 +2191,7 @@ const AddTest = () => {
                           type="text"
                           value={parameter.decimal !== undefined && parameter.decimal !== "" ? parameter.decimal : ""}
                           onChange={(e) => handleParameterChange(categoryIndex, paramIndex, 'decimal', e.target.value)}
-                          disabled={isViewMode} 
+                           
                         />
                         <input 
                           className="px-2 py-1.5 sm:py-1 border border-gray-300 rounded text-xs sm:text-sm w-full sm:w-24" 
@@ -2169,7 +2199,7 @@ const AddTest = () => {
                           type="number"
                           value={parameter.sortOrder !== undefined && parameter.sortOrder !== "" ? parameter.sortOrder : ""}
                           onChange={(e) => handleParameterChange(categoryIndex, paramIndex, 'sortOrder', e.target.value)}
-                          disabled={isViewMode} 
+                           
                         />
                         
                         
@@ -2179,10 +2209,123 @@ const AddTest = () => {
                             className="w-4 h-4" 
                             checked={parameter.isDescriptive || false}
                             onChange={(e) => handleParameterChange(categoryIndex, paramIndex, 'isDescriptive', e.target.checked)}
-                            disabled={isViewMode} 
+                             
                           />
                           <span className="text-xs sm:text-sm">Is Descriptive</span>
                         </label>
+                        {parameter.isDescriptive && (
+                          <div className="col-span-full mt-3 p-3 border border-green-300 rounded-lg bg-green-50">
+                            <div className="flex justify-between items-center mb-2">
+                              <label className="font-semibold text-gray-700 text-sm">
+                                Descriptive Text
+                              </label>
+                              <small className="text-gray-500">Will display below parameter results</small>
+                            </div>
+                            {editorLoaded && (
+                              <div className="border border-gray-300 rounded">
+                                <div className="flex justify-between items-center bg-gray-50 px-3 py-2 border-b border-gray-300">
+                                  <span className="text-sm font-medium text-gray-700">Rich Text Editor</span>
+                                  <div className="flex gap-2">
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        const editorContainer = document.querySelector(`#desc-editor-${categoryIndex}-${paramIndex}`) as HTMLElement;
+                                        const expandBtn = document.querySelector(`#desc-expand-btn-${categoryIndex}-${paramIndex}`) as HTMLElement;
+                                        const minimizeBtn = document.querySelector(`#desc-minimize-btn-${categoryIndex}-${paramIndex}`) as HTMLElement;
+                                        
+                                        if (editorContainer) {
+                                          editorContainer.classList.add('expanded');
+                                          editorContainer.style.position = 'fixed';
+                                          editorContainer.style.zIndex = '9999';
+                                          editorContainer.style.top = '0';
+                                          editorContainer.style.left = '0';
+                                          editorContainer.style.width = '100vw';
+                                          editorContainer.style.height = '100vh';
+                                          editorContainer.style.backgroundColor = 'white';
+                                          editorContainer.style.padding = '20px';
+                                          
+                                          if (expandBtn) expandBtn.style.display = 'none';
+                                          if (minimizeBtn) minimizeBtn.style.display = 'block';
+                                        }
+                                      }}
+                                      id={`desc-expand-btn-${categoryIndex}-${paramIndex}`}
+                                      className="px-3 py-1 bg-orange-500 text-white text-xs rounded hover:bg-orange-600 focus:outline-none"
+                                    >
+                                      ⛶ Expand
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        const editorContainer = document.querySelector(`#desc-editor-${categoryIndex}-${paramIndex}`) as HTMLElement;
+                                        const expandBtn = document.querySelector(`#desc-expand-btn-${categoryIndex}-${paramIndex}`) as HTMLElement;
+                                        const minimizeBtn = document.querySelector(`#desc-minimize-btn-${categoryIndex}-${paramIndex}`) as HTMLElement;
+                                        
+                                        if (editorContainer) {
+                                          editorContainer.classList.remove('expanded');
+                                          editorContainer.style.position = 'relative';
+                                          editorContainer.style.zIndex = 'auto';
+                                          editorContainer.style.top = 'auto';
+                                          editorContainer.style.left = 'auto';
+                                          editorContainer.style.width = 'auto';
+                                          editorContainer.style.height = 'auto';
+                                          editorContainer.style.backgroundColor = 'transparent';
+                                          editorContainer.style.padding = '0';
+                                          
+                                          if (expandBtn) expandBtn.style.display = 'block';
+                                          if (minimizeBtn) minimizeBtn.style.display = 'none';
+                                        }
+                                      }}
+                                      id={`desc-minimize-btn-${categoryIndex}-${paramIndex}`}
+                                      className="px-3 py-1 bg-red-600 text-white text-xs rounded hover:bg-red-700 focus:outline-none"
+                                      style={{ display: 'none' }}
+                                    >
+                                      ⛝ Minimize
+                                    </button>
+                                  </div>
+                                </div>
+                                <div id={`desc-editor-${categoryIndex}-${paramIndex}`} className="relative">
+                                  <CKEditor
+                                    editor={ClassicEditor}
+                                    data={parameter.descriptiveText || ""}
+                                    onChange={(event, editor) => {
+                                      const data = editor.getData();
+                                      handleParameterChange(categoryIndex, paramIndex, 'descriptiveText', data);
+                                    }}
+                                    config={{
+                                      toolbar: [
+                                        'heading', '|',
+                                        'fontFamily', 'fontSize', '|',
+                                        'fontColor', 'fontBackgroundColor', '|',
+                                        'bold', 'italic', 'underline', 'strikethrough', '|',
+                                        'alignment', '|',
+                                        'bulletedList', 'numberedList', '|',
+                                        'outdent', 'indent', '|',
+                                        'link', 'insertTable', '|',
+                                        'blockQuote', 'insertTable', '|',
+                                        'undo', 'redo'
+                                      ],
+                                      height: 300,
+                                      placeholder: 'Enter descriptive text here...',
+                                      fontFamily: {
+                                        options: [
+                                          'default',
+                                          'Arial, Helvetica, sans-serif',
+                                          'Courier New, Courier, monospace',
+                                          'Georgia, serif',
+                                          'Times New Roman, Times, serif',
+                                          'Verdana, Geneva, sans-serif'
+                                        ]
+                                      },
+                                      fontSize: {
+                                        options: [ 9, 11, 13, 'default', 17, 19, 21 ]
+                                      }
+                                    }}
+                                  />
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        )}
                         <div>
                           <input 
                             id={`param-method-${categoryIndex}-${paramIndex}`}
@@ -2190,10 +2333,10 @@ const AddTest = () => {
                             placeholder="Parameter Test Method" 
                             value={parameter.testMethod || ""}
                             onChange={(e) => handleParameterChange(categoryIndex, paramIndex, 'testMethod', e.target.value.toUpperCase())}
-                            disabled={isViewMode}
+                            
                             style={{ textTransform: 'uppercase' }}
                           />
-                          {!isViewMode && (
+                          {(
                             <div className="flex gap-1 mt-1">
                               {/* Bold Button */}
                               <button
@@ -2284,7 +2427,7 @@ const AddTest = () => {
                           step="0.01"
                           value={parameter.lowPanic || ""}
                           onChange={(e) => handleParameterChange(categoryIndex, paramIndex, 'lowPanic', e.target.value)}
-                          disabled={isViewMode} 
+                           
                         />
                         <input 
                           className="px-2 py-1.5 sm:py-1 border border-gray-300 rounded text-xs sm:text-sm w-full sm:w-24" 
@@ -2293,7 +2436,7 @@ const AddTest = () => {
                           step="0.01"
                           value={parameter.highPanic || ""}
                           onChange={(e) => handleParameterChange(categoryIndex, paramIndex, 'highPanic', e.target.value)}
-                          disabled={isViewMode} 
+                           
                         />
                         <label className="flex items-center gap-1">
                           <input 
@@ -2301,7 +2444,7 @@ const AddTest = () => {
                             className="w-4 h-4" 
                             checked={parameter.isNABL || false}
                             onChange={(e) => handleParameterChange(categoryIndex, paramIndex, 'isNABL', e.target.checked)}
-                            disabled={isViewMode} 
+                             
                           />
                           <span className="text-xs sm:text-sm">Is NABL</span>
                         </label>
@@ -2323,7 +2466,7 @@ const AddTest = () => {
                                   handleParameterChange(categoryIndex, paramIndex, '_editingFormula', true);
                                 }
                               }}
-                              disabled={isViewMode} 
+                               
                             />
                             <span className="text-xs sm:text-sm">Formula</span>
                           </label>
@@ -2347,7 +2490,7 @@ const AddTest = () => {
                                     const cur = formulaDrafts[getFormulaKey(categoryIndex, paramIndex)] || '';
                                     updateDraft(categoryIndex, paramIndex, cur + `{${e.target.value}}`);
                                   }}
-                                  disabled={isViewMode}
+                                  
                                 >
                                   <option value="">+ Add Parameter</option>
                                   {categories.flatMap(cat => cat.parameters)
@@ -2369,7 +2512,7 @@ const AddTest = () => {
                                     }
                                   }}
                                   className="text-xs bg-green-600 text-white px-3 py-1 rounded hover:bg-green-700 font-semibold"
-                                  disabled={isViewMode}
+                                  
                                 >
                                   Save Formula
                                 </button>
@@ -2381,7 +2524,7 @@ const AddTest = () => {
                                     handleParameterChange(categoryIndex, paramIndex, '_editingFormula', false);
                                   }}
                                   className="text-xs text-red-600 hover:text-red-800 ml-auto"
-                                  disabled={isViewMode}
+                                  
                                 >
                                   Cancel
                                 </button>
@@ -2408,18 +2551,18 @@ const AddTest = () => {
                                       type="button"
                                       onClick={() => updateDraft(categoryIndex, paramIndex, (formulaDrafts[getFormulaKey(categoryIndex, paramIndex)]||'') + num)}
                                       className="w-9 h-9 bg-slate-600 text-white rounded text-sm font-mono hover:bg-slate-700 transition-colors"
-                                      disabled={isViewMode}
+                                      
                                     >
                                       {num}
                                     </button>
                                   ))}
-                                  <button type="button" onClick={() => updateDraft(categoryIndex, paramIndex, (formulaDrafts[getFormulaKey(categoryIndex, paramIndex)]||'')+'.')} className="w-9 h-9 bg-slate-600 text-white rounded text-sm font-mono hover:bg-slate-700" disabled={isViewMode}>.</button>
-                                  <button type="button" onClick={() => updateDraft(categoryIndex, paramIndex, (formulaDrafts[getFormulaKey(categoryIndex, paramIndex)]||'')+'+')} className="w-9 h-9 bg-green-600 text-white rounded text-sm font-bold hover:bg-green-700" disabled={isViewMode}>+</button>
-                                  <button type="button" onClick={() => updateDraft(categoryIndex, paramIndex, (formulaDrafts[getFormulaKey(categoryIndex, paramIndex)]||'')+'-')} className="w-9 h-9 bg-yellow-600 text-white rounded text-sm font-bold hover:bg-yellow-700" disabled={isViewMode}>−</button>
-                                  <button type="button" onClick={() => updateDraft(categoryIndex, paramIndex, (formulaDrafts[getFormulaKey(categoryIndex, paramIndex)]||'')+'*')} className="w-9 h-9 bg-purple-600 text-white rounded text-sm font-bold hover:bg-purple-700" disabled={isViewMode}>×</button>
-                                  <button type="button" onClick={() => updateDraft(categoryIndex, paramIndex, (formulaDrafts[getFormulaKey(categoryIndex, paramIndex)]||'')+'/')} className="w-9 h-9 bg-pink-600 text-white rounded text-sm font-bold hover:bg-pink-700" disabled={isViewMode}>÷</button>
-                                  <button type="button" onClick={() => updateDraft(categoryIndex, paramIndex, (formulaDrafts[getFormulaKey(categoryIndex, paramIndex)]||'')+'(')} className="w-9 h-9 bg-gray-500 text-white rounded text-sm font-bold hover:bg-gray-600" disabled={isViewMode}>(</button>
-                                  <button type="button" onClick={() => updateDraft(categoryIndex, paramIndex, (formulaDrafts[getFormulaKey(categoryIndex, paramIndex)]||'')+')')} className="w-9 h-9 bg-gray-500 text-white rounded text-sm font-bold hover:bg-gray-600" disabled={isViewMode}>)</button>
+                                  <button type="button" onClick={() => updateDraft(categoryIndex, paramIndex, (formulaDrafts[getFormulaKey(categoryIndex, paramIndex)]||'')+'.')} className="w-9 h-9 bg-slate-600 text-white rounded text-sm font-mono hover:bg-slate-700" >.</button>
+                                  <button type="button" onClick={() => updateDraft(categoryIndex, paramIndex, (formulaDrafts[getFormulaKey(categoryIndex, paramIndex)]||'')+'+')} className="w-9 h-9 bg-green-600 text-white rounded text-sm font-bold hover:bg-green-700" >+</button>
+                                  <button type="button" onClick={() => updateDraft(categoryIndex, paramIndex, (formulaDrafts[getFormulaKey(categoryIndex, paramIndex)]||'')+'-')} className="w-9 h-9 bg-yellow-600 text-white rounded text-sm font-bold hover:bg-yellow-700" >−</button>
+                                  <button type="button" onClick={() => updateDraft(categoryIndex, paramIndex, (formulaDrafts[getFormulaKey(categoryIndex, paramIndex)]||'')+'*')} className="w-9 h-9 bg-purple-600 text-white rounded text-sm font-bold hover:bg-purple-700" >×</button>
+                                  <button type="button" onClick={() => updateDraft(categoryIndex, paramIndex, (formulaDrafts[getFormulaKey(categoryIndex, paramIndex)]||'')+'/')} className="w-9 h-9 bg-pink-600 text-white rounded text-sm font-bold hover:bg-pink-700" >÷</button>
+                                  <button type="button" onClick={() => updateDraft(categoryIndex, paramIndex, (formulaDrafts[getFormulaKey(categoryIndex, paramIndex)]||'')+'(')} className="w-9 h-9 bg-gray-500 text-white rounded text-sm font-bold hover:bg-gray-600" >(</button>
+                                  <button type="button" onClick={() => updateDraft(categoryIndex, paramIndex, (formulaDrafts[getFormulaKey(categoryIndex, paramIndex)]||'')+')')} className="w-9 h-9 bg-gray-500 text-white rounded text-sm font-bold hover:bg-gray-600" >)</button>
                                   <button
                                     type="button"
                                     onClick={() => {
@@ -2428,7 +2571,7 @@ const AddTest = () => {
                                       updateDraft(categoryIndex, paramIndex, tokenMatch ? tokenMatch[1] : cur.slice(0, -1));
                                     }}
                                     className="px-3 h-9 bg-red-600 text-white rounded text-xs font-bold hover:bg-red-700"
-                                    disabled={isViewMode}
+                                    
                                   >
                                     ⌫
                                   </button>
@@ -2449,7 +2592,7 @@ const AddTest = () => {
                               className="px-2 py-1.5 sm:py-1 border border-gray-300 rounded text-xs sm:text-sm w-32" 
                               value={parameter.type || "Numeric"}
                               onChange={(e) => handleParameterChange(categoryIndex, paramIndex, 'type', e.target.value)}
-                              disabled={isViewMode}
+                              
                             >
                               <option value="Numeric">Numeric</option>
                               <option value="Text">Text</option>
@@ -2464,7 +2607,7 @@ const AddTest = () => {
                               className="w-4 h-4" 
                               checked={parameter.isMandatory || false}
                               onChange={(e) => handleParameterChange(categoryIndex, paramIndex, 'isMandatory', e.target.checked)}
-                              disabled={isViewMode} 
+                               
                             />
                             <span className="text-xs sm:text-sm font-semibold">Is Mandatory</span>
                           </label>
@@ -2494,7 +2637,7 @@ const AddTest = () => {
                                   value="BySex"
                                   checked={parameter.rangeType === "BySex"}
                                   onChange={(e) => handleParameterChange(categoryIndex, paramIndex, 'rangeType', e.target.value)}
-                                  disabled={isViewMode}
+                                  
                                   className="w-4 h-4"
                                 />
                                 <span className="text-xs sm:text-sm">By Sex</span>
@@ -2506,7 +2649,7 @@ const AddTest = () => {
                                   value="ByAge"
                                   checked={parameter.rangeType === "ByAge"}
                                   onChange={(e) => handleParameterChange(categoryIndex, paramIndex, 'rangeType', e.target.value)}
-                                  disabled={isViewMode}
+                                  
                                   className="w-4 h-4"
                                 />
                                 <span className="text-xs sm:text-sm">By Age</span>
@@ -2518,7 +2661,7 @@ const AddTest = () => {
                                   value="ByRange"
                                   checked={parameter.rangeType === "ByRange"}
                                   onChange={(e) => handleParameterChange(categoryIndex, paramIndex, 'rangeType', e.target.value)}
-                                  disabled={isViewMode}
+                                  
                                   className="w-4 h-4"
                                 />
                                 <span className="text-xs sm:text-sm">By Range</span>
@@ -2537,7 +2680,7 @@ const AddTest = () => {
                               placeholder="This is for Range text"
                               value={parameter.rangeText || ""}
                               onChange={(e) => handleParameterChange(categoryIndex, paramIndex, 'rangeText', e.target.value)}
-                              disabled={isViewMode}
+                              
                               style={{ resize: 'both', overflow: 'auto' }}
                             />
                             <textarea 
@@ -2545,7 +2688,7 @@ const AddTest = () => {
                               placeholder="Enter text content here..."
                               value={parameter.textContent || ""}
                               onChange={(e) => handleParameterChange(categoryIndex, paramIndex, 'textContent', e.target.value)}
-                              disabled={isViewMode} 
+                               
                               style={{ resize: 'both', overflow: 'auto' }}
                             />
                           </div>
@@ -2555,15 +2698,15 @@ const AddTest = () => {
                               className="w-4 h-4" 
                               checked={parameter.isMultipleOptions || false}
                               onChange={(e) => handleParameterChange(categoryIndex, paramIndex, 'isMultipleOptions', e.target.checked)}
-                              disabled={isViewMode} 
+                               
                             />
                             <span className="text-xs sm:text-sm">Is multiple options? [Please add pipe "|" separated values]</span>
                           </label>
                         </div>
                       )}
 
-                      {/* Rich Text Editor - only visible when Type is TextEditor */}
-                      {parameter.type === "TextEditor" && (
+                      {/* Rich Text Editor - only visible when Type is TextEditor AND isDescriptive is NOT checked */}
+                      {parameter.type === "TextEditor" && !parameter.isDescriptive && (
                         <div className="space-y-3 mb-3">
                           {editorLoaded && (
                             <div className="border border-gray-300 rounded">
@@ -2594,7 +2737,7 @@ const AddTest = () => {
                                     }}
                                     id={`expand-btn-${categoryIndex}-${paramIndex}`}
                                     className="px-3 py-1 bg-orange-500 text-white text-xs rounded hover:bg-orange-600 focus:outline-none"
-                                    disabled={isViewMode}
+                                    
                                   >
                                     ⛶ Expand
                                   </button>
@@ -2623,7 +2766,7 @@ const AddTest = () => {
                                     id={`minimize-btn-${categoryIndex}-${paramIndex}`}
                                     className="px-3 py-1 bg-red-600 text-white text-xs rounded hover:bg-red-700 focus:outline-none"
                                     style={{ display: 'none' }}
-                                    disabled={isViewMode}
+                                    
                                   >
                                     ⛝ Minimize
                                   </button>
@@ -2637,7 +2780,7 @@ const AddTest = () => {
                                     const data = editor.getData();
                                     handleParameterChange(categoryIndex, paramIndex, 'textContent', data);
                                   }}
-                                  disabled={isViewMode}
+                                  
                                   config={{
                                     toolbar: [
                                       'heading', '|',
@@ -2682,8 +2825,8 @@ const AddTest = () => {
                             // Empty div for Text and TextEditor types since content is now above
                             <div></div>
                           ) : parameter.rangeType === "ByAge" ? (
-                          // By Age Table Structure
-                          <table className="border-collapse border border-gray-300 text-xs sm:text-sm min-w-[700px]  resize min-h-[3rem]">
+                            // By Age Table Structure
+                            <table className="border-collapse border border-gray-300 text-xs sm:text-sm min-w-[700px]  resize min-h-[3rem]">
                             <thead>
                               <tr className="bg-orange-700 text-white">
                                 <th className="border border-gray-300 px-2 py-1 text-left w-32">Label</th>
@@ -2706,7 +2849,7 @@ const AddTest = () => {
                                           className="px-1 py-0.5 border border-gray-300 rounded text-xs" 
                                           value={(ageRange as any).gender || "Male"}
                                           onChange={(e) => handleAgeRangeChange(categoryIndex, paramIndex, ageIndex, 'gender', e.target.value)}
-                                          disabled={isViewMode}
+                                          
                                         >
                                           <option value="Male">Male</option>
                                           <option value="Female">Female</option>
@@ -2725,7 +2868,7 @@ const AddTest = () => {
                                           placeholder="From"
                                           value={(ageRange as any).from || ""}
                                           onChange={(e) => handleAgeRangeChange(categoryIndex, paramIndex, ageIndex, 'from', e.target.value)}
-                                          disabled={isViewMode} 
+                                           
                                         />
                                         <span className="px-1 py-1 text-xs">-</span>
                                         <input 
@@ -2733,7 +2876,7 @@ const AddTest = () => {
                                           placeholder="To"
                                           value={(ageRange as any).to || ""}
                                           onChange={(e) => handleAgeRangeChange(categoryIndex, paramIndex, ageIndex, 'to', e.target.value)}
-                                          disabled={isViewMode} 
+                                           
                                         />
                                       </div>
                                     ) : (ageRange.label.includes("Less Than") || ageRange.label.includes("More Than")) ? (
@@ -2742,7 +2885,7 @@ const AddTest = () => {
                                         
                                         value={(ageRange as any).value || ""}
                                         onChange={(e) => handleAgeRangeChange(categoryIndex, paramIndex, ageIndex, 'value', e.target.value)}
-                                        disabled={isViewMode} 
+                                         
                                       />
                                     ) : (
                                       <span className="text-xs text-gray-500">-</span>
@@ -2754,7 +2897,7 @@ const AddTest = () => {
                                       type="text"
                                       value={ageRange.ll || ""}
                                       onChange={(e) => handleAgeRangeChange(categoryIndex, paramIndex, ageIndex, 'll', e.target.value)}
-                                      disabled={isViewMode} 
+                                       
                                     />
                                   </td>
                                   <td className="border border-gray-300 p-1">
@@ -2763,7 +2906,7 @@ const AddTest = () => {
                                       type="text"
                                       value={ageRange.ul || ""}
                                       onChange={(e) => handleAgeRangeChange(categoryIndex, paramIndex, ageIndex, 'ul', e.target.value)}
-                                      disabled={isViewMode} 
+                                       
                                     />
                                   </td>
                                   <td className="border border-gray-300 p-1">
@@ -2771,7 +2914,7 @@ const AddTest = () => {
                                       className="w-full px-2 py-1 border border-gray-300 rounded text-xs sm:text-sm" 
                                       value={ageRange.default || ""}
                                       onChange={(e) => handleAgeRangeChange(categoryIndex, paramIndex, ageIndex, 'default', e.target.value)}
-                                      disabled={isViewMode}
+                                      
                                       rows={2}
                                       style={{ minHeight: '2.5rem', maxHeight: '5rem', resize: 'both', overflow: 'auto' }}
                                     />
@@ -2781,7 +2924,7 @@ const AddTest = () => {
                                       className="w-full px-2 py-1 border border-gray-300 rounded text-xs sm:text-sm" 
                                       value={ageRange.timeUnit || "Day(s)"}
                                       onChange={(e) => handleAgeRangeChange(categoryIndex, paramIndex, ageIndex, 'timeUnit', e.target.value)}
-                                      disabled={isViewMode}
+                                      
                                     >
                                       <option value="Day(s)">Day(s)</option>
                                       <option value="Month(s)">Month(s)</option>
@@ -2789,7 +2932,7 @@ const AddTest = () => {
                                     </select>
                                   </td>
                                   <td className="border border-gray-300 p-1 text-center">
-                                    {!isViewMode && (
+                                    {(
                                       <div className="flex gap-1 justify-center">
                                         {ageRange.label.includes("Between") && (
                                           <button
@@ -2842,7 +2985,7 @@ const AddTest = () => {
                                         type="text"
                                         value={rangeValue.min || ""}
                                         onChange={(e) => handleRangeValueChange(categoryIndex, paramIndex, rangeIndex, 'min', e.target.value)}
-                                        disabled={isViewMode} 
+                                         
                                       />
                                     </td>
                                     <td className="border border-gray-300 p-1">
@@ -2852,7 +2995,7 @@ const AddTest = () => {
                                         type="text"
                                         value={rangeValue.max || ""}
                                         onChange={(e) => handleRangeValueChange(categoryIndex, paramIndex, rangeIndex, 'max', e.target.value)}
-                                        disabled={isViewMode} 
+                                         
                                       />
                                     </td>
                                     <td className="border border-gray-300 p-1">
@@ -2861,11 +3004,11 @@ const AddTest = () => {
                                         placeholder="Interpretation"
                                         value={rangeValue.interpretation || ""}
                                         onChange={(e) => handleRangeValueChange(categoryIndex, paramIndex, rangeIndex, 'interpretation', e.target.value)}
-                                        disabled={isViewMode} 
+                                         
                                       />
                                     </td>
                                     <td className="border border-gray-300 p-1 text-center">
-                                      {!isViewMode && rangeValue.label === "Between" && (
+                                      {rangeValue.label === "Between" && (
                                         <div className="flex gap-1 justify-center">
                                           <button
                                             onClick={() => addRangeValue(categoryIndex, paramIndex)}
@@ -2915,7 +3058,7 @@ const AddTest = () => {
                                       type="text"
                                       value={range.ll || ""}
                                       onChange={(e) => handleNormalRangeChange(categoryIndex, paramIndex, rangeIndex, 'll', e.target.value)}
-                                      disabled={isViewMode} 
+                                       
                                     />
                                   </td>
                                   <td className="border border-gray-300 p-1">
@@ -2924,7 +3067,7 @@ const AddTest = () => {
                                       type="text"
                                       value={range.ul || ""}
                                       onChange={(e) => handleNormalRangeChange(categoryIndex, paramIndex, rangeIndex, 'ul', e.target.value)}
-                                      disabled={isViewMode} 
+                                       
                                     />
                                   </td>
                                   <td className="border border-gray-300 p-1">
@@ -2932,37 +3075,41 @@ const AddTest = () => {
                                       className="w-full px-2 py-1 border border-gray-300 rounded text-xs sm:text-sm" 
                                       value={range.default || ""}
                                       onChange={(e) => handleNormalRangeChange(categoryIndex, paramIndex, rangeIndex, 'default', e.target.value)}
-                                      disabled={isViewMode} 
+                                       
                                     />
                                   </td>
                                   <td className="border border-gray-300 p-1">
-                                    {range.gender === "Male" ? (
-                                      <textarea 
-                                        className="w-full px-1.5 py-1 border border-gray-300 rounded text-xs" 
-                                        placeholder="Male text..."
-                                        value={parameter.maleDisplayText || ""}
-                                        onChange={(e) => handleParameterChange(categoryIndex, paramIndex, 'maleDisplayText', e.target.value)}
-                                        disabled={isViewMode}
-                                        style={{ minHeight: '40px', resize: 'both' }}
-                                      />
-                                    ) : range.gender === "Female" ? (
-                                      <textarea 
-                                        className="w-full px-1.5 py-1 border border-gray-300 rounded text-xs" 
-                                        placeholder="Female text..."
-                                        value={parameter.femaleDisplayText || ""}
-                                        onChange={(e) => handleParameterChange(categoryIndex, paramIndex, 'femaleDisplayText', e.target.value)}
-                                        disabled={isViewMode}
-                                        style={{ minHeight: '40px', resize: 'both' }}
-                                      />
-                                    ) : (
-                                      <textarea 
-                                        className="w-full px-1.5 py-1 border border-gray-300 rounded text-xs" 
-                                        placeholder="Default text..."
-                                        value={parameter.defaultDisplayText || ""}
-                                        onChange={(e) => handleParameterChange(categoryIndex, paramIndex, 'defaultDisplayText', e.target.value)}
-                                        disabled={isViewMode}
-                                        style={{ minHeight: '40px', resize: 'both' }}
-                                      />
+                                    {!parameter.isDescriptive && parameter.type !== "TextEditor" && (
+                                      <>
+                                        {range.gender === "Male" ? (
+                                          <textarea 
+                                            className="w-full px-1.5 py-1 border border-gray-300 rounded text-xs" 
+                                            placeholder="Male text..."
+                                            value={parameter.maleDisplayText || ""}
+                                            onChange={(e) => handleParameterChange(categoryIndex, paramIndex, 'maleDisplayText', e.target.value)}
+                                            
+                                            style={{ minHeight: '40px', resize: 'both' }}
+                                          />
+                                        ) : range.gender === "Female" ? (
+                                          <textarea 
+                                            className="w-full px-1.5 py-1 border border-gray-300 rounded text-xs" 
+                                            placeholder="Female text..."
+                                            value={parameter.femaleDisplayText || ""}
+                                            onChange={(e) => handleParameterChange(categoryIndex, paramIndex, 'femaleDisplayText', e.target.value)}
+                                            
+                                            style={{ minHeight: '40px', resize: 'both' }}
+                                          />
+                                        ) : (
+                                          <textarea 
+                                            className="w-full px-1.5 py-1 border border-gray-300 rounded text-xs" 
+                                            placeholder="Default text..."
+                                            value={parameter.defaultDisplayText || ""}
+                                            onChange={(e) => handleParameterChange(categoryIndex, paramIndex, 'defaultDisplayText', e.target.value)}
+                                            
+                                            style={{ minHeight: '40px', resize: 'both' }}
+                                          />
+                                        )}
+                                      </>
                                     )}
                                   </td>
                                 </tr>
@@ -2985,7 +3132,7 @@ const AddTest = () => {
         ))}
 
         {/* ================= ADD CATEGORY BUTTON ================= */}
-        {!isViewMode && (
+        {(
           <div className="mt-4 flex justify-center">
             <button
               onClick={addCategory}
@@ -3277,7 +3424,7 @@ const AddTest = () => {
             <button onClick={handleCancel} className="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600 transition-colors text-xs sm:text-sm w-full sm:w-auto">
               Cancel
             </button>
-            {!isViewMode && (
+            {(
               <button onClick={handleSave} className="bg-orange-500 text-white px-4 py-2 rounded hover:bg-orange-600 transition-colors text-xs sm:text-sm w-full sm:w-auto" disabled={loading}>
                 {loading ? "Saving..." : (isAddMode ? "Save" : "Save Changes")}
               </button>
@@ -3292,6 +3439,30 @@ const AddTest = () => {
           onUnitAdded={handleUnitAdded}
           editingUnit={null}
         />
+
+        {/* ================= ERROR MESSAGE ================= */}
+        {error && (
+          <div className="fixed inset-0 flex items-center justify-center pointer-events-none z-50">
+            <div className="bg-red-500 text-white px-6 py-4 rounded shadow-lg max-w-sm pointer-events-auto">
+              <div className="font-semibold mb-2">{error}</div>
+              <button 
+                onClick={() => setError(null)}
+                className="text-sm underline hover:opacity-80"
+              >
+                Dismiss
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* ================= SUCCESS MESSAGE ================= */}
+        {successMsg && (
+          <div className="fixed inset-0 flex items-center justify-center pointer-events-none z-50">
+            <div className="bg-green-500 text-white px-6 py-4 rounded shadow-lg max-w-sm pointer-events-auto text-center">
+              {successMsg}
+            </div>
+          </div>
+        )}
       </div>
     </>
   );

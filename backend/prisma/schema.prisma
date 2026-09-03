@@ -364,8 +364,6 @@ model Test {
   attachFile              Boolean                  @default(false)
   imageSize               String?                  @default("800|600")
   profileTest             Boolean                  @default(false)
-  isHeader                Boolean                  @default(true)
-  showTestName            Boolean                  @default(true)
   isNABL                  Boolean                  @default(false)
   lineHeight              Float?                   @default(1.4)
   isActive                Boolean                  @default(true)
@@ -545,6 +543,7 @@ model TestParameter {
   decimal            Int?             @default(2)
   parameterSortOrder Int?
   isDescriptive      Boolean          @default(false)
+  descriptiveText    String?          @db.Text
   lowPanic           Float?
   highPanic          Float?
   isNABL             Boolean          @default(false)

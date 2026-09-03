@@ -50,17 +50,15 @@ export const importTestsFromExcel = async (buffer) => {
           const preparationType = row[9]?.toString().trim() || null;
           const isNABL = row[10]?.toString().toLowerCase() === 'yes';
           const profileTest = row[11]?.toString().toLowerCase() === 'yes';
-          const isHeader = row[12]?.toString().toLowerCase() === 'yes';
-          const showTestName = row[13]?.toString().toLowerCase() === 'yes';
-          const lineHeight = parseFloat(row[14]) || 1.4;
-          const attachFile = row[15]?.toString().toLowerCase() === 'yes';
-          const imageSize = row[16]?.toString().trim() || '800|600';
-          const outsourceLab = row[17]?.toString().trim() || null;
-          const isActive = row[18]?.toString().toLowerCase() === 'yes';
-          const instructionPreparation = row[19]?.toString().trim() || null;
-          const instructionPatient = row[20]?.toString().trim() || null;
-          const interpretationLabel = row[21]?.toString().trim() || null;
-          const interpretation = row[22]?.toString().trim() || null;
+          const lineHeight = parseFloat(row[12]) || 1.4;
+          const attachFile = row[13]?.toString().toLowerCase() === 'yes';
+          const imageSize = row[14]?.toString().trim() || '800|600';
+          const outsourceLab = row[15]?.toString().trim() || null;
+          const isActive = row[16]?.toString().toLowerCase() === 'yes';
+          const instructionPreparation = row[17]?.toString().trim() || null;
+          const instructionPatient = row[18]?.toString().trim() || null;
+          const interpretationLabel = row[19]?.toString().trim() || null;
+          const interpretation = row[20]?.toString().trim() || null;
 
           // Validate required fields
           if (!testName) {
@@ -137,8 +135,6 @@ export const importTestsFromExcel = async (buffer) => {
                 preparationType: preparationType || existingTest.preparationType,
                 isNABL,
                 profileTest,
-                isHeader,
-                showTestName,
                 lineHeight,
                 attachFile,
                 imageSize,
@@ -168,8 +164,6 @@ export const importTestsFromExcel = async (buffer) => {
                 preparationType,
                 isNABL,
                 profileTest,
-                isHeader,
-                showTestName,
                 lineHeight,
                 attachFile,
                 imageSize,
@@ -266,9 +260,16 @@ export const importTestsFromExcel = async (buffer) => {
           const childHighValue = parseFloat(row[20]) || null;
           const ageRangesRaw = row[21]?.toString().trim() || null;
           const rangeValuesRaw = row[22]?.toString().trim() || null;
-          const isNABL = row[23]?.toString().toLowerCase() === 'yes';
-          const isActive = row[24]?.toString().toLowerCase() === 'yes';
-          const parameterSortOrder = parseInt(row[25]) || null;
+          const textContent = row[23]?.toString().trim() || null;
+          const maleDisplayText = row[24]?.toString().trim() || null;
+          const femaleDisplayText = row[25]?.toString().trim() || null;
+          const defaultDisplayText = row[26]?.toString().trim() || null;
+          const isMultipleOptions = row[27]?.toString().toLowerCase() === 'yes';
+          const displayRangeText = row[28]?.toString().trim() || null;
+          const rangeText = row[29]?.toString().trim() || null;
+          const isNABL = row[30]?.toString().toLowerCase() === 'yes';
+          const isActive = row[31]?.toString().toLowerCase() === 'yes';
+          const parameterSortOrder = parseInt(row[32]) || null;
 
           // Parse JSON fields safely
           let ageRanges = null;
@@ -338,6 +339,13 @@ export const importTestsFromExcel = async (buffer) => {
                 childHighValue,
                 ageRanges: ageRanges ? JSON.stringify(ageRanges) : null,
                 rangeValues: rangeValues ? JSON.stringify(rangeValues) : null,
+                textContent,
+                maleDisplayText,
+                femaleDisplayText,
+                defaultDisplayText,
+                isMultipleOptions,
+                displayRangeText,
+                rangeText,
                 isNABL,
                 isActive,
                 parameterSortOrder,
@@ -371,6 +379,13 @@ export const importTestsFromExcel = async (buffer) => {
                 childHighValue,
                 ageRanges: ageRanges ? JSON.stringify(ageRanges) : null,
                 rangeValues: rangeValues ? JSON.stringify(rangeValues) : null,
+                textContent,
+                maleDisplayText,
+                femaleDisplayText,
+                defaultDisplayText,
+                isMultipleOptions,
+                displayRangeText,
+                rangeText,
                 isNABL,
                 isActive,
                 parameterSortOrder

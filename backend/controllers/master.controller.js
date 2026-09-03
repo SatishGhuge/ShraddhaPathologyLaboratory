@@ -579,6 +579,7 @@ export const getTestById = async (req, res) => {
           decimal: param.decimal ? Number(param.decimal) : undefined,
           sortOrder: param.parameterSortOrder,
           isDescriptive: param.isDescriptive,
+          descriptiveText: param.descriptiveText,  // ✅ CRITICAL: Return descriptive text
           lowPanic: param.lowPanic,
           highPanic: param.highPanic,
           isNABL: param.isNABL,
@@ -661,6 +662,7 @@ export const getTestById = async (req, res) => {
           decimal: 2,
           sortOrder: "",
           isDescriptive: false,
+          descriptiveText: "",  // ✅ CRITICAL: Include empty descriptiveText
           lowPanic: "",
           highPanic: "",
           isNABL: false,
@@ -750,8 +752,6 @@ export const getTestById = async (req, res) => {
       attachFile: test.attachFile ? true : false,  // ✅ Convert to boolean
       imageSize: test.imageSize,
       profileTest: test.profileTest ? true : false,  // ✅ Convert to boolean
-      isHeader: test.isHeader,
-      showTestName: test.showTestName,
       isNABL: test.isNABL,
       lineHeight: test.lineHeight,
       isActive: test.isActive,
@@ -813,8 +813,6 @@ export const createTest = async (req, res) => {
       outsourceLab,
       attachFile,
       profileTest,
-      isHeader,
-      showTestName,
       isNABL,
       lineHeight,
       categories
@@ -873,8 +871,6 @@ export const createTest = async (req, res) => {
         outsourceLab,
         attachFile: attachFileValue,
         profileTest: profileTestValue,
-        isHeader: isHeader !== undefined ? isHeader : true,
-        showTestName: showTestName !== undefined ? showTestName : true,
         isNABL: isNABL || false,
         lineHeight: lineHeight ? parseFloat(lineHeight) : null,
         linkedTestIds: req.body.linkedTestIds ? JSON.stringify(req.body.linkedTestIds) : null
@@ -906,62 +902,135 @@ export const createTest = async (req, res) => {
             let testParameterId;
             
             // ✅ NEW: If param has an ID, it's an existing parameter - just link it
-            // If no ID, create a new parameter
+            // If no ID, check if parameter with same name exists FIRST before creating new
             if (param.id) {
               // Existing parameter - just link it to the test
               console.log(`🔗 Linking existing parameter ID: ${param.id}`);
               testParameterId = parseInt(param.id);
             } else {
-              // New parameter - create it
-              console.log(`✨ Creating new parameter: ${param.parameterName}`);
-              
-              // Create TestParameter
-              const testParameter = await prisma.testParameter.create({
-                data: {
-                  testId: test.id, // ✅ Link parameter to test
-                  parameterName: param.parameterName || 'Unnamed',
-                  machineCode: param.machineCode || null,
-                  multiplyBy: param.multiplyBy || null,
-                  decimal: param.decimal ? parseInt(param.decimal) : null,
-                  parameterSortOrder: param.sortOrder !== undefined && param.sortOrder !== null ? parseInt(param.sortOrder) : null,
-                  isDescriptive: param.isDescriptive || false,
-                  lowPanic: param.lowPanic ? parseFloat(param.lowPanic) : null,
-                  highPanic: param.highPanic ? parseFloat(param.highPanic) : null,
-                  isNABL: param.isNABL || false,
-                  parameterCode: param.parameterCode || null,
-                  hasFormula: param.hasFormula || false,
-                  formula: param.formula || null,
+              // ✅ NEW: Check if parameter with same NAME already exists
+              // But ONLY reuse if it serves the SAME PURPOSE
+              let existingParam = await prisma.testParameter.findFirst({
+                where: {
+                  parameterName: {
+                    equals: param.parameterName
+                  }
+                }
+              });
+
+              // Function to check if two parameters serve the same purpose
+              const doParametersServeSamePurpose = (existing, newData) => {
+                const fieldsToCompare = [
+                  'type',
+                  'textContent',
+                  'maleDisplayText',
+                  'femaleDisplayText',
+                  'defaultDisplayText',
+                  'rangeType',
+                  'isDescriptive',
+                  'isMultipleOptions'
+                ];
+
+                for (const field of fieldsToCompare) {
+                  const existingVal = existing[field];
+                  const newVal = newData[field];
+                  
+                  if (!existingVal && !newVal) continue;
+                  if ((existingVal && !newVal) || (!existingVal && newVal)) {
+                    console.log(`      ⚠️  Different purpose - ${field}: "${existingVal}" vs "${newVal}"`);
+                    return false;
+                  }
+                  if (existingVal && newVal && String(existingVal).toLowerCase() !== String(newVal).toLowerCase()) {
+                    console.log(`      ⚠️  Different purpose - ${field}: "${existingVal}" vs "${newVal}"`);
+                    return false;
+                  }
+                }
+                return true;
+              };
+
+              if (existingParam) {
+                console.log(`🔗 Found existing parameter by name: ${param.parameterName} (ID: ${existingParam.id})`);
+                
+                const paramData = {
                   type: param.type || 'Numeric',
-                  isMandatory: param.isMandatory || false,
-                  rangeType: param.rangeType || 'BySex',
-                  unitId: param.unitId ? parseInt(param.unitId) : null,
-                  displayRangeText: param.displayRangeText || null,
-                  rangeText: param.rangeText || null,
                   textContent: param.textContent || null,
                   maleDisplayText: param.maleDisplayText || null,
                   femaleDisplayText: param.femaleDisplayText || null,
                   defaultDisplayText: param.defaultDisplayText || null,
-                  isMultipleOptions: param.isMultipleOptions || false,
-                  testMethod: param.testMethod || null,
-                  maleLowValue: param.normalRanges?.find(r => r.gender === 'Male')?.ll ? String(param.normalRanges.find(r => r.gender === 'Male').ll) : null,
-                  maleHighValue: param.normalRanges?.find(r => r.gender === 'Male')?.ul ? String(param.normalRanges.find(r => r.gender === 'Male').ul) : null,
-                  maleDefaultValue: param.normalRanges?.find(r => r.gender === 'Male')?.default || null,
-                  maleActive: param.normalRanges?.find(r => r.gender === 'Male')?.isActive || false,
-                  femaleLowValue: param.normalRanges?.find(r => r.gender === 'Female')?.ll ? String(param.normalRanges.find(r => r.gender === 'Female').ll) : null,
-                  femaleHighValue: param.normalRanges?.find(r => r.gender === 'Female')?.ul ? String(param.normalRanges.find(r => r.gender === 'Female').ul) : null,
-                  femaleDefaultValue: param.normalRanges?.find(r => r.gender === 'Female')?.default || null,
-                  femaleActive: param.normalRanges?.find(r => r.gender === 'Female')?.isActive || false,
-                  childLowValue: param.normalRanges?.find(r => r.gender === 'Child')?.ll ? String(param.normalRanges.find(r => r.gender === 'Child').ll) : null,
-                  childHighValue: param.normalRanges?.find(r => r.gender === 'Child')?.ul ? String(param.normalRanges.find(r => r.gender === 'Child').ul) : null,
-                  childDefaultValue: param.normalRanges?.find(r => r.gender === 'Child')?.default || null,
-                  childActive: param.normalRanges?.find(r => r.gender === 'Child')?.isActive || false,
-                  ageRanges: processAgeRangesWithGender(param.ageRanges, param.parameterName),
-                  rangeValues: param.rangeValues && param.rangeValues.length > 0 ? JSON.stringify(param.rangeValues) : null,
-                  isActive: true
+                  rangeType: param.rangeType || 'BySex',
+                  isDescriptive: param.isDescriptive || false,
+                  isMultipleOptions: param.isMultipleOptions || false
+                };
+
+                if (doParametersServeSamePurpose(existingParam, paramData)) {
+                  console.log(`   ✅ Same purpose confirmed - REUSING parameter`);
+                  testParameterId = existingParam.id;
+                  
+                  // Add parameter code if missing
+                  if (param.parameterCode && param.parameterCode.trim() && !existingParam.parameterCode) {
+                    console.log(`   📝 Adding parameter code: ${param.parameterCode}`);
+                    await prisma.testParameter.update({
+                      where: { id: existingParam.id },
+                      data: { parameterCode: param.parameterCode.trim() }
+                    });
+                  }
+                } else {
+                  console.log(`   ⚠️  DIFFERENT PURPOSE - creating NEW separate parameter`);
+                  existingParam = null; // Force new creation
                 }
-              });
-              
-              testParameterId = testParameter.id;
+              }
+
+              if (!existingParam) {
+                
+                // Create TestParameter
+                const testParameter = await prisma.testParameter.create({
+                  data: {
+                    testId: test.id, // ✅ Link parameter to test
+                    parameterName: param.parameterName || 'Unnamed',
+                    machineCode: param.machineCode || null,
+                    multiplyBy: param.multiplyBy || null,
+                    decimal: param.decimal ? parseInt(param.decimal) : null,
+                    parameterSortOrder: param.sortOrder !== undefined && param.sortOrder !== null ? parseInt(param.sortOrder) : null,
+                    isDescriptive: param.isDescriptive || false,
+                    descriptiveText: param.descriptiveText || null,  // ✅ CRITICAL: Save descriptive text
+                    lowPanic: param.lowPanic ? parseFloat(param.lowPanic) : null,
+                    highPanic: param.highPanic ? parseFloat(param.highPanic) : null,
+                    isNABL: param.isNABL || false,
+                    parameterCode: param.parameterCode && param.parameterCode.trim() ? param.parameterCode : null,  // ✅ Convert empty string to null
+                    hasFormula: param.hasFormula || false,
+                    formula: param.formula || null,
+                    type: param.type || 'Numeric',
+                    isMandatory: param.isMandatory || false,
+                    rangeType: param.rangeType || 'BySex',
+                    unitId: param.unitId ? parseInt(param.unitId) : null,
+                    displayRangeText: param.displayRangeText || null,
+                    rangeText: param.rangeText || null,
+                    textContent: param.textContent || null,
+                    maleDisplayText: param.maleDisplayText || null,
+                    femaleDisplayText: param.femaleDisplayText || null,
+                    defaultDisplayText: param.defaultDisplayText || null,
+                    isMultipleOptions: param.isMultipleOptions || false,
+                    testMethod: param.testMethod || null,
+                    maleLowValue: param.normalRanges?.find(r => r.gender === 'Male')?.ll ? String(param.normalRanges.find(r => r.gender === 'Male').ll) : null,
+                    maleHighValue: param.normalRanges?.find(r => r.gender === 'Male')?.ul ? String(param.normalRanges.find(r => r.gender === 'Male').ul) : null,
+                    maleDefaultValue: param.normalRanges?.find(r => r.gender === 'Male')?.default || null,
+                    maleActive: param.normalRanges?.find(r => r.gender === 'Male')?.isActive || false,
+                    femaleLowValue: param.normalRanges?.find(r => r.gender === 'Female')?.ll ? String(param.normalRanges.find(r => r.gender === 'Female').ll) : null,
+                    femaleHighValue: param.normalRanges?.find(r => r.gender === 'Female')?.ul ? String(param.normalRanges.find(r => r.gender === 'Female').ul) : null,
+                    femaleDefaultValue: param.normalRanges?.find(r => r.gender === 'Female')?.default || null,
+                    femaleActive: param.normalRanges?.find(r => r.gender === 'Female')?.isActive || false,
+                    childLowValue: param.normalRanges?.find(r => r.gender === 'Child')?.ll ? String(param.normalRanges.find(r => r.gender === 'Child').ll) : null,
+                    childHighValue: param.normalRanges?.find(r => r.gender === 'Child')?.ul ? String(param.normalRanges.find(r => r.gender === 'Child').ul) : null,
+                    childDefaultValue: param.normalRanges?.find(r => r.gender === 'Child')?.default || null,
+                    childActive: param.normalRanges?.find(r => r.gender === 'Child')?.isActive || false,
+                    ageRanges: processAgeRangesWithGender(param.ageRanges, param.parameterName),
+                    rangeValues: param.rangeValues && param.rangeValues.length > 0 ? JSON.stringify(param.rangeValues) : null,
+                    isActive: true
+                  }
+                });
+                
+                testParameterId = testParameter.id;
+              }
             }
 
             // Create TestCategory linking to TestParameter (existing or new)
@@ -1057,8 +1126,6 @@ export const updateTest = async (req, res) => {
       attachFile,
       imageSize,
       profileTest,
-      isHeader,
-      showTestName,
       isNABL,
       lineHeight,
       isActive,
@@ -1136,8 +1203,6 @@ export const updateTest = async (req, res) => {
     if (outsourceLab !== undefined) updateData.outsourceLab = outsourceLab || null;
     if (imageSize !== undefined) updateData.imageSize = imageSize || null;
     if (sampleTypeId !== undefined) updateData.sample_type = sampleTypeId ? { connect: { id: parseInt(sampleTypeId) } } : { disconnect: true };
-    if (isHeader !== undefined) updateData.isHeader = isHeader;
-    if (showTestName !== undefined) updateData.showTestName = showTestName;
     if (isNABL !== undefined) updateData.isNABL = isNABL;
     if (lineHeight !== undefined) updateData.lineHeight = lineHeight ? parseFloat(lineHeight) : 1.4;
     if (isActive !== undefined) updateData.isActive = isActive;
@@ -1213,6 +1278,13 @@ export const updateTest = async (req, res) => {
         const femaleRange = getFemaleRange();
         const childRange = getChildRange();
 
+        // ✅ CRITICAL FIX: Handle parameterCode carefully to avoid unique constraint violations
+        // If parameterCode is empty string, convert to null (nullable field)
+        let finalParameterCode = param.parameterCode;
+        if (typeof finalParameterCode === 'string') {
+          finalParameterCode = finalParameterCode.trim() ? param.parameterCode : null;
+        }
+
         return {
           parameterName: param.parameterName || 'Unnamed',
           machineCode: param.machineCode || null,
@@ -1220,10 +1292,11 @@ export const updateTest = async (req, res) => {
           decimal: param.decimal ? parseInt(param.decimal) : null,
           parameterSortOrder: param.sortOrder !== undefined && param.sortOrder !== null ? parseInt(param.sortOrder) : undefined,
           isDescriptive: param.isDescriptive || false,
+          descriptiveText: param.descriptiveText || null,  // ✅ CRITICAL: Save descriptive text
           lowPanic: param.lowPanic ? parseFloat(param.lowPanic) : null,
           highPanic: param.highPanic ? parseFloat(param.highPanic) : null,
           isNABL: param.isNABL || false,
-          parameterCode: param.parameterCode || null,
+          parameterCode: finalParameterCode,  // ✅ Handle empty string -> null conversion
           hasFormula: param.hasFormula || false,
           formula: param.formula || null,
           type: param.type || 'Numeric',
@@ -1304,11 +1377,27 @@ export const updateTest = async (req, res) => {
                 const updatePayload = prepareParameterData(param);
                 console.log(`   📤 Prepared update payload for ${param.parameterName}:`, {
                   parameterName: updatePayload.parameterName,
+                  parameterCode: updatePayload.parameterCode,
                   ageRanges: updatePayload.ageRanges ? updatePayload.ageRanges.substring(0, 100) + '...' : 'null',
                   maleLowValue: updatePayload.maleLowValue,
                   maleActive: updatePayload.maleActive,
                   hasAgeRanges: !!updatePayload.ageRanges
                 });
+                
+                // ✅ CRITICAL FIX: Check for parameterCode conflicts before update
+                if (updatePayload.parameterCode) {
+                  const existingWithCode = await prisma.testParameter.findFirst({
+                    where: {
+                      parameterCode: updatePayload.parameterCode,
+                      id: { not: parsedId }  // Exclude current parameter
+                    }
+                  });
+                  
+                  if (existingWithCode) {
+                    console.warn(`   ⚠️ CONFLICT: Another parameter already has parameterCode "${updatePayload.parameterCode}". Setting to null to avoid unique constraint violation.`);
+                    updatePayload.parameterCode = null;  // Force null to avoid conflict
+                  }
+                }
                 
                 testParameter = await prisma.testParameter.update({
                   where: { id: parsedId },
@@ -1322,6 +1411,7 @@ export const updateTest = async (req, res) => {
                 
                 console.log(`   🔍 VERIFICATION - Data after update:`, {
                   parameterName: verifyUpdate.parameterName,
+                  parameterCode: verifyUpdate.parameterCode,
                   ageRanges: verifyUpdate.ageRanges ? verifyUpdate.ageRanges.substring(0, 100) + '...' : 'null',
                   maleLowValue: verifyUpdate.maleLowValue,
                   maleActive: verifyUpdate.maleActive
@@ -4713,52 +4803,134 @@ export const createTestCategoryWithParameter = async (req, res) => {
       });
     }
 
-    // Step 1: Create the parameter
-    const parameter = await prisma.testParameter.create({
-      data: {
-        testId: parseInt(testId),
-        parameterName,
-        machineCode: machineCode || null,
-        multiplyBy: multiplyBy || null,
-        decimal: decimal || 2,
-        parameterSortOrder: parameterSortOrder ? parseInt(parameterSortOrder) : null,
-        isDescriptive: isDescriptive || false,
-        lowPanic: lowPanic ? parseFloat(lowPanic) : null,
-        highPanic: highPanic ? parseFloat(highPanic) : null,
-        isNABL: isNABL || false,
-        parameterCode: parameterCode || null,
-        hasFormula: hasFormula || false,
-        formula: formula || null,
-        type: type || 'Numeric',
-        isMandatory: isMandatory || false,
-        rangeType: rangeType || 'BySex',
-        unitId: unitId ? parseInt(unitId) : null,
-        displayRangeText: displayRangeText || null,
-        rangeText: rangeText || null,
-        textContent: textContent || null,
-        maleDisplayText: maleDisplayText || null,           // ✅ NEW
-        femaleDisplayText: femaleDisplayText || null,       // ✅ NEW
-        defaultDisplayText: defaultDisplayText || null,     // ✅ NEW
-        isMultipleOptions: isMultipleOptions || false,
-        maleLowValue: normalRanges?.find(r => r.gender === 'Male')?.ll ? String(normalRanges.find(r => r.gender === 'Male').ll) : null,
-        maleHighValue: normalRanges?.find(r => r.gender === 'Male')?.ul ? String(normalRanges.find(r => r.gender === 'Male').ul) : null,
-        maleDefaultValue: normalRanges?.find(r => r.gender === 'Male')?.default || null,
-        maleActive: normalRanges?.find(r => r.gender === 'Male')?.isActive || false,
-        femaleLowValue: normalRanges?.find(r => r.gender === 'Female')?.ll ? String(normalRanges.find(r => r.gender === 'Female').ll) : null,
-        femaleHighValue: normalRanges?.find(r => r.gender === 'Female')?.ul ? String(normalRanges.find(r => r.gender === 'Female').ul) : null,
-        femaleDefaultValue: normalRanges?.find(r => r.gender === 'Female')?.default || null,
-        femaleActive: normalRanges?.find(r => r.gender === 'Female')?.isActive || false,
-        childLowValue: normalRanges?.find(r => r.gender === 'Child')?.ll ? String(normalRanges.find(r => r.gender === 'Child').ll) : null,
-        childHighValue: normalRanges?.find(r => r.gender === 'Child')?.ul ? String(normalRanges.find(r => r.gender === 'Child').ul) : null,
-        childDefaultValue: normalRanges?.find(r => r.gender === 'Child')?.default || null,
-        childActive: normalRanges?.find(r => r.gender === 'Child')?.isActive || false,
-        ageRanges: processAgeRangesWithGender(ageRanges, parameterName || "Parameter"),
-        rangeValues: rangeValues && rangeValues.length > 0 ? JSON.stringify(rangeValues) : null,
-        isActive: true
+    // ✅ NEW: Check if parameter with same NAME already exists
+    // But ONLY reuse if it serves the SAME PURPOSE (same textContent, type, etc.)
+    let parameter = await prisma.testParameter.findFirst({
+      where: {
+        parameterName: {
+          equals: parameterName
+        }
       }
     });
 
-    console.log('✅ Parameter created with ID:', parameter.id);
+    // Function to check if two parameters serve the same purpose
+    const doParametersServeSamePurpose = (existingParam, newParamData) => {
+      const fieldsToCompare = [
+        'type',
+        'textContent',
+        'maleDisplayText',
+        'femaleDisplayText',
+        'defaultDisplayText',
+        'rangeType',
+        'isDescriptive',
+        'isMultipleOptions'
+      ];
+
+      for (const field of fieldsToCompare) {
+        const existingVal = existingParam[field];
+        const newVal = newParamData[field];
+        
+        // If both are null/empty, they match
+        if (!existingVal && !newVal) continue;
+        
+        // If one is null and other isn't, they're DIFFERENT purposes
+        if ((existingVal && !newVal) || (!existingVal && newVal)) {
+          console.log(`   ⚠️  Different purpose detected - ${field}: existing="${existingVal}" vs new="${newVal}"`);
+          return false;
+        }
+        
+        // If both exist but differ, they're DIFFERENT purposes
+        if (existingVal && newVal && String(existingVal).toLowerCase() !== String(newVal).toLowerCase()) {
+          console.log(`   ⚠️  Different purpose detected - ${field}: existing="${existingVal}" vs new="${newVal}"`);
+          return false;
+        }
+      }
+      
+      return true;
+    };
+
+    if (parameter) {
+      console.log(`🔗 Found existing parameter: ${parameterName} (ID: ${parameter.id})`);
+      
+      // Check if they serve the same purpose
+      const sameParamData = {
+        type: type || 'Numeric',
+        textContent: textContent || null,
+        maleDisplayText: maleDisplayText || null,
+        femaleDisplayText: femaleDisplayText || null,
+        defaultDisplayText: defaultDisplayText || null,
+        rangeType: rangeType || 'BySex',
+        isDescriptive: isDescriptive || false,
+        isMultipleOptions: isMultipleOptions || false
+      };
+
+      if (doParametersServeSamePurpose(parameter, sameParamData)) {
+        console.log(`   ✅ Same purpose confirmed - REUSING parameter`);
+        
+        // ✅ If found and parameterCode is provided, update it to ensure consistency
+        if (parameterCode && parameterCode.trim() && !parameter.parameterCode) {
+          console.log(`   📝 Adding parameter code to existing parameter: ${parameterCode}`);
+          parameter = await prisma.testParameter.update({
+            where: { id: parameter.id },
+            data: { parameterCode: parameterCode.trim() }
+          });
+        }
+      } else {
+        console.log(`   ⚠️  DIFFERENT PURPOSE detected! Creating NEW separate parameter`);
+        console.log(`   📌 Reason: Different textContent/type means different parameter`);
+        parameter = null; // Force creation of new parameter
+      }
+    }
+
+    if (!parameter) {
+      // Step 1: Create the parameter
+      console.log(`✨ Creating new parameter: ${parameterName}`);
+      parameter = await prisma.testParameter.create({
+        data: {
+          testId: parseInt(testId),
+          parameterName,
+          machineCode: machineCode || null,
+          multiplyBy: multiplyBy || null,
+          decimal: decimal || 2,
+          parameterSortOrder: parameterSortOrder ? parseInt(parameterSortOrder) : null,
+          isDescriptive: isDescriptive || false,
+          lowPanic: lowPanic ? parseFloat(lowPanic) : null,
+          highPanic: highPanic ? parseFloat(highPanic) : null,
+          isNABL: isNABL || false,
+          parameterCode: parameterCode && parameterCode.trim() ? parameterCode : null,
+          hasFormula: hasFormula || false,
+          formula: formula || null,
+          type: type || 'Numeric',
+          isMandatory: isMandatory || false,
+          rangeType: rangeType || 'BySex',
+          unitId: unitId ? parseInt(unitId) : null,
+          displayRangeText: displayRangeText || null,
+          rangeText: rangeText || null,
+          textContent: textContent || null,
+          maleDisplayText: maleDisplayText || null,           // ✅ NEW
+          femaleDisplayText: femaleDisplayText || null,       // ✅ NEW
+          defaultDisplayText: defaultDisplayText || null,     // ✅ NEW
+          isMultipleOptions: isMultipleOptions || false,
+          maleLowValue: normalRanges?.find(r => r.gender === 'Male')?.ll ? String(normalRanges.find(r => r.gender === 'Male').ll) : null,
+          maleHighValue: normalRanges?.find(r => r.gender === 'Male')?.ul ? String(normalRanges.find(r => r.gender === 'Male').ul) : null,
+          maleDefaultValue: normalRanges?.find(r => r.gender === 'Male')?.default || null,
+          maleActive: normalRanges?.find(r => r.gender === 'Male')?.isActive || false,
+          femaleLowValue: normalRanges?.find(r => r.gender === 'Female')?.ll ? String(normalRanges.find(r => r.gender === 'Female').ll) : null,
+          femaleHighValue: normalRanges?.find(r => r.gender === 'Female')?.ul ? String(normalRanges.find(r => r.gender === 'Female').ul) : null,
+          femaleDefaultValue: normalRanges?.find(r => r.gender === 'Female')?.default || null,
+          femaleActive: normalRanges?.find(r => r.gender === 'Female')?.isActive || false,
+          childLowValue: normalRanges?.find(r => r.gender === 'Child')?.ll ? String(normalRanges.find(r => r.gender === 'Child').ll) : null,
+          childHighValue: normalRanges?.find(r => r.gender === 'Child')?.ul ? String(normalRanges.find(r => r.gender === 'Child').ul) : null,
+          childDefaultValue: normalRanges?.find(r => r.gender === 'Child')?.default || null,
+          childActive: normalRanges?.find(r => r.gender === 'Child')?.isActive || false,
+          ageRanges: processAgeRangesWithGender(ageRanges, parameterName || "Parameter"),
+          rangeValues: rangeValues && rangeValues.length > 0 ? JSON.stringify(rangeValues) : null,
+          isActive: true
+        }
+      });
+
+      console.log('✅ Parameter created with ID:', parameter.id);
+    }
 
     // Step 2: Create the category linking to the parameter
     const category = await prisma.testCategory.create({

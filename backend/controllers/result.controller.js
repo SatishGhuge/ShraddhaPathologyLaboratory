@@ -506,6 +506,7 @@ export const getPatientTestById = async (req, res) => {
             testMethod: true,
             type: true,
             isDescriptive: true,
+            descriptiveText: true,  // ✅ ADDED: Fetch descriptive text for display below parameter
             isMultipleOptions: true,
             isMandatory: true,
             parameterSortOrder: true,
@@ -624,6 +625,7 @@ export const getPatientTestById = async (req, res) => {
           units: category.testParameter.unit?.symbol || '',
           type: category.testParameter.type,
           isDescriptive: category.testParameter.isDescriptive,
+          descriptiveText: category.testParameter.descriptiveText,  // ✅ ADDED: Descriptive text to display below parameter
           isMultipleOptions: category.testParameter.isMultipleOptions,
           isMandatory: category.testParameter.isMandatory,
           categoryName: categoryName,
@@ -678,6 +680,15 @@ export const getPatientTestById = async (req, res) => {
           // Text content for text-type parameters
           textContent: category.testParameter.textContent,
           
+          // 🔴 DEBUG: Log textContent
+          _debug_textContent: {
+            raw: category.testParameter.textContent,
+            type: typeof category.testParameter.textContent,
+            length: category.testParameter.textContent?.length || 0,
+            isEmpty: !category.testParameter.textContent?.trim(),
+            paramName: category.testParameter.parameterName
+          },
+          
           // Formula fields - INCLUDE BOTH
           hasFormula: category.testParameter.hasFormula,
           formula: category.testParameter.formula,
@@ -714,6 +725,7 @@ export const getPatientTestById = async (req, res) => {
           testMethod: true,
           type: true,
           isDescriptive: true,
+          descriptiveText: true,  // ✅ ADDED: Fetch descriptive text for display below parameter
           isMultipleOptions: true,
           isMandatory: true,
           parameterSortOrder: true,
@@ -778,6 +790,7 @@ export const getPatientTestById = async (req, res) => {
           units: param.unit?.symbol || '',
           type: param.type,
           isDescriptive: param.isDescriptive,
+          descriptiveText: param.descriptiveText,  // ✅ ADDED: Descriptive text to display below parameter
           isMultipleOptions: param.isMultipleOptions,
           isMandatory: param.isMandatory,
           categoryName: 'NO_CATEGORY_HEADER',
@@ -850,6 +863,16 @@ export const getPatientTestById = async (req, res) => {
 
     console.log(`Processed ${allParameters.length} parameters in ${Object.keys(groupedParameters).length} categories`);
     console.log(`📤 RETURNING: ${totalExistingResults} parameters have existing saved results`);
+
+    // 🔴 DEBUG: Log final parameters with textContent info
+    console.log(`\n✅ FINAL Parameter List for Response:`);
+    allParameters.forEach(p => {
+      if (p.type === 'Text') {
+        console.log(`  📝 TEXT PARAM: ${p.parameterName}`);
+        console.log(`     textContent: "${p.textContent}"`);
+        console.log(`     _debug_textContent:`, p._debug_textContent);
+      }
+    });
 
     // 🔧 Fetch outsourcing report data if this is an outsourced test
     let outsourcingReport = null;
