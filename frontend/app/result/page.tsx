@@ -28,6 +28,7 @@ import { getOrganizations } from "@/src/api/master";
 import ReadingValidationModal from "@/app/components/ReadingValidationModal";
 import AuthenticateModal from "@/app/components/AuthenticateModal";
 import TestSelectionModal, { SelectedTestItem } from "@/app/components/TestSelectionModal";
+import { stripHtmlTags } from "@/src/utils/htmlParser";
 
 const LetterHead = "/LetterHead.jpeg";
 
@@ -984,12 +985,7 @@ export default function Result() {
   const getAgeAppropriateRange = (parameterData: any, patient: any) => {
     if (!parameterData) return '-';
     
-    // ✅ PRIORITY 1: If textContent (RIGHT textarea) has a value, show ONLY that
-    if (parameterData.textContent) {
-      return parameterData.textContent;
-    }
-    
-    // ✅ PRIORITY 2: If textContent is empty, calculate age/gender-based ranges
+    // ✅ PRIORITY 1: Calculate age/gender-based ranges
     const patientAgeYears = patient.ageYears ?? 0;
     const patientAgeMonths = patient.ageMonths ?? 0;
     const patientAgeDays = patient.ageDays ?? 0;
@@ -1614,6 +1610,27 @@ export default function Result() {
           });
         }
 
+        // Build descriptive parameters section
+        let descriptiveHtml = '';
+        if (response.parameters && Array.isArray(response.parameters)) {
+          const descriptiveParams = response.parameters.filter((p: any) => p.isDescriptive);
+          if (descriptiveParams.length > 0) {
+            descriptiveHtml = '<div style="margin-top:6mm;padding:3mm;background:#f9f9f9;border:0.5px solid #ddd;border-radius:2px;">';
+            
+            descriptiveParams.forEach((param: any) => {
+              const displayText = param.textContent || param.displayRangeText || '-';
+              descriptiveHtml += `
+                <div style="margin-bottom:3mm;">
+                  <strong style="font-size:11px;display:block;margin-bottom:1mm;">${param.parameterName}:</strong>
+                  <div style="font-size:10px;line-height:1.4;color:#333;white-space:pre-wrap;">${stripHtmlTags(displayText)}</div>
+                </div>
+              `;
+            });
+            
+            descriptiveHtml += '</div>';
+          }
+        }
+
         // Build letterhead image HTML if available
         const letterheadHtml = withHeader && (letterheadDB?.headerImage || letterHeadBase64)
           ? `<img src="${letterheadDB?.headerImage || letterHeadBase64}" style="position:absolute;top:0;left:0;width:100%;height:100%;object-fit:fill;z-index:0;" />`
@@ -1656,6 +1673,8 @@ export default function Result() {
                   ${paramsHtml}
                 </tbody>
               </table>
+
+              ${descriptiveHtml}
 
               <!-- Interpretation -->
               ${interpretationHtml}

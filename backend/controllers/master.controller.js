@@ -579,6 +579,7 @@ export const getTestById = async (req, res) => {
           decimal: param.decimal ? Number(param.decimal) : undefined,
           sortOrder: param.parameterSortOrder,
           isDescriptive: param.isDescriptive,
+          descriptiveText: param.descriptiveText,  // ✅ CRITICAL: Return descriptive text
           lowPanic: param.lowPanic,
           highPanic: param.highPanic,
           isNABL: param.isNABL,
@@ -661,6 +662,7 @@ export const getTestById = async (req, res) => {
           decimal: 2,
           sortOrder: "",
           isDescriptive: false,
+          descriptiveText: "",  // ✅ CRITICAL: Include empty descriptiveText
           lowPanic: "",
           highPanic: "",
           isNABL: false,
@@ -911,8 +913,7 @@ export const createTest = async (req, res) => {
               let existingParam = await prisma.testParameter.findFirst({
                 where: {
                   parameterName: {
-                    equals: param.parameterName,
-                    mode: 'insensitive'  // Case-insensitive search
+                    equals: param.parameterName
                   }
                 }
               });
@@ -991,6 +992,7 @@ export const createTest = async (req, res) => {
                     decimal: param.decimal ? parseInt(param.decimal) : null,
                     parameterSortOrder: param.sortOrder !== undefined && param.sortOrder !== null ? parseInt(param.sortOrder) : null,
                     isDescriptive: param.isDescriptive || false,
+                    descriptiveText: param.descriptiveText || null,  // ✅ CRITICAL: Save descriptive text
                     lowPanic: param.lowPanic ? parseFloat(param.lowPanic) : null,
                     highPanic: param.highPanic ? parseFloat(param.highPanic) : null,
                     isNABL: param.isNABL || false,
@@ -1290,6 +1292,7 @@ export const updateTest = async (req, res) => {
           decimal: param.decimal ? parseInt(param.decimal) : null,
           parameterSortOrder: param.sortOrder !== undefined && param.sortOrder !== null ? parseInt(param.sortOrder) : undefined,
           isDescriptive: param.isDescriptive || false,
+          descriptiveText: param.descriptiveText || null,  // ✅ CRITICAL: Save descriptive text
           lowPanic: param.lowPanic ? parseFloat(param.lowPanic) : null,
           highPanic: param.highPanic ? parseFloat(param.highPanic) : null,
           isNABL: param.isNABL || false,
@@ -4805,8 +4808,7 @@ export const createTestCategoryWithParameter = async (req, res) => {
     let parameter = await prisma.testParameter.findFirst({
       where: {
         parameterName: {
-          equals: parameterName,
-          mode: 'insensitive'  // Case-insensitive search
+          equals: parameterName
         }
       }
     });

@@ -10,56 +10,29 @@ import { getPatientTestById, updateTestStatus, updatePatientComments, deleteComm
 import API_BASE_URL from "@/src/api/config";
 import { useTestTemplates } from '@/src/hooks/useTestTemplates';
 import InlineTemplateSelector from '@/app/components/InlineTemplateSelector';
-import { CKEditor } from '@ckeditor/ckeditor5-react';
-import ClassicEditor from '@ckeditor/ckeditor5-build-classic';
 import { parseHtmlText, stripHtmlTags, HtmlPart } from '@/src/utils/htmlParser';
 const LetterHead = "/LetterHead.jpeg";
 
 // ✅ Helper function to extract ALL available options from a parameter (from ALL database fields)
 const getAllOptionsFromParameter = (param: any): string[] => {
-  const allOptions: string[] = [];  // Use array to maintain order
+  const allOptions: string[] = [];
   const seenOptions = new Set<string>();
   
-  // 1. Add all options from textContent (primary source - textarea with newline or pipe-separated values)
-  // IMPORTANT: Keep order as entered (first line = first option)
-  if (param.textContent) {
+  // 1. Add all options from rangeText ONLY (LEFT textarea - pipe-separated dropdown options)
+  // IMPORTANT: This is the PRIMARY source for dropdown options
+  if (param.rangeText?.trim()) {
     try {
-      let options: any[] = [];
-      try {
-        options = JSON.parse(param.textContent);
-      } catch {
-        // Split by newlines first to get lines in order
-        const byNewline = param.textContent.split('\n').map((o: string) => o.trim()).filter(Boolean);
-        console.log(`📋 ${param.parameterName} - Raw textContent:`, param.textContent);
-        console.log(`📋 ${param.parameterName} - Split by newline:`, byNewline);
-        if (byNewline.length > 1) {
-          options = byNewline;
-        } else {
-          // If only one line, split by pipes ONLY (not commas - commas are part of the continuous value)
-          options = param.textContent.split('|').map((o: string) => o.trim()).filter(Boolean);
-          console.log(`📋 ${param.parameterName} - Split by pipe (single line):`, options);
-        }
-      }
-      
-      console.log(`🔍 ${param.parameterName} - Options before processing:`, options);
-      
-      options.forEach((option: any) => {
-        const optionValue = typeof option === 'object' ? option.value || option.name : option;
-        const trimmed = optionValue?.toString().trim();
-        console.log(`  → Option: "${optionValue}" → Trimmed: "${trimmed}"`);
-        // Include even if it's just a dash "-" or empty (they are valid values)
-        if (trimmed !== null && trimmed !== undefined && !seenOptions.has(trimmed)) {
-          allOptions.push(trimmed);
-          seenOptions.add(trimmed);
-          console.log(`    ✅ Added: "${trimmed}"`);
+      const options = param.rangeText.split('|').map((o: string) => o.trim()).filter(Boolean);
+      options.forEach((option: string) => {
+        if (option && !seenOptions.has(option)) {
+          allOptions.push(option);
+          seenOptions.add(option);
         }
       });
     } catch (e) {
-      console.warn(`Error parsing textContent for parameter ${param.id}:`, e);
+      console.warn(`Error parsing rangeText for parameter ${param.id}:`, e);
     }
   }
-  
-  console.log(`✅ Final allOptions for ${param.parameterName}:`, allOptions);
   
   // 2. Add gender-specific default values (same as validation module)
   if (param.maleDefaultValue?.trim() && !seenOptions.has(param.maleDefaultValue.trim())) {
@@ -86,18 +59,7 @@ const getAllOptionsFromParameter = (param: any): string[] => {
     });
   }
   
-  // 4. Add from rangeText (split by pipe only)
-  if (param.rangeText?.trim()) {
-    param.rangeText.split('|').forEach((opt: string) => {
-      const trimmed = opt.trim();
-      if (trimmed !== null && trimmed !== undefined && !seenOptions.has(trimmed)) {
-        allOptions.push(trimmed);
-        seenOptions.add(trimmed);
-      }
-    });
-  }
-  
-  // 5. Add from rangeValues (JSON or pipe-separated)
+  // 4. Add from rangeValues (JSON or pipe-separated)
   if (param.rangeValues?.trim()) {
     try {
       let rangeValues: any[] = [];
@@ -134,6 +96,15 @@ const getFirstTextOption = (param: any): string | null => {
     allOptions: options
   });
   return options.length > 0 ? options[0] : null;
+};
+
+// ✅ Helper function to format multi-line text - just return cleaned text
+// The whitespace-pre-wrap CSS class will handle line break display
+const formatMultiLineText = (text: string | undefined): string => {
+  if (!text) return '-';
+  
+  const cleanedText = stripHtmlTags(text);
+  return cleanedText && cleanedText !== '-' ? cleanedText : '-';
 };
 
 // Plain text area with suggestion dropdown and formatting support
@@ -1132,8 +1103,9 @@ const PatientResult = () => {
         console.log('✅ Fetched parameters from backend:');
         console.table(data.parameters.map(p => ({
           name: p.parameterName,
-          units: p.units,
           type: p.type,
+          textContent: p.textContent ? p.textContent.substring(0, 30) : '(empty)',
+          units: p.units,
           isDescriptive: p.isDescriptive,
           lowPanic: p.lowPanic,
           highPanic: p.highPanic,
@@ -1972,6 +1944,20 @@ const PatientResult = () => {
                       </tr>
                     </thead>
                     <tbody>
+                      {(() => {
+                        // 🔴 DEBUG: Log ALL parameters to see what's loaded
+                        console.log(`🔍 ALL PARAMETERS LOADED:`);
+                        (testData.parameters || []).forEach((param, idx) => {
+                          console.log(`  ${idx + 1}. ${param.parameterName}`);
+                          console.log(`     - type: ${param.type}`);
+                          console.log(`     - isDescriptive: ${param.isDescriptive}`);
+                          console.log(`     - textContent: "${param.textContent}" (length: ${param.textContent?.length || 0})`);
+                          console.log(`     - rangeText: "${param.rangeText}"`);
+                          console.log(`     - displayRangeText: "${param.displayRangeText}"`);
+                          console.log(`     - normalRange: "${param.normalRange}"`);
+                        });
+                        return null;
+                      })()}
                       {Object.entries(testData.groupedParameters || {})
                         .sort(([, paramsA]: any, [, paramsB]: any) => (paramsA[0]?.categorySortOrder ?? 999) - (paramsB[0]?.categorySortOrder ?? 999))
                         .map(([categoryKey, categoryParams]: [string, any]) => (
@@ -1993,18 +1979,32 @@ const PatientResult = () => {
                             // Determine if this is a text/dropdown parameter (not numeric, not descriptive)
                             const isTextDropdown = param.type === 'Text' && !param.isDescriptive;
                             
+                            // ✅ DEBUG LOGGING FOR NORMAL RANGE ISSUE
+                            console.log(`🔍 PARAM: ${param.parameterName}`);
+                            console.log(`   - type: ${param.type}`);
+                            console.log(`   - isDescriptive: ${param.isDescriptive}`);
+                            console.log(`   - isTextDropdown: ${isTextDropdown}`);
+                            console.log(`   - textContent: "${param.textContent}"`);
+                            console.log(`   - textContent?.trim(): "${param.textContent?.trim()}"`);
+                            console.log(`   - textContent is truthy: ${!!param.textContent?.trim()}`);
+                            console.log(`   - RANGE FIELDS:`);
+                            console.log(`     * normalRange: "${param.normalRange}"`);
+                            console.log(`     * displayRangeText: "${param.displayRangeText}"`);
+                            console.log(`     * rangeText: "${param.rangeText}"`);
+                            console.log(`     * ageRanges: ${JSON.stringify(param.ageRanges || [])}`);
+                            console.log(`     * maleLowValue: ${param.maleLowValue}, maleHighValue: ${param.maleHighValue}`);
+                            console.log(`     * femaleLowValue: ${param.femaleLowValue}, femaleHighValue: ${param.femaleHighValue}`);
+                            console.log(`     * childLowValue: ${param.childLowValue}, childHighValue: ${param.childHighValue}`);
+                            console.log(`   - Should show NORMAL RANGE? ${!param.isDescriptive && (!isTextDropdown || (isTextDropdown && param.textContent?.trim()))}`);
+                            
                             // 🔴 DEBUG: Log parameter type info
                             if (param.type === 'Text') {
                               console.log(`DEBUG: param.parameterName="${param.parameterName}", type="${param.type}", isDescriptive=${param.isDescriptive}, isTextDropdown=${isTextDropdown}`);
                             }
                             
-                            // 🔴 DEBUG: Also log ALL descriptive parameters
-                            if (param.isDescriptive) {
-                              console.log(`🎨 DESCRIPTIVE PARAM: ${param.parameterName} - should render CKEditor`);
-                            }
                             
                             // 🔴 DEBUG: Log which branch each parameter takes
-                            console.log(`📊 PARAM ${param.parameterName}: type=${param.type}, isDescriptive=${param.isDescriptive}, branch=${ param.type === 'Numeric' ? 'NUMERIC' : param.isDescriptive ? 'DESCRIPTIVE(CKEDITOR)' : param.type === 'Text' ? 'TEXT' : 'OTHER'}`);
+                            console.log(`📊 PARAM ${param.parameterName}: type=${param.type}, isDescriptive=${param.isDescriptive}, branch=${ param.type === 'Numeric' ? 'NUMERIC' : param.type === 'Text' ? 'TEXT' : 'OTHER'}`);
                             
                             return (
                               <tr key={param.id} className="bg-purple-100">
@@ -2019,32 +2019,6 @@ const PatientResult = () => {
                                         disabled={isFormula}
                                         className={`${results[paramKey]?.isHighlighted ? 'border-2 border-red-500 bg-red-50' : inputClass} px-2 py-1 w-24 rounded`}
                                       />
-                                    ) : param.isDescriptive ? (
-                                      (() => {
-                                        console.log(`✅ RENDERING CKEDITOR for ${param.parameterName} (id: ${param.id})`);
-                                        return (
-                                          <div className="border border-gray-300 rounded min-h-[150px] w-full">
-                                            <CKEditor
-                                              editor={ClassicEditor as any}
-                                              data={results[paramKey]?.textValue || ''}
-                                              onChange={(_, editor) => {
-                                                const data = editor.getData();
-                                                handleResultChange(paramKey, 'textValue', data, testData.parameters);
-                                              }}
-                                              config={{
-                                                toolbar: [
-                                                  'heading', '|',
-                                                  'bold', 'italic', 'underline', '|',
-                                                  'fontSize', 'fontColor', '|',
-                                                  'bulletedList', 'numberedList', '|',
-                                                  'link', 'blockQuote', '|',
-                                                  'undo', 'redo'
-                                                ]
-                                              }}
-                                            />
-                                          </div>
-                                        );
-                                      })()
                                     ) : param.type === 'Text' ? (
                                       // ✅ TEXT/DROPDOWN - Same logic as Validation & Authentication modules
                                       <div className="w-full space-y-1">
@@ -2148,16 +2122,24 @@ const PatientResult = () => {
                                     })()}
                                   </div>
                                 </td>
-                                {!isTextDropdown && !param.isDescriptive && (
-                                  <>
-                                    <td className="border p-2 text-xs">{param.units || '-'}</td>
-                                    <td className="border p-2 text-xs">
-                                      {stripHtmlTags(
-                                        getAgeAppropriateRange(param, patientData?.patient?.ageYears, patientData?.patient?.ageMonths, patientData?.patient?.ageDays, patientData?.patient?.gender) || param.normalRange || param.displayRangeText || param.rangeText || '-'
-                                      )}
-                                    </td>
-                                  </>
+                                {/* UNITS cell - only show for non-text parameters */}
+                                {!isTextDropdown && (
+                                  <td className="border p-2 text-xs">
+                                    {param.units || '-'}
+                                  </td>
                                 )}
+
+                                {/* NORMAL RANGE cell - always render, show content based on condition */}
+                                <td className="border p-2 text-xs whitespace-pre-wrap break-words">
+                                  {(() => {
+                                    const shouldShow = isTextDropdown ? true : !param.isDescriptive;
+                                    if (!shouldShow) return '-';
+                                    
+                                    return formatMultiLineText(
+                                      getAgeAppropriateRange(param, patientData?.patient?.ageYears, patientData?.patient?.ageMonths, patientData?.patient?.ageDays, patientData?.patient?.gender) || param.normalRange || param.displayRangeText || param.textContent || param.rangeText || '-'
+                                    );
+                                  })()}
+                                </td>
                                 <td className="border p-2 text-center" style={{width: '40px'}}>
                                   <input 
                                     type="checkbox" 
@@ -2368,27 +2350,6 @@ const PatientResult = () => {
                                   </div>
                                 ) : param.type === 'Numeric' ? (
                                   <input type="text" value={results[param.id]?.numericValue ?? ''} onChange={(e) => handleResultChange(param.id, 'numericValue', e.target.value === '' ? null : e.target.value, parameters)} className={`${results[param.id]?.isHighlighted ? 'border-2 border-red-500 bg-red-50' : inputClass} px-2 py-1 w-24 rounded`} placeholder="e.g., 7.5, <7.5 or >140" />
-                                ) : param.isDescriptive ? (
-                                  <div className="border border-gray-300 rounded min-h-[150px]">
-                                    <CKEditor
-                                      editor={ClassicEditor as any}
-                                      data={results[param.id]?.textValue || ''}
-                                      onChange={(_, editor) => {
-                                        const data = editor.getData();
-                                        handleResultChange(param.id, 'textValue', data, parameters);
-                                      }}
-                                      config={{
-                                        toolbar: [
-                                          'heading', '|',
-                                          'bold', 'italic', 'underline', '|',
-                                          'fontSize', 'fontColor', '|',
-                                          'bulletedList', 'numberedList', '|',
-                                          'link', 'blockQuote', '|',
-                                          'undo', 'redo'
-                                        ]
-                                      }}
-                                    />
-                                  </div>
                                 ) : param.type === 'Text' ? (
                                   (() => {
                                     // ✅ Use getAllOptionsFromParameter to get all options (includes textContent, rangeText, displayRangeText, etc.)
@@ -2467,10 +2428,26 @@ const PatientResult = () => {
                                     return unitValue;
                                   })()}
                                 </td>
-                                <td className="border p-2">
-                                  {stripHtmlTags(
-                                    getAgeAppropriateRange(param, patientData?.patient?.ageYears, patientData?.patient?.ageMonths, patientData?.patient?.ageDays, patientData?.patient?.gender) || ''
-                                  )}
+                                <td className="border p-2 text-xs whitespace-pre-wrap break-words">
+                                  {/* ✅ Show textContent if available, otherwise show normal range */}
+                                  {(() => {
+                                    const hasTextContent = !!param.textContent && param.textContent.trim() !== '';
+                                    const rangeValue = getAgeAppropriateRange(param, patientData?.patient?.ageYears, patientData?.patient?.ageMonths, patientData?.patient?.ageDays, patientData?.patient?.gender) || '';
+                                    
+                                    console.log(`📋 Normal Range render for ${param.parameterName}:`, {
+                                      type: param.type,
+                                      hasTextContent,
+                                      textContent: param.textContent ? param.textContent.substring(0, 50) : 'N/A',
+                                      rangeValue: rangeValue.substring(0, 50),
+                                      willShowText: hasTextContent
+                                    });
+                                    
+                                    if (hasTextContent) {
+                                      return formatMultiLineText(param.textContent);
+                                    } else {
+                                      return formatMultiLineText(rangeValue);
+                                    }
+                                  })()}
                                 </td>
                               </>
                             )}

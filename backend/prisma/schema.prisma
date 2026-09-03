@@ -543,6 +543,7 @@ model TestParameter {
   decimal            Int?             @default(2)
   parameterSortOrder Int?
   isDescriptive      Boolean          @default(false)
+  descriptiveText    String?          @db.Text
   lowPanic           Float?
   highPanic          Float?
   isNABL             Boolean          @default(false)
