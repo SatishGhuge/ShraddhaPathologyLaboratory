@@ -151,6 +151,7 @@ interface Parameter {
   categoryName: string;
   categoryId: number;
   sortOrder: number;
+  categorySortOrder?: number;
   showCategoryHeader: boolean;
   rangeType: string;
   displayRangeText: string;
@@ -178,6 +179,7 @@ interface Parameter {
     textValue?: string;
     selectedOption?: string;
     isAbnormal?: boolean;
+    isHighlighted?: boolean;
     referenceRange?: string;
   };
 }

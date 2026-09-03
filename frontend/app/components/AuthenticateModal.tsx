@@ -150,6 +150,7 @@ interface Parameter {
   categoryName: string;
   categoryId: number;
   sortOrder: number;
+  categorySortOrder?: number;
   showCategoryHeader: boolean;
   rangeType: string;
   displayRangeText: string;
@@ -177,6 +178,7 @@ interface Parameter {
     textValue?: string;
     selectedOption?: string;
     isAbnormal?: boolean;
+    isHighlighted?: boolean;
     referenceRange?: string;
   };
 }
@@ -828,12 +830,8 @@ const AuthenticateModal = ({
                                   <td className="border p-1.5 text-center text-gray-600 text-xs">
                                     {param.units || '-'}
                                   </td>
-                                  <td className="border p-1.5 text-center text-gray-600 text-xs max-w-xs truncate" title={param.type === 'Text' || param.isMultipleOptions ? (param?.textContent || '') : rangeStr}>
-                                    {param.type === 'Text' || param.isMultipleOptions ? (
-                                      param?.textContent ? param.textContent.substring(0, 30) + (param.textContent.length > 30 ? '...' : '') : '-'
-                                    ) : (
-                                      rangeStr && rangeStr.length > 35 ? rangeStr.substring(0, 35) + '...' : rangeStr
-                                    )}
+                                  <td className="border p-1.5 text-center text-gray-600 text-xs max-w-xs truncate" title={rangeStr}>
+                                    {rangeStr && rangeStr.length > 35 ? rangeStr.substring(0, 35) + '...' : rangeStr}
                                   </td>
                                 </>
                               )}
