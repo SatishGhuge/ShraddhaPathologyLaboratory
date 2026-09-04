@@ -242,6 +242,7 @@ export const getPatientTests = async (req, res) => {
                     decimal: true,
                     lowPanic: true,
                     highPanic: true,
+                    multiplyBy: true,
                     unit: {
                       select: {
                         symbol: true
@@ -538,6 +539,7 @@ export const getPatientTestById = async (req, res) => {
             decimal: true,
             lowPanic: true,
             highPanic: true,
+            multiplyBy: true,
             unit: {
               select: {
                 symbol: true
@@ -694,6 +696,9 @@ export const getPatientTestById = async (req, res) => {
           formula: category.testParameter.formula,
           decimal: category.testParameter.decimal || 2,
           
+          // ✅ NEW: Multiply factor for parameter values
+          multiplyBy: category.testParameter.multiplyBy,
+          
           // Get appropriate range based on patient demographics from database
           normalRange: getNormalRange(category.testParameter, patientTest.patient),
           
@@ -841,6 +846,9 @@ export const getPatientTestById = async (req, res) => {
           hasFormula: param.hasFormula,
           formula: param.formula,
           decimal: param.decimal || 2,
+          
+          // ✅ NEW: Multiply factor for parameter values
+          multiplyBy: param.multiplyBy,
           
           // Get appropriate range based on patient demographics from database
           normalRange: getNormalRange(param, patientTest.patient),

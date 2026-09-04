@@ -360,6 +360,19 @@ const AddTest = () => {
           const testData = await getTestById((Array.isArray(id) ? id[0] : id) as string);
           console.log('✅ Received test data:', testData);
           
+          // 🔍 NEW: Log multiplyBy values received from API
+          console.log('%c═══ MULTIPLYING BY VALUES RECEIVED FROM API ═══', 'color: #ff6600; font-weight: bold');
+          if (testData.categories && testData.categories.length > 0) {
+            testData.categories.forEach((cat, catIdx) => {
+              console.log(`Category ${catIdx}: ${cat.name}`);
+              if (cat.parameters && cat.parameters.length > 0) {
+                cat.parameters.forEach((param, paramIdx) => {
+                  console.log(`  Param ${paramIdx}: "${param.parameterName}" - multiplyBy: "${param.multiplyBy}" (type: ${typeof param.multiplyBy})`);
+                });
+              }
+            });
+          }
+          
           if (testData) {
             const formDataToSet = {
               name: testData.name || "",
@@ -460,6 +473,7 @@ const AddTest = () => {
                           id: param.id,  // ✅ CRITICAL FIX: Include parameter ID from API response
                           parameterName: param.parameterName || "",
                           machineCode: param.machineCode || "",
+                          multiplyBy: param.multiplyBy || "",
                           decimal: param.decimal !== undefined && param.decimal !== "" ? param.decimal : "",
                           sortOrder: param.sortOrder ? param.sortOrder.toString() : "",
                           testMethod: param.testMethod || "",
@@ -562,6 +576,17 @@ const AddTest = () => {
               }));
               
               console.log('✅ Categories sorted by sortOrder:', sortedCategories.map(c => ({ name: c.name, sortOrder: c.sortOrder })));
+              
+              // 🔍 NEW: Log multiplyBy values being set to state
+              console.log('%c═══ MULTIPLYING BY VALUES BEING SET TO STATE ═══', 'color: #ff6600; font-weight: bold');
+              sortedCategories.forEach((cat, catIdx) => {
+                console.log(`Category ${catIdx}: ${cat.name}`);
+                if (cat.parameters && cat.parameters.length > 0) {
+                  cat.parameters.forEach((param, paramIdx) => {
+                    console.log(`  Param ${paramIdx}: "${param.parameterName}" - multiplyBy: "${param.multiplyBy}"`);
+                  });
+                }
+              });
             }
             
             // Load linked tests if present (edit mode)
@@ -1080,14 +1105,36 @@ const AddTest = () => {
 
       console.log("📤 Sending test data to API:", completeTestData);
       
-      // 🔍 DEBUG: Log parameter IDs being sent
-      console.log('%c═══ PARAMETER IDs BEING SENT ═══', 'color: #ff00ff; font-weight: bold');
+      // 🔍 DEBUG: Log multiplyBy field for all parameters - DETAILED CHECK
+      console.log('%c═══ MULTIPLY BY VALUES - DETAILED CHECK ═══', 'color: #ff6600; font-weight: bold; font-size: 14px');
+      console.log('Total categories:', completeTestData.categories.length);
       completeTestData.categories.forEach((cat, catIdx) => {
-        console.log(`Category ${catIdx}: ${cat.name}`);
+        console.log(`\n📂 Category ${catIdx}: "${cat.name}" (isCategory: ${cat.isCategory})`);
+        console.log(`   Parameters in category: ${cat.parameters.length}`);
         cat.parameters.forEach((param, paramIdx) => {
-          console.log(`  Param ${paramIdx}: "${param.parameterName}" - ID: ${param.id} (type: ${typeof param.id}, is undefined: ${param.id === undefined})`);
+          console.log(`   ├─ Param ${paramIdx}: "${param.parameterName}"`);
+          console.log(`   │  ├─ multiplyBy: "${param.multiplyBy}" (type: ${typeof param.multiplyBy}, is null: ${param.multiplyBy === null}, is empty: ${param.multiplyBy === ""})`);
+          console.log(`   │  ├─ machineCode: "${param.machineCode}"`);
+          console.log(`   │  └─ decimal: ${param.decimal}`);
         });
       });
+      
+      // ✅ CRITICAL: Log the exact JSON that will be sent
+      console.log('%c═══ EXACT JSON BEING SENT TO API ═══', 'color: #00ff00; font-weight: bold');
+      const jsonString = JSON.stringify(completeTestData);
+      console.log(jsonString);
+      console.log('JSON length:', jsonString.length);
+      
+      // Verify multiplyBy is in the JSON string
+      if (jsonString.includes('multiplyBy')) {
+        console.log('✅ multiplyBy found in JSON string');
+        const multiplyByMatches = jsonString.match(/"multiplyBy":"[^"]*"/g);
+        if (multiplyByMatches) {
+          console.log('Found multiplyBy values:', multiplyByMatches);
+        }
+      } else {
+        console.log('❌ WARNING: multiplyBy NOT found in JSON string!');
+      }
       
       console.log("📋 Test table data:", testData);
       console.log("📂 Category table data:", categoryData);

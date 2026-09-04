@@ -2285,7 +2285,15 @@ const PatientResult = () => {
                         const inputClass = outOfRange ? "border-2 border-red-500 bg-red-50 px-2 py-1 w-24 rounded" : "border border-gray-300 px-2 py-1 w-24 rounded";
                         return (
                           <tr key={param.id} className={`${param.isDescriptive ? 'bg-purple-100 h-auto' : 'bg-purple-100'}`}>
-                            <td className="border p-2">{renderStyledText((param.parameterName || '').toUpperCase(), false)}{param.isMandatory && <span className="text-red-500">*</span>}</td>
+                            <td className="border p-2">
+                              {renderStyledText((param.parameterName || '').toUpperCase(), false)}
+                              {param.isMandatory && <span className="text-red-500">*</span>}
+                              {param.multiplyBy && (
+                                <div className="text-xs text-gray-500 font-normal">
+                                  (× {param.multiplyBy})
+                                </div>
+                              )}
+                            </td>
                             <td className={`border p-2 ${param.isDescriptive ? 'p-0 py-1' : ''}`} colSpan={param.type === 'Text' && !param.isDescriptive && param.rangeText?.trim() ? 3 : undefined}>
                               <div className={`${param.type === 'Text' && !param.isDescriptive && param.rangeText?.trim() ? 'w-full flex flex-col' : param.isDescriptive ? 'flex items-center gap-0' : 'flex items-center gap-2'}`} style={param.isDescriptive ? { margin: 0, padding: 0 } : {}}>
                                 {isFormula ? (

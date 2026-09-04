@@ -372,12 +372,30 @@ export const submitResults = async (req, res) => {
 
             console.log(`[MACHINE API RESULTS] Found testParameterId=${testParam.id}, storing value: ${value}`);
 
+            // ✅ NEW: Apply multiply factor if parameter has multiplyBy field
+            let finalValue = value;
+            if (testParam.multiplyBy) {
+              try {
+                // Safely evaluate the multiplyBy expression (e.g., "10^3" -> 1000)
+                // eslint-disable-next-line no-new-func
+                const multiplier = Function('"use strict"; return (' + testParam.multiplyBy + ')')();
+                if (typeof multiplier === 'number' && isFinite(multiplier)) {
+                  finalValue = parseFloat(value) * multiplier;
+                  console.log(`[MACHINE API RESULTS] ✅ Applied multiplier: ${value} × ${testParam.multiplyBy} (${multiplier}) = ${finalValue}`);
+                } else {
+                  console.warn(`[MACHINE API RESULTS] ⚠️ Invalid multiplier result for parameter ${testParam.parameterName}: ${multiplier}`);
+                }
+              } catch (err) {
+                console.warn(`[MACHINE API RESULTS] ⚠️ Error evaluating multiplyBy "${testParam.multiplyBy}" for parameter ${testParam.parameterName}: ${err.message}`);
+              }
+            }
+
             // Store for batch upsert
             valuesToUpsert.push({
               patientTestId: patientTest.id,
               testParameterId: testParam.id,
-              numericValue: String(value),  // ✅ Convert to string - schema expects String
-              textValue: String(value)
+              numericValue: String(finalValue),  // ✅ Convert to string - schema expects String (after multiplication)
+              textValue: String(finalValue)
             });
           }
 

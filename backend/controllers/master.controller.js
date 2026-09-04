@@ -571,6 +571,7 @@ export const getTestById = async (req, res) => {
       // Get parameter data from testParameter relation
       if (cat.testParameter) {
         const param = cat.testParameter;
+        console.log(`🔍 Parameter: ${param.parameterName}, multiplyBy in DB: "${param.multiplyBy}"`);
         const parameter = {
           id: param.id,  // ✅ CRITICAL: Include parameter ID for updates
           parameterName: param.parameterName,
@@ -723,9 +724,24 @@ export const getTestById = async (req, res) => {
     console.log('📊 profileTest value:', test.profileTest, 'type:', typeof test.profileTest);
     console.log('📊 sampleTypeId value:', test.sampleTypeId);
     console.log('📊 sample_type object:', test.sample_type);
+    
+    // 🔍 NEW: Log multiplyBy values in response
+    console.log('%c═══ MULTIPLYING BY VALUES IN RESPONSE ═══', 'color: #ff6600; font-weight: bold');
+    if (test.categories && test.categories.length > 0) {
+      test.categories.forEach((cat, catIdx) => {
+        console.log(`Category ${catIdx}: ${cat.name}`);
+        if (cat.parameters && cat.parameters.length > 0) {
+          cat.parameters.forEach((param, paramIdx) => {
+            console.log(`  Param ${paramIdx}: "${param.parameterName}" - multiplyBy: "${param.multiplyBy}"`);
+          });
+        }
+      });
+    }
+    
     if (test.categories && test.categories.length > 0 && test.categories[0].parameters) {
       console.log('📊 First parameter unitId:', test.categories[0].parameters[0]?.unitId);
       console.log('📊 First parameter unit object:', test.categories[0].parameters[0]?.unit);
+      console.log('📊 First parameter multiplyBy:', test.categories[0].parameters[0]?.multiplyBy);
     }
 
     // Build response object
@@ -898,6 +914,7 @@ export const createTest = async (req, res) => {
         if (category.parameters && category.parameters.length > 0) {
           for (const param of category.parameters) {
             console.log(`📋 Processing parameter: ${param.parameterName}, ID: ${param.id}`);
+            console.log(`   ✅ multiplyBy received: "${param.multiplyBy}" (type: ${typeof param.multiplyBy})`);
             
             let testParameterId;
             
@@ -966,13 +983,25 @@ export const createTest = async (req, res) => {
                   console.log(`   ✅ Same purpose confirmed - REUSING parameter`);
                   testParameterId = existingParam.id;
                   
-                  // Add parameter code if missing
+                  // ✅ CRITICAL FIX: Update multiplyBy even if reusing parameter
+                  const updatePayload = {};
+                  if (param.multiplyBy !== undefined && param.multiplyBy !== existingParam.multiplyBy) {
+                    console.log(`   📝 Updating multiplyBy: "${existingParam.multiplyBy}" → "${param.multiplyBy}"`);
+                    updatePayload.multiplyBy = param.multiplyBy || null;
+                  }
+                  
                   if (param.parameterCode && param.parameterCode.trim() && !existingParam.parameterCode) {
                     console.log(`   📝 Adding parameter code: ${param.parameterCode}`);
+                    updatePayload.parameterCode = param.parameterCode.trim();
+                  }
+                  
+                  // Apply any updates if needed
+                  if (Object.keys(updatePayload).length > 0) {
                     await prisma.testParameter.update({
                       where: { id: existingParam.id },
-                      data: { parameterCode: param.parameterCode.trim() }
+                      data: updatePayload
                     });
+                    console.log(`   ✅ Parameter updated with:`, updatePayload);
                   }
                 } else {
                   console.log(`   ⚠️  DIFFERENT PURPOSE - creating NEW separate parameter`);
@@ -1257,6 +1286,8 @@ export const updateTest = async (req, res) => {
 
       // Helper function to prepare parameter data
       const prepareParameterData = (param) => {
+        console.log(`🔧 prepareParameterData called for: "${param.parameterName}", multiplyBy: "${param.multiplyBy}"`);
+        
         // ✅ NEW: Handle 'Both' gender which applies to both Male and Female
         const getMaleRange = () => {
           const maleRange = param.normalRanges?.find(r => r.gender === 'Male');
@@ -1378,6 +1409,7 @@ export const updateTest = async (req, res) => {
                 console.log(`   📤 Prepared update payload for ${param.parameterName}:`, {
                   parameterName: updatePayload.parameterName,
                   parameterCode: updatePayload.parameterCode,
+                  multiplyBy: updatePayload.multiplyBy,
                   ageRanges: updatePayload.ageRanges ? updatePayload.ageRanges.substring(0, 100) + '...' : 'null',
                   maleLowValue: updatePayload.maleLowValue,
                   maleActive: updatePayload.maleActive,
@@ -1412,6 +1444,7 @@ export const updateTest = async (req, res) => {
                 console.log(`   🔍 VERIFICATION - Data after update:`, {
                   parameterName: verifyUpdate.parameterName,
                   parameterCode: verifyUpdate.parameterCode,
+                  multiplyBy: verifyUpdate.multiplyBy,
                   ageRanges: verifyUpdate.ageRanges ? verifyUpdate.ageRanges.substring(0, 100) + '...' : 'null',
                   maleLowValue: verifyUpdate.maleLowValue,
                   maleActive: verifyUpdate.maleActive

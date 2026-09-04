@@ -750,8 +750,20 @@ const AddTest = () => {
   };
 
   const handleParameterChange = (categoryIndex, parameterIndex, field, value) => {
+    // 🔍 DEBUG: Log all parameter changes
+    if (field === 'multiplyBy') {
+      console.log(`🔧 handleParameterChange CALLED - multiplyBy field changed`);
+      console.log(`   Category: ${categoryIndex}, Parameter: ${parameterIndex}`);
+      console.log(`   Field: ${field}, Value: "${value}", Type: ${typeof value}`);
+    }
+    
     // Convert testMethod and parameterName to uppercase
     const finalValue = (field === 'testMethod' || field === 'parameterName') ? (value || '').toUpperCase() : value;
+    
+    // 🔍 DEBUG: Log finalValue if multiplyBy
+    if (field === 'multiplyBy') {
+      console.log(`   FinalValue: "${finalValue}", Type: ${typeof finalValue}`);
+    }
     
     const updatedCategories = categories.map((category, cIdx) => 
       cIdx === categoryIndex
@@ -765,6 +777,11 @@ const AddTest = () => {
           }
         : category
     );
+    
+    // 🔍 DEBUG: Verify state was updated
+    if (field === 'multiplyBy') {
+      console.log(`   ✅ State updated. New parameter:`, updatedCategories[categoryIndex].parameters[parameterIndex]);
+    }
     
     // If range type is changed, ensure proper initialization
     if (field === 'rangeType') {
@@ -1113,6 +1130,37 @@ const AddTest = () => {
       };
 
       console.log("📤 Sending test data to API:", completeTestData);
+      
+      // 🔍 DEBUG: Log multiplyBy field for all parameters - DETAILED CHECK
+      console.log('%c═══ MULTIPLY BY VALUES - DETAILED CHECK ═══', 'color: #ff6600; font-weight: bold; font-size: 14px');
+      console.log('Total categories:', completeTestData.categories.length);
+      completeTestData.categories.forEach((cat, catIdx) => {
+        console.log(`\n📂 Category ${catIdx}: "${cat.name}" (isCategory: ${cat.isCategory})`);
+        console.log(`   Parameters in category: ${cat.parameters.length}`);
+        cat.parameters.forEach((param, paramIdx) => {
+          console.log(`   ├─ Param ${paramIdx}: "${param.parameterName}"`);
+          console.log(`   │  ├─ multiplyBy: "${param.multiplyBy}" (type: ${typeof param.multiplyBy}, is null: ${param.multiplyBy === null}, is empty: ${param.multiplyBy === ""})`);
+          console.log(`   │  ├─ machineCode: "${param.machineCode}"`);
+          console.log(`   │  └─ decimal: ${param.decimal}`);
+        });
+      });
+      
+      // ✅ CRITICAL: Log the exact JSON that will be sent
+      console.log('%c═══ EXACT JSON BEING SENT TO API ═══', 'color: #00ff00; font-weight: bold');
+      const jsonString = JSON.stringify(completeTestData);
+      console.log(jsonString);
+      console.log('JSON length:', jsonString.length);
+      
+      // Verify multiplyBy is in the JSON string
+      if (jsonString.includes('multiplyBy')) {
+        console.log('✅ multiplyBy found in JSON string');
+        const multiplyByMatches = jsonString.match(/"multiplyBy":"[^"]*"/g);
+        if (multiplyByMatches) {
+          console.log('Found multiplyBy values:', multiplyByMatches);
+        }
+      } else {
+        console.log('❌ WARNING: multiplyBy NOT found in JSON string!');
+      }
       
       // 🔍 DEBUG: Log parameter IDs being sent
       console.log('%c═══ PARAMETER IDs BEING SENT ═══', 'color: #ff00ff; font-weight: bold');
