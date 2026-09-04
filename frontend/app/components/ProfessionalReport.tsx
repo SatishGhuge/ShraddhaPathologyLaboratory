@@ -100,6 +100,7 @@ type ContentBlock =
   | { kind: 'test-title'; testData: any }
   | { kind: 'thead' }
   | { kind: 'category'; catName: string }
+  | { kind: 'cat-space' }  // ✅ ADDED: Category spacing block for pagination calculation
   | { kind: 'param'; param: any }
   | { kind: 'comments'; text: string }  // ✅ NEW: Comments as table row
   | { kind: 'instrument'; machine: any }  // ✅ NEW: Instrument/Machine as table row
@@ -146,6 +147,7 @@ function blockHeight(block: ContentBlock): number {
     case 'test-title': return TITLE_MM;
     case 'thead': return THEAD_MM;
     case 'category': return ROW_CAT_MM;
+    case 'cat-space': return 1.5;  // ✅ ADDED: Minimal height for category spacing (1.5mm instead of 2px)
     case 'param': return ROW_PARAM_MM;
     case 'comments': return ROW_PARAM_MM * 1.5;  // ✅ INCREASED: Comments wrap text, estimate 1.5x
     case 'instrument': return ROW_PARAM_MM * 1.5;  // ✅ INCREASED: Instrument wraps, estimate 1.5x
@@ -267,6 +269,7 @@ function buildContentBlocks(
       if (!visible.length) return;
       if (catName !== 'NO_CATEGORY_HEADER' && catParams[0]?.showCategoryHeader)
         blocks.push({ kind: 'category', catName });
+      blocks.push({ kind: 'cat-space' });  // ✅ ADDED: Add spacing block after category for pagination
       visible.forEach(p => blocks.push({ kind: 'param', param: p }));
     });
 
@@ -357,7 +360,7 @@ function paginateBlocks(blocks: ContentBlock[]): ReportPage[] {
     }
 
     // Reserve interpretation when still packing params for a test that has one
-    if (block.kind === 'category' || block.kind === 'param' || block.kind === 'comments' || block.kind === 'instrument') {
+    if (block.kind === 'category' || block.kind === 'param' || block.kind === 'comments' || block.kind === 'instrument' || block.kind === 'cat-space') {
       let j = i + 1;
       let hasInterpretation = false;
       let hasComments = false;
@@ -389,7 +392,7 @@ function paginateBlocks(blocks: ContentBlock[]): ReportPage[] {
       flush();
       
       // ✅ On continuation, add context blocks (test-title, thead) to continue the test
-      if (block.kind === 'category' || block.kind === 'param' || block.kind === 'comments' || block.kind === 'instrument') {
+      if (block.kind === 'category' || block.kind === 'param' || block.kind === 'comments' || block.kind === 'instrument' || block.kind === 'cat-space') {
         // Re-add test title on continuation for context
         if (lastTestTitle) {
           cur.push(lastTestTitle);
@@ -979,53 +982,88 @@ const ProfessionalReport = React.forwardRef<HTMLDivElement, ProfessionalReportPr
       const bodyStyle = getFormattingStyle('body');
 
       return (
-        <tr key={key} style={{ borderBottom: 'none', minHeight: '14px', lineHeight: '1.25' }}>
-          <td style={{ 
-            padding: '1px 3px',
-            ...bodyStyle,
-            fontWeight: (isabn || isHighlighted) ? 'bold' : (paramStyle.fontWeight || 'normal'),
-            fontStyle: paramStyle.fontStyle || 'normal',
-            textDecoration: isHighlighted ? 'underline' : (paramStyle.textDecoration || 'none'),
-            minHeight: '14px',
-            fontSize: '11px',
-          }}>
-            {strip(p.parameterName ?? '').toUpperCase()}
-            {p.parameterTestMethod && (
-              <div style={{ fontSize: '9px', color: '#000', fontWeight: 'normal', marginTop: '0px', marginBottom: '1px' }}>
-                <small>METHOD: {p.parameterTestMethod}</small>
-              </div>
-            )}
-          </td>
-          <td style={{ 
-            padding: '1px 3px',
-            textAlign: 'left',
-            ...bodyStyle,
-            fontWeight: isabn || isHighlighted ? 'bold' : 'normal',
-            color: isHighlighted ? '#c0392b' : (isabn ? '#c0392b' : 'inherit'),
-            minHeight: '14px',
-            fontSize: '11px',
-          }}>
-            {(p.isDescriptive || hasHtml(val)) && val !== '-' ? (
-              // ✅ For any text with HTML or descriptive fields: Convert <b> tags to bold CSS styling
-              <div 
-                dangerouslySetInnerHTML={{ __html: safe(val).replace(/<b>/g, '<span style="font-weight:bold;">').replace(/<\/b>/g, '</span>') }} 
-                style={{ whiteSpace: 'normal', textAlign: 'left', fontWeight: 'normal' }} 
-              />
-            ) : (
-              <>{val}{(isabn || isHighlighted) && val !== '-' ? ' *' : ''}</>
-            )}
-          </td>
-          {showUnits && (
-            <td style={{ padding: '1px 3px', textAlign: 'center', ...bodyStyle, color: '#000', minHeight: '14px', fontSize: '11px' }}>
-              {strip(p.units ?? '') || '-'}
+        <>
+          <tr key={key} style={{ borderBottom: 'none', minHeight: '14px', lineHeight: '1.25' }}>
+            <td style={{ 
+              padding: '1px 3px',
+              ...bodyStyle,
+              fontWeight: (isabn || isHighlighted) ? 'bold' : (paramStyle.fontWeight || 'normal'),
+              fontStyle: paramStyle.fontStyle || 'normal',
+              textDecoration: isHighlighted ? 'underline' : (paramStyle.textDecoration || 'none'),
+              minHeight: '14px',
+              fontSize: '11px',
+            }}>
+              {strip(p.parameterName ?? '').toUpperCase()}
+              {p.parameterTestMethod && (
+                <div style={{ fontSize: '9px', color: '#000', fontWeight: 'normal', marginTop: '0px', marginBottom: '1px' }}>
+                  <small>METHOD: {p.parameterTestMethod}</small>
+                </div>
+              )}
             </td>
-          )}
-          {showRange && (
-            <td style={{ padding: '1px 3px', ...bodyStyle, color: '#000', minHeight: '14px', fontSize: '11px' }}>
-              {strip(getDisplayRangeText(p, patient?.gender, patient?.ageYears, patient?.ageMonths, patient?.ageDays) || '') || ''}
+            <td style={{ 
+              padding: '1px 3px',
+              textAlign: 'left',
+              ...bodyStyle,
+              fontWeight: isabn || isHighlighted ? 'bold' : 'normal',
+              color: isHighlighted ? '#c0392b' : (isabn ? '#c0392b' : 'inherit'),
+              minHeight: '14px',
+              fontSize: '11px',
+            }}>
+              {(p.isDescriptive || hasHtml(val)) && val !== '-' ? (
+                // ✅ For any text with HTML or descriptive fields: Convert <b> tags to bold CSS styling
+                <div 
+                  dangerouslySetInnerHTML={{ __html: safe(val).replace(/<b>/g, '<span style="font-weight:bold;">').replace(/<\/b>/g, '</span>') }} 
+                  style={{ whiteSpace: 'normal', textAlign: 'left', fontWeight: 'normal' }} 
+                />
+              ) : (
+                <>{val}{(isabn || isHighlighted) && val !== '-' ? ' *' : ''}</>
+              )}
             </td>
+            {showUnits && (
+              <td style={{ padding: '1px 3px', textAlign: 'center', ...bodyStyle, color: '#000', minHeight: '14px', fontSize: '11px' }}>
+                {strip(p.units ?? '') || '-'}
+              </td>
+            )}
+            {showRange && (
+              <td style={{ padding: '1px 3px', ...bodyStyle, color: '#000', minHeight: '14px', fontSize: '11px' }}>
+                {strip(getDisplayRangeText(p, patient?.gender, patient?.ageYears, patient?.ageMonths, patient?.ageDays) || '') || ''}
+              </td>
+            )}
+          </tr>
+          {/* ✅ Display descriptive text on next line if isDescriptive is true and descriptiveText exists */}
+          {p.isDescriptive && p.descriptiveText && (
+            <tr key={`${key}-desc`} style={{ borderBottom: 'none', minHeight: '14px', lineHeight: '1.25' }}>
+              <td colSpan={2 + (showUnits ? 1 : 0) + (showRange ? 1 : 0)} style={{ 
+                padding: '2px 3px',
+                paddingLeft: '6px',
+                ...bodyStyle,
+                fontSize: '11px',  // ✅ Changed from 10px to match body text
+                color: 'inherit',  // ✅ Changed from #555 to inherit from body style
+                fontStyle: 'normal',  // ✅ Changed from italic to normal
+                whiteSpace: 'normal',
+                minHeight: '14px',
+              }}>
+                <div style={{ whiteSpace: 'pre-wrap', textAlign: 'left' }}>
+                  {hasHtml(p.descriptiveText) ? (
+                    // ✅ Process HTML tags: convert <b> to bold, handle all HTML
+                    <div 
+                      dangerouslySetInnerHTML={{ 
+                        __html: safe(p.descriptiveText)
+                          .replace(/<b>/g, '<span style="font-weight:bold;">')
+                          .replace(/<\/b>/g, '</span>')
+                          .replace(/<strong>/g, '<span style="font-weight:bold;">')
+                          .replace(/<\/strong>/g, '</span>')
+                      }} 
+                      style={{ fontWeight: 'normal' }}
+                    />
+                  ) : (
+                    p.descriptiveText
+                  )}
+                </div>
+              </td>
+            </tr>
           )}
-        </tr>
+        </>
       );
     };
 
@@ -1283,7 +1321,7 @@ const ProfessionalReport = React.forwardRef<HTMLDivElement, ProfessionalReportPr
             break;
 
           case 'category':
-            // ✅ Render category as a bold row header
+            // ✅ Render category as a bold row header with spacing
             tableRows.push(
               <tr key={`cat-${bi}`} style={{ borderBottom: 'none', minHeight: '12px' }}>
                 <td colSpan={2 + (showUnits ? 1 : 0) + (showRange ? 1 : 0)} style={{ 
@@ -1296,6 +1334,22 @@ const ProfessionalReport = React.forwardRef<HTMLDivElement, ProfessionalReportPr
                   ...getFormattingStyle('body')
                 }}>
                   <u>{strip(block.catName ?? '').toUpperCase()}</u>
+                </td>
+              </tr>
+            );
+            break;
+
+          case 'cat-space':
+            // ✅ ADDED: Render category spacing as a subtle space row
+            tableRows.push(
+              <tr key={`cat-space-${bi}`} style={{ height: '1.5px', borderBottom: 'none' }}>
+                <td colSpan={2 + (showUnits ? 1 : 0) + (showRange ? 1 : 0)} style={{ 
+                  padding: '0px',
+                  backgroundColor: 'transparent',
+                  border: 'none',
+                  height: '1.5px',
+                }}>
+                  {' '}
                 </td>
               </tr>
             );
