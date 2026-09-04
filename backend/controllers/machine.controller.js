@@ -300,15 +300,16 @@ export const submitResults = async (req, res) => {
         for (const patientTest of patientTests) {
           console.log(`[MACHINE API RESULTS] Processing patientTestId=${patientTest.id}`);
           
+          // Declare array to store all parameter upserts for this test
+          const valuesToUpsert = [];
+          
           // Store each parameter as a TestResult
           for (const [paramCode, value] of Object.entries(parameters)) {
             console.log(`[MACHINE API RESULTS] Looking for parameter: ${paramCode}`);
             
-            // ✅ PRIORITY-BASED MATCHING with FUZZY MATCHING for variations
-            // 1. First try: parameterCode exact match for this test
-            // 2. Second try: parameterCode exact global match
-            // 3. Third try: parameterCode partial/fuzzy match (handle "PCT*2" → "PCT")
-            // 4. Fallback: machineCode, parameterName
+            // ✅ EXACT MATCHING ONLY - No fuzzy matching
+            // Fuzzy matching causes wrong parameter assignment (e.g., LYMPH% matched to LYMPH#)
+            // Parameters must match exactly: parameterCode, machineCode, or parameterName
 
             let testParam = null;
             
@@ -329,47 +330,20 @@ export const submitResults = async (req, res) => {
               });
             }
             
-            // Step 3: Fuzzy matching - extract base parameter code (before special characters)
-            // Example: "PCT*2" → extract "PCT" and try matching
+            // Step 3: Try machineCode match
             if (!testParam) {
-              // Extract base parameter code (letters/numbers only, remove special chars)
-              const baseParamCode = paramCode.replace(/[^A-Za-z0-9]/g, '').toUpperCase();
-              console.log(`[MACHINE API RESULTS] Trying fuzzy match: "${paramCode}" → "${baseParamCode}"`);
-              
-              // Try fuzzy match for this test first
               testParam = await prisma.testParameter.findFirst({
                 where: {
-                  testId: patientTest.testId,
-                  parameterCode: {
-                    startsWith: baseParamCode
-                  }
+                  machineCode: paramCode
                 }
               });
-              
-              if (!testParam && baseParamCode.length > 0) {
-                // Try fuzzy match globally
-                testParam = await prisma.testParameter.findFirst({
-                  where: {
-                    parameterCode: {
-                      startsWith: baseParamCode
-                    }
-                  }
-                });
-              }
-              
-              if (testParam) {
-                console.log(`[MACHINE API RESULTS] ✅ Fuzzy matched: "${paramCode}" → parameterCode="${testParam.parameterCode}"`);
-              }
             }
             
-            // Step 4: Fallback to machineCode or parameterName (for backward compatibility)
+            // Step 4: Try parameterName match
             if (!testParam) {
               testParam = await prisma.testParameter.findFirst({
                 where: {
-                  OR: [
-                    { machineCode: paramCode },
-                    { parameterName: paramCode }
-                  ]
+                  parameterName: paramCode
                 }
               });
             }
@@ -386,28 +360,42 @@ export const submitResults = async (req, res) => {
 
             console.log(`[MACHINE API RESULTS] Found testParameterId=${testParam.id}, storing value: ${value}`);
 
-            // Create or update TestResult
-            await prisma.testResult.upsert({
-              where: {
-                patientTestId_testParameterId: {
-                  patientTestId: patientTest.id,
-                  testParameterId: testParam.id
-                }
-              },
-              create: {
-                patientTestId: patientTest.id,
-                testParameterId: testParam.id,
-                numericValue: value,
-                textValue: value,
-                enteredBy: 'MACHINE',
-                enteredAt: new Date()
-              },
-              update: {
-                numericValue: value,
-                textValue: value,
-                enteredAt: new Date()
-              }
+            // Store for batch upsert
+            valuesToUpsert.push({
+              patientTestId: patientTest.id,
+              testParameterId: testParam.id,
+              numericValue: String(value),  // ✅ Convert to string - schema expects String
+              textValue: String(value)
             });
+          }
+
+          // Batch upsert all values for this test in a transaction
+          if (valuesToUpsert.length > 0) {
+            await prisma.$transaction(
+              valuesToUpsert.map(item =>
+                prisma.testResult.upsert({
+                  where: {
+                    patientTestId_testParameterId: {
+                      patientTestId: item.patientTestId,
+                      testParameterId: item.testParameterId
+                    }
+                  },
+                  create: {
+                    patientTestId: item.patientTestId,
+                    testParameterId: item.testParameterId,
+                    numericValue: String(item.numericValue),  // ✅ Ensure string
+                    textValue: String(item.textValue),
+                    enteredBy: 'MACHINE',
+                    enteredAt: new Date()
+                  },
+                  update: {
+                    numericValue: String(item.numericValue),  // ✅ Ensure string
+                    textValue: String(item.textValue),
+                    enteredAt: new Date()
+                  }
+                })
+              )
+            );
           }
 
           // ✅ Update PatientTest status to "Entered" AND save the machine ID

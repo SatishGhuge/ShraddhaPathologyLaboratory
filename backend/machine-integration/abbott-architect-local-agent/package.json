@@ -1,0 +1,25 @@
+{
+  "name": "abbott-architect-local-agent",
+  "version": "1.0.0",
+  "description": "Abbott Architect i1000SR Local Agent - ASTM Protocol Integration",
+  "main": "app.js",
+  "scripts": {
+    "start": "node app.js",
+    "dev": "node app.js",
+    "sim": "node simulator.js"
+  },
+  "keywords": [
+    "abbott",
+    "architect",
+    "i1000sr",
+    "astm",
+    "immunoassay"
+  ],
+  "author": "SnapSofts",
+  "license": "MIT",
+  "dependencies": {
+    "mysql2": "^3.6.5",
+    "axios": "^1.6.2",
+    "dotenv": "^16.3.1"
+  }
+}

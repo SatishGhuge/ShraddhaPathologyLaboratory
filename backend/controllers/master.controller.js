@@ -6150,6 +6150,265 @@ export const importTests = async (req, res) => {
   }
 };
 
+// 🔹 DOCTOR EXPORT/IMPORT FUNCTIONS
+
+export const exportDoctors = async (req, res) => {
+  try {
+    console.log('📥 Exporting referral doctors to Excel...');
+    
+    const ExcelJS = await import('exceljs');
+    const workbook = new ExcelJS.default.Workbook();
+    const worksheet = workbook.addWorksheet('Doctors');
+
+    // Get all doctors (including inactive)
+    const doctors = await prisma.doctor.findMany({
+      orderBy: { name: 'asc' }
+    });
+
+    // Define columns
+    worksheet.columns = [
+      { header: 'Name', key: 'name', width: 30 },
+      { header: 'Type', key: 'type', width: 15 },
+      { header: 'Degree', key: 'degree', width: 30 },
+      { header: 'Mobile', key: 'mobile', width: 15 },
+      { header: 'Email', key: 'email', width: 30 },
+      { header: 'Address', key: 'address', width: 40 },
+      { header: 'Discount (%)', key: 'discount', width: 12 },
+      { header: 'Send Reports Via WhatsApp', key: 'sendReportsViaWhatsApp', width: 20 },
+      { header: 'Send Reports Via Mail', key: 'sendReportsViaMail', width: 20 },
+      { header: 'Active', key: 'isActive', width: 10 }
+    ];
+
+    // Style header row
+    worksheet.getRow(1).font = { bold: true, color: { argb: 'FFFFFFFF' } };
+    worksheet.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1a3a52' } };
+    worksheet.getRow(1).alignment = { horizontal: 'center', vertical: 'center', wrapText: true };
+
+    // Add data rows
+    doctors.forEach((doctor, index) => {
+      worksheet.addRow({
+        name: doctor.name,
+        type: doctor.type || 'Doctor',
+        degree: doctor.degree || '',
+        mobile: doctor.mobile || '',
+        email: doctor.email || '',
+        address: doctor.address || '',
+        discount: doctor.discount || 0,
+        sendReportsViaWhatsApp: doctor.sendReportsViaWhatsApp ? 'Yes' : 'No',
+        sendReportsViaMail: doctor.sendReportsViaMail ? 'Yes' : 'No',
+        isActive: doctor.isActive ? 'Yes' : 'No'
+      });
+    });
+
+    // Format data rows
+    worksheet.eachRow((row, rowNumber) => {
+      if (rowNumber > 1) {
+        row.alignment = { horizontal: 'left', vertical: 'center', wrapText: true };
+        row.height = 20;
+      }
+    });
+
+    // Set response headers for file download
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="doctors_export_${new Date().toISOString().split('T')[0]}.xlsx"`);
+    
+    // Write workbook to response
+    await workbook.xlsx.write(res);
+    
+    console.log('✅ Doctors exported successfully');
+    res.end();
+    
+  } catch (error) {
+    console.error('❌ Export error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to export doctors',
+      error: error.message
+    });
+  }
+};
+
+export const importDoctors = async (req, res) => {
+  try {
+    console.log('📤 Importing referral doctors from Excel...');
+
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        message: 'No file uploaded',
+        data: { errors: ['No file provided'] }
+      });
+    }
+
+    // Validate file type
+    if (!req.file.mimetype.includes('spreadsheet') && !req.file.originalname.endsWith('.xlsx')) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid file format. Please upload an Excel file (.xlsx)',
+        data: { errors: ['File must be Excel format (.xlsx)'] }
+      });
+    }
+
+    const ExcelJS = await import('exceljs');
+    const workbook = new ExcelJS.default.Workbook();
+    await workbook.xlsx.load(req.file.buffer);
+
+    const worksheet = workbook.getWorksheet('Doctors');
+
+    if (!worksheet) {
+      return res.status(400).json({
+        success: false,
+        message: 'Excel file must contain a "Doctors" sheet',
+        data: { errors: ['Missing "Doctors" sheet'] }
+      });
+    }
+
+    const errors = [];
+    const warnings = [];
+    let created = 0;
+    let updated = 0;
+    const rowsToProcess = [];
+
+    // First pass: collect and validate all rows
+    worksheet.eachRow((row, rowNumber) => {
+      if (rowNumber === 1) return; // Skip header
+
+      const values = row.values;
+      
+      // Helper function to safely extract cell value (handles hyperlinks and objects)
+      const getCellValue = (cell) => {
+        if (!cell) return '';
+        // If it's an object with hyperlink, get the text
+        if (typeof cell === 'object' && cell.text) {
+          return String(cell.text).trim();
+        }
+        // If it's a regular value, convert to string
+        return String(cell).trim();
+      };
+
+      // Get values by column index (1-indexed)
+      const name = getCellValue(values[1]);
+      const type = getCellValue(values[2]) || 'Doctor';
+      const degree = getCellValue(values[3]) || null;
+      const mobile = getCellValue(values[4]) || null;
+      const email = getCellValue(values[5]) || null;
+      const address = getCellValue(values[6]) || null;
+      const discount = values[7] ? parseFloat(String(values[7])) : 0;
+      const sendReportsViaWhatsApp = getCellValue(values[8]).toLowerCase() === 'yes';
+      const sendReportsViaMail = getCellValue(values[9]).toLowerCase() === 'yes';
+      const isActive = getCellValue(values[10]).toLowerCase() !== 'no';
+
+      // Validate required fields
+      if (!name) {
+        errors.push(`Row ${rowNumber}: Doctor name is required`);
+        return;
+      }
+
+      rowsToProcess.push({
+        rowNumber,
+        name,
+        type,
+        degree,
+        mobile,
+        email,
+        address,
+        discount,
+        sendReportsViaWhatsApp,
+        sendReportsViaMail,
+        isActive
+      });
+    });
+
+    // If there are validation errors, return them
+    if (errors.length > 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Validation errors found in Excel file',
+        data: {
+          errors,
+          warnings,
+          summary: `Found ${errors.length} error(s) and ${warnings.length} warning(s)`
+        }
+      });
+    }
+
+    // Second pass: process each row (create/update)
+    for (const row of rowsToProcess) {
+      try {
+        const existingDoctor = await prisma.doctor.findFirst({
+          where: { name: row.name }
+        });
+
+        if (existingDoctor) {
+          // Update existing doctor
+          await prisma.doctor.update({
+            where: { id: existingDoctor.id },
+            data: {
+              type: row.type,
+              degree: row.degree,
+              mobile: row.mobile,
+              email: row.email,
+              address: row.address,
+              discount: row.discount,
+              sendReportsViaWhatsApp: row.sendReportsViaWhatsApp,
+              sendReportsViaMail: row.sendReportsViaMail,
+              isActive: row.isActive
+            }
+          });
+          updated++;
+          console.log(`✅ Doctor "${row.name}" updated`);
+        } else {
+          // Create new doctor
+          await prisma.doctor.create({
+            data: {
+              name: row.name,
+              type: row.type,
+              degree: row.degree,
+              mobile: row.mobile,
+              email: row.email,
+              address: row.address,
+              discount: row.discount,
+              sendReportsViaWhatsApp: row.sendReportsViaWhatsApp,
+              sendReportsViaMail: row.sendReportsViaMail,
+              isActive: true
+            }
+          });
+          created++;
+          console.log(`✅ Doctor "${row.name}" created`);
+        }
+      } catch (err) {
+        console.error(`Error importing doctor at row ${row.rowNumber}:`, err);
+        errors.push(`Row ${row.rowNumber}: ${(err).message}`);
+      }
+    }
+
+    console.log('✅ Import completed');
+
+    res.json({
+      success: true,
+      message: 'Doctors imported successfully',
+      data: {
+        created,
+        updated,
+        errors,
+        warnings,
+        totalErrors: errors.length,
+        totalWarnings: warnings.length,
+        summary: `Created ${created} doctor(s), Updated ${updated} doctor(s)`
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ Import error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to import doctors',
+      error: error.message,
+      data: { errors: [error.message] }
+    });
+  }
+};
+
 
 // ✅ DELETE PARAMETER FROM TEST - Properly removes from TestParameter, TestCategory, and TestResult
 export const updateTestParameter = async (req, res) => {

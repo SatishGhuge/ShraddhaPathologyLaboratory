@@ -58,6 +58,58 @@ const ERBA_TESTS = {
   'LDL': { name: 'LDL Cholesterol', unit: 'mg/dL', refRange: '0-100' },
   'TP': { name: 'Total Protein', unit: 'g/dL', refRange: '6.4-8.3' },
   'UA': { name: 'Uric Acid', unit: 'mg/dL', refRange: '3.5-7.2' },
+
+};
+
+// ============================================================================
+// DATABASE POOL
+// ============================================================================
+
+const dbPool = mysql.createPool(CONFIG.database);
+
+// ============================================================================
+// UTILITY FUNCTIONS
+// ============================================================================
+
+/**
+ * Parse sample ID in format: VISITID-SAMPLETYPEID
+ * Example: "202608190001-3" -> { visitId: "202608190001", sampleTypeId: "3" }
+ * 
+ * @param {string} fullSampleId - Full sample ID from barcode
+ * @returns {object} { visitId, sampleTypeId } or null if format is invalid
+ */
+function parseSampleId(fullSampleId) {
+  if (!fullSampleId || typeof fullSampleId !== 'string') {
+    console.warn(`[PARSE SAMPLE ID] Invalid input: ${fullSampleId}`);
+    return null;
+  }
+
+  // Check if format contains hyphen separator
+  if (fullSampleId.includes('-')) {
+    const parts = fullSampleId.split('-');
+    if (parts.length === 2) {
+      const visitId = parts[0].trim();
+      const sampleTypeId = parts[1].trim();
+
+      if (visitId && sampleTypeId) {
+        console.log(`[PARSE SAMPLE ID] ✓ Parsed "${fullSampleId}" -> visitId="${visitId}", sampleTypeId="${sampleTypeId}"`);
+        return {
+          visitId: visitId,
+          sampleTypeId: sampleTypeId,
+          fullSampleId: fullSampleId
+        };
+      }
+    }
+  }
+
+  // Fallback: treat entire ID as visitId with no sampleTypeId
+  console.warn(`[PARSE SAMPLE ID] ⚠️ Could not parse format with hyphen, treating as visitId: ${fullSampleId}`);
+  return {
+    visitId: fullSampleId,
+    sampleTypeId: null,
+    fullSampleId: fullSampleId
+  };
+}
   'GLU': { name: 'Glucose', unit: 'mg/dL', refRange: '70-99' },
   'LDH': { name: 'Lactate Dehydrogenase', unit: 'U/L', refRange: '140-280' },
   'CK-MB': { name: 'Creatine Kinase MB', unit: 'U/L', refRange: '0-25' },
@@ -322,17 +374,31 @@ const ASTMParser = {
       frameType = 'QUERY';
       
       // Per EM200 ASTM E1394-97 Manual:
-      // Q|seq|startSpecimenId|endSpecimenId|^^^testcode|nature|status
+      // Q|seq|barcode|endSpecimenId|^^^testcode|nature|status
       // parts[0] = "Q"
       // parts[1] = Sequence Number
-      // parts[2] = Starting Specimen ID (visitId - barcode scanned)
+      // parts[2] = Starting Specimen ID (barcode scanned, e.g., "202608060002-3")
       // parts[3] = Ending Specimen ID (same as start for single specimen)
       // parts[4] = Universal Test ID (ALL or ^^^CODE1^CODE2)
       // parts[5] = Request Information Nature (optional)
       // parts[6] = Status Code (optional)
       
-      visitId = parts[2]?.trim() || null;
-      sampleId = parts[3]?.trim() || null;
+      const fullBarcode = parts[2]?.trim() || null;
+      
+      // Parse barcode to extract visitId and sampleTypeId
+      if (fullBarcode && fullBarcode.includes('-')) {
+        const parsed = parseSampleId(fullBarcode);
+        if (parsed) {
+          visitId = parsed.visitId;
+          sampleId = parsed.sampleTypeId;
+          console.log(`[ASTM PARSER] QUERY frame parsed: fullBarcode="${fullBarcode}" -> visitId="${visitId}", sampleId="${sampleId}"`);
+        }
+      } else {
+        // Fallback: treat as visitId, use endSpecimenId as sampleId
+        visitId = fullBarcode;
+        sampleId = parts[3]?.trim() || null;
+        console.log(`[ASTM PARSER] QUERY frame (unparsed): visitId="${visitId}", sampleId="${sampleId}"`);
+      }
       
       const testField = parts[4]?.trim() || '';
       if (testField && testField !== 'ALL') {
