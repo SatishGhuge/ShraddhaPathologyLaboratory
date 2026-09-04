@@ -690,7 +690,7 @@ export default function ReferralDoctorSettlementReport() {
   }, []);
 
   useEffect(() => {
-    if (selectedDoctor) {
+    if (selectedDoctor && dateFrom && dateTo) {
       fetchData();
     }
   }, [selectedDoctor, dateFrom, dateTo, status, currentPage]);

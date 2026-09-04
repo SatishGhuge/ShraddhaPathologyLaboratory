@@ -219,6 +219,9 @@ const Page = () => {
   }, []);
 
   useEffect(() => {
+    // Only fetch if dates are set and not empty
+    if (!dateFrom || !dateTo) return;
+    
     fetchData();
   }, [dateFrom, dateTo, organizationId, supplierId, statusFilter, searchTerm, sortBy, sortOrder]);
 

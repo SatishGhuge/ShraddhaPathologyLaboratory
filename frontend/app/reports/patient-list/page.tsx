@@ -130,7 +130,7 @@ export default function PatientList() {
     if(searched){
       fetchData(dateFrom, dateTo);
     }
-  },[f.patientName, f.mobile, f.referralDoctor, f.visitType, f.paymentMode, f.onlyOutstandings]);
+  },[dateFrom, dateTo, f.patientName, f.mobile, f.referralDoctor, f.visitType, f.paymentMode, f.onlyOutstandings]);
   
   useEffect(()=>{
     const h = (e: any) =>{

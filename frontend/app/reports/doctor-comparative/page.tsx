@@ -102,7 +102,10 @@ const Page = () => {
 
   // Auto-fetch data on mount and when date filters change
   useEffect(() => {
-    fetchData();
+    // Only fetch if dates are set and not empty
+    if (dateFrom && dateTo) {
+      fetchData();
+    }
   }, [dateFrom, dateTo]);
 
   // Date picker handlers

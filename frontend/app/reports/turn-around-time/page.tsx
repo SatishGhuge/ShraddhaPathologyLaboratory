@@ -117,10 +117,6 @@ export default function TurnAroundTime() {
       console.error('Failed to fetch dropdown data:', error);
     });
 
-    // Load today's data by default
-    const today = fmtISO(today0());
-    handleSearchWithDates(today, today);
-
     // Close dropdowns on outside click
     const handleClickOutside = (e: any) => {
       if (dpRef.current && !dpRef.current.contains(e.target)) setDpOpen(false);

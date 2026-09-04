@@ -81,6 +81,8 @@ const urlPathMap: { [key: string]: string } = {
   "reports/patient-location-report": "Reports / Patient Location Report",
   "reports/b2b-bulk-settlement": "Reports / B2B Bulk Settlement",
   "reports/bulk-settlement": "Reports / Bulk Settlement",
+  "reports/doctor-comparative": "Reports / Doctor Comparative",
+  "reports/inventory-stock-management": "Reports / Inventory Stock Management",
   
   // Configuration Module
   "config/signature": "Configuration / Signature",
@@ -100,7 +102,7 @@ const urlPathMap: { [key: string]: string } = {
 };
 
 export default function PageHeader({ title = "", icon: Icon, path = "" }: { title?: string; icon?: React.ComponentType<any>; path?: string }) {
-  const pathname = usePathname();
+  const pathname = usePathname() || "";
   const router = useRouter();
   
   // Generate breadcrumb path from URL if not provided
@@ -132,7 +134,7 @@ export default function PageHeader({ title = "", icon: Icon, path = "" }: { titl
         <div className="flex items-center gap-1 text-sm text-slate-600">
           {/* Home link */}
           <button
-            onClick={() => router.push('/')}
+            onClick={() => router.push('/labdashboard')}
             className="flex items-center gap-1 hover:text-blue-600 transition"
           >
             <Home size={16} />

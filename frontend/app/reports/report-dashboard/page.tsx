@@ -120,10 +120,9 @@ export default function AnalyticsDashboard() {
   const [loading,       setLoading]       = useState(false);
   const [errors,        setErrors]        = useState<any>({});
 
-  /* ── load doctors + auto-fetch today on mount ── */
+  /* ── load doctors ── */
   useEffect(() => {
     getDoctors().then((res: any) => setDoctors(Array.isArray(res) ? res : res?.data || [])).catch(() => {});
-    fetchData(fmtISO(today0()), fmtISO(today0()), "", "");
 
     const h = (e: any) => { if (dpRef.current && !dpRef.current.contains(e.target)) setDpOpen(false); };
     document.addEventListener("mousedown", h);

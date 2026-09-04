@@ -174,19 +174,17 @@ export default function ReferralDoctorRevenueReport() {
     }
   }, [allTransactions]);
 
-  // Re-filter when any filter parameter changes (except allTransactions which is handled above)
+  // Re-filter when any filter parameter changes OR when transactions are loaded
   useEffect(() => {
     if (allTransactions.length > 0) {
       console.log('🔍 Filter changed, re-filtering...');
       handleSearch();
+    } else if (dateFrom && dateTo) {
+      // Fetch new data when date range changes AND no data yet
+      console.log('📅 Date range changed, fetching new data...');
+      fetchTransactions();
     }
   }, [dateFrom, dateTo, selectedDoctor, searchPatient, inactiveVisits]);
-
-  // Fetch new data when date range changes
-  useEffect(() => {
-    console.log('📅 Date range changed, fetching new data...');
-    fetchTransactions();
-  }, [dateFrom, dateTo]);
 
   // Close dropdowns on outside click
   useEffect(() => {

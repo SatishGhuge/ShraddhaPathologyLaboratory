@@ -638,7 +638,7 @@ export default function OrganizationSettlementReport() {
   }, []);
 
   useEffect(() => {
-    if (selectedOrg) {
+    if (selectedOrg && dateFrom && dateTo) {
       fetchData();
     }
   }, [selectedOrg, dateFrom, dateTo, status, currentPage]);
