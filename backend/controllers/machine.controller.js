@@ -313,37 +313,49 @@ export const submitResults = async (req, res) => {
 
             let testParam = null;
             
-            // Step 1: Try exact parameterCode match within this test
+            // Step 1: Try exact parameterCode match within this test (case-insensitive)
             testParam = await prisma.testParameter.findFirst({
               where: {
                 testId: patientTest.testId,
-                parameterCode: paramCode
+                parameterCode: {
+                  equals: paramCode,
+                  mode: 'insensitive'
+                }
               }
             });
             
             if (!testParam) {
-              // Step 2: Try exact global parameterCode match
+              // Step 2: Try exact global parameterCode match (case-insensitive)
               testParam = await prisma.testParameter.findFirst({
                 where: {
-                  parameterCode: paramCode
+                  parameterCode: {
+                    equals: paramCode,
+                    mode: 'insensitive'
+                  }
                 }
               });
             }
             
-            // Step 3: Try machineCode match
+            // Step 3: Try machineCode match (case-insensitive)
             if (!testParam) {
               testParam = await prisma.testParameter.findFirst({
                 where: {
-                  machineCode: paramCode
+                  machineCode: {
+                    equals: paramCode,
+                    mode: 'insensitive'
+                  }
                 }
               });
             }
             
-            // Step 4: Try parameterName match
+            // Step 4: Try parameterName match (case-insensitive)
             if (!testParam) {
               testParam = await prisma.testParameter.findFirst({
                 where: {
-                  parameterName: paramCode
+                  parameterName: {
+                    equals: paramCode,
+                    mode: 'insensitive'
+                  }
                 }
               });
             }
@@ -396,6 +408,116 @@ export const submitResults = async (req, res) => {
                 })
               )
             );
+          }
+
+          // ✅ NEW: Auto-evaluate formulas for dependent parameters
+          console.log(`[MACHINE API] Evaluating formulas for patientTestId=${patientTest.id}`);
+          try {
+            const parametersWithFormulas = await prisma.testParameter.findMany({
+              where: {
+                testId: patientTest.testId,
+                hasFormula: true
+              }
+            });
+
+            console.log(`[MACHINE API] Found ${parametersWithFormulas.length} parameters with formulas`);
+
+            // Build a map of all current values for formula evaluation
+            const allCurrentResults = await prisma.testResult.findMany({
+              where: {
+                patientTestId: patientTest.id
+              },
+              include: {
+                testParameter: true
+              }
+            });
+
+            // Create a results map for formula evaluation: { paramId: { numericValue: X } }
+            const resultsMap = {};
+            allCurrentResults.forEach(result => {
+              resultsMap[result.testParameterId] = {
+                numericValue: result.numericValue ? parseFloat(result.numericValue) : null,
+                textValue: result.textValue
+              };
+            });
+
+            // Fetch all parameters for this test for formula substitution
+            const allTestParams = await prisma.testParameter.findMany({
+              where: {
+                testId: patientTest.testId
+              }
+            });
+
+            // Evaluate each formula
+            for (const formulaParam of parametersWithFormulas) {
+              console.log(`[MACHINE API] Evaluating formula for parameter: ${formulaParam.parameterName}, formula: ${formulaParam.formula}`);
+              
+              try {
+                // Helper function to evaluate formula
+                let expr = formulaParam.formula;
+                let allRequiredParamsPresent = true;
+
+                // Replace {ParameterName} placeholders with actual values
+                allTestParams.forEach(p => {
+                  const val = resultsMap[p.id]?.numericValue;
+                  if (val !== null && val !== undefined && val !== '') {
+                    const escaped = p.parameterName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                    expr = expr.replace(new RegExp(`\\{${escaped}\\}`, 'g'), val);
+                  }
+                });
+
+                // Check if all required parameters are present
+                if (/\{[^}]+\}/.test(expr)) {
+                  console.log(`[MACHINE API] ⚠️ Skipping formula - missing required parameters: ${formulaParam.parameterName}`);
+                  allRequiredParamsPresent = false;
+                }
+
+                if (!allRequiredParamsPresent) {
+                  continue;
+                }
+
+                // Safe evaluation using Function constructor
+                // eslint-disable-next-line no-new-func
+                const calculated = Function('"use strict"; return (' + expr + ')')();
+
+                if (typeof calculated === 'number' && isFinite(calculated)) {
+                  // Apply decimal rounding
+                  const decimalPlaces = formulaParam.decimal || 2;
+                  const multiplier = Math.pow(10, decimalPlaces);
+                  const roundedValue = (Math.round(calculated * multiplier) / multiplier).toString();
+
+                  console.log(`[MACHINE API] ✅ Calculated ${formulaParam.parameterName}: ${calculated} -> rounded: ${roundedValue}`);
+
+                  // Save calculated result
+                  await prisma.testResult.upsert({
+                    where: {
+                      patientTestId_testParameterId: {
+                        patientTestId: patientTest.id,
+                        testParameterId: formulaParam.id
+                      }
+                    },
+                    create: {
+                      patientTestId: patientTest.id,
+                      testParameterId: formulaParam.id,
+                      numericValue: roundedValue,
+                      enteredBy: 'MACHINE_CALCULATED',
+                      enteredAt: new Date()
+                    },
+                    update: {
+                      numericValue: roundedValue,
+                      enteredBy: 'MACHINE_CALCULATED',
+                      enteredAt: new Date()
+                    }
+                  });
+                } else {
+                  console.warn(`[MACHINE API] ⚠️ Formula evaluation failed or returned invalid result for ${formulaParam.parameterName}: ${calculated}`);
+                }
+              } catch (formulaErr) {
+                console.warn(`[MACHINE API] Error evaluating formula for ${formulaParam.parameterName}: ${formulaErr.message}`);
+              }
+            }
+          } catch (formulaEvalError) {
+            console.warn(`[MACHINE API] Error in formula evaluation process: ${formulaEvalError.message}`);
           }
 
           // ✅ Update PatientTest status to "Entered" AND save the machine ID
