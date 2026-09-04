@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { Ruler, RotateCcw, ChevronLeft, ChevronRight } from "lucide-react";
 import UnitModal from "@/src/components/UnitModal";
 import { getUnits, deleteUnit } from "@/src/api/master";
+import PaginationControls from "@/app/components/PaginationControls";
 
 export default function ResultUnits() {
   const [data, setData] = useState<any[]>([]);
@@ -14,17 +15,22 @@ export default function ResultUnits() {
   const [editingUnit, setEditingUnit] = useState<any>(null);
   const [successMsg, setSuccessMsg] = useState("");
 
-  const ITEMS_PER_PAGE = 20;
+  const [itemsPerPage, setItemsPerPage] = useState(25);
   const [pagination, setPagination] = useState<any>(null);
 
   useEffect(() => {
     fetchUnits();
   }, [currentPage]);
 
+  useEffect(() => {
+    setCurrentPage(1);
+    fetchUnits();
+  }, [itemsPerPage]);
+
   const fetchUnits = async () => {
     try {
       setLoading(true);
-      const response = await getUnits(currentPage, ITEMS_PER_PAGE);
+      const response = await getUnits(currentPage, itemsPerPage);
       setData(response.data || []);
       setPagination(response.pagination || null);
     } catch (error) {
@@ -138,40 +144,22 @@ export default function ResultUnits() {
           </table>
 
           {/* ✅ PAGINATION CONTROLS */}
-          {pagination && pagination.total > 0 && (
-            <div className="mt-3 bg-white rounded shadow-md p-3 flex items-center justify-between text-xs flex-wrap gap-3">
-              <div className="text-gray-600">
-                Showing {(currentPage - 1) * ITEMS_PER_PAGE + 1} to{' '}
-                {Math.min(currentPage * ITEMS_PER_PAGE, pagination.total)} of{' '}
-                {pagination.total} records
-              </div>
-
-              <div className="flex gap-2 items-center flex-wrap">
-                <button
-                  onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
-                  disabled={currentPage === 1}
-                  className={`flex items-center gap-1 px-3 py-1 rounded ${currentPage === 1 ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-orange-500 text-white hover:bg-orange-600'}`}
-                >
-                  <ChevronLeft size={14} /> Previous
-                </button>
-
-                <span className="px-3 py-1 text-gray-700 font-medium">
-                  Page {currentPage} of {pagination.totalPages}
-                </span>
-
-                <button
-                  onClick={() => setCurrentPage(Math.min(pagination.totalPages, currentPage + 1))}
-                  disabled={currentPage === pagination.totalPages}
-                  className={`flex items-center gap-1 px-3 py-1 rounded ${currentPage === pagination.totalPages ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-orange-500 text-white hover:bg-orange-600'}`}
-                >
-                  Next <ChevronRight size={14} />
-                </button>
-              </div>
-
-              <div className="text-gray-600">
-                Total: {pagination.total} records
-              </div>
-            </div>
+          {pagination && data.length > 0 && (
+            <PaginationControls
+              pagination={pagination}
+              currentPage={currentPage}
+              itemsPerPage={itemsPerPage}
+              onPageChange={(page) => {
+                setCurrentPage(page);
+                fetchUnits();
+              }}
+              onItemsPerPageChange={(newLimit) => {
+                setItemsPerPage(newLimit);
+                setCurrentPage(1);
+                fetchUnits();
+              }}
+              isLoading={loading}
+            />
           )}
         </div>
       </div>

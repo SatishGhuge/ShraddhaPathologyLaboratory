@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { ArrowLeft, TestTube, RotateCwIcon, ChevronLeft, ChevronRight } from "lucide-react";
 import { getSpecimenTypes, createSpecimenType, updateSpecimenType, deleteSpecimenType } from "@/src/api/master";
+import PaginationControls from "@/app/components/PaginationControls";
 
 // Common color name <-> hex map
 const COLOR_MAP = {
@@ -59,8 +60,8 @@ export default function SampleTypes() {
   const [data, setData] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(25);
   const [pagination, setPagination] = useState<any>(null);
-  const ITEMS_PER_PAGE = 20;
 
   const [showModal, setShowModal] = useState(false);
   const [sampleType, setSampleType] = useState("");
@@ -75,7 +76,7 @@ export default function SampleTypes() {
   const fetchSpecimenTypes = async (page: number = 1) => {
     try {
       setLoading(true);
-      const response = await getSpecimenTypes(page, ITEMS_PER_PAGE);
+      const response = await getSpecimenTypes(page, itemsPerPage);
       setData(response);
       setPagination(null);
     } catch (error) {
@@ -91,6 +92,11 @@ export default function SampleTypes() {
   useEffect(() => {
     fetchSpecimenTypes(1);
   }, []);
+
+  // Reset to page 1 when itemsPerPage changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [itemsPerPage]);
 
   const filteredData = data.filter((item) =>
     item?.Sample_Type?.toLowerCase().includes(search.toLowerCase())
@@ -304,47 +310,20 @@ export default function SampleTypes() {
 
           {/* PAGINATION CONTROLS */}
           {pagination && data.length > 0 && (
-            <div className="mt-3 bg-white rounded shadow-md p-3 flex items-center justify-between text-xs">
-              <div className="text-gray-600">
-                Showing {(currentPage - 1) * ITEMS_PER_PAGE + 1} to{' '}
-                {Math.min(currentPage * ITEMS_PER_PAGE, pagination.total)} of{' '}
-                {pagination.total} records
-              </div>
-
-              <div className="flex gap-2 items-center">
-                <button
-                  onClick={() => {
-                    const newPage = Math.max(1, currentPage - 1);
-                    setCurrentPage(newPage);
-                    fetchSpecimenTypes(newPage);
-                  }}
-                  disabled={currentPage === 1}
-                  className={`flex items-center gap-1 px-3 py-1 rounded ${currentPage === 1 ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-orange-500 text-white hover:bg-orange-600'}`}
-                >
-                  <ChevronLeft size={14} /> Previous
-                </button>
-
-                <span className="px-3 py-1">
-                  Page {currentPage} of {pagination.totalPages}
-                </span>
-
-                <button
-                  onClick={() => {
-                    const newPage = Math.min(pagination.totalPages, currentPage + 1);
-                    setCurrentPage(newPage);
-                    fetchSpecimenTypes(newPage);
-                  }}
-                  disabled={currentPage === pagination.totalPages}
-                  className={`flex items-center gap-1 px-3 py-1 rounded ${currentPage === pagination.totalPages ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-orange-500 text-white hover:bg-orange-600'}`}
-                >
-                  Next <ChevronRight size={14} />
-                </button>
-              </div>
-
-              <div className="text-gray-600">
-                Total: {pagination.total} records
-              </div>
-            </div>
+            <PaginationControls
+              pagination={pagination}
+              currentPage={currentPage}
+              itemsPerPage={itemsPerPage}
+              onPageChange={(page) => {
+                setCurrentPage(page);
+                fetchSpecimenTypes(page);
+              }}
+              onItemsPerPageChange={(newLimit) => {
+                setItemsPerPage(newLimit);
+                setCurrentPage(1);
+              }}
+              isLoading={loading}
+            />
           )}
         </div>
       </div>
