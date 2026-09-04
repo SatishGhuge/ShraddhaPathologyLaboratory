@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { RotateCcw, Loader } from "lucide-react";
+import PaginationControls from "@/app/components/PaginationControls";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
 
@@ -16,13 +17,16 @@ const OutsourcingList = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
-  const [pagination, setPagination] = useState<any>(null);
-  const ITEMS_PER_PAGE = 20;
+  const [itemsPerPage, setItemsPerPage] = useState(25);
 
   // Fetch labs on mount
   useEffect(() => {
     fetchLabs();
-  }, [currentPage]);
+  }, []);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [itemsPerPage]);
 
   const fetchLabs = async () => {
     try {
@@ -104,6 +108,19 @@ const OutsourcingList = () => {
     alert("Lab status updated successfully!");
   };
 
+  // Calculate pagination
+  const totalPages = Math.ceil(filteredLabs.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const paginatedData = filteredLabs.slice(startIndex, endIndex);
+
+  const pagination = {
+    total: filteredLabs.length,
+    totalPages: totalPages,
+    page: currentPage,
+    limit: itemsPerPage
+  };
+
   if (loading) {
     return (
       <div className="p-6 bg-white min-h-screen flex items-center justify-center">
@@ -129,7 +146,7 @@ const OutsourcingList = () => {
               type="text"
               placeholder="Search By Lab Name"
               value={searchName}
-              onChange={(e) => setSearchName(e.target.value)}
+              onChange={(e: any) => setSearchName(e.target.value)}
               className="border border-gray-300 bg-white rounded px-3 py-2 w-48 text-sm placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500"
             />
 
@@ -165,21 +182,8 @@ const OutsourcingList = () => {
             </thead>
 
             <tbody>
-              {(() => {
-                const totalPages = Math.ceil(filteredLabs.length / ITEMS_PER_PAGE);
-                const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
-                const endIndex = startIndex + ITEMS_PER_PAGE;
-                const paginatedData = filteredLabs.slice(startIndex, endIndex);
-
-                // Update pagination state
-                setPagination({
-                  total: filteredLabs.length,
-                  totalPages: totalPages,
-                  currentPage: currentPage
-                });
-
-                return paginatedData.length > 0 ? (
-                  paginatedData.map((lab) => (
+              {paginatedData.length > 0 ? (
+                paginatedData.map((lab: any) => (
                   <tr key={lab.id} className="hover:bg-gray-50 border-b border-gray-200">
                     <td className="border border-gray-300 px-3 py-1">{lab.id}</td>
                     <td className="border border-gray-300 px-3 py-1 font-medium">{lab.labName}</td>
@@ -221,41 +225,26 @@ const OutsourcingList = () => {
                     No outsourcing labs found
                   </td>
                 </tr>
-              );
-              })()}
+              )}
             </tbody>
           </table>
         </div>
 
         {/* Pagination Controls */}
-        {pagination && pagination.totalPages > 1 && (
-          <div className="mt-4 flex items-center justify-between bg-white p-3 rounded shadow-md">
-            <div className="text-sm text-gray-600">
-              Showing {Math.min((currentPage - 1) * ITEMS_PER_PAGE + 1, pagination.total)} to{" "}
-              {Math.min(currentPage * ITEMS_PER_PAGE, pagination.total)} of {pagination.total} records
-            </div>
-            <div className="flex gap-2 items-center">
-              <button
-                onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
-                disabled={currentPage === 1}
-                className="bg-orange-500 hover:bg-orange-600 disabled:bg-gray-400 text-white px-4 py-2 rounded text-sm transition-colors"
-              >
-                Previous
-              </button>
-              
-              <span className="text-sm text-gray-700 font-semibold">
-                Page {currentPage} of {pagination.totalPages}
-              </span>
-              
-              <button
-                onClick={() => setCurrentPage(Math.min(pagination.totalPages, currentPage + 1))}
-                disabled={currentPage === pagination.totalPages}
-                className="bg-orange-500 hover:bg-orange-600 disabled:bg-gray-400 text-white px-4 py-2 rounded text-sm transition-colors"
-              >
-                Next
-              </button>
-            </div>
-          </div>
+        {pagination && filteredLabs.length > 0 && (
+          <PaginationControls
+            pagination={pagination}
+            currentPage={currentPage}
+            itemsPerPage={itemsPerPage}
+            onPageChange={(page: number) => {
+              setCurrentPage(page);
+            }}
+            onItemsPerPageChange={(newLimit: number) => {
+              setItemsPerPage(newLimit);
+              setCurrentPage(1);
+            }}
+            isLoading={loading}
+          />
         )}
       </div>
     </>

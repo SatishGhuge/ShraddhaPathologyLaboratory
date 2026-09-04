@@ -6,6 +6,7 @@ import { UserCheck, RotateCcw, GitMerge, Download, Upload, FileSpreadsheet } fro
 import { getDoctors, deleteDoctor } from "@/src/api/master";
 import DoctorMergeModal from "@/src/components/DoctorMergeModal";
 import API_BASE_URL from "@/src/api/config";
+import PaginationControls from "@/app/components/PaginationControls";
 
 export default function ReferralListing() {
   const [search, setSearch] = useState("");
@@ -26,12 +27,12 @@ export default function ReferralListing() {
   const [importErrors, setImportErrors] = useState<string[]>([]);
   const [importWarnings, setImportWarnings] = useState<string[]>([]);
   
-  const ITEMS_PER_PAGE = 20;
+  const [itemsPerPage, setItemsPerPage] = useState(25);
   const router = useRouter();
 
   const fetchDoctors = (page: number = 1) => {
     setLoading(true);
-    getDoctors(page, ITEMS_PER_PAGE)
+    getDoctors(page, itemsPerPage)
       .then((res: any) => {
         setData(res);
         setPagination(null);
@@ -43,6 +44,11 @@ export default function ReferralListing() {
   useEffect(() => {
     fetchDoctors(currentPage);
   }, [currentPage]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+    fetchDoctors(1);
+  }, [itemsPerPage]);
 
   const filteredData = data.filter((item) =>
     item.name.toLowerCase().includes(search.toLowerCase())
@@ -298,25 +304,21 @@ export default function ReferralListing() {
       </div>
 
       {pagination && filteredData.length > 0 && (
-        <div className="mt-3 bg-white rounded shadow-md p-3 flex items-center justify-between text-xs">
-          <button
-            onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-            disabled={currentPage === 1}
-            className="bg-orange-500 hover:bg-orange-600 disabled:bg-gray-400 text-white px-3 py-1 rounded transition-colors"
-          >
-            Previous
-          </button>
-          <span className="text-gray-700 font-medium">
-            Page {currentPage} of {pagination.totalPages} | Showing {filteredData.length} of {pagination.total} records
-          </span>
-          <button
-            onClick={() => setCurrentPage(p => Math.min(pagination.totalPages, p + 1))}
-            disabled={currentPage === pagination.totalPages}
-            className="bg-orange-500 hover:bg-orange-600 disabled:bg-gray-400 text-white px-3 py-1 rounded transition-colors"
-          >
-            Next
-          </button>
-        </div>
+        <PaginationControls
+          pagination={pagination}
+          currentPage={currentPage}
+          itemsPerPage={itemsPerPage}
+          onPageChange={(page) => {
+            setCurrentPage(page);
+            fetchDoctors(page);
+          }}
+          onItemsPerPageChange={(newLimit) => {
+            setItemsPerPage(newLimit);
+            setCurrentPage(1);
+            fetchDoctors(1);
+          }}
+          isLoading={loading}
+        />
       )}
 
       {/* Merge Target Selection Modal */}

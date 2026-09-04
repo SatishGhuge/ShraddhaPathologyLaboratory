@@ -5,6 +5,7 @@ import React, { useState, useEffect } from "react";
 import { RotateCwIcon, Upload, FileSpreadsheet } from "lucide-react";
 import { getTests, updateTest } from "@/src/api/master";
 import API_BASE_URL from "@/src/api/config";
+import PaginationControls from "@/app/components/PaginationControls";
 
 const TestList = () => {
   const router = useRouter();
@@ -17,7 +18,7 @@ const TestList = () => {
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [pagination, setPagination] = useState<any>(null);
   const [outsourcedTestIds, setOutsourcedTestIds] = useState<Set<number>>(new Set());
-  const ITEMS_PER_PAGE = 20;
+  const [itemsPerPage, setItemsPerPage] = useState(25);
 
   // Import modal states
   const [showImportModal, setShowImportModal] = useState(false);
@@ -31,6 +32,11 @@ const TestList = () => {
     fetchTests(currentPage);
     fetchOutsourcedTests();
   }, [currentPage]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+    fetchTests(1);
+  }, [itemsPerPage]);
 
   // Fetch outsourced tests to get list of test IDs linked to outsourcing labs
   const fetchOutsourcedTests = async () => {
@@ -63,7 +69,7 @@ const TestList = () => {
     try {
       setLoading(true);
       setError(null);
-      const response = await getTests(page, ITEMS_PER_PAGE);
+      const response = await getTests(page, itemsPerPage);
       
       // Handle API response - getTests returns { data: [], pagination: {} }
       const testsArray = response.data || [];
@@ -415,7 +421,7 @@ const TestList = () => {
                         }`}
                       >
                         <td className="border border-gray-300 px-3 py-1">
-                          {((pagination?.page || 1) - 1) * ITEMS_PER_PAGE + index + 1}
+                          {((pagination?.page || 1) - 1) * itemsPerPage + index + 1}
                         </td>
 
                         <td className="border border-gray-300 px-3 py-1">
@@ -479,57 +485,22 @@ const TestList = () => {
             </table>
 
             {/* Pagination Controls */}
-            {pagination && pagination.totalPages > 1 && (
-              <div className="border-t p-3 bg-gray-50 flex items-center justify-between text-xs sm:text-sm">
-                <button
-                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                  disabled={currentPage === 1}
-                  className={`px-3 py-1 rounded ${currentPage === 1 ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-orange-500 text-white hover:bg-orange-600'}`}
-                >
-                  ← Previous
-                </button>
-
-                <div className="flex items-center gap-1">
-                  {(() => {
-                    const pages: (number | string)[] = [];
-                    const totalPages = pagination.totalPages;
-                    
-                    if (totalPages <= 5) {
-                      for (let i = 1; i <= totalPages; i++) pages.push(i);
-                    } else {
-                      if (currentPage <= 3) {
-                        pages.push(1, 2, 3, 4, '...', totalPages);
-                      } else if (currentPage >= totalPages - 2) {
-                        pages.push(1, '...', totalPages - 3, totalPages - 2, totalPages - 1, totalPages);
-                      } else {
-                        pages.push(1, '...', currentPage - 1, currentPage, currentPage + 1, '...', totalPages);
-                      }
-                    }
-
-                    return pages.map((page, idx) => (
-                      page === '...' ? (
-                        <span key={idx} className="px-2">...</span>
-                      ) : (
-                        <button
-                          key={idx}
-                          onClick={() => setCurrentPage(page as number)}
-                          className={`w-7 h-7 rounded ${currentPage === page ? 'bg-orange-500 text-white font-bold' : 'bg-white border hover:bg-gray-100'}`}
-                        >
-                          {page}
-                        </button>
-                      )
-                    ));
-                  })()}
-                </div>
-
-                <button
-                  onClick={() => setCurrentPage(p => Math.min(pagination.totalPages, p + 1))}
-                  disabled={currentPage === pagination.totalPages}
-                  className={`px-3 py-1 rounded ${currentPage === pagination.totalPages ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-orange-500 text-white hover:bg-orange-600'}`}
-                >
-                  Next →
-                </button>
-              </div>
+            {pagination && filteredTests.length > 0 && (
+              <PaginationControls
+                pagination={pagination}
+                currentPage={currentPage}
+                itemsPerPage={itemsPerPage}
+                onPageChange={(page) => {
+                  setCurrentPage(page);
+                  fetchTests(page);
+                }}
+                onItemsPerPageChange={(newLimit) => {
+                  setItemsPerPage(newLimit);
+                  setCurrentPage(1);
+                  fetchTests(1);
+                }}
+                isLoading={loading}
+              />
             )}
           </div>
         )}

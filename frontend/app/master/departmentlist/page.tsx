@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Eye, Edit, Trash2, Plus, Layers, RotateCcw } from "lucide-react";
+import PaginationControls from "@/app/components/PaginationControls";
 
 const DepartmentTable = () => {
   const [search, setSearch] = useState("");
@@ -12,7 +13,7 @@ const DepartmentTable = () => {
   const [showInactive, setShowInactive] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [pagination, setPagination] = useState<any>(null);
-  const ITEMS_PER_PAGE = 20;
+  const [itemsPerPage, setItemsPerPage] = useState(25);
   const router = useRouter();
 
   // Fetch departments on component mount and when page changes
@@ -20,13 +21,18 @@ const DepartmentTable = () => {
     fetchDepartments(currentPage);
   }, [currentPage]);
 
+  useEffect(() => {
+    setCurrentPage(1);
+    fetchDepartments(1);
+  }, [itemsPerPage]);
+
   const fetchDepartments = async (page: number = 1) => {
     try {
       setLoading(true);
       setError("");
       
       // Use /all endpoint to get both active and inactive departments
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/master/departments/all?page=${page}&limit=${ITEMS_PER_PAGE}`);
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/master/departments/all?page=${page}&limit=${itemsPerPage}`);
       const result = await response.json();
       
       if (result.success) {
@@ -252,7 +258,7 @@ const DepartmentTable = () => {
                   }`}
                 >
                   <td className="border border-gray-300 px-3 py-1">
-                    {((pagination?.page || 1) - 1) * ITEMS_PER_PAGE + index + 1}
+                    {((pagination?.page || 1) - 1) * itemsPerPage + index + 1}
                   </td>
                   <td className="border border-gray-300 px-3 py-1">{dept.name}</td>
                   <td className="border border-gray-300 px-3 py-1">{dept.code || '-'}</td>
@@ -303,57 +309,22 @@ const DepartmentTable = () => {
         </div>
 
         {/* Pagination Controls */}
-        {pagination && pagination.totalPages > 1 && (
-          <div className="border-t p-3 bg-gray-50 flex items-center justify-between text-xs sm:text-sm">
-            <button
-              onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-              disabled={currentPage === 1}
-              className={`px-3 py-1 rounded ${currentPage === 1 ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-orange-500 text-white hover:bg-orange-600'}`}
-            >
-              ← Previous
-            </button>
-
-            <div className="flex items-center gap-1">
-              {(() => {
-                const pages = [];
-                const totalPages = pagination.totalPages;
-                
-                if (totalPages <= 5) {
-                  for (let i = 1; i <= totalPages; i++) pages.push(i);
-                } else {
-                  if (currentPage <= 3) {
-                    pages.push(1, 2, 3, 4, '...', totalPages);
-                  } else if (currentPage >= totalPages - 2) {
-                    pages.push(1, '...', totalPages - 3, totalPages - 2, totalPages - 1, totalPages);
-                  } else {
-                    pages.push(1, '...', currentPage - 1, currentPage, currentPage + 1, '...', totalPages);
-                  }
-                }
-
-                return pages.map((page, idx) => (
-                  page === '...' ? (
-                    <span key={idx} className="px-2">...</span>
-                  ) : (
-                    <button
-                      key={idx}
-                      onClick={() => setCurrentPage(page as number)}
-                      className={`w-7 h-7 rounded ${currentPage === page ? 'bg-orange-500 text-white font-bold' : 'bg-white border hover:bg-gray-100'}`}
-                    >
-                      {page}
-                    </button>
-                  )
-                ));
-              })()}
-            </div>
-
-            <button
-              onClick={() => setCurrentPage(p => Math.min(pagination.totalPages, p + 1))}
-              disabled={currentPage === pagination.totalPages}
-              className={`px-3 py-1 rounded ${currentPage === pagination.totalPages ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-orange-500 text-white hover:bg-orange-600'}`}
-            >
-              Next →
-            </button>
-          </div>
+        {pagination && filteredDepartments.length > 0 && (
+          <PaginationControls
+            pagination={pagination}
+            currentPage={currentPage}
+            itemsPerPage={itemsPerPage}
+            onPageChange={(page) => {
+              setCurrentPage(page);
+              fetchDepartments(page);
+            }}
+            onItemsPerPageChange={(newLimit) => {
+              setItemsPerPage(newLimit);
+              setCurrentPage(1);
+              fetchDepartments(1);
+            }}
+            isLoading={loading}
+          />
         )}
       </div>
     </div>

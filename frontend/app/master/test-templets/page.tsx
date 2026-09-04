@@ -1,10 +1,11 @@
 "use client";
 
 import { useState, useEffect, useRef } from 'react';
-import { FileText, RotateCwIcon, X, Check, Plus, Trash2, ChevronLeft, ChevronRight } from 'lucide-react';
+import { FileText, RotateCwIcon, X, Check, Plus, Trash2 } from 'lucide-react';
 import { CKEditor } from '@ckeditor/ckeditor5-react';
 import ClassicEditor from '@ckeditor/ckeditor5-build-classic';
-import { getTemplates, getTests, createTemplate, updateTemplate, deleteTemplate, getUnits, createCategoryWithParameter, getTestById } from "@/src/api/master.js";
+import { getTemplates, getTests, createTemplate, updateTemplate, deleteTemplate, getUnits, createCategoryWithParameter, getTestById } from "@/src/api/master";
+import PaginationControls from '@/app/components/PaginationControls';
 
 const TestTemplets = () => {
 
@@ -15,8 +16,8 @@ const TestTemplets = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<any>(null);
   const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(25);
   const [pagination, setPagination] = useState<any>(null);
-  const ITEMS_PER_PAGE = 20;
   const [showForm, setShowForm] = useState(false);
   const [editMode, setEditMode] = useState(false);
   const [currentTemplateId, setCurrentTemplateId] = useState<any>(null);
@@ -28,7 +29,7 @@ const TestTemplets = () => {
     categoryName: '',
     parameters: []
   });
-  const autoSaveTimeoutRef = useRef(null);
+  const autoSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const [formData, setFormData] = useState({
     testId: '',
@@ -41,6 +42,11 @@ const TestTemplets = () => {
     fetchTests();
     fetchUnits();
   }, []);
+
+  useEffect(() => {
+    setCurrentPage(1);
+    fetchTemplates(1);
+  }, [itemsPerPage]);
 
   useEffect(() => {
     if (!showForm || !editMode || !currentTemplateId) return;
@@ -80,7 +86,7 @@ const TestTemplets = () => {
       setTimeout(() => {
         setAutoSaveStatus(null);
       }, 2000);
-    } catch (err) {
+    } catch (err: any) {
       console.error('❌ Auto-save error:', err);
       setAutoSaveStatus('error');
       
@@ -93,15 +99,24 @@ const TestTemplets = () => {
     try {
       setLoading(true);
       setError(null);
-      const data = await getTemplates(page, ITEMS_PER_PAGE);
-      // Ensure data is an array - handle cases where API returns data.data or data.templates
-      const templatesArray = Array.isArray(data) ? data : (data?.data || data?.templates || []);
+      const response = await getTemplates(page, itemsPerPage);
+      // Extract templates array from response
+      const templatesArray = Array.isArray(response) ? response : (response?.data || response?.templates || []);
       setTemplates(templatesArray);
-      setPagination(null);
-    } catch (err) {
+      
+      // Extract pagination data from response
+      const paginationData = response?.pagination || null;
+      console.log('📄 Pagination data:', paginationData);
+      setPagination(paginationData);
+      
+      if (paginationData) {
+        console.log(`✅ Page ${page} of ${paginationData.totalPages} loaded`);
+      }
+    } catch (err: any) {
       console.error('Error fetching templates:', err);
       setError('Failed to load templates. Please try again.');
       setTemplates([]); // Set empty array on error to prevent filter error
+      setPagination(null);
     } finally {
       setLoading(false);
     }
@@ -112,7 +127,7 @@ const TestTemplets = () => {
       const data = await getTests();
       // Ensure data is always an array
       setTests(Array.isArray(data) ? data : ((data as any)?.data || []));
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error fetching tests:', err);
       setTests([]); // Set empty array on error
     }
@@ -123,7 +138,7 @@ const TestTemplets = () => {
       const data = await getUnits();
       // Ensure data is always an array
       setUnits(Array.isArray(data) ? data : ((data as any)?.data || []));
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error fetching units:', err);
       setUnits([]); // Set empty array on error
     }
@@ -153,10 +168,10 @@ const TestTemplets = () => {
       const fullTestData = await getTestById(testId);
       if (fullTestData && fullTestData.categories && fullTestData.categories.length > 0) {
         // Flatten all parameters from all categories
-        const allParams = [];
-        fullTestData.categories.forEach(cat => {
+        const allParams: any[] = [];
+        fullTestData.categories.forEach((cat: any) => {
           if (cat.parameters && Array.isArray(cat.parameters)) {
-            cat.parameters.forEach(param => {
+            cat.parameters.forEach((param: any) => {
               allParams.push({
                 id: param.id || `${cat.categoryId}-${param.parameterName}`,
                 name: param.parameterName,
@@ -170,7 +185,7 @@ const TestTemplets = () => {
       } else {
         setSelectedTestParameters([]);
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error fetching test data:', err);
       setSelectedTestParameters([]);
     }
@@ -188,10 +203,10 @@ const TestTemplets = () => {
       const fullTestData = await getTestById(template.testId.toString());
       if (fullTestData && fullTestData.categories && fullTestData.categories.length > 0) {
         // Flatten all parameters from all categories
-        const allParams = [];
-        fullTestData.categories.forEach(cat => {
+        const allParams: any[] = [];
+        fullTestData.categories.forEach((cat: any) => {
           if (cat.parameters && Array.isArray(cat.parameters)) {
-            cat.parameters.forEach(param => {
+            cat.parameters.forEach((param: any) => {
               allParams.push({
                 id: param.id || `${cat.categoryId}-${param.parameterName}`,
                 name: param.parameterName,
@@ -205,7 +220,7 @@ const TestTemplets = () => {
       } else {
         setSelectedTestParameters([]);
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error fetching test data:', err);
       setSelectedTestParameters([]);
     }
@@ -215,7 +230,7 @@ const TestTemplets = () => {
     setShowForm(true);
   };
 
-  const handleDelete = async (id) => {
+  const handleDelete = async (id: any) => {
     const template = templates.find(t => t.id === id);
     if (!template) return;
 
@@ -234,8 +249,11 @@ const TestTemplets = () => {
       
       await updateTemplate(id, updateData);
       alert('Template deleted permanently!');
-      fetchTemplates();
-    } catch (err) {
+      
+      // Refresh current page or go back if last item on page
+      const newPage = Math.max(1, currentPage);
+      fetchTemplates(newPage);
+    } catch (err: any) {
       console.error('Error deleting template:', err);
       alert(`Failed to delete template: ${err.message}`);
     } finally {
@@ -243,7 +261,7 @@ const TestTemplets = () => {
     }
   };
 
-  const handleToggleActive = async (id) => {
+  const handleToggleActive = async (id: any) => {
     const currentTemplate = templates.find((t) => t.id === id);
     if (!currentTemplate) return;
 
@@ -266,8 +284,11 @@ const TestTemplets = () => {
 
       await updateTemplate(id, updateData);
       alert(currentTemplate.isActive ? "Template inactivated successfully!" : "Template activated successfully!");
-      fetchTemplates();
-    } catch (err) {
+      
+      // Refresh current page
+      const newPage = Math.max(1, currentPage);
+      fetchTemplates(newPage);
+    } catch (err: any) {
       console.error('Error updating template:', err);
       alert('Failed to update template');
     } finally {
@@ -300,7 +321,7 @@ const TestTemplets = () => {
 
       setShowForm(false);
       fetchTemplates();
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error saving template:', err);
       alert(`Failed to save template: ${err.message}`);
     } finally {
@@ -318,7 +339,7 @@ const TestTemplets = () => {
     setSelectedTestParameters([]);
   };
 
-  const filteredTemplates = (Array.isArray(templates) ? templates : []).filter(template => {
+  const filteredTemplates = (Array.isArray(templates) ? templates : []).filter((template: any) => {
     // Exclude deleted items from all views
     if (template.isDeleted) return false;
     
@@ -386,12 +407,12 @@ const TestTemplets = () => {
                 </label>
                 <select
                   value={formData.testId}
-                  onChange={(e) => handleTestChange(e.target.value)}
+                  onChange={(e: any) => handleTestChange(e.target.value)}
                   disabled={editMode}
                   className="w-full px-3 py-2 border border-gray-300 bg-white rounded text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 disabled:bg-gray-100 disabled:cursor-not-allowed disabled:text-gray-500"
                 >
                   <option value="">Please Select</option>
-                  {Array.isArray(tests) && tests.map(test => (
+                  {Array.isArray(tests) && tests.map((test: any) => (
                     <option key={test.id} value={test.id}>
                       {test.name}
                     </option>
@@ -406,7 +427,7 @@ const TestTemplets = () => {
                 <input
                   type="text"
                   value={formData.templateName}
-                  onChange={(e) => setFormData({ ...formData, templateName: e.target.value })}
+                  onChange={(e: any) => setFormData({ ...formData, templateName: e.target.value })}
                   className="w-full px-3 py-2 border border-gray-300 bg-white rounded text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
                   placeholder="Enter template name"
                 />
@@ -416,7 +437,7 @@ const TestTemplets = () => {
             {selectedTestParameters.length > 0 && (
               <div className="p-4 sm:p-6">
                 <div className="space-y-6">
-                  {selectedTestParameters.map((param) => (
+                  {selectedTestParameters.map((param: any) => (
                     <div key={param.id}>
                       <div className="flex items-start gap-4">
                         <div className="w-32 flex-shrink-0">
@@ -433,9 +454,9 @@ const TestTemplets = () => {
                           {param.type === 'Numeric' ? (
                             <input
                               type="number"
-                              value={formData.parameters.find(p => p.id === param.id)?.value || ''}
-                              onChange={(e) => {
-                                const updatedParams = formData.parameters.filter(p => p.id !== param.id);
+                              value={formData.parameters.find((p: any) => p.id === param.id)?.value || ''}
+                              onChange={(e: any) => {
+                                const updatedParams = formData.parameters.filter((p: any) => p.id !== param.id);
                                 updatedParams.push({
                                   id: param.id,
                                   name: param.name,
@@ -452,9 +473,9 @@ const TestTemplets = () => {
                           ) : param.type === 'Text' ? (
                             <input
                               type="text"
-                              value={formData.parameters.find(p => p.id === param.id)?.value || ''}
-                              onChange={(e) => {
-                                const updatedParams = formData.parameters.filter(p => p.id !== param.id);
+                              value={formData.parameters.find((p: any) => p.id === param.id)?.value || ''}
+                              onChange={(e: any) => {
+                                const updatedParams = formData.parameters.filter((p: any) => p.id !== param.id);
                                 updatedParams.push({
                                   id: param.id,
                                   name: param.name,
@@ -472,10 +493,10 @@ const TestTemplets = () => {
                             <div className="border border-gray-300 rounded">
                               <CKEditor
                                 editor={ClassicEditor as any}
-                                data={formData.parameters.find(p => p.id === param.id)?.value || ''}
-                                onChange={(_, editor) => {
+                                data={formData.parameters.find((p: any) => p.id === param.id)?.value || ''}
+                                onChange={(_: any, editor: any) => {
                                   const data = editor.getData();
-                                  const updatedParams = formData.parameters.filter(p => p.id !== param.id);
+                                  const updatedParams = formData.parameters.filter((p: any) => p.id !== param.id);
                                   updatedParams.push({
                                     id: param.id,
                                     name: param.name,
@@ -538,7 +559,7 @@ const TestTemplets = () => {
                 type="text"
                 placeholder="Search by keyword"
                 value={search}
-                onChange={(e) => setSearch(e.target.value)}
+                onChange={(e: any) => setSearch(e.target.value)}
                 className="border border-gray-300 bg-white rounded px-3 py-2 w-full sm:w-64 text-xs sm:text-sm placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500"
               />
 
@@ -554,7 +575,7 @@ const TestTemplets = () => {
                 <input
                   type="checkbox"
                   checked={showInactive}
-                  onChange={(e) => setShowInactive(e.target.checked)}
+                  onChange={(e: any) => setShowInactive(e.target.checked)}
                   className="w-4 h-4 accent-orange-500"
                 />
                 <span className="text-gray-700">Show Inactive</span>
@@ -611,7 +632,7 @@ const TestTemplets = () => {
                         </td>
                       </tr>
                     ) : (
-                      filteredTemplates.map((template, index) => (
+                      filteredTemplates.map((template: any, index: number) => (
                         <tr
                           key={template.id}
                           className={`hover:bg-blue-50 border-b border-gray-200 transition-colors ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} ${!template.isActive ? 'bg-gray-100 opacity-60' : ''}`}
@@ -665,48 +686,22 @@ const TestTemplets = () => {
                 </table>
               </div>
 
-              {pagination && templates.length > 0 && (
-                <div className="mt-3 bg-white rounded shadow-md p-3 flex items-center justify-between text-xs">
-                  <div className="text-gray-600">
-                    Showing {(currentPage - 1) * ITEMS_PER_PAGE + 1} to{' '}
-                    {Math.min(currentPage * ITEMS_PER_PAGE, pagination.total)} of{' '}
-                    {pagination.total} records
-                  </div>
-
-                  <div className="flex gap-2 items-center">
-                    <button
-                      onClick={() => {
-                        const newPage = Math.max(1, currentPage - 1);
-                        setCurrentPage(newPage);
-                        fetchTemplates(newPage);
-                      }}
-                      disabled={currentPage === 1}
-                      className={`flex items-center gap-1 px-3 py-1 rounded ${currentPage === 1 ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-orange-500 text-white hover:bg-orange-600'}`}
-                    >
-                      <ChevronLeft size={14} /> Previous
-                    </button>
-
-                    <span className="px-3 py-1">
-                      Page {currentPage} of {pagination.totalPages}
-                    </span>
-
-                    <button
-                      onClick={() => {
-                        const newPage = Math.min(pagination.totalPages, currentPage + 1);
-                        setCurrentPage(newPage);
-                        fetchTemplates(newPage);
-                      }}
-                      disabled={currentPage === pagination.totalPages}
-                      className={`flex items-center gap-1 px-3 py-1 rounded ${currentPage === pagination.totalPages ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-orange-500 text-white hover:bg-orange-600'}`}
-                    >
-                      Next <ChevronRight size={14} />
-                    </button>
-                  </div>
-
-                  <div className="text-gray-600">
-                    Total: {pagination.total} records
-                  </div>
-                </div>
+              {pagination && filteredTemplates.length > 0 && (
+                <PaginationControls
+                  pagination={pagination}
+                  currentPage={currentPage}
+                  itemsPerPage={itemsPerPage}
+                  onPageChange={(page: number) => {
+                    setCurrentPage(page);
+                    fetchTemplates(page);
+                  }}
+                  onItemsPerPageChange={(newLimit: number) => {
+                    setItemsPerPage(newLimit);
+                    setCurrentPage(1);
+                    fetchTemplates(1);
+                  }}
+                  isLoading={loading}
+                />
               )}
             </>
           )}

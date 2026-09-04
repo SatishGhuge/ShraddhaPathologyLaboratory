@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { getAllPatients, updatePayment, updatePatient, updatePatientTestDetails, getVisitBill, cancelTest } from "@/src/api/patient";
 import { getDoctors, getTests, getPackages, getSpecimenTypes, getOrganizations } from "@/src/api/master";
+import PaginationControls from "@/app/components/PaginationControls";
 import html2pdf from "html2pdf.js";
 import { jsPDF } from "jspdf";
 const LetterHead = "/LetterHead.jpeg";
@@ -537,7 +538,8 @@ export default function BookingPage() {
   
   /* ===== PAGINATION STATES ===== */
   const [currentPage, setCurrentPage] = useState(1);
-  const ITEMS_PER_PAGE = 20;
+  const [itemsPerPage, setItemsPerPage] = useState(25);
+  const ITEMS_PER_PAGE = itemsPerPage;  // Use dynamic items per page
   const [showReceiptModal, setShowReceiptModal] = useState(false);
   const [successPopup,     setSuccessPopup]     = useState("");
 
@@ -2111,6 +2113,7 @@ export default function BookingPage() {
 
         {/* LEFT - BOOKING LIST - FULL WIDTH */}
         <div className="col-span-12 bg-white rounded shadow flex flex-col overflow-hidden">
+          {/* TABLE WRAPPER */}
           <div className="overflow-y-auto overflow-x-hidden flex-1">
             <table className="w-full text-xs">
               <thead className="bg-cyan-900 text-white sticky top-0">
@@ -2202,58 +2205,24 @@ export default function BookingPage() {
             </table>
           </div>
           
-          {/* PAGINATION CONTROLS */}
-          {filteredBookings.length > ITEMS_PER_PAGE && (
-            <div className="border-t p-2 bg-gray-50 flex items-center justify-between text-xs">
-              <button
-                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                disabled={currentPage === 1}
-                className={`flex items-center gap-1 px-3 py-1 rounded ${currentPage === 1 ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-slate-900 hover:bg-orange-600 text-white'}`}>
-                <ChevronLeft size={14} />
-                Previous
-              </button>
-              
-              <div className="flex items-center gap-2">
-                {(() => {
-                  const totalPages = Math.ceil(filteredBookings.length / ITEMS_PER_PAGE);
-                  const pages: (number | string)[] = [];
-                  
-                  // Show page numbers with ellipsis
-                  if (totalPages <= 5) {
-                    for (let i = 1; i <= totalPages; i++) pages.push(i);
-                  } else {
-                    if (currentPage <= 3) {
-                      pages.push(1, 2, 3, 4, '...', totalPages);
-                    } else if (currentPage >= totalPages - 2) {
-                      pages.push(1, '...', totalPages - 3, totalPages - 2, totalPages - 1, totalPages);
-                    } else {
-                      pages.push(1, '...', currentPage - 1, currentPage, currentPage + 1, '...', totalPages);
-                    }
-                  }
-                  
-                  return pages.map((page, idx) => (
-                    page === '...' ? (
-                      <span key={idx} className="px-2 text-gray-400">...</span>
-                    ) : (
-                      <button
-                        key={idx}
-                        onClick={() => setCurrentPage(typeof page === 'number' ? page : 1)}
-                        className={`w-7 h-7 rounded ${typeof page === 'number' && currentPage === page ? 'bg-orange-500 text-white font-bold' : 'bg-white border hover:bg-gray-100'}`}>
-                        {page}
-                      </button>
-                    )
-                  ));
-                })()}
-              </div>
-              
-              <button
-                onClick={() => setCurrentPage(p => Math.min(Math.ceil(filteredBookings.length / ITEMS_PER_PAGE), p + 1))}
-                disabled={currentPage === Math.ceil(filteredBookings.length / ITEMS_PER_PAGE)}
-                className={`flex items-center gap-1 px-3 py-1 rounded ${currentPage === Math.ceil(filteredBookings.length / ITEMS_PER_PAGE) ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-slate-900 hover:bg-orange-600 text-white'}`}>
-                Next
-                <ChevronRight size={14} />
-              </button>
-            </div>
+          {/* PAGINATION CONTROLS - OUTSIDE SCROLLABLE AREA */}
+          {filteredBookings.length > 0 && (
+            <PaginationControls
+              pagination={{
+                page: currentPage,
+                limit: ITEMS_PER_PAGE,
+                total: filteredBookings.length,
+                totalPages: Math.ceil(filteredBookings.length / ITEMS_PER_PAGE)
+              }}
+              currentPage={currentPage}
+              itemsPerPage={ITEMS_PER_PAGE}
+              onPageChange={(page: number) => setCurrentPage(page)}
+              onItemsPerPageChange={(newLimit: number) => {
+                setItemsPerPage(newLimit);
+                setCurrentPage(1);
+              }}
+              isLoading={loadingBookings}
+            />
           )}
         </div>
 
