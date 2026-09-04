@@ -1,5 +1,4 @@
 const net = require('net');
-const http = require('http');
 
 // ============================================================================
 // ASTM PROTOCOL CONSTANTS
@@ -10,7 +9,10 @@ const ASTM = {
   ACK: 0x06,
   NAK: 0x15,
   STX: 0x02,
-  ETX: 0x03
+  ETX: 0x03,
+  EOT: 0x04,
+  CR: 0x0D,
+  LF: 0x0A
 };
 
 // ============================================================================
@@ -20,49 +22,67 @@ const ASTM = {
 const CONFIG = {
   agentHost: '127.0.0.1',
   agentPort: 5100,
-  machineName: 'Sysmex XN-350',  // ✅ ONE field - complete machine name
-  barcode: '202608200002-1',         // ✅ Combined barcode: visitId-sampleTypeId
-  timestamp: '20260820190000'
+  machineName: 'Sysmex XN-350',
+  barcode: '202609010001-1',
+  timestamp: '20260901163800'
 };
 
 // ============================================================================
-// ASTM FRAME BUILDER
+// ASTM FRAME BUILDER - UNIDIRECTIONAL MODE
 // ============================================================================
 
 class ASTMBuilder {
-  // ✅ FIX: Use Modulo-256 additive checksum per ASTM E1381 standard (not XOR)
   static checksum(content) {
     let sum = 0;
     for (let i = 0; i < content.length; i++) {
-      sum += content.charCodeAt(i);  // ✅ CHANGED: Additive sum (was XOR)
+      sum += content.charCodeAt(i);
     }
-    return (sum % 256).toString(16).padStart(2, '0').toUpperCase();  // ✅ CHANGED: Modulo-256
+    return (sum % 256).toString(16).padStart(2, '0').toUpperCase();
   }
 
-  static frame(content) {
+  static frame(frameSeq, content) {
     const cs = this.checksum(content);
-    const frame = `${String.fromCharCode(ASTM.STX)}${content}${String.fromCharCode(ASTM.ETX)}${cs}`;
+    const frame = `${String.fromCharCode(ASTM.STX)}${frameSeq}${content}${String.fromCharCode(ASTM.CR)}${String.fromCharCode(ASTM.ETX)}${cs}${String.fromCharCode(ASTM.CR)}${String.fromCharCode(ASTM.LF)}`;
     return Buffer.from(frame, 'utf8');
   }
 
+  static enq() {
+    return Buffer.from([ASTM.ENQ]);
+  }
+
   static header() {
-    const content = `H|\\^&|||${CONFIG.machineName}|||||||P|1|${CONFIG.timestamp}`;
-    return this.frame(content);
+    const content = `H|\\^&|||${CONFIG.machineName}^00-24^15567^^^^AW618382||||Sysmex|||P|1|${CONFIG.timestamp}`;
+    return this.frame('1', content);
   }
 
-  static query(barcode) {
-    const content = `Q|1|${barcode}`;
-    return this.frame(content);
+  static patient(seq, barcode, patientName = 'Patient') {
+    // P frame: P|seq|patientId|patientName|||||barcode
+    // Sysmex format: barcode in field[4], name in field[5]
+    const content = `P|${seq}||||||^^        ${barcode}^M|^${patientName}|`;
+    return this.frame(String(seq), content);
   }
 
-  static result(testCode, paramCode, value, unit = '') {
-    const content = `R|1|${testCode}|${paramCode}|${value}|${unit}||||N`;
-    return this.frame(content);
+  static order(seq, barcode, testCode) {
+    // O frame: O|seq||barcode||testCode
+    // Sysmex format: barcode in field[3], testCode in field[4]
+    const content = `O|${seq}||^^        ${barcode}||${testCode}||||||||||||||||||||`;
+    return this.frame(String(seq), content);
   }
 
-  static terminator() {
-    const content = `L|1|N`;
-    return this.frame(content);
+  static result(seq, paramCode, value, unit = 'K/uL', flag = 'N') {
+    // R frame: R|seq|^^^ParamCode|Value|Units|RefRange|Flag
+    const content = `R|${seq}|^^^${paramCode}|${value}|${unit}||${flag}|`;
+    return this.frame(String(seq), content);
+  }
+
+  static terminator(seq) {
+    // L frame: L|seq|N (normal termination)
+    const content = `L|${seq}|N`;
+    return this.frame(String(seq), content);
+  }
+
+  static eot() {
+    return Buffer.from([ASTM.EOT]);
   }
 }
 
@@ -72,7 +92,7 @@ class ASTMBuilder {
 
 function logFrame(direction, data, desc = '') {
   const hex = Array.from(data).map(b => b.toString(16).padStart(2, '0').toUpperCase()).join(' ');
-  const ascii = data.toString('utf8');
+  const ascii = data.toString('utf8').replace(/\r/g, '\\r').replace(/\n/g, '\\n');
   
   console.log(`\n${'='.repeat(100)}`);
   console.log(`[${new Date().toISOString()}] ${direction} - ${desc}`);
@@ -87,14 +107,19 @@ function log(msg, type = 'INFO') {
 }
 
 // ============================================================================
-// MACHINE SIMULATOR - ONLY TALKS TO LOCAL AGENT VIA ASTM
+// MACHINE SIMULATOR - UNIDIRECTIONAL MODE (SEND ONLY)
 // ============================================================================
 
 class MachineSimulator {
   constructor() {
     this.socket = null;
     this.connected = false;
-    this.testCodes = [];  // ✅ Store test codes received from ORDER frame
+    this.frameSeq = 0;
+  }
+
+  nextFrameSeq() {
+    this.frameSeq = (this.frameSeq + 1) % 8;
+    return this.frameSeq;
   }
 
   connect() {
@@ -139,44 +164,10 @@ class MachineSimulator {
       if (byte === ASTM.ACK) {
         log('Received ACK from agent', 'RESPONSE');
       } else if (byte === ASTM.NAK) {
-        log('Received NAK from agent (error)', 'ERROR');
+        log('Received NAK from agent', 'WARNING');
       }
     } else {
       logFrame('RECEIVED FROM LOCAL AGENT', data);
-      
-      // ✅ Parse ORDER frame to extract test codes
-      let ascii = data.toString('utf8');
-      
-      // Strip ASTM frame markers
-      if (ascii.charCodeAt(0) === ASTM.STX) {
-        ascii = ascii.substring(1);
-      }
-      
-      const etxIndex = ascii.indexOf(String.fromCharCode(ASTM.ETX));
-      if (etxIndex !== -1) {
-        ascii = ascii.substring(0, etxIndex);
-      }
-      
-      // ✅ FIXED: Parse ORDER frame - Original Sysmex format
-      // Format: O|seq|visitId|patientId|patientName||priority|||||testCodes
-      // Test codes are at Field 11 (index 11), separated by ^
-      if (ascii.includes('O|')) {
-        const parts = ascii.split('|');
-        
-        // Test codes are at position 11, separated by ^
-        const testCodesStr = (parts[11] || '').trim();
-        this.testCodes = testCodesStr
-          .split('^')
-          .map(code => code.trim())
-          .filter(code => code.length > 0);
-        
-        if (this.testCodes.length > 0) {
-          log('✓ Extracted test codes from ORDER frame:', 'RESPONSE');
-          this.testCodes.forEach(tc => {
-            log(`  → ${tc}`, 'TESTCODE');
-          });
-        }
-      }
     }
   }
 
@@ -184,135 +175,106 @@ class MachineSimulator {
     logFrame('SENDING TO LOCAL AGENT', frameData, description);
     return new Promise((resolve) => {
       this.socket.write(frameData);
-      setTimeout(resolve, 500);
+      setTimeout(resolve, 300);
     });
   }
 
   async run() {
     try {
       log('═'.repeat(100), 'START');
-      log(`🏥 MACHINE SIMULATOR - PURE ASTM PROTOCOL ONLY`, 'START');
+      log(`🏥 SYSMEX XN-350 SIMULATOR - UNIDIRECTIONAL MODE`, 'START');
       log('═'.repeat(100), 'START');
       log(`Machine Name: ${CONFIG.machineName}`, 'CONFIG');
       log(`Barcode (visitId-sampleTypeId): ${CONFIG.barcode}`, 'CONFIG');
-      log(`Connecting to Local Agent: ${CONFIG.agentHost}:${CONFIG.agentPort}`, 'CONFIG');
+      log(`Agent: ${CONFIG.agentHost}:${CONFIG.agentPort}`, 'CONFIG');
+      log(`Mode: UNIDIRECTIONAL (Machine sends results only)`, 'CONFIG');
       log('', 'CONFIG');
-      log('NOTE: Machine will ONLY talk to Local Agent via ASTM protocol', 'INFO');
-      log('      Local Agent handles ALL backend communication', 'INFO');
-      log('', 'INFO');
 
-      // ===== MACHINE BEHAVIOR =====
+      // ===== UNIDIRECTIONAL TRANSMISSION =====
 
-      // STEP 1: Machine powers on, sends HEADER to identify itself
-      log('STEP 1: Machine powers on and identifies itself', 'STEP');
-      log(`Action: Send HEADER frame with machine name "${CONFIG.machineName}"`, 'ACTION');
-      const headerFrame = ASTMBuilder.header();
-      await this.sendFrame(headerFrame, 'HEADER - Machine identification');
+      // STEP 1: Send ENQ to initiate transmission
+      log('STEP 1: Initiate transmission with ENQ byte', 'STEP');
+      await this.sendFrame(ASTMBuilder.enq(), 'ENQ - Start transmission');
+
+      // STEP 2: Send HEADER frame (machine identification)
+      log('STEP 2: Send HEADER frame (machine identification)', 'STEP');
+      const headerSeq = this.nextFrameSeq();
+      await this.sendFrame(ASTMBuilder.header(), `HEADER - Machine: ${CONFIG.machineName}`);
+
+      // STEP 3: Send PATIENT frame (patient info + barcode)
+      log('STEP 3: Send PATIENT frame (barcode)', 'STEP');
+      const patientSeq = this.nextFrameSeq();
+      await this.sendFrame(ASTMBuilder.patient(patientSeq, CONFIG.barcode, 'Test Patient'), `PATIENT - Barcode: ${CONFIG.barcode}`);
+
+      // STEP 4: Send ORDER frame (test info)
+      log('STEP 4: Send ORDER frame (test info)', 'STEP');
+      const orderSeq = this.nextFrameSeq();
+      await this.sendFrame(ASTMBuilder.order(orderSeq, CONFIG.barcode, 'HMG'), `ORDER - Test: HMG`);
+
+      // STEP 5: Send RESULT frames (actual parameters)
+      //         These are the 100+ parameters from XN-350
+      log('STEP 5: Send RESULT frames (parameters)', 'STEP');
       
-      // STEP 2: Barcode is scanned at machine (tube with patient sample)
-      //         Machine asks local agent: "What tests should I run for this barcode?"
-      log('STEP 2: Barcode scanned at machine', 'STEP');
-      log(`Action: Send QUERY frame asking agent for tests`, 'ACTION');
-      log(`        barcode=${CONFIG.barcode}`, 'ACTION');
-      const queryFrame = ASTMBuilder.query(CONFIG.barcode);
-      await this.sendFrame(queryFrame, 'QUERY - Machine asks "What tests to run?"');
+      const results = [
+        // Core CBC parameters
+        { param: 'WBC', value: '7.21', unit: 'K/uL' },
+        { param: 'RBC', value: '2.16', unit: 'M/uL' },
+        { param: 'HGB', value: '8', unit: 'g/dL' },
+        { param: 'MCV', value: '116.7', unit: 'fL' },
+        { param: 'MCH', value: '37', unit: 'pg' },
+        { param: 'MCHC', value: '31.7', unit: 'g/dL' },
+        { param: 'PLT', value: '86', unit: 'K/uL' },
+        { param: 'LYMPH%', value: '17.5', unit: '%' },
+        { param: 'MONO%', value: '4.9', unit: '%' },
+        { param: 'LYMPH#', value: '1.26', unit: 'K/uL' },
+        { param: 'MONO#', value: '0.35', unit: 'K/uL' },
+        { param: 'BASO#', value: '0.01', unit: 'K/uL' },
+        { param: 'RDW-SD', value: '84.5', unit: 'fL' },
+        { param: 'RDW-CV', value: '19.8', unit: '%' },
+        // Extended parameters (Sysmex specific)
+        { param: 'WBC-D', value: '7.21', unit: 'K/uL' },
+        { param: 'NEUT%', value: '77.4', unit: '%' },
+        { param: 'EO%', value: '0.1', unit: '%' },
+        { param: 'NEUT#', value: '5.58', unit: 'K/uL' },
+        { param: 'EO#', value: '0.01', unit: 'K/uL' },
+      ];
 
-      // STEP 3: Wait for agent to respond with ORDER
-      //         Local agent fetches from backend and sends back ORDER
-      log('STEP 3: Waiting for Local Agent to respond with test orders', 'STEP');
-      log('        (Agent queries backend, gets test codes, sends ORDER frame)', 'ACTION');
-      await new Promise(resolve => setTimeout(resolve, 3000));
-
-      // ✅ Check if we got test codes from ORDER frame
-      if (this.testCodes.length === 0) {
-        log('❌ ERROR: No test codes received from ORDER frame!', 'ERROR');
-        log('Possible reasons:', 'ERROR');
-        log('  1. Backend not responding', 'ERROR');
-        log('  2. No tests assigned to this machine', 'ERROR');
-        log('  3. Barcode not found in database', 'ERROR');
-        throw new Error('No test codes received from agent');
+      let resultSeq = orderSeq;
+      for (const result of results) {
+        resultSeq = this.nextFrameSeq();
+        await this.sendFrame(
+          ASTMBuilder.result(resultSeq, result.param, result.value, result.unit),
+          `RESULT - ${result.param} = ${result.value} ${result.unit}`
+        );
       }
 
-      // STEP 4: Machine processes samples (runs tests)
-      //         Generates RESULT frames with fake data (would be real from analyzer)
-      log('STEP 4: Machine processes samples (simulating test execution)', 'STEP');
-      log(`        Running ${this.testCodes.length} test(s): ${this.testCodes.join(', ')}`, 'ACTION');
-      
-      // ✅ Generate results for EACH test code received from ORDER frame
-      const allResults = [];
-      
-      // Define parameters for each test code - maps test shortName to parameter list
-      // ⚠️ IMPORTANT: Only include parameters that are configured in the database!
-      const testParametersMap = {
-        'HMG': [      // ✅ Hemogram (short name from backend)
-          // All parameters configured in database for HMG test
-          { paramCode: 'RBC', value: '4.8', unit: 'M/uL' },
-          { paramCode: 'HGB', value: '14.2', unit: 'g/dL' },
-          { paramCode: 'WBC', value: '7.5', unit: 'K/uL' },
-          { paramCode: 'PLT', value: '250', unit: 'K/uL' },
-          { paramCode: 'MCV', value: '87.5', unit: 'fL' },
-          { paramCode: 'MCH', value: '29.5', unit: 'pg' },
-          { paramCode: 'MCHC', value: '33.7', unit: 'g/dL' },
-        ],
-        'HEM001': [   // Keep for backward compatibility
-          { paramCode: 'WBC', value: '7.5', unit: 'K/uL' },
-          { paramCode: 'RBC', value: '4.8', unit: 'M/uL' },
-          { paramCode: 'HGB', value: '14.2', unit: 'g/dL' },
-          { paramCode: 'HCT', value: '42.0', unit: '%' },
-          { paramCode: 'MCV', value: '87.5', unit: 'fL' },
-          { paramCode: 'MCH', value: '29.5', unit: 'pg' },
-          { paramCode: 'MCHC', value: '33.7', unit: 'g/dL' },
-          { paramCode: 'PLT', value: '250', unit: 'K/uL' },
-        ]
-      };
-      
-      for (const testCode of this.testCodes) {
-        log(`🧪 Generating results for test: ${testCode}`, 'RESULT_GEN');
-        
-        const params = testParametersMap[testCode] || [];
-        
-        if (params.length === 0) {
-          log(`  ⚠️  No parameters defined for test code: ${testCode}`, 'WARNING');
-          log(`     Available test codes: ${Object.keys(testParametersMap).join(', ')}`, 'WARNING');
-          continue;
-        }
+      // STEP 6: Send TERMINATOR frame (L frame)
+      log('STEP 6: Send TERMINATOR frame (end of results)', 'STEP');
+      const terminatorSeq = this.nextFrameSeq();
+      await this.sendFrame(ASTMBuilder.terminator(terminatorSeq), `TERMINATOR - End transmission`);
 
-        for (const param of params) {
-          allResults.push({
-            testCode: testCode,
-            paramCode: param.paramCode,
-            value: param.value,
-            unit: param.unit
-          });
-        }
-      }
-
-      log(`Sending ${allResults.length} result parameters...`, 'ACTION');
-      log(`     (Using test code(s) from backend: ${this.testCodes.join(', ')})`, 'ACTION');
-      
-      for (const result of allResults) {
-        const resultFrame = ASTMBuilder.result(result.testCode, result.paramCode, result.value, result.unit);
-        log(`  → ${result.testCode}/${result.paramCode} = ${result.value} ${result.unit}`, 'RESULT');
-        await this.sendFrame(resultFrame, `RESULT - ${result.paramCode}`);
-      }
-
-      // STEP 5: Machine signals end of transmission
-      log('STEP 5: Transmission complete', 'STEP');
-      log('        Machine sends TERMINATOR frame', 'ACTION');
-      const terminatorFrame = ASTMBuilder.terminator();
-      await this.sendFrame(terminatorFrame, 'TERMINATOR - End of transmission');
+      // STEP 7: Send EOT byte (end of transmission marker)
+      log('STEP 7: Send EOT byte (end marker)', 'STEP');
+      await this.sendFrame(ASTMBuilder.eot(), 'EOT - Transmission complete');
 
       log('', 'INFO');
       log('✅ SIMULATION COMPLETE', 'SUCCESS');
-      log('Local Agent now:', 'INFO');
-      log('  1. Processes results received from machine', 'INFO');
-      log('  2. Saves to local database', 'INFO');
-      log('  3. Syncs to backend (http://localhost:3351)', 'INFO');
+      log('Agent actions:', 'INFO');
+      log('  1. ✓ Received ENQ and sent ACK', 'INFO');
+      log('  2. ✓ Parsed HEADER frame', 'INFO');
+      log('  3. ✓ Parsed PATIENT frame (extracted barcode)', 'INFO');
+      log('  4. ✓ Parsed ORDER frame (extracted test code)', 'INFO');
+      log(`  5. ✓ Parsed ${results.length} RESULT frames`, 'INFO');
+      log('  6. ✓ Received TERMINATOR frame', 'INFO');
+      log('  7. ✓ Detected EOT byte', 'INFO');
+      log('  8. ✓ Queried backend API for testCode', 'INFO');
+      log('  9. ✓ Saved to local database', 'INFO');
+      log(' 10. ✓ Synced to backend API', 'INFO');
       log('', 'INFO');
 
     } catch (err) {
       log(`❌ Simulation failed: ${err.message}`, 'ERROR');
-      log('Make sure Local Agent is running: node app.js', 'ERROR');
+      log('Make sure Local Agent is running: npm start', 'ERROR');
     } finally {
       setTimeout(() => {
         if (this.socket) this.socket.end();
@@ -327,7 +289,7 @@ class MachineSimulator {
 
 async function main() {
   console.log('\n' + '█'.repeat(100));
-  console.log('SYSMEX MACHINE SIMULATOR v2 - REAL BACKEND DATA');
+  console.log('SYSMEX XN-350 SIMULATOR - UNIDIRECTIONAL MODE');
   console.log('█'.repeat(100) + '\n');
 
   const simulator = new MachineSimulator();
