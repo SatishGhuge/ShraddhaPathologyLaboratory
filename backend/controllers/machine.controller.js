@@ -313,49 +313,37 @@ export const submitResults = async (req, res) => {
 
             let testParam = null;
             
-            // Step 1: Try exact parameterCode match within this test (case-insensitive)
+            // Step 1: Try exact parameterCode match within this test
             testParam = await prisma.testParameter.findFirst({
               where: {
                 testId: patientTest.testId,
-                parameterCode: {
-                  equals: paramCode,
-                  mode: 'insensitive'
-                }
+                parameterCode: paramCode
               }
             });
             
             if (!testParam) {
-              // Step 2: Try exact global parameterCode match (case-insensitive)
+              // Step 2: Try exact global parameterCode match
               testParam = await prisma.testParameter.findFirst({
                 where: {
-                  parameterCode: {
-                    equals: paramCode,
-                    mode: 'insensitive'
-                  }
+                  parameterCode: paramCode
                 }
               });
             }
             
-            // Step 3: Try machineCode match (case-insensitive)
+            // Step 3: Try machineCode match
             if (!testParam) {
               testParam = await prisma.testParameter.findFirst({
                 where: {
-                  machineCode: {
-                    equals: paramCode,
-                    mode: 'insensitive'
-                  }
+                  machineCode: paramCode
                 }
               });
             }
             
-            // Step 4: Try parameterName match (case-insensitive)
+            // Step 4: Try parameterName match
             if (!testParam) {
               testParam = await prisma.testParameter.findFirst({
                 where: {
-                  parameterName: {
-                    equals: paramCode,
-                    mode: 'insensitive'
-                  }
+                  parameterName: paramCode
                 }
               });
             }
@@ -376,9 +364,13 @@ export const submitResults = async (req, res) => {
             let finalValue = value;
             if (testParam.multiplyBy) {
               try {
-                // Safely evaluate the multiplyBy expression (e.g., "10^3" -> 1000)
+                // Convert notation like "10^3" to "10**3" for JavaScript exponentiation
+                // 10^3 = XOR operation (wrong), 10**3 = exponentiation (correct = 1000)
+                const jsExpression = testParam.multiplyBy.replace(/\^/g, '**');
+                
+                // Safely evaluate the expression
                 // eslint-disable-next-line no-new-func
-                const multiplier = Function('"use strict"; return (' + testParam.multiplyBy + ')')();
+                const multiplier = Function('"use strict"; return (' + jsExpression + ')')();
                 if (typeof multiplier === 'number' && isFinite(multiplier)) {
                   finalValue = parseFloat(value) * multiplier;
                   console.log(`[MACHINE API RESULTS] ✅ Applied multiplier: ${value} × ${testParam.multiplyBy} (${multiplier}) = ${finalValue}`);

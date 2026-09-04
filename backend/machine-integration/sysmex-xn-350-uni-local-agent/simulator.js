@@ -22,8 +22,8 @@ const ASTM = {
 const CONFIG = {
   agentHost: '127.0.0.1',
   agentPort: 5100,
-  machineName: 'Sysmex XN-350',
-  barcode: '202609010001-1',
+  machineName: 'XN-350',
+  barcode: '202609040002-1',
   timestamp: '20260901163800'
 };
 
