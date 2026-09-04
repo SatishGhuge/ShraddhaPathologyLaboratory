@@ -14,6 +14,7 @@
     "seed:tests": "node prisma/seed-tests-charges.js",
     "seed:units": "node prisma/seed-units.js",
     "populate:allocations": "node scripts/populate-module-allocations.js",
+    "normalize:params": "node scripts/normalize-parameter-codes.js",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:studio": "prisma studio"

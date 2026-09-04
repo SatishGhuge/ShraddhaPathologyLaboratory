@@ -65,10 +65,12 @@ const allModules: NavModule[] = [
       { label: "Collection Report", path: "/reports/collection" },
       { label: "Organization Settlement", path: "/reports/organization-settlement" },
       { label: "Referral Doctor Settlement", path: "/reports/referral-doctor-settlement" },
+      { label: "Doctor Comparative", path: "/reports/doctor-comparative" },
       { label: "Patient List", path: "/reports/patient-list" },
       { label: "Referral Doctor Revenue", path: "/reports/referral-doctor-revenue" },
       { label: "Test Report", path: "/reports/test-report" },
       { label: "Turn Around Time", path: "/reports/turn-around-time" },
+      { label: "Inventory Stock Management", path: "/reports/inventory-stock-management" },
     ],
   },
   {
@@ -213,10 +215,12 @@ const Header = () => {
                 if (item.path.includes("/collection")) return accessible.reports.collectionReport === true;
                 if (item.path.includes("organization-settlement")) return (accessible.reports as any)?.organizationSettlement === true;
                 if (item.path.includes("referral-doctor-settlement")) return (accessible.reports as any)?.referralDoctorSettlement === true;
+                if (item.path.includes("doctor-comparative")) return (accessible.reports as any)?.doctorComparative === true;
                 if (item.path.includes("patient-list")) return accessible.reports.patientList === true;
                 if (item.path.includes("referral-doctor-revenue")) return accessible.reports.referralDoctorRevenue === true;
                 if (item.path.includes("test-report")) return accessible.reports.testReport === true;
                 if (item.path.includes("turn-around-time")) return (accessible.reports as any)?.turnAroundTime === true;
+                if (item.path.includes("inventory-stock-management")) return (accessible.reports as any)?.inventoryStockManagement === true;
                 return false;
               })
             };

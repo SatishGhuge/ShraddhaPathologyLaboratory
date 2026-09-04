@@ -28,6 +28,7 @@ import { getOrganizations } from "@/src/api/master";
 import ReadingValidationModal from "@/app/components/ReadingValidationModal";
 import AuthenticateModal from "@/app/components/AuthenticateModal";
 import TestSelectionModal, { SelectedTestItem } from "@/app/components/TestSelectionModal";
+import { stripHtmlTags } from "@/src/utils/htmlParser";
 
 const LetterHead = "/LetterHead.jpeg";
 
@@ -255,23 +256,25 @@ export default function Result() {
     
     // Sort patient's records by date (ascending - oldest first)
     const sortedRecords = [...patientRecords].sort((a, b) => {
-      const dateA = new Date(a.order_date || a.visit_date || 0).getTime();
-      const dateB = new Date(b.order_date || b.visit_date || 0).getTime();
+      const dateA = new Date(a.order_date || a.visit_date || a.registration_date || 0).getTime();
+      const dateB = new Date(b.order_date || b.visit_date || b.registration_date || 0).getTime();
       return dateA - dateB;  // Ascending order (oldest first)
     });
     
     // Get the earliest (first) record
     const firstRecord = sortedRecords[0];
     
-    // Show "R" only if this patient record is NOT the first visit
-    const isRepeat = patient.patient_uid === firstRecord.patient_uid && 
-                     patient.visit_id !== firstRecord.visit_id;
+    // Show "R" only if this patient record is NOT the first (earliest) visit by DATE
+    // Compare by order_date/visit_date, not by visit_id
+    const currentDate = new Date(patient.order_date || patient.visit_date || patient.registration_date || 0).getTime();
+    const firstDate = new Date(firstRecord.order_date || firstRecord.visit_date || firstRecord.registration_date || 0).getTime();
+    const isRepeat = currentDate > firstDate;  // Only true if current date is AFTER first date
     
     // ✅ DEBUG: Log repeat patient detection
     if (isRepeat) {
-      console.log(`🔄 REPEAT PATIENT: "${patient.patient_name}" | Patient UID: ${patient.patient_uid} | This is visit #${patientRecords.length}`);
+      console.log(`🔄 REPEAT PATIENT: "${patient.patient_name}" | Patient UID: ${patient.patient_uid} | Current Date: ${new Date(currentDate).toLocaleDateString()} | First Date: ${new Date(firstDate).toLocaleDateString()}`);
     } else {
-      console.log(`✅ FIRST VISIT: "${patient.patient_name}" | Patient UID: ${patient.patient_uid}`);
+      console.log(`✅ FIRST VISIT: "${patient.patient_name}" | Patient UID: ${patient.patient_uid} | Date: ${new Date(currentDate).toLocaleDateString()}`);
     }
     
     return isRepeat;
@@ -393,6 +396,7 @@ export default function Result() {
   // State for Required Columns dropdown
   const [showColumnsDropdown, setShowColumnsDropdown] = useState(false);
   const [columnsFilter, setColumnsFilter] = useState('');
+  const columnsDropdownRef = useRef<HTMLDivElement>(null);
   const [selectedColumns, setSelectedColumns] = useState(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('resultPageColumns');
@@ -501,6 +505,10 @@ export default function Result() {
                 switch (col.key) {
                   case 'visitId':
                     cellValue = patient.visit_id || '';
+                    // ✅ Add 'R' for repeat patients
+                    if (isRepeatPatientInResult(patient, sortedAndFilteredResults)) {
+                      cellValue += ' R';
+                    }
                     break;
                   case 'orgId':
                     cellValue = patient.organizationCode || patient.organizationId || '';
@@ -615,6 +623,14 @@ export default function Result() {
             startY: 40,
             margin: { top: 40, right: 10, left: 10, bottom: 10 },
             theme: 'grid',
+            columnStyles: headers.reduce((acc: any, _, idx) => {
+              acc[idx] = { 
+                cellWidth: 'wrap',
+                overflow: 'hidden',
+                lineNumber: 1
+              };
+              return acc;
+            }, {}),
             headStyles: {
               fillColor: [30, 41, 82],
               textColor: [255, 255, 255],
@@ -622,14 +638,31 @@ export default function Result() {
               fontSize: 8,
               halign: 'left',
               valign: 'middle',
+              lineWidth: 0.5,
+              lineColor: [200, 200, 200],
+              cellPadding: 2,
+              overflow: 'hidden'
             },
             bodyStyles: {
-              fontSize: 8,
+              fontSize: 7,
               halign: 'left',
               valign: 'middle',
+              lineWidth: 0.5,
+              lineColor: [220, 220, 220],
+              cellPadding: 2,
+              overflow: 'hidden'
             },
             alternateRowStyles: {
               fillColor: [245, 245, 245]
+            },
+            didParseCell: (data: any) => {
+              // Truncate cell content to prevent wrapping
+              const maxLength = 30;
+              if (data.cell.text && Array.isArray(data.cell.text)) {
+                data.cell.text = data.cell.text.map((text: string) => 
+                  text.length > maxLength ? text.substring(0, maxLength) : text
+                );
+              }
             }
           });
         } else {
@@ -637,34 +670,43 @@ export default function Result() {
           const margin = 10;
           const tableWidth = pageWidth - 2 * margin;
           
-          // Calculate column widths based on header text length
-          // Minimum width per column to prevent text overflow
-          const minColWidth = 15;
-          const maxColWidth = tableWidth / headers.length;
+          // Calculate column widths - use variable widths based on column importance
+          // Smaller columns: Age, Gender, Org ID (need less space)
+          // Larger columns: Patient Name, Services/Test Name (need more space)
+          const columnWidthMap: { [key: string]: number } = {
+            'age': 10,
+            'gender': 10,
+            'orgId': 10,
+            'services': 28,
+            'patientName': 25,
+            'referralDoc': 18,
+            'visitId': 14,
+            'result': 14,
+            'unit': 12,
+            'refInterval': 16,
+            'ptr': 10,
+            'atr': 10,
+            'sTaken': 8,
+            'barcode': 10,
+            'history': 18
+          };
           
-          // Estimate optimal column widths based on content
-          const columnWidths = headers.map((header, idx) => {
-            // Calculate average content length for this column
-            let maxContentLength = String(header).length;
-            tableData.forEach(row => {
-              const cellLength = String(row[idx] || '').length;
-              if (cellLength > maxContentLength) {
-                maxContentLength = cellLength;
-              }
-            });
-            
-            // Width proportional to content length, but not too narrow or wide
-            const estimatedWidth = Math.max(minColWidth, Math.min(maxColWidth, maxContentLength * 0.8));
-            return estimatedWidth;
+          // Calculate column widths for enabled columns
+          const columnWidths: number[] = [];
+          RESULT_COLUMNS.forEach(col => {
+            if (selectedColumns[col.key]) {
+              columnWidths.push(columnWidthMap[col.key] || 15);
+            }
           });
           
-          // Normalize widths to fit exactly in tableWidth
+          // Scale column widths to fit exactly in tableWidth
           const totalWidth = columnWidths.reduce((sum, w) => sum + w, 0);
           const scaleFactor = tableWidth / totalWidth;
           const finalColumnWidths = columnWidths.map(w => w * scaleFactor);
           
+          const rowHeight = 5.5; // Slightly reduced for compact layout
+          
           let yPosition = 40;
-          const rowHeight = 6;
           
           // Draw table header with background
           doc.setFillColor(30, 41, 82);
@@ -673,7 +715,7 @@ export default function Result() {
           // Draw header text
           doc.setTextColor(255, 255, 255);
           doc.setFont('helvetica', 'bold');
-          doc.setFontSize(8);
+          doc.setFontSize(7);
           
           let xPos = margin;
           headers.forEach((header, idx) => {
@@ -681,8 +723,9 @@ export default function Result() {
             // Draw header border
             doc.setDrawColor(200, 200, 200);
             doc.rect(xPos, yPosition, colWidth, rowHeight);
-            // Draw text
-            doc.text(String(header).substring(0, 20), xPos + 2, yPosition + 4, { maxWidth: colWidth - 4 });
+            // Truncate header text aggressively - max 15 chars
+            const headerText = String(header).substring(0, 15);
+            doc.text(headerText, xPos + 1, yPosition + 3, { align: 'left' });
             xPos += colWidth;
           });
           
@@ -705,14 +748,16 @@ export default function Result() {
               
               doc.setTextColor(255, 255, 255);
               doc.setFont('helvetica', 'bold');
-              doc.setFontSize(8);
+              doc.setFontSize(7);
               
               let xPosHeader = margin;
               headers.forEach((header, idx) => {
                 const colWidth = finalColumnWidths[idx];
                 doc.setDrawColor(200, 200, 200);
                 doc.rect(xPosHeader, yPosition, colWidth, rowHeight);
-                doc.text(String(header).substring(0, 20), xPosHeader + 2, yPosition + 4, { maxWidth: colWidth - 4 });
+                // Truncate header text aggressively - max 15 chars
+                const headerText = String(header).substring(0, 15);
+                doc.text(headerText, xPosHeader + 1, yPosition + 3, { align: 'left' });
                 xPosHeader += colWidth;
               });
               
@@ -738,11 +783,22 @@ export default function Result() {
               // Draw cell border
               doc.rect(xPosCell, yPosition, colWidth, rowHeight);
               
-              // Draw cell content
+              // Draw cell content - truncate based on column width
               doc.setTextColor(0, 0, 0);
-              doc.setFontSize(7);
-              const cellText = String(cell || '').substring(0, 25);
-              doc.text(cellText, xPosCell + 1.5, yPosition + 3.5, { maxWidth: colWidth - 3 });
+              doc.setFont('helvetica', 'normal');
+              doc.setFontSize(6.5);
+              
+              // Calculate max characters based on actual column width
+              // Narrow columns (10-14mm): 12-15 chars
+              // Medium columns (14-20mm): 20-25 chars
+              // Wide columns (25-30mm): 35-40 chars
+              let maxChars = 20;
+              if (colWidth < 12) maxChars = 12;
+              else if (colWidth < 16) maxChars = 15;
+              else if (colWidth > 24) maxChars = 35;
+              
+              const cellText = String(cell || '').substring(0, maxChars);
+              doc.text(cellText, xPosCell + 1, yPosition + 2.8, { align: 'left' });
               
               xPosCell += colWidth;
             });
@@ -978,12 +1034,7 @@ export default function Result() {
   const getAgeAppropriateRange = (parameterData: any, patient: any) => {
     if (!parameterData) return '-';
     
-    // ✅ PRIORITY 1: If textContent (RIGHT textarea) has a value, show ONLY that
-    if (parameterData.textContent) {
-      return parameterData.textContent;
-    }
-    
-    // ✅ PRIORITY 2: If textContent is empty, calculate age/gender-based ranges
+    // ✅ PRIORITY 1: Calculate age/gender-based ranges
     const patientAgeYears = patient.ageYears ?? 0;
     const patientAgeMonths = patient.ageMonths ?? 0;
     const patientAgeDays = patient.ageDays ?? 0;
@@ -1608,6 +1659,27 @@ export default function Result() {
           });
         }
 
+        // Build descriptive parameters section
+        let descriptiveHtml = '';
+        if (response.parameters && Array.isArray(response.parameters)) {
+          const descriptiveParams = response.parameters.filter((p: any) => p.isDescriptive);
+          if (descriptiveParams.length > 0) {
+            descriptiveHtml = '<div style="margin-top:6mm;padding:3mm;background:#f9f9f9;border:0.5px solid #ddd;border-radius:2px;">';
+            
+            descriptiveParams.forEach((param: any) => {
+              const displayText = param.textContent || param.displayRangeText || '-';
+              descriptiveHtml += `
+                <div style="margin-bottom:3mm;">
+                  <strong style="font-size:11px;display:block;margin-bottom:1mm;">${param.parameterName}:</strong>
+                  <div style="font-size:10px;line-height:1.4;color:#333;white-space:pre-wrap;">${stripHtmlTags(displayText)}</div>
+                </div>
+              `;
+            });
+            
+            descriptiveHtml += '</div>';
+          }
+        }
+
         // Build letterhead image HTML if available
         const letterheadHtml = withHeader && (letterheadDB?.headerImage || letterHeadBase64)
           ? `<img src="${letterheadDB?.headerImage || letterHeadBase64}" style="position:absolute;top:0;left:0;width:100%;height:100%;object-fit:fill;z-index:0;" />`
@@ -1650,6 +1722,8 @@ export default function Result() {
                   ${paramsHtml}
                 </tbody>
               </table>
+
+              ${descriptiveHtml}
 
               <!-- Interpretation -->
               ${interpretationHtml}
@@ -2789,6 +2863,20 @@ export default function Result() {
     };
   }, [showDownloadDropdown]);
 
+  // Close columns dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: any) => {
+      if (showColumnsDropdown && columnsDropdownRef.current && !columnsDropdownRef.current.contains(event.target)) {
+        setShowColumnsDropdown(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showColumnsDropdown]);
+
   // Handle Ctrl+B to toggle sidebar
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -3405,7 +3493,7 @@ export default function Result() {
                 </button>
                 
                 {/* Required Columns Button */}
-                <div className="relative">
+                <div className="relative" ref={columnsDropdownRef}>
                   <button
                     onClick={() => setShowColumnsDropdown(!showColumnsDropdown)}
                     className="h-8 px-2 rounded border border-gray-300 text-xs focus:outline-none focus:ring-1 focus:ring-cyan-600 bg-white flex items-center gap-1 hover:bg-gray-50"
@@ -3663,7 +3751,15 @@ export default function Result() {
                             {/* Column 2: Visit ID (show only on first test row) */}
                             {selectedColumns.visitId && (
                               <td className="px-1 sm:px-2 py-0.25 text-[11px] border border-gray-300">
-                                {testIndex === 0 ? patient.visit_id : ''}
+                                {testIndex === 0 ? (
+                                  <span className="flex items-center gap-1">
+                                    <span className="font-medium">{patient.visit_id}</span>
+                                    {/* ✅ Show 'R' badge for repeat patients on Visit ID */}
+                                    {isRepeatPatientInResult(patient, sortedAndFilteredResults) && (
+                                      <span className="text-blue-600 font-bold text-sm" title="Repeat Patient - Has previous test reports">R</span>
+                                    )}
+                                  </span>
+                                ) : ''}
                               </td>
                             )}
 

@@ -9,92 +9,115 @@ const getAllOptionsFromParameter = (param: Parameter): string[] => {
   const allOptions: string[] = [];  // Use array to maintain order
   const seenOptions = new Set<string>();
   
+  console.log(`🔍 DEBUG: Processing parameter "${param.parameterName}" (ID: ${param.id}, Type: ${param.type}, isMultipleOptions: ${param.isMultipleOptions})`);
+  console.log(`  📊 Available data fields:`, {
+    textContent: param.textContent ? `"${param.textContent.substring(0, 50)}${param.textContent.length > 50 ? '...' : ''}"` : 'EMPTY',
+    displayRangeText: param.displayRangeText || 'EMPTY',
+    rangeText: param.rangeText || 'EMPTY',
+    rangeValues: param.rangeValues ? `"${param.rangeValues.substring(0, 50)}${param.rangeValues.length > 50 ? '...' : ''}"` : 'EMPTY',
+    maleDefaultValue: param.maleDefaultValue || 'EMPTY',
+    femaleDefaultValue: param.femaleDefaultValue || 'EMPTY',
+    childDefaultValue: param.childDefaultValue || 'EMPTY'
+  });
+  
   // 1. Add all options from textContent (primary source - textarea with newline or pipe-separated values)
   // IMPORTANT: Keep order as entered (first line = first option)
-  if (param.textContent) {
+  if (param.textContent?.trim()) {
     try {
       let options: any[] = [];
       try {
         options = JSON.parse(param.textContent);
+        console.log(`  ✅ textContent parsed as JSON:`, options);
       } catch {
         // Split by newlines first to get lines in order
         const byNewline = param.textContent.split('\n').map((o: string) => o.trim()).filter(Boolean);
-        console.log(`📋 ${param.parameterName} - Raw textContent:`, param.textContent);
-        console.log(`📋 ${param.parameterName} - Split by newline:`, byNewline);
+        console.log(`  📋 Raw textContent:`, param.textContent.substring(0, 100));
+        console.log(`  📋 Split by newline:`, byNewline);
         if (byNewline.length > 1) {
           options = byNewline;
         } else {
           // If only one line, split by pipes ONLY (not commas - commas are part of the continuous value)
           options = param.textContent.split('|').map((o: string) => o.trim()).filter(Boolean);
-          console.log(`📋 ${param.parameterName} - Split by pipe (single line):`, options);
+          console.log(`  📋 Split by pipe (single line):`, options);
         }
       }
       
-      console.log(`🔍 ${param.parameterName} - Options before processing:`, options);
+      console.log(`  🔍 Options before processing:`, options);
       
       options.forEach((option: any) => {
         const optionValue = typeof option === 'object' ? option.value || option.name : option;
         const trimmed = optionValue?.toString().trim();
-        console.log(`  → Option: "${optionValue}" → Trimmed: "${trimmed}"`);
         // Include even if it's just a dash "-" or empty (they are valid values)
         if (trimmed !== null && trimmed !== undefined && !seenOptions.has(trimmed)) {
           allOptions.push(trimmed);
           seenOptions.add(trimmed);
-          console.log(`    ✅ Added: "${trimmed}"`);
+          console.log(`    ✅ Added from textContent: "${trimmed}"`);
         }
       });
     } catch (e) {
-      console.warn(`Error parsing textContent for parameter ${param.id}:`, e);
+      console.warn(`⚠️ Error parsing textContent for parameter ${param.id}:`, e);
     }
+  } else {
+    console.log(`  ⚠️ textContent is empty or null - checking other fields`);
   }
   
-  console.log(`✅ Final allOptions for ${param.parameterName}:`, allOptions);
+  console.log(`  📊 After textContent processing - allOptions:`, allOptions);
   
   // 2. Add gender-specific default values (same as patient result page)
   if (param.maleDefaultValue?.trim() && !seenOptions.has(param.maleDefaultValue.trim())) {
     allOptions.push(param.maleDefaultValue.trim());
     seenOptions.add(param.maleDefaultValue.trim());
+    console.log(`    ✅ Added maleDefaultValue: "${param.maleDefaultValue.trim()}"`);
   }
   if (param.femaleDefaultValue?.trim() && !seenOptions.has(param.femaleDefaultValue.trim())) {
     allOptions.push(param.femaleDefaultValue.trim());
     seenOptions.add(param.femaleDefaultValue.trim());
+    console.log(`    ✅ Added femaleDefaultValue: "${param.femaleDefaultValue.trim()}"`);
   }
   if (param.childDefaultValue?.trim() && !seenOptions.has(param.childDefaultValue.trim())) {
     allOptions.push(param.childDefaultValue.trim());
     seenOptions.add(param.childDefaultValue.trim());
+    console.log(`    ✅ Added childDefaultValue: "${param.childDefaultValue.trim()}"`);
   }
   
   // 3. Add from displayRangeText (split by pipe only)
   if (param.displayRangeText?.trim()) {
+    console.log(`  📊 Processing displayRangeText: "${param.displayRangeText}"`);
     param.displayRangeText.split('|').forEach((opt: string) => {
       const trimmed = opt.trim();
       if (trimmed !== null && trimmed !== undefined && !seenOptions.has(trimmed)) {
         allOptions.push(trimmed);
         seenOptions.add(trimmed);
+        console.log(`    ✅ Added from displayRangeText: "${trimmed}"`);
       }
     });
   }
   
   // 4. Add from rangeText (split by pipe only)
   if (param.rangeText?.trim()) {
+    console.log(`  📊 Processing rangeText: "${param.rangeText}"`);
     param.rangeText.split('|').forEach((opt: string) => {
       const trimmed = opt.trim();
       if (trimmed !== null && trimmed !== undefined && !seenOptions.has(trimmed)) {
         allOptions.push(trimmed);
         seenOptions.add(trimmed);
+        console.log(`    ✅ Added from rangeText: "${trimmed}"`);
       }
     });
   }
   
   // 5. Add from rangeValues (JSON or pipe-separated)
   if (param.rangeValues?.trim()) {
+    console.log(`  📊 Processing rangeValues: "${param.rangeValues}"`);
     try {
       let rangeValues: any[] = [];
       try {
         rangeValues = JSON.parse(param.rangeValues);
+        console.log(`    ✅ rangeValues parsed as JSON:`, rangeValues);
       } catch {
         // Split by pipes ONLY
         rangeValues = param.rangeValues.split('|').map((o: string) => o.trim());
+        console.log(`    ✅ rangeValues split by pipe:`, rangeValues);
       }
       
       rangeValues.forEach((val: any) => {
@@ -103,15 +126,18 @@ const getAllOptionsFromParameter = (param: Parameter): string[] => {
         if (trimmed !== null && trimmed !== undefined && !seenOptions.has(trimmed)) {
           allOptions.push(trimmed);
           seenOptions.add(trimmed);
+          console.log(`    ✅ Added from rangeValues: "${trimmed}"`);
         }
       });
     } catch (e) {
-      console.warn(`Error parsing rangeValues for parameter ${param.id}:`, e);
+      console.warn(`⚠️ Error parsing rangeValues for parameter ${param.id}:`, e);
     }
   }
   
   // Return in order (first option from textContent will be first in array)
-  return allOptions.filter(opt => opt !== null && opt !== undefined);
+  const finalOptions = allOptions.filter(opt => opt !== null && opt !== undefined);
+  console.log(`✅ FINAL OPTIONS for "${param.parameterName}": ${finalOptions.length} options:`, finalOptions);
+  return finalOptions;
 };
 
 interface Parameter {
@@ -125,6 +151,7 @@ interface Parameter {
   categoryName: string;
   categoryId: number;
   sortOrder: number;
+  categorySortOrder?: number;
   showCategoryHeader: boolean;
   rangeType: string;
   displayRangeText: string;
@@ -152,6 +179,7 @@ interface Parameter {
     textValue?: string;
     selectedOption?: string;
     isAbnormal?: boolean;
+    isHighlighted?: boolean;
     referenceRange?: string;
   };
 }
@@ -204,6 +232,9 @@ const ReadingValidationModal = ({
   const [showCommentDropdown, setShowCommentDropdown] = useState(false);
   const [commentFocused, setCommentFocused] = useState(false);
   const commentInputRef = useRef<HTMLInputElement>(null);
+  const [openDropdowns, setOpenDropdowns] = useState<{ [key: number]: boolean }>({});
+  const dropdownRefs = useRef<any>({});
+  const dropdownTimeoutRef = useRef<any>({});
 
   // Fetch existing comments and comment history for the test
   useEffect(() => {
@@ -758,7 +789,7 @@ const ReadingValidationModal = ({
               <thead className="bg-gradient-to-r from-purple-700 to-purple-600 text-white">
                 <tr>
                   <th className="border p-1.5 text-left">Parameter Name</th>
-                  <th className="border p-1.5 text-center w-60">Value</th>
+                  <th className="border p-1.5 text-center w-96">Value</th>
                   <th className="border p-1.5 text-center w-12">Units</th>
                   <th className="border p-1.5 text-center w-32">Biological Range</th>
                   <th className="border p-1.5 text-center w-12">Highlight</th>
@@ -816,7 +847,7 @@ const ReadingValidationModal = ({
                             </span>
                             {param.isMandatory && <span className="text-red-500 ml-1">*</span>}
                           </td>
-                          <td className="border p-1.5 text-center">
+                          <td className="border p-1.5 text-center" colSpan={param.type === 'Text' || param.isMultipleOptions ? 3 : 1}>
                             {param.type === 'Numeric' ? (
                               <div className="relative">
                                 <input
@@ -876,102 +907,83 @@ const ReadingValidationModal = ({
                                 )}
                               </div>
                             ) : param.type === 'Text' || param.isMultipleOptions ? (
-                              // TEXT/DROPDOWN with predefined options - SIMPLIFIED
-                              <div className="w-full space-y-1">
-                                {/* ✅ Only pipe (|) separator splits into separate items. Commas (,) show as continuous text */}
-                                {(() => {
-                                  const textValue = results[param.id]?.textValue || '';
-                                  const hasPipe = textValue.includes('|');
-                                  
-                                  if (hasPipe) {
-                                    // PIPE separator: Split and show as separate items
-                                    const items = textValue.split('|').map((o: string) => o.trim()).filter(Boolean);
-                                    return (
-                                      <>
-                                        <div className="flex flex-col gap-1 text-xs">
-                                          {items.map((option: string, idx: number) => (
-                                            <div
-                                              key={idx}
-                                              className="inline-flex items-center text-xs font-medium text-gray-900 bg-blue-50 px-2 py-1 rounded"
-                                            >
-                                              <span className="text-xs flex-1">{option}</span>
-                                              <button
-                                                type="button"
-                                                onClick={() => {
-                                                  const newItems = items.filter((_: string, i: number) => i !== idx);
-                                                  handleResultChange(param.id, 'textValue', newItems.join('|'));
-                                                }}
-                                                className="text-gray-500 hover:text-gray-700 font-bold cursor-pointer ml-1"
-                                                title="Remove this selection"
-                                              >
-                                                ×
-                                              </button>
-                                            </div>
-                                          ))}
+                              // TEXT/DROPDOWN with predefined options - FULL WIDTH DROPDOWN with dropdown list
+                              <div className="w-full relative">
+                                <textarea
+                                  ref={(el) => { if (el) inputRefs.current[param.id] = el; }}
+                                  value={results[param.id]?.textValue || ''}
+                                  onChange={(e) => {
+                                    handleResultChange(param.id, 'textValue', e.target.value);
+                                  }}
+                                  onFocus={() => {
+                                    setFocusedInputId(param.id);
+                                    setOpenDropdowns(prev => ({ ...prev, [param.id]: true }));
+                                  }}
+                                  onBlur={() => {
+                                    // Close dropdown after short delay to allow option clicks to register
+                                    if (dropdownTimeoutRef.current[param.id]) {
+                                      clearTimeout(dropdownTimeoutRef.current[param.id]);
+                                    }
+                                    dropdownTimeoutRef.current[param.id] = setTimeout(() => {
+                                      setOpenDropdowns(prev => ({ ...prev, [param.id]: false }));
+                                    }, 150);
+                                  }}
+                                  placeholder="-- Select or enter option --"
+                                  className="w-full border border-gray-300 px-2 py-1 rounded text-xs focus:outline-none focus:ring-2 focus:ring-cyan-500 bg-white text-gray-700"
+                                  style={{ minHeight: '2.5rem', resize: 'both', overflow: 'auto' }}
+                                />
+                                {/* Options Dropdown List - stays open until explicitly closed */}
+                                {openDropdowns[param.id] && (
+                                  <div 
+                                    ref={(el) => {
+                                      if (el) dropdownRefs.current[param.id] = el;
+                                    }}
+                                    className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-300 rounded shadow-lg z-50" 
+                                    style={{ maxHeight: '200px', overflowY: 'auto' }}
+                                  >
+                                    {getAllOptionsFromParameter(param).length > 0 ? (
+                                      getAllOptionsFromParameter(param).map((option, idx) => (
+                                        <div
+                                          key={idx}
+                                          onMouseDown={(e) => {
+                                            // Prevent default to keep focus on textarea
+                                            e.preventDefault();
+                                            
+                                            // ✅ APPEND option to textarea (support multiple selections)
+                                            const currentValue = results[param.id]?.textValue || '';
+                                            let newValue = '';
+                                            
+                                            if (currentValue.trim() === '') {
+                                              // If empty, just set the option
+                                              newValue = option;
+                                            } else {
+                                              // If has content, append on new line
+                                              newValue = currentValue + '\n' + option;
+                                            }
+                                            
+                                            handleResultChange(param.id, 'textValue', newValue);
+                                            
+                                            // Keep dropdown open and refocus textarea
+                                            setTimeout(() => {
+                                              inputRefs.current[param.id]?.focus();
+                                            }, 0);
+                                          }}
+                                          className="px-3 py-2 text-xs text-gray-700 hover:bg-blue-100 cursor-pointer border-b border-gray-200 last:border-b-0"
+                                        >
+                                          {option}
                                         </div>
-                                        {/* Dropdown to add more items */}
-                                        <select
-                                          ref={(el) => { if (el) inputRefs.current[param.id] = el; }}
-                                          value=""
-                                          onChange={(e) => {
-                                            if (e.target.value) {
-                                              const existing = results[param.id]?.textValue || '';
-                                              const options = existing ? existing.split('|').map((o: string) => o.trim()).filter(Boolean) : [];
-                                              if (!options.includes(e.target.value)) {
-                                                options.push(e.target.value);
-                                                handleResultChange(param.id, 'textValue', options.join('|'));
-                                              }
-                                              e.target.value = '';
-                                            }
-                                          }}
-                                          onFocus={() => setFocusedInputId(param.id)}
-                                          className="w-full border border-gray-300 px-1.5 py-0.5 rounded text-xs focus:outline-none focus:ring-1 focus:ring-gray-400 bg-white text-gray-700 cursor-pointer"
-                                        >
-                                          <option value="">➕ Add...</option>
-                                          {getAllOptionsFromParameter(param).map((optionValue: string) => (
-                                            <option key={optionValue} value={optionValue}>
-                                              {optionValue}
-                                            </option>
-                                          ))}
-                                        </select>
-                                      </>
-                                    );
-                                  } else {
-                                    // NO PIPE: Show as single continuous text value (including comma-separated values)
-                                    return (
-                                      <>
-                                        {textValue && (
-                                          <div className="text-xs font-medium text-gray-900 px-2 py-1 border border-gray-200 rounded bg-gray-50">
-                                            {textValue}
-                                          </div>
-                                        )}
-                                        {/* Dropdown - use pipe separator for new additions */}
-                                        <select
-                                          ref={(el) => { if (el) inputRefs.current[param.id] = el; }}
-                                          value=""
-                                          onChange={(e) => {
-                                            if (e.target.value) {
-                                              const existing = results[param.id]?.textValue || '';
-                                              // For new additions to non-pipe values, append with pipe to indicate new format
-                                              const newText = existing ? `${existing}|${e.target.value}` : e.target.value;
-                                              handleResultChange(param.id, 'textValue', newText);
-                                              e.target.value = '';
-                                            }
-                                          }}
-                                          onFocus={() => setFocusedInputId(param.id)}
-                                          className="w-full border border-gray-300 px-1.5 py-0.5 rounded text-xs focus:outline-none focus:ring-1 focus:ring-gray-400 bg-white text-gray-700 cursor-pointer"
-                                        >
-                                          <option value="">➕ Add...</option>
-                                          {getAllOptionsFromParameter(param).map((optionValue: string) => (
-                                            <option key={optionValue} value={optionValue}>
-                                              {optionValue}
-                                            </option>
-                                          ))}
-                                        </select>
-                                      </>
-                                    );
-                                  }
-                                })()}
+                                      ))
+                                    ) : (
+                                      <div className="px-3 py-2 text-xs text-gray-600 bg-yellow-50">
+                                        <div className="font-semibold text-yellow-800 mb-1">⚠️ No predefined options</div>
+                                        <div className="text-yellow-700">Type to enter custom value</div>
+                                        <div className="text-gray-500 mt-2 text-xs italic">
+                                          💡 Tip: Check browser console (F12) for parameter data details
+                                        </div>
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
                               </div>
                             ) : (
                               <div className="relative">
@@ -989,12 +1001,17 @@ const ReadingValidationModal = ({
                               </div>
                             )}
                           </td>
-                          <td className="border p-1.5 text-center text-gray-600 text-xs">
-                            {param.units || '-'}
-                          </td>
-                          <td className="border p-1.5 text-center text-gray-600 text-xs max-w-xs truncate" title={rangeStr}>
-                            {truncatedRange}
-                          </td>
+                          {/* Only show Units and Biological Range columns for Numeric types */}
+                          {param.type === 'Numeric' && (
+                            <>
+                              <td className="border p-1.5 text-center text-gray-600 text-xs">
+                                {param.units || '-'}
+                              </td>
+                              <td className="border p-1.5 text-center text-gray-600 text-xs max-w-xs truncate" title={rangeStr}>
+                                {truncatedRange}
+                              </td>
+                            </>
+                          )}
                           <td className="border p-1.5 text-center">
                             <input
                               type="checkbox"
