@@ -311,7 +311,7 @@ const ReadingValidationModal = ({
           
           initialResults[param.id] = {
             numericValue: (numericVal !== null && numericVal !== undefined) ? numericVal : null,
-            textValue: (textVal && typeof textVal === 'string' && textVal.trim() !== '') ? textVal : '',
+            textValue: (textVal && typeof textVal === 'string' && textVal.trim() !== '') ? textVal.replace(/\|/g, ', ') : '',
             selectedOption: (optionVal && typeof optionVal === 'string' && optionVal.trim() !== '') ? optionVal : '',
             isAbnormal: param.existingResult.isAbnormal || false,
             referenceRange: param.existingResult.referenceRange || param.normalRange,
@@ -860,32 +860,71 @@ const ReadingValidationModal = ({
                                 />
                               </div>
                             ) : param.isDescriptive ? (
-                              // DESCRIPTIVE/TEXT - Simple empty textarea
+                              // DESCRIPTIVE/TEXT - Textarea with dropdown suggestions
                               <div className="w-full relative">
                                 <textarea
                                   ref={(el) => { if (el) inputRefs.current[param.id] = el; }}
-                                  value={results[param.id]?.textValue || ''}
+                                  value={(results[param.id]?.textValue || '').replace(/\|/g, ', ')}
                                   onChange={(e) => {
-                                    handleResultChange(param.id, 'textValue', e.target.value);
+                                    handleResultChange(param.id, 'textValue', e.target.value.replace(/,\s*/g, '|'));
                                   }}
+                                  onFocus={() => setOpenDropdowns({ ...openDropdowns, [param.id]: true })}
                                   placeholder=""
                                   className="w-full border border-gray-300 px-2 py-1 rounded text-xs focus:outline-none focus:ring-2 focus:ring-cyan-500 bg-white text-gray-700"
                                   style={{ minHeight: '2.5rem', resize: 'both', overflow: 'auto' }}
                                 />
+                                {/* Dropdown suggestions */}
+                                {openDropdowns[param.id] && getAllOptionsFromParameter(param).length > 0 && (
+                                  <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-300 rounded shadow-lg max-h-40 overflow-y-auto z-50" onMouseDown={(e) => e.preventDefault()}>
+                                    {getAllOptionsFromParameter(param).map((option: string) => (
+                                      <div
+                                        key={option}
+                                        onMouseDown={() => {
+                                          handleResultChange(param.id, 'textValue', (results[param.id]?.textValue || '') ? `${results[param.id].textValue}|${option}` : option);
+                                          setOpenDropdowns({ ...openDropdowns, [param.id]: false });
+                                          inputRefs.current[param.id]?.focus();
+                                        }}
+                                        className="px-2 py-1.5 text-xs bg-white hover:bg-blue-50 text-gray-700 cursor-pointer border-b last:border-b-0 transition-colors"
+                                      >
+                                        {option}
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
                               </div>
                             ) : param.type === 'Text' || param.isMultipleOptions ? (
-                              // TEXT/DROPDOWN - Simple empty textarea (no dropdown suggestions)
+                              // TEXT/DROPDOWN - Textarea with dropdown suggestions
                               <div className="w-full relative">
                                 <textarea
                                   ref={(el) => { if (el) inputRefs.current[param.id] = el; }}
-                                  value={results[param.id]?.textValue || ''}
+                                  value={(results[param.id]?.textValue || '').replace(/\|/g, ', ')}
                                   onChange={(e) => {
-                                    handleResultChange(param.id, 'textValue', e.target.value);
+                                    handleResultChange(param.id, 'textValue', e.target.value.replace(/,\s*/g, '|'));
                                   }}
+                                  onFocus={() => setOpenDropdowns({ ...openDropdowns, [param.id]: true })}
+                                  onBlur={() => setTimeout(() => setOpenDropdowns({ ...openDropdowns, [param.id]: false }), 100)}
                                   placeholder=""
                                   className="w-full border border-gray-300 px-2 py-1 rounded text-xs focus:outline-none focus:ring-2 focus:ring-cyan-500 bg-white text-gray-700"
                                   style={{ minHeight: '2.5rem', resize: 'both', overflow: 'auto' }}
                                 />
+                                {/* Dropdown suggestions */}
+                                {openDropdowns[param.id] && getAllOptionsFromParameter(param).length > 0 && (
+                                  <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-300 rounded shadow-lg max-h-40 overflow-y-auto z-50" onMouseDown={(e) => e.preventDefault()}>
+                                    {getAllOptionsFromParameter(param).map((option: string) => (
+                                      <div
+                                        key={option}
+                                        onMouseDown={() => {
+                                          handleResultChange(param.id, 'textValue', (results[param.id]?.textValue || '') ? `${results[param.id].textValue}|${option}` : option);
+                                          setOpenDropdowns({ ...openDropdowns, [param.id]: false });
+                                          inputRefs.current[param.id]?.focus();
+                                        }}
+                                        className="px-2 py-1.5 text-xs bg-white hover:bg-blue-50 text-gray-700 cursor-pointer border-b last:border-b-0 transition-colors"
+                                      >
+                                        {option}
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
                               </div>
                             ) : (
                               <div className="relative">
