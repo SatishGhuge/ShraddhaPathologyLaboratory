@@ -649,11 +649,8 @@ const AddTest = () => {
       });
     } else {
       setFormData(prev => {
-        // Convert test name and short name to uppercase
-        let finalValue = value;
-        if (name === 'name' || name === 'shortName') {
-          finalValue = value.toUpperCase();
-        }
+        // Accept both uppercase and lowercase text values
+        const finalValue = value;
         const updated = { ...prev, [name]: finalValue };
         
         // If department changed, auto-populate fields from the selected department
@@ -1276,7 +1273,6 @@ const AddTest = () => {
                     onChange={handleChange}
                     required 
                     disabled={isViewMode}
-                    style={{ textTransform: 'uppercase' }}
                   />
                   <Select 
                     label="Select Department" 
@@ -1806,9 +1802,8 @@ const AddTest = () => {
                             className="px-2 py-1.5 sm:py-1 border border-gray-300 rounded text-xs sm:text-sm w-full sm:w-40" 
                             placeholder="Category name..."
                             value={category.name || ""}
-                            onChange={(e) => handleCategoryChange(categoryIndex, 'name', e.target.value.toUpperCase())}
+                            onChange={(e) => handleCategoryChange(categoryIndex, 'name', e.target.value)}
                             disabled={isViewMode}
-                            style={{ textTransform: 'uppercase' }}
                           />
                           {/* Formatting Buttons - Below Input */}
                           {!isViewMode && (
@@ -1902,9 +1897,8 @@ const AddTest = () => {
                           className="px-2 py-1.5 sm:py-1 border border-gray-300 rounded text-xs sm:text-sm w-full sm:w-40" 
                           placeholder="Category test method..." 
                           value={category.testMethod || ""}
-                          onChange={(e) => handleCategoryChange(categoryIndex, 'testMethod', e.target.value.toUpperCase())}
+                          onChange={(e) => handleCategoryChange(categoryIndex, 'testMethod', e.target.value)}
                           disabled={isViewMode}
-                          style={{ textTransform: 'uppercase' }}
                         />
                         {!isViewMode && (
                           <div className="flex gap-1 mt-1">
@@ -2063,14 +2057,13 @@ const AddTest = () => {
                               className="px-2 py-1.5 sm:py-1 border border-gray-300 rounded text-xs sm:text-sm w-full sm:w-40" 
                               placeholder="Parameter Name" 
                               value={parameter.parameterName || ""}
-                              onChange={(e) => handleParamNameSearch(categoryIndex, paramIndex, e.target.value.toUpperCase())}
+                              onChange={(e) => handleParamNameSearch(categoryIndex, paramIndex, e.target.value)}
                               onBlur={() => {
                                 const key = `${categoryIndex}-${paramIndex}`;
                                 setTimeout(() => setParamSuggestionsOpen(prev => ({ ...prev, [key]: false })), 150);
                               }}
                               autoComplete="off"
                               disabled={isViewMode}
-                              style={{ textTransform: 'uppercase' }}
                             />
                             {/* Autocomplete dropdown */}
                             {paramSuggestionsOpen[`${categoryIndex}-${paramIndex}`] && (
@@ -2332,9 +2325,8 @@ const AddTest = () => {
                             className="px-2 py-1.5 sm:py-1 border border-gray-300 rounded text-xs sm:text-sm w-full sm:w-32" 
                             placeholder="Parameter Test Method" 
                             value={parameter.testMethod || ""}
-                            onChange={(e) => handleParameterChange(categoryIndex, paramIndex, 'testMethod', e.target.value.toUpperCase())}
+                            onChange={(e) => handleParameterChange(categoryIndex, paramIndex, 'testMethod', e.target.value)}
                             disabled={isViewMode}
-                            style={{ textTransform: 'uppercase' }}
                           />
                           {!isViewMode && (
                             <div className="flex gap-1 mt-1">

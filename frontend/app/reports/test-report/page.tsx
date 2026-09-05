@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { RotateCcw, Printer, FileSpreadsheet, Search, ChevronDown, Calendar, ChevronLeft, ChevronRight, AlertCircle } from "lucide-react";
 import Header from "@/src/components/Header";
+import PaginationControls from "@/app/components/PaginationControls";
 import { getPatientTests } from "@/src/api/result";
 import { getOrganizations } from "@/src/api/patient";
 import * as XLSX from "xlsx";
@@ -134,7 +135,7 @@ export default function TestReport() {
   const [expandedTestId, setExpandedTestId] = useState<string | null>(null);
 
   // Pagination state
-  const ITEMS_PER_PAGE = 40;
+  const [itemsPerPage, setItemsPerPage] = useState(40);
   const [currentPage, setCurrentPage] = useState(1);
   const [pagination, setPagination] = useState<any>(null);
 
@@ -188,6 +189,20 @@ export default function TestReport() {
     }
   }, [dateFrom, dateTo, patientSearch, serviceSearch, doctorSearch, showInactive]);
 
+  // Update pagination when itemsPerPage changes
+  useEffect(() => {
+    if (pagination && data.length > 0) {
+      const newTotalPages = Math.ceil(data.length / itemsPerPage);
+      setPagination({
+        ...pagination,
+        limit: itemsPerPage,
+        totalPages: newTotalPages,
+        page: 1
+      });
+      setCurrentPage(1);
+    }
+  }, [itemsPerPage]);
+
   // Column helpers
   const toggleCol = (id: any) => setSelectedColumns(prev=>prev.includes(id)?prev.filter(x=>x!==id):[...prev,id]);
   const checkAll = () => setSelectedColumns(AVAILABLE_COLS.map(c=>c.id));
@@ -216,8 +231,8 @@ export default function TestReport() {
 
   // Pagination helpers
   const getPaginatedData = () => {
-    const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
-    const endIndex = startIndex + ITEMS_PER_PAGE;
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
     return filteredData.slice(startIndex, endIndex);
   };
 
@@ -538,10 +553,10 @@ export default function TestReport() {
       
       // Set pagination metadata
       const total = rows.length;
-      const totalPages = Math.ceil(total / ITEMS_PER_PAGE);
+      const totalPages = Math.ceil(total / itemsPerPage);
       setPagination({
         page: 1,
-        limit: ITEMS_PER_PAGE,
+        limit: itemsPerPage,
         total: total,
         totalPages: totalPages,
         hasMore: totalPages > 1
@@ -897,59 +912,18 @@ export default function TestReport() {
         </div>
 
         {/* PAGINATION */}
-        {pagination && Math.ceil(filteredData.length / ITEMS_PER_PAGE) > 1 && (
-          <div className="mt-3 p-2 bg-white border border-gray-300 rounded flex items-center justify-between">
-            <div className="text-xs text-gray-600">
-              Showing {Math.min((currentPage - 1) * ITEMS_PER_PAGE + 1, filteredData.length)}-{Math.min(currentPage * ITEMS_PER_PAGE, filteredData.length)} of {filteredData.length} records | Page {currentPage} of {Math.ceil(filteredData.length / ITEMS_PER_PAGE)}
-            </div>
-            <div className="flex gap-1.5">
-              <button onClick={() => setCurrentPage(1)} disabled={currentPage === 1}
-                className="px-2 py-1 text-xs border border-gray-300 rounded hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed">
-                First
-              </button>
-              <button onClick={() => setCurrentPage(currentPage - 1)} disabled={currentPage === 1}
-                className="px-2 py-1 text-xs border border-gray-300 rounded hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed">
-                ← Prev
-              </button>
-              
-              {/* Page numbers */}
-              <div className="flex gap-1">
-                {Array.from({ length: Math.min(5, Math.ceil(filteredData.length / ITEMS_PER_PAGE)) }, (_, i) => {
-                  let pageNum;
-                  const totalPages = Math.ceil(filteredData.length / ITEMS_PER_PAGE);
-                  if (totalPages <= 5) {
-                    pageNum = i + 1;
-                  } else if (currentPage <= 3) {
-                    pageNum = i + 1;
-                  } else if (currentPage >= totalPages - 2) {
-                    pageNum = totalPages - 4 + i;
-                  } else {
-                    pageNum = currentPage - 2 + i;
-                  }
-                  
-                  return pageNum >= 1 && pageNum <= totalPages ? (
-                    <button key={pageNum} onClick={() => setCurrentPage(pageNum)}
-                      className={`px-2 py-1 text-xs border rounded ${
-                        currentPage === pageNum
-                          ? 'bg-blue-600 text-white border-blue-600'
-                          : 'border-gray-300 hover:bg-gray-100'
-                      }`}>
-                      {pageNum}
-                    </button>
-                  ) : null;
-                })}
-              </div>
-              
-              <button onClick={() => setCurrentPage(currentPage + 1)} disabled={currentPage === Math.ceil(filteredData.length / ITEMS_PER_PAGE)}
-                className="px-2 py-1 text-xs border border-gray-300 rounded hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed">
-                Next →
-              </button>
-              <button onClick={() => { const maxPage = Math.ceil(filteredData.length / ITEMS_PER_PAGE); setCurrentPage(maxPage); }} disabled={currentPage === Math.ceil(filteredData.length / ITEMS_PER_PAGE)}
-                className="px-2 py-1 text-xs border border-gray-300 rounded hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed">
-                Last
-              </button>
-            </div>
-          </div>
+        {data.length > 0 && pagination && (
+          <PaginationControls
+            pagination={pagination}
+            currentPage={currentPage}
+            itemsPerPage={itemsPerPage}
+            onPageChange={setCurrentPage}
+            onItemsPerPageChange={(newItemsPerPage) => {
+              setItemsPerPage(newItemsPerPage);
+              setCurrentPage(1);
+            }}
+            isLoading={loading}
+          />
         )}
 
         {/* Report Info */}

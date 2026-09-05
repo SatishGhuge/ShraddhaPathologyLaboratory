@@ -78,11 +78,22 @@ export default function SampleTypes() {
       setLoading(true);
       const response = await getSpecimenTypes(page, itemsPerPage);
       setData(response);
-      setPagination(null);
+      
+      // Set pagination metadata
+      const total = response.length;
+      const totalPages = Math.ceil(total / itemsPerPage);
+      setPagination({
+        page: page,
+        limit: itemsPerPage,
+        total: total,
+        totalPages: totalPages,
+        hasMore: totalPages > 1
+      });
     } catch (error) {
       console.error('Error fetching specimen types:', error);
       setErrorMsg('Failed to fetch specimen types');
       setData([]);
+      setPagination(null);
     } finally {
       setLoading(false);
     }
@@ -309,7 +320,7 @@ export default function SampleTypes() {
           )}
 
           {/* PAGINATION CONTROLS */}
-          {pagination && data.length > 0 && (
+          {data.length > 0 && pagination && (
             <PaginationControls
               pagination={pagination}
               currentPage={currentPage}

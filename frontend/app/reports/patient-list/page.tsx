@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { Search, RotateCcw, Printer, FileSpreadsheet, Users, ChevronDown, Calendar, ChevronLeft, ChevronRight } from "lucide-react";
 import * as XLSX from 'xlsx';
 import Header from "@/src/components/Header";
+import PaginationControls from "@/app/components/PaginationControls";
 import { getAllPatients, getCollectionCenters, getOrganizations } from "@/src/api/patient";
 import API_BASE_URL from "@/src/api/config";
 
@@ -111,8 +112,8 @@ export default function PatientList() {
   const [visitTypes, setVisitTypes] = useState<any[]>([]);
   const [refDoctors, setRefDoctors] = useState<any[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(20);
   const [pagination, setPagination] = useState<any>(null);
-  const ITEMS_PER_PAGE = 20;
 
   useEffect(()=>{ 
     getCollectionCenters().then((res: any) => setCenters(Array.isArray(res) ? res : res?.data || [])).catch(()=>{});
@@ -131,7 +132,21 @@ export default function PatientList() {
       fetchData(dateFrom, dateTo);
     }
   },[f.patientName, f.mobile, f.referralDoctor, f.visitType, f.paymentMode, f.onlyOutstandings]);
-  
+
+  // Update pagination when itemsPerPage changes
+  useEffect(() => {
+    if (pagination && data.length > 0) {
+      const newTotalPages = Math.ceil(data.length / itemsPerPage);
+      setPagination({
+        ...pagination,
+        limit: itemsPerPage,
+        totalPages: newTotalPages,
+        page: 1
+      });
+      setCurrentPage(1);
+    }
+  }, [itemsPerPage]);
+
   useEffect(()=>{
     const h = (e: any) =>{
       if(dpRef.current&&!dpRef.current.contains(e.target)) setOpen(false);
@@ -328,10 +343,10 @@ export default function PatientList() {
       
       // Set pagination metadata
       const total = filteredRows.length;
-      const totalPages = Math.ceil(total / ITEMS_PER_PAGE);
+      const totalPages = Math.ceil(total / itemsPerPage);
       setPagination({
         page: 1,
-        limit: ITEMS_PER_PAGE,
+        limit: itemsPerPage,
         total: total,
         totalPages: totalPages,
         hasMore: totalPages > 1
@@ -570,8 +585,8 @@ export default function PatientList() {
                 :errors.api?(<tr><td colSpan={5+vis.length} className="text-center p-4 text-red-500 text-xs border border-gray-300">{errors.api}</td></tr>)
                 :data.length===0?(<tr><td colSpan={5+vis.length} className="text-center p-4 text-gray-500 text-xs border border-gray-300">{searched?"No records found.":"Select filters and click Search."}</td></tr>)
                 :(() => {
-                  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
-                  const endIndex = startIndex + ITEMS_PER_PAGE;
+                  const startIndex = (currentPage - 1) * itemsPerPage;
+                  const endIndex = startIndex + itemsPerPage;
                   const paginatedData = data.slice(startIndex, endIndex);
                   return paginatedData.map((row, i) => (
                     <tr key={`${row.visitId}-${i}`} className={i%2===0?"bg-white hover:bg-gray-50":"bg-gray-50 hover:bg-gray-100"}>
@@ -590,45 +605,17 @@ export default function PatientList() {
 
           {/* PAGINATION CONTROLS */}
           {searched && !loading && data.length > 0 && pagination && (
-            <div className="mt-3 bg-white rounded shadow-md p-3 flex items-center justify-between text-xs">
-              <div className="text-gray-600">
-                Showing {(currentPage - 1) * ITEMS_PER_PAGE + 1} to{' '}
-                {Math.min(currentPage * ITEMS_PER_PAGE, pagination.total)} of{' '}
-                {pagination.total} records
-              </div>
-
-              <div className="flex gap-2 items-center">
-                <button
-                  onClick={() => {
-                    const newPage = Math.max(1, currentPage - 1);
-                    setCurrentPage(newPage);
-                  }}
-                  disabled={currentPage === 1}
-                  className={`flex items-center gap-1 px-3 py-1 rounded ${currentPage === 1 ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-cyan-600 text-white hover:bg-cyan-700'}`}
-                >
-                  <ChevronLeft size={14} /> Previous
-                </button>
-
-                <span className="px-3 py-1">
-                  Page {currentPage} of {pagination.totalPages}
-                </span>
-
-                <button
-                  onClick={() => {
-                    const newPage = Math.min(pagination.totalPages, currentPage + 1);
-                    setCurrentPage(newPage);
-                  }}
-                  disabled={currentPage === pagination.totalPages}
-                  className={`flex items-center gap-1 px-3 py-1 rounded ${currentPage === pagination.totalPages ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-cyan-600 text-white hover:bg-cyan-700'}`}
-                >
-                  Next <ChevronRight size={14} />
-                </button>
-              </div>
-
-              <div className="text-gray-600">
-                Total: {pagination.total} records
-              </div>
-            </div>
+            <PaginationControls
+              pagination={pagination}
+              currentPage={currentPage}
+              itemsPerPage={itemsPerPage}
+              onPageChange={setCurrentPage}
+              onItemsPerPageChange={(newItemsPerPage) => {
+                setItemsPerPage(newItemsPerPage);
+                setCurrentPage(1);
+              }}
+              isLoading={loading}
+            />
           )}
           {data.length>0&&(
             <div className="px-3 py-1.5 border-t border-gray-200 text-xs text-gray-500 flex justify-between">

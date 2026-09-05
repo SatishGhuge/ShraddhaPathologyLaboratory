@@ -13,6 +13,7 @@ import {
   ChevronRight,
 } from "lucide-react";
 import Header from "@/src/components/Header";
+import PaginationControls from "@/app/components/PaginationControls";
 import { getTurnAroundTimeReport } from "@/src/api/admin";
 import { getCollectionCenters, getCorporates } from "@/src/api/patient";
 
@@ -103,7 +104,7 @@ export default function TurnAroundTime() {
   const [corporates, setCorporates] = useState<any[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [pagination, setPagination] = useState<any>(null);
-  const ITEMS_PER_PAGE = 20;
+  const [itemsPerPage, setItemsPerPage] = useState(20);
 
   // Fetch collection centers and corporates for dropdowns
   useEffect(() => {
@@ -128,6 +129,20 @@ export default function TurnAroundTime() {
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
+
+  // Update pagination when itemsPerPage changes
+  useEffect(() => {
+    if (pagination && data.length > 0) {
+      const newTotalPages = Math.ceil(data.length / itemsPerPage);
+      setPagination({
+        ...pagination,
+        limit: itemsPerPage,
+        totalPages: newTotalPages,
+        page: 1
+      });
+      setCurrentPage(1);
+    }
+  }, [itemsPerPage]);
 
   // Date picker handlers (matching DailyCollection.jsx)
   const openPicker = () => { setTFrom(dateFrom); setTTo(dateTo); setCustom(false); setPicking(false); setHover(""); setDpOpen(true); };
@@ -171,10 +186,19 @@ export default function TurnAroundTime() {
         ...filters
       };
       
-      const response = await getTurnAroundTimeReport(searchParams, page, ITEMS_PER_PAGE);
+      const response = await getTurnAroundTimeReport(searchParams, page, itemsPerPage);
       if (response.success) {
         setData(response.data || []);
-        setPagination(response.pagination || null);
+        const paginationData = response.pagination || null;
+        if (paginationData) {
+          setPagination({
+            page: paginationData.page || page,
+            limit: itemsPerPage,
+            total: paginationData.total || 0,
+            totalPages: paginationData.totalPages || 1,
+            hasMore: (paginationData.totalPages || 1) > 1
+          });
+        }
       } else {
         setData(response.data || []);
         setPagination(null);
@@ -476,47 +500,21 @@ export default function TurnAroundTime() {
 
               {/* PAGINATION CONTROLS */}
               {data.length > 0 && pagination && (
-                <div className="mt-3 bg-white rounded shadow-md p-3 flex items-center justify-between text-xs">
-                  <div className="text-gray-600">
-                    Showing {(currentPage - 1) * ITEMS_PER_PAGE + 1} to{' '}
-                    {Math.min(currentPage * ITEMS_PER_PAGE, pagination.total)} of{' '}
-                    {pagination.total} records
-                  </div>
-
-                  <div className="flex gap-2 items-center">
-                    <button
-                      onClick={() => {
-                        const newPage = Math.max(1, currentPage - 1);
-                        setCurrentPage(newPage);
-                        handleSearchWithDates(dateFrom, dateTo, newPage);
-                      }}
-                      disabled={currentPage === 1}
-                      className={`flex items-center gap-1 px-3 py-1 rounded ${currentPage === 1 ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-cyan-600 text-white hover:bg-cyan-700'}`}
-                    >
-                      <ChevronLeft size={14} /> Previous
-                    </button>
-
-                    <span className="px-3 py-1">
-                      Page {currentPage} of {pagination.totalPages}
-                    </span>
-
-                    <button
-                      onClick={() => {
-                        const newPage = Math.min(pagination.totalPages, currentPage + 1);
-                        setCurrentPage(newPage);
-                        handleSearchWithDates(dateFrom, dateTo, newPage);
-                      }}
-                      disabled={currentPage === pagination.totalPages}
-                      className={`flex items-center gap-1 px-3 py-1 rounded ${currentPage === pagination.totalPages ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-cyan-600 text-white hover:bg-cyan-700'}`}
-                    >
-                      Next <ChevronRight size={14} />
-                    </button>
-                  </div>
-
-                  <div className="text-gray-600">
-                    Total: {pagination.total} records
-                  </div>
-                </div>
+                <PaginationControls
+                  pagination={pagination}
+                  currentPage={currentPage}
+                  itemsPerPage={itemsPerPage}
+                  onPageChange={(newPage) => {
+                    setCurrentPage(newPage);
+                    handleSearchWithDates(dateFrom, dateTo, newPage);
+                  }}
+                  onItemsPerPageChange={(newItemsPerPage) => {
+                    setItemsPerPage(newItemsPerPage);
+                    setCurrentPage(1);
+                    handleSearchWithDates(dateFrom, dateTo, 1);
+                  }}
+                  isLoading={loading}
+                />
               )}
             </div>
 
