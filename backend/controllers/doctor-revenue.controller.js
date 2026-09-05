@@ -197,44 +197,19 @@ export const getDoctorReferralRevenue = async (req, res) => {
 
     console.log(`✅ Found ${patientTests.length} patient tests total`);
     
-    // Filter for referral doctors
+    // Filter for referral doctors - ONLY include tests where referralDoctor is set and not 'SELF'
     const testsWithRefDoctors = patientTests.filter(t => t.referralDoctor && t.referralDoctor !== 'SELF' && t.referralDoctor !== '');
     console.log(`👨‍⚕️ Tests WITH referral doctors: ${testsWithRefDoctors.length}`);
     
     if (testsWithRefDoctors.length === 0) {
       console.log('⚠️  NO TESTS WITH REFERRAL DOCTORS FOUND!');
-      console.log('📊 USING ALL TESTS (no referral doctor filtering)');
-      
-      // If no referral doctors found, return ALL tests without referral doctor filtering
-      // This ensures the report shows data even if referral doctors aren't populated
-      const allTestsForReport = patientTests.map(pt => ({
-        id: pt.id,
-        visitId: pt.visitId,
-        patientId: pt.patient.patientId,
-        patientName: `${pt.patient.firstName || ''} ${pt.patient.lastName || ''}`.trim(),
-        testId: pt.testId,
-        testName: pt.test.name,
-        testShortName: pt.test.shortName || pt.test.name,
-        doctorName: pt.referralDoctor || '(No referral doctor)',
-        organization: pt.organization?.name || pt.organizationId || '-',
-        visitDate: pt.visitDate,
-        billAmount: parseFloat(pt.charge) || 0,
-        discountR: 0,
-        discountS: 0,
-        netAmount: parseFloat(pt.charge) || 0,
-        paymentMode: pt.paymentMode || '-',
-        paidAmount: parseFloat(pt.paidAmount) || 0,
-        balanceAmount: parseFloat(pt.balanceAmount) || 0,
-        paymentStatus: parseFloat(pt.balanceAmount) <= 0 ? 'Paid' : 'Unpaid'
-      }));
-      
-      console.log(`📤 Returning ${allTestsForReport.length} records (all tests, no referral doctor filter)`);
+      console.log('📊 Returning empty array - patients must have a referral doctor to appear in this report');
       
       return res.json({
         success: true,
-        data: allTestsForReport,
-        count: allTestsForReport.length,
-        note: 'Showing all patient tests (no referral doctors populated yet)'
+        data: [],
+        count: 0,
+        note: 'No referral doctor revenue records found. Only patients with a referral doctor assigned will appear in this report.'
       });
     }
 
