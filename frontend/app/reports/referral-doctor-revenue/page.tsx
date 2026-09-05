@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { DollarSign, Download, Search, RotateCcw, ChevronDown, Printer, Calendar, ChevronLeft, ChevronRight } from "lucide-react";
 import Header from "@/src/components/Header";
+import PaginationControls from "@/app/components/PaginationControls";
 import * as XLSX from 'xlsx';
 
 /* ── date helpers ── */
@@ -121,7 +122,8 @@ export default function ReferralDoctorRevenueReport() {
   
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
-  const ITEMS_PER_PAGE = 40;
+  const [itemsPerPage, setItemsPerPage] = useState(40);
+  const [pagination, setPagination] = useState<any>(null);
   
   // Delete tracking (client-side only) - persisted in localStorage
   const [inactiveVisits, setInactiveVisits] = useState<Set<string>>(new Set());
@@ -181,6 +183,20 @@ export default function ReferralDoctorRevenueReport() {
       handleSearch();
     }
   }, [dateFrom, dateTo, selectedDoctor, searchPatient, inactiveVisits]);
+
+  // Update pagination when itemsPerPage changes
+  useEffect(() => {
+    if (pagination && filteredData.length > 0) {
+      const newTotalPages = Math.ceil(filteredData.length / itemsPerPage);
+      setPagination({
+        ...pagination,
+        limit: itemsPerPage,
+        totalPages: newTotalPages,
+        page: 1
+      });
+      setCurrentPage(1);
+    }
+  }, [itemsPerPage]);
 
   // Fetch new data when date range changes
   useEffect(() => {
@@ -419,10 +435,23 @@ export default function ReferralDoctorRevenueReport() {
   const selCount = Object.values(selCols).filter(Boolean).length;
 
   // Pagination calculations
-  const totalPages = Math.ceil(filteredData.length / ITEMS_PER_PAGE);
-  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
-  const endIndex = startIndex + ITEMS_PER_PAGE;
+  const totalPages = Math.ceil(filteredData.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
   const paginatedData = filteredData.slice(startIndex, endIndex);
+
+  // Update pagination state whenever data changes
+  useEffect(() => {
+    const total = filteredData.length;
+    const pages = Math.ceil(total / itemsPerPage);
+    setPagination({
+      page: currentPage,
+      limit: itemsPerPage,
+      total: total,
+      totalPages: pages,
+      hasMore: pages > 1
+    });
+  }, [filteredData, itemsPerPage, currentPage]);
 
   // Group transactions by visitId to show doctor name only once per visit
   const groupedTransactions = () => {
@@ -854,38 +883,18 @@ export default function ReferralDoctorRevenueReport() {
         )}
 
         {/* Pagination */}
-        {filteredData.length > 0 && (
-          <div className="mt-3 bg-white rounded shadow-md p-3 flex flex-wrap items-center justify-between text-xs border border-gray-200 gap-2">
-            <div className="text-gray-600">
-              Showing {filteredData.length > 0 ? startIndex + 1 : 0} to {Math.min(endIndex, filteredData.length)} of {filteredData.length} records
-            </div>
-
-            <div className="flex gap-2 items-center">
-              <button
-                onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
-                disabled={currentPage === 1}
-                className={`px-2 sm:px-3 py-1 rounded text-xs sm:text-sm ${currentPage === 1 ? "bg-gray-200 text-gray-400 cursor-not-allowed" : "bg-blue-600 text-white hover:bg-blue-700"}`}
-              >
-                Previous
-              </button>
-
-              <span className="px-2 sm:px-3 py-1">
-                Page {currentPage} of {totalPages}
-              </span>
-
-              <button
-                onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
-                disabled={currentPage === totalPages}
-                className={`px-2 sm:px-3 py-1 rounded text-xs sm:text-sm ${currentPage === totalPages ? "bg-gray-200 text-gray-400 cursor-not-allowed" : "bg-blue-600 text-white hover:bg-blue-700"}`}
-              >
-                Next
-              </button>
-            </div>
-
-            <div className="text-gray-600">
-              Total: {filteredData.length} records
-            </div>
-          </div>
+        {filteredData.length > 0 && pagination && (
+          <PaginationControls
+            pagination={pagination}
+            currentPage={currentPage}
+            itemsPerPage={itemsPerPage}
+            onPageChange={setCurrentPage}
+            onItemsPerPageChange={(newItemsPerPage) => {
+              setItemsPerPage(newItemsPerPage);
+              setCurrentPage(1);
+            }}
+            isLoading={false}
+          />
         )}
 
         {filteredData.length > 0 && (

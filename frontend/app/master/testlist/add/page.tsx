@@ -145,7 +145,7 @@ const AddTest = () => {
                 ? {
                     ...param,
                     id: suggestion.id || undefined,
-                    parameterName: (suggestion.parameterName || '').toUpperCase(),
+                    parameterName: suggestion.parameterName || '',
                     machineCode: suggestion.machineCode || '',
                     multiplyBy: suggestion.multiplyBy || '',
                     decimal: suggestion.decimal?.toString() || '',
@@ -667,11 +667,8 @@ const AddTest = () => {
       });
     } else {
       setFormData(prev => {
-        // Convert test name and short name to uppercase
-        let finalValue = value;
-        if (name === 'name' || name === 'shortName') {
-          finalValue = value.toUpperCase();
-        }
+        // Accept both uppercase and lowercase text values
+        const finalValue = value;
         const updated = { ...prev, [name]: finalValue };
         
         // If department changed, auto-populate the group field from the selected department
@@ -743,8 +740,8 @@ const AddTest = () => {
 
   const handleCategoryChange = (categoryIndex: any, field: any, value: any) => {
     const updatedCategories = [...categories];
-    // Convert testMethod and name to uppercase
-    const finalValue = (field === 'testMethod' || field === 'name') ? (value || '').toUpperCase() : value;
+    // Accept both uppercase and lowercase text values for category fields
+    const finalValue = value;
     updatedCategories[categoryIndex][field] = finalValue;
     setCategories(updatedCategories);
   };
@@ -757,8 +754,8 @@ const AddTest = () => {
       console.log(`   Field: ${field}, Value: "${value}", Type: ${typeof value}`);
     }
     
-    // Convert testMethod and parameterName to uppercase
-    const finalValue = (field === 'testMethod' || field === 'parameterName') ? (value || '').toUpperCase() : value;
+    // Accept both uppercase and lowercase text values for parameter fields
+    const finalValue = value;
     
     // 🔍 DEBUG: Log finalValue if multiplyBy
     if (field === 'multiplyBy') {
@@ -1322,8 +1319,6 @@ const AddTest = () => {
                     value={formData.name}
                     onChange={handleChange}
                     required 
-                    
-                    style={{ textTransform: 'uppercase' }}
                   />
                   <Select 
                     label="Select Department" 
@@ -2380,9 +2375,8 @@ const AddTest = () => {
                             className="px-2 py-1.5 sm:py-1 border border-gray-300 rounded text-xs sm:text-sm w-full sm:w-32" 
                             placeholder="Parameter Test Method" 
                             value={parameter.testMethod || ""}
-                            onChange={(e) => handleParameterChange(categoryIndex, paramIndex, 'testMethod', e.target.value.toUpperCase())}
+                            onChange={(e) => handleParameterChange(categoryIndex, paramIndex, 'testMethod', e.target.value)}
                             
-                            style={{ textTransform: 'uppercase' }}
                           />
                           {(
                             <div className="flex gap-1 mt-1">
