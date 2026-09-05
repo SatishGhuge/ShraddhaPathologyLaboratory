@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { DollarSign, Download, Search, RotateCcw, ChevronDown, Printer, Calendar, ChevronLeft, ChevronRight } from "lucide-react";
 import Header from "@/src/components/Header";
+import PaginationControls from "@/app/components/PaginationControls";
 import * as XLSX from 'xlsx';
 
 /* ── date helpers ── */
@@ -55,8 +56,8 @@ function Cal({ month, year, onPrev, onNext, onDay, onHover, from, to, hover, pic
       <div className="grid grid-cols-7 text-center gap-y-0.5">
         {["Su","Mo","Tu","We","Th","Fr","Sa"].map(d=><div key={d} className="text-xs text-gray-400 py-1 font-medium">{d}</div>)}
         {cells.map((d,i)=>(
-          <div key={i} onClick={()=>d&&onDay(fmtISO(new Date(year,month,d)))}
-            onMouseEnter={()=>d&&picking&&onHover(fmtISO(new Date(year,month,d)))}
+          <div key={i} onClick={()=>d&&onDay?.(fmtISO(new Date(year,month,d)))}
+            onMouseEnter={()=>d&&picking&&onHover?.(fmtISO(new Date(year,month,d)))}
             className={`text-xs py-1 cursor-pointer transition-colors text-center ${cls(d)}`}>{d||""}</div>
         ))}
       </div>
@@ -121,7 +122,8 @@ export default function ReferralDoctorRevenueReport() {
   
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
-  const ITEMS_PER_PAGE = 40;
+  const [itemsPerPage, setItemsPerPage] = useState(40);
+  const [pagination, setPagination] = useState<any>(null);
   
   // Delete tracking (client-side only) - persisted in localStorage
   const [inactiveVisits, setInactiveVisits] = useState<Set<string>>(new Set());
@@ -186,12 +188,32 @@ export default function ReferralDoctorRevenueReport() {
     }
   }, [dateFrom, dateTo, selectedDoctor, searchPatient, inactiveVisits]);
 
+  // Update pagination when itemsPerPage changes
+  useEffect(() => {
+    if (pagination && filteredData.length > 0) {
+      const newTotalPages = Math.ceil(filteredData.length / itemsPerPage);
+      setPagination({
+        ...pagination,
+        limit: itemsPerPage,
+        totalPages: newTotalPages,
+        page: 1
+      });
+      setCurrentPage(1);
+    }
+  }, [itemsPerPage]);
+
+  // Fetch new data when date range changes
+  useEffect(() => {
+    console.log('📅 Date range changed, fetching new data...');
+    fetchTransactions();
+  }, [dateFrom, dateTo]);
+
   // Close dropdowns on outside click
   useEffect(() => {
     const handler = (e: any) => {
-      if (dpRef.current && !dpRef.current.contains(e.target)) setOpen(false);
-      if (colRef.current && !colRef.current.contains(e.target)) setColOpen(false);
-      if (doctorRef.current && !doctorRef.current.contains(e.target)) setDoctorOpen(false);
+      if (dpRef.current && !((dpRef.current as any).contains?.(e.target))) setOpen(false);
+      if (colRef.current && !((colRef.current as any).contains?.(e.target))) setColOpen(false);
+      if (doctorRef.current && !((doctorRef.current as any).contains?.(e.target))) setDoctorOpen(false);
     };
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
@@ -417,10 +439,23 @@ export default function ReferralDoctorRevenueReport() {
   const selCount = Object.values(selCols).filter(Boolean).length;
 
   // Pagination calculations
-  const totalPages = Math.ceil(filteredData.length / ITEMS_PER_PAGE);
-  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
-  const endIndex = startIndex + ITEMS_PER_PAGE;
+  const totalPages = Math.ceil(filteredData.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
   const paginatedData = filteredData.slice(startIndex, endIndex);
+
+  // Update pagination state whenever data changes
+  useEffect(() => {
+    const total = filteredData.length;
+    const pages = Math.ceil(total / itemsPerPage);
+    setPagination({
+      page: currentPage,
+      limit: itemsPerPage,
+      total: total,
+      totalPages: pages,
+      hasMore: pages > 1
+    });
+  }, [filteredData, itemsPerPage, currentPage]);
 
   // Group transactions by visitId to show doctor name only once per visit
   const groupedTransactions = () => {
@@ -475,8 +510,8 @@ export default function ReferralDoctorRevenueReport() {
                     {custom?(
                       <div className="p-4">
                         <div className="flex gap-8">
-                          <Cal month={cm} year={cy} onPrev={prevM} onNext={null} onDay={clickDay} onHover={setHover} from={tFrom} to={tTo} hover={hover} picking={picking}/>
-                          <Cal month={rm} year={ry} onPrev={null} onNext={nextM} onDay={clickDay} onHover={setHover} from={tFrom} to={tTo} hover={hover} picking={picking}/>
+                          <Cal month={cm} year={cy} onPrev={prevM} onNext={undefined} onDay={clickDay} onHover={(date)=>setHover(date||"")} from={tFrom} to={tTo} hover={hover} picking={picking}/>
+                          <Cal month={rm} year={ry} onPrev={undefined} onNext={nextM} onDay={clickDay} onHover={(date)=>setHover(date||"")} from={tFrom} to={tTo} hover={hover} picking={picking}/>
                         </div>
                         <div className="flex items-center justify-between mt-3 pt-3 border-t border-gray-100">
                           <span className="text-xs text-gray-500">{tFrom?`${toGB(tFrom)} - ${tTo?toGB(tTo):"..."}`:"Click start date"}</span>
@@ -852,38 +887,18 @@ export default function ReferralDoctorRevenueReport() {
         )}
 
         {/* Pagination */}
-        {filteredData.length > 0 && (
-          <div className="mt-3 bg-white rounded shadow-md p-3 flex flex-wrap items-center justify-between text-xs border border-gray-200 gap-2">
-            <div className="text-gray-600">
-              Showing {filteredData.length > 0 ? startIndex + 1 : 0} to {Math.min(endIndex, filteredData.length)} of {filteredData.length} records
-            </div>
-
-            <div className="flex gap-2 items-center">
-              <button
-                onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
-                disabled={currentPage === 1}
-                className={`px-2 sm:px-3 py-1 rounded text-xs sm:text-sm ${currentPage === 1 ? "bg-gray-200 text-gray-400 cursor-not-allowed" : "bg-blue-600 text-white hover:bg-blue-700"}`}
-              >
-                Previous
-              </button>
-
-              <span className="px-2 sm:px-3 py-1">
-                Page {currentPage} of {totalPages}
-              </span>
-
-              <button
-                onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
-                disabled={currentPage === totalPages}
-                className={`px-2 sm:px-3 py-1 rounded text-xs sm:text-sm ${currentPage === totalPages ? "bg-gray-200 text-gray-400 cursor-not-allowed" : "bg-blue-600 text-white hover:bg-blue-700"}`}
-              >
-                Next
-              </button>
-            </div>
-
-            <div className="text-gray-600">
-              Total: {filteredData.length} records
-            </div>
-          </div>
+        {filteredData.length > 0 && pagination && (
+          <PaginationControls
+            pagination={pagination}
+            currentPage={currentPage}
+            itemsPerPage={itemsPerPage}
+            onPageChange={setCurrentPage}
+            onItemsPerPageChange={(newItemsPerPage) => {
+              setItemsPerPage(newItemsPerPage);
+              setCurrentPage(1);
+            }}
+            isLoading={false}
+          />
         )}
 
         {filteredData.length > 0 && (

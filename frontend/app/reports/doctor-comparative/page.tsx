@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { Calendar, ChevronDown, ChevronLeft, ChevronRight, Download, RotateCcw, Printer } from "lucide-react";
 import Header from "@/src/components/Header";
+import PaginationControls from "@/app/components/PaginationControls";
 
 const toGB = (iso: any) => { if(!iso) return "-"; const d=new Date(iso); return d.toLocaleDateString("en-GB"); };
 const fmtISO = (d: any) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
@@ -72,7 +73,8 @@ const Page = () => {
   const [errors, setErrors] = useState<any>({});
   const [colOpen, setColOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 25;
+  const [itemsPerPage, setItemsPerPage] = useState(25);
+  const [pagination, setPagination] = useState<any>(null);
   
   const [dpOpen, setDpOpen] = useState(false);
   const [preset, setPreset] = useState("All Dates");
@@ -107,6 +109,20 @@ const Page = () => {
       fetchData();
     }
   }, [dateFrom, dateTo]);
+
+  // Update pagination when itemsPerPage changes
+  useEffect(() => {
+    if (pagination && data.length > 0) {
+      const newTotalPages = Math.ceil(data.length / itemsPerPage);
+      setPagination({
+        ...pagination,
+        limit: itemsPerPage,
+        totalPages: newTotalPages,
+        page: 1
+      });
+      setCurrentPage(1);
+    }
+  }, [itemsPerPage]);
 
   // Date picker handlers
   const openPicker = () => { setTFrom(dateFrom); setTTo(dateTo); setCustom(false); setPicking(false); setHover(""); setDpOpen(true); };
@@ -186,7 +202,20 @@ const Page = () => {
       const result = await response.json();
 
       if (result.data) {
-        setData(Array.isArray(result.data) ? result.data : []);
+        const fetchedData = Array.isArray(result.data) ? result.data : [];
+        setData(fetchedData);
+        
+        // Set pagination metadata
+        const total = fetchedData.length;
+        const totalPages = Math.ceil(total / itemsPerPage);
+        setPagination({
+          page: 1,
+          limit: itemsPerPage,
+          total: total,
+          totalPages: totalPages,
+          hasMore: totalPages > 1
+        });
+        
         if (result.months && Array.isArray(result.months)) {
           setAllMonths(result.months);
           // Auto-select months that have data
@@ -198,6 +227,7 @@ const Page = () => {
         }
       } else {
         setData([]);
+        setPagination(null);
         setSelectedMonths([]);
         setErrors({ api: result.message || 'Failed to fetch data' });
       }
@@ -205,6 +235,7 @@ const Page = () => {
       console.error('Error:', error);
       setErrors({ api: error.message || 'Failed to fetch data' });
       setData([]);
+      setPagination(null);
       setSelectedMonths([]);
     } finally {
       setLoading(false);
@@ -260,18 +291,8 @@ const Page = () => {
   };
 
   // Pagination helpers
-  const totalPages = Math.ceil(data.length / itemsPerPage);
-  const startIndex = (currentPage - 1) * itemsPerPage;
-  const endIndex = startIndex + itemsPerPage;
-  const paginatedData = data.slice(startIndex, endIndex);
-
-  const handlePreviousPage = () => {
-    setCurrentPage(prev => Math.max(prev - 1, 1));
-  };
-
-  const handleNextPage = () => {
-    setCurrentPage(prev => Math.min(prev + 1, totalPages));
-  };
+  const paginatedData = data.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+  const totalPages = Math.ceil(data.length / itemsPerPage) || 1;
 
   return (
     <>
@@ -626,43 +647,20 @@ const Page = () => {
               </tbody>
             </table>
           </div>
-        </div>
 
-        {/* RESULTS SUMMARY */}
-        {data.length > 0 && (
-          <div className="mt-3 p-3 bg-white rounded text-xs text-gray-600">
-            Total Doctors: <strong>{data.length}</strong> | Total Months: <strong>{allMonths.length}</strong>
-            <div className="mt-2 flex items-center justify-between">
-              <div className="text-xs">
-                Showing {startIndex + 1} to {Math.min(endIndex, data.length)} of {data.length} doctors (Page {currentPage} of {totalPages})
-              </div>
-              <div className="flex gap-2">
-                <button 
-                  onClick={handlePreviousPage}
-                  disabled={currentPage === 1}
-                  className="px-3 py-1 text-xs border rounded bg-white hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed">
-                  ← Previous
-                </button>
-                <div className="flex items-center gap-1">
-                  {Array.from({ length: totalPages }, (_, i) => i + 1).map(pageNum => (
-                    <button
-                      key={pageNum}
-                      onClick={() => setCurrentPage(pageNum)}
-                      className={`px-2 py-1 text-xs rounded ${currentPage === pageNum ? 'bg-blue-600 text-white' : 'border bg-white hover:bg-gray-100'}`}>
-                      {pageNum}
-                    </button>
-                  ))}
-                </div>
-                <button 
-                  onClick={handleNextPage}
-                  disabled={currentPage === totalPages}
-                  className="px-3 py-1 text-xs border rounded bg-white hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed">
-                  Next →
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
+          {/* PAGINATION CONTROLS */}
+          <PaginationControls
+            pagination={pagination}
+            currentPage={currentPage}
+            itemsPerPage={itemsPerPage}
+            onPageChange={setCurrentPage}
+            onItemsPerPageChange={(newItemsPerPage) => {
+              setItemsPerPage(newItemsPerPage);
+              setCurrentPage(1);
+            }}
+            isLoading={loading}
+          />
+        </div>
       </div>
       </div>
     </>

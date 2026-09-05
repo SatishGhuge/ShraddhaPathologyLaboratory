@@ -71,7 +71,7 @@ export default function ReferralDoctorModal({
   const handleChange = (e: any) => {
     const { name, value, type: inputType, checked } = e.target;
 
-    // Name: only letters and spaces
+    // Name: only letters and spaces, convert to uppercase
     if (name === "name" && !/^[a-zA-Z\s]*$/.test(value)) return;
 
     // Mobile: only digits, max 10
@@ -80,7 +80,13 @@ export default function ReferralDoctorModal({
     // Discount: only numbers with optional decimal
     if (name === "discount" && value && !/^\d*\.?\d*$/.test(value)) return;
 
-    setFormData({ ...formData, [name]: inputType === "checkbox" ? checked : value });
+    // Capitalize Name and Degree to uppercase
+    let finalValue = value;
+    if ((name === "name" || name === "degree") && inputType !== "checkbox") {
+      finalValue = value.toUpperCase();
+    }
+
+    setFormData({ ...formData, [name]: inputType === "checkbox" ? checked : finalValue });
     if (errors[name]) setErrors((prev) => ({ ...prev, [name]: "" }));
   };
 
@@ -219,6 +225,7 @@ export default function ReferralDoctorModal({
               value={formData.name}
               onChange={handleChange}
               placeholder="Please Enter Name"
+              style={{ textTransform: 'uppercase' }}
               className={`w-full border px-3 py-2 rounded bg-white focus:ring-2 outline-none ${errors.name ? "border-red-500 focus:ring-red-400" : "border-gray-300 focus:ring-orange-500"}`}
               disabled={loading}
             />
@@ -231,7 +238,16 @@ export default function ReferralDoctorModal({
             <label className="block text-sm font-semibold text-gray-700 mb-1">Degree</label>
             <div className="flex items-center border border-gray-300 rounded px-2 bg-white">
               <GraduationCap size={16} className="text-cyan-600 mr-2 flex-shrink-0" />
-              <input type="text" name="degree" value={formData.degree} onChange={handleChange} placeholder="Degree" className="w-full py-2 outline-none bg-transparent" disabled={loading} />
+              <input 
+                type="text" 
+                name="degree" 
+                value={formData.degree} 
+                onChange={handleChange} 
+                placeholder="Degree" 
+                style={{ textTransform: 'uppercase' }}
+                className="w-full py-2 outline-none bg-transparent" 
+                disabled={loading} 
+              />
             </div>
           </div>
 

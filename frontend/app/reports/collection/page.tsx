@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { RotateCcw, Printer, FileSpreadsheet, ChevronDown, Calendar, ChevronLeft, ChevronRight, X } from "lucide-react";
 import Header from "@/src/components/Header";
 import { getAllPatients, getOrganizations } from "@/src/api/patient";
+import PaginationControls from "@/app/components/PaginationControls";
 import * as XLSX from 'xlsx';
 
 /* ── Date helpers ── */
@@ -149,7 +150,7 @@ export default function CollectionReport() {
   const [selectedColumns, setSelectedColumns] = useState(["date", "billNo", "patient", "mobile", "cash", "debitCard", "creditCard", "upi", "discount", "netAmount", "total", "balance"]);
 
   // Pagination state
-  const ITEMS_PER_PAGE = 40;
+  const [itemsPerPage, setItemsPerPage] = useState(40);
   const [currentPage, setCurrentPage] = useState(1);
   const [pagination, setPagination] = useState<any>(null);
 
@@ -189,6 +190,21 @@ export default function CollectionReport() {
       fetchData(dateFrom, dateTo, organization, nameSearch);
     }
   }, [dateFrom, dateTo, organization, nameSearch]);
+
+  // Update pagination when itemsPerPage changes
+  useEffect(() => {
+    if (pagination && data.length > 0) {
+      const newTotalPages = Math.ceil(data.length / itemsPerPage);
+      setPagination({
+        ...pagination,
+        limit: itemsPerPage,
+        totalPages: newTotalPages,
+        page: 1
+      });
+      setCurrentPage(1);
+    }
+  }, [itemsPerPage]);
+
   // Date picker handlers
   const openPicker = () => { setTFrom(dateFrom); setTTo(dateTo); setCustom(false); setPicking(false); setHover(""); setDpOpen(true); };
   const pickPreset = (p: any) => { if(!p.fn){setCustom(true);setPreset("Custom Range");setTFrom("");setTTo("");setPicking(false);return;} const[a,b]=p.fn(); setTFrom(a);setTTo(b);setPreset(p.label);setCustom(false); };
@@ -208,8 +224,8 @@ export default function CollectionReport() {
 
   // Pagination helpers
   const getPaginatedData = () => {
-    const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
-    const endIndex = startIndex + ITEMS_PER_PAGE;
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
     return data.slice(startIndex, endIndex);
   };
 
@@ -382,10 +398,10 @@ export default function CollectionReport() {
       
       // Set pagination metadata
       const total = rows.length;
-      const totalPages = Math.ceil(total / ITEMS_PER_PAGE);
+      const totalPages = Math.ceil(total / itemsPerPage);
       setPagination({
         page: 1,
-        limit: ITEMS_PER_PAGE,
+        limit: itemsPerPage,
         total: total,
         totalPages: totalPages,
         hasMore: totalPages > 1
@@ -614,6 +630,19 @@ export default function CollectionReport() {
               )}
             </table>
           </div>
+
+          {/* PAGINATION CONTROLS */}
+          <PaginationControls
+            pagination={pagination}
+            currentPage={currentPage}
+            itemsPerPage={itemsPerPage}
+            onPageChange={setCurrentPage}
+            onItemsPerPageChange={(newItemsPerPage) => {
+              setItemsPerPage(newItemsPerPage);
+              setCurrentPage(1);
+            }}
+            isLoading={loading}
+          />
         </div>
       </div>
     </>

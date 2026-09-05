@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 
 import { Users, RotateCcw, ChevronLeft, ChevronRight } from "lucide-react";
 import { getUsers, deleteUser } from "@/src/api/master";
+import PaginationControls from "@/app/components/PaginationControls";
 
 const UserList = () => {
   const router = useRouter();
@@ -13,14 +14,14 @@ const UserList = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<any>(null);
   const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(25);
   const [pagination, setPagination] = useState<any>(null);
-  const ITEMS_PER_PAGE = 20;
 
   const fetchUsers = async (page: number = 1) => {
     setLoading(true);
     setError(null);
     try {
-      const data = await getUsers(page, ITEMS_PER_PAGE);
+      const data = await getUsers(page, itemsPerPage);
       setUsers(data);
       setPagination(null);
     } catch (err) {
@@ -31,6 +32,11 @@ const UserList = () => {
   };
 
   useEffect(() => { fetchUsers(1); }, []);
+
+  useEffect(() => {
+    setCurrentPage(1);
+    fetchUsers(1);
+  }, [itemsPerPage]);
 
   const handleDelete = async (user: any) => {
     if (!window.confirm(`Delete "${user.name}"?`)) return;
@@ -130,47 +136,21 @@ const UserList = () => {
 
         {/* PAGINATION CONTROLS */}
         {pagination && users.length > 0 && (
-          <div className="mt-3 bg-white rounded shadow-md p-3 flex items-center justify-between text-xs">
-            <div className="text-gray-600">
-              Showing {(currentPage - 1) * ITEMS_PER_PAGE + 1} to{' '}
-              {Math.min(currentPage * ITEMS_PER_PAGE, pagination.total)} of{' '}
-              {pagination.total} records
-            </div>
-
-            <div className="flex gap-2 items-center">
-              <button
-                onClick={() => {
-                  const newPage = Math.max(1, currentPage - 1);
-                  setCurrentPage(newPage);
-                  fetchUsers(newPage);
-                }}
-                disabled={currentPage === 1}
-                className={`flex items-center gap-1 px-3 py-1 rounded ${currentPage === 1 ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-orange-500 text-white hover:bg-orange-600'}`}
-              >
-                <ChevronLeft size={14} /> Previous
-              </button>
-
-              <span className="px-3 py-1">
-                Page {currentPage} of {pagination.totalPages}
-              </span>
-
-              <button
-                onClick={() => {
-                  const newPage = Math.min(pagination.totalPages, currentPage + 1);
-                  setCurrentPage(newPage);
-                  fetchUsers(newPage);
-                }}
-                disabled={currentPage === pagination.totalPages}
-                className={`flex items-center gap-1 px-3 py-1 rounded ${currentPage === pagination.totalPages ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-orange-500 text-white hover:bg-orange-600'}`}
-              >
-                Next <ChevronRight size={14} />
-              </button>
-            </div>
-
-            <div className="text-gray-600">
-              Total: {pagination.total} records
-            </div>
-          </div>
+          <PaginationControls
+            pagination={pagination}
+            currentPage={currentPage}
+            itemsPerPage={itemsPerPage}
+            onPageChange={(page) => {
+              setCurrentPage(page);
+              fetchUsers(page);
+            }}
+            onItemsPerPageChange={(newLimit) => {
+              setItemsPerPage(newLimit);
+              setCurrentPage(1);
+              fetchUsers(1);
+            }}
+            isLoading={loading}
+          />
         )}
       </div>
     </>

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { Plus, Pencil, Trash2, ArrowLeft, Microscope, RotateCcw } from "lucide-react";
+import PaginationControls from "@/app/components/PaginationControls";
 
 const initialData = [
   { id: 1, name: "E. coli" },
@@ -21,7 +22,7 @@ export default function MicrobiologyOrganism() {
   const [search, setSearch] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [pagination, setPagination] = useState<any>(null);
-  const ITEMS_PER_PAGE = 20;
+  const [itemsPerPage, setItemsPerPage] = useState(25);
 
   const [showModal, setShowModal] = useState(false);
   const [editId, setEditId] = useState<any>(null);
@@ -41,13 +42,17 @@ export default function MicrobiologyOrganism() {
 
   useEffect(() => {
     // Update pagination when filtered data changes
-    const totalPages = Math.ceil(filteredData.length / ITEMS_PER_PAGE);
+    const totalPages = Math.ceil(filteredData.length / itemsPerPage);
     setPagination({
       total: filteredData.length,
       totalPages: totalPages,
       currentPage: currentPage
     });
-  }, [filteredData, currentPage]);
+  }, [filteredData, currentPage, itemsPerPage]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [itemsPerPage]);
 
   const handleDelete = (id: any) => {
     if (window.confirm("Are you sure you want to delete this organism?")) {
@@ -145,9 +150,9 @@ export default function MicrobiologyOrganism() {
 
             <tbody>
               {(() => {
-                const totalPages = Math.ceil(filteredData.length / ITEMS_PER_PAGE);
-                const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
-                const endIndex = startIndex + ITEMS_PER_PAGE;
+                const totalPages = Math.ceil(filteredData.length / itemsPerPage);
+                const startIndex = (currentPage - 1) * itemsPerPage;
+                const endIndex = startIndex + itemsPerPage;
                 const paginatedData = filteredData.slice(startIndex, endIndex);
 
                 return paginatedData.length > 0 ? (
@@ -187,34 +192,20 @@ export default function MicrobiologyOrganism() {
         </div>
 
         {/* Pagination Controls */}
-        {pagination && pagination.totalPages > 1 && (
-          <div className="mt-4 flex items-center justify-between bg-white p-3 rounded shadow-md">
-            <div className="text-sm text-gray-600">
-              Showing {Math.min((currentPage - 1) * ITEMS_PER_PAGE + 1, pagination.total)} to{" "}
-              {Math.min(currentPage * ITEMS_PER_PAGE, pagination.total)} of {pagination.total} records
-            </div>
-            <div className="flex gap-2 items-center">
-              <button
-                onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
-                disabled={currentPage === 1}
-                className="bg-orange-500 hover:bg-orange-600 disabled:bg-gray-400 text-white px-4 py-2 rounded text-sm transition-colors"
-              >
-                Previous
-              </button>
-              
-              <span className="text-sm text-gray-700 font-semibold">
-                Page {currentPage} of {pagination.totalPages}
-              </span>
-              
-              <button
-                onClick={() => setCurrentPage(Math.min(pagination.totalPages, currentPage + 1))}
-                disabled={currentPage === pagination.totalPages}
-                className="bg-orange-500 hover:bg-orange-600 disabled:bg-gray-400 text-white px-4 py-2 rounded text-sm transition-colors"
-              >
-                Next
-              </button>
-            </div>
-          </div>
+        {pagination && filteredData.length > 0 && (
+          <PaginationControls
+            pagination={pagination}
+            currentPage={currentPage}
+            itemsPerPage={itemsPerPage}
+            onPageChange={(page) => {
+              setCurrentPage(page);
+            }}
+            onItemsPerPageChange={(newLimit) => {
+              setItemsPerPage(newLimit);
+              setCurrentPage(1);
+            }}
+            isLoading={false}
+          />
         )}
       </div>
 

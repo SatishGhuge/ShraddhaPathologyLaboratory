@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { getOrganizations, deleteOrganization } from "@/src/api/master";
 
 import { RotateCcw, Building2 } from "lucide-react";
+import PaginationControls from "@/app/components/PaginationControls";
 
 const OrganizationList = () => {
   const router = useRouter();
@@ -14,12 +15,15 @@ const OrganizationList = () => {
   const [showInactive, setShowInactive] = useState(false);
   const [organizations, setOrganizations] = useState<any[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
-  const [pagination, setPagination] = useState<any>(null);
-  const ITEMS_PER_PAGE = 20;
+  const [itemsPerPage, setItemsPerPage] = useState(25);
 
   useEffect(() => {
     fetchOrganizations();
-  }, [currentPage, searchName, searchLocation, showInactive]);
+  }, []);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [itemsPerPage]);
 
   const fetchOrganizations = async () => {
     try {
@@ -34,12 +38,25 @@ const OrganizationList = () => {
     }
   };
 
-  const filteredOrganizations = organizations.filter((o) => {
+  const filteredOrganizations = organizations.filter((o: any) => {
     const nameMatch = o.name.toLowerCase().includes(searchName.toLowerCase());
     const locationMatch = (o.location || "").toLowerCase().includes(searchLocation.toLowerCase());
     const statusMatch = showInactive ? o.isActive === false : o.isActive === true;
     return nameMatch && locationMatch && statusMatch;
   });
+
+  // Calculate pagination
+  const totalPages = Math.ceil(filteredOrganizations.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const paginatedData = filteredOrganizations.slice(startIndex, endIndex);
+
+  const pagination = {
+    total: filteredOrganizations.length,
+    totalPages: totalPages,
+    page: currentPage,
+    limit: itemsPerPage
+  };
 
   const handleReset = () => {
     setSearchName("");
@@ -59,6 +76,10 @@ const OrganizationList = () => {
         })
         .catch(() => alert("Failed to delete organization"));
     }
+  };
+
+  const setFilteredOrganizations = (data: any[]) => {
+    // This is a placeholder - we'll use filteredOrganizations from the filter logic instead
   };
 
   /* TOGGLE ACTIVE/INACTIVE */
@@ -83,7 +104,7 @@ const OrganizationList = () => {
               type="text"
               placeholder="Search By Name"
               value={searchName}
-              onChange={(e) => setSearchName(e.target.value)}
+              onChange={(e: any) => setSearchName(e.target.value)}
               className="border border-gray-300 bg-white rounded px-3 py-2 w-48 text-sm placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500"
             />
 
@@ -91,7 +112,7 @@ const OrganizationList = () => {
               type="text"
               placeholder="Search By Location"
               value={searchLocation}
-              onChange={(e) => setSearchLocation(e.target.value)}
+              onChange={(e: any) => setSearchLocation(e.target.value)}
               className="border border-gray-300 bg-white rounded px-3 py-2 w-48 text-sm placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500"
             />
 
@@ -100,7 +121,7 @@ const OrganizationList = () => {
               <input
                 type="checkbox"
                 checked={showInactive}
-                onChange={(e) => setShowInactive(e.target.checked)}
+                onChange={(e: any) => setShowInactive(e.target.checked)}
                 className="w-4 h-4 cursor-pointer accent-orange-500 rounded"
               />
               <span>Show Inactive</span>
@@ -141,21 +162,8 @@ const OrganizationList = () => {
             </thead>
 
             <tbody>
-              {(() => {
-                const totalPages = Math.ceil(filteredOrganizations.length / ITEMS_PER_PAGE);
-                const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
-                const endIndex = startIndex + ITEMS_PER_PAGE;
-                const paginatedData = filteredOrganizations.slice(startIndex, endIndex);
-
-                // Update pagination state
-                setPagination({
-                  total: filteredOrganizations.length,
-                  totalPages: totalPages,
-                  currentPage: currentPage
-                });
-
-                return paginatedData.length > 0 ? (
-                  paginatedData.map((o) => (
+              {paginatedData.length > 0 ? (
+                paginatedData.map((o: any) => (
                   <tr key={o.id} className="hover:bg-gray-50 border-b border-gray-200">
                     <td className="border border-gray-300 px-3 py-1">{o.id}</td>
                     <td className="border border-gray-300 px-3 py-1 font-medium">{o.name}</td>
@@ -212,41 +220,26 @@ const OrganizationList = () => {
                     No organizations found
                   </td>
                 </tr>
-              );
-              })()}
+              )}
             </tbody>
           </table>
         </div>
 
         {/* Pagination Controls */}
         {pagination && pagination.totalPages > 1 && (
-          <div className="mt-4 flex items-center justify-between bg-white p-3 rounded shadow-md">
-            <div className="text-sm text-gray-600">
-              Showing {Math.min((currentPage - 1) * ITEMS_PER_PAGE + 1, pagination.total)} to{" "}
-              {Math.min(currentPage * ITEMS_PER_PAGE, pagination.total)} of {pagination.total} records
-            </div>
-            <div className="flex gap-2 items-center">
-              <button
-                onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
-                disabled={currentPage === 1}
-                className="bg-orange-500 hover:bg-orange-600 disabled:bg-gray-400 text-white px-4 py-2 rounded text-sm transition-colors"
-              >
-                Previous
-              </button>
-              
-              <span className="text-sm text-gray-700 font-semibold">
-                Page {currentPage} of {pagination.totalPages}
-              </span>
-              
-              <button
-                onClick={() => setCurrentPage(Math.min(pagination.totalPages, currentPage + 1))}
-                disabled={currentPage === pagination.totalPages}
-                className="bg-orange-500 hover:bg-orange-600 disabled:bg-gray-400 text-white px-4 py-2 rounded text-sm transition-colors"
-              >
-                Next
-              </button>
-            </div>
-          </div>
+          <PaginationControls
+            pagination={pagination}
+            currentPage={currentPage}
+            itemsPerPage={itemsPerPage}
+            onPageChange={(page: number) => {
+              setCurrentPage(page);
+            }}
+            onItemsPerPageChange={(newLimit: number) => {
+              setItemsPerPage(newLimit);
+              setCurrentPage(1);
+            }}
+            isLoading={false}
+          />
         )}
       </div>
     </>

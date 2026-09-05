@@ -12,7 +12,7 @@ const CONFIG = {
     host: '0.0.0.0'
   },
   vps: {
-    baseUrl: process.env.VPS_TAILSCALE_URL || 'https://shraddha.snapsofts.com'
+    baseUrl: process.env.VPS_TAILSCALE_URL || 'http://localhost:3351'
   },
   database: {
     host: process.env.DB_HOST || 'localhost',

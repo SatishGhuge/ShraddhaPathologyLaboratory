@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { DollarSign, RotateCcw, FileSpreadsheet, FileText, Upload } from "lucide-react";
+import PaginationControls from "@/app/components/PaginationControls";
 
 export default function AddLabCharges() {
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -24,12 +25,17 @@ export default function AddLabCharges() {
   
   // Pagination states
   const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage, setItemsPerPage] = useState(20);
+  const [itemsPerPage, setItemsPerPage] = useState(25);
 
   // Fetch tests and charges on component mount
   useEffect(() => {
     fetchTestsAndCharges();
   }, []);
+
+  // Watch for itemsPerPage changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [itemsPerPage]);
 
   const fetchTestsAndCharges = async () => {
     try {
@@ -544,66 +550,23 @@ export default function AddLabCharges() {
 
             {/* Pagination Controls */}
             {filteredData.length > 0 && (
-              <div className="px-4 py-3 bg-gray-50 border-t border-gray-300 flex items-center justify-between flex-wrap gap-4">
-                <div className="text-sm text-gray-600">
-                  Showing {startIndex + 1} to {Math.min(endIndex, filteredData.length)} of {filteredData.length} tests
-                </div>
-                
-                <div className="flex items-center gap-4">
-                  {/* Items per page selector */}
-                  <div className="flex items-center gap-2">
-                    <label className="text-sm font-medium text-gray-700">Items per page:</label>
-                    <select
-                      value={itemsPerPage}
-                      onChange={(e) => {
-                        setItemsPerPage(parseInt(e.target.value));
-                        setCurrentPage(1);
-                      }}
-                      className="border border-gray-300 rounded px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
-                    >
-                      <option value={10}>10</option>
-                      <option value={20}>20</option>
-                      <option value={50}>50</option>
-                      <option value={100}>100</option>
-                    </select>
-                  </div>
-
-                  {/* Pagination buttons */}
-                  <div className="flex gap-2 items-center">
-                    <button
-                      onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
-                      disabled={currentPage === 1}
-                      className="px-3 py-1.5 text-sm bg-gray-300 text-gray-700 rounded hover:bg-gray-400 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                    >
-                      ← Previous
-                    </button>
-                    
-                    <div className="flex gap-1">
-                      {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-                        <button
-                          key={page}
-                          onClick={() => setCurrentPage(page)}
-                          className={`px-2.5 py-1.5 text-sm rounded transition-colors ${
-                            currentPage === page
-                              ? "bg-orange-500 text-white font-semibold"
-                              : "bg-gray-200 text-gray-700 hover:bg-gray-300"
-                          }`}
-                        >
-                          {page}
-                        </button>
-                      ))}
-                    </div>
-
-                    <button
-                      onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
-                      disabled={currentPage === totalPages}
-                      className="px-3 py-1.5 text-sm bg-gray-300 text-gray-700 rounded hover:bg-gray-400 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                    >
-                      Next →
-                    </button>
-                  </div>
-                </div>
-              </div>
+              <PaginationControls
+                pagination={{
+                  page: currentPage,
+                  limit: itemsPerPage,
+                  total: filteredData.length,
+                  totalPages: Math.ceil(filteredData.length / itemsPerPage),
+                  hasMore: currentPage < Math.ceil(filteredData.length / itemsPerPage)
+                }}
+                currentPage={currentPage}
+                itemsPerPage={itemsPerPage}
+                onPageChange={(page) => setCurrentPage(page)}
+                onItemsPerPageChange={(newLimit) => {
+                  setItemsPerPage(newLimit);
+                  setCurrentPage(1);
+                }}
+                isLoading={loading}
+              />
             )}
           </div>
         </div>

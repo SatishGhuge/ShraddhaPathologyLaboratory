@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { DollarSign, RotateCcw, Printer, Calendar, ChevronDown, ChevronLeft, ChevronRight } from "lucide-react";
 import Header from "@/src/components/Header";
+import PaginationControls from "@/app/components/PaginationControls";
 import { getOrganizations } from "@/src/api/patient";
 
 // Hide number input spinners (up/down arrows)
@@ -610,6 +611,7 @@ export default function OrganizationSettlementReport() {
   const [showBulkSettlement, setShowBulkSettlement] = useState(false);
   const [pagination, setPagination] = useState<any>(null);
   const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(25);
 
   useEffect(() => {
     const initializeReport = async () => {
@@ -643,6 +645,20 @@ export default function OrganizationSettlementReport() {
     }
   }, [selectedOrg, dateFrom, dateTo, status, currentPage]);
 
+  // Update pagination when itemsPerPage changes
+  useEffect(() => {
+    if (pagination && data.length > 0) {
+      const newTotalPages = Math.ceil(data.length / itemsPerPage);
+      setPagination({
+        ...pagination,
+        limit: itemsPerPage,
+        totalPages: newTotalPages,
+        page: 1
+      });
+      setCurrentPage(1);
+    }
+  }, [itemsPerPage]);
+
   // Date picker handlers
   const openPicker = () => { setTFrom(dateFrom); setTTo(dateTo); setCustom(false); setPicking(false); setHover(""); setDpOpen(true); };
   const pickPreset = (p: any) => { if(!p.fn){setCustom(true);setPreset("Custom Range");setTFrom("");setTTo("");setPicking(false);return;} const[a,b]=p.fn(); setTFrom(a);setTTo(b);setPreset(p.label);setCustom(false); };
@@ -671,7 +687,7 @@ export default function OrganizationSettlementReport() {
         toDate: dateTo,
         ...(status && { status }),
         page: currentPage.toString(),
-        limit: '40'
+        limit: itemsPerPage.toString()
       });
       
       const response = await fetch(
@@ -686,7 +702,14 @@ export default function OrganizationSettlementReport() {
       
       if (result.data) {
         setData(Array.isArray(result.data) ? result.data : []);
-        setPagination(result.pagination || { pages: 1, page: currentPage });
+        const paginationData = result.pagination || { pages: 1, page: currentPage };
+        setPagination({
+          page: paginationData.page || currentPage,
+          limit: itemsPerPage,
+          total: paginationData.total || 0,
+          totalPages: paginationData.pages || 1,
+          hasMore: paginationData.pages > 1
+        });
       } else {
         setData([]);
         setErrors({ api: result.message || 'Failed to fetch data' });
@@ -1000,28 +1023,18 @@ export default function OrganizationSettlementReport() {
         </div>
 
         {/* PAGINATION */}
-        {pagination && pagination.pages > 1 && (
-          <div className="flex items-center justify-between mt-4 p-3 bg-white rounded">
-            <span className="text-xs text-gray-600">
-              Page {pagination.page} of {pagination.pages}
-            </span>
-            <div className="flex gap-2">
-              <button 
-                onClick={() => setCurrentPage(prev => Math.max(1, prev-1))}
-                disabled={currentPage === 1}
-                className="px-3 py-1 border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50 text-xs"
-              >
-                Previous
-              </button>
-              <button 
-                onClick={() => setCurrentPage(prev => Math.min(pagination.pages, prev+1))}
-                disabled={currentPage === pagination.pages}
-                className="px-3 py-1 border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50 text-xs"
-              >
-                Next
-              </button>
-            </div>
-          </div>
+        {pagination && pagination.totalPages > 1 && (
+          <PaginationControls
+            pagination={pagination}
+            currentPage={currentPage}
+            itemsPerPage={itemsPerPage}
+            onPageChange={setCurrentPage}
+            onItemsPerPageChange={(newItemsPerPage) => {
+              setItemsPerPage(newItemsPerPage);
+              setCurrentPage(1);
+            }}
+            isLoading={loading}
+          />
         )}
       </div>
 
