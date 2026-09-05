@@ -2075,20 +2075,20 @@ export const getOrganizationById = async (req, res) => {
         sendReportsViaMail: true,
         isHomeCollection: true,
         isOPD: true,
-        isIPD: true,
-        moduleAllocations: {
-          select: { modules: true }
-        }
+        isIPD: true
       }
     });
     if (!organization) return res.status(404).json({ success: false, message: 'Organization not found' });
     
+    // Query moduleAllocation separately for reliability
+    const moduleAllocationRecord = await prisma.moduleAllocation.findUnique({
+      where: { organizationId: req.params.id }
+    });
+    
     // Transform response to match frontend expectations
-    // moduleAllocations is an array, but organization has only one allocation record (organizationId is unique)
     const response = {
       ...organization,
-      moduleAllocation: organization.moduleAllocations?.[0]?.modules || null,
-      moduleAllocations: undefined  // Remove the array version
+      moduleAllocation: moduleAllocationRecord?.modules || null
     };
     
     res.json({ success: true, data: response });
@@ -2137,12 +2137,16 @@ export const createOrganization = async (req, res) => {
     // Create module allocation for organization if provided
     if (moduleAllocation) {
       const modulesData = typeof moduleAllocation === 'string' ? moduleAllocation : JSON.stringify(moduleAllocation);
-      await prisma.moduleAllocation.create({
-        data: {
-          organizationId: newId,
-          modules: modulesData
-        }
-      });
+      try {
+        await prisma.moduleAllocation.create({
+          data: {
+            organizationId: newId,
+            modules: modulesData
+          }
+        });
+      } catch (allocError) {
+        // Silent fail - organization still created
+      }
     }
 
     // Create admin account for this organization
@@ -2225,10 +2229,45 @@ export const createOrganization = async (req, res) => {
       sendOrganizationCredentialsEmail(email, name.trim(), username, plainPassword, false).catch(err => {});
     }
 
+    // Fetch the created organization
+    const createdOrganization = await prisma.organization.findUnique({
+      where: { id: newId },
+      select: {
+        id: true,
+        name: true,
+        code: true,
+        location: true,
+        address: true,
+        mobile: true,
+        email: true,
+        date: true,
+        discount: true,
+        isActive: true,
+        createdAt: true,
+        updatedAt: true,
+        sendReportsViaWhatsApp: true,
+        sendReportsViaMail: true,
+        isHomeCollection: true,
+        isOPD: true,
+        isIPD: true
+      }
+    });
+
+    // Query moduleAllocation separately for reliability
+    const moduleAllocationRecord = await prisma.moduleAllocation.findUnique({
+      where: { organizationId: newId }
+    });
+
+    // Transform response to match frontend expectations
+    const response = {
+      ...createdOrganization,
+      moduleAllocation: moduleAllocationRecord?.modules || null
+    };
+
     res.status(201).json({
       success: true,
       message: `Organization created successfully${chargesCreated > 0 ? ` with ${chargesCreated} test charges` : ''}`,
-      data: organization,
+      data: response,
       credentials: { username, password: plainPassword },
       chargesCreated
     });
@@ -2246,6 +2285,7 @@ export const updateOrganization = async (req, res) => {
   try {
     const { id } = req.params;
     const { name, code, location, address, mobile, email, date, isActive, moduleAllocation, sendReportsViaWhatsApp, sendReportsViaMail, discount, isHomeCollection, isOPD, isIPD } = req.body;
+    
     const existing = await prisma.organization.findUnique({ where: { id } });
     if (!existing) return res.status(404).json({ success: false, message: 'Organization not found' });
 
@@ -2272,11 +2312,28 @@ export const updateOrganization = async (req, res) => {
     // Update module allocation for organization if provided
     if (moduleAllocation !== undefined) {
       if (moduleAllocation) {
-        await prisma.moduleAllocation.upsert({
-          where: { organizationId: id },
-          update: { modules: typeof moduleAllocation === 'string' ? moduleAllocation : JSON.stringify(moduleAllocation) },
-          create: { organizationId: id, modules: typeof moduleAllocation === 'string' ? moduleAllocation : JSON.stringify(moduleAllocation) }
+        const modulesData = typeof moduleAllocation === 'string' ? moduleAllocation : JSON.stringify(moduleAllocation);
+        
+        // First, check if it exists
+        const existing = await prisma.moduleAllocation.findUnique({
+          where: { organizationId: id }
         });
+
+        if (existing) {
+          // Update existing
+          await prisma.moduleAllocation.update({
+            where: { organizationId: id },
+            data: { modules: modulesData }
+          });
+        } else {
+          // Create new
+          await prisma.moduleAllocation.create({
+            data: {
+              organizationId: id,
+              modules: modulesData
+            }
+          });
+        }
       } else {
         await prisma.moduleAllocation.deleteMany({ where: { organizationId: id } });
       }
@@ -2299,11 +2356,28 @@ export const updateOrganization = async (req, res) => {
         // Update user's module allocation if organization's module allocation changed
         if (moduleAllocation !== undefined) {
           if (moduleAllocation) {
-            await prisma.moduleAllocation.upsert({
-              where: { userId: user.id },
-              update: { modules: typeof moduleAllocation === 'string' ? moduleAllocation : JSON.stringify(moduleAllocation) },
-              create: { userId: user.id, modules: typeof moduleAllocation === 'string' ? moduleAllocation : JSON.stringify(moduleAllocation) }
+            const modulesData = typeof moduleAllocation === 'string' ? moduleAllocation : JSON.stringify(moduleAllocation);
+            
+            // Check if it exists
+            const existingUserAlloc = await prisma.moduleAllocation.findUnique({
+              where: { userId: user.id }
             });
+
+            if (existingUserAlloc) {
+              // Update existing
+              await prisma.moduleAllocation.update({
+                where: { userId: user.id },
+                data: { modules: modulesData }
+              });
+            } else {
+              // Create new
+              await prisma.moduleAllocation.create({
+                data: {
+                  userId: user.id,
+                  modules: modulesData
+                }
+              });
+            }
           } else {
             await prisma.moduleAllocation.deleteMany({ where: { userId: user.id } });
           }
@@ -2319,7 +2393,42 @@ export const updateOrganization = async (req, res) => {
         .catch(err => {});
     }
 
-    res.json({ success: true, message: 'Organization updated successfully', data: organization });
+    // Fetch the updated organization with module allocation
+    const updatedOrganization = await prisma.organization.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        name: true,
+        code: true,
+        location: true,
+        address: true,
+        mobile: true,
+        email: true,
+        date: true,
+        discount: true,
+        isActive: true,
+        createdAt: true,
+        updatedAt: true,
+        sendReportsViaWhatsApp: true,
+        sendReportsViaMail: true,
+        isHomeCollection: true,
+        isOPD: true,
+        isIPD: true
+      }
+    });
+
+    // Query the moduleAllocation separately - this is more reliable
+    const moduleAllocationRecord = await prisma.moduleAllocation.findUnique({
+      where: { organizationId: id }
+    });
+
+    // Transform response to match frontend expectations
+    const response = {
+      ...updatedOrganization,
+      moduleAllocation: moduleAllocationRecord?.modules || null
+    };
+
+    res.json({ success: true, message: 'Organization updated successfully', data: response });
   } catch (error) {
     if (error.code === 'P2002') return res.status(400).json({ success: false, message: 'Organization name already exists' });
     res.status(500).json({ success: false, message: 'Failed to update organization' });

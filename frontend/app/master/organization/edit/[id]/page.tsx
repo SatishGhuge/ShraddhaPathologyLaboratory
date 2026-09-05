@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import Header from "@/src/components/Header";
 import { updateOrganization, getOrganizationById, createOrganizationWithCredentials } from "@/src/api/master";
+import { defaultModuleAllocation } from "@/utils/modulePermissions";
 
 // Module Accordion Component with Select All and Auto-close functionality
 const ModuleAccordion = ({ title, icon: Icon, items, moduleAllocation, toggleModule, onToggleAll, activeModule, onModuleChange }: any) => {
@@ -159,54 +160,7 @@ const SingleToggle = ({ title, icon: Icon, moduleKey, moduleAllocation, toggleMo
   );
 };
 
-const defaultModuleAllocation = {
-  patient: {
-    registration: false,
-    tests: false,
-  },
-  masters: {
-    testlist: false,
-    testTemplates: false,
-    departmentlist: false,
-    packagelist: false,
-    charges: false,
-    rolelist: false,
-    userlist: false,
-    referralDoctorList: false,
-    organization: false,
-    specimenType: false,
-    units: false,
-    outsourcing: false,
-  },
-  reports: {
-    dashboard: false,
-    collectionReport: false,
-    organizationSettlement: false,
-    referralDoctorSettlement: false,
-    patientList: false,
-    referralDoctorRevenue: false,
-    testReport: false,
-    turnAroundTime: false,
-  },
-  configuration: {
-    signature: false,
-    machines: false,
-    reportSettings: false,
-  },
-  help: {
-    userManual: false,
-    ultraviewer: false,
-    anydesk: false,
-  },
-  inventory: {
-    stockTransactions: false,
-    item: false,
-    supplier: false,
-    stockEntry: false,
-    orgTransfer: false,
-  },
-  result: false,
-};
+
 
 const Toast = ({ type, message, credentials, onClose }: { type: string; message: string; credentials?: any; onClose: () => void }) => (
   <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
@@ -267,22 +221,9 @@ const EditOrganization = () => {
 
   useEffect(() => {
     if (id && (isViewMode || isEditMode)) {
-      console.log('🚀 Starting to fetch organization:', id);
       getOrganizationById((Array.isArray(id) ? id[0] : id) as string).then(organization => {
-        console.log('📥 COMPLETE organization object received:', JSON.stringify(organization, null, 2));
         
         if (organization) {
-          console.log('✅ Organization exists, checking for moduleAllocation...');
-          console.log('📋 Organization keys:', Object.keys(organization));
-          console.log('🔍 moduleAllocation field:', {
-            exists: 'moduleAllocation' in organization,
-            value: organization.moduleAllocation,
-            type: typeof organization.moduleAllocation,
-            isNull: organization.moduleAllocation === null,
-            isUndefined: organization.moduleAllocation === undefined,
-            length: organization.moduleAllocation?.length
-          });
-          
           setFormData({
             name: organization.name || "",
             organizationType: organization.organizationType || "",
@@ -302,26 +243,23 @@ const EditOrganization = () => {
             isIPD: organization.isIPD || false,
           });
           
+          // ✅ FIXED: Properly handle moduleAllocation parsing
           if (organization.moduleAllocation) {
             try {
-              console.log('🔄 Attempting to parse moduleAllocation...');
               const allocation = typeof organization.moduleAllocation === 'string' 
                 ? JSON.parse(organization.moduleAllocation) 
                 : organization.moduleAllocation;
-              console.log('✅ Successfully parsed moduleAllocation:', allocation);
               setModuleAllocation(allocation);
             } catch (e) {
-              console.error('❌ Error parsing moduleAllocation:', e);
-              console.error('   Raw value was:', organization.moduleAllocation);
               setModuleAllocation(defaultModuleAllocation);
             }
           } else {
-            console.warn('⚠️ NO moduleAllocation found - using default');
             setModuleAllocation(defaultModuleAllocation);
           }
         }
       }).catch(error => {
         console.error('❌ Error fetching organization:', error);
+        setModuleAllocation(defaultModuleAllocation);
       });
     }
   }, [id, isViewMode, isEditMode]);
@@ -417,7 +355,20 @@ const EditOrganization = () => {
       };
 
       if (isEditMode) {
-        await updateOrganization((Array.isArray(id) ? id[0] : id) as string, payload);
+        const response = await updateOrganization((Array.isArray(id) ? id[0] : id) as string, payload);
+        
+        // Update local state with returned moduleAllocation to confirm it saved
+        if (response.data?.moduleAllocation) {
+          try {
+            const savedAllocation = typeof response.data.moduleAllocation === 'string'
+              ? JSON.parse(response.data.moduleAllocation)
+              : response.data.moduleAllocation;
+            setModuleAllocation(savedAllocation);
+          } catch (e) {
+            // Silent fail - data still saved
+          }
+        }
+        
         setToast({ type: "success", message: "Organization updated successfully! Update notification sent to email." });
       } else {
         const res = await createOrganizationWithCredentials(payload);
