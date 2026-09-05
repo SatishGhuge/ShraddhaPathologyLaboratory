@@ -1,8 +1,10 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import Header from "@/src/components/Header";
-import { Search, Plus, Edit, Trash2, RotateCcw, FileSignature, X } from 'lucide-react';
+import PaginationControls from "@/app/components/PaginationControls";
+import { Search, Plus, Edit, Trash2, RotateCcw, FileSignature, X, ArrowLeft } from 'lucide-react';
 
 const API = process.env.NEXT_PUBLIC_API_URL || '/api';
 
@@ -12,6 +14,7 @@ const empty = {
 };
 
 const SignatureList = () => {
+  const router = useRouter();
   const [searchTerm, setSearchTerm] = useState('');
   const [showModal, setShowModal] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
@@ -19,6 +22,9 @@ const SignatureList = () => {
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [formData, setFormData] = useState(empty);
   const [signatures, setSignatures] = useState<any[]>([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(25);
+  const [pagination, setPagination] = useState<any>(null);
 
   useEffect(() => { fetchSignatures(); }, []);
 
@@ -26,9 +32,37 @@ const SignatureList = () => {
     try {
       const res = await fetch(`${API}/signatures`);
       const data = await res.json();
-      if (data.success) setSignatures(data.data);
+      if (data.success) {
+        setSignatures(data.data);
+        
+        // Set pagination metadata
+        const total = data.data.length;
+        const totalPages = Math.ceil(total / itemsPerPage);
+        setPagination({
+          page: 1,
+          limit: itemsPerPage,
+          total: total,
+          totalPages: totalPages,
+          hasMore: totalPages > 1
+        });
+        setCurrentPage(1);
+      }
     } catch (e) { console.error(e); }
   };
+
+  // Update pagination when itemsPerPage changes
+  useEffect(() => {
+    if (pagination && signatures.length > 0) {
+      const newTotalPages = Math.ceil(signatures.length / itemsPerPage);
+      setPagination({
+        ...pagination,
+        limit: itemsPerPage,
+        totalPages: newTotalPages,
+        page: 1
+      });
+      setCurrentPage(1);
+    }
+  }, [itemsPerPage]);
 
   const handleEdit = (sig: any) => {
     setFormData({
@@ -114,6 +148,9 @@ const SignatureList = () => {
     s.doctorName?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  // Pagination helpers
+  const paginatedData = filtered.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+
   return (
     <>
       <Header />
@@ -135,7 +172,7 @@ const SignatureList = () => {
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full min-w-max text-sm">
-              <thead className="bg-gradient-to-r from-slate-800 via-primary-700 to-primary-600 text-white">
+              <thead className="bg-slate-900 text-white">
                 <tr>
                   {['Doctor','Signature Text','W','H','Status','Action'].map(h => (
                     <th key={h} className="px-3 py-2 text-left text-xs font-semibold whitespace-nowrap">{h}</th>
@@ -143,7 +180,7 @@ const SignatureList = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
-                {filtered.map((sig, i) => (
+                {paginatedData.map((sig, i) => (
                   <tr key={sig.id} className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
                     <td className="px-3 py-2 text-xs">{sig.doctorName}</td>
                     <td className="px-3 py-2 text-xs max-w-[180px]">
@@ -170,15 +207,32 @@ const SignatureList = () => {
           </div>
           {filtered.length === 0 && <div className="text-center py-10 text-gray-400 text-sm">No signatures found</div>}
         </div>
+
+        {/* PAGINATION CONTROLS */}
+        {filtered.length > 0 && pagination && (
+          <PaginationControls
+            pagination={pagination}
+            currentPage={currentPage}
+            itemsPerPage={itemsPerPage}
+            onPageChange={setCurrentPage}
+            onItemsPerPageChange={(newItemsPerPage) => {
+              setItemsPerPage(newItemsPerPage);
+              setCurrentPage(1);
+            }}
+            isLoading={false}
+          />
+        )}
       </div>
 
       {/* Modal */}
       {showModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
-            <div className="sticky top-0 bg-white border-b px-5 py-3 flex justify-between items-center">
-              <h2 className="text-base font-bold text-gray-800">{isEditMode ? 'Edit' : 'Add'} Signature</h2>
-              <button onClick={() => setShowModal(false)}><X size={18} /></button>
+            <div className="sticky top-0 bg-slate-900 text-white px-5 py-3 flex justify-between items-center">
+              <h2 className="text-base font-bold">{isEditMode ? 'Edit' : 'Add'} Signature</h2>
+              <button onClick={() => setShowModal(false)} className="flex items-center gap-1 text-blue-200 hover:text-white">
+                <ArrowLeft size={16} /> Back
+              </button>
             </div>
             <div className="px-5 py-4 space-y-3 text-sm">
               {[
@@ -243,8 +297,8 @@ const SignatureList = () => {
               </div>
             </div>
             <div className="sticky bottom-0 bg-white border-t px-5 py-3 flex justify-end gap-2">
-              <button onClick={() => setShowModal(false)} className="bg-gray-500 text-white px-4 py-1.5 rounded text-sm">Cancel</button>
-              <button onClick={handleSave} className="bg-primary-600 text-white px-4 py-1.5 rounded text-sm">Save</button>
+              <button onClick={() => setShowModal(false)} className="bg-gray-500 text-white px-4 py-1.5 rounded text-sm hover:bg-gray-600">Cancel</button>
+              <button onClick={handleSave} className="bg-orange-500 text-white px-4 py-1.5 rounded text-sm hover:bg-orange-600">Save</button>
             </div>
           </div>
         </div>

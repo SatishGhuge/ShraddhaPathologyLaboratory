@@ -1,8 +1,9 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { Plus, Edit2, Info, Search, RefreshCw, Trash2 } from "lucide-react";
+import { Plus, Edit2, Info, Search, RefreshCw, Trash2, ArrowLeft } from "lucide-react";
 import { getMachines, toggleMachine, Machine, MachineUsage, getMachineUsage } from "../../../api/machines";
+import PaginationControls from "@/app/components/PaginationControls";
 import MachineForm from "./MachineForm";
 import MachineUsageDialog from "./MachineUsageDialog";
 
@@ -17,10 +18,27 @@ const MachineList: React.FC = () => {
   const [selectedMachineUsage, setSelectedMachineUsage] = useState<MachineUsage | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(25);
+  const [pagination, setPagination] = useState<any>(null);
 
   useEffect(() => {
     loadMachines();
   }, []);
+
+  useEffect(() => {
+    // Update pagination when itemsPerPage changes
+    if (pagination && filteredMachines.length > 0) {
+      const newTotalPages = Math.ceil(filteredMachines.length / itemsPerPage);
+      setPagination({
+        ...pagination,
+        limit: itemsPerPage,
+        totalPages: newTotalPages,
+        page: 1
+      });
+      setCurrentPage(1);
+    }
+  }, [itemsPerPage]);
 
   useEffect(() => {
     // Filter machines based on search term
@@ -33,6 +51,18 @@ const MachineList: React.FC = () => {
     }
 
     setFilteredMachines(filtered);
+    setCurrentPage(1);
+    
+    // Update pagination when filtered results change
+    const total = filtered.length;
+    const totalPages = Math.ceil(total / itemsPerPage);
+    setPagination({
+      page: 1,
+      limit: itemsPerPage,
+      total: total,
+      totalPages: totalPages,
+      hasMore: totalPages > 1
+    });
   }, [machines, searchTerm]);
 
   const loadMachines = async () => {
@@ -105,6 +135,9 @@ const MachineList: React.FC = () => {
     setSelectedMachineUsage(null);
   };
 
+  // Pagination helpers
+  const paginatedMachines = filteredMachines.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+
   return (
     <div className="w-full px-3 sm:px-6 pt-4">
       {/* Search and Action Bar */}
@@ -153,7 +186,7 @@ const MachineList: React.FC = () => {
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full min-w-max text-sm">
-            <thead className="bg-gradient-to-r from-slate-800 via-orange-700 to-orange-600 text-white">
+            <thead className="bg-slate-900 text-white">
               <tr>
                 {["Name", "Status", "Tests", "Action"].map((h) => (
                   <th key={h} className="px-3 py-2 text-left text-xs font-semibold whitespace-nowrap">
@@ -178,7 +211,7 @@ const MachineList: React.FC = () => {
                   </td>
                 </tr>
               ) : (
-                filteredMachines.map((machine, i) => (
+                paginatedMachines.map((machine, i) => (
                   <tr key={machine.id} className={i % 2 === 0 ? "bg-white" : "bg-gray-50"}>
                     <td className="px-3 py-2 text-xs font-medium">{machine.name}</td>
                     <td className="px-3 py-2 text-xs">
@@ -229,6 +262,21 @@ const MachineList: React.FC = () => {
           </table>
         </div>
       </div>
+
+      {/* PAGINATION CONTROLS */}
+      {filteredMachines.length > 0 && pagination && (
+        <PaginationControls
+          pagination={pagination}
+          currentPage={currentPage}
+          itemsPerPage={itemsPerPage}
+          onPageChange={setCurrentPage}
+          onItemsPerPageChange={(newItemsPerPage) => {
+            setItemsPerPage(newItemsPerPage);
+            setCurrentPage(1);
+          }}
+          isLoading={loading}
+        />
+      )}
 
       {/* Machine Form Dialog */}
       <MachineForm

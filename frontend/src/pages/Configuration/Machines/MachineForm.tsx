@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { X } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { createMachine, updateMachine, Machine } from "../../../api/machines";
 
 interface MachineFormProps {
@@ -73,17 +73,18 @@ const MachineForm: React.FC<MachineFormProps> = ({ isOpen, onClose, machine, onS
   return (
     <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex justify-center items-center z-50">
       <div className="bg-white w-full max-w-md p-6 rounded-lg shadow-lg relative">
-        <button
-          onClick={handleClose}
-          disabled={loading}
-          className="absolute top-4 right-4 p-1 hover:bg-slate-100 rounded transition-colors disabled:opacity-50"
-        >
-          <X size={20} className="text-slate-600" />
-        </button>
-
-        <h2 className="text-xl font-semibold text-slate-900 mb-4">
-          {isEdit ? "Edit Machine" : "Add New Machine"}
-        </h2>
+        <div className="flex justify-between items-center mb-4 pb-4 border-b">
+          <h2 className="text-lg font-semibold text-slate-900">
+            {isEdit ? "Edit Machine" : "Add New Machine"}
+          </h2>
+          <button
+            onClick={handleClose}
+            disabled={loading}
+            className="flex items-center gap-1 text-blue-600 hover:text-blue-800 disabled:opacity-50"
+          >
+            <ArrowLeft size={18} /> Back
+          </button>
+        </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           {error && (
@@ -132,7 +133,7 @@ const MachineForm: React.FC<MachineFormProps> = ({ isOpen, onClose, machine, onS
               type="button"
               onClick={handleClose}
               disabled={loading}
-              className="px-4 py-2 border border-slate-300 rounded-lg text-slate-900 hover:bg-slate-50 transition-colors disabled:opacity-50"
+              className="px-4 py-2 border border-gray-300 rounded-lg text-slate-900 hover:bg-gray-50 transition-colors disabled:opacity-50"
             >
               Cancel
             </button>
