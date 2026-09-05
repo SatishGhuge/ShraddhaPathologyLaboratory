@@ -1649,23 +1649,29 @@ const PatientResult = () => {
   const handleSave = async () => {
     try {
       setSaving(true);
-      const resultsData = parameters.map(param => ({
-        testParameterId: param.id,
-        testCategoryId: param.categoryId,
-        numericValue: results[param.id]?.numericValue || null,
-        // ✅ Strip leading "- " from text values before saving
-        textValue: results[param.id]?.textValue 
-          ? results[param.id].textValue.replace(/^-\s*/, '').trim() || null
-          : null,
-        selectedOption: results[param.id]?.selectedOption || null,
-        isAbnormal: results[param.id]?.isAbnormal || false,
-        isHighlighted: results[param.id]?.isHighlighted || false,
-        referenceRange: results[param.id]?.referenceRange || param.normalRange
-      })).filter(r => {
+      const resultsData = parameters.map(param => {
+        const resultKey = param.id; // Use composite key for state lookup
+        return {
+          testParameterId: param.parameterId || param.id,
+          testCategoryId: param.categoryId,
+          numericValue: results[resultKey]?.numericValue || null,
+          // ✅ Strip leading "- " from text values before saving
+          textValue: results[resultKey]?.textValue 
+            ? results[resultKey].textValue.replace(/^-\s*/, '').trim() || null
+            : null,
+          selectedOption: results[resultKey]?.selectedOption || null,
+          isAbnormal: results[resultKey]?.isAbnormal || false,
+          isHighlighted: results[resultKey]?.isHighlighted || false,
+          referenceRange: results[resultKey]?.referenceRange || param.normalRange
+        };
+      }).filter(r => {
         const hasNumeric = r.numericValue !== null && r.numericValue !== undefined && r.numericValue !== '';
+        // ✅ Find the original param to get the correct result key
+        const originalParam = parameters.find(p => (p.parameterId || p.id) === (typeof r.testParameterId === 'string' ? parseInt(r.testParameterId.split('_')[0]) : r.testParameterId));
+        const resultKey = originalParam?.id;
         // ✅ Save text if: (1) not empty after stripping, OR (2) manually cleared (wasManuallyCleared flag)
         const hasText = r.textValue !== null && r.textValue !== undefined && 
-                       (r.textValue !== '' || results[r.testParameterId]?.wasManuallyCleared);
+                       (r.textValue !== '' || results[resultKey]?.wasManuallyCleared);
         const hasOption = r.selectedOption && typeof r.selectedOption === 'string' && r.selectedOption.trim() !== '';
         return hasNumeric || hasText || hasOption;
       });
@@ -1730,23 +1736,29 @@ const PatientResult = () => {
   const handleSaveAndPrint = async (withHeader) => {
     try {
       setSaving(true);
-      const resultsData = parameters.map(param => ({
-        testParameterId: param.id,
-        testCategoryId: param.categoryId,
-        numericValue: results[param.id]?.numericValue || null,
-        // ✅ Strip leading "- " from text values before saving
-        textValue: results[param.id]?.textValue 
-          ? results[param.id].textValue.replace(/^-\s*/, '').trim() || null
-          : null,
-        selectedOption: results[param.id]?.selectedOption || null,
-        isAbnormal: results[param.id]?.isAbnormal || false,
-        isHighlighted: results[param.id]?.isHighlighted || false,
-        referenceRange: results[param.id]?.referenceRange || param.normalRange
-      })).filter(r => {
+      const resultsData = parameters.map(param => {
+        const resultKey = param.id; // Use composite key for state lookup
+        return {
+          testParameterId: param.parameterId || param.id,
+          testCategoryId: param.categoryId,
+          numericValue: results[resultKey]?.numericValue || null,
+          // ✅ Strip leading "- " from text values before saving
+          textValue: results[resultKey]?.textValue 
+            ? results[resultKey].textValue.replace(/^-\s*/, '').trim() || null
+            : null,
+          selectedOption: results[resultKey]?.selectedOption || null,
+          isAbnormal: results[resultKey]?.isAbnormal || false,
+          isHighlighted: results[resultKey]?.isHighlighted || false,
+          referenceRange: results[resultKey]?.referenceRange || param.normalRange
+        };
+      }).filter(r => {
         const hasNumeric = r.numericValue !== null && r.numericValue !== undefined && r.numericValue !== '';
+        // ✅ Find the original param to get the correct result key
+        const originalParam = parameters.find(p => (p.parameterId || p.id) === (typeof r.testParameterId === 'string' ? parseInt(r.testParameterId.split('_')[0]) : r.testParameterId));
+        const resultKey = originalParam?.id;
         // ✅ Save text if: (1) not empty after stripping, OR (2) manually cleared (wasManuallyCleared flag)
         const hasText = r.textValue !== null && r.textValue !== undefined && 
-                       (r.textValue !== '' || results[r.testParameterId]?.wasManuallyCleared);
+                       (r.textValue !== '' || results[resultKey]?.wasManuallyCleared);
         const hasOption = r.selectedOption && typeof r.selectedOption === 'string' && r.selectedOption.trim() !== '';
         return hasNumeric || hasText || hasOption;
       });
@@ -1841,7 +1853,7 @@ const PatientResult = () => {
   return (
     <>
       <Header />
-      <div className="p-4 bg-gray-100 min-h-screen mt-2">
+      <div className="p-4 bg-gray-100 min-h-screen mt-2 w-full">
 
         {/* Patient Header */}
         <div className="bg-yellow-100 border p-2 text-sm flex justify-between flex-wrap">
@@ -1932,7 +1944,7 @@ const PatientResult = () => {
                 </div>
 
                 {/* Results Table */}
-                <div className="mt-3 bg-white border">
+                <div className="mt-3 bg-white border overflow-x-auto">
                   <table className="w-full text-sm border-collapse">
                     <thead className="bg-secondary-700 text-white">
                       <tr>
@@ -1940,7 +1952,7 @@ const PatientResult = () => {
                         <th className="border p-2 text-left">OBSERVED VALUE</th>
                         <th className="border p-2 text-left">UNITS</th>
                         <th className="border p-2 text-left">NORMAL RANGE</th>
-                        <th className="border p-2 text-center" style={{width: '40px'}}>HIGHLIGHT</th>
+                        <th className="border p-2 text-center">HIGHLIGHT</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -2009,7 +2021,7 @@ const PatientResult = () => {
                             return (
                               <tr key={param.id} className="bg-purple-100">
                                 <td className="border p-2">{(param.parameterName || '').toUpperCase()}</td>
-                                <td className="border p-2" colSpan={isTextDropdown ? 3 : undefined}>
+                                <td className="border p-2" colSpan={isTextDropdown && param.rangeText?.trim() ? 3 : 1}>
                                   <div className="flex items-center gap-2">
                                     {param.type === 'Numeric' ? (
                                       <input
@@ -2122,25 +2134,28 @@ const PatientResult = () => {
                                     })()}
                                   </div>
                                 </td>
-                                {/* UNITS cell - only show for non-text parameters */}
-                                {!isTextDropdown && (
+                                {/* UNITS cell - hide for text dropdowns with rangeText */}
+                                {!(isTextDropdown && param.rangeText?.trim()) && (
                                   <td className="border p-2 text-xs">
-                                    {param.units || '-'}
+                                    {isTextDropdown ? '-' : (param.units || '-')}
                                   </td>
                                 )}
 
-                                {/* NORMAL RANGE cell - always render, show content based on condition */}
-                                <td className="border p-2 text-xs whitespace-pre-wrap break-words">
-                                  {(() => {
-                                    const shouldShow = isTextDropdown ? true : !param.isDescriptive;
-                                    if (!shouldShow) return '-';
-                                    
-                                    return formatMultiLineText(
-                                      getAgeAppropriateRange(param, patientData?.patient?.ageYears, patientData?.patient?.ageMonths, patientData?.patient?.ageDays, patientData?.patient?.gender) || param.normalRange || param.displayRangeText || param.textContent || param.rangeText || '-'
-                                    );
-                                  })()}
-                                </td>
-                                <td className="border p-2 text-center" style={{width: '40px'}}>
+                                {/* NORMAL RANGE cell - hide for text dropdowns with rangeText */}
+                                {!(isTextDropdown && param.rangeText?.trim()) && (
+                                  <td className="border p-2 text-xs whitespace-pre-wrap break-words">
+                                    {(() => {
+                                      if (isTextDropdown && param.textContent?.trim()) {
+                                        return formatMultiLineText(param.textContent);
+                                      }
+                                      if (param.isDescriptive) return '-';
+                                      return formatMultiLineText(
+                                        getAgeAppropriateRange(param, patientData?.patient?.ageYears, patientData?.patient?.ageMonths, patientData?.patient?.ageDays, patientData?.patient?.gender) || param.normalRange || param.displayRangeText || param.textContent || param.rangeText || '-'
+                                      );
+                                    })()}
+                                  </td>
+                                )}
+                                <td className="border p-2 text-center">
                                   <input 
                                     type="checkbox" 
                                     checked={results[paramKey]?.isHighlighted || false}
@@ -2256,7 +2271,7 @@ const PatientResult = () => {
             </div>
 
             {/* Results Table - Single Test */}
-            <div className="mt-3 bg-white border">
+            <div className="mt-3 bg-white border overflow-x-auto">
               <table className="w-full text-sm border-collapse">
                 <thead className="bg-secondary-700 text-white">
                   <tr>
@@ -2264,7 +2279,7 @@ const PatientResult = () => {
                     <th className="border p-2 text-left">OBSERVED VALUE</th>
                     <th className="border p-2 text-left">UNITS</th>
                     <th className="border p-2 text-left">NORMAL RANGE</th>
-                    <th className="border p-2 text-center" style={{width: '40px'}}>HIGHLIGHT</th>
+                    <th className="border p-2 text-center">HIGHLIGHT</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -2294,7 +2309,7 @@ const PatientResult = () => {
                                 </div>
                               )}
                             </td>
-                            <td className={`border p-2 ${param.isDescriptive ? 'p-0 py-1' : ''}`} colSpan={param.type === 'Text' && !param.isDescriptive && param.rangeText?.trim() ? 3 : undefined}>
+                            <td className={`border p-2 ${param.isDescriptive ? 'p-0 py-1' : ''}`} colSpan={param.type === 'Text' && !param.isDescriptive && param.rangeText?.trim() ? 3 : 1}>
                               <div className={`${param.type === 'Text' && !param.isDescriptive && param.rangeText?.trim() ? 'w-full flex flex-col' : param.isDescriptive ? 'flex items-center gap-0' : 'flex items-center gap-2'}`} style={param.isDescriptive ? { margin: 0, padding: 0 } : {}}>
                                 {isFormula ? (
                                   <div className="flex items-center gap-1">
@@ -2427,71 +2442,36 @@ const PatientResult = () => {
                                 })()}
                               </div>
                             </td>
-                            {param.type !== 'Text' && !param.isDescriptive && (
-                              <>
-                                <td className="border p-2 text-xs">
-                                  {(() => {
-                                    const unitValue = stripHtmlTags(param.units || '') || '-';
-                                    console.log(`🔍 Rendering UNITS for ${param.parameterName}: "${unitValue}"`);
-                                    return unitValue;
-                                  })()}
-                                </td>
-                                <td className="border p-2 text-xs whitespace-pre-wrap break-words">
-                                  {/* ✅ Show textContent if available, otherwise show normal range */}
-                                  {(() => {
-                                    const hasTextContent = !!param.textContent && param.textContent.trim() !== '';
-                                    const rangeValue = getAgeAppropriateRange(param, patientData?.patient?.ageYears, patientData?.patient?.ageMonths, patientData?.patient?.ageDays, patientData?.patient?.gender) || '';
-                                    
-                                    console.log(`📋 Normal Range render for ${param.parameterName}:`, {
-                                      type: param.type,
-                                      hasTextContent,
-                                      textContent: param.textContent ? param.textContent.substring(0, 50) : 'N/A',
-                                      rangeValue: rangeValue.substring(0, 50),
-                                      willShowText: hasTextContent
-                                    });
-                                    
-                                    if (hasTextContent) {
-                                      return formatMultiLineText(param.textContent);
-                                    } else {
-                                      return formatMultiLineText(rangeValue);
-                                    }
-                                  })()}
-                                </td>
-                              </>
+                            {/* UNITS cell - hide for text with rangeText */}
+                            {!(param.type === 'Text' && !param.isDescriptive && param.rangeText?.trim()) && (
+                              <td className="border p-2 text-xs">
+                                {(() => {
+                                  if (param.type === 'Text') return '-';
+                                  const unitValue = stripHtmlTags(param.units || '') || '-';
+                                  return unitValue;
+                                })()}
+                              </td>
                             )}
-                            {(param.type === 'Text' || param.isDescriptive) && !param.isDescriptive && (
-                              <>
-                                <td className="border p-2 text-xs"></td>
-                                <td className="border p-2 text-xs whitespace-pre-wrap break-words">
-                                  {(() => {
-                                    const hasTextContent = !!param.textContent && param.textContent.trim() !== '';
-                                    
-                                    if (hasTextContent) {
-                                      return formatMultiLineText(param.textContent);
-                                    } else {
-                                      return '-';
-                                    }
-                                  })()}
-                                </td>
-                              </>
+
+                            {/* NORMAL RANGE cell - hide for text with rangeText */}
+                            {!(param.type === 'Text' && !param.isDescriptive && param.rangeText?.trim()) && (
+                              <td className="border p-2 text-xs whitespace-pre-wrap break-words">
+                                {(() => {
+                                  if (param.type === 'Text' && param.textContent?.trim()) {
+                                    return formatMultiLineText(param.textContent);
+                                  }
+                                  if (param.isDescriptive) return '-';
+                                  const hasTextContent = !!param.textContent && param.textContent.trim() !== '';
+                                  const rangeValue = getAgeAppropriateRange(param, patientData?.patient?.ageYears, patientData?.patient?.ageMonths, patientData?.patient?.ageDays, patientData?.patient?.gender) || '';
+                                  if (hasTextContent) {
+                                    return formatMultiLineText(param.textContent);
+                                  } else {
+                                    return formatMultiLineText(rangeValue || '-');
+                                  }
+                                })()}
+                              </td>
                             )}
-                            {param.isDescriptive && (
-                              <>
-                                <td className="border p-2 text-xs"></td>
-                                <td className="border p-2 text-xs whitespace-pre-wrap break-words">
-                                  {(() => {
-                                    const hasTextContent = !!param.textContent && param.textContent.trim() !== '';
-                                    
-                                    if (hasTextContent) {
-                                      return formatMultiLineText(param.textContent);
-                                    } else {
-                                      return '-';
-                                    }
-                                  })()}
-                                </td>
-                              </>
-                            )}
-                            <td className="border p-2 text-center" style={{width: '40px'}}>
+                            <td className="border p-2 text-center">
                               <input 
                                 type="checkbox" 
                                 checked={results[param.id]?.isHighlighted || false}

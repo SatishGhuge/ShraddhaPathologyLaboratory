@@ -593,12 +593,14 @@ export const getPatientTestById = async (req, res) => {
         }
         
         const foundResult = patientTest.testResults.find(r => 
-          // Match by category ID if available
-          r.testCategoryId === category.id || 
-          // Match by exact parameter ID
-          r.testParameterId === category.testParameter.id ||
-          // Fallback: match by parameter name (in case parameter was updated)
-          (r.testParameter && r.testParameter.parameterName === category.testParameter.parameterName)
+          // ✅ PRIORITY 1: Match by BOTH testCategoryId AND testParameterId (most specific)
+          (r.testCategoryId === category.id && r.testParameterId === category.testParameter.id) ||
+          // ✅ PRIORITY 2: Match by testCategoryId alone (if categoryId is set)
+          (r.testCategoryId === category.id) ||
+          // ✅ PRIORITY 3: Match by parameterId alone (fallback for old data without categoryId)
+          (r.testCategoryId === null && r.testParameterId === category.testParameter.id) ||
+          // ✅ PRIORITY 4: Fallback: match by parameter name (in case parameter was updated)
+          (r.testParameter && r.testParameter.parameterName === category.testParameter.parameterName && r.testCategoryId === null)
         );
         
         console.log(`  📌 Parameter: ${category.testParameter.parameterName} (ID: ${category.testParameter.id}, CategoryID: ${category.id})`);
@@ -622,7 +624,8 @@ export const getPatientTestById = async (req, res) => {
         }
 
         const parameter = {
-          id: category.testParameter.id,
+          id: `${category.testParameter.id}_${category.id}`, // ✅ UNIQUE ID combining parameter ID and category ID
+          parameterId: category.testParameter.id, // ✅ Keep original parameter ID for API calls
           parameterName: category.testParameter.parameterName,
           units: category.testParameter.unit?.symbol || '',
           type: category.testParameter.type,
@@ -1710,8 +1713,21 @@ export const saveTestResults = async (req, res) => {
         }
       }
 
-      // Upsert result
+      // Upsert result - but first handle duplicate testParameterIds with different categories
       try {
+        // If testCategoryId is provided, delete any OTHER results for this parameter from DIFFERENT categories
+        if (testCategoryId) {
+          await prisma.testResult.deleteMany({
+            where: {
+              patientTestId: parseInt(patientTestId),
+              testParameterId: parseInt(testParameterId),
+              testCategoryId: {
+                not: parseInt(testCategoryId)  // Delete from OTHER categories
+              }
+            }
+          });
+        }
+
         const savedResult = await prisma.testResult.upsert({
           where: {
             patientTestId_testParameterId: {

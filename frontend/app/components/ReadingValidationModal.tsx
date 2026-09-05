@@ -325,15 +325,8 @@ const ReadingValidationModal = ({
             isHighlighted: (initialResults[param.id] as any).isHighlighted
           });
         } else {
-          // ✅ NEW: For text fields with no saved value, show first available option as default
+          // ✅ NEW: For text fields with no saved value, show EMPTY textbox (no default value)
           let defaultTextValue = '';
-          if ((param.type === 'Text' || param.isMultipleOptions) && !param.isDescriptive) {
-            const availableOptions = getAllOptionsFromParameter(param);
-            if (availableOptions.length > 0) {
-              defaultTextValue = availableOptions[0]; // Show first option as default
-              console.log(`📌 DEFAULT: Param ${param.id} (${param.parameterName}) set to first option: "${defaultTextValue}"`);
-            }
-          }
           
           initialResults[param.id] = {
             numericValue: null,
@@ -847,7 +840,7 @@ const ReadingValidationModal = ({
                             </span>
                             {param.isMandatory && <span className="text-red-500 ml-1">*</span>}
                           </td>
-                          <td className="border p-1.5 text-center" colSpan={param.type === 'Text' || param.isMultipleOptions ? 3 : 1}>
+                          <td className="border p-1.5 text-center" colSpan={(param.type === 'Text' || param.isMultipleOptions) && param.rangeText?.trim() ? 3 : 1}>
                             {param.type === 'Numeric' ? (
                               <div className="relative">
                                 <input
@@ -867,47 +860,7 @@ const ReadingValidationModal = ({
                                 />
                               </div>
                             ) : param.isDescriptive ? (
-                              <div className="w-full space-y-1">
-                                {/* Saved readings/tags from database - editable */}
-                                <div className="flex flex-wrap gap-2">
-                                  {(results[param.id]?.textValue || '').split('|').map((tag: string, idx: number) => {
-                                    const trimmedTag = tag.trim();
-                                    return trimmedTag ? (
-                                      <div
-                                        key={idx}
-                                        className="inline-flex items-center gap-2 px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm font-medium border border-blue-300"
-                                      >
-                                        <span>{trimmedTag}</span>
-                                        <button
-                                          type="button"
-                                          onClick={() => {
-                                            const tags = (results[param.id]?.textValue || '').split(',').map((t: string) => t.trim()).filter(Boolean);
-                                            const newTags = tags.filter((_: string, i: number) => i !== idx);
-                                            handleResultChange(param.id, 'textValue', newTags.join(', '));
-                                          }}
-                                          className="hover:text-blue-900 font-bold cursor-pointer hover:bg-blue-200 rounded-full w-5 h-5 flex items-center justify-center"
-                                          title="Remove this reading"
-                                        >
-                                          ×
-                                        </button>
-                                      </div>
-                                    ) : null;
-                                  })}
-                                </div>
-
-                                {/* Input for adding new readings - only show if needed */}
-                                {results[param.id]?.textValue && results[param.id]?.textValue.trim() !== '' ? (
-                                  <div className="text-xs text-gray-500 mt-1">
-                                    {(results[param.id].textValue.split(',').filter((t: string) => t.trim())).length} reading(s) saved
-                                  </div>
-                                ) : (
-                                  <div className="text-xs text-red-500 mt-1">
-                                    ⚠ No readings saved yet
-                                  </div>
-                                )}
-                              </div>
-                            ) : param.type === 'Text' || param.isMultipleOptions ? (
-                              // TEXT/DROPDOWN with predefined options - FULL WIDTH DROPDOWN with dropdown list
+                              // DESCRIPTIVE/TEXT - Simple empty textarea
                               <div className="w-full relative">
                                 <textarea
                                   ref={(el) => { if (el) inputRefs.current[param.id] = el; }}
@@ -915,75 +868,24 @@ const ReadingValidationModal = ({
                                   onChange={(e) => {
                                     handleResultChange(param.id, 'textValue', e.target.value);
                                   }}
-                                  onFocus={() => {
-                                    setFocusedInputId(param.id);
-                                    setOpenDropdowns(prev => ({ ...prev, [param.id]: true }));
-                                  }}
-                                  onBlur={() => {
-                                    // Close dropdown after short delay to allow option clicks to register
-                                    if (dropdownTimeoutRef.current[param.id]) {
-                                      clearTimeout(dropdownTimeoutRef.current[param.id]);
-                                    }
-                                    dropdownTimeoutRef.current[param.id] = setTimeout(() => {
-                                      setOpenDropdowns(prev => ({ ...prev, [param.id]: false }));
-                                    }, 150);
-                                  }}
-                                  placeholder="-- Select or enter option --"
+                                  placeholder=""
                                   className="w-full border border-gray-300 px-2 py-1 rounded text-xs focus:outline-none focus:ring-2 focus:ring-cyan-500 bg-white text-gray-700"
                                   style={{ minHeight: '2.5rem', resize: 'both', overflow: 'auto' }}
                                 />
-                                {/* Options Dropdown List - stays open until explicitly closed */}
-                                {openDropdowns[param.id] && (
-                                  <div 
-                                    ref={(el) => {
-                                      if (el) dropdownRefs.current[param.id] = el;
-                                    }}
-                                    className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-300 rounded shadow-lg z-50" 
-                                    style={{ maxHeight: '200px', overflowY: 'auto' }}
-                                  >
-                                    {getAllOptionsFromParameter(param).length > 0 ? (
-                                      getAllOptionsFromParameter(param).map((option, idx) => (
-                                        <div
-                                          key={idx}
-                                          onMouseDown={(e) => {
-                                            // Prevent default to keep focus on textarea
-                                            e.preventDefault();
-                                            
-                                            // ✅ APPEND option to textarea (support multiple selections)
-                                            const currentValue = results[param.id]?.textValue || '';
-                                            let newValue = '';
-                                            
-                                            if (currentValue.trim() === '') {
-                                              // If empty, just set the option
-                                              newValue = option;
-                                            } else {
-                                              // If has content, append on new line
-                                              newValue = currentValue + '\n' + option;
-                                            }
-                                            
-                                            handleResultChange(param.id, 'textValue', newValue);
-                                            
-                                            // Keep dropdown open and refocus textarea
-                                            setTimeout(() => {
-                                              inputRefs.current[param.id]?.focus();
-                                            }, 0);
-                                          }}
-                                          className="px-3 py-2 text-xs text-gray-700 hover:bg-blue-100 cursor-pointer border-b border-gray-200 last:border-b-0"
-                                        >
-                                          {option}
-                                        </div>
-                                      ))
-                                    ) : (
-                                      <div className="px-3 py-2 text-xs text-gray-600 bg-yellow-50">
-                                        <div className="font-semibold text-yellow-800 mb-1">⚠️ No predefined options</div>
-                                        <div className="text-yellow-700">Type to enter custom value</div>
-                                        <div className="text-gray-500 mt-2 text-xs italic">
-                                          💡 Tip: Check browser console (F12) for parameter data details
-                                        </div>
-                                      </div>
-                                    )}
-                                  </div>
-                                )}
+                              </div>
+                            ) : param.type === 'Text' || param.isMultipleOptions ? (
+                              // TEXT/DROPDOWN - Simple empty textarea (no dropdown suggestions)
+                              <div className="w-full relative">
+                                <textarea
+                                  ref={(el) => { if (el) inputRefs.current[param.id] = el; }}
+                                  value={results[param.id]?.textValue || ''}
+                                  onChange={(e) => {
+                                    handleResultChange(param.id, 'textValue', e.target.value);
+                                  }}
+                                  placeholder=""
+                                  className="w-full border border-gray-300 px-2 py-1 rounded text-xs focus:outline-none focus:ring-2 focus:ring-cyan-500 bg-white text-gray-700"
+                                  style={{ minHeight: '2.5rem', resize: 'both', overflow: 'auto' }}
+                                />
                               </div>
                             ) : (
                               <div className="relative">
@@ -1001,14 +903,14 @@ const ReadingValidationModal = ({
                               </div>
                             )}
                           </td>
-                          {/* Only show Units and Biological Range columns for Numeric types */}
-                          {param.type === 'Numeric' && (
+                          {/* Show Units and Biological Range for Numeric OR Text without rangeText */}
+                          {(param.type === 'Numeric' || ((param.type === 'Text' || param.isMultipleOptions) && !param.rangeText?.trim())) && (
                             <>
                               <td className="border p-1.5 text-center text-gray-600 text-xs">
                                 {param.units || '-'}
                               </td>
-                              <td className="border p-1.5 text-center text-gray-600 text-xs max-w-xs truncate" title={rangeStr}>
-                                {truncatedRange}
+                              <td className="border p-1.5 text-left text-gray-600 text-xs whitespace-pre-wrap break-words" title={param.type === 'Text' || param.isMultipleOptions ? param.textContent : rangeStr}>
+                                {param.type === 'Text' || param.isMultipleOptions ? (param.textContent || '-') : truncatedRange}
                               </td>
                             </>
                           )}
