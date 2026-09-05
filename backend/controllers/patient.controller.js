@@ -25,9 +25,9 @@ async function calculateAndSaveAgeFields(patientId, dob) {
       }
     });
     
-    console.log(`✅ Updated age fields for ${patientId}: ${ageData.years}Y ${ageData.months}M ${ageData.days}D`);
+
   } catch (error) {
-    console.error(`Error calculating age fields for ${patientId}:`, error);
+
   }
 }
 
@@ -47,10 +47,10 @@ async function createVisitBill(visitId, patientId, grossAmount, totalDiscount, t
       }
     });
     
-    console.log(`✅ VisitBill created: visitId=${visitId}, grossAmount=${grossAmount}, balance=${balanceAmount}`);
+
     return visitBill;
   } catch (error) {
-    console.error('Error creating VisitBill:', error);
+
     throw error;
   }
 }
@@ -68,10 +68,10 @@ async function createBillingSession(visitId, sessionType, sequence, remarks = nu
       }
     });
     
-    console.log(`✅ BillingSession created: sessionType=${sessionType}, sequence=${sequence}`);
+
     return billingSession;
   } catch (error) {
-    console.error('Error creating BillingSession:', error);
+
     throw error;
   }
 }
@@ -92,10 +92,10 @@ async function createBillDiscount(visitId, billingSessionId, discountType, disco
       }
     });
     
-    console.log(`✅ BillDiscount created: type=${discountType}, amount=${discountAmount}`);
+
     return billDiscount;
   } catch (error) {
-    console.error('Error creating BillDiscount:', error);
+
     throw error;
   }
 }
@@ -114,10 +114,10 @@ async function createPaymentRecord(visitId, billingSessionId, amount, paymentMod
       }
     });
     
-    console.log(`✅ Payment created: amount=${amount}, mode=${paymentMode}`);
+
     return payment;
   } catch (error) {
-    console.error('Error creating Payment:', error);
+
     throw error;
   }
 }
@@ -137,10 +137,10 @@ async function createBillTransaction(visitId, billingSessionId, transactionType,
       }
     });
     
-    console.log(`✅ BillTransaction created: type=${transactionType}, amount=${amount}`);
+
     return transaction;
   } catch (error) {
-    console.error('Error creating BillTransaction:', error);
+
     throw error;
   }
 }
@@ -155,7 +155,7 @@ async function getNextSequence(visitId) {
     
     return (lastSession?.sequence || 0) + 1;
   } catch (error) {
-    console.error('Error getting next sequence:', error);
+
     return 1;
   }
 }
@@ -172,13 +172,6 @@ export const createPatient = async (req, res) => {
         errors: errors.array()
       });
     }
-
-    console.log('📝 Creating patient with data:', {
-      firstName: req.body.firstName,
-      mobile: req.body.mobile,
-      testsCount: req.body.tests?.length || 0,
-      businessType: req.body.businessType
-    });
 
     let { 
       // Existing patient ID (if this is an existing patient)
@@ -204,20 +197,8 @@ export const createPatient = async (req, res) => {
     let discountAmount = billing.discountAmount || 0;
     let advanceAmount = billing.paidAmount || 0; // Frontend sends paidAmount, not advanceAmount
     let discountRemark = billing.discountRemark || null;
-
     // 🔧 FIX: Declare visitId at top level so it's accessible in response
     let visitId = null;
-
-    console.log('💳 BILLING FIELDS RECEIVED:', {
-      'billing.discountPercent': billing.discountPercent,
-      'billing.discountAmount': billing.discountAmount,
-      'billing.paidAmount': billing.paidAmount,
-      'billing.discountRemark': billing.discountRemark,
-      'extracted discountPercent': discountPercent,
-      'extracted discountAmount': discountAmount,
-      'extracted advanceAmount': advanceAmount,
-      'extracted discountRemark': discountRemark
-    });
 
     // ✅ NEW BILLING VALIDATION
     if (!tests || tests.length === 0) {
@@ -281,8 +262,8 @@ export const createPatient = async (req, res) => {
         // Found existing patient with same name + mobile
         isExistingPatient = true;
         patient = matchingPatient;
-        console.log(`✅ Found EXISTING patient: ${patient.patientId} (${patient.firstName} ${patient.lastName})`);
-        console.log(`📋 Adding new visit to existing patient. New Visit ID will be generated.`);
+
+
       }
     }
 
@@ -335,13 +316,7 @@ export const createPatient = async (req, res) => {
       const finalAdvanceAmount = Math.min(parseFloat(advanceAmount) || 0, testAmount);
       const balanceAmount = Math.max(0, Math.round(testAmount - finalAdvanceAmount));
       
-      console.log('💰 Billing Calculation (Existing Patient):', {
-        totalTestCharges,
-        finalDiscountAmount,
-        testAmount,
-        advanceAmount: finalAdvanceAmount,
-        balanceAmount
-      });
+      // Billing calculation for existing patient
       
       // ✅ WRAP IN TRANSACTION - All or nothing
       // ⚠️ CRITICAL: Create VisitBill FIRST (foreign key constraint)
@@ -362,7 +337,7 @@ export const createPatient = async (req, res) => {
           }
         });
         
-        console.log(`✅ [TX] VisitBill created: ₹${totalTestCharges} (balance: ₹${balanceAmount})`);
+
         
         // Step 2: Create BillingSession (references VisitBill.visitId)
         const billingSession = await tx.billingSession.create({
@@ -374,7 +349,7 @@ export const createPatient = async (req, res) => {
           }
         });
         
-        console.log(`✅ [TX] BillingSession created: sessionType=REGISTRATION, sequence=1`);
+
         
         // Step 3: Create BillDiscount if discount > 0
         if (finalDiscountAmount > 0) {
@@ -389,7 +364,7 @@ export const createPatient = async (req, res) => {
               remarks: discountRemark || null
             }
           });
-          console.log(`✅ [TX] BillDiscount created: ₹${finalDiscountAmount}`);
+
         }
         
         // Step 4: Create Payment if advance > 0
@@ -414,7 +389,7 @@ export const createPatient = async (req, res) => {
               paymentDate: new Date()
             }
           });
-          console.log(`✅ [TX] Payment created: ₹${finalAdvanceAmount}`);
+
         }
         
         // Step 5: Create PatientTest records (source of truth for test data)
@@ -450,10 +425,10 @@ export const createPatient = async (req, res) => {
           data: patientTestsData
         });
         
-        console.log(`✅ [TX] PatientTest records created: ${tests.length} tests`);
+
       });
       
-      console.log(`✅ Transaction completed successfully for existing patient`);
+
 
       // Get updated patient with ONLY the tests from the current visit
       patient = await prisma.patient.findUnique({
@@ -470,7 +445,7 @@ export const createPatient = async (req, res) => {
         }
       });
       
-      console.log(`✅ Fetched patient with current visit tests: visitId=${visitId}, testsCount=${patient.tests.length}`);
+
 
     } else {
       // Create new patient with new ID format: S + YY + MM + 00001
@@ -504,13 +479,7 @@ export const createPatient = async (req, res) => {
       const finalAdvanceAmount = Math.min(parseFloat(advanceAmount) || 0, testAmount);
       const balanceAmount = Math.max(0, Math.round(testAmount - finalAdvanceAmount));
       
-      console.log('💰 Billing Calculation for NEW patient:', {
-        totalTestCharges,
-        finalDiscountAmount,
-        testAmount,
-        advanceAmount: finalAdvanceAmount,
-        balanceAmount
-      });
+      // Billing calculation for new patient
       
       // ✅ WRAP IN TRANSACTION - All or nothing
       // ⚠️ CRITICAL: Create VisitBill FIRST (foreign key constraint)
@@ -538,7 +507,7 @@ export const createPatient = async (req, res) => {
           }
         });
         
-        console.log(`✅ [TX] Patient created: ${patient.patientId}`);
+
         
         // Step 2: Create VisitBill SECOND (master record with FK reference for BillingSession)
         await tx.visitBill.create({
@@ -555,7 +524,7 @@ export const createPatient = async (req, res) => {
           }
         });
         
-        console.log(`✅ [TX] VisitBill created: ₹${totalTestCharges} (balance: ₹${balanceAmount})`);
+
         
         // Step 3: Create BillingSession (references VisitBill.visitId)
         const billingSession = await tx.billingSession.create({
@@ -567,7 +536,7 @@ export const createPatient = async (req, res) => {
           }
         });
         
-        console.log(`✅ [TX] BillingSession created: sessionType=REGISTRATION, sequence=1`);
+
         
         // Step 4: Create BillDiscount if discount > 0
         if (finalDiscountAmount > 0) {
@@ -582,7 +551,7 @@ export const createPatient = async (req, res) => {
               remarks: discountRemark || null
             }
           });
-          console.log(`✅ [TX] BillDiscount created: ₹${finalDiscountAmount}`);
+
         }
         
         // Step 5: Create Payment if advance > 0
@@ -607,7 +576,7 @@ export const createPatient = async (req, res) => {
               paymentDate: new Date()
             }
           });
-          console.log(`✅ [TX] Payment created: ₹${finalAdvanceAmount}`);
+
         }
         
         // Step 6: Create PatientTest records (source of truth)
@@ -643,10 +612,10 @@ export const createPatient = async (req, res) => {
           data: patientTestsData
         });
         
-        console.log(`✅ [TX] PatientTest records created: ${tests.length} tests`);
+
       });
       
-      console.log(`✅ Transaction completed successfully for new patient`);
+
 
       // Fetch patient with tests
       patient = await prisma.patient.findUnique({
@@ -662,13 +631,13 @@ export const createPatient = async (req, res) => {
         }
       });
 
-      console.log(`✅ Patient created and fetched: ${patient.patientId}`);
+
       
       // ✅ Calculate and save age fields from DOB (takes priority over manual age)
       if (dob) {
         await calculateAndSaveAgeFields(patient.patientId, dob);
       } else if (age) {
-        console.log(`✅ Manually entered age: ${age} years → ageYears=${age}, ageMonths=0, ageDays=0`);
+
       }
     }
 
@@ -693,29 +662,14 @@ export const createPatient = async (req, res) => {
           randomPassword,
           'direct'
         );
-        console.log(`✅ Credentials email sent to ${email} for patient ${patient.patientId} (emailWasManuallyFilled: ${emailWasManuallyFilled})`);
+
       } catch (emailError) {
-        console.warn('⚠️ Failed to send credentials email:', emailError.message);
+
         // Don't fail the registration if email fails
       }
     } else if (email && emailWasManuallyFilled === false) {
-      console.log(`⏭️ SKIPPED: Email credentials NOT sent (email was auto-filled from referral doctor). Email: ${email}, Patient: ${patient.patientId}`);
-    }
 
-    // 🔍 DEBUG: Log what we're returning to frontend
-    console.log('🔍 RESPONSE DEBUG - Returning patient to frontend:', {
-      patientId: patient?.patientId,
-      allTestsCount: patient?.tests?.length,
-      currentVisitId: isExistingPatient ? visitId : (patient?.tests?.[0]?.visitId || 'UNKNOWN'),
-      allTestVisitIds: patient?.tests?.map(t => t.visitId),
-      firstTestVisitId: patient?.tests?.[0]?.visitId,
-      firstTestData: {
-        id: patient?.tests?.[0]?.id,
-        visitId: patient?.tests?.[0]?.visitId,
-        testId: patient?.tests?.[0]?.testId,
-        charge: patient?.tests?.[0]?.charge
-      }
-    });
+    }
 
     res.status(201).json({
       success: true,
@@ -729,13 +683,6 @@ export const createPatient = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Create patient error:', error);
-    console.error('Error details:', {
-      message: error.message,
-      code: error.code,
-      meta: error.meta,
-      stack: error.stack
-    });
     res.status(500).json({
       success: false,
       message: 'Failed to register patient',
@@ -784,7 +731,7 @@ export const registerPatientWithEmail = async (req, res) => {
       organizationId = null
     } = req.body;
 
-    console.log('📝 Admin registering patient with email:', { firstName, email, mobile });
+
 
     // Validate email is provided (for patient, not referral doctor)
     if (!email || !email.trim()) {
@@ -887,7 +834,7 @@ export const registerPatientWithEmail = async (req, res) => {
       }
     }
 
-    console.log('✅ Patient created:', patientId);
+
 
     // Send email with credentials
     try {
@@ -898,9 +845,9 @@ export const registerPatientWithEmail = async (req, res) => {
         randomPassword,
         'direct'
       );
-      console.log(`✅ Credentials email sent to ${email}`);
+
     } catch (emailError) {
-      console.warn('⚠️ Failed to send email:', emailError.message);
+
       // Don't fail the registration if email fails
     }
 
@@ -916,7 +863,7 @@ export const registerPatientWithEmail = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('❌ Admin registration error:', error);
+
     res.status(500).json({
       success: false,
       message: 'Failed to register patient',
@@ -1011,13 +958,6 @@ export const getAllPatients = async (req, res) => {
         }
       });
 
-      console.log('💳 Raw Payment Records from DB:', payments.map(p => ({
-        visitId: p.visitId,
-        amount: p.amount,
-        paymentMode: p.paymentMode,
-        remarks: p.remarks
-      })));
-
       // Create a map of visitId -> payment breakdown by mode
       const paymentMap = {};
       payments.forEach(payment => {
@@ -1030,9 +970,7 @@ export const getAllPatients = async (req, res) => {
         const amount = payment.amount?.toNumber?.() || Number(payment.amount) || 0;
         const mode = (payment.paymentMode || "").toUpperCase();
         
-        console.log(`💳 Processing payment: amount=${amount}, rawMode="${payment.paymentMode}", processedMode="${mode}"`);
-        
-        // ✅ Track payment chronologically
+        // Track payment chronologically
         paymentMap[payment.visitId].paymentSequence.push({
           amount: amount,
           mode: mode,
@@ -1056,12 +994,12 @@ export const getAllPatients = async (req, res) => {
         else if (mode === "CHEQUE" || mode === "CHECK") paymentMap[payment.visitId].cheque += amount;
         else if (mode === "BANK_TRANSFER" || mode === "NET BANKING" || mode === "NEFT" || mode === "RTGS") paymentMap[payment.visitId].netBanking += amount;
         else {
-          console.warn(`⚠️ Unknown payment mode: "${mode}", defaulting to other`);
+
           paymentMap[payment.visitId].other += amount;
         }
       });
 
-      console.log('💰 Final Payment Map:', paymentMap);
+      // Payment map created
 
       // Create a map of visitId -> balance data
       const balanceMap = {};
@@ -1098,16 +1036,10 @@ export const getAllPatients = async (req, res) => {
       };
     }));
 
-    console.log('✅ getAllPatients - Sample patient with balance:', {
-      patientId: patientsWithBalance[0]?.patientId,
-      firstTestBalance: patientsWithBalance[0]?.tests[0]?.balanceAmount,
-      age: patientsWithBalance[0]?.age
-    });
-
     res.json(buildPaginatedResponse(patientsWithBalance, total, page, limit));
 
   } catch (error) {
-    console.error('Get patients error:', error);
+
     res.status(500).json({
       success: false,
       message: 'Failed to fetch patients'
@@ -1166,7 +1098,7 @@ export const getPatientById = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Get patient error:', error);
+
     res.status(500).json({
       success: false,
       message: 'Failed to fetch patient'
@@ -1179,7 +1111,7 @@ export const searchPatient = async (req, res) => {
   try {
     const { mobile, email } = req.query;
     
-    console.log('🔍 Search patient request:', { mobile, email });
+
 
     if (!mobile && !email) {
       return res.status(400).json({
@@ -1196,7 +1128,7 @@ export const searchPatient = async (req, res) => {
     if (mobile) where.mobile = { startsWith: mobile };
     if (email) where.email = email;
     
-    console.log('🔍 Search where condition:', where);
+
 
     // Get total count
     const total = await prisma.patient.count({ where });
@@ -1236,7 +1168,7 @@ export const searchPatient = async (req, res) => {
       take: limit
     });
     
-    console.log(`✅ Found ${total} patient(s), returning page ${page}`);
+
 
     if (!patients || patients.length === 0) {
       return res.json(buildPaginatedResponse([], total, page, limit));
@@ -1254,18 +1186,10 @@ export const searchPatient = async (req, res) => {
       tests: patient.tests.filter(test => test.status !== 'Cancelled' && test.status !== 'CANCELLED')
     }));
 
-    console.log('✅ searchPatient - Sample patient with formatted age:', {
-      patientId: patientsWithActiveTests[0]?.patientId,
-      ageYears: patientsWithActiveTests[0]?.ageYears,
-      ageMonths: patientsWithActiveTests[0]?.ageMonths,
-      ageDays: patientsWithActiveTests[0]?.ageDays,
-      age: patientsWithActiveTests[0]?.age
-    });
-
     res.json(buildPaginatedResponse(patientsWithActiveTests, total, page, limit));
 
   } catch (error) {
-    console.error('Search patient error:', error);
+
     res.status(500).json({
       success: false,
       message: 'Failed to search patient',
@@ -1301,7 +1225,7 @@ export const updatePatientTestDetails = async (req, res) => {
       updatedCount: updated.count
     });
   } catch (error) {
-    console.error('Update patient test details error:', error);
+
     res.status(500).json({ success: false, message: 'Failed to update patient test details' });
   }
 };
@@ -1334,7 +1258,7 @@ export const updatePatient = async (req, res) => {
         updateData.ageYears = ageNum;
         updateData.ageMonths = 0;
         updateData.ageDays = 0;
-        console.log(`✅ Manually entered age: ${ageNum} years → ageYears=${ageNum}, ageMonths=0, ageDays=0`);
+
       }
     }
 
@@ -1345,7 +1269,7 @@ export const updatePatient = async (req, res) => {
 
     // ✅ If emergency flag is being updated, update all tests for this visit
     if (isEmergency !== undefined && visitId) {
-      console.log(`🚨 Updating emergency status for visitId: ${visitId}, isEmergency: ${isEmergency}`);
+
       
       const updatedTests = await prisma.patientTest.updateMany({
         where: { 
@@ -1360,7 +1284,7 @@ export const updatePatient = async (req, res) => {
         }
       });
       
-      console.log(`✅ Updated ${updatedTests.count} tests as emergency for visit ${visitId}`);
+
     }
 
     // ✅ Calculate and save age fields if DOB was updated (takes precedence over manual age)
@@ -1370,7 +1294,7 @@ export const updatePatient = async (req, res) => {
 
     res.json({ success: true, message: 'Patient updated successfully', data: updated });
   } catch (error) {
-    console.error('Update patient error:', error);
+
     res.status(500).json({ success: false, message: 'Failed to update patient' });
   }
 };
@@ -1434,7 +1358,7 @@ export const updatePayment = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Update payment error:', error);
+
     res.status(500).json({ success: false, message: 'Failed to update payment', error: error.message });
   }
 };
@@ -1509,7 +1433,7 @@ export const getPatientStatistics = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Get patient statistics error:', error);
+
     res.status(500).json({
       success: false,
       message: 'Failed to fetch patient statistics'
@@ -1521,8 +1445,6 @@ export const getPatientStatistics = async (req, res) => {
 export const getOrganizationTypeStatistics = async (req, res) => {
   try {
     const { fromDate, toDate } = req.query;
-
-    console.log('📊 getOrganizationTypeStatistics called with:', { fromDate, toDate });
 
     // Build date filter for patient tests
     const dateFilter = {};
@@ -1541,8 +1463,6 @@ export const getOrganizationTypeStatistics = async (req, res) => {
       end.setHours(23, 59, 59, 999);
       dateFilter.createdAt = { lte: end };
     }
-
-    console.log('📅 Date filter:', dateFilter);
 
     // Get all patient tests with their organization data
     // ✅ Exclude cancelled tests from statistics
@@ -1566,8 +1486,6 @@ export const getOrganizationTypeStatistics = async (req, res) => {
         }
       }
     });
-
-    console.log('🧪 Total patient tests found:', patientTests.length);
 
     // Use Sets to count unique patients per organization type
     const homeCollectionPatients = new Set();
@@ -1594,7 +1512,7 @@ export const getOrganizationTypeStatistics = async (req, res) => {
       ipd: ipdPatients.size
     };
 
-    console.log('✅ Final stats (unique patients):', stats);
+    // Stats calculated
 
     res.json({
       success: true,
@@ -1602,7 +1520,7 @@ export const getOrganizationTypeStatistics = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('❌ Get organization type statistics error:', error);
+
     res.status(500).json({
       success: false,
       message: 'Failed to fetch organization type statistics'
@@ -1613,8 +1531,6 @@ export const getOrganizationTypeStatistics = async (req, res) => {
 // Get weekly organization type statistics for dashboard
 export const getWeeklyOrganizationTypeStatistics = async (req, res) => {
   try {
-    console.log('📊 getWeeklyOrganizationTypeStatistics called');
-
     // Get last 7 days data
     const weeklyData = [];
     const today = new Date();
@@ -1671,15 +1587,12 @@ export const getWeeklyOrganizationTypeStatistics = async (req, res) => {
       });
     }
 
-    console.log('✅ Weekly stats:', weeklyData);
-
     res.json({
       success: true,
       data: weeklyData
     });
 
   } catch (error) {
-    console.error('❌ Get weekly organization type statistics error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to fetch weekly organization type statistics'
@@ -1750,7 +1663,7 @@ export const getPatientLocationStatistics = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Get patient location statistics error:', error);
+
     res.status(500).json({
       success: false,
       message: 'Failed to fetch patient location statistics',
@@ -1849,7 +1762,7 @@ export const addTestToVisit = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Add test to visit error:', error);
+
     res.status(500).json({
       success: false,
       message: 'Failed to add test to visit',
@@ -1863,16 +1776,16 @@ export const createPaymentTransaction = async (req, res) => {
   try {
     const { visitId, patientId, paymentMode, paymentAmount, remarks } = req.body;
     
-    console.log('📨 createPaymentTransaction request received:');
-    console.log('  visitId:', visitId);
-    console.log('  patientId:', patientId);
-    console.log('  paymentMode:', paymentMode);
-    console.log('  paymentAmount:', paymentAmount);
-    console.log('  remarks:', remarks);
+
+
+
+
+
+
     
     // Validate required fields
     if (!visitId || !patientId || !paymentMode || !paymentAmount) {
-      console.error('❌ Validation failed: Missing required fields');
+
       return res.status(400).json({
         success: false,
         message: 'Missing required fields: visitId, patientId, paymentMode, paymentAmount'
@@ -1889,7 +1802,7 @@ export const createPaymentTransaction = async (req, res) => {
       }
     });
     
-    console.log('✅ Payment transaction created:', transaction.id);
+
 
     res.status(201).json({ 
       success: true, 
@@ -1897,7 +1810,7 @@ export const createPaymentTransaction = async (req, res) => {
       data: transaction 
     });
   } catch (error) {
-    console.error('❌ Create payment transaction error:', error);
+
     res.status(500).json({ 
       success: false, 
       message: 'Failed to create payment transaction',
@@ -1923,7 +1836,7 @@ export const getPaymentTransactions = async (req, res) => {
       orderBy: { createdAt: 'asc' }
     });
     
-    console.log(`✅ Found ${transactions.length} payment transactions for visit ${visitId}`);
+
 
     res.json({ 
       success: true, 
@@ -1936,7 +1849,7 @@ export const getPaymentTransactions = async (req, res) => {
       }))
     });
   } catch (error) {
-    console.error('Get payment transactions error:', error);
+
     res.status(500).json({ 
       success: false, 
       message: 'Failed to fetch payment transactions',
@@ -1962,14 +1875,14 @@ export const getPatientPaymentTransactions = async (req, res) => {
       orderBy: { createdAt: 'desc' }
     });
     
-    console.log(`✅ Found ${transactions.length} payment transactions for patient ${patientId}`);
+
 
     res.json({ 
       success: true, 
       data: transactions 
     });
   } catch (error) {
-    console.error('Get patient payment transactions error:', error);
+
     res.status(500).json({ 
       success: false, 
       message: 'Failed to fetch payment transactions',
@@ -2013,13 +1926,13 @@ export const getPatientTests = async (req, res) => {
       take: limit
     });
 
-    console.log('🔍 Result Page - Tests fetched:', patientTests.length);
-    console.log('✅ Cancelled tests filtered out from result page');
+
+
 
     res.json(buildPaginatedResponse(patientTests, total, page, limit));
 
   } catch (error) {
-    console.error('Get patient tests error:', error);
+
     res.status(500).json({
       success: false,
       message: 'Failed to fetch patient tests'
@@ -2041,7 +1954,7 @@ export const getTestsByVisitId = async (req, res) => {
       });
     }
 
-    console.log(`📋 Fetching tests for visitId: ${visitId}`);
+
 
     // ✅ NEW: Fetch VisitBill (master bill record)
     let visitBill = await prisma.visitBill.findUnique({
@@ -2055,17 +1968,6 @@ export const getTestsByVisitId = async (req, res) => {
           }
         }
       }
-    });
-
-    console.log('🔍 VisitBill fetched from DB:', {
-      visitId,
-      exists: !!visitBill,
-      grossAmount: visitBill?.grossAmount,
-      totalDiscount: visitBill?.totalDiscount,
-      totalPaid: visitBill?.totalPaid,
-      balanceAmount: visitBill?.balanceAmount,
-      status: visitBill?.status,
-      updatedAt: visitBill?.updatedAt
     });
 
     // Find all ACTIVE (non-cancelled) tests for this visit
@@ -2127,18 +2029,18 @@ export const getTestsByVisitId = async (req, res) => {
       }
     });
 
-    console.log(`✅ Found ${tests.length} test(s) for visitId: ${visitId} (cancelled tests already filtered)`);
+
 
     // ✅ VERIFICATION: Ensure no cancelled tests in response
     const cancelledCount = tests.filter(t => t.status === 'Cancelled' || t.status === 'CANCELLED').length;
     if (cancelledCount > 0) {
-      console.warn(`⚠️ WARNING: Found ${cancelledCount} cancelled tests that weren't filtered!`);
+
     }
-    console.log(`🔍 Cancelled test verification: ${cancelledCount} cancelled tests found (should be 0)`);
+
 
     // If VisitBill doesn't exist, calculate totals from PatientTest records
     if (!visitBill && tests.length > 0) {
-      console.log('📊 Calculating billing totals from PatientTest records...');
+
       
       // Sum up all test charges
       grossAmount = tests.reduce((sum, t) => sum + (parseFloat(t.charge) || 0), 0);
@@ -2161,7 +2063,7 @@ export const getTestsByVisitId = async (req, res) => {
         billStatus = 'PENDING';
       }
       
-      console.log('✅ Calculated from PatientTest:', { grossAmount, totalDiscount, totalPaid, balanceAmount, billStatus });
+
     }
 
     if (!tests || tests.length === 0) {
@@ -2203,10 +2105,10 @@ export const getTestsByVisitId = async (req, res) => {
       balanceAmount = visitBill?.balanceAmount ? parseFloat(visitBill.balanceAmount) : 0;
       billStatus = visitBill?.status || 'PENDING';
       
-      console.log('✅ Using VisitBill data:', { grossAmount, totalDiscount, totalPaid, balanceAmount });
+
     } else {
       // Fallback: Calculate from PatientTest records
-      console.log('⚠️ VisitBill not found, calculating from PatientTest records...');
+
       // Will calculate after fetching tests
       grossAmount = 0;
       totalDiscount = 0;
@@ -2233,17 +2135,6 @@ export const getTestsByVisitId = async (req, res) => {
     
     // Use stored discount percent from VisitBill, or calculate if not available
     const totalDiscountPercent = visitBill?.totalDiscountPercent || (grossAmount > 0 ? Math.round((totalDiscount * 100) / grossAmount) : 0);
-    
-    console.log('💰 VisitBill Data:', {
-      grossAmount,
-      totalDiscount,
-      totalPaid,
-      balanceAmount,
-      discountType,
-      discountValue,
-      paymentMode,
-      status: billStatus
-    });
 
     // Transform tests to match frontend expectations
     const transformedTests = tests.map(pt => ({
@@ -2340,7 +2231,7 @@ export const getTestsByVisitId = async (req, res) => {
       billingSessions: visitBill?.billingSessions || []
     };
 
-    console.log('💰 Billing Summary from VisitBill:', billingSummary);
+
 
     res.json({
       success: true,
@@ -2357,7 +2248,7 @@ export const getTestsByVisitId = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('❌ Get tests by visitId error:', error);
+
     res.status(500).json({
       success: false,
       message: 'Failed to fetch tests for this visit',
@@ -2465,7 +2356,7 @@ export const applyDiscount = async (req, res) => {
       data: updatedBill
     });
   } catch (error) {
-    console.error('Apply discount error:', error);
+
     res.status(500).json({
       success: false,
       message: 'Failed to apply discount',
@@ -2572,7 +2463,7 @@ export const recordPayment = async (req, res) => {
       data: updatedBill
     });
   } catch (error) {
-    console.error('Record payment error:', error);
+
     res.status(500).json({
       success: false,
       message: 'Failed to record payment',
@@ -2587,17 +2478,9 @@ export const cancelTest = async (req, res) => {
     const { visitId, patientTestId } = req.params;
     const { remarks, cancelledBy } = req.body;
 
-    console.log('🟡 [cancelTest] START - Received request:', {
-      visitId,
-      patientTestId,
-      remarks,
-      url: req.originalUrl,
-      method: req.method
-    });
-
     // Validate inputs
     if (!visitId || !patientTestId) {
-      console.error('❌ [cancelTest] Missing required params:', { visitId, patientTestId });
+
       return res.status(400).json({
         success: false,
         message: 'visitId and patientTestId are required'
@@ -2609,16 +2492,8 @@ export const cancelTest = async (req, res) => {
       where: { id: parseInt(patientTestId) }
     });
 
-    console.log('🔍 [cancelTest] PatientTest lookup:', {
-      patientTestId,
-      found: !!patientTest,
-      testId: patientTest?.testId,
-      status: patientTest?.status,
-      charge: patientTest?.charge
-    });
-
     if (!patientTest) {
-      console.error('❌ [cancelTest] Test not found:', { patientTestId });
+
       return res.status(404).json({
         success: false,
         message: 'Test not found'
@@ -2626,7 +2501,7 @@ export const cancelTest = async (req, res) => {
     }
 
     if (patientTest.status === 'Cancelled') {
-      console.warn('⚠️ [cancelTest] Test already cancelled:', { patientTestId });
+
       return res.status(400).json({
         success: false,
         message: 'Test is already cancelled'
@@ -2638,16 +2513,8 @@ export const cancelTest = async (req, res) => {
       where: { visitId }
     });
 
-    console.log('💰 [cancelTest] VisitBill lookup:', {
-      visitId,
-      found: !!visitBill,
-      grossAmount: visitBill?.grossAmount?.toString?.(),
-      totalPaid: visitBill?.totalPaid?.toString?.(),
-      balanceAmount: visitBill?.balanceAmount?.toString?.()
-    });
-
     if (!visitBill) {
-      console.error('❌ [cancelTest] VisitBill not found:', { visitId });
+
       return res.status(404).json({
         success: false,
         message: 'Visit bill not found'
@@ -2655,14 +2522,6 @@ export const cancelTest = async (req, res) => {
     }
 
     const testCharge = parseFloat(patientTest.charge || 0);
-    
-    console.log('📝 [cancelTest] Cancelling test:', {
-      patientTestId,
-      visitId,
-      testName: patientTest.testId,
-      testCharge,
-      remarks
-    });
 
     // ✅ WRAP IN TRANSACTION
     let updatedTest;
@@ -2682,7 +2541,7 @@ export const cancelTest = async (req, res) => {
         }
       });
       
-      console.log(`✅ [TX] PatientTest marked as Cancelled`);
+
 
       // Step 2: Get all ACTIVE tests for this visit to recalculate
       const activeTests = await tx.patientTest.findMany({
@@ -2695,7 +2554,7 @@ export const cancelTest = async (req, res) => {
       // Calculate new gross amount from active tests only
       const newGrossAmount = activeTests.reduce((sum, t) => sum + parseFloat(t.charge || 0), 0);
       
-      console.log(`✅ [TX] Active tests remaining: ${activeTests.length}, new gross: ₹${newGrossAmount}`);
+
 
       // Step 3: Recalculate discount proportionally (if applicable)
       const oldGross = visitBill.grossAmount.toNumber();
@@ -2709,7 +2568,7 @@ export const cancelTest = async (req, res) => {
       
       const discountReduction = oldDiscount - newDiscount;
       
-      console.log(`✅ [TX] Discount recalculated: old=₹${oldDiscount}, new=₹${newDiscount}, reduction=₹${discountReduction}`);
+
 
       // Step 4: Create CANCEL_TEST BillingSession
       const lastSession = await tx.billingSession.findFirst({
@@ -2727,7 +2586,7 @@ export const cancelTest = async (req, res) => {
         }
       });
       
-      console.log(`✅ [TX] BillingSession created: CANCEL_TEST, sequence=${nextSequence}`);
+
 
       // Step 5: Calculate new balance and check for overpayment
       const oldBalance = visitBill.balanceAmount.toNumber();
@@ -2741,18 +2600,6 @@ export const cancelTest = async (req, res) => {
       
       // Check if patient overpaid
       const overpaymentAmount = Math.max(0, oldPaid - newAmountDue);
-      
-      console.log(`✅ [TX] Balance calculation:`, {
-        oldGross,
-        newGross: newGrossAmount,
-        oldDiscount,
-        newDiscount,
-        oldPaid,
-        newAmountDue,
-        oldBalance,
-        newBalance,
-        overpaymentAmount
-      });
 
       // Step 6: Create Refund record if overpaid
       if (overpaymentAmount > 0) {
@@ -2765,7 +2612,7 @@ export const cancelTest = async (req, res) => {
           }
         });
         
-        console.log(`✅ [TX] Refund created: ₹${overpaymentAmount}`);
+
       }
 
       // Step 7: Update VisitBill with recalculated values
@@ -2784,10 +2631,10 @@ export const cancelTest = async (req, res) => {
         }
       });
       
-      console.log(`✅ [TX] VisitBill updated: grossAmount=₹${newGrossAmount}, balance=₹${newBalance}`);
+
     });
     
-    console.log(`✅ Transaction completed successfully for CANCEL_TEST`);
+
 
     const responseData = {
       success: true,
@@ -2812,22 +2659,10 @@ export const cancelTest = async (req, res) => {
         } : null
       }
     };
-    
-    console.log('✅ [cancelTest] SUCCESS - Sending response:', {
-      visitId,
-      patientTestId,
-      grossAmount: responseData.data.updatedBill.grossAmount,
-      balanceAmount: responseData.data.updatedBill.balanceAmount
-    });
 
     res.json(responseData);
 
   } catch (error) {
-    console.error('❌ [cancelTest] EXCEPTION:', {
-      message: error.message,
-      stack: error.stack,
-      code: error.code
-    });
     res.status(500).json({
       success: false,
       message: 'Failed to cancel test',
@@ -2882,7 +2717,7 @@ export const getBillSummary = async (req, res) => {
       data: visitBill
     });
   } catch (error) {
-    console.error('Get bill summary error:', error);
+
     res.status(500).json({
       success: false,
       message: 'Failed to fetch bill summary',
@@ -2933,7 +2768,7 @@ export const getTransactionHistory = async (req, res) => {
       data: transactions
     });
   } catch (error) {
-    console.error('Get transaction history error:', error);
+
     res.status(500).json({
       success: false,
       message: 'Failed to fetch transaction history',
@@ -2955,17 +2790,6 @@ export const addTestsToExistingVisit = async (req, res) => {
         message: 'patientId, visitId, and tests array are required' 
       });
     }
-
-    console.log('📝 Adding tests to existing visit:', {
-      patientId,
-      visitId,
-      newTestsCount: tests.length,
-      discountPercent: discountPercent || discount?.discountPercent,
-      discountAmount: discountAmount || discount?.discountAmount || discount?.amount,
-      paymentAmount: payment?.amount,
-      paymentMode: payment?.paymentMode,
-      businessType
-    });
 
     // Get existing VisitBill
     const visitBill = await prisma.visitBill.findUnique({
@@ -3038,21 +2862,6 @@ export const addTestsToExistingVisit = async (req, res) => {
     // ✅ Calculate final balance using formula: grossAmount - totalDiscount - totalPaid
     // ✅ ROUND to nearest rupee to avoid decimal precision issues (e.g., 1.00 instead of 0)
     const finalBalance = Math.max(0, Math.round(totalTestCharges - totalDiscountAmount - newTotalPaid));
-    
-    console.log('💰 Billing calculation for ADD_TEST:', {
-      existingGross: visitBill.grossAmount.toNumber(),
-      existingDiscount: visitBill.totalDiscount.toNumber(),
-      existingBalance: currentBalance,
-      newTestChargesTotal,
-      balanceAfterNewTests,
-      newDiscountPercent,
-      newDiscountAmount,
-      paymentAmount,
-      finalBalance: 0, // Will calculate after
-      totalTestCharges: 0, // Will calculate after
-      totalDiscountAmount: 0, // Will calculate after
-      totalPaid: 0 // Will calculate after
-    });
 
     // ✅ WRAP IN TRANSACTION - All or nothing
     let allTestsForVisit;
@@ -3075,7 +2884,7 @@ export const addTestsToExistingVisit = async (req, res) => {
         }
       });
       
-      console.log(`✅ [TX] BillingSession created: sessionType=ADD_TEST, sequence=${nextSequence}`);
+
 
       // Step 2: Create BillDiscount for new discount if applicable
       if (newDiscountAmount > 0) {
@@ -3090,9 +2899,9 @@ export const addTestsToExistingVisit = async (req, res) => {
             remarks: discountRemark_final || null
           }
         });
-        console.log(`✅ [TX] BillDiscount created: id=${discountRecord.id}, ₹${newDiscountAmount}, type=${newDiscountPercent > 0 ? 'PERCENTAGE' : 'FLAT'}`);
+
       } else {
-        console.log(`ℹ️ [TX] No discount for this session (newDiscountAmount=0)`);
+
       }
 
       // Step 3: Create Payment record if payment > 0
@@ -3117,7 +2926,7 @@ export const addTestsToExistingVisit = async (req, res) => {
             paymentDate: new Date()
           }
         });
-        console.log(`✅ [TX] Payment created: ₹${paymentAmount}`);
+
       }
 
       // Step 4: Create PatientTest records for new tests (FIRST - source of truth)
@@ -3152,7 +2961,7 @@ export const addTestsToExistingVisit = async (req, res) => {
         data: newPatientTestsData
       });
       
-      console.log(`✅ [TX] Created ${tests.length} new PatientTest records`);
+
 
       // Step 5: Update VisitBill LAST (summary/cache)
       const totalDiscountPercent = totalTestCharges > 0 
@@ -3171,10 +2980,10 @@ export const addTestsToExistingVisit = async (req, res) => {
         }
       });
       
-      console.log(`✅ [TX] VisitBill updated: grossAmount=₹${totalTestCharges}, balance=₹${finalBalance}`);
+
     });
     
-    console.log(`✅ Transaction completed successfully for ADD_TEST`);
+
 
     // Fetch all tests for this visit to return
     allTestsForVisit = await prisma.patientTest.findMany({
@@ -3214,7 +3023,7 @@ export const addTestsToExistingVisit = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Add tests to existing visit error:', error);
+
     res.status(500).json({
       success: false,
       message: 'Failed to add tests to existing visit',
@@ -3261,14 +3070,6 @@ export const addPaymentToVisit = async (req, res) => {
       });
     }
 
-    console.log('📝 Adding payment/discount to existing visit:', {
-      patientId,
-      visitId,
-      paymentAmount,
-      discountPercent,
-      discountAmount
-    });
-
     // Calculate new discount if applicable
     let newDiscountAmount = 0;
     let newDiscountPercent = 0;
@@ -3297,18 +3098,6 @@ export const addPaymentToVisit = async (req, res) => {
     // ✅ ROUND to nearest rupee to avoid decimal precision issues (e.g., 1.00 instead of 0)
     const finalBalance = Math.max(0, Math.round(totalTestCharges - totalDiscountAmount - newTotalPaid));
 
-    console.log('💰 Payment/Discount calculation:', {
-      existingGross: visitBill.grossAmount.toNumber(),
-      existingDiscount: visitBill.totalDiscount.toNumber(),
-      existingBalance: visitBill.balanceAmount.toNumber(),
-      newDiscountAmount,
-      newDiscountPercent,
-      paymentAmount,
-      newTotalPaid,
-      finalBalance,
-      totalDiscountAmount
-    });
-
     // ✅ WRAP IN TRANSACTION - All or nothing
     let updatedBill;
     
@@ -3329,7 +3118,7 @@ export const addPaymentToVisit = async (req, res) => {
         }
       });
       
-      console.log(`✅ [TX] BillingSession created: PAYMENT, sequence=${nextSequence}`);
+
 
       // Step 2: Create BillDiscount if discount > 0
       if (newDiscountAmount > 0) {
@@ -3344,7 +3133,7 @@ export const addPaymentToVisit = async (req, res) => {
             remarks: discountRemark || null
           }
         });
-        console.log(`✅ [TX] BillDiscount created: ₹${newDiscountAmount}`);
+
       }
 
       // Step 3: Create Payment record if payment > 0
@@ -3369,7 +3158,7 @@ export const addPaymentToVisit = async (req, res) => {
             paymentDate: new Date()
           }
         });
-        console.log(`✅ [TX] Payment created: ₹${paymentAmount}`);
+
       }
 
       // Step 4: Update VisitBill (summary/cache)
@@ -3389,10 +3178,10 @@ export const addPaymentToVisit = async (req, res) => {
         }
       });
       
-      console.log(`✅ [TX] VisitBill updated: balance=₹${finalBalance}, status=${finalBalance <= 0 ? 'PAID' : 'PARTIAL'}`);
+
     });
     
-    console.log(`✅ Transaction completed successfully for PAYMENT`);
+
 
     res.json({
       success: true,
@@ -3412,7 +3201,7 @@ export const addPaymentToVisit = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Add payment to visit error:', error);
+
     res.status(500).json({
       success: false,
       message: 'Failed to add payment to visit',
@@ -3426,10 +3215,10 @@ export const getVisitBill = async (req, res) => {
   try {
     const { visitId } = req.params;
 
-    console.log('📍 getVisitBill called with visitId:', visitId);
+
 
     if (!visitId) {
-      console.warn('⚠️ visitId is missing');
+
       return res.status(400).json({
         success: false,
         message: 'visitId is required'
@@ -3437,24 +3226,18 @@ export const getVisitBill = async (req, res) => {
     }
 
     // Fetch VisitBill data
-    console.log('🔍 Querying database for visitId:', visitId);
+
     const visitBill = await prisma.visitBill.findUnique({
       where: { visitId }
     });
 
     if (!visitBill) {
-      console.warn('⚠️ VisitBill not found for visitId:', visitId);
+
       return res.status(404).json({
         success: false,
         message: 'VisitBill not found'
       });
     }
-
-    console.log('✅ VisitBill found:', {
-      visitId: visitBill.visitId,
-      balanceAmount: visitBill.balanceAmount?.toString?.() || visitBill.balanceAmount,
-      status: visitBill.status
-    });
 
     // Convert Decimal to Number for JSON response
     const response = {
@@ -3466,7 +3249,7 @@ export const getVisitBill = async (req, res) => {
       status: visitBill.status || 'PENDING'
     };
 
-    console.log('📤 Returning response:', response);
+
 
     res.json({
       success: true,
@@ -3474,8 +3257,8 @@ export const getVisitBill = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('❌ Get visit bill error:', error.message);
-    console.error('Stack:', error.stack);
+
+
     res.status(500).json({
       success: false,
       message: 'Failed to fetch visit bill',
@@ -3522,7 +3305,7 @@ export const toggleTestEmergency = async (req, res) => {
       }
     });
 
-    console.log(`✅ Test ${patientTestId} emergency status updated to: ${isEmergency}`);
+
 
     res.json({
       success: true,
@@ -3539,7 +3322,7 @@ export const toggleTestEmergency = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('❌ Toggle emergency error:', error.message);
+
     res.status(500).json({
       success: false,
       message: 'Failed to update emergency status',
@@ -3547,3 +3330,5 @@ export const toggleTestEmergency = async (req, res) => {
     });
   }
 };
+
+

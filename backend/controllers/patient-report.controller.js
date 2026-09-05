@@ -127,7 +127,6 @@ export const getPatientVisitReport = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Error generating patient visit report:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to generate patient visit report',
@@ -246,7 +245,6 @@ export const getPatientBillingSummary = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Error generating billing summary:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to generate billing summary',
@@ -254,3 +252,4 @@ export const getPatientBillingSummary = async (req, res) => {
     });
   }
 };
+

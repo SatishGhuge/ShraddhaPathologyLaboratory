@@ -54,7 +54,6 @@ export const getUniqueDoctors = async (req, res) => {
       data: uniqueDoctors
     });
   } catch (error) {
-    console.error('❌ Error fetching doctors:', error);
     return res.status(500).json({
       success: false,
       message: 'Failed to fetch doctors',
@@ -71,8 +70,6 @@ export const getUniqueDoctors = async (req, res) => {
 export const getDoctorComparativeReport = async (req, res) => {
   try {
     const { fromDate, toDate } = req.query;
-
-    console.log('🔍 Doctor Comparative Report Request:', { fromDate, toDate });
 
     // Build date filter if provided
     let dateFilter = {};
@@ -107,8 +104,6 @@ export const getDoctorComparativeReport = async (req, res) => {
         createdAt: 'asc'
       }
     });
-
-    console.log(`📊 Found ${allTests.length} test records for doctors`);
 
     if (allTests.length === 0) {
       return res.json({
@@ -172,9 +167,6 @@ export const getDoctorComparativeReport = async (req, res) => {
     // Sort by doctor name
     reportData = reportData.sort((a, b) => a.doctorName.localeCompare(b.doctorName));
 
-    console.log(`📊 Report generated for ${reportData.length} doctors with ${sortedMonths.length} months`);
-    console.log(`📊 Months: ${sortedMonths.join(', ')}`);
-
     // Return ALL data without pagination (no limit)
     return res.json({
       success: true,
@@ -183,7 +175,6 @@ export const getDoctorComparativeReport = async (req, res) => {
       pagination: { page: 1, limit: reportData.length, pages: 1, total: reportData.length }
     });
   } catch (error) {
-    console.error('❌ Error generating report:', error);
     return res.status(500).json({
       success: false,
       message: 'Failed to generate report',
@@ -191,3 +182,4 @@ export const getDoctorComparativeReport = async (req, res) => {
     });
   }
 };
+

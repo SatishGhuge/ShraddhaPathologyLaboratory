@@ -47,7 +47,6 @@ export const getQRTokenForTest = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Error getting QR token:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to get QR token',
@@ -128,7 +127,6 @@ export const generateQRToken = async (req, res) => {
       tokenExists: false
     });
   } catch (error) {
-    console.error('Error generating QR token:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to generate QR token',
@@ -153,13 +151,10 @@ export const validateQRToken = async (req, res) => {
       });
     }
 
-    console.log('🔍 Validating QR token:', token.substring(0, 8) + '...');
-
     // Validate token
     const validation = await validateTokenFull(token);
 
     if (!validation.valid) {
-      console.error('❌ Token validation failed:', validation.error);
       return res.status(401).json({
         success: false,
         message: validation.error
@@ -168,8 +163,6 @@ export const validateQRToken = async (req, res) => {
 
     const tokenRecord = validation.data;
     const patientTest = tokenRecord.patientTest;
-
-    console.log('✅ Token validated for patientTestId:', patientTest.id);
 
     // Return report data (same as qr-scan endpoint but with token validation)
     res.json({
@@ -227,7 +220,6 @@ export const validateQRToken = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Error validating QR token:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to validate QR token',
@@ -283,7 +275,6 @@ export const invalidateQRToken = async (req, res) => {
       message: 'QR code access has been disabled for this report'
     });
   } catch (error) {
-    console.error('Error invalidating QR token:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to invalidate QR token',
@@ -349,7 +340,6 @@ export const regenerateQRToken = async (req, res) => {
       regeneratedAt: updatedToken.createdAt
     });
   } catch (error) {
-    console.error('Error regenerating QR token:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to regenerate QR token',
@@ -396,7 +386,6 @@ export const getQRTokenInfo = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Error getting QR token info:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to get QR token info',
@@ -404,3 +393,4 @@ export const getQRTokenInfo = async (req, res) => {
     });
   }
 };
+

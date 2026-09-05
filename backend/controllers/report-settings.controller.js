@@ -65,7 +65,6 @@ export const getFieldConfigurations = async (req, res) => {
 
     res.json({ success: true, data: fields });
   } catch (error) {
-    console.error("Error fetching field configurations:", error);
     res.status(500).json({ success: false, message: error.message });
   }
 };
@@ -84,7 +83,6 @@ export const getFormattingConfiguration = async (req, res) => {
 
     res.json({ success: true, data: formatting });
   } catch (error) {
-    console.error("Error fetching formatting configuration:", error);
     res.status(500).json({ success: false, message: error.message });
   }
 };
@@ -108,7 +106,6 @@ export const saveFieldConfigurations = async (req, res) => {
 
     res.json({ success: true, data: saved, message: `Saved ${saved.count} field configurations` });
   } catch (error) {
-    console.error("Error saving field configurations:", error);
     res.status(500).json({ success: false, message: error.message });
   }
 };
@@ -134,7 +131,6 @@ export const saveFormattingConfiguration = async (req, res) => {
       res.json({ success: true, data: created, message: "Formatting configuration created" });
     }
   } catch (error) {
-    console.error("Error saving formatting configuration:", error);
     res.status(500).json({ success: false, message: error.message });
   }
 };
@@ -155,7 +151,6 @@ export const getAllSettings = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error("Error fetching all settings:", error);
     res.status(500).json({ success: false, message: error.message });
   }
 };
@@ -164,46 +159,29 @@ export const getAllSettings = async (req, res) => {
 export const saveAllSettings = async (req, res) => {
   try {
     const { fields, formatting } = req.body;
-    
-    console.log('💾 saveAllSettings - Received:', {
-      fieldsCount: fields?.length,
-      formattingKeys: formatting ? Object.keys(formatting).length : 0
-    });
 
     if (fields && Array.isArray(fields)) {
-      console.log(`🗑️ Deleting existing ${fields.length} field configurations...`);
       await prisma.reportFieldConfiguration.deleteMany({});
-      
-      console.log(`✅ Creating ${fields.length} new field configurations...`);
       const created = await prisma.reportFieldConfiguration.createMany({
         data: fields,
       });
-      console.log('✅ Fields created:', created);
     }
 
     if (formatting) {
-      console.log('💾 Saving formatting configuration...');
       let existing = await prisma.reportFormatting.findFirst();
       if (existing) {
-        console.log('✅ Updating existing formatting...');
         const updated = await prisma.reportFormatting.update({
           where: { id: existing.id },
           data: formatting,
         });
-        console.log('✅ Formatting updated:', updated);
       } else {
-        console.log('✅ Creating new formatting...');
         const created = await prisma.reportFormatting.create({
           data: formatting,
         });
-        console.log('✅ Formatting created:', created);
       }
     }
-
-    console.log('✅ All settings saved successfully');
     res.json({ success: true, message: "All settings saved successfully" });
   } catch (error) {
-    console.error("❌ Error saving all settings:", error);
     res.status(500).json({ success: false, message: error.message });
   }
 };
@@ -225,7 +203,6 @@ export const resetToDefaults = async (req, res) => {
 
     res.json({ success: true, message: "Settings reset to defaults" });
   } catch (error) {
-    console.error("Error resetting settings:", error);
     res.status(500).json({ success: false, message: error.message });
   }
 };
@@ -243,7 +220,7 @@ export const updateFieldConfiguration = async (req, res) => {
 
     res.json({ success: true, data: updated });
   } catch (error) {
-    console.error("Error updating field configuration:", error);
     res.status(500).json({ success: false, message: error.message });
   }
 };
+

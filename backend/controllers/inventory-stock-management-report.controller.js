@@ -9,8 +9,6 @@ export const getInventoryStockManagementReport = async (req, res) => {
       sortBy = 'itemName', sortOrder = 'asc'
     } = req.query;
 
-    console.log('📡 Report Request - Org:', organizationId, 'Supplier:', supplierId);
-
     const pageNum = parseInt(page) || 1;
     const pageLimit = parseInt(limit) || 50;
     const skip = (pageNum - 1) * pageLimit;
@@ -242,7 +240,6 @@ export const getInventoryStockManagementReport = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('❌ Error:', error);
     return res.status(500).json({
       success: false,
       message: 'Failed to generate report',
@@ -266,7 +263,6 @@ export const getLowStockAlerts = async (req, res) => {
       count: labStocks.length
     });
   } catch (error) {
-    console.error('❌ Error:', error);
     return res.status(500).json({
       success: false,
       message: 'Failed to fetch low stock alerts',
@@ -323,7 +319,6 @@ export const getExpiringItems = async (req, res) => {
       count: labData.length + orgData.length
     });
   } catch (error) {
-    console.error('❌ Error:', error);
     return res.status(500).json({
       success: false,
       message: 'Failed to fetch expiring items',
@@ -331,3 +326,4 @@ export const getExpiringItems = async (req, res) => {
     });
   }
 };
+

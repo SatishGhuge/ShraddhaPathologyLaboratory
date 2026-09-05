@@ -99,7 +99,6 @@ export const getDashboardData = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('❌ Dashboard error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to fetch dashboard data',
@@ -161,7 +160,6 @@ export const getPatientTests = async (req, res) => {
       }))
     });
   } catch (error) {
-    console.error('❌ Get tests error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to fetch tests',
@@ -225,7 +223,6 @@ export const getAvailableTestsAndPackages = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('❌ Get available tests error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to fetch available tests',
@@ -247,8 +244,6 @@ export const createTestVisit = async (req, res) => {
       paidAmount = 0,
       notes
     } = req.body;
-
-    console.log('📝 Creating test visit for patient:', patientId);
 
     // Get patient
     const patient = await prisma.patient.findUnique({
@@ -347,8 +342,6 @@ export const createTestVisit = async (req, res) => {
       }))
     });
 
-    console.log('✅ Test visit created:', visitId, 'with', patientTests.count, 'tests');
-
     res.status(201).json({
       success: true,
       message: 'Test visit created successfully',
@@ -364,7 +357,6 @@ export const createTestVisit = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('❌ Create test visit error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to create test visit',
@@ -412,7 +404,6 @@ export const getTestDetails = async (req, res) => {
       data: test
     });
   } catch (error) {
-    console.error('❌ Get test details error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to fetch test details',
@@ -476,7 +467,6 @@ export const getAvailableRunnersAndSlots = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('❌ Get runners and slots error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to fetch runners and slots',
@@ -521,7 +511,6 @@ export const checkSlotAvailability = async (req, res) => {
       message: 'Slot is available'
     });
   } catch (error) {
-    console.error('❌ Check slot availability error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to check slot availability',
@@ -535,8 +524,6 @@ export const bookHomeVisit = async (req, res) => {
   try {
     const { patientId } = req.params;
     const { patientTestId, runnerId, visitDate, visitTime, address, notes } = req.body;
-
-    console.log('🏠 Booking home visit for patient:', patientId);
 
     // Validate inputs
     if (!patientTestId || !runnerId || !visitDate || !visitTime) {
@@ -615,8 +602,6 @@ export const bookHomeVisit = async (req, res) => {
       }
     });
 
-    console.log('✅ Home visit booked:', homeVisit.id);
-
     // Update patient test status
     await prisma.patientTest.update({
       where: { id: parseInt(patientTestId) },
@@ -642,7 +627,6 @@ export const bookHomeVisit = async (req, res) => {
         runner.name
       );
     } catch (notifError) {
-      console.warn('⚠️ Notification failed:', notifError.message);
       // Don't fail the booking if notification fails
     }
 
@@ -664,7 +648,6 @@ export const bookHomeVisit = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('❌ Book home visit error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to book home visit',
@@ -704,14 +687,11 @@ export const cancelHomeVisit = async (req, res) => {
       data: { status: 'Cancelled' }
     });
 
-    console.log('✅ Home visit cancelled:', homeVisitId);
-
     res.json({
       success: true,
       message: 'Home visit cancelled successfully'
     });
   } catch (error) {
-    console.error('❌ Cancel home visit error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to cancel home visit',
@@ -719,4 +699,5 @@ export const cancelHomeVisit = async (req, res) => {
     });
   }
 };
+
 

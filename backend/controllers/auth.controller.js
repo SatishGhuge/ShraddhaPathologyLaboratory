@@ -102,10 +102,6 @@ export const login = async (req, res) => {
         select: { modules: true }
       });
       
-      console.log(`🔐 Staff user login: ${user.username}`);
-      console.log(`🔐 Module allocation found:`, !!moduleAllocation);
-      console.log(`🔐 Modules data:`, moduleAllocation?.modules?.substring(0, 100));
-      
       const { password: _, ...userData } = user;
       return res.json({ 
         success: true, 
@@ -122,7 +118,6 @@ export const login = async (req, res) => {
     return res.status(401).json({ success: false, message: 'Invalid credentials' });
 
   } catch (error) {
-    console.error('Login error:', error);
     res.status(500).json({ success: false, message: 'Login failed. Please try again.' });
   }
 };
@@ -167,16 +162,13 @@ export const forgotPassword = async (req, res) => {
 
     try {
       await sendPasswordResetEmail(email, code);
-      console.log(`🔐 OTP sent to: ${email} (${admin ? 'admin' : 'user'})`);
     } catch (emailError) {
-      console.error('❌ Failed to send OTP email:', emailError);
       return res.status(500).json({ success: false, message: 'Failed to send OTP email. Please try again.' });
     }
 
     res.json({ success: true, message: 'OTP sent to your email. It is valid for 1 minute.' });
 
   } catch (error) {
-    console.error('Forgot password error:', error);
     res.status(500).json({ success: false, message: 'Failed to process password reset request' });
   }
 };
@@ -216,7 +208,6 @@ export const verifyCode = async (req, res) => {
     return res.status(400).json({ success: false, message: 'Invalid OTP' });
 
   } catch (error) {
-    console.error('Verify code error:', error);
     res.status(500).json({ success: false, message: 'Failed to verify OTP' });
   }
 };
@@ -284,7 +275,7 @@ export const resetPassword = async (req, res) => {
     return res.status(400).json({ success: false, message: 'Invalid request' });
 
   } catch (error) {
-    console.error('Reset password error:', error);
     res.status(500).json({ success: false, message: 'Failed to reset password' });
   }
 };
+

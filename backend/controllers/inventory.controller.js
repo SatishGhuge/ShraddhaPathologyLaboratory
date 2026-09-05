@@ -35,7 +35,6 @@ export const createHSNCode = async (req, res) => {
       data: newHSNCode
     });
   } catch (error) {
-    console.error('Create HSN Code error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to create HSN Code'
@@ -59,7 +58,6 @@ export const getAllHSNCodes = async (req, res) => {
 
     res.json(buildPaginatedResponse(data, total, page, limit, 'HSN Codes fetched successfully'));
   } catch (error) {
-    console.error('Get HSN Codes error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to fetch HSN Codes'
@@ -89,7 +87,6 @@ export const getHSNCodeById = async (req, res) => {
       data: hsnCode
     });
   } catch (error) {
-    console.error('Get HSN Code by ID error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to fetch HSN Code'
@@ -114,7 +111,6 @@ export const updateHSNCode = async (req, res) => {
       data: hsnCode
     });
   } catch (error) {
-    console.error('Update HSN Code error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to update HSN Code'
@@ -157,7 +153,6 @@ export const createInventoryItem = async (req, res) => {
       data: newItem
     });
   } catch (error) {
-    console.error('Create inventory item error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to create inventory item'
@@ -181,7 +176,6 @@ export const getAllInventoryItems = async (req, res) => {
 
     res.json(buildPaginatedResponse(data, total, page, limit, 'Inventory items fetched successfully'));
   } catch (error) {
-    console.error('Get inventory items error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to fetch inventory items'
@@ -207,7 +201,6 @@ export const getAllItemsForDropdown = async (req, res) => {
       data: items
     });
   } catch (error) {
-    console.error('Get items for dropdown error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to fetch items'
@@ -218,8 +211,6 @@ export const getAllItemsForDropdown = async (req, res) => {
 export const getBatchesByItem = async (req, res) => {
   try {
     const { itemId } = req.params;
-    
-    console.log(`[getBatchesByItem] Fetching batches for itemId: ${itemId}`);
 
     // Fetch batches from lab_stocks table (real-time available quantities)
     const batches = await prisma.labStock.findMany({
@@ -233,8 +224,6 @@ export const getBatchesByItem = async (req, res) => {
       },
       orderBy: { expiryDate: 'asc' }
     });
-
-    console.log(`[getBatchesByItem] Found ${batches.length} batches`);
 
     // Format the response
     const formattedBatches = batches.map(batch => ({
@@ -251,7 +240,6 @@ export const getBatchesByItem = async (req, res) => {
       data: formattedBatches
     });
   } catch (error) {
-    console.error('[getBatchesByItem] Error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to fetch batches'
@@ -281,7 +269,6 @@ export const getInventoryItemById = async (req, res) => {
       data: item
     });
   } catch (error) {
-    console.error('Get inventory item error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to fetch inventory item'
@@ -306,7 +293,6 @@ export const updateInventoryItem = async (req, res) => {
       data: item
     });
   } catch (error) {
-    console.error('Update inventory item error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to update inventory item'
@@ -340,7 +326,6 @@ export const deleteInventoryItem = async (req, res) => {
       data: item
     });
   } catch (error) {
-    console.error('Delete inventory item error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to delete inventory item: ' + error.message
@@ -409,7 +394,6 @@ export const createSupplier = async (req, res) => {
       data: newSupplier
     });
   } catch (error) {
-    console.error('Create supplier error:', error);
     
     // Handle Prisma unique constraint errors
     if (error.code === 'P2002') {
@@ -456,7 +440,6 @@ export const getAllSuppliers = async (req, res) => {
 
     res.json(buildPaginatedResponse(data, total, page, limit, 'Suppliers fetched successfully'));
   } catch (error) {
-    console.error('Get suppliers error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to fetch suppliers'
@@ -486,7 +469,6 @@ export const getSupplierById = async (req, res) => {
       data: supplier
     });
   } catch (error) {
-    console.error('Get supplier error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to fetch supplier'
@@ -548,7 +530,6 @@ export const updateSupplier = async (req, res) => {
       data: supplier
     });
   } catch (error) {
-    console.error('Update supplier error:', error);
     
     // Handle Prisma unique constraint errors
     if (error.code === 'P2002') {
@@ -600,7 +581,6 @@ export const deleteSupplier = async (req, res) => {
       data: supplier
     });
   } catch (error) {
-    console.error('Delete supplier error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to delete supplier: ' + error.message
@@ -637,8 +617,6 @@ export const createStockEntry = async (req, res) => {
     // Determine if supplier is from outside Maharashtra for IGST calculation
     const isOutOfMaharashtra = supplier.state && 
       supplier.state.toLowerCase().trim() !== 'maharashtra';
-
-    console.log(`[createStockEntry] Supplier: ${supplier.supplierName}, State: ${supplier.state}, Out of Maharashtra: ${isOutOfMaharashtra}`);
 
     // Generate unique entryId with pattern: SE + YYMM + 0001
     const now = new Date();
@@ -701,18 +679,13 @@ export const createStockEntry = async (req, res) => {
           igstAmount = (basicAmount * finalIGSTPercent) / 100;
           calculatedIGSTPercent = finalIGSTPercent; // Use HSN GST rate as IGST
         } else {
-          console.warn(`[createStockEntry] No HSN code found for item ${item.itemId}`);
           igstAmount = 0;
         }
-
-        console.log(`[createStockEntry] Out-of-state item ${item.itemId}: IGST Rate = ${finalIGSTPercent}%, Amount = ${igstAmount}`);
       } else {
         // For Maharashtra suppliers: Use CGST + SGST
         cgstAmount = (basicAmount * item.cgstPercent) / 100;
         sgstAmount = (basicAmount * item.sgstPercent) / 100;
         igstAmount = 0;
-
-        console.log(`[createStockEntry] In-state item ${item.itemId}: CGST = ${item.cgstPercent}%, SGST = ${item.sgstPercent}%`);
       }
 
       const totalAmount = basicAmount + cgstAmount + sgstAmount + igstAmount;
@@ -847,7 +820,6 @@ export const createStockEntry = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Create stock entry error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to create stock entry: ' + error.message,
@@ -872,7 +844,6 @@ export const getAllStockEntries = async (req, res) => {
 
     res.json(buildPaginatedResponse(data, total, page, limit, 'Stock entries fetched successfully'));
   } catch (error) {
-    console.error('Get stock entries error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to fetch stock entries'
@@ -902,7 +873,6 @@ export const getStockEntryById = async (req, res) => {
       data: stockEntry
     });
   } catch (error) {
-    console.error('Get stock entry error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to fetch stock entry'
@@ -969,7 +939,6 @@ export const deleteStockEntry = async (req, res) => {
       data: deletedEntry
     });
   } catch (error) {
-    console.error('Delete stock entry error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to delete stock entry: ' + error.message
@@ -1121,7 +1090,6 @@ export const updateStockEntry = async (req, res) => {
       data: updatedEntry
     });
   } catch (error) {
-    console.error('Update stock entry error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to update stock entry: ' + error.message
@@ -1147,7 +1115,6 @@ export const getLabStocks = async (req, res) => {
 
     res.json(buildPaginatedResponse(data, total, page, limit, 'Lab stocks fetched successfully'));
   } catch (error) {
-    console.error('Get lab stocks error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to fetch lab stocks'
@@ -1253,7 +1220,6 @@ export const getLabStocksGroupedByItem = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Get lab stocks grouped error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to fetch lab stocks'
@@ -1276,7 +1242,6 @@ export const getLabStockByItem = async (req, res) => {
       data: stocks
     });
   } catch (error) {
-    console.error('Get lab stock by item error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to fetch lab stocks'
@@ -1389,7 +1354,6 @@ export const createStockTransaction = async (req, res) => {
       data: transaction
     });
   } catch (error) {
-    console.error('Create stock transaction error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to create stock transaction'
@@ -1420,7 +1384,6 @@ export const getAllStockTransactions = async (req, res) => {
 
     res.json(buildPaginatedResponse(data, total, page, limit, 'Stock transactions fetched successfully'));
   } catch (error) {
-    console.error('Get stock transactions error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to fetch stock transactions'
@@ -1442,13 +1405,9 @@ export const createLabToOrgTransfer = async (req, res) => {
       });
     }
 
-    console.log('[createLabToOrgTransfer] Starting transfer with organizationId:', organizationId);
-    console.log('[createLabToOrgTransfer] Items to transfer:', JSON.stringify(items));
-
     // Validate that sufficient stock exists for all items before proceeding
     const validationErrors = [];
     for (const item of items) {
-      console.log(`[createLabToOrgTransfer] Validating item - ItemId: ${item.itemId}, Batch: ${item.batchNo}`);
       
       const labStock = await prisma.labStock.findUnique({
         where: {
@@ -1472,7 +1431,6 @@ export const createLabToOrgTransfer = async (req, res) => {
     }
 
     if (validationErrors.length > 0) {
-      console.log('[createLabToOrgTransfer] Validation errors:', validationErrors);
       return res.status(400).json({
         success: false,
         message: 'Stock validation failed',
@@ -1511,12 +1469,9 @@ export const createLabToOrgTransfer = async (req, res) => {
       transferId = `${yearPrefix}${newSequence}`;
     }
 
-    console.log('[createLabToOrgTransfer] Generated transferId:', transferId);
-
     // Execute all operations within a transaction
     const transfer = await prisma.$transaction(async (tx) => {
       // Step 1: Create the transfer with items
-      console.log('[createLabToOrgTransfer] Creating transfer record...');
       
       const newTransfer = await tx.labToOrgTransfer.create({
         data: {
@@ -1537,19 +1492,14 @@ export const createLabToOrgTransfer = async (req, res) => {
         include: { items: { include: { item: true } }, organization: true }
       });
 
-      console.log('[createLabToOrgTransfer] Transfer record created:', newTransfer.id);
-
       // Step 2: Reduce LabStock and create/update OrganizationStock for each item
       for (const item of items) {
         const transferQty = parseInt(item.quantity);
         const itemId = parseInt(item.itemId);
         const batchNo = item.batchNo;
 
-        console.log(`[createLabToOrgTransfer] Processing item - ItemId: ${itemId}, Batch: ${batchNo}, Qty: ${transferQty}`);
-
         try {
           // STEP 2A: Reduce LabStock quantity
-          console.log(`  Updating LabStock with key: itemId=${itemId}, batchNo=${batchNo}`);
           const updatedLabStock = await tx.labStock.update({
             where: { itemId_batchNo: { itemId, batchNo } },
             data: {
@@ -1560,10 +1510,7 @@ export const createLabToOrgTransfer = async (req, res) => {
             }
           });
 
-          console.log(`[createLabToOrgTransfer] ✓ LabStock Updated - ItemId: ${itemId}, Batch: ${batchNo}, Qty Reduced: ${transferQty}, Remaining: ${updatedLabStock.quantityAvailable}`);
-
           // STEP 2B: Create or update OrganizationStock using upsert
-          console.log(`  Upserting OrgStock with orgId=${organizationId}, itemId=${itemId}, batch=${batchNo}`);
           const updatedOrgStock = await tx.organizationStock.upsert({
             where: {
               organizationId_itemId_batchNo: {
@@ -1587,10 +1534,7 @@ export const createLabToOrgTransfer = async (req, res) => {
               lastStockUpdate: new Date()
             }
           });
-
-          console.log(`[createLabToOrgTransfer] ✓ OrgStock Updated/Created - OrgId: ${organizationId}, ItemId: ${itemId}, Batch: ${batchNo}, New Qty: ${updatedOrgStock.quantityAvailable}`);
         } catch (itemError) {
-          console.error(`[ERROR] Failed to process item ${itemId}:`, itemError);
           throw itemError;
         }
       }
@@ -1598,15 +1542,12 @@ export const createLabToOrgTransfer = async (req, res) => {
       return newTransfer;
     });
 
-    console.log('[createLabToOrgTransfer] ✓✓✓ Transfer completed successfully!');
-
     res.status(201).json({
       success: true,
       message: 'Lab to organization transfer created successfully and stock updated',
       data: transfer
     });
   } catch (error) {
-    console.error('Create lab to org transfer error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to create transfer: ' + error.message
@@ -1636,7 +1577,6 @@ export const getAllLabToOrgTransfers = async (req, res) => {
 
     res.json(buildPaginatedResponse(data, total, page, limit, 'Transfers fetched successfully'));
   } catch (error) {
-    console.error('Get lab to org transfers error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to fetch transfers'
@@ -1661,7 +1601,6 @@ export const updateTransferStatus = async (req, res) => {
       data: transfer
     });
   } catch (error) {
-    console.error('Update transfer status error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to update transfer status'
@@ -1673,8 +1612,6 @@ export const deleteLabToOrgTransfer = async (req, res) => {
   try {
     const { id } = req.params;
 
-    console.log('[deleteLabToOrgTransfer] Deleting transfer ID:', id);
-
     // Get the transfer with all its items
     const transfer = await prisma.labToOrgTransfer.findUnique({
       where: { id: parseInt(id) },
@@ -1682,14 +1619,11 @@ export const deleteLabToOrgTransfer = async (req, res) => {
     });
 
     if (!transfer) {
-      console.log('[deleteLabToOrgTransfer] Transfer not found:', id);
       return res.status(404).json({
         success: false,
         message: 'Transfer not found'
       });
     }
-
-    console.log('[deleteLabToOrgTransfer] Found transfer:', transfer.transferId, 'OrgId:', transfer.organizationId);
 
     // Execute all operations within a transaction
     const deletedTransfer = await prisma.$transaction(async (tx) => {
@@ -1698,8 +1632,6 @@ export const deleteLabToOrgTransfer = async (req, res) => {
         const transferQty = item.quantity;
         const itemId = item.itemId;
         const batchNo = item.batchNo;
-
-        console.log(`[deleteLabToOrgTransfer] Processing item - ItemId: ${itemId}, Batch: ${batchNo}, Qty: ${transferQty}`);
 
         // Restore LabStock - add back the transferred quantity
         const restoredLabStock = await tx.labStock.update({
@@ -1716,8 +1648,6 @@ export const deleteLabToOrgTransfer = async (req, res) => {
             lastStockUpdate: new Date()
           }
         });
-
-        console.log(`[deleteLabToOrgTransfer] ✓ LabStock Restored - ItemId: ${itemId}, Batch: ${batchNo}, Qty Added: ${transferQty}, New Total: ${restoredLabStock.quantityAvailable}`);
 
         // Reduce OrganizationStock or delete if quantity becomes 0
         const orgStockKey = {
@@ -1740,7 +1670,6 @@ export const deleteLabToOrgTransfer = async (req, res) => {
             await tx.organizationStock.delete({
               where: orgStockKey
             });
-            console.log(`[deleteLabToOrgTransfer] ✓ OrgStock Deleted - OrgId: ${transfer.organizationId}, ItemId: ${itemId}, Batch: ${batchNo}`);
           } else {
             // Update organization stock quantity
             const updatedOrgStock = await tx.organizationStock.update({
@@ -1750,7 +1679,6 @@ export const deleteLabToOrgTransfer = async (req, res) => {
                 lastStockUpdate: new Date()
               }
             });
-            console.log(`[deleteLabToOrgTransfer] ✓ OrgStock Updated - OrgId: ${transfer.organizationId}, ItemId: ${itemId}, Batch: ${batchNo}, New Qty: ${updatedOrgStock.quantityAvailable}`);
           }
         }
       }
@@ -1768,15 +1696,12 @@ export const deleteLabToOrgTransfer = async (req, res) => {
       return deleted;
     });
 
-    console.log('[deleteLabToOrgTransfer] ✓✓✓ Transfer deleted successfully!');
-
     res.json({
       success: true,
       message: 'Transfer deleted successfully and stock restored',
       data: deletedTransfer
     });
   } catch (error) {
-    console.error('Delete lab to org transfer error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to delete transfer: ' + error.message
@@ -1806,7 +1731,6 @@ export const getOrganizationStocks = async (req, res) => {
 
     res.json(buildPaginatedResponse(data, total, page, limit, 'Organization stocks fetched successfully'));
   } catch (error) {
-    console.error('Get organization stocks error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to fetch organization stocks'
@@ -1855,7 +1779,6 @@ export const getInventorySummary = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Get inventory summary error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to fetch inventory summary'
@@ -1927,10 +1850,10 @@ export const processStockEntriesToLabStock = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Process stock entries error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to process stock entries: ' + error.message
     });
   }
 };
+

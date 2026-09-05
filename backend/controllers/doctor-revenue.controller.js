@@ -3,8 +3,6 @@ import prisma from '../config/database.js';
 // DEBUG: Test endpoint to check database content
 export const debugDoctorRevenue = async (req, res) => {
   try {
-    console.log('\n🔍 DEBUG ENDPOINT CALLED\n');
-
     // Get all patient tests
     const allTests = await prisma.patientTest.findMany({
       select: {
@@ -31,19 +29,19 @@ export const debugDoctorRevenue = async (req, res) => {
       take: 20
     });
 
-    console.log(`📊 Total patient tests in database: ${allTests.length}`);
-    console.log('\n📋 All tests (last 20):');
+
+
     allTests.forEach((t, i) => {
       const dateStr = t.visitDate ? new Date(t.visitDate).toISOString() : 'null';
-      console.log(`${i+1}. ID:${t.id} | Date:${dateStr} | RefDoctor:"${t.referralDoctor}" | Test:${t.test.name} | Patient:${t.patient.firstName} ${t.patient.lastName}`);
+
     });
 
     // Filter for referral doctors
     const withRefDoctors = allTests.filter(t => t.referralDoctor && t.referralDoctor !== 'SELF' && t.referralDoctor !== '');
-    console.log(`\n👨‍⚕️ Tests WITH referral doctors: ${withRefDoctors.length}`);
+
     withRefDoctors.forEach((t, i) => {
       const dateStr = t.visitDate ? new Date(t.visitDate).toISOString().split('T')[0] : 'null';
-      console.log(`${i+1}. Date:${dateStr} | Doctor:${t.referralDoctor} | Patient:${t.patient.firstName}`);
+
     });
 
     // Get yesterday's date
@@ -52,8 +50,8 @@ export const debugDoctorRevenue = async (req, res) => {
     const yesterday = new Date(today);
     yesterday.setDate(yesterday.getDate() - 1);
 
-    console.log(`\n📅 Today's date (00:00): ${today.toISOString()}`);
-    console.log(`📅 Yesterday's date (00:00): ${yesterday.toISOString()}`);
+
+
 
     // Find yesterday's tests
     const yesterdayTests = await prisma.patientTest.findMany({
@@ -75,9 +73,9 @@ export const debugDoctorRevenue = async (req, res) => {
       }
     });
 
-    console.log(`\n📅 Tests registered YESTERDAY: ${yesterdayTests.length}`);
+
     yesterdayTests.forEach((t, i) => {
-      console.log(`${i+1}. visitDate:${t.visitDate} | refDoctor:"${t.referralDoctor}" | patient:${t.patient.firstName}`);
+
     });
 
     // Check doctor charges
@@ -102,9 +100,9 @@ export const debugDoctorRevenue = async (req, res) => {
       take: 10
     });
 
-    console.log(`\n💰 Doctor test charges in database: ${doctorCharges.length}`);
+
     doctorCharges.slice(0, 5).forEach((dc, i) => {
-      console.log(`${i+1}. Doctor:${dc.doctor.name} | Test:${dc.test.name} | DiscountR:${dc.discountR} | DiscountS:${dc.discountS}`);
+
     });
 
     res.json({
@@ -121,7 +119,7 @@ export const debugDoctorRevenue = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('❌ Debug endpoint error:', error);
+
     res.status(500).json({
       success: false,
       error: error.message
@@ -134,10 +132,10 @@ export const getDoctorReferralRevenue = async (req, res) => {
   try {
     const { fromDate, toDate, doctorName } = req.query;
     
-    console.log('📥 getDoctorReferralRevenue called with:');
-    console.log('   fromDate:', fromDate);
-    console.log('   toDate:', toDate);
-    console.log('   doctorName:', doctorName);
+
+
+
+
 
     // Build where condition - FIRST, get ALL tests for the date range
     const whereCondition = {};
@@ -156,14 +154,7 @@ export const getDoctorReferralRevenue = async (req, res) => {
         gte: startDate,
         lte: endDate
       };
-      
-      console.log('📅 Date filter (local timezone):');
-      console.log('   Requested fromDate:', fromDate, '→ Start:', startDate);
-      console.log('   Requested toDate:', toDate, '→ End:', endDate);
-      console.log('   Filter: visitDate between', startDate, 'and', endDate);
     }
-
-    console.log('   Where condition:', JSON.stringify(whereCondition, null, 2));
 
     // Fetch patient tests with related data
     const patientTests = await prisma.patientTest.findMany({
@@ -195,15 +186,13 @@ export const getDoctorReferralRevenue = async (req, res) => {
       }
     });
 
-    console.log(`✅ Found ${patientTests.length} patient tests total`);
-    
     // Filter for referral doctors - ONLY include tests where referralDoctor is set and not 'SELF'
     const testsWithRefDoctors = patientTests.filter(t => t.referralDoctor && t.referralDoctor !== 'SELF' && t.referralDoctor !== '');
-    console.log(`👨‍⚕️ Tests WITH referral doctors: ${testsWithRefDoctors.length}`);
+
     
     if (testsWithRefDoctors.length === 0) {
-      console.log('⚠️  NO TESTS WITH REFERRAL DOCTORS FOUND!');
-      console.log('📊 Returning empty array - patients must have a referral doctor to appear in this report');
+
+
       
       return res.json({
         success: true,
@@ -281,7 +270,7 @@ export const getDoctorReferralRevenue = async (req, res) => {
       })
     );
 
-    console.log(`📤 Returning ${revenue.length} revenue records`);
+
 
     res.json({
       success: true,
@@ -289,8 +278,8 @@ export const getDoctorReferralRevenue = async (req, res) => {
       count: revenue.length
     });
   } catch (error) {
-    console.error('❌ Get doctor referral revenue error:', error);
-    console.error('   Stack:', error.stack);
+
+
     res.status(500).json({
       success: false,
       message: 'Failed to fetch doctor referral revenue',
@@ -298,3 +287,4 @@ export const getDoctorReferralRevenue = async (req, res) => {
     });
   }
 };
+

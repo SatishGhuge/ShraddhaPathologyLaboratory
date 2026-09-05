@@ -22,7 +22,6 @@ export const getAllRunners = async (req, res) => {
       data: runners
     });
   } catch (error) {
-    console.error('❌ Get runners error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to fetch runners',
@@ -63,7 +62,6 @@ export const getRunnersByLocation = async (req, res) => {
       data: runners
     });
   } catch (error) {
-    console.error('❌ Get runners by location error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to fetch runners',
@@ -118,7 +116,6 @@ export const getRunnerWorkload = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('❌ Get runner workload error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to fetch runner workload',
@@ -185,7 +182,6 @@ export const getAllHomeVisits = async (req, res) => {
       data: visits
     });
   } catch (error) {
-    console.error('❌ Get home visits error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to fetch home visits',
@@ -228,7 +224,6 @@ export const getHomeVisitDetails = async (req, res) => {
       data: visit
     });
   } catch (error) {
-    console.error('❌ Get home visit details error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to fetch home visit details',
@@ -287,8 +282,6 @@ export const autoAssignRunner = async (req, res) => {
       prev.workload < current.workload ? prev : current
     );
 
-    console.log(`✅ Runner auto-assigned: ${assignedRunner.runner.name}`);
-
     res.json({
       success: true,
       data: {
@@ -299,7 +292,6 @@ export const autoAssignRunner = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('❌ Auto-assign runner error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to auto-assign runner',
@@ -366,7 +358,6 @@ export const updateHomeVisitStatus = async (req, res) => {
           `Hello ${homeVisit.patientTest.patient.firstName}!\n\n✓ Your sample has been received by ${homeVisit.runner.name}.\n\nYour test report will be ready soon.\n\nThank you!`
         );
       } catch (err) {
-        console.warn('⚠️ SMS notification failed:', err.message);
       }
     }
 
@@ -378,15 +369,12 @@ export const updateHomeVisitStatus = async (req, res) => {
       });
     }
 
-    console.log(`✅ Home visit status updated: ${homeVisitId} → ${status}`);
-
     res.json({
       success: true,
       message: `Home visit status updated to ${status}`,
       data: updatedVisit
     });
   } catch (error) {
-    console.error('❌ Update status error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to update home visit status',
@@ -436,15 +424,12 @@ export const updateRunnerLocation = async (req, res) => {
       }
     });
 
-    console.log(`📍 Runner location updated: ${homeVisitId}`);
-
     res.json({
       success: true,
       message: 'Location updated',
       data: location
     });
   } catch (error) {
-    console.error('❌ Update location error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to update location',
@@ -468,7 +453,6 @@ export const getRunnerLocationHistory = async (req, res) => {
       data: locations
     });
   } catch (error) {
-    console.error('❌ Get location history error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to fetch location history',
@@ -501,7 +485,6 @@ export const getCurrentRunnerLocation = async (req, res) => {
       data: location
     });
   } catch (error) {
-    console.error('❌ Get current location error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to fetch current location',
@@ -547,7 +530,6 @@ export const getHomeVisitStats = async (req, res) => {
       data: stats
     });
   } catch (error) {
-    console.error('❌ Get stats error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to fetch statistics',
@@ -555,4 +537,5 @@ export const getHomeVisitStats = async (req, res) => {
     });
   }
 };
+
 

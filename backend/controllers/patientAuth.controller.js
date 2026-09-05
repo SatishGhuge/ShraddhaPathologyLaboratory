@@ -62,8 +62,6 @@ export const patientSelfRegister = async (req, res) => {
       title
     } = req.body;
 
-    console.log('📝 Patient Self-Registration:', { firstName, email, phone });
-
     // Validate password match
     if (password !== confirmPassword) {
       return res.status(400).json({
@@ -131,8 +129,6 @@ export const patientSelfRegister = async (req, res) => {
       }
     });
 
-    console.log('✅ Patient registered:', patientId);
-
     // Send registration credentials email with patient ID and password
     await emailService.sendRegistrationCredentials(
       email,
@@ -158,7 +154,6 @@ export const patientSelfRegister = async (req, res) => {
       requiresEmailVerification: true
     });
   } catch (error) {
-    console.error('❌ Patient registration error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to register patient',
@@ -187,12 +182,6 @@ export const registerPatientViaOrganization = async (req, res) => {
       title,
       organizationId
     } = req.body;
-
-    console.log('🏢 Patient Registration via Organization:', {
-      firstName,
-      email,
-      organizationId
-    });
 
     // Verify organization exists
     const organization = await prisma.organization.findUnique({
@@ -258,8 +247,6 @@ export const registerPatientViaOrganization = async (req, res) => {
       }
     });
 
-    console.log('✅ Patient registered via organization:', patientId);
-
     // Send credentials email with temporary password
     await emailService.sendRegistrationCredentials(
       email,
@@ -289,7 +276,6 @@ export const registerPatientViaOrganization = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('❌ Organization registration error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to register patient',
@@ -317,8 +303,6 @@ export const registerPatientDirect = async (req, res) => {
       location,
       title
     } = req.body;
-
-    console.log('🏥 Direct Patient Registration:', { firstName, email, phone });
 
     // Check if patient already exists
     const existingPatient = await prisma.patient.findFirst({
@@ -371,8 +355,6 @@ export const registerPatientDirect = async (req, res) => {
       }
     });
 
-    console.log('✅ Patient registered directly:', patientId);
-
     // Send credentials via Email and WhatsApp
     await emailService.sendRegistrationCredentials(
       email,
@@ -402,7 +384,6 @@ export const registerPatientDirect = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('❌ Direct registration error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to register patient',
@@ -421,26 +402,20 @@ export const patientLogin = async (req, res) => {
 
     const { email, password } = req.body;
 
-    console.log('🔐 Patient Login Attempt:', email);
-
     // Find patient by email
     const patient = await prisma.patient.findFirst({
       where: { email }
     });
 
     if (!patient) {
-      console.log('❌ Patient not found with email:', email);
       return res.status(401).json({
         success: false,
         message: 'Invalid email or password'
       });
     }
 
-    console.log('✅ Patient found:', patient.patientId);
-
     // Check if patient has password set
     if (!patient.password) {
-      console.log('❌ Patient has no password set:', patient.patientId);
       return res.status(401).json({
         success: false,
         message: 'Invalid email or password'
@@ -451,19 +426,14 @@ export const patientLogin = async (req, res) => {
     const isPasswordValid = await bcrypt.compare(password, patient.password);
 
     if (!isPasswordValid) {
-      console.log('❌ Password mismatch for patient:', patient.patientId);
       return res.status(401).json({
         success: false,
         message: 'Invalid email or password'
       });
     }
 
-    console.log('✅ Password verified for patient:', patient.patientId);
-
     // Generate JWT token
     const token = generateToken(patient.patientId, patient.email);
-
-    console.log('✅ Patient logged in successfully:', patient.patientId);
 
     res.json({
       success: true,
@@ -479,7 +449,6 @@ export const patientLogin = async (req, res) => {
       token
     });
   } catch (error) {
-    console.error('❌ Login error:', error);
     res.status(500).json({
       success: false,
       message: 'Login failed',
@@ -492,8 +461,6 @@ export const patientLogin = async (req, res) => {
 export const verifyEmail = async (req, res) => {
   try {
     const { patientId, token } = req.body;
-
-    console.log('📧 Email Verification Attempt:', patientId);
 
     // Find patient
     const patient = await prisma.patient.findUnique({
@@ -557,14 +524,11 @@ export const verifyEmail = async (req, res) => {
       data: { isEmailVerified: true }
     });
 
-    console.log('✅ Email verified successfully:', patientId);
-
     res.json({
       success: true,
       message: 'Email verified successfully'
     });
   } catch (error) {
-    console.error('❌ Email verification error:', error);
     res.status(500).json({
       success: false,
       message: 'Email verification failed',
@@ -577,8 +541,6 @@ export const verifyEmail = async (req, res) => {
 export const resendVerificationEmail = async (req, res) => {
   try {
     const { email } = req.body;
-
-    console.log('🔄 Resend Verification Email:', email);
 
     // Find patient
     const patient = await prisma.patient.findFirst({
@@ -623,8 +585,6 @@ export const resendVerificationEmail = async (req, res) => {
       }
     });
 
-    console.log('✅ Verification email resent:', email);
-
     // Send verification email
     await emailService.sendEmailVerificationLink(
       email,
@@ -638,7 +598,6 @@ export const resendVerificationEmail = async (req, res) => {
       message: 'Verification email resent. Please check your inbox.'
     });
   } catch (error) {
-    console.error('❌ Resend verification error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to resend verification email',
@@ -651,8 +610,6 @@ export const resendVerificationEmail = async (req, res) => {
 export const forgotPassword = async (req, res) => {
   try {
     const { email } = req.body;
-
-    console.log('🔑 Forgot Password Request:', email);
 
     // Find patient
     const patient = await prisma.patient.findFirst({
@@ -679,8 +636,6 @@ export const forgotPassword = async (req, res) => {
       }
     });
 
-    console.log('✅ Password reset token generated:', patient.patientId);
-
     // Send password reset email
     await emailService.sendPasswordResetLink(
       email,
@@ -694,7 +649,6 @@ export const forgotPassword = async (req, res) => {
       message: 'If email exists, password reset link will be sent to your email.'
     });
   } catch (error) {
-    console.error('❌ Forgot password error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to process forgot password request',
@@ -712,8 +666,6 @@ export const resetPassword = async (req, res) => {
     }
 
     const { patientId, token, password, confirmPassword } = req.body;
-
-    console.log('🔄 Reset Password:', patientId);
 
     // Validate passwords match
     if (password !== confirmPassword) {
@@ -772,14 +724,11 @@ export const resetPassword = async (req, res) => {
       data: { password: passwordHash }
     });
 
-    console.log('✅ Password reset successfully:', patientId);
-
     res.json({
       success: true,
       message: 'Password reset successfully. Please login with your new password.'
     });
   } catch (error) {
-    console.error('❌ Reset password error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to reset password',
@@ -827,7 +776,6 @@ export const getPatientProfile = async (req, res) => {
       data: patient
     });
   } catch (error) {
-    console.error('❌ Get profile error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to fetch profile',
@@ -866,15 +814,12 @@ export const updatePatientProfile = async (req, res) => {
       }
     });
 
-    console.log('✅ Patient profile updated:', patientId);
-
     res.json({
       success: true,
       message: 'Profile updated successfully',
       data: patient
     });
   } catch (error) {
-    console.error('❌ Update profile error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to update profile',
@@ -882,4 +827,5 @@ export const updatePatientProfile = async (req, res) => {
     });
   }
 };
+
 

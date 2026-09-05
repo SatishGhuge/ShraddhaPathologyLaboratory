@@ -41,8 +41,6 @@ const calculateAndUpdateAgeFields = async (patientId, dob) => {
       months += 12;
     }
     
-    console.log(`✅ Calculated age for patient ${patientId}: ${years}Y ${months}M ${days}D`);
-    
     // Update the patient record with calculated age fields (Int fields only)
     await prisma.patient.update({
       where: { patientId },
@@ -55,7 +53,6 @@ const calculateAndUpdateAgeFields = async (patientId, dob) => {
     
     return { years, months, days };
   } catch (error) {
-    console.error('Error calculating age fields:', error);
     return null;
   }
 };
@@ -94,13 +91,6 @@ export const getPatientTests = async (req, res) => {
     const andConditions = [];
 
     // 🔴 DEBUG: Log all incoming filters
-    console.log('🔴 Result Controller - getPatientTests Filters:');
-    console.log('   department:', department);
-    console.log('   organization:', organization);
-    console.log('   status:', status);
-    console.log('   testName:', testName);
-    console.log('   fromDate:', fromDate);
-    console.log('   toDate:', toDate);
 
     // Filter by status
     if (status && status !== 'All') {
@@ -136,7 +126,6 @@ export const getPatientTests = async (req, res) => {
 
     // Filter by department - use case-insensitive comparison
     if (department && department !== '') {
-      console.log(`🔴 Applying department filter: "${department}"`);
       // Use contains for case-insensitive matching (MySQL default is case-insensitive)
       andConditions.push({ 
         department: { 
@@ -184,17 +173,10 @@ export const getPatientTests = async (req, res) => {
 
     const whereCondition = andConditions.length > 0 ? { AND: andConditions } : {};
 
-    // 🔴 DEBUG: Log the where condition
-    console.log('🔴 WHERE condition:', JSON.stringify(whereCondition, null, 2));
-    console.log('🔴 Filter applied: Excluding tests with status IN [Cancelled, CANCELLED, cancelled]');
-
     // Get total count for pagination
     const total = await prisma.patientTest.count({
       where: whereCondition
     });
-
-    // 🔴 DEBUG: Log total count
-    console.log(`🔴 Total records found: ${total}`);
 
     // Get paginated data
     const patientTests = await prisma.patientTest.findMany({
@@ -266,15 +248,6 @@ export const getPatientTests = async (req, res) => {
       ]
     });
 
-    // 🔴 DEBUG: Log test statuses to verify filter is working
-    console.log(`🔴 Query returned ${patientTests.length} tests`);
-    const testStatuses = patientTests.map(t => ({ id: t.id, status: t.status }));
-    console.log('🔴 Test Statuses:', JSON.stringify(testStatuses, null, 2));
-    const cancelledInResults = patientTests.filter(t => t.status && t.status.toLowerCase() === 'cancelled');
-    if (cancelledInResults.length > 0) {
-      console.warn(`🔴 WARNING: Found ${cancelledInResults.length} cancelled tests in results! Filter not working!`);
-    }
-
     // Group tests by patient and visitId for display
     const groupedResults = {};
     
@@ -286,13 +259,6 @@ export const getPatientTests = async (req, res) => {
         const ageYears = patientTest.patient.ageYears || 0;
         const ageMonths = patientTest.patient.ageMonths || 0;
         const ageDays = patientTest.patient.ageDays || 0;
-        
-        // 🔴 DEBUG: Log age values being sent
-        console.log(`🔴 DEBUG Age - Patient: ${patientTest.patient.firstName} ${patientTest.patient.lastName}`);
-        console.log(`   ageYears: ${patientTest.patient.ageYears} (type: ${typeof patientTest.patient.ageYears})`);
-        console.log(`   ageMonths: ${patientTest.patient.ageMonths} (type: ${typeof patientTest.patient.ageMonths})`);
-        console.log(`   ageDays: ${patientTest.patient.ageDays} (type: ${typeof patientTest.patient.ageDays})`);
-        console.log(`   dob: ${patientTest.patient.dob}`);
         
         // Use the formatAgeFromComponents helper function
         const formattedAge = formatAgeFromComponents(ageYears, ageMonths, ageDays);
@@ -312,7 +278,6 @@ export const getPatientTests = async (req, res) => {
           // Demographics
           gender: patientTest.patient.gender || '',
           mobile: patientTest.patient.mobile || '',
-          email: patientTest.patient.email || '',
           address: patientTest.patient.address || '',
           location: patientTest.patient.location || '',
           
@@ -418,7 +383,6 @@ export const getPatientTests = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Get patient tests error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to fetch patient tests'
@@ -430,9 +394,7 @@ export const getPatientTests = async (req, res) => {
 export const getPatientTestById = async (req, res) => {
   try {
     const { id } = req.params;
-    
-    console.log('Fetching patient test with ID:', id);
-    
+
     const patientTest = await prisma.patientTest.findUnique({
       where: { id: parseInt(id) },
       include: {
@@ -453,16 +415,12 @@ export const getPatientTestById = async (req, res) => {
     });
 
     if (!patientTest) {
-      console.log('Patient test not found for ID:', id);
       return res.status(404).json({
         success: false,
         message: 'Patient test not found'
       });
     }
 
-    console.log('Found patient test:', patientTest.id, 'for patient:', patientTest.patient.firstName);
-    console.log('Total testResults in database:', patientTest.testResults?.length || 0);
-    
     // ✅ Calculate and update age fields if DOB is available
     if (patientTest.patient.dob) {
       await calculateAndUpdateAgeFields(patientTest.patient.patientId, patientTest.patient.dob);
@@ -472,18 +430,6 @@ export const getPatientTestById = async (req, res) => {
       });
     }
     
-    console.log('Test Results Details:', JSON.stringify(patientTest.testResults, null, 2));
-    
-    // Log which parameters exist in testResults
-    if (patientTest.testResults && patientTest.testResults.length > 0) {
-      console.log('✅ Found test results with values:');
-      patientTest.testResults.forEach(tr => {
-        console.log(`  - parameterId: ${tr.testParameterId}, numericValue: ${tr.numericValue}, textValue: ${tr.textValue}`);
-      });
-    } else {
-      console.log('⚠️  No test results found - array is empty or null');
-    }
-
     // Get test categories with their parameters - fetch all range-related fields
     const testCategories = await prisma.testCategory.findMany({
       where: { 
@@ -553,15 +499,6 @@ export const getPatientTestById = async (req, res) => {
       }
     });
 
-    console.log(`\nℹ️  Test Categories found: ${testCategories.length}`);
-    testCategories.forEach(cat => {
-      console.log(`  - CategoryID ${cat.id}: ${cat.categoryName || '(no name)'}`);
-      console.log(`    testMethod: "${cat.testMethod}" (from category)`);
-      console.log(`    parameter: ${cat.testParameter?.parameterName}`);
-      console.log(`    parameter.testMethod: "${cat.testParameter?.testMethod}" (from parameter)`);
-      console.log(`    FINAL testMethod: "${cat.testMethod || cat.testParameter?.testMethod || '(none)'}"`);
-    });
-
     // Process parameters from categories
     const allParameters = [];
     const groupedParameters = {};
@@ -581,15 +518,7 @@ export const getPatientTestById = async (req, res) => {
         // Find existing result for this parameter
         const existingResult = patientTest.testResults.find(r => r.testParameterId === category.testParameter.id);
         if (existingResult) {
-          console.log(`  ✅ Found saved result for parameter ${category.testParameter.parameterName}:`, {
-            paramId: category.testParameter.id,
-            numericValue: existingResult.numericValue,
-            textValue: existingResult.textValue,
-            selectedOption: existingResult.selectedOption
-          });
           totalExistingResults++;
-        } else {
-          console.log(`  ⭕ NO result found for parameter ${category.testParameter.parameterName} (ID: ${category.testParameter.id})`);
         }
         
         const foundResult = patientTest.testResults.find(r => 
@@ -600,26 +529,6 @@ export const getPatientTestById = async (req, res) => {
           // Fallback: match by parameter name (in case parameter was updated)
           (r.testParameter && r.testParameter.parameterName === category.testParameter.parameterName)
         );
-        
-        console.log(`  📌 Parameter: ${category.testParameter.parameterName} (ID: ${category.testParameter.id}, CategoryID: ${category.id})`);
-        console.log(`    Looking for result matching: categoryId=${category.id} OR paramId=${category.testParameter.id} OR paramName=${category.testParameter.parameterName}`);
-        if (patientTest.testResults.length > 0) {
-          console.log(`    Available results:`, patientTest.testResults.map(tr => ({
-            paramId: tr.testParameterId,
-            categoryId: tr.testCategoryId,
-            paramName: tr.testParameter?.parameterName,
-            value: tr.numericValue || tr.textValue
-          })));
-        }
-        console.log(`    Result found: ${!!foundResult}`);
-        if (foundResult) {
-          console.log(`    ✅ MATCHED! Result data:`, {
-            testResultId: foundResult.id,
-            parameterName: foundResult.testParameter?.parameterName,
-            numericValue: foundResult.numericValue,
-            textValue: foundResult.textValue
-          });
-        }
 
         const parameter = {
           id: category.testParameter.id,
@@ -641,13 +550,6 @@ export const getPatientTestById = async (req, res) => {
           categoryTestMethod: category.testMethod || null,
           parameterTestMethod: category.testParameter.testMethod || null,
           testMethod: category.testMethod || category.testParameter.testMethod || '',
-          
-          // Log for debugging
-          _debug_testMethod: {
-            categoryTestMethod: category.testMethod,
-            parameterTestMethod: category.testParameter.testMethod,
-            finalValue: category.testMethod || category.testParameter.testMethod || ''
-          },
           
           // Range type and display text from database
           rangeType: category.testParameter.rangeType,
@@ -778,15 +680,8 @@ export const getPatientTestById = async (req, res) => {
         // Find existing result for this parameter
         const existingResult = patientTest.testResults.find(r => r.testParameterId === param.id);
         if (existingResult) {
-          console.log(`  ✅ Found saved result for DIRECT parameter ${param.parameterName}:`, {
-            paramId: param.id,
-            numericValue: existingResult.numericValue,
-            textValue: existingResult.textValue,
-            selectedOption: existingResult.selectedOption
-          });
           totalExistingResults++;
         } else {
-          console.log(`  ⭕ NO result found for DIRECT parameter ${param.parameterName} (ID: ${param.id})`);
         }
         
         const parameter = {
@@ -869,19 +764,6 @@ export const getPatientTestById = async (req, res) => {
       });
     }
 
-    console.log(`Processed ${allParameters.length} parameters in ${Object.keys(groupedParameters).length} categories`);
-    console.log(`📤 RETURNING: ${totalExistingResults} parameters have existing saved results`);
-
-    // 🔴 DEBUG: Log final parameters with textContent info
-    console.log(`\n✅ FINAL Parameter List for Response:`);
-    allParameters.forEach(p => {
-      if (p.type === 'Text') {
-        console.log(`  📝 TEXT PARAM: ${p.parameterName}`);
-        console.log(`     textContent: "${p.textContent}"`);
-        console.log(`     _debug_textContent:`, p._debug_textContent);
-      }
-    });
-
     // 🔧 Fetch outsourcing report data if this is an outsourced test
     let outsourcingReport = null;
     if (patientTest.test?.isOutsourced) {
@@ -897,24 +779,7 @@ export const getPatientTestById = async (req, res) => {
           }
         }
       });
-      console.log('✅ Fetched outsourcing report:', outsourcingReport ? 'Found' : 'Not found');
-      if (outsourcingReport?.extractedData) {
-        console.log('📋 Extracted data stored:', outsourcingReport.extractedData);
-      }
     }
-
-    // 🔴 DEBUG: Log what we're sending back
-    console.log(`\n📤 SENDING RESPONSE for PatientTest ID: ${patientTest.id}`);
-    console.log(`   patientTest.patient exists: ${!!patientTest.patient}`);
-    console.log(`   patientTest.patient.ageYears: ${patientTest.patient?.ageYears}`);
-    console.log(`   patientTest.patient.ageMonths: ${patientTest.patient?.ageMonths}`);
-    console.log(`   patientTest.patient.ageDays: ${patientTest.patient?.ageDays}`);
-    console.log(`   patientTest.patient.gender: ${patientTest.patient?.gender}`);
-    console.log(`   parameters count: ${allParameters.length}`);
-    console.log(`   Total with ageRanges: ${allParameters.filter(p => p.ageRanges).length}`);
-    console.log(`   ✅ usedMachineId: ${patientTest.usedMachineId}`);
-    console.log(`   ✅ usedMachine data:`, JSON.stringify(patientTest.usedMachine, null, 2));
-    console.log(`   ✅ Full patientTest object keys:`, Object.keys(patientTest));
 
     // ✅ Ensure usedMachine is included in response
     const responseData = {
@@ -936,21 +801,12 @@ export const getPatientTestById = async (req, res) => {
       }
     };
 
-    console.log('🔧 MACHINE DATA DEBUG:');
-    console.log(`   usedMachineId in DB: ${patientTest.usedMachineId}`);
-    console.log(`   usedMachine object:`, patientTest.usedMachine);
-    console.log(`   usedMachine name: ${patientTest.usedMachine?.name}`);
-    console.log(`   usedMachine description: ${patientTest.usedMachine?.description}`);
-    console.log('📤 FINAL RESPONSE DATA usedMachine:', responseData.patientTest.usedMachine);
-
     res.json({
       success: true,
       data: responseData
     });
 
   } catch (error) {
-    console.error('Get patient test error:', error);
-    console.error('Error stack:', error.stack);
     res.status(500).json({
       success: false,
       message: 'Failed to fetch patient test: ' + error.message
@@ -993,7 +849,7 @@ function getNormalRange(parameter, patient) {
   if (parameter.ageRanges) {
     try {
       let ageRanges = JSON.parse(parameter.ageRanges);
-      console.log(`\n   🔍 CHECKING ${ageRanges.length} AGE RANGES:`);
+
       
       // ✅ PRIORITY SORT: Check matching gender first, then both/other
       // This ensures exact gender match takes priority over "Both"
@@ -1010,22 +866,22 @@ function getNormalRange(parameter, patient) {
       
       // Find matching range based on patient gender and age
       for (const range of ageRanges) {
-        console.log(`\n   📋 Range: "${range.label}"`);
+
         
         if (!range.enabled) {
-          console.log(`      ❌ DISABLED - skipping`);
+
           continue;
         }
         
         // Check gender match - if range has gender specified, it must match patient gender or be 'both'
         const rangeGender = range.gender?.toLowerCase();
-        console.log(`      Gender Check: range="${rangeGender}", patient="${patientGender}"`);
+
         
         if (rangeGender && rangeGender !== 'both' && rangeGender !== patientGender) {
-          console.log(`      ❌ GENDER MISMATCH - skipping`);
+
           continue;
         }
-        console.log(`      ✅ GENDER OK`);
+
         
         let ageMatches = false;
         
@@ -1034,57 +890,57 @@ function getNormalRange(parameter, patient) {
           const ageToCheck = getAgeInUnit(exactAgeInYears, exactAgeInMonths, exactAgeInDays, range.timeUnit);
           // -1 indicates patient is too old for this unit (e.g., months for an 8-year-old)
           if (ageToCheck === -1) {
-            console.log(`      Age Check: "Less Than" - patient too old for ${range.timeUnit} ranges`);
+
             continue;
           }
           ageMatches = ageToCheck < range.value;
-          console.log(`      Age Check: "Less Than" - ageToCheck(${range.timeUnit})=${ageToCheck} < ${range.value} = ${ageMatches}`);
+
         } else if (range.label?.includes('More Than') && range.value !== null && range.value !== undefined) {
           const ageToCheck = getAgeInUnit(exactAgeInYears, exactAgeInMonths, exactAgeInDays, range.timeUnit);
           // -1 indicates patient is too old for this unit
           if (ageToCheck === -1) {
-            console.log(`      Age Check: "More Than" - patient too old for ${range.timeUnit} ranges`);
+
             continue;
           }
           ageMatches = ageToCheck > range.value;
-          console.log(`      Age Check: "More Than" - ageToCheck(${range.timeUnit})=${ageToCheck} > ${range.value} = ${ageMatches}`);
+
         } else if (range.label?.includes('Between') && range.from !== null && range.to !== null) {
           const ageToCheck = getAgeInUnit(exactAgeInYears, exactAgeInMonths, exactAgeInDays, range.timeUnit);
           // -1 indicates patient is too old for this unit
           if (ageToCheck === -1) {
-            console.log(`      Age Check: "Between" - patient too old for ${range.timeUnit} ranges`);
+
             continue;
           }
           ageMatches = ageToCheck >= range.from && ageToCheck <= range.to;
-          console.log(`      Age Check: "Between" - ageToCheck(${range.timeUnit})=${ageToCheck} in [${range.from}, ${range.to}] = ${ageMatches}`);
+
         } else if (range.label?.includes('Equal To') && range.value !== null && range.value !== undefined) {
           const ageToCheck = getAgeInUnit(exactAgeInYears, exactAgeInMonths, exactAgeInDays, range.timeUnit);
           // -1 indicates patient is too old for this unit
           if (ageToCheck === -1) {
-            console.log(`      Age Check: "Equal To" - patient too old for ${range.timeUnit} ranges`);
+
             continue;
           }
           ageMatches = ageToCheck === range.value;
-          console.log(`      Age Check: "Equal To" - ageToCheck(${range.timeUnit})=${ageToCheck} === ${range.value} = ${ageMatches}`);
+
         }
         
         // Check if range has valid LL and UL
         const hasValidRange = range.ll !== null && range.ul !== null;
-        console.log(`      Range Values: LL=${range.ll}, UL=${range.ul}, valid=${hasValidRange}`);
+
         
         // Return range if age and gender conditions match
         if (ageMatches && hasValidRange) {
-          console.log(`      ✅✅✅ MATCH FOUND! RETURNING: ${range.ll} - ${range.ul}`);
+
           return `${range.ll} - ${range.ul}`;
         }
         
         if (ageMatches && !hasValidRange) {
-          console.log(`      ⚠️ Age matched but NO valid range values (LL/UL null)`);
+
         }
       }
-      console.log(`\n   ❌ NO AGE RANGE MATCHED - continuing to fallback`);
+
     } catch (error) {
-      console.error('Error parsing age ranges:', error);
+
     }
   }
 
@@ -1093,7 +949,7 @@ function getNormalRange(parameter, patient) {
     // Child ranges (typically < 18 years) - check if child range is active and available
     if (exactAgeInYears < 18 && parameter.childActive && 
         parameter.childLowValue !== null && parameter.childHighValue !== null) {
-      console.log(`   ✅ Using CHILD range: ${parameter.childLowValue} - ${parameter.childHighValue}`);
+
       return `${parameter.childLowValue} - ${parameter.childHighValue}`;
     }
     
@@ -1101,25 +957,25 @@ function getNormalRange(parameter, patient) {
     if (exactAgeInYears >= 18) {
       if (patientGender === 'female' && parameter.femaleActive && 
           parameter.femaleLowValue !== null && parameter.femaleHighValue !== null) {
-        console.log(`   ✅ Using FEMALE range (gender match): ${parameter.femaleLowValue} - ${parameter.femaleHighValue}`);
+
         return `${parameter.femaleLowValue} - ${parameter.femaleHighValue}`;
       }
       
       if (patientGender === 'male' && parameter.maleActive && 
           parameter.maleLowValue !== null && parameter.maleHighValue !== null) {
-        console.log(`   ✅ Using MALE range (gender match): ${parameter.maleLowValue} - ${parameter.maleHighValue}`);
+
         return `${parameter.maleLowValue} - ${parameter.maleHighValue}`;
       }
       
       // If gender doesn't match male/female, try both with priority to male
       if (!['male', 'female'].includes(patientGender)) {
-        console.log(`   ⚠️ Gender is "${patientGender}" (not male/female), checking both ranges...`);
+
         if (parameter.maleActive && parameter.maleLowValue !== null && parameter.maleHighValue !== null) {
-          console.log(`   ✅ Using MALE range (fallback for non-standard gender): ${parameter.maleLowValue} - ${parameter.maleHighValue}`);
+
           return `${parameter.maleLowValue} - ${parameter.maleHighValue}`;
         }
         if (parameter.femaleActive && parameter.femaleLowValue !== null && parameter.femaleHighValue !== null) {
-          console.log(`   ✅ Using FEMALE range (fallback for non-standard gender): ${parameter.femaleLowValue} - ${parameter.femaleHighValue}`);
+
           return `${parameter.femaleLowValue} - ${parameter.femaleHighValue}`;
         }
       }
@@ -1127,26 +983,22 @@ function getNormalRange(parameter, patient) {
   }
 
   // Final fallback: try any available range regardless of rangeType or active status
-  console.log(`   Checking final fallback ranges...`);
+
   
   // Try gender-specific ranges first regardless of rangeType
   if (patientGender === 'female' && parameter.femaleLowValue !== null && parameter.femaleHighValue !== null) {
-    console.log(`   ✅ Using FEMALE range (final fallback): ${parameter.femaleLowValue} - ${parameter.femaleHighValue}`);
     return `${parameter.femaleLowValue} - ${parameter.femaleHighValue}`;
   }
   if (patientGender === 'male' && parameter.maleLowValue !== null && parameter.maleHighValue !== null) {
-    console.log(`   ✅ Using MALE range (final fallback): ${parameter.maleLowValue} - ${parameter.maleHighValue}`);
     return `${parameter.maleLowValue} - ${parameter.maleHighValue}`;
   }
   
   // If no gender-specific range, try child range
   if (parameter.childLowValue !== null && parameter.childHighValue !== null) {
-    console.log(`   ✅ Using CHILD range (final fallback): ${parameter.childLowValue} - ${parameter.childHighValue}`);
     return `${parameter.childLowValue} - ${parameter.childHighValue}`;
   }
   
   // Last resort - return display text or empty
-  console.log(`   ❌ No matching range found, returning empty`);
   return parameter.displayRangeText || parameter.rangeText || '';
 }
 
@@ -1191,27 +1043,27 @@ function getAgeInUnit(years, months, days, timeUnit) {
 
 // 🔴 DEBUG: Helper function to check ageRanges data
 function debugAgeRanges(parameter, patient) {
-  console.log(`\n🔴 DEBUG getNormalRange - Parameter: ${parameter.parameterName}`);
-  console.log(`   Patient Age: ${patient.ageYears}Y ${patient.ageMonths}M ${patient.ageDays}D`);
-  console.log(`   Patient Gender: ${patient.gender}`);
-  console.log(`   Has ageRanges: ${!!parameter.ageRanges}`);
+
+
+
+
   
   if (parameter.ageRanges) {
     try {
       const ageRanges = JSON.parse(parameter.ageRanges);
-      console.log(`   ageRanges Count: ${ageRanges.length}`);
+
       ageRanges.forEach((range, idx) => {
-        console.log(`     Range ${idx}: label="${range.label}", gender="${range.gender}", enabled=${range.enabled}, timeUnit="${range.timeUnit}", value=${range.value}, from=${range.from}, to=${range.to}, ll=${range.ll}, ul=${range.ul}`);
+
       });
     } catch (err) {
-      console.log(`   ⚠️  Error parsing ageRanges: ${err.message}`);
+
     }
   }
   
-  console.log(`   rangeType: ${parameter.rangeType}`);
-  console.log(`   childActive: ${parameter.childActive}, childLowValue: ${parameter.childLowValue}, childHighValue: ${parameter.childHighValue}`);
-  console.log(`   femaleActive: ${parameter.femaleActive}, femaleLowValue: ${parameter.femaleLowValue}, femaleHighValue: ${parameter.femaleHighValue}`);
-  console.log(`   maleActive: ${parameter.maleActive}, maleLowValue: ${parameter.maleLowValue}, maleHighValue: ${parameter.maleHighValue}`);
+
+
+
+
 }
 
 // Update test status
@@ -1260,7 +1112,7 @@ export const updateTestStatus = async (req, res) => {
 
     // If status is being set to "Delivered", unmark the emergency flag
     if (properStatus === 'Delivered') {
-      console.log(`🚨→✅ Unmarking emergency for test ${id} as status changed to Delivered`);
+
       updateData.isEmergency = false;
       updateData.emergencySetAt = null;
     }
@@ -1282,7 +1134,7 @@ export const updateTestStatus = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Update test status error:', error);
+
     
     if (error.code === 'P2025') {
       return res.status(404).json({
@@ -1304,10 +1156,10 @@ export const updateTestResult = async (req, res) => {
     const { id } = req.params;
     const { result, status, parameterResults } = req.body;
 
-    console.log('🔵 updateTestResult called');
-    console.log('  📋 patientTestId:', id);
-    console.log('  📊 result:', result);
-    console.log('  📦 parameterResults:', JSON.stringify(parameterResults, null, 2));
+
+
+
+
 
     // Map old uppercase statuses to new format for backward compatibility
     const statusMapping = {
@@ -1353,23 +1205,16 @@ export const updateTestResult = async (req, res) => {
       }
     });
 
-    console.log('  ✅ PatientTest updated');
+
 
     // Handle parameterResults if provided (for inline editing of individual test parameter values)
     if (parameterResults && Array.isArray(parameterResults) && parameterResults.length > 0) {
-      console.log('  🔄 Processing parameterResults...');
+
       for (const paramResult of parameterResults) {
         const { parameterId, numericValue, textValue, isHighlighted } = paramResult;
         
-        console.log(`  📝 Upserting TestResult:
-          patientTestId: ${id}
-          parameterId: ${parameterId}
-          numericValue: ${numericValue}
-          textValue: ${textValue}
-          isHighlighted: ${isHighlighted}`);
-        
         if (!parameterId) {
-          console.error(`  ❌ SKIPPED: parameterId is null or undefined!`);
+
           continue;
         }
         
@@ -1398,20 +1243,13 @@ export const updateTestResult = async (req, res) => {
               verifiedAt: new Date()
             }
           });
-
-          console.log(`  ✅ TestResult upserted for parameterId=${parameterId}:`, {
-            id: testResult.id,
-            numericValue: testResult.numericValue,
-            textValue: testResult.textValue,
-            isHighlighted: testResult.isHighlighted
-          });
         } catch (upsertError) {
-          console.error(`  ❌ Upsert error for parameterId=${parameterId}:`, upsertError.message);
+
           throw upsertError;
         }
       }
     } else {
-      console.log('  ⚠️  No parameterResults provided or empty array');
+
     }
 
     res.json({
@@ -1421,7 +1259,7 @@ export const updateTestResult = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('❌ Update test result error:', error);
+
     
     if (error.code === 'P2025') {
       return res.status(404).json({
@@ -1489,7 +1327,7 @@ export const bulkUpdateTestStatus = async (req, res) => {
 
     // If status is being set to "Delivered", unmark the emergency flag
     if (properStatus === 'Delivered') {
-      console.log(`🚨→✅ Unmarking emergency for ${testIds.length} tests as status changed to Delivered`);
+
       updateData.isEmergency = false;
       updateData.emergencySetAt = null;
     }
@@ -1510,7 +1348,7 @@ export const bulkUpdateTestStatus = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Bulk update test status error:', error);
+
     res.status(500).json({
       success: false,
       message: 'Failed to update test statuses'
@@ -1605,7 +1443,7 @@ export const getTestStatistics = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Get test statistics error:', error);
+
     res.status(500).json({
       success: false,
       message: 'Failed to fetch test statistics'
@@ -1654,7 +1492,7 @@ export const saveTestResults = async (req, res) => {
 
       // Validate required field
       if (!testParameterId) {
-        console.warn('Skipping result - missing testParameterId');
+
         continue;
       }
 
@@ -1665,12 +1503,12 @@ export const saveTestResults = async (req, res) => {
           where: { id: parseInt(testParameterId) }
         });
       } catch (err) {
-        console.warn(`Failed to fetch parameter ${testParameterId}:`, err.message);
+
         continue;
       }
 
       if (!parameter) {
-        console.warn(`Parameter not found: ${testParameterId}`);
+
         continue; // Skip invalid parameters
       }
 
@@ -1750,7 +1588,7 @@ export const saveTestResults = async (req, res) => {
 
         savedResults.push(savedResult);
       } catch (upsertError) {
-        console.error(`Failed to upsert result for parameter ${testParameterId}:`, upsertError.message);
+
         throw upsertError; // Re-throw to be caught by outer catch
       }
     }
@@ -1788,9 +1626,9 @@ export const saveTestResults = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Save test results error:', error);
-    console.error('Error message:', error.message);
-    console.error('Error code:', error.code);
+
+
+
     res.status(500).json({
       success: false,
       message: 'Failed to save test results: ' + (error.message || 'Unknown error'),
@@ -1850,7 +1688,7 @@ export const updateTestDates = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Update test dates error:', error);
+
     
     if (error.code === 'P2025') {
       return res.status(404).json({
@@ -1953,7 +1791,7 @@ export const sendReport = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Send report error:', error);
+
     res.status(500).json({ success: false, message: 'Failed to send report: ' + error.message });
   }
 };
@@ -1980,7 +1818,7 @@ export const uploadAttachment = async (req, res) => {
 
     res.json({ success: true, attachmentPath: filePath });
   } catch (error) {
-    console.error('Upload attachment error:', error);
+
     res.status(500).json({ success: false, message: 'Failed to upload attachment' });
   }
 };
@@ -2071,7 +1909,7 @@ export const getPreviousTestResult = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Get previous test result error:', error);
+
     res.status(500).json({
       success: false,
       message: 'Failed to fetch previous test result'
@@ -2155,7 +1993,7 @@ export const getAllTestResults = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Get all test results error:', error);
+
     res.status(500).json({
       success: false,
       message: 'Failed to fetch test result history'
@@ -2175,12 +2013,6 @@ export const getAllTestResults = async (req, res) => {
 export const saveTestResultWithTemplate = async (req, res) => {
   try {
     const { patientTestId, result, parameterResults, templateDecision } = req.body;
-
-    console.log('📋 saveTestResultWithTemplate called:', {
-      patientTestId,
-      templateDecision,
-      parametersCount: parameterResults?.length
-    });
 
     // First, save the result using existing updateTestResult logic
     const updateData = {
@@ -2203,7 +2035,7 @@ export const saveTestResultWithTemplate = async (req, res) => {
       }
     });
 
-    console.log('✅ PatientTest result updated');
+
 
     // Handle parameterResults if provided
     if (parameterResults && Array.isArray(parameterResults) && parameterResults.length > 0) {
@@ -2211,7 +2043,7 @@ export const saveTestResultWithTemplate = async (req, res) => {
         const { parameterId, numericValue, textValue } = paramResult;
         
         if (!parameterId) {
-          console.warn('⚠️ Skipping - no parameterId provided');
+
           continue;
         }
 
@@ -2240,7 +2072,7 @@ export const saveTestResultWithTemplate = async (req, res) => {
           }
         });
 
-        console.log(`✅ TestResult upserted for parameterId=${parameterId}`);
+
       }
     }
 
@@ -2262,7 +2094,7 @@ export const saveTestResultWithTemplate = async (req, res) => {
           }
         });
 
-        console.log('✅ New template created:', newTemplate.id, newTemplate.templateName);
+
 
         return res.json({
           success: true,
@@ -2285,7 +2117,7 @@ export const saveTestResultWithTemplate = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('❌ Error in saveTestResultWithTemplate:', error);
+
 
     if (error.code === 'P2025') {
       return res.status(404).json({
@@ -2315,8 +2147,8 @@ export const updatePatientComments = async (req, res) => {
     const { id } = req.params;
     const { comments } = req.body;
 
-    console.log(`📝 Updating comments for PatientTest ID: ${id}`);
-    console.log(`Comments: ${comments}`);
+
+
 
     if (!id) {
       return res.status(400).json({
@@ -2330,7 +2162,7 @@ export const updatePatientComments = async (req, res) => {
     if (comments && comments.trim()) {
       const parts = comments.split(',').map(c => c.trim()).filter(c => c.length > 0);
       normalizedComments = parts.join(', ');  // Join with comma + space
-      console.log(`✅ Normalized comments: ${normalizedComments}`);
+
     }
 
     // Update the PatientTest record with comments
@@ -2356,7 +2188,7 @@ export const updatePatientComments = async (req, res) => {
       }
     });
 
-    console.log(`✅ Comments updated successfully for test: ${updatedPatientTest.test.name}`);
+
 
     res.json({
       success: true,
@@ -2365,7 +2197,7 @@ export const updatePatientComments = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Update comments error:', error);
+
     res.status(500).json({
       success: false,
       message: 'Failed to update comments: ' + error.message
@@ -2380,7 +2212,7 @@ export const getCommentHistory = async (req, res) => {
   try {
     const { patientId } = req.params;
 
-    console.log(`📋 Fetching GLOBAL comment history (system-wide, not just for patient: ${patientId})`);
+
 
     // Fetch ALL patient tests with comments (from ALL patients in the system)
     const allPatientTests = await prisma.patientTest.findMany({
@@ -2410,7 +2242,7 @@ export const getCommentHistory = async (req, res) => {
 
     const commentHistory = Array.from(allComments).sort();
 
-    console.log(`✅ Found ${commentHistory.length} unique comments from all patients:`, commentHistory);
+
 
     res.json({
       success: true,
@@ -2418,7 +2250,7 @@ export const getCommentHistory = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Get comment history error:', error);
+
     res.status(500).json({
       success: false,
       message: 'Failed to fetch comment history: ' + error.message
@@ -2439,7 +2271,7 @@ export const deleteCommentFromHistory = async (req, res) => {
     }
 
     const trimmedComment = comment.trim();
-    console.log(`🗑️ Deleting comment from history: "${trimmedComment}"`);
+
 
     // Find all patient tests that contain this comment
     const allPatientTests = await prisma.patientTest.findMany({
@@ -2474,12 +2306,12 @@ export const deleteCommentFromHistory = async (req, res) => {
             data: { comments: newComments }
           });
           updatedCount++;
-          console.log(`✅ Updated test ${test.id}: removed "${trimmedComment}"`);
+
         }
       }
     }
 
-    console.log(`✅ Deleted comment from ${updatedCount} test(s)`);
+
 
     res.json({
       success: true,
@@ -2488,10 +2320,11 @@ export const deleteCommentFromHistory = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Delete comment error:', error);
+
     res.status(500).json({
       success: false,
       message: 'Failed to delete comment: ' + error.message
     });
   }
 };
+

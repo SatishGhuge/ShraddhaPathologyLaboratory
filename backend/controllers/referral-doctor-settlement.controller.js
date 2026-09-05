@@ -29,19 +29,6 @@ export const saveSettlement = async (req, res) => {
       });
     }
 
-    console.log('🔍 Referral Doctor Settlement Save Request:', {
-      visitId,
-      referralDoctorId,
-      referralDoctorName,
-      doctorDiscount,
-      tdsChecked,
-      tdsPercent,
-      otherDiscountPercent,
-      otherDiscountAmount,
-      amountPaid,
-      remark
-    });
-
     // Get existing VisitBill
     const visitBill = await prisma.visitBill.findUnique({
       where: { visitId },
@@ -85,20 +72,6 @@ export const saveSettlement = async (req, res) => {
     } else if (paymentAmount > 0) {
       billStatus = 'PARTIAL';
     }
-
-    console.log('💰 Settlement Calculation:', {
-      grandTotal,
-      finalDoctorDiscount,
-      tdsAmount: Math.round(tdsAmount * 100) / 100,
-      finalOtherDiscount: Math.round(finalOtherDiscount * 100) / 100,
-      totalDeductions: Math.round(totalDeductions * 100) / 100,
-      finalAmount: Math.round(finalAmount * 100) / 100,
-      paymentAmount,
-      balance: Math.round(balance * 100) / 100,
-      isFullySettled,
-      billStatus,
-      debug: `paymentAmount (${paymentAmount}) >= finalAmount-0.01 (${finalAmount - 0.01}) ? ${isFullySettled}`
-    });
 
     // ✅ WRAP IN TRANSACTION - All or nothing
     let updatedBill;
@@ -200,14 +173,6 @@ export const saveSettlement = async (req, res) => {
         where: { visitId },
         data: updateData
       });
-
-      console.log('✅ Settlement Processed:', {
-        visitId,
-        settlementId: settlementSession.id,
-        billStatus,
-        newBalance: balance,
-        isFullySettled
-      });
     });
 
     res.json({
@@ -229,7 +194,6 @@ export const saveSettlement = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('❌ Settlement save error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to save settlement',
@@ -260,15 +224,6 @@ export const saveReferralDoctorSettlement = async (req, res) => {
         message: 'visitIds are required'
       });
     }
-
-    console.log('👨‍⚕️ Referral Doctor Settlement Request:', { 
-      visitIds, 
-      applyDoctorDiscount,
-      tdsPercent, 
-      otherDiscountPercent, 
-      otherDiscountAmount, 
-      amountPaid 
-    });
 
     // Get all VisitBill records
     const visitBills = await prisma.visitBill.findMany({
@@ -351,9 +306,6 @@ export const saveReferralDoctorSettlement = async (req, res) => {
     // OR use provided discount from frontend if available (only for single doctor bulk settlements)
     const doctorDiscountMap = new Map();
     
-    console.log(`📝 Frontend provided doctorDiscountPercent: ${doctorDiscountPercent}`);
-    console.log(`📝 Number of unique doctors in selection: ${doctorNamesList.length}`);
-    
     // Only use frontend-provided discount if there's exactly ONE doctor
     const useFrontendDiscount = doctorNamesList.length === 1 && 
                                doctorDiscountPercent !== null && 
@@ -364,7 +316,6 @@ export const saveReferralDoctorSettlement = async (req, res) => {
       // If frontend provided a discount AND this is a single-doctor settlement, use it
       if (useFrontendDiscount) {
         const discount = Number(doctorDiscountPercent);
-        console.log(`✅ Using frontend discount: ${discount}% for ${docName} (single doctor settlement)`);
         doctorDiscountMap.set(docName, discount);
         continue;
       }
@@ -380,7 +331,6 @@ export const saveReferralDoctorSettlement = async (req, res) => {
           select: { discount: true }
         });
         if (doctor) {
-          console.log(`✅ Fetched from DB: ${docName} has ${doctor.discount || 0}% discount`);
           doctorDiscountMap.set(docName, doctor.discount || 0);
         }
       } catch (e) {
@@ -390,10 +340,8 @@ export const saveReferralDoctorSettlement = async (req, res) => {
         });
         const matchedDoc = allDoctors.find(d => d.name.toLowerCase() === docName.toLowerCase());
         if (matchedDoc) {
-          console.log(`✅ Fetched via fallback: ${docName} has ${matchedDoc.discount || 0}% discount`);
           doctorDiscountMap.set(docName, matchedDoc.discount || 0);
         } else {
-          console.log(`⚠️ Doctor not found: ${docName}, using 0% discount`);
           doctorDiscountMap.set(docName, 0);
         }
       }
@@ -415,12 +363,8 @@ export const saveReferralDoctorSettlement = async (req, res) => {
         });
         
         if (bills.length === 0) {
-          console.log(`⚠️ Skipping ${doctorName} - all selected visits are already paid`);
           continue;  // Skip this doctor if no pending visits
         }
-        
-        console.log(`\n👨‍⚕️ Processing Referral Doctor: ${doctorName}`);
-        console.log(`   Processing ${bills.length} pending visit(s)`);
         
         // Step 1: Calculate total GROSS AMOUNT from PENDING visit gross amounts only
         const totalGrossAmount = bills.reduce((sum, vb) => sum + (vb.grossAmount?.toNumber?.() || parseFloat(vb.grossAmount) || 0), 0);
@@ -431,21 +375,13 @@ export const saveReferralDoctorSettlement = async (req, res) => {
         const doctorDiscountAmount = applyDoctorDiscount ? (totalGrossAmount * doctorDiscountPercent) / 100 : 0;
         const afterDoctorDiscount = totalGrossAmount - doctorDiscountAmount;
         
-        console.log(`   Apply Doctor Discount: ${applyDoctorDiscount}`);
-        console.log(`   Doctor Discount (${doctorDiscountPercent}%): -₹${doctorDiscountAmount.toFixed(2)}`);
-        console.log(`   After Doctor Discount: ₹${afterDoctorDiscount.toFixed(2)}`);
-        
         // Step 3: TDS calculation on gross amount ONLY if tdsPercent is provided
         const tdsAmount = tdsPercent && parseFloat(tdsPercent) > 0 ? (totalGrossAmount * parseFloat(tdsPercent)) / 100 : 0;
-        
-        console.log(`   TDS (${tdsPercent}%): -₹${tdsAmount.toFixed(2)}`);
         
         // Step 4: Other discount calculation on gross amount
         const finalOtherDiscount = otherDiscountPercent && parseFloat(otherDiscountPercent) > 0
           ? (totalGrossAmount * parseFloat(otherDiscountPercent)) / 100
           : parseFloat(otherDiscountAmount || 0);
-        
-        console.log(`   Other Discount: -₹${finalOtherDiscount.toFixed(2)}`);
         
         // Step 5: Total deductions
         const totalDeductions = doctorDiscountAmount + tdsAmount + finalOtherDiscount;
@@ -453,14 +389,9 @@ export const saveReferralDoctorSettlement = async (req, res) => {
         // Step 6: Final amount after all deductions
         const finalAmountAfterDeductions = totalGrossAmount - totalDeductions;
         
-        console.log(`   Total Deductions: ₹${totalDeductions.toFixed(2)}`);
-        console.log(`   Final Amount (after deductions): ₹${finalAmountAfterDeductions.toFixed(2)}`);
-        
         // Step 7: Get actual amount paid
         const paymentAmount = parseFloat(amountPaid || 0);
         const paymentAmountForDoctor = paymentAmount;
-        
-        console.log(`   Payment Received: ₹${paymentAmountForDoctor.toFixed(2)}`);
         
         // Step 8: Determine if fully settled
         const amountWeAskedFor = totalDeductions > 0 ? finalAmountAfterDeductions : totalGrossAmount;
@@ -487,8 +418,6 @@ export const saveReferralDoctorSettlement = async (req, res) => {
         await tx.referralDoctorSettlement.create({
           data: doctorSettlementData
         });
-
-        console.log(`✅ ReferralDoctorSettlement created for ${doctorName}`);
 
         // Step 10: Process each visit - update balance based on proportional payment allocation
         let remainingPayment = paymentAmountForDoctor;
@@ -518,8 +447,6 @@ export const saveReferralDoctorSettlement = async (req, res) => {
           
           const visitBillStatus = newVisitBalance <= 0.01 ? 'PAID' : (visitPaymentAmount > 0 ? 'PARTIAL' : 'PENDING');
 
-          console.log(`   Visit ${visitId}: gross=${currentVisitGross.toFixed(2)}, payment=${visitPaymentAmount.toFixed(2)}, newBalance=${newVisitBalance.toFixed(2)}, isFullySettled=${isFullySettled}, status=${visitBillStatus}`);
-
           let updateData = {
             status: visitBillStatus
           };
@@ -542,8 +469,6 @@ export const saveReferralDoctorSettlement = async (req, res) => {
             data: updateData
           });
           
-          console.log(`   ✅ VisitBill updated: visitId=${visitId}, balanceAmount=${updated.balanceAmount}, totalPaid=${updated.totalPaid}, status=${updated.status}`);
-          
           updatedBills.push(updated);
         }
 
@@ -564,8 +489,6 @@ export const saveReferralDoctorSettlement = async (req, res) => {
       }
     });
 
-    console.log('\n✅ Referral Doctor Settlement Processed for', updatedBills.length, 'visits across', visitsByDoctor.size, 'doctors');
-
     res.json({
       success: true,
       message: 'Settlement saved successfully',
@@ -576,7 +499,6 @@ export const saveReferralDoctorSettlement = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('❌ Settlement error:', error);
     res.status(500).json({ 
       success: false, 
       message: 'Failed to save settlement', 
@@ -599,8 +521,6 @@ export const getReferralDoctorSettlementReport = async (req, res) => {
         message: 'referralDoctorName is required'
       });
     }
-
-    console.log('🔍 Settlement Report Request:', { referralDoctorName, fromDate, toDate, status, page, limit });
 
     // Build date filter for billing sessions
     let dateFilter = {};
@@ -629,7 +549,6 @@ export const getReferralDoctorSettlementReport = async (req, res) => {
         distinct: ['visitId']
       });
     } catch (e) {
-      console.log('Contains query failed, using fallback');
     }
 
     // Fallback: if contains didn't work, fetch all and filter in JavaScript for case-insensitive match
@@ -653,15 +572,12 @@ export const getReferralDoctorSettlementReport = async (req, res) => {
       );
     }
 
-    console.log(`📊 Found ${patientTestsForDoctor.length} unique visits for referral doctor ${referralDoctorName}`);
-
     if (patientTestsForDoctor.length === 0) {
       return res.json(buildPaginatedResponse([], 0, page, limit));
     }
 
     // Get unique visit IDs from raw query result
     const visitIds = patientTestsForDoctor.map(pt => pt.visitId);
-    console.log(`📋 Unique visits: ${visitIds.length}`);
 
     // Build where clause for VisitBill
     let visitBillWhere = {
@@ -681,8 +597,6 @@ export const getReferralDoctorSettlementReport = async (req, res) => {
     const totalCount = await prisma.visitBill.count({
       where: visitBillWhere
     });
-
-    console.log(`📊 Total count of bills matching criteria: ${totalCount}`);
 
     // Fetch paginated settlement sessions with related data
     const visitBills = await prisma.visitBill.findMany({
@@ -711,8 +625,6 @@ export const getReferralDoctorSettlementReport = async (req, res) => {
       skip,
       take: limit
     });
-
-    console.log(`📈 Fetched ${visitBills.length} visit bills with settlements`);
 
     // Get PatientTest details for each visit (case-insensitive) and fetch doctor discount
     const visitTestsMap = new Map();
@@ -744,7 +656,6 @@ export const getReferralDoctorSettlementReport = async (req, res) => {
           }
         });
       } catch (e) {
-        console.log('Contains query failed, using fallback');
       }
 
       // Fallback: if contains didn't work, fetch all and filter in JavaScript for case-insensitive match
@@ -799,7 +710,6 @@ export const getReferralDoctorSettlementReport = async (req, res) => {
           doctorId = doctor.id;
         }
       } catch (e) {
-        console.log('Contains query failed for doctor, using fallback');
       }
       
       // Fallback: filter by name case-insensitively if contains doesn't work
@@ -823,8 +733,6 @@ export const getReferralDoctorSettlementReport = async (req, res) => {
       } else {
         doctorDiscount = doctor.discount || 0;
       }
-      
-      console.log(`💰 Doctor found: ID=${doctorId}, Discount=${doctorDiscount}% for ${referralDoctorName}`);
     }
 
     // Map to response format
@@ -920,11 +828,8 @@ export const getReferralDoctorSettlementReport = async (req, res) => {
       };
     });
 
-    console.log(`✅ Settlement Report Ready: ${data.length} records`);
-
     res.json(buildPaginatedResponse(data, totalCount, page, limit));
   } catch (error) {
-    console.error('❌ Get referral doctor settlement report error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to fetch referral doctor settlement report',
@@ -986,7 +891,6 @@ export const getUniqueDoctors = async (req, res) => {
       data: uniqueDoctors
     });
   } catch (error) {
-    console.error('Error fetching unique doctors:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to fetch doctors',
@@ -994,3 +898,4 @@ export const getUniqueDoctors = async (req, res) => {
     });
   }
 };
+

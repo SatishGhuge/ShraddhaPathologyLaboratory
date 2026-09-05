@@ -33,7 +33,6 @@ export const getOutsourcingLabs = async (req, res) => {
       data: labs
     });
   } catch (error) {
-    console.error('Get outsourcing labs error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to fetch outsourcing labs'
@@ -82,7 +81,6 @@ export const getAllOutsourcingLabs = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Get all outsourcing labs error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to fetch outsourcing labs'
@@ -125,7 +123,6 @@ export const getOutsourcingLabById = async (req, res) => {
       data: lab
     });
   } catch (error) {
-    console.error('Get outsourcing lab by ID error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to fetch outsourcing lab'
@@ -226,7 +223,6 @@ export const createOutsourcingLab = async (req, res) => {
       data: lab
     });
   } catch (error) {
-    console.error('Create outsourcing lab error:', error);
     res.status(500).json({
       success: false,
       message: error.message || 'Failed to create outsourcing lab'
@@ -324,7 +320,6 @@ export const updateOutsourcingLab = async (req, res) => {
       data: lab
     });
   } catch (error) {
-    console.error('Update outsourcing lab error:', error);
     res.status(500).json({
       success: false,
       message: error.message || 'Failed to update outsourcing lab'
@@ -359,7 +354,6 @@ export const deleteOutsourcingLab = async (req, res) => {
       message: 'Outsourcing lab deleted successfully'
     });
   } catch (error) {
-    console.error('Delete outsourcing lab error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to delete outsourcing lab'
@@ -406,7 +400,6 @@ export const getOutsourcingLabTests = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Get outsourcing lab tests error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to fetch outsourcing lab tests'
@@ -419,14 +412,7 @@ export const importOutsourcingReport = async (req, res) => {
   try {
     const { patientTestId, outsourcingLabId, selectedTests } = req.body;
 
-    console.log('🔍 Import Report - Received:', {
-      patientTestId,
-      outsourcingLabId,
-      selectedTestsCount: selectedTests?.length || 0
-    });
-
     if (!patientTestId || !outsourcingLabId) {
-      console.error('❌ Missing required fields');
       return res.status(400).json({
         success: false,
         message: 'Patient Test ID and Outsourcing Lab ID are required'
@@ -439,7 +425,6 @@ export const importOutsourcingReport = async (req, res) => {
     });
 
     if (!patientTest) {
-      console.error('❌ Patient test not found:', patientTestId);
       return res.status(404).json({
         success: false,
         message: 'Patient test not found'
@@ -452,14 +437,11 @@ export const importOutsourcingReport = async (req, res) => {
     });
 
     if (!lab) {
-      console.error('❌ Outsourcing lab not found:', outsourcingLabId);
       return res.status(404).json({
         success: false,
         message: 'Outsourcing lab not found'
       });
     }
-
-    console.log('✅ Verified patient test and lab');
 
     // Store selected test data in OutsourcingReport table
     const extractedData = selectedTests || [];
@@ -478,7 +460,6 @@ export const importOutsourcingReport = async (req, res) => {
           updatedAt: new Date()
         }
       });
-      console.log('✅ Updated existing outsourcing report');
     } else {
       // Create new report
       report = await prisma.outsourcingReport.create({
@@ -490,7 +471,6 @@ export const importOutsourcingReport = async (req, res) => {
           letterheadUrl: null
         }
       });
-      console.log('✅ Created new outsourcing report');
     }
 
     // Mark patient test as imported
@@ -501,9 +481,6 @@ export const importOutsourcingReport = async (req, res) => {
         outsourcedTo: lab.labName
       }
     });
-
-    console.log('✅ Patient test marked as imported');
-    console.log('📋 Stored extracted data:', extractedData);
 
     res.status(200).json({
       success: true,
@@ -517,7 +494,6 @@ export const importOutsourcingReport = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('❌ Import report error:', error);
     res.status(500).json({
       success: false,
       message: error.message || 'Failed to import report'
@@ -550,7 +526,6 @@ export const getOutsourcingReport = async (req, res) => {
       data: report
     });
   } catch (error) {
-    console.error('Get outsourcing report error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to fetch outsourcing report'
@@ -562,13 +537,6 @@ export const getOutsourcingReport = async (req, res) => {
 export const extractPdfData = async (req, res) => {
   try {
     const { patientTestId, outsourcingLabId } = req.body;
-
-    console.log('📥 Extract PDF endpoint called:', {
-      patientTestId,
-      outsourcingLabId,
-      fileSize: req.file?.size,
-      fileName: req.file?.filename
-    });
 
     if (!req.file) {
       return res.status(400).json({
@@ -591,31 +559,24 @@ export const extractPdfData = async (req, res) => {
     });
 
     if (!patientTest) {
-      console.error('❌ Patient test not found:', patientTestId);
       return res.status(404).json({
         success: false,
         message: 'Patient test not found'
       });
     }
 
-    console.log('✅ File received:', req.file.originalname);
-
     // Extract PDF text using pdf2json
     try {
       const pdfParser = new PDFParser();
       const fileBuffer = fs.readFileSync(req.file.path);
-      
-      console.log('✅ PDF file read, size:', fileBuffer.length, 'bytes');
 
       // Parse PDF and extract text
       const pdfData = await new Promise((resolve, reject) => {
         pdfParser.on('pdfParser_dataError', (errData) => {
-          console.error('❌ PDF parsing error:', errData);
           reject(new Error(errData.parserError));
         });
 
         pdfParser.on('pdfParser_dataReady', (pdfData) => {
-          console.log('✅ PDF parsed successfully');
           resolve(pdfData);
         });
 
@@ -637,14 +598,9 @@ export const extractPdfData = async (req, res) => {
         }
       }
 
-      console.log('📄 Total extracted text length:', fullText.length);
-      console.log('📄 First 500 chars:\n', fullText.substring(0, 500));
-
       // Parse test results from extracted text with their individual interpretations
       const lines = fullText.split('\n').map(l => l.trim()).filter(l => l.length > 0);
       const extractedRows = [];
-
-      console.log('📄 Total lines:', lines.length);
 
       // Build a map of test data with their interpretations
       // Strategy: Find each test result, then collect interpretation lines that follow it
@@ -750,7 +706,6 @@ export const extractPdfData = async (req, res) => {
                 range: refRange,
                 interpretation: testInterpretation || ''  // Per-test interpretation
               });
-              console.log('✅ Found test:', { testName, result, unit, refRange, interpretationLength: testInterpretation.length });
             }
           }
         }
@@ -758,7 +713,6 @@ export const extractPdfData = async (req, res) => {
 
       // If extraction is empty or has issues, use hardcoded fallback with good interpretations
       if (extractedRows.length === 0) {
-        console.log('⚠️ PDF extraction returned no results or failed, using fallback data');
       }
       
       // Use fallback data which has professional interpretations
@@ -811,8 +765,6 @@ Decreased values are observed in a number of inflammatory & infectious disease. 
         }
       ];
 
-      console.log('✅ Final extracted rows:', extractedRows.length);
-
       // Return extracted data
       res.json({
         success: true,
@@ -825,7 +777,6 @@ Decreased values are observed in a number of inflammatory & infectious disease. 
       });
 
     } catch (pdfError) {
-      console.error('❌ PDF parsing error:', pdfError);
       
       // Fallback: return hardcoded data on error
       // Try to extract interpretation from the error case too
@@ -859,7 +810,6 @@ Decreased values are observed in a number of inflammatory & infectious disease. 
           }
         }
       } catch (e) {
-        console.warn('Could not extract interpretation from error case:', e.message);
       }
       
       const fallbackData = [
@@ -923,7 +873,6 @@ Decreased values are observed in a number of inflammatory & infectious disease. 
     }
 
   } catch (error) {
-    console.error('❌ Extract PDF error:', error);
     res.status(500).json({
       success: false,
       message: error.message || 'Failed to extract PDF data'
@@ -953,10 +902,10 @@ export const getAvailableTests = async (req, res) => {
       data: tests
     });
   } catch (error) {
-    console.error('Get available tests error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to fetch available tests'
     });
   }
 };
+

@@ -28,18 +28,6 @@ export const saveSettlement = async (req, res) => {
       });
     }
 
-    console.log('🔍 Settlement Save Request:', {
-      visitId,
-      orgId,
-      orgDiscount,
-      tdsChecked,
-      tdsPercent,
-      otherDiscountPercent,
-      otherDiscountAmount,
-      amountPaid,
-      remark
-    });
-
     // Get existing VisitBill
     const visitBill = await prisma.visitBill.findUnique({
       where: { visitId },
@@ -92,18 +80,6 @@ export const saveSettlement = async (req, res) => {
     } else if (paymentAmount > 0) {
       billStatus = 'PARTIAL';
     }
-
-    console.log('💰 Settlement Calculation:', {
-      grandTotal,
-      finalOrgDiscount,
-      afterOrgDiscount,
-      tdsAmount: Math.round(tdsAmount * 100) / 100,
-      finalOtherDiscount: Math.round(finalOtherDiscount * 100) / 100,
-      finalAmount: Math.round(finalAmount * 100) / 100,
-      paymentAmount,
-      balance: Math.round(balance * 100) / 100,
-      billStatus
-    });
 
     // ✅ WRAP IN TRANSACTION - All or nothing
     let updatedBill;
@@ -200,13 +176,6 @@ export const saveSettlement = async (req, res) => {
           status: billStatus
         }
       });
-
-      console.log('✅ Settlement Processed:', {
-        visitId,
-        settlementId: settlementSession.id,
-        billStatus,
-        newBalance: balance
-      });
     });
 
     res.json({
@@ -227,7 +196,6 @@ export const saveSettlement = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('❌ Settlement save error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to save settlement',
@@ -262,20 +230,6 @@ export const savePatientSettlement = async (req, res) => {
       });
     }
 
-    console.log('🔍 Bulk Patient Settlement Request:', {
-      patientId,
-      orgId,
-      visitIds,
-      visitCount: visitIds.length,
-      orgDiscount,
-      tdsChecked,
-      tdsPercent,
-      otherDiscountPercent,
-      otherDiscountAmount,
-      amountPaid,
-      remark
-    });
-
     // Get organization to verify discount
     const organization = await prisma.organization.findUnique({
       where: { id: orgId }
@@ -301,8 +255,6 @@ export const savePatientSettlement = async (req, res) => {
         message: 'No visit bills found'
       });
     }
-
-    console.log('📋 Found visit bills:', visitBills.length);
 
     // ✅ Calculate Combined Settlement Amounts
     // Sum all gross amounts from all visits
@@ -332,18 +284,6 @@ export const savePatientSettlement = async (req, res) => {
     } else if (paymentAmount > 0) {
       billStatus = 'PARTIAL';
     }
-
-    console.log('💰 Bulk Settlement Calculation:', {
-      totalGrossAmount,
-      finalOrgDiscount,
-      afterOrgDiscount,
-      tdsAmount: Math.round(tdsAmount * 100) / 100,
-      finalOtherDiscount: Math.round(finalOtherDiscount * 100) / 100,
-      finalAmount: Math.round(finalAmount * 100) / 100,
-      paymentAmount,
-      balance: Math.round(balance * 100) / 100,
-      billStatus
-    });
 
     // ✅ WRAP IN TRANSACTION - All or nothing
     const updatedBills = [];
@@ -456,8 +396,6 @@ export const savePatientSettlement = async (req, res) => {
 
         updatedBills.push(updated);
       }
-
-      console.log('✅ Bulk Settlement Processed for', updatedBills.length, 'visits');
     });
 
     res.json({
@@ -479,7 +417,6 @@ export const savePatientSettlement = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('❌ Bulk settlement save error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to save bulk settlement',
@@ -509,15 +446,6 @@ export const saveOrgSettlement = async (req, res) => {
         message: 'visitIds are required'
       });
     }
-
-    console.log('🏢 Organization Settlement Request:', { 
-      visitIds, 
-      applyOrgDiscount,
-      tdsPercent, 
-      otherDiscountPercent, 
-      otherDiscountAmount, 
-      amountPaid 
-    });
 
     // Get all VisitBill records
     const visitBills = await prisma.visitBill.findMany({
@@ -580,13 +508,8 @@ export const saveOrgSettlement = async (req, res) => {
         });
         
         if (bills.length === 0) {
-          console.log(`⚠️ Skipping ${orgName} - all selected visits are already paid`);
           continue;  // Skip this organization if no pending visits
         }
-        
-        console.log(`\n📊 Processing Organization: ${orgName}`);
-        console.log(`   Selected ${orgData.bills.length} visits, but ${orgData.bills.length - bills.length} are already paid`);
-        console.log(`   Processing ${bills.length} pending visit(s)`);
         
         // Step 1: Calculate total GROSS AMOUNT from PENDING visit gross amounts only
         const totalGrossAmount = bills.reduce((sum, vb) => sum + (vb.grossAmount?.toNumber?.() || parseFloat(vb.grossAmount) || 0), 0);
@@ -595,21 +518,13 @@ export const saveOrgSettlement = async (req, res) => {
         const orgDiscountAmount = applyOrgDiscount ? (totalGrossAmount * orgDiscount) / 100 : 0;
         const afterOrgDiscount = totalGrossAmount - orgDiscountAmount;
         
-        console.log(`   Apply Org Discount: ${applyOrgDiscount}`);
-        console.log(`   Org Discount (${orgDiscount}%): -₹${orgDiscountAmount.toFixed(2)}`);
-        console.log(`   After Org Discount: ₹${afterOrgDiscount.toFixed(2)}`);
-        
         // Step 3: TDS calculation on gross amount ONLY if tdsPercent is provided
         const tdsAmount = tdsPercent && parseFloat(tdsPercent) > 0 ? (totalGrossAmount * parseFloat(tdsPercent)) / 100 : 0;
-        
-        console.log(`   TDS (${tdsPercent}%): -₹${tdsAmount.toFixed(2)}`);
         
         // Step 4: Other discount calculation on gross amount
         const finalOtherDiscount = otherDiscountPercent && parseFloat(otherDiscountPercent) > 0
           ? (totalGrossAmount * parseFloat(otherDiscountPercent)) / 100
           : parseFloat(otherDiscountAmount || 0);
-        
-        console.log(`   Other Discount: -₹${finalOtherDiscount.toFixed(2)}`);
         
         // Step 5: Total deductions
         const totalDeductions = orgDiscountAmount + tdsAmount + finalOtherDiscount;
@@ -617,26 +532,16 @@ export const saveOrgSettlement = async (req, res) => {
         // Step 6: Final amount after all deductions (what organization receives after deductions)
         const finalAmountAfterDeductions = totalGrossAmount - totalDeductions;
         
-        console.log(`   Total Deductions: ₹${totalDeductions.toFixed(2)}`);
-        console.log(`   Final Amount (after deductions): ₹${finalAmountAfterDeductions.toFixed(2)}`);
-        
         // Step 7: Get actual amount paid
         // We don't cap it here - we'll validate it's reasonable later
         const paymentAmount = parseFloat(amountPaid || 0);
         const paymentAmountForOrg = paymentAmount;
-        
-        console.log(`   Payment Received: ₹${paymentAmountForOrg.toFixed(2)}`);
-        console.log(`   Total Gross Amount: ₹${totalGrossAmount.toFixed(2)}`);
-        console.log(`   Amount After Deductions: ₹${finalAmountAfterDeductions.toFixed(2)}`);
         
         // Step 8: Determine if fully settled based on what we asked to be paid
         // If NO deductions: payment should equal gross amount
         // If deductions exist: payment should equal amount after deductions
         const amountWeAskedFor = totalDeductions > 0 ? finalAmountAfterDeductions : totalGrossAmount;
         const isFullySettled = Math.abs(paymentAmountForOrg - amountWeAskedFor) < 0.01;
-        
-        console.log(`   Amount Asked For: ₹${amountWeAskedFor.toFixed(2)}`);
-        console.log(`   Is Fully Settled: ${isFullySettled}`);
         const orgSettlementData = {
           organizationId: orgId,
           visitIds: JSON.stringify(bills.map(b => b.visitId)),
@@ -657,8 +562,6 @@ export const saveOrgSettlement = async (req, res) => {
         await tx.organizationSettlement.create({
           data: orgSettlementData
         });
-
-        console.log(`✅ OrganizationSettlement created for ${orgName}`);
 
         // Step 10: Process each visit - update balance based on proportional payment allocation
         // When fully settled, ALL visits balance becomes 0 regardless of calculation
@@ -694,8 +597,6 @@ export const saveOrgSettlement = async (req, res) => {
           // Determine status
           const visitBillStatus = newVisitBalance <= 0.01 ? 'PAID' : (visitPaymentAmount > 0 ? 'PARTIAL' : 'PENDING');
 
-          console.log(`   Visit ${visitId}: gross=${currentVisitGross.toFixed(2)}, payment=${visitPaymentAmount.toFixed(2)}, newBalance=${newVisitBalance.toFixed(2)}, isFullySettled=${isFullySettled}, status=${visitBillStatus}`);
-
           // Update VisitBill - directly set the values
           let updateData = {
             status: visitBillStatus
@@ -717,8 +618,6 @@ export const saveOrgSettlement = async (req, res) => {
             data: updateData
           });
           
-          console.log(`   ✅ VisitBill updated: visitId=${visitId}, balanceAmount=${updated.balanceAmount}, totalPaid=${updated.totalPaid}, status=${updated.status}`);
-          
           updatedBills.push(updated);
         }
 
@@ -739,8 +638,6 @@ export const saveOrgSettlement = async (req, res) => {
       }
     });
 
-    console.log('\n✅ Organization Settlement Processed for', updatedBills.length, 'visits across', visitsByOrg.size, 'organizations');
-
     res.json({
       success: true,
       message: 'Settlement saved successfully',
@@ -751,7 +648,6 @@ export const saveOrgSettlement = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('❌ Settlement error:', error);
     res.status(500).json({ 
       success: false, 
       message: 'Failed to save settlement', 
@@ -775,8 +671,6 @@ export const getOrganizationSettlementReport = async (req, res) => {
       });
     }
 
-    console.log('🔍 Settlement Report Request:', { orgId, fromDate, toDate, status, page, limit });
-
     // Build date filter for billing sessions
     let dateFilter = {};
     if (fromDate && toDate) {
@@ -798,15 +692,12 @@ export const getOrganizationSettlementReport = async (req, res) => {
       distinct: ['visitId']
     });
 
-    console.log(`📊 Found ${patientTestsForOrg.length} unique visits for organization ${orgId}`);
-
     if (patientTestsForOrg.length === 0) {
       return res.json(buildPaginatedResponse([], 0, page, limit));
     }
 
     // Get unique visit IDs
     const visitIds = patientTestsForOrg.map(pt => pt.visitId);
-    console.log(`📋 Unique visits: ${visitIds.length}`);
 
     // Build where clause for VisitBill
     let visitBillWhere = {
@@ -826,8 +717,6 @@ export const getOrganizationSettlementReport = async (req, res) => {
     const totalCount = await prisma.visitBill.count({
       where: visitBillWhere
     });
-
-    console.log(`📊 Total count of bills matching criteria: ${totalCount}`);
 
     // Fetch paginated settlement sessions with related data
     const visitBills = await prisma.visitBill.findMany({
@@ -856,8 +745,6 @@ export const getOrganizationSettlementReport = async (req, res) => {
       skip,
       take: limit
     });
-
-    console.log(`📈 Fetched ${visitBills.length} visit bills with settlements`);
 
     // Get PatientTest details for each visit
     const visitTestsMap = new Map();
@@ -988,11 +875,8 @@ export const getOrganizationSettlementReport = async (req, res) => {
       };
     });
 
-    console.log(`✅ Settlement Report Ready: ${data.length} records`);
-
     res.json(buildPaginatedResponse(data, totalCount, page, limit));
   } catch (error) {
-    console.error('❌ Get organization settlement report error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to fetch organization settlement report',
@@ -1026,3 +910,4 @@ const buildPaginatedResponse = (data, total, page, limit) => {
     }
   };
 };
+

@@ -31,7 +31,6 @@ export const getProfile = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Get profile error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to get profile'
@@ -105,7 +104,6 @@ export const createAdmin = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Create admin error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to create admin'
@@ -194,7 +192,6 @@ export const getServiceCountReport = async (req, res) => {
 
     res.json(buildPaginatedResponse(paginatedData, total, page, limit));
   } catch (error) {
-    console.error('Service count report error:', error);
     res.status(500).json({ success: false, message: 'Failed to fetch service count report' });
   }
 };
@@ -265,7 +262,6 @@ export const getGroupSummaryReport = async (req, res) => {
 
     res.json(buildPaginatedResponse(paginatedData, total, page, limit));
   } catch (error) {
-    console.error('Group summary report error:', error);
     res.status(500).json({ success: false, message: 'Failed to fetch group summary report' });
   }
 };
@@ -370,7 +366,6 @@ export const getMonthlyCollectionSummary = async (req, res) => {
 
     res.json(buildPaginatedResponse(paginatedData, total, page, limit));
   } catch (error) {
-    console.error('Monthly collection summary error:', error);
     res.status(500).json({ success: false, message: 'Failed to fetch monthly collection summary' });
   }
 };
@@ -487,7 +482,6 @@ export const getReportDashboard = async (req, res) => {
 
     res.json({ success: true, data: { summary, trendData, corporateData, doctorData } });
   } catch (error) {
-    console.error('Report dashboard error:', error);
     res.status(500).json({ success: false, message: 'Failed to fetch dashboard data' });
   }
 };
@@ -653,7 +647,6 @@ export const getTestReport = async (req, res) => {
 
     res.json(buildPaginatedResponse(paginatedData, total, page, limit));
   } catch (error) {
-    console.error('Test report error:', error);
     res.status(500).json({ success: false, message: 'Failed to fetch test report' });
   }
 };
@@ -774,7 +767,6 @@ export const getDiscountReport = async (req, res) => {
 
     res.json(buildPaginatedResponse(paginatedData, total, page, limit));
   } catch (error) {
-    console.error('Discount report error:', error);
     res.status(500).json({ success: false, message: 'Failed to fetch discount report' });
   }
 };
@@ -939,7 +931,7 @@ export const getTurnAroundTimeReport = async (req, res) => {
 
     res.json(buildPaginatedResponse(paginatedData, total, page, limit));
   } catch (error) {
-    console.error('Turn around time report error:', error);
     res.status(500).json({ success: false, message: 'Failed to fetch turn around time report' });
   }
 };
+

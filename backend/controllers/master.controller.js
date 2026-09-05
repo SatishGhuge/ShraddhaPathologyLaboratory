@@ -36,26 +36,19 @@ function extractFirstName(fullName) {
 // Helper function to process age ranges and auto-assign gender based on label
 function processAgeRangesWithGender(ageRanges, parameterName = '') {
   if (!ageRanges || ageRanges.length === 0) {
-    console.log(`📌 No age ranges to process for ${parameterName}`);
     return null;
   }
-  
-  console.log(`📋 Processing age ranges for ${parameterName}:`, JSON.stringify(ageRanges, null, 2));
   
   const processedRanges = ageRanges.map(range => {
     // ✅ Preserve the gender value as-is from the frontend (Both, Male, Female, Child)
     // Don't convert to lowercase - keep the original value
     let gender = range.gender;
     
-    console.log(`   Range: Label="${range.label}" | Gender="${range.gender}" | Enabled=${range.enabled} | LL=${range.ll} | UL=${range.ul}`);
-    
     return {
       ...range,
       gender: gender  // ✅ Keep original gender value without conversion
     };
   });
-  
-  console.log(`✅ Processed age ranges for ${parameterName}:`, JSON.stringify(processedRanges, null, 2));
   return JSON.stringify(processedRanges);
 }
 
@@ -138,7 +131,6 @@ function reconstructCategories(categoriesData) {
           try {
             return param.ageRanges ? JSON.parse(param.ageRanges) : [];
           } catch (e) {
-            console.warn('Failed to parse ageRanges:', param.ageRanges);
             return [];
           }
         })(),
@@ -146,7 +138,6 @@ function reconstructCategories(categoriesData) {
           try {
             return param.rangeValues ? JSON.parse(param.rangeValues) : [];
           } catch (e) {
-            console.warn('Failed to parse rangeValues:', param.rangeValues);
             return [];
           }
         })()
@@ -245,7 +236,6 @@ export const getDepartments = async (req, res) => {
 
     res.json(buildPaginatedResponse(departments, total, page, limit));
   } catch (error) {
-    console.error('Get departments error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to fetch departments'
@@ -277,7 +267,6 @@ export const getAllDepartments = async (req, res) => {
 
     res.json(buildPaginatedResponse(departments, total, page, limit));
   } catch (error) {
-    console.error('Get all departments error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to fetch departments'
@@ -314,7 +303,6 @@ export const getDepartmentById = async (req, res) => {
       data: department
     });
   } catch (error) {
-    console.error('Get department error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to fetch department'
@@ -362,7 +350,6 @@ export const createDepartment = async (req, res) => {
       data: department
     });
   } catch (error) {
-    console.error('Create department error:', error);
     
     if (error.code === 'P2002') {
       return res.status(400).json({
@@ -412,7 +399,6 @@ export const updateDepartment = async (req, res) => {
       data: department
     });
   } catch (error) {
-    console.error('Update department error:', error);
     
     if (error.code === 'P2002') {
       return res.status(400).json({
@@ -472,7 +458,6 @@ export const deleteDepartment = async (req, res) => {
       message: 'Department deleted successfully'
     });
   } catch (error) {
-    console.error('Delete department error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to delete department'
@@ -534,17 +519,7 @@ export const getTestById = async (req, res) => {
         message: 'Test not found'
       });
     }
-
-    console.log('🔍 RAW PRISMA RESPONSE:');
-    console.log('- Test ID:', test.id);
-    console.log('- attachFile (raw):', test.attachFile, typeof test.attachFile);
-    console.log('- profileTest (raw):', test.profileTest, typeof test.profileTest);
-    console.log('- sampleTypeId (raw):', test.sampleTypeId);
-    console.log('- sample_type (raw):', test.sample_type);
-    console.log('- categories count:', test.categories?.length);
     if (test.categories && test.categories[0]) {
-      console.log('- first category:', test.categories[0].categoryId);
-      console.log('- first parameter:', test.categories[0].testParameter);
     }
 
     // Reconstruct categories with parameters from TestParameter table
@@ -552,7 +527,6 @@ export const getTestById = async (req, res) => {
     const categoriesMap = new Map();
     
     test.categories.forEach((cat, idx) => {
-      console.log(`📋 Processing category ${idx}:`, { categoryId: cat.categoryId, categoryName: cat.categoryName, hasTestParam: !!cat.testParameter });
       
       // Use categoryId as key to group parameters properly
       const categoryKey = cat.categoryId || cat.categoryName || 'Default';
@@ -571,7 +545,6 @@ export const getTestById = async (req, res) => {
       // Get parameter data from testParameter relation
       if (cat.testParameter) {
         const param = cat.testParameter;
-        console.log(`🔍 Parameter: ${param.parameterName}, multiplyBy in DB: "${param.multiplyBy}"`);
         const parameter = {
           id: param.id,  // ✅ CRITICAL: Include parameter ID for updates
           parameterName: param.parameterName,
@@ -627,7 +600,6 @@ export const getTestById = async (req, res) => {
             try {
               return param.ageRanges ? JSON.parse(param.ageRanges) : [];
             } catch (e) {
-              console.warn('Failed to parse ageRanges:', param.ageRanges, e);
               return [];
             }
           })(),
@@ -635,7 +607,6 @@ export const getTestById = async (req, res) => {
             try {
               return param.rangeValues ? JSON.parse(param.rangeValues) : [];
             } catch (e) {
-              console.warn('Failed to parse rangeValues:', param.rangeValues, e);
               return [];
             }
           })()
@@ -647,10 +618,7 @@ export const getTestById = async (req, res) => {
 
     // Convert map to array
     const categoriesArray = Array.from(categoriesMap.values());
-    
-    console.log('✅ Categories reconstructed:', categoriesArray.length, 'categories');
     categoriesArray.forEach((cat, idx) => {
-      console.log(`  Category ${idx}: ${cat.name || '(unnamed)'} - ${cat.parameters.length} parameters`);
     });
 
     // Ensure categories without parameters have at least one empty parameter
@@ -718,32 +686,6 @@ export const getTestById = async (req, res) => {
 
     test.charges = charges;
 
-    // Log the complete response before sending
-    console.log('📤 COMPLETE RESPONSE FOR TEST ID:', test.id);
-    console.log('📊 attachFile value:', test.attachFile, 'type:', typeof test.attachFile);
-    console.log('📊 profileTest value:', test.profileTest, 'type:', typeof test.profileTest);
-    console.log('📊 sampleTypeId value:', test.sampleTypeId);
-    console.log('📊 sample_type object:', test.sample_type);
-    
-    // 🔍 NEW: Log multiplyBy values in response
-    console.log('%c═══ MULTIPLYING BY VALUES IN RESPONSE ═══', 'color: #ff6600; font-weight: bold');
-    if (test.categories && test.categories.length > 0) {
-      test.categories.forEach((cat, catIdx) => {
-        console.log(`Category ${catIdx}: ${cat.name}`);
-        if (cat.parameters && cat.parameters.length > 0) {
-          cat.parameters.forEach((param, paramIdx) => {
-            console.log(`  Param ${paramIdx}: "${param.parameterName}" - multiplyBy: "${param.multiplyBy}"`);
-          });
-        }
-      });
-    }
-    
-    if (test.categories && test.categories.length > 0 && test.categories[0].parameters) {
-      console.log('📊 First parameter unitId:', test.categories[0].parameters[0]?.unitId);
-      console.log('📊 First parameter unit object:', test.categories[0].parameters[0]?.unit);
-      console.log('📊 First parameter multiplyBy:', test.categories[0].parameters[0]?.multiplyBy);
-    }
-
     // Build response object
     const responseData = {
       ...test,
@@ -780,7 +722,6 @@ export const getTestById = async (req, res) => {
           }
           return test.linkedTestIds || [];
         } catch (e) {
-          console.warn('Failed to parse linkedTestIds:', test.linkedTestIds);
           return [];
         }
       })(),
@@ -788,9 +729,6 @@ export const getTestById = async (req, res) => {
       charges: test.charges,
       department: test.department
     };
-    
-    console.log('✅ AFTER CONVERSION - attachFile:', responseData.attachFile, 'type:', typeof responseData.attachFile);
-    console.log('✅ AFTER CONVERSION - profileTest:', responseData.profileTest, 'type:', typeof responseData.profileTest);
 
     // Return complete test object with all fields
     res.json({
@@ -798,7 +736,6 @@ export const getTestById = async (req, res) => {
       data: responseData
     });
   } catch (error) {
-    console.error('Get test error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to fetch test'
@@ -809,7 +746,6 @@ export const getTestById = async (req, res) => {
 // Enhanced Create Test function with TestParameter support
 export const createTest = async (req, res) => {
   try {
-    console.log('📥 Received test data:', JSON.stringify(req.body, null, 2));
     
     const {
       name,
@@ -853,8 +789,6 @@ export const createTest = async (req, res) => {
         message: 'Department not found'
       });
     }
-
-    console.log('📊 Processing categories:', categories?.length || 0);
     
     // Helper function for boolean field conversion
     const convertToBoolean = (value) => {
@@ -893,8 +827,6 @@ export const createTest = async (req, res) => {
       }
     });
 
-    console.log('✅ Test created with ID:', test.id);
-
     // Link machines to test if machineIds provided
     if (machineIds && Array.isArray(machineIds) && machineIds.length > 0) {
       for (const machineId of machineIds) {
@@ -905,7 +837,6 @@ export const createTest = async (req, res) => {
           }
         });
       }
-      console.log(`✅ Linked ${machineIds.length} machine(s) to test`);
     }
 
     // Now create TestParameters and TestCategories
@@ -913,8 +844,6 @@ export const createTest = async (req, res) => {
       for (const category of categories) {
         if (category.parameters && category.parameters.length > 0) {
           for (const param of category.parameters) {
-            console.log(`📋 Processing parameter: ${param.parameterName}, ID: ${param.id}`);
-            console.log(`   ✅ multiplyBy received: "${param.multiplyBy}" (type: ${typeof param.multiplyBy})`);
             
             let testParameterId;
             
@@ -922,7 +851,6 @@ export const createTest = async (req, res) => {
             // If no ID, check if parameter with same name exists FIRST before creating new
             if (param.id) {
               // Existing parameter - just link it to the test
-              console.log(`🔗 Linking existing parameter ID: ${param.id}`);
               testParameterId = parseInt(param.id);
             } else {
               // ✅ NEW: Check if parameter with same NAME already exists
@@ -954,11 +882,9 @@ export const createTest = async (req, res) => {
                   
                   if (!existingVal && !newVal) continue;
                   if ((existingVal && !newVal) || (!existingVal && newVal)) {
-                    console.log(`      ⚠️  Different purpose - ${field}: "${existingVal}" vs "${newVal}"`);
                     return false;
                   }
                   if (existingVal && newVal && String(existingVal).toLowerCase() !== String(newVal).toLowerCase()) {
-                    console.log(`      ⚠️  Different purpose - ${field}: "${existingVal}" vs "${newVal}"`);
                     return false;
                   }
                 }
@@ -966,7 +892,6 @@ export const createTest = async (req, res) => {
               };
 
               if (existingParam) {
-                console.log(`🔗 Found existing parameter by name: ${param.parameterName} (ID: ${existingParam.id})`);
                 
                 const paramData = {
                   type: param.type || 'Numeric',
@@ -980,18 +905,15 @@ export const createTest = async (req, res) => {
                 };
 
                 if (doParametersServeSamePurpose(existingParam, paramData)) {
-                  console.log(`   ✅ Same purpose confirmed - REUSING parameter`);
                   testParameterId = existingParam.id;
                   
                   // ✅ CRITICAL FIX: Update multiplyBy even if reusing parameter
                   const updatePayload = {};
                   if (param.multiplyBy !== undefined && param.multiplyBy !== existingParam.multiplyBy) {
-                    console.log(`   📝 Updating multiplyBy: "${existingParam.multiplyBy}" → "${param.multiplyBy}"`);
                     updatePayload.multiplyBy = param.multiplyBy || null;
                   }
                   
                   if (param.parameterCode && param.parameterCode.trim() && !existingParam.parameterCode) {
-                    console.log(`   📝 Adding parameter code: ${param.parameterCode}`);
                     updatePayload.parameterCode = param.parameterCode.trim();
                   }
                   
@@ -1001,10 +923,8 @@ export const createTest = async (req, res) => {
                       where: { id: existingParam.id },
                       data: updatePayload
                     });
-                    console.log(`   ✅ Parameter updated with:`, updatePayload);
                   }
                 } else {
-                  console.log(`   ⚠️  DIFFERENT PURPOSE - creating NEW separate parameter`);
                   existingParam = null; // Force new creation
                 }
               }
@@ -1075,8 +995,6 @@ export const createTest = async (req, res) => {
                 sortOrder: category.sortOrder ? parseInt(category.sortOrder) : null
               }
             });
-
-            console.log(`✅ Parameter linked: ${param.parameterName} (ID: ${testParameterId})`);
           }
         }
       }
@@ -1103,16 +1021,12 @@ export const createTest = async (req, res) => {
       }
     });
 
-    console.log('✅ Test created successfully with ID:', test.id);
-    console.log('📊 Categories saved:', completeTest.categories.length);
-
     res.status(201).json({
       success: true,
       message: 'Test created successfully',
       data: completeTest
     });
   } catch (error) {
-    console.error('❌ Create test error:', error);
     
     if (error.code === 'P2002') {
       return res.status(400).json({
@@ -1133,8 +1047,6 @@ export const createTest = async (req, res) => {
 export const updateTest = async (req, res) => {
   try {
     const { id } = req.params;
-    console.log('📝 Updating test ID:', id);
-    console.log('📥 Received update data:', JSON.stringify(req.body, null, 2));
     
     const {
       name,
@@ -1173,7 +1085,6 @@ export const updateTest = async (req, res) => {
       });
     } catch (err) {
       // If type conversion error, try raw SQL to fetch
-      console.log('⚠️ Type conversion error, using raw SQL:', err.message);
       const result = await prisma.$queryRaw`SELECT id FROM tests WHERE id = ${testId}`;
       if (!result || result.length === 0) {
         return res.status(404).json({
@@ -1216,9 +1127,7 @@ export const updateTest = async (req, res) => {
             }
           });
         }
-        console.log(`✅ Updated ${machineIds.length} machine(s) for test`);
       } else {
-        console.log('✅ Removed all machine associations from test');
       }
     }
     if (group !== undefined) updateData.group = group || null;
@@ -1256,14 +1165,11 @@ export const updateTest = async (req, res) => {
     }
 
     if (sampleTypeId !== undefined) {
-      console.log('📌 Updating sampleTypeId:', sampleTypeId);
       updateData.sample_type = sampleTypeId ? { connect: { id: parseInt(sampleTypeId) } } : { disconnect: true };
     }
 
     // Remove undefined values from updateData
     Object.keys(updateData).forEach(key => updateData[key] === undefined && delete updateData[key]);
-
-    console.log('📝 Update data being sent:', updateData);
 
     const test = await prisma.test.update({
       where: { id: testId },
@@ -1273,20 +1179,15 @@ export const updateTest = async (req, res) => {
     // Handle categories update if provided
     // 🔄 BEHAVIOR: UPDATE existing parameters/categories, CREATE new ones
     if (categories && categories.length > 0) {
-      console.log('📋 Processing categories update for test ID:', testId);
-      console.log('📥 RECEIVED CATEGORIES:');
       categories.forEach((cat, catIdx) => {
-        console.log(`  Category ${catIdx}: ${cat.name}`);
         if (cat.parameters) {
           cat.parameters.forEach((param, paramIdx) => {
-            console.log(`    Param ${paramIdx}: "${param.parameterName}" - ID: ${param.id} (type: ${typeof param.id})`);
           });
         }
       });
 
       // Helper function to prepare parameter data
       const prepareParameterData = (param) => {
-        console.log(`🔧 prepareParameterData called for: "${param.parameterName}", multiplyBy: "${param.multiplyBy}"`);
         
         // ✅ NEW: Handle 'Both' gender which applies to both Male and Female
         const getMaleRange = () => {
@@ -1361,13 +1262,9 @@ export const updateTest = async (req, res) => {
               if (typeof ageRangesData === 'string') {
                 ageRangesData = JSON.parse(ageRangesData);
               }
-              console.log(`📥 Original ageRangesData for ${param.parameterName}:`, JSON.stringify(ageRangesData, null, 2));
               const processed = processAgeRangesWithGender(ageRangesData, param.parameterName);
-              console.log(`📤 Processed ageRanges to save:`, processed);
               return processed;
             } catch (e) {
-              console.error(`❌ Error processing age ranges for ${param.parameterName}:`, e);
-              console.error(`   ageRanges value was:`, param.ageRanges);
               return null;
             }
           })(),
@@ -1383,38 +1280,16 @@ export const updateTest = async (req, res) => {
       for (const category of categories) {
         if (category.parameters && category.parameters.length > 0) {
           for (const param of category.parameters) {
-            console.log(`📝 Processing parameter: ${param.parameterName}`);
-            console.log(`   Raw ID value from request: ${param.id}`);
-            console.log(`   Parsed ID: ${param.id ? parseInt(param.id) : 'null/undefined'} (original type: ${typeof param.id})`);
-            console.log(`   Normal Ranges: ${JSON.stringify(param.normalRanges)}`);
             
             // ✅ CRITICAL: Parse ID as integer to handle string or number
             const parsedId = param.id ? parseInt(param.id) : null;
-            console.log(`   Will ${parsedId ? 'UPDATE' : 'CREATE'} this parameter`);
 
             let testParameter;
 
             if (parsedId) {
               // ✅ EXISTING PARAMETER - UPDATE IT (keep same ID)
-              console.log(`   ↻ Updating existing parameter ID: ${parsedId}`);
-              console.log(`   📊 Parameter data to update:`, {
-                parameterName: param.parameterName,
-                hasAgeRanges: !!param.ageRanges,
-                ageRangesType: typeof param.ageRanges,
-                ageRangesLength: Array.isArray(param.ageRanges) ? param.ageRanges.length : 'N/A',
-                normalRangesCount: param.normalRanges?.length || 0
-              });
               try {
                 const updatePayload = prepareParameterData(param);
-                console.log(`   📤 Prepared update payload for ${param.parameterName}:`, {
-                  parameterName: updatePayload.parameterName,
-                  parameterCode: updatePayload.parameterCode,
-                  multiplyBy: updatePayload.multiplyBy,
-                  ageRanges: updatePayload.ageRanges ? updatePayload.ageRanges.substring(0, 100) + '...' : 'null',
-                  maleLowValue: updatePayload.maleLowValue,
-                  maleActive: updatePayload.maleActive,
-                  hasAgeRanges: !!updatePayload.ageRanges
-                });
                 
                 // ✅ CRITICAL FIX: Check for parameterCode conflicts before update
                 if (updatePayload.parameterCode) {
@@ -1426,7 +1301,6 @@ export const updateTest = async (req, res) => {
                   });
                   
                   if (existingWithCode) {
-                    console.warn(`   ⚠️ CONFLICT: Another parameter already has parameterCode "${updatePayload.parameterCode}". Setting to null to avoid unique constraint violation.`);
                     updatePayload.parameterCode = null;  // Force null to avoid conflict
                   }
                 }
@@ -1441,25 +1315,12 @@ export const updateTest = async (req, res) => {
                   where: { id: parsedId }
                 });
                 
-                console.log(`   🔍 VERIFICATION - Data after update:`, {
-                  parameterName: verifyUpdate.parameterName,
-                  parameterCode: verifyUpdate.parameterCode,
-                  multiplyBy: verifyUpdate.multiplyBy,
-                  ageRanges: verifyUpdate.ageRanges ? verifyUpdate.ageRanges.substring(0, 100) + '...' : 'null',
-                  maleLowValue: verifyUpdate.maleLowValue,
-                  maleActive: verifyUpdate.maleActive
-                });
-                
                 incomingParamIds.push(parsedId);
-                console.log(`   ✅ Parameter updated successfully with SAME ID: ${parsedId}`);
               } catch (updateError) {
-                console.error(`   ❌ ERROR updating parameter ID ${parsedId} (${param.parameterName}):`, updateError.message);
-                console.error(`   📋 Stack:`, updateError.stack);
                 throw updateError;
               }
             } else {
               // ✅ NEW PARAMETER - CREATE IT (new ID generated)
-              console.log(`   ➕ Creating new parameter (no ID provided)`);
               testParameter = await prisma.testParameter.create({
                 data: {
                   testId: testId,
@@ -1467,7 +1328,6 @@ export const updateTest = async (req, res) => {
                 }
               });
               incomingParamIds.push(testParameter.id);
-              console.log(`   ✅ NEW parameter created with NEW ID: ${testParameter.id}`);
             }
 
             // Update or create TestCategory
@@ -1480,7 +1340,6 @@ export const updateTest = async (req, res) => {
 
             if (existingCategory) {
               // ✅ UPDATE EXISTING CATEGORY (keep same ID)
-              console.log(`   ↻ Updating existing category ID: ${existingCategory.id}`);
               await prisma.testCategory.update({
                 where: { id: existingCategory.id },
                 data: {
@@ -1491,10 +1350,8 @@ export const updateTest = async (req, res) => {
                   sortOrder: category.sortOrder !== undefined && category.sortOrder !== null ? parseInt(category.sortOrder) : undefined
                 }
               });
-              console.log(`   ✅ Category updated successfully with SAME ID: ${existingCategory.id}`);
             } else {
               // ✅ CREATE NEW CATEGORY LINK (new ID generated)
-              console.log(`   ➕ Creating new category link`);
               const newCat = await prisma.testCategory.create({
                 data: {
                   testId: testId,
@@ -1506,15 +1363,12 @@ export const updateTest = async (req, res) => {
                   sortOrder: category.sortOrder !== undefined && category.sortOrder !== null ? parseInt(category.sortOrder) : null
                 }
               });
-              console.log(`   ✅ NEW category link created with NEW ID: ${newCat.id}`);
             }
           }
         }
       }
 
       // ✅ DELETE PARAMETERS NOT IN INCOMING LIST
-      console.log(`🗑️ Cleaning up deleted parameters...`);
-      console.log(`📋 Incoming parameter IDs to keep: [${incomingParamIds.join(', ')}]`);
       
       const deletedParams = await prisma.testParameter.findMany({
         where: {
@@ -1523,31 +1377,23 @@ export const updateTest = async (req, res) => {
         }
       });
 
-      console.log(`🗑️ Found ${deletedParams.length} parameters NOT in incoming list - these will be deleted`);
-
       for (const param of deletedParams) {
-        console.log(`   🗑️ Deleting parameter ID: ${param.id} (${param.parameterName})`);
 
         // 1. Delete TestResults linked to this parameter
         const deletedResults = await prisma.testResult.deleteMany({
           where: { testParameterId: param.id }
         });
-        console.log(`      ├─ Deleted ${deletedResults.count} test result(s)`);
 
         // 2. Delete TestCategories linked to this parameter
         const deletedCategories = await prisma.testCategory.deleteMany({
           where: { testParameterId: param.id }
         });
-        console.log(`      ├─ Deleted ${deletedCategories.count} category link(s)`);
 
         // 3. Delete the parameter itself
         await prisma.testParameter.delete({
           where: { id: param.id }
         });
-        console.log(`      └─ Parameter deleted from database`);
       }
-
-      console.log(`✅ Categories processing complete. Deleted ${deletedParams.length} orphaned parameter(s)`);
     }
 
     // Fetch updated test with categories, parameters, and machines
@@ -1571,16 +1417,12 @@ export const updateTest = async (req, res) => {
       }
     });
 
-    console.log('✅ Test updated successfully with ID:', updatedTest.id);
-    console.log('📊 Categories updated:', updatedTest.categories.length);
-
     res.json({
       success: true,
       message: 'Test updated successfully',
       data: updatedTest
     });
   } catch (error) {
-    console.error('❌ Update test error:', error);
     
     if (error.code === 'P2002') {
       return res.status(400).json({
@@ -1676,7 +1518,6 @@ export const getTests = async (req, res) => {
       }));
     } catch (err) {
       // If type conversion error, fetch with raw SQL and convert
-      console.log('⚠️ Type conversion error in findMany, using raw SQL:', err.message);
       const rawTests = await prisma.$queryRaw`
         SELECT * FROM tests WHERE isDeleted = false ORDER BY name ASC LIMIT ${limit} OFFSET ${skip}
       `;
@@ -1690,7 +1531,6 @@ export const getTests = async (req, res) => {
 
     res.json(buildPaginatedResponse(tests, total, page, limit));
   } catch (error) {
-    console.error('Get tests error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to fetch tests'
@@ -1726,7 +1566,6 @@ export const deleteTest = async (req, res) => {
       message: 'Test deleted successfully'
     });
   } catch (error) {
-    console.error('Delete test error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to delete test'
@@ -1751,7 +1590,6 @@ export const getDoctors = async (req, res) => {
       data: doctors
     });
   } catch (error) {
-    console.error('Get doctors error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to fetch doctors'
@@ -1774,7 +1612,6 @@ export const getDoctorById = async (req, res) => {
       data: doctor
     });
   } catch (error) {
-    console.error('Get doctor by ID error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to fetch doctor'
@@ -1805,7 +1642,6 @@ export const createDoctor = async (req, res) => {
     });
     res.status(201).json({ success: true, message: 'Doctor created successfully', data: doctor });
   } catch (error) {
-    console.error('Create doctor error:', error);
     res.status(500).json({ success: false, message: 'Failed to create doctor' });
   }
 };
@@ -1843,7 +1679,6 @@ export const updateDoctor = async (req, res) => {
 
     res.json({ success: true, message: 'Doctor updated successfully', data: doctor });
   } catch (error) {
-    console.error('Update doctor error:', error);
     res.status(500).json({ success: false, message: 'Failed to update doctor' });
   }
 };
@@ -1857,7 +1692,6 @@ export const deleteDoctor = async (req, res) => {
     await prisma.doctor.update({ where: { id: parseInt(id) }, data: { isActive: false } });
     res.json({ success: true, message: 'Doctor deleted successfully' });
   } catch (error) {
-    console.error('Delete doctor error:', error);
     res.status(500).json({ success: false, message: 'Failed to delete doctor' });
   }
 };
@@ -1936,7 +1770,6 @@ export const findDuplicateDoctors = async (req, res) => {
       count: duplicates.length
     });
   } catch (error) {
-    console.error('Find duplicate doctors error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to find duplicate doctors'
@@ -1986,7 +1819,6 @@ export const getDoctorMergeHistory = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Get doctor merge history error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to fetch merge history'
@@ -2051,8 +1883,6 @@ export const mergeDoctors = async (req, res) => {
         select: { testId: true, id: true }
       });
 
-      console.log(`Found ${sourceCharges.length} source doctor charges`);
-
       // Delete conflicting target charges (same testId)
       for (const charge of sourceCharges) {
         await prisma.doctorTestCharge.deleteMany({
@@ -2069,7 +1899,6 @@ export const mergeDoctors = async (req, res) => {
         data: { doctorId: parseInt(targetDoctorId) }
       });
       chargesUpdated = chargeUpdateResult.count;
-      console.log(`Transferred ${chargesUpdated} charges to target doctor`);
 
       // Step 2: Update PatientTest records (by referral doctor name - handle "Dr." prefix)
       // Get all variants of source doctor name (with/without "Dr." prefix)
@@ -2087,7 +1916,6 @@ export const mergeDoctors = async (req, res) => {
         patientTestsUpdated += patientTestUpdateResult.count;
       }
       recordsUpdated = patientTestsUpdated;
-      console.log(`Updated ${recordsUpdated} patient test records`);
 
       // Step 3: Create merge history record
       const mergeHistory = await prisma.doctorMerge.create({
@@ -2123,7 +1951,6 @@ export const mergeDoctors = async (req, res) => {
         }
       });
     } catch (error) {
-      console.error('Error during merge transaction:', error);
       res.status(500).json({
         success: false,
         message: 'Failed to complete merge operation: ' + error.message,
@@ -2131,7 +1958,6 @@ export const mergeDoctors = async (req, res) => {
       });
     }
   } catch (error) {
-    console.error('Merge doctors error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to merge doctors'
@@ -2223,7 +2049,6 @@ export const getOrganizations = async (req, res) => {
     });
     res.json({ success: true, data: organizations });
   } catch (error) {
-    console.error('Get organizations error:', error);
     res.status(500).json({ success: false, message: 'Failed to fetch organizations' });
   }
 };
@@ -2266,35 +2091,8 @@ export const getOrganizationById = async (req, res) => {
       moduleAllocations: undefined  // Remove the array version
     };
     
-    console.log('📦 getOrganizationById FULL response:', {
-      orgId: organization.id,
-      orgName: organization.name,
-      discount: organization.discount,
-      isHomeCollection: organization.isHomeCollection,
-      isOPD: organization.isOPD,
-      isIPD: organization.isIPD,
-      hasModuleAllocations: !!organization.moduleAllocations,
-      moduleAllocationsCount: organization.moduleAllocations?.length,
-      modulesValue: organization.moduleAllocations?.[0]?.modules ? 'EXISTS' : 'NULL',
-      finalModuleAllocation: response.moduleAllocation ? 'EXISTS (length: ' + response.moduleAllocation.length + ')' : 'NULL',
-      responseKeys: Object.keys(response),
-      sendingToFrontend: {
-        success: true,
-        data: {
-          id: response.id,
-          name: response.name,
-          discount: response.discount,
-          isHomeCollection: response.isHomeCollection,
-          isOPD: response.isOPD,
-          isIPD: response.isIPD,
-          moduleAllocation: response.moduleAllocation ? '...JSON STRING...' : null
-        }
-      }
-    });
-    
     res.json({ success: true, data: response });
   } catch (error) {
-    console.error('Get organization error:', error);
     res.status(500).json({ success: false, message: 'Failed to fetch organization' });
   }
 };
@@ -2309,8 +2107,6 @@ export const createOrganization = async (req, res) => {
     const suffix = newId.replace('ORG-', '');
     const username = newId;           // ORG-AAA
     const plainPassword = `${suffix}@123`;  // AAA@123
-
-    console.log('Creating organization:', { newId, name, email, adminName, discount, isHomeCollection, isOPD, isIPD });
 
     // Check if organization already exists
     const existingOrg = await prisma.organization.findUnique({ where: { id: newId } });
@@ -2337,8 +2133,6 @@ export const createOrganization = async (req, res) => {
         isIPD: isIPD || false,
       },
     });
-
-    console.log('Organization created:', organization);
 
     // Create module allocation for organization if provided
     if (moduleAllocation) {
@@ -2367,10 +2161,7 @@ export const createOrganization = async (req, res) => {
           isActive: true
         }
       });
-      
-      console.log('Admin created for organization:', { adminId: admin.id, adminName: admin.adminName, username: admin.username });
     } catch (adminError) {
-      console.error('Admin creation error:', adminError);
       // Delete the organization if admin creation fails
       await prisma.organization.delete({ where: { id: newId } });
       throw adminError;
@@ -2396,7 +2187,6 @@ export const createOrganization = async (req, res) => {
           });
           chargesCreated++;
         } catch (chargeError) {
-          console.warn(`Failed to create charge for test ${charge.testId}:`, chargeError.message);
         }
       }
     } else {
@@ -2421,21 +2211,18 @@ export const createOrganization = async (req, res) => {
             });
             chargesCreated++;
           } catch (chargeError) {
-            console.warn(`Failed to copy default charge for test ${defaultCharge.testId}:`, chargeError.message);
           }
         }
         
         if (chargesCreated > 0) {
-          console.log(`Copied ${chargesCreated} default charges to organization ${newId}`);
         }
       } catch (error) {
-        console.warn('Failed to copy default charges:', error.message);
       }
     }
 
     // Send credentials email if provided
     if (email) {
-      sendOrganizationCredentialsEmail(email, name.trim(), username, plainPassword, false).catch(console.error);
+      sendOrganizationCredentialsEmail(email, name.trim(), username, plainPassword, false).catch(err => {});
     }
 
     res.status(201).json({
@@ -2450,7 +2237,6 @@ export const createOrganization = async (req, res) => {
       const field = error.meta?.target?.[0] || 'field';
       return res.status(400).json({ success: false, message: `Organization ${field} already exists` });
     }
-    console.error('Create organization error:', error);
     res.status(500).json({ success: false, message: error.message || 'Failed to create organization' });
   }
 };
@@ -2524,20 +2310,18 @@ export const updateOrganization = async (req, res) => {
         }
       }
     } catch (userError) {
-      console.warn('Failed to update user for organization:', userError.message);
     }
 
     // Send update notification email (non-blocking)
     const emailTo = email || existing.email;
     if (emailTo) {
       sendOrganizationCredentialsEmail(emailTo, name || existing.name, id, null, true)
-        .catch(e => console.error('Failed to send organization update email:', e.message));
+        .catch(err => {});
     }
 
     res.json({ success: true, message: 'Organization updated successfully', data: organization });
   } catch (error) {
     if (error.code === 'P2002') return res.status(400).json({ success: false, message: 'Organization name already exists' });
-    console.error('Update organization error:', error);
     res.status(500).json({ success: false, message: 'Failed to update organization' });
   }
 };
@@ -2551,7 +2335,6 @@ export const deleteOrganization = async (req, res) => {
     await prisma.organization.update({ where: { id }, data: { isActive: false } });
     res.json({ success: true, message: 'Organization deleted successfully' });
   } catch (error) {
-    console.error('Delete organization error:', error);
     res.status(500).json({ success: false, message: 'Failed to delete organization' });
   }
 };
@@ -2603,7 +2386,6 @@ export const getSeedDataSummary = async (req, res) => {
       data: seedStatus
     });
   } catch (error) {
-    console.error('Get seed data summary error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to fetch seed data summary'
@@ -2669,7 +2451,6 @@ export const getTestCharges = async (req, res) => {
       data: charges
     });
   } catch (error) {
-    console.error('Get test charges error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to fetch test charges'
@@ -2715,7 +2496,6 @@ export const getAllTestCharges = async (req, res) => {
       data: tests
     });
   } catch (error) {
-    console.error('Get all test charges error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to fetch test charges'
@@ -2813,7 +2593,6 @@ export const getDoctorTestCharges = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Get doctor test charges error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to fetch doctor test charges'
@@ -2911,7 +2690,6 @@ export const getOrganizationTestCharges = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Get organization test charges error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to fetch organization test charges'
@@ -3018,7 +2796,6 @@ export const createTestCharge = async (req, res) => {
       data: charge
     });
   } catch (error) {
-    console.error('Create test charge error:', error);
     
     if (error.code === 'P2002') {
       return res.status(400).json({
@@ -3105,7 +2882,6 @@ export const updateTestCharge = async (req, res) => {
       data: charge
     });
   } catch (error) {
-    console.error('Update test charge error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to update test charge'
@@ -3138,7 +2914,6 @@ export const deleteTestCharge = async (req, res) => {
       message: 'Test charge deleted successfully'
     });
   } catch (error) {
-    console.error('Delete test charge error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to delete test charge'
@@ -3257,7 +3032,6 @@ export const bulkCreateOrganizationTestCharges = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Bulk create organization test charges error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to bulk create organization test charges'
@@ -3430,7 +3204,6 @@ export const bulkCreateTestCharges = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Bulk create test charges error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to bulk create test charges'
@@ -3495,7 +3268,6 @@ export const getPackages = async (req, res) => {
 
     res.json(buildPaginatedResponse(packagesWithTests, total, page, limit));
   } catch (error) {
-    console.error('Get packages error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to fetch packages'
@@ -3553,7 +3325,6 @@ export const getAllPackages = async (req, res) => {
 
     res.json(buildPaginatedResponse(packagesWithTests, total, page, limit));
   } catch (error) {
-    console.error('Get all packages error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to fetch packages'
@@ -3614,7 +3385,6 @@ export const getPackageById = async (req, res) => {
       data: formattedPackage
     });
   } catch (error) {
-    console.error('Get package error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to fetch package'
@@ -3713,7 +3483,6 @@ export const createPackage = async (req, res) => {
       data: completePackage
     });
   } catch (error) {
-    console.error('Create package error:', error);
     
     if (error.code === 'P2002') {
       return res.status(400).json({
@@ -3821,7 +3590,6 @@ export const updatePackage = async (req, res) => {
       data: completePackage
     });
   } catch (error) {
-    console.error('Update package error:', error);
     
     if (error.code === 'P2002') {
       return res.status(400).json({
@@ -3865,7 +3633,6 @@ export const deletePackage = async (req, res) => {
       message: 'Package deleted successfully'
     });
   } catch (error) {
-    console.error('Delete package error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to delete package'
@@ -3904,7 +3671,6 @@ export const getPackageTests = async (req, res) => {
       data: packageTests
     });
   } catch (error) {
-    console.error('Get package tests error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to fetch package tests'
@@ -3995,7 +3761,6 @@ export const addTestToPackage = async (req, res) => {
       data: packageTest
     });
   } catch (error) {
-    console.error('Add test to package error:', error);
     
     if (error.code === 'P2002') {
       return res.status(400).json({
@@ -4047,7 +3812,6 @@ export const removeTestFromPackage = async (req, res) => {
       message: 'Test removed from package successfully'
     });
   } catch (error) {
-    console.error('Remove test from package error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to remove test from package'
@@ -4083,7 +3847,6 @@ export const getParameterMasters = async (req, res) => {
       data: parameters
     });
   } catch (error) {
-    console.error('Get parameter masters error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to fetch parameter masters'
@@ -4127,7 +3890,6 @@ export const getParameterMasterById = async (req, res) => {
       data: parameterData
     });
   } catch (error) {
-    console.error('Get parameter master error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to fetch parameter master'
@@ -4234,7 +3996,6 @@ export const createParameterMaster = async (req, res) => {
       data: parameter
     });
   } catch (error) {
-    console.error('Create parameter master error:', error);
     
     if (error.code === 'P2002') {
       return res.status(400).json({
@@ -4286,12 +4047,8 @@ export const updateParameterMaster = async (req, res) => {
     };
 
     // 🔴 DEBUG: Log what's being saved
-    console.log(`\n🔴 UPDATE PARAMETER: ${updateData.parameterName}`);
-    console.log(`   ageRanges count: ${updateData.ageRanges?.length || 0}`);
     if (updateData.ageRanges && updateData.ageRanges.length > 0) {
-      console.log(`   ageRanges data:`, JSON.stringify(updateData.ageRanges, null, 2));
     }
-    console.log(`   Will be saved as JSON: ${processedData.ageRanges ? 'YES' : 'NO'}`);
 
     const parameter = await prisma.parameterMaster.update({
       where: { id: parseInt(id) },
@@ -4307,18 +4064,12 @@ export const updateParameterMaster = async (req, res) => {
     });
 
     // 🔴 DEBUG: Confirm what was saved
-    console.log(`\n✅ PARAMETER SAVED TO DATABASE:`);
-    console.log(`   ID: ${parameter.id}, Name: ${parameter.parameterName}`);
-    console.log(`   ageRanges saved: ${parameter.ageRanges ? 'YES' : 'NO'}`);
     if (parameter.ageRanges) {
       try {
         const parsed = JSON.parse(parameter.ageRanges);
-        console.log(`   ageRanges count: ${parsed.length}`);
         parsed.forEach((range, idx) => {
-          console.log(`     Range ${idx}: label="${range.label}", gender="${range.gender}", enabled=${range.enabled}, from=${range.from}, to=${range.to}, ll=${range.ll}, ul=${range.ul}`);
         });
       } catch (e) {
-        console.log(`   Error parsing ageRanges: ${e.message}`);
       }
     }
 
@@ -4328,7 +4079,6 @@ export const updateParameterMaster = async (req, res) => {
       data: parameter
     });
   } catch (error) {
-    console.error('Update parameter master error:', error);
     
     if (error.code === 'P2002') {
       return res.status(400).json({
@@ -4372,7 +4122,6 @@ export const deleteParameterMaster = async (req, res) => {
       message: 'Parameter master deleted successfully'
     });
   } catch (error) {
-    console.error('Delete parameter master error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to delete parameter master'
@@ -4431,7 +4180,6 @@ export const searchParameters = async (req, res) => {
 
     res.json({ success: true, data: transformedParameters });
   } catch (error) {
-    console.error('Search parameters error:', error);
     res.status(500).json({ success: false, message: 'Failed to search parameters' });
   }
 };
@@ -4462,7 +4210,6 @@ export const getUnits = async (req, res) => {
 
     res.json(buildPaginatedResponse(units, total, page, limit));
   } catch (error) {
-    console.error('Get units error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to fetch units'
@@ -4491,7 +4238,6 @@ export const getUnitById = async (req, res) => {
       data: unit
     });
   } catch (error) {
-    console.error('Get unit by ID error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to fetch unit'
@@ -4535,7 +4281,6 @@ export const createUnit = async (req, res) => {
       data: unit
     });
   } catch (error) {
-    console.error('Create unit error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to create unit'
@@ -4596,7 +4341,6 @@ export const updateUnit = async (req, res) => {
       data: unit
     });
   } catch (error) {
-    console.error('Update unit error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to update unit'
@@ -4630,7 +4374,6 @@ export const deleteUnit = async (req, res) => {
       message: 'Unit deleted successfully'
     });
   } catch (error) {
-    console.error('Delete unit error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to delete unit'
@@ -4672,8 +4415,6 @@ export const createTestParameter = async (req, res) => {
       ageRanges,
       rangeValues
     } = req.body;
-
-    console.log('📥 Creating test parameter:', { parameterName, testId });
 
     // Validate required fields
     if (!parameterName || !parameterName.trim()) {
@@ -4741,15 +4482,12 @@ export const createTestParameter = async (req, res) => {
       }
     });
 
-    console.log('✅ Test parameter created with ID:', parameter.id);
-
     res.status(201).json({
       success: true,
       message: 'Test parameter created successfully',
       data: parameter
     });
   } catch (error) {
-    console.error('❌ Error creating test parameter:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to create test parameter',
@@ -4797,8 +4535,6 @@ export const createTestCategoryWithParameter = async (req, res) => {
       ageRanges,
       rangeValues
     } = req.body;
-
-    console.log('📥 Creating category with parameter:', { categoryName, parameterName, testId });
 
     // Validate required fields
     if (!testId || !parameterName) {
@@ -4868,13 +4604,11 @@ export const createTestCategoryWithParameter = async (req, res) => {
         
         // If one is null and other isn't, they're DIFFERENT purposes
         if ((existingVal && !newVal) || (!existingVal && newVal)) {
-          console.log(`   ⚠️  Different purpose detected - ${field}: existing="${existingVal}" vs new="${newVal}"`);
           return false;
         }
         
         // If both exist but differ, they're DIFFERENT purposes
         if (existingVal && newVal && String(existingVal).toLowerCase() !== String(newVal).toLowerCase()) {
-          console.log(`   ⚠️  Different purpose detected - ${field}: existing="${existingVal}" vs new="${newVal}"`);
           return false;
         }
       }
@@ -4883,7 +4617,6 @@ export const createTestCategoryWithParameter = async (req, res) => {
     };
 
     if (parameter) {
-      console.log(`🔗 Found existing parameter: ${parameterName} (ID: ${parameter.id})`);
       
       // Check if they serve the same purpose
       const sameParamData = {
@@ -4898,26 +4631,21 @@ export const createTestCategoryWithParameter = async (req, res) => {
       };
 
       if (doParametersServeSamePurpose(parameter, sameParamData)) {
-        console.log(`   ✅ Same purpose confirmed - REUSING parameter`);
         
         // ✅ If found and parameterCode is provided, update it to ensure consistency
         if (parameterCode && parameterCode.trim() && !parameter.parameterCode) {
-          console.log(`   📝 Adding parameter code to existing parameter: ${parameterCode}`);
           parameter = await prisma.testParameter.update({
             where: { id: parameter.id },
             data: { parameterCode: parameterCode.trim() }
           });
         }
       } else {
-        console.log(`   ⚠️  DIFFERENT PURPOSE detected! Creating NEW separate parameter`);
-        console.log(`   📌 Reason: Different textContent/type means different parameter`);
         parameter = null; // Force creation of new parameter
       }
     }
 
     if (!parameter) {
       // Step 1: Create the parameter
-      console.log(`✨ Creating new parameter: ${parameterName}`);
       parameter = await prisma.testParameter.create({
         data: {
           testId: parseInt(testId),
@@ -4961,8 +4689,6 @@ export const createTestCategoryWithParameter = async (req, res) => {
           isActive: true
         }
       });
-
-      console.log('✅ Parameter created with ID:', parameter.id);
     }
 
     // Step 2: Create the category linking to the parameter
@@ -4983,8 +4709,6 @@ export const createTestCategoryWithParameter = async (req, res) => {
       }
     });
 
-    console.log('✅ Category created with ID:', category.id);
-
     res.status(201).json({
       success: true,
       message: 'Category with parameter created successfully',
@@ -4994,7 +4718,6 @@ export const createTestCategoryWithParameter = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('❌ Error creating category with parameter:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to create category with parameter',
@@ -5014,8 +4737,6 @@ export const createTestCategory = async (req, res) => {
       testMethod,
       sortOrder
     } = req.body;
-
-    console.log('📥 Creating test category:', { categoryName, testId, testParameterId });
 
     // Validate required fields
     if (!testId || !testParameterId) {
@@ -5084,15 +4805,12 @@ export const createTestCategory = async (req, res) => {
       }
     });
 
-    console.log('✅ Test category created with ID:', category.id);
-
     res.status(201).json({
       success: true,
       message: 'Test category created successfully',
       data: category
     });
   } catch (error) {
-    console.error('❌ Error creating test category:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to create test category',
@@ -5144,7 +4862,6 @@ export const getTemplates = async (req, res) => {
 
     res.json(buildPaginatedResponse(parsedTemplates, total, page, limit));
   } catch (error) {
-    console.error('Error fetching templates:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to fetch templates',
@@ -5208,7 +4925,6 @@ export const getTemplatesByTestId = async (req, res) => {
       count: parsedTemplates.length
     });
   } catch (error) {
-    console.error('Error fetching templates by test ID:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to fetch templates',
@@ -5256,7 +4972,6 @@ export const getTemplateById = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Error fetching template:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to fetch template',
@@ -5270,11 +4985,8 @@ export const createTemplate = async (req, res) => {
   try {
     const { testId, templateName, parameters, testCategoryId } = req.body;
 
-    console.log('📥 Creating template:', { testId, templateName, testCategoryId, parametersCount: parameters?.length });
-
     // Validate required fields
     if (!testId || !templateName) {
-      console.error('❌ Missing required fields');
       return res.status(400).json({
         success: false,
         message: 'Test ID and Template Name are required'
@@ -5287,7 +4999,6 @@ export const createTemplate = async (req, res) => {
     });
 
     if (!test) {
-      console.error('❌ Test not found with ID:', testId);
       return res.status(404).json({
         success: false,
         message: 'Test not found'
@@ -5301,7 +5012,6 @@ export const createTemplate = async (req, res) => {
       });
 
       if (!category) {
-        console.error('❌ Test Category not found with ID:', testCategoryId);
         return res.status(404).json({
           success: false,
           message: 'Test Category not found'
@@ -5318,7 +5028,6 @@ export const createTemplate = async (req, res) => {
     });
 
     if (existingTemplate) {
-      console.warn('⚠️ Template already exists with this name for this test');
       return res.status(409).json({
         success: false,
         message: `A template named "${templateName}" already exists for this test. Please use a different template name.`
@@ -5349,8 +5058,6 @@ export const createTemplate = async (req, res) => {
       }
     });
 
-    console.log('✅ Template created successfully with ID:', template.id);
-
     res.status(201).json({
       success: true,
       message: 'Template created successfully',
@@ -5360,7 +5067,6 @@ export const createTemplate = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('❌ Error creating template:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to create template',
@@ -5375,16 +5081,12 @@ export const updateTemplate = async (req, res) => {
     const { id } = req.params;
     const { testId, templateName, parameters, testCategoryId } = req.body;
 
-    console.log('📝 Updating template ID:', id);
-    console.log('📥 Update data:', { testId, templateName, testCategoryId, parametersCount: parameters?.length });
-
     // Check if template exists
     const existingTemplate = await prisma.testTemplate.findUnique({
       where: { id: parseInt(id) }
     });
 
     if (!existingTemplate) {
-      console.error('❌ Template not found with ID:', id);
       return res.status(404).json({
         success: false,
         message: 'Template not found'
@@ -5398,7 +5100,6 @@ export const updateTemplate = async (req, res) => {
       });
 
       if (!test) {
-        console.error('❌ Test not found with ID:', testId);
         return res.status(404).json({
           success: false,
           message: 'Test not found'
@@ -5413,7 +5114,6 @@ export const updateTemplate = async (req, res) => {
       });
 
       if (!category) {
-        console.error('❌ Test Category not found with ID:', testCategoryId);
         return res.status(404).json({
           success: false,
           message: 'Test Category not found'
@@ -5429,8 +5129,6 @@ export const updateTemplate = async (req, res) => {
       // Handle parameters - convert array to JSON string
       updateData.parameters = Array.isArray(parameters) ? JSON.stringify(parameters) : parameters;
     }
-
-    console.log('🔄 Updating with data:', updateData);
 
     const template = await prisma.testTemplate.update({
       where: { id: parseInt(id) },
@@ -5452,8 +5150,6 @@ export const updateTemplate = async (req, res) => {
       }
     });
 
-    console.log('✅ Template updated successfully');
-
     res.json({
       success: true,
       message: 'Template updated successfully',
@@ -5463,7 +5159,6 @@ export const updateTemplate = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('❌ Error updating template:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to update template',
@@ -5498,7 +5193,6 @@ export const deleteTemplate = async (req, res) => {
       message: 'Template deleted successfully'
     });
   } catch (error) {
-    console.error('Error deleting template:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to delete template',
@@ -5529,7 +5223,6 @@ export const getSpecimenTypes = async (req, res) => {
 
     res.json(buildPaginatedResponse(specimenTypes, total, page, limit));
   } catch (error) {
-    console.error('Get specimen types error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to fetch specimen types'
@@ -5558,7 +5251,6 @@ export const getSpecimenTypeById = async (req, res) => {
       data: specimenType
     });
   } catch (error) {
-    console.error('Get specimen type error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to fetch specimen type'
@@ -5604,7 +5296,6 @@ export const createSpecimenType = async (req, res) => {
       data: specimenType
     });
   } catch (error) {
-    console.error('Create specimen type error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to create specimen type'
@@ -5667,7 +5358,6 @@ export const updateSpecimenType = async (req, res) => {
       data: specimenType
     });
   } catch (error) {
-    console.error('Update specimen type error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to update specimen type'
@@ -5701,7 +5391,6 @@ export const deleteSpecimenType = async (req, res) => {
       message: 'Specimen type deleted successfully'
     });
   } catch (error) {
-    console.error('Delete specimen type error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to delete specimen type'
@@ -5739,7 +5428,6 @@ export const getRoles = async (req, res) => {
 
     res.json(buildPaginatedResponse(roles, total, page, limit));
   } catch (error) {
-    console.error('Get roles error:', error);
     res.status(500).json({ success: false, message: 'Failed to fetch roles' });
   }
 };
@@ -5904,8 +5592,6 @@ export const createUser = async (req, res) => {
   try {
     const { organizationId, name, role, mobile, gender, email, address, moduleAllocation } = req.body;
     
-    console.log('📥 Creating user with data:', { organizationId, name, role, gender, email });
-    
     // Auto-generate username from first name
     const username = extractFirstName(name);
     
@@ -5963,16 +5649,11 @@ export const createUser = async (req, res) => {
 
     // Send credentials email if email is provided (non-blocking — don't fail user creation if email fails)
     if (email) {
-      console.log(`📧 Sending auto-generated credentials to ${email} - Username: ${username}, Password: ${password}`);
-      sendUserCredentialsEmail(email, name, username.trim(), password, role).catch(e =>
-        console.error('Failed to send staff credentials email:', e.message)
-      );
+      sendUserCredentialsEmail(email, name, username.trim(), password, role).catch(err => {});
     }
 
     res.status(201).json({ success: true, message: 'User created successfully', data: user });
   } catch (error) {
-    console.error('❌ Create user error:', error);
-    console.error('Error details:', { code: error.code, message: error.message, meta: error.meta });
     if (error.code === 'P2002') return res.status(400).json({ success: false, message: 'Username already exists' });
     res.status(500).json({ success: false, message: 'Failed to create user', detail: error.message });
   }
@@ -6042,16 +5723,13 @@ export const updateUser = async (req, res) => {
     if (email) {
       try {
         await sendAccountUpdateEmail(email, name || existing.name, newUsername, role || existing.role);
-        console.log(`✅ Account update notification sent to ${email}`);
       } catch (emailError) {
-        console.error('⚠️ Failed to send update notification email:', emailError);
         // Don't fail the update if email fails, just log it
       }
     }
 
     res.json({ success: true, message: 'User updated successfully', data: user });
   } catch (error) {
-    console.error('Update user error:', error);
     if (error.code === 'P2002') return res.status(400).json({ success: false, message: 'Username already exists' });
     res.status(500).json({ success: false, message: 'Failed to update user', detail: error.message });
   }
@@ -6073,7 +5751,6 @@ export const deleteUser = async (req, res) => {
 
 export const exportTests = async (req, res) => {
   try {
-    console.log('📥 Exporting tests to Excel...');
     
     // Import the export utility
     const { exportTestsToExcel } = await import('../utils/excelExport.js');
@@ -6087,12 +5764,9 @@ export const exportTests = async (req, res) => {
     
     // Write workbook to response
     await workbook.xlsx.write(res);
-    
-    console.log('✅ Tests exported successfully');
     res.end();
     
   } catch (error) {
-    console.error('❌ Export error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to export tests',
@@ -6103,7 +5777,6 @@ export const exportTests = async (req, res) => {
 
 export const importTests = async (req, res) => {
   try {
-    console.log('📤 Importing tests from Excel...');
 
     if (!req.file) {
       return res.status(400).json({
@@ -6150,13 +5823,8 @@ export const importTests = async (req, res) => {
       });
     }
 
-    console.log('✅ File structure valid, proceeding with import...');
-    console.log('📊 File contains:', preValidation.stats);
-
     // Process the file
     const result = await importTestsFromExcel(req.file.buffer);
-
-    console.log('✅ Import completed:', result);
 
     res.json({
       success: result.success,
@@ -6173,7 +5841,6 @@ export const importTests = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('❌ Import error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to import tests',
@@ -6187,7 +5854,6 @@ export const importTests = async (req, res) => {
 
 export const exportDoctors = async (req, res) => {
   try {
-    console.log('📥 Exporting referral doctors to Excel...');
     
     const ExcelJS = await import('exceljs');
     const workbook = new ExcelJS.default.Workbook();
@@ -6247,12 +5913,9 @@ export const exportDoctors = async (req, res) => {
     
     // Write workbook to response
     await workbook.xlsx.write(res);
-    
-    console.log('✅ Doctors exported successfully');
     res.end();
     
   } catch (error) {
-    console.error('❌ Export error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to export doctors',
@@ -6263,7 +5926,6 @@ export const exportDoctors = async (req, res) => {
 
 export const importDoctors = async (req, res) => {
   try {
-    console.log('📤 Importing referral doctors from Excel...');
 
     if (!req.file) {
       return res.status(400).json({
@@ -6389,7 +6051,6 @@ export const importDoctors = async (req, res) => {
             }
           });
           updated++;
-          console.log(`✅ Doctor "${row.name}" updated`);
         } else {
           // Create new doctor
           await prisma.doctor.create({
@@ -6407,15 +6068,11 @@ export const importDoctors = async (req, res) => {
             }
           });
           created++;
-          console.log(`✅ Doctor "${row.name}" created`);
         }
       } catch (err) {
-        console.error(`Error importing doctor at row ${row.rowNumber}:`, err);
         errors.push(`Row ${row.rowNumber}: ${(err).message}`);
       }
     }
-
-    console.log('✅ Import completed');
 
     res.json({
       success: true,
@@ -6432,7 +6089,6 @@ export const importDoctors = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('❌ Import error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to import doctors',
@@ -6449,9 +6105,6 @@ export const updateTestParameter = async (req, res) => {
     const { parameterId } = req.params;
     const paramId = parseInt(parameterId);
 
-    console.log(`📝 UPDATE PARAMETER REQUEST for ID: ${paramId}`);
-    console.log(`📥 Update data:`, JSON.stringify(req.body, null, 2));
-
     // Check if parameter exists
     const existingParameter = await prisma.testParameter.findUnique({
       where: { id: paramId }
@@ -6463,8 +6116,6 @@ export const updateTestParameter = async (req, res) => {
         message: 'Parameter not found'
       });
     }
-
-    console.log(`📋 Updating parameter: ${existingParameter.parameterName}`);
 
     // Build update data from request body
     const updateData = {
@@ -6511,15 +6162,11 @@ export const updateTestParameter = async (req, res) => {
     // Remove undefined values to only update provided fields
     Object.keys(updateData).forEach(key => updateData[key] === undefined && delete updateData[key]);
 
-    console.log(`📤 Prepared update data:`, Object.keys(updateData));
-
     // ✅ UPDATE PARAMETER - This will propagate to ALL tests using this parameter
     const updatedParameter = await prisma.testParameter.update({
       where: { id: paramId },
       data: updateData
     });
-
-    console.log(`✅ Parameter updated successfully: ${updatedParameter.parameterName}`);
 
     // Count how many tests are using this parameter
     const testCategories = await prisma.testCategory.findMany({
@@ -6529,7 +6176,6 @@ export const updateTestParameter = async (req, res) => {
     });
 
     const uniqueTestCount = testCategories.length;
-    console.log(`📊 This parameter is used in ${uniqueTestCount} test(s) - all have been updated!`);
 
     res.json({
       success: true,
@@ -6541,7 +6187,6 @@ export const updateTestParameter = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('❌ Update parameter error:', error);
     
     if (error.code === 'P2002') {
       return res.status(400).json({
@@ -6563,8 +6208,6 @@ export const deleteTestParameter = async (req, res) => {
     const { parameterId } = req.params;
     const paramId = parseInt(parameterId);
 
-    console.log(`🗑️ DELETE PARAMETER REQUEST for ID: ${paramId}`);
-
     // Check if parameter exists
     const existingParameter = await prisma.testParameter.findUnique({
       where: { id: paramId }
@@ -6577,25 +6220,20 @@ export const deleteTestParameter = async (req, res) => {
       });
     }
 
-    console.log(`📋 Parameter found: ${existingParameter.parameterName}`);
-
     // 1. Delete TestResults linked to this parameter
     const deletedResults = await prisma.testResult.deleteMany({
       where: { testParameterId: paramId }
     });
-    console.log(`   ✅ Deleted ${deletedResults.count} test result(s) linked to this parameter`);
 
     // 2. Delete TestCategories linked to this parameter
     const deletedCategories = await prisma.testCategory.deleteMany({
       where: { testParameterId: paramId }
     });
-    console.log(`   ✅ Deleted ${deletedCategories.count} category link(s) for this parameter`);
 
     // 3. Delete the parameter itself
     await prisma.testParameter.delete({
       where: { id: paramId }
     });
-    console.log(`   ✅ Parameter deleted from database`);
 
     res.json({
       success: true,
@@ -6608,7 +6246,6 @@ export const deleteTestParameter = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('❌ Delete parameter error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to delete parameter',
@@ -6616,3 +6253,4 @@ export const deleteTestParameter = async (req, res) => {
     });
   }
 };
+
