@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Package, RotateCcw, ChevronLeft, ChevronRight, Eye, Trash2, Plus, Download } from "lucide-react";
+import { Package, RotateCcw, Eye, Trash2, Plus, Download } from "lucide-react";
+import PaginationControls from "@/app/components/PaginationControls";
 import OrganizationTransferModal from "@/src/components/OrganizationTransferModal";
 import TransferDetailsModal from "@/src/components/TransferDetailsModal";
 import * as XLSX from "xlsx";
@@ -37,16 +38,15 @@ export default function OrganizationTransferPage() {
 
   const [search, setSearch] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(25);
   const [showModal, setShowModal] = useState(false);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [selectedTransfer, setSelectedTransfer] = useState<OrganizationTransfer | null>(null);
   const [successMsg, setSuccessMsg] = useState("");
 
-  const ITEMS_PER_PAGE = 10;
-
   useEffect(() => {
     fetchTransfers();
-  }, [currentPage]);
+  }, [currentPage, itemsPerPage]);
 
   const fetchTransfers = async () => {
     try {
@@ -54,7 +54,7 @@ export default function OrganizationTransferPage() {
       setError("");
       
       const [transfersRes, itemsRes, labStocksRes] = await Promise.all([
-        inventoryAPI.transfers.getAll(currentPage, ITEMS_PER_PAGE),
+        inventoryAPI.transfers.getAll(currentPage, itemsPerPage),
         inventoryAPI.items.getDropdownItems(),
         inventoryAPI.labStocks.getAll(1, 100)
       ]);
@@ -262,7 +262,7 @@ export default function OrganizationTransferPage() {
                     .map((transfer, index) => (
                     <tr key={transfer.id} className="hover:bg-gray-50 border-b border-gray-200">
                       <td className="border border-gray-300 px-3 py-2 font-semibold text-gray-900">
-                        {((pagination?.page || 1) - 1) * ITEMS_PER_PAGE + index + 1}
+                        {((currentPage || 1) - 1) * itemsPerPage + index + 1}
                       </td>
                       <td className="border border-gray-300 px-3 py-2 text-gray-600 text-xs font-mono">
                         {transfer.transferNumber || transfer.id}
@@ -312,56 +312,17 @@ export default function OrganizationTransferPage() {
 
           {/* Pagination Controls */}
           {pagination && pagination.totalPages > 1 && (
-            <div className="border-t p-3 bg-gray-50 flex items-center justify-between text-xs sm:text-sm">
-              <button
-                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                disabled={currentPage === 1}
-                className={`px-3 py-1 rounded ${currentPage === 1 ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-orange-500 text-white hover:bg-orange-600'}`}
-              >
-                ← Previous
-              </button>
-
-              <div className="flex items-center gap-1">
-                {(() => {
-                  const pages = [];
-                  const totalPages = pagination.totalPages;
-                  
-                  if (totalPages <= 5) {
-                    for (let i = 1; i <= totalPages; i++) pages.push(i);
-                  } else {
-                    if (currentPage <= 3) {
-                      pages.push(1, 2, 3, 4, '...', totalPages);
-                    } else if (currentPage >= totalPages - 2) {
-                      pages.push(1, '...', totalPages - 3, totalPages - 2, totalPages - 1, totalPages);
-                    } else {
-                      pages.push(1, '...', currentPage - 1, currentPage, currentPage + 1, '...', totalPages);
-                    }
-                  }
-
-                  return pages.map((page, idx) => (
-                    page === '...' ? (
-                      <span key={idx} className="px-2">...</span>
-                    ) : (
-                      <button
-                        key={idx}
-                        onClick={() => setCurrentPage(page as number)}
-                        className={`w-7 h-7 rounded ${currentPage === page ? 'bg-orange-500 text-white font-bold' : 'bg-white border hover:bg-gray-100'}`}
-                      >
-                        {page}
-                      </button>
-                    )
-                  ));
-                })()}
-              </div>
-
-              <button
-                onClick={() => setCurrentPage(p => Math.min(pagination.totalPages, p + 1))}
-                disabled={currentPage === pagination.totalPages}
-                className={`px-3 py-1 rounded ${currentPage === pagination.totalPages ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-orange-500 text-white hover:bg-orange-600'}`}
-              >
-                Next →
-              </button>
-            </div>
+            <PaginationControls
+              pagination={pagination}
+              currentPage={currentPage}
+              itemsPerPage={itemsPerPage}
+              onPageChange={setCurrentPage}
+              onItemsPerPageChange={(newItemsPerPage) => {
+                setItemsPerPage(newItemsPerPage);
+                setCurrentPage(1);
+              }}
+              isLoading={loading}
+            />
           )}
         </div>
       </div>

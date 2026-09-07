@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Package, RotateCcw, ChevronLeft, ChevronRight, Edit2, Trash2, Plus } from "lucide-react";
+import { Package, RotateCcw, Edit2, Trash2, Plus } from "lucide-react";
+import PaginationControls from "@/app/components/PaginationControls";
 import StockEntryModal from "@/src/components/StockEntryModal";
 import inventoryAPI from "@/lib/api/inventory.api";
 
@@ -96,16 +97,15 @@ export default function StockEntryPage() {
 
   const [search, setSearch] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(25);
   const [showModal, setShowModal] = useState(false);
   const [editingEntry, setEditingEntry] = useState<StockEntry | null>(null);
   const [successMsg, setSuccessMsg] = useState("");
   const [showInactive, setShowInactive] = useState(false);
 
-  const ITEMS_PER_PAGE = 10;
-
   useEffect(() => {
     fetchData();
-  }, [currentPage]);
+  }, [currentPage, itemsPerPage]);
 
   // Listen for new item creation and refresh items
   useEffect(() => {
@@ -133,7 +133,7 @@ export default function StockEntryPage() {
       setError("");
       
       const [entriesRes, suppliersRes, itemsRes] = await Promise.all([
-        inventoryAPI.stockEntries.getAll(currentPage, ITEMS_PER_PAGE),
+        inventoryAPI.stockEntries.getAll(currentPage, itemsPerPage),
         inventoryAPI.suppliers.getAll(1, 100),
         inventoryAPI.items.getAll(1, 100)
       ]);
@@ -323,7 +323,7 @@ export default function StockEntryPage() {
                         {itemIndex === 0 && (
                           <>
                             <td rowSpan={entry.items.length} className="border border-gray-300 px-3 py-2 font-semibold text-gray-900">
-                              {((pagination?.page || 1) - 1) * ITEMS_PER_PAGE + entryIndex + 1}
+                              {((currentPage || 1) - 1) * itemsPerPage + entryIndex + 1}
                             </td>
                             <td rowSpan={entry.items.length} className="border border-gray-300 px-3 py-2 text-gray-600 text-xs font-mono">
                               {entry.entryId}
@@ -400,56 +400,17 @@ export default function StockEntryPage() {
 
           {/* Pagination Controls */}
           {pagination && pagination.totalPages > 1 && (
-            <div className="border-t p-3 bg-gray-50 flex items-center justify-between text-xs sm:text-sm">
-              <button
-                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                disabled={currentPage === 1}
-                className={`px-3 py-1 rounded ${currentPage === 1 ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-orange-500 text-white hover:bg-orange-600'}`}
-              >
-                ← Previous
-              </button>
-
-              <div className="flex items-center gap-1">
-                {(() => {
-                  const pages = [];
-                  const totalPages = pagination.totalPages;
-                  
-                  if (totalPages <= 5) {
-                    for (let i = 1; i <= totalPages; i++) pages.push(i);
-                  } else {
-                    if (currentPage <= 3) {
-                      pages.push(1, 2, 3, 4, '...', totalPages);
-                    } else if (currentPage >= totalPages - 2) {
-                      pages.push(1, '...', totalPages - 3, totalPages - 2, totalPages - 1, totalPages);
-                    } else {
-                      pages.push(1, '...', currentPage - 1, currentPage, currentPage + 1, '...', totalPages);
-                    }
-                  }
-
-                  return pages.map((page, idx) => (
-                    page === '...' ? (
-                      <span key={idx} className="px-2">...</span>
-                    ) : (
-                      <button
-                        key={idx}
-                        onClick={() => setCurrentPage(page as number)}
-                        className={`w-7 h-7 rounded ${currentPage === page ? 'bg-orange-500 text-white font-bold' : 'bg-white border hover:bg-gray-100'}`}
-                      >
-                        {page}
-                      </button>
-                    )
-                  ));
-                })()}
-              </div>
-
-              <button
-                onClick={() => setCurrentPage(p => Math.min(pagination.totalPages, p + 1))}
-                disabled={currentPage === pagination.totalPages}
-                className={`px-3 py-1 rounded ${currentPage === pagination.totalPages ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-orange-500 text-white hover:bg-orange-600'}`}
-              >
-                Next →
-              </button>
-            </div>
+            <PaginationControls
+              pagination={pagination}
+              currentPage={currentPage}
+              itemsPerPage={itemsPerPage}
+              onPageChange={setCurrentPage}
+              onItemsPerPageChange={(newItemsPerPage) => {
+                setItemsPerPage(newItemsPerPage);
+                setCurrentPage(1);
+              }}
+              isLoading={loading}
+            />
           )}
         </div>
       </div>

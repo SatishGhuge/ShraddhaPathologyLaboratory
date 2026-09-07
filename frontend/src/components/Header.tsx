@@ -118,6 +118,7 @@ const Header = () => {
   const pathname = usePathname();
   const { sidebarOpen, setSidebarOpen } = useContext(SidebarContext);
   const [activeModule, setActiveModule] = useState<string | null>(null);
+  const [activeSubmenuPath, setActiveSubmenuPath] = useState<string | null>(null);
   const [currentUser, setCurrentUser] = useState<any>({});
   const [searchQuery, setSearchQuery] = useState("");
   const [dateTime, setDateTime] = useState(new Date());
@@ -390,9 +391,10 @@ const Header = () => {
     if (pathSegments.length > 0) {
       let moduleId = pathSegments[0];
 
-      // Handle path-to-module ID mapping (e.g., "reports" -> "report")
+      // Handle path-to-module ID mapping (e.g., "reports" -> "report", "config" -> "configuration")
       const pathToModuleMap: { [key: string]: string } = {
         "reports": "report",
+        "config": "configuration",
       };
 
       if (pathToModuleMap[moduleId]) {
@@ -402,7 +404,11 @@ const Header = () => {
       // Check if this is a valid module
       const validModule = modules.find(m => m.id === moduleId);
       if (validModule) {
+        console.log('🔍 Header - Pathname:', pathname, 'First segment:', pathSegments[0], 'Mapped moduleId:', moduleId);
         setActiveModule(moduleId);
+        setActiveSubmenuPath(pathname);
+      } else {
+        console.log('🔍 Header - No valid module found for:', moduleId, 'Available modules:', modules.map(m => m.id));
       }
     }
   }, [pathname, modules]);
@@ -464,6 +470,7 @@ const Header = () => {
 
   const handleItemClick = (path: string) => {
     router.push(path);
+    setActiveSubmenuPath(path);
     // Don't close the sidebar - let the useEffect handle active module based on pathname
   };
 
@@ -725,7 +732,7 @@ const Header = () => {
         }`}>
 
         {/* Sidebar Header with Close Button */}
-        <div className="flex items-center justify-between px-7 py-2 border-b border-gray-200">
+        <div className="flex items-center justify-between px-7 py-2 border-b border-gray-200 flex-shrink-0">
           <h3 className="font-bold text-primary-600">Menu</h3>
           <button
             onClick={() => setSidebarOpen(false)}
@@ -764,7 +771,7 @@ const Header = () => {
                 </button>
               ))}
             </nav>
-          ) : selectedModule ? (
+          ) : activeModule && selectedModule ? (
             // Sub-modules List with active module header
             <nav className="p-3 space-y-1" key={`submenu-${selectedModule.id}`}>
               {/* Active Module Header - shows even when viewing submenu */}
@@ -776,7 +783,7 @@ const Header = () => {
               </div>
               {selectedModule.items.map((item, index) => {
                 // Check if this item's path matches the current pathname
-                const isActive = pathname && (pathname === item.path || pathname.startsWith(item.path + '/'));
+                const isActive = activeSubmenuPath === item.path;
                 return (
                   <button
                     key={`${selectedModule.id}-${index}`}
@@ -797,7 +804,7 @@ const Header = () => {
 
         {/* Back Button - Only show when submenu is active */}
         {activeModule && (
-          <div className="p-3 border-t border-gray-200">
+          <div className="p-3 border-t border-gray-200 flex-shrink-0">
             <button
               onClick={handleBackClick}
               className="w-full flex items-center justify-center gap-2 px-4 py-3 hover:bg-primary-50 rounded-lg transition-colors font-semibold text-sm text-primary-500"
@@ -809,7 +816,7 @@ const Header = () => {
         )}
 
         {/* Footer Info */}
-        <div className="p-3 border-t border-gray-200 text-center text-xs text-gray-500">
+        <div className="p-3 border-t border-gray-200 text-center text-xs text-gray-500 flex-shrink-0">
           <p>© 2026 Shraddha Pathology</p>
         </div>
       </aside>

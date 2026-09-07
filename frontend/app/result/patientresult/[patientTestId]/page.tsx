@@ -117,7 +117,7 @@ const SuggestionInput = ({ value, onChange, options, isAbnormal, panicInfo, full
   const [showTooltip, setShowTooltip] = useState(false);
   const [searchInput, setSearchInput] = useState('');
   const [isResizing, setIsResizing] = useState(false);
-  const [customSize, setCustomSize] = useState({ width: fullWidth ? 500 : 150, height: fullWidth ? 70 : 30 });
+  const [customSize, setCustomSize] = useState({ width: fullWidth ? 500 : 120, height: fullWidth ? 40 : 24 });
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const containerRef = useRef(null);
   const ref = useRef(null);
@@ -255,12 +255,12 @@ const SuggestionInput = ({ value, onChange, options, isAbnormal, panicInfo, full
       >
         <textarea
           ref={textareaRef}
-          value={value ? value.replace(/\|/g, ' ') : ''}
+          value={value ? value.replace(/\|/g, ', ') : ''}
           onChange={handleInputChange}
           onKeyDown={handleKeyDown}
           onFocus={() => setShow(true)}
           placeholder="Type or select..."
-          className="outline-none text-xs bg-transparent text-black resize-none font-sans border-none flex-1 p-2"
+          className="outline-none text-xs bg-transparent text-black resize-none font-sans border-none flex-1 px-1 py-0.5"
           style={{
             fontSize: '12px',
             lineHeight: '1.5',
@@ -309,12 +309,12 @@ const SuggestionInput = ({ value, onChange, options, isAbnormal, panicInfo, full
 
       {/* Dropdown with option suggestions */}
       {show && filtered.length > 0 && (
-        <ul className="absolute z-50 left-0 top-full mt-1 bg-white border border-gray-300 rounded shadow-lg max-h-48 overflow-y-auto text-sm" style={{ width: fullWidth ? '100%' : `${customSize.width}px` }}>
+        <ul className="absolute z-50 left-0 top-full mt-0.5 bg-white border border-gray-300 rounded shadow-lg max-h-28 overflow-y-auto text-sm" style={{ width: fullWidth ? '100%' : `${customSize.width}px` }}>
           {filtered.map(opt => (
             <li
               key={opt}
               onMouseDown={() => addOption(opt)}
-              className="px-3 py-2 cursor-pointer hover:bg-blue-50 hover:text-blue-800 border-b last:border-b-0 transition-colors text-xs"
+              className="px-2 py-0.5 cursor-pointer hover:bg-blue-50 hover:text-blue-800 border-b last:border-b-0 transition-colors text-xs"
             >
               {opt}
             </li>
@@ -1649,23 +1649,29 @@ const PatientResult = () => {
   const handleSave = async () => {
     try {
       setSaving(true);
-      const resultsData = parameters.map(param => ({
-        testParameterId: param.id,
-        testCategoryId: param.categoryId,
-        numericValue: results[param.id]?.numericValue || null,
-        // ✅ Strip leading "- " from text values before saving
-        textValue: results[param.id]?.textValue 
-          ? results[param.id].textValue.replace(/^-\s*/, '').trim() || null
-          : null,
-        selectedOption: results[param.id]?.selectedOption || null,
-        isAbnormal: results[param.id]?.isAbnormal || false,
-        isHighlighted: results[param.id]?.isHighlighted || false,
-        referenceRange: results[param.id]?.referenceRange || param.normalRange
-      })).filter(r => {
+      const resultsData = parameters.map(param => {
+        const resultKey = param.id; // Use composite key for state lookup
+        return {
+          testParameterId: param.parameterId || param.id,
+          testCategoryId: param.categoryId,
+          numericValue: results[resultKey]?.numericValue || null,
+          // ✅ Strip leading "- " from text values before saving
+          textValue: results[resultKey]?.textValue 
+            ? results[resultKey].textValue.replace(/^-\s*/, '').trim() || null
+            : null,
+          selectedOption: results[resultKey]?.selectedOption || null,
+          isAbnormal: results[resultKey]?.isAbnormal || false,
+          isHighlighted: results[resultKey]?.isHighlighted || false,
+          referenceRange: results[resultKey]?.referenceRange || param.normalRange
+        };
+      }).filter(r => {
         const hasNumeric = r.numericValue !== null && r.numericValue !== undefined && r.numericValue !== '';
+        // ✅ Find the original param to get the correct result key
+        const originalParam = parameters.find(p => (p.parameterId || p.id) === (typeof r.testParameterId === 'string' ? parseInt(r.testParameterId.split('_')[0]) : r.testParameterId));
+        const resultKey = originalParam?.id;
         // ✅ Save text if: (1) not empty after stripping, OR (2) manually cleared (wasManuallyCleared flag)
         const hasText = r.textValue !== null && r.textValue !== undefined && 
-                       (r.textValue !== '' || results[r.testParameterId]?.wasManuallyCleared);
+                       (r.textValue !== '' || results[resultKey]?.wasManuallyCleared);
         const hasOption = r.selectedOption && typeof r.selectedOption === 'string' && r.selectedOption.trim() !== '';
         return hasNumeric || hasText || hasOption;
       });
@@ -1730,23 +1736,29 @@ const PatientResult = () => {
   const handleSaveAndPrint = async (withHeader) => {
     try {
       setSaving(true);
-      const resultsData = parameters.map(param => ({
-        testParameterId: param.id,
-        testCategoryId: param.categoryId,
-        numericValue: results[param.id]?.numericValue || null,
-        // ✅ Strip leading "- " from text values before saving
-        textValue: results[param.id]?.textValue 
-          ? results[param.id].textValue.replace(/^-\s*/, '').trim() || null
-          : null,
-        selectedOption: results[param.id]?.selectedOption || null,
-        isAbnormal: results[param.id]?.isAbnormal || false,
-        isHighlighted: results[param.id]?.isHighlighted || false,
-        referenceRange: results[param.id]?.referenceRange || param.normalRange
-      })).filter(r => {
+      const resultsData = parameters.map(param => {
+        const resultKey = param.id; // Use composite key for state lookup
+        return {
+          testParameterId: param.parameterId || param.id,
+          testCategoryId: param.categoryId,
+          numericValue: results[resultKey]?.numericValue || null,
+          // ✅ Strip leading "- " from text values before saving
+          textValue: results[resultKey]?.textValue 
+            ? results[resultKey].textValue.replace(/^-\s*/, '').trim() || null
+            : null,
+          selectedOption: results[resultKey]?.selectedOption || null,
+          isAbnormal: results[resultKey]?.isAbnormal || false,
+          isHighlighted: results[resultKey]?.isHighlighted || false,
+          referenceRange: results[resultKey]?.referenceRange || param.normalRange
+        };
+      }).filter(r => {
         const hasNumeric = r.numericValue !== null && r.numericValue !== undefined && r.numericValue !== '';
+        // ✅ Find the original param to get the correct result key
+        const originalParam = parameters.find(p => (p.parameterId || p.id) === (typeof r.testParameterId === 'string' ? parseInt(r.testParameterId.split('_')[0]) : r.testParameterId));
+        const resultKey = originalParam?.id;
         // ✅ Save text if: (1) not empty after stripping, OR (2) manually cleared (wasManuallyCleared flag)
         const hasText = r.textValue !== null && r.textValue !== undefined && 
-                       (r.textValue !== '' || results[r.testParameterId]?.wasManuallyCleared);
+                       (r.textValue !== '' || results[resultKey]?.wasManuallyCleared);
         const hasOption = r.selectedOption && typeof r.selectedOption === 'string' && r.selectedOption.trim() !== '';
         return hasNumeric || hasText || hasOption;
       });
@@ -1841,7 +1853,7 @@ const PatientResult = () => {
   return (
     <>
       <Header />
-      <div className="p-4 bg-gray-100 min-h-screen mt-2">
+      <div className="p-4 bg-gray-100 min-h-screen mt-2 w-full">
 
         {/* Patient Header */}
         <div className="bg-yellow-100 border p-2 text-sm flex justify-between flex-wrap">
@@ -1932,15 +1944,15 @@ const PatientResult = () => {
                 </div>
 
                 {/* Results Table */}
-                <div className="mt-3 bg-white border">
+                <div className="mt-3 bg-white border overflow-x-auto">
                   <table className="w-full text-sm border-collapse">
                     <thead className="bg-secondary-700 text-white">
-                      <tr>
-                        <th className="border p-2 text-left">INVESTIGATION</th>
-                        <th className="border p-2 text-left">OBSERVED VALUE</th>
-                        <th className="border p-2 text-left">UNITS</th>
-                        <th className="border p-2 text-left">NORMAL RANGE</th>
-                        <th className="border p-2 text-center" style={{width: '40px'}}>HIGHLIGHT</th>
+                      <tr className="h-8">
+                        <th className="border px-2 py-1 text-left">INVESTIGATION</th>
+                        <th className="border px-2 py-1 text-left">OBSERVED VALUE</th>
+                        <th className="border px-2 py-1 text-left">UNITS</th>
+                        <th className="border px-2 py-1 text-left">NORMAL RANGE</th>
+                        <th className="border px-2 py-1 text-center">HIGHLIGHT</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -1963,9 +1975,9 @@ const PatientResult = () => {
                         .map(([categoryKey, categoryParams]: [string, any]) => (
                         <React.Fragment key={categoryKey}>
                           {categoryKey !== 'NO_CATEGORY_HEADER' && !categoryKey.startsWith('__NO_NAME_') && categoryParams[0]?.showCategoryHeader && (
-                            <tr className="bg-gray-200 font-semibold">
-                              <td className="p-2">{stripHtmlTags(categoryParams[0]?.categoryName || '').toUpperCase()}</td>
-                              <td className="p-2 text-center">Parameter</td>
+                            <tr className="bg-gray-200 font-semibold h-6">
+                              <td className="px-2 py-1">{stripHtmlTags(categoryParams[0]?.categoryName || '').toUpperCase()}</td>
+                              <td className="px-2 py-1 text-center">Parameter</td>
                               <td colSpan={3}></td>
                             </tr>
                           )}
@@ -2007,9 +2019,9 @@ const PatientResult = () => {
                             console.log(`📊 PARAM ${param.parameterName}: type=${param.type}, isDescriptive=${param.isDescriptive}, branch=${ param.type === 'Numeric' ? 'NUMERIC' : param.type === 'Text' ? 'TEXT' : 'OTHER'}`);
                             
                             return (
-                              <tr key={param.id} className="bg-purple-100">
-                                <td className="border p-2">{(param.parameterName || '').toUpperCase()}</td>
-                                <td className="border p-2" colSpan={isTextDropdown ? 3 : undefined}>
+                              <tr key={param.id} className="bg-purple-100 h-8">
+                                <td className="border px-2 py-1">{(param.parameterName || '').toUpperCase()}</td>
+                                <td className="border px-2 py-1" colSpan={isTextDropdown && param.rangeText?.trim() ? 3 : 1}>
                                   <div className="flex items-center gap-2">
                                     {param.type === 'Numeric' ? (
                                       <input
@@ -2122,32 +2134,35 @@ const PatientResult = () => {
                                     })()}
                                   </div>
                                 </td>
-                                {/* UNITS cell - only show for non-text parameters */}
-                                {!isTextDropdown && (
-                                  <td className="border p-2 text-xs">
-                                    {param.units || '-'}
+                                {/* UNITS cell - hide for text dropdowns with rangeText */}
+                                {!(isTextDropdown && param.rangeText?.trim()) && (
+                                  <td className="border px-2 py-1">
+                                    {isTextDropdown ? '-' : (param.units || '-')}
                                   </td>
                                 )}
 
-                                {/* NORMAL RANGE cell - always render, show content based on condition */}
-                                <td className="border p-2 text-xs whitespace-pre-wrap break-words">
-                                  {(() => {
-                                    const shouldShow = isTextDropdown ? true : !param.isDescriptive;
-                                    if (!shouldShow) return '-';
-                                    
-                                    return formatMultiLineText(
-                                      getAgeAppropriateRange(param, patientData?.patient?.ageYears, patientData?.patient?.ageMonths, patientData?.patient?.ageDays, patientData?.patient?.gender) || param.normalRange || param.displayRangeText || param.textContent || param.rangeText || '-'
-                                    );
-                                  })()}
-                                </td>
-                                <td className="border p-2 text-center" style={{width: '40px'}}>
+                                {/* NORMAL RANGE cell - hide for text dropdowns with rangeText */}
+                                {!(isTextDropdown && param.rangeText?.trim()) && (
+                                  <td className="border px-2 py-1 whitespace-pre-wrap break-words">
+                                    {(() => {
+                                      if (isTextDropdown && param.textContent?.trim()) {
+                                        return formatMultiLineText(param.textContent);
+                                      }
+                                      if (param.isDescriptive) return '-';
+                                      return formatMultiLineText(
+                                        getAgeAppropriateRange(param, patientData?.patient?.ageYears, patientData?.patient?.ageMonths, patientData?.patient?.ageDays, patientData?.patient?.gender) || param.normalRange || param.displayRangeText || param.textContent || param.rangeText || '-'
+                                      );
+                                    })()}
+                                  </td>
+                                )}
+                                <td className="border px-2 py-1 text-center">
                                   <input 
                                     type="checkbox" 
                                     checked={results[paramKey]?.isHighlighted || false}
                                     onChange={() => {
                                       handleHighlightChange(paramKey);
                                     }}
-                                    className="w-5 h-5 accent-blue-600 cursor-pointer"
+                                    className="w-4 h-4 accent-blue-600 cursor-pointer"
                                     tabIndex={-1}
                                     title="Check to highlight this value bold in report"
                                   />
@@ -2159,17 +2174,17 @@ const PatientResult = () => {
                       ))}
                       {/* Comment Row */}
                       <tr className="bg-gray-100 border-t-2 border-gray-400">
-                        <td colSpan={5} className="border p-3">
-                          <div className="flex items-center gap-3">
+                        <td colSpan={5} className="border px-2 py-1">
+                          <div className="flex items-start gap-2">
                             <input 
                               type="checkbox" 
                               id={`show-comment-test-${testIdx}`}
                               checked={testShowComment[testIdx] || false}
                               onChange={(e) => setTestShowComment(prev => ({ ...prev, [testIdx]: e.target.checked }))}
-                              className="w-5 h-5 accent-blue-600 cursor-pointer flex-shrink-0"
+                              className="w-4 h-4 accent-blue-600 cursor-pointer flex-shrink-0 mt-1"
                               title="Check to add comments"
                             />
-                            <label htmlFor={`show-comment-test-${testIdx}`} className="text-sm font-semibold text-gray-700 cursor-pointer flex-shrink-0">Comment:</label>
+                            <label htmlFor={`show-comment-test-${testIdx}`} className="text-sm font-semibold text-gray-700 cursor-pointer flex-shrink-0 mt-1">Comment:</label>
                             {testShowComment[testIdx] && (
                               <div className="flex-1 relative">
                                 <textarea
@@ -2178,13 +2193,13 @@ const PatientResult = () => {
                                   onFocus={() => setTestCommentFocused(prev => ({ ...prev, [testIdx]: true }))}
                                   onBlur={() => setTimeout(() => setTestCommentFocused(prev => ({ ...prev, [testIdx]: false })), 200)}
                                   placeholder="Type comment here or select from history"
-                                  className="w-full border border-gray-300 rounded px-2 py-1 text-xs font-normal h-12 resize-none"
+                                  className="w-full border border-gray-300 rounded px-2 py-1 text-xs font-normal h-8 resize-none"
                                 />
                                 {commentHistory.length > 0 && testCommentFocused[testIdx] && (
-                                  <div className="absolute top-12 left-0 right-0 bg-white border border-gray-300 rounded shadow-lg p-2 max-h-40 overflow-y-auto z-50">
-                                    <div className="space-y-1">
+                                  <div className="absolute top-8 left-0 right-0 bg-white border border-gray-300 rounded shadow-lg p-1 max-h-32 overflow-y-auto z-50">
+                                    <div className="space-y-0.5">
                                       {commentHistory.map((hist, idx) => (
-                                        <div key={idx} className="flex items-center gap-2 px-2 py-1.5 text-xs bg-gray-50 hover:bg-blue-50 rounded group">
+                                        <div key={idx} className="flex items-center gap-1 px-2 py-1 text-xs bg-gray-50 hover:bg-blue-50 rounded group">
                                           <button
                                             type="button"
                                             onMouseDown={(e) => e.preventDefault()}
@@ -2193,7 +2208,7 @@ const PatientResult = () => {
                                               const newComments = currentComment.trim() ? `${currentComment}, ${hist}` : hist;
                                               setTestComments(prev => ({ ...prev, [testIdx]: newComments }));
                                             }}
-                                            className="flex-1 text-left text-gray-800 hover:text-blue-600 transition-colors cursor-pointer"
+                                            className="flex-1 text-left text-gray-700 hover:text-blue-600 transition-colors cursor-pointer"
                                           >
                                             {hist}
                                           </button>
@@ -2210,7 +2225,7 @@ const PatientResult = () => {
                                                 alert('Failed to delete comment');
                                               }
                                             }}
-                                            className="text-red-500 hover:text-red-700 opacity-0 group-hover:opacity-100 transition-opacity"
+                                            className="text-red-500 hover:text-red-700 opacity-0 group-hover:opacity-100 transition-opacity text-xs"
                                             title="Delete this comment"
                                           >
                                             ✕
@@ -2256,15 +2271,15 @@ const PatientResult = () => {
             </div>
 
             {/* Results Table - Single Test */}
-            <div className="mt-3 bg-white border">
+            <div className="mt-3 bg-white border overflow-x-auto">
               <table className="w-full text-sm border-collapse">
                 <thead className="bg-secondary-700 text-white">
-                  <tr>
-                    <th className="border p-2 text-left">INVESTIGATION</th>
-                    <th className="border p-2 text-left">OBSERVED VALUE</th>
-                    <th className="border p-2 text-left">UNITS</th>
-                    <th className="border p-2 text-left">NORMAL RANGE</th>
-                    <th className="border p-2 text-center" style={{width: '40px'}}>HIGHLIGHT</th>
+                  <tr className="h-8">
+                    <th className="border px-2 py-1 text-left">INVESTIGATION</th>
+                    <th className="border px-2 py-1 text-left">OBSERVED VALUE</th>
+                    <th className="border px-2 py-1 text-left">UNITS</th>
+                    <th className="border px-2 py-1 text-left">NORMAL RANGE</th>
+                    <th className="border px-2 py-1 text-center">HIGHLIGHT</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -2273,9 +2288,9 @@ const PatientResult = () => {
                     .map(([categoryKey, categoryParams]: [string, any]) => (
                     <React.Fragment key={categoryKey}>
                       {categoryKey !== 'NO_CATEGORY_HEADER' && !categoryKey.startsWith('__NO_NAME_') && categoryParams[0]?.showCategoryHeader && (
-                        <tr className="bg-gray-200 font-semibold">
-                          <td className="p-2">{renderStyledText((categoryParams[0]?.categoryName || '').toUpperCase(), true)}</td>
-                          <td className="p-2 text-center">Parameter</td>
+                        <tr className="bg-gray-200 font-semibold h-6">
+                          <td className="px-2 py-1">{renderStyledText((categoryParams[0]?.categoryName || '').toUpperCase(), true)}</td>
+                          <td className="px-2 py-1 text-center">Parameter</td>
                           <td colSpan={3}></td>
                         </tr>
                       )}
@@ -2284,8 +2299,8 @@ const PatientResult = () => {
                         const isFormula = param.hasFormula && param.formula;
                         const inputClass = outOfRange ? "border-2 border-red-500 bg-red-50 px-2 py-1 w-24 rounded" : "border border-gray-300 px-2 py-1 w-24 rounded";
                         return (
-                          <tr key={param.id} className={`${param.isDescriptive ? 'bg-purple-100 h-auto' : 'bg-purple-100'}`}>
-                            <td className="border p-2">
+                          <tr key={param.id} className={`${param.isDescriptive ? 'bg-purple-100 h-8' : 'bg-purple-100 h-8'}`}>
+                            <td className="border px-2 py-1">
                               {renderStyledText((param.parameterName || '').toUpperCase(), false)}
                               {param.isMandatory && <span className="text-red-500">*</span>}
                               {param.multiplyBy && (
@@ -2294,7 +2309,7 @@ const PatientResult = () => {
                                 </div>
                               )}
                             </td>
-                            <td className={`border p-2 ${param.isDescriptive ? 'p-0 py-1' : ''}`} colSpan={param.type === 'Text' && !param.isDescriptive && param.rangeText?.trim() ? 3 : undefined}>
+                            <td className={`border px-2 py-1 ${param.isDescriptive ? 'py-1' : ''}`} colSpan={param.type === 'Text' && !param.isDescriptive && param.rangeText?.trim() ? 3 : 1}>
                               <div className={`${param.type === 'Text' && !param.isDescriptive && param.rangeText?.trim() ? 'w-full flex flex-col' : param.isDescriptive ? 'flex items-center gap-0' : 'flex items-center gap-2'}`} style={param.isDescriptive ? { margin: 0, padding: 0 } : {}}>
                                 {isFormula ? (
                                   <div className="flex items-center gap-1">
@@ -2427,78 +2442,43 @@ const PatientResult = () => {
                                 })()}
                               </div>
                             </td>
-                            {param.type !== 'Text' && !param.isDescriptive && (
-                              <>
-                                <td className="border p-2 text-xs">
-                                  {(() => {
-                                    const unitValue = stripHtmlTags(param.units || '') || '-';
-                                    console.log(`🔍 Rendering UNITS for ${param.parameterName}: "${unitValue}"`);
-                                    return unitValue;
-                                  })()}
-                                </td>
-                                <td className="border p-2 text-xs whitespace-pre-wrap break-words">
-                                  {/* ✅ Show textContent if available, otherwise show normal range */}
-                                  {(() => {
-                                    const hasTextContent = !!param.textContent && param.textContent.trim() !== '';
-                                    const rangeValue = getAgeAppropriateRange(param, patientData?.patient?.ageYears, patientData?.patient?.ageMonths, patientData?.patient?.ageDays, patientData?.patient?.gender) || '';
-                                    
-                                    console.log(`📋 Normal Range render for ${param.parameterName}:`, {
-                                      type: param.type,
-                                      hasTextContent,
-                                      textContent: param.textContent ? param.textContent.substring(0, 50) : 'N/A',
-                                      rangeValue: rangeValue.substring(0, 50),
-                                      willShowText: hasTextContent
-                                    });
-                                    
-                                    if (hasTextContent) {
-                                      return formatMultiLineText(param.textContent);
-                                    } else {
-                                      return formatMultiLineText(rangeValue);
-                                    }
-                                  })()}
-                                </td>
-                              </>
+                            {/* UNITS cell - hide for text with rangeText */}
+                            {!(param.type === 'Text' && !param.isDescriptive && param.rangeText?.trim()) && (
+                              <td className="border px-2 py-1">
+                                {(() => {
+                                  if (param.type === 'Text') return '-';
+                                  const unitValue = stripHtmlTags(param.units || '') || '-';
+                                  return unitValue;
+                                })()}
+                              </td>
                             )}
-                            {(param.type === 'Text' || param.isDescriptive) && !param.isDescriptive && (
-                              <>
-                                <td className="border p-2 text-xs"></td>
-                                <td className="border p-2 text-xs whitespace-pre-wrap break-words">
-                                  {(() => {
-                                    const hasTextContent = !!param.textContent && param.textContent.trim() !== '';
-                                    
-                                    if (hasTextContent) {
-                                      return formatMultiLineText(param.textContent);
-                                    } else {
-                                      return '-';
-                                    }
-                                  })()}
-                                </td>
-                              </>
+
+                            {/* NORMAL RANGE cell - hide for text with rangeText */}
+                            {!(param.type === 'Text' && !param.isDescriptive && param.rangeText?.trim()) && (
+                              <td className="border px-2 py-1 whitespace-pre-wrap break-words">
+                                {(() => {
+                                  if (param.type === 'Text' && param.textContent?.trim()) {
+                                    return formatMultiLineText(param.textContent);
+                                  }
+                                  if (param.isDescriptive) return '-';
+                                  const hasTextContent = !!param.textContent && param.textContent.trim() !== '';
+                                  const rangeValue = getAgeAppropriateRange(param, patientData?.patient?.ageYears, patientData?.patient?.ageMonths, patientData?.patient?.ageDays, patientData?.patient?.gender) || '';
+                                  if (hasTextContent) {
+                                    return formatMultiLineText(param.textContent);
+                                  } else {
+                                    return formatMultiLineText(rangeValue || '-');
+                                  }
+                                })()}
+                              </td>
                             )}
-                            {param.isDescriptive && (
-                              <>
-                                <td className="border p-2 text-xs"></td>
-                                <td className="border p-2 text-xs whitespace-pre-wrap break-words">
-                                  {(() => {
-                                    const hasTextContent = !!param.textContent && param.textContent.trim() !== '';
-                                    
-                                    if (hasTextContent) {
-                                      return formatMultiLineText(param.textContent);
-                                    } else {
-                                      return '-';
-                                    }
-                                  })()}
-                                </td>
-                              </>
-                            )}
-                            <td className="border p-2 text-center" style={{width: '40px'}}>
+                            <td className="border px-2 py-1 text-center">
                               <input 
                                 type="checkbox" 
                                 checked={results[param.id]?.isHighlighted || false}
                                 onChange={() => {
                                   handleHighlightChange(param.id);
                                 }}
-                                className="w-5 h-5 accent-blue-600 cursor-pointer"
+                                className="w-4 h-4 accent-blue-600 cursor-pointer"
                                 tabIndex={-1}
                                 title="Check to highlight this value bold in report"
                               />
@@ -2510,17 +2490,17 @@ const PatientResult = () => {
                   ))}
                   {/* Comment Row */}
                   <tr className="bg-gray-100 border-t-2 border-gray-400">
-                    <td colSpan={6} className="border p-3">
-                      <div className="flex items-center gap-3">
+                    <td colSpan={6} className="border px-2 py-1">
+                      <div className="flex items-start gap-2">
                         <input 
                           type="checkbox" 
                           id="show-comment-table"
                           checked={showComment}
                           onChange={(e) => setShowComment(e.target.checked)}
-                          className="w-5 h-5 accent-blue-600 cursor-pointer flex-shrink-0"
+                          className="w-4 h-4 accent-blue-600 cursor-pointer flex-shrink-0 mt-1"
                           title="Check to add comments"
                         />
-                        <label htmlFor="show-comment-table" className="text-sm font-semibold text-gray-700 cursor-pointer flex-shrink-0">Comment:</label>
+                        <label htmlFor="show-comment-table" className="text-sm font-semibold text-gray-700 cursor-pointer flex-shrink-0 mt-1">Comment:</label>
                         {showComment && (
                           <div className="flex-1 relative">
                             <textarea
@@ -2529,13 +2509,13 @@ const PatientResult = () => {
                               onFocus={() => setCommentFocused(true)}
                               onBlur={() => setTimeout(() => setCommentFocused(false), 200)}
                               placeholder="Type comment or select from history"
-                              className="w-full border border-gray-300 rounded px-2 py-1 text-xs font-normal h-12 resize-none"
+                              className="w-full border border-gray-300 rounded px-2 py-1 text-xs font-normal h-8 resize-none"
                             />
                             {commentHistory.length > 0 && commentFocused && (
-                              <div className="absolute top-12 left-0 right-0 bg-white border border-gray-300 rounded shadow-lg p-2 max-h-40 overflow-y-auto z-50">
-                                <div className="space-y-1">
+                              <div className="absolute top-8 left-0 right-0 bg-white border border-gray-300 rounded shadow-lg p-1 max-h-32 overflow-y-auto z-50">
+                                <div className="space-y-0.5">
                                   {commentHistory.map((hist, idx) => (
-                                    <div key={idx} className="flex items-center gap-2 px-2 py-1.5 text-xs bg-gray-50 hover:bg-blue-50 rounded group">
+                                    <div key={idx} className="flex items-center gap-1 px-2 py-1 text-xs bg-gray-50 hover:bg-blue-50 rounded group">
                                       <button
                                         type="button"
                                         onMouseDown={(e) => e.preventDefault()}
@@ -2543,7 +2523,7 @@ const PatientResult = () => {
                                           const newComments = comments.trim() ? `${comments}, ${hist}` : hist;
                                           setComments(newComments);
                                         }}
-                                        className="flex-1 text-left text-gray-800 hover:text-blue-600 transition-colors cursor-pointer"
+                                        className="flex-1 text-left text-gray-700 hover:text-blue-600 transition-colors cursor-pointer"
                                       >
                                         {hist}
                                       </button>
@@ -2560,7 +2540,7 @@ const PatientResult = () => {
                                             alert('Failed to delete comment');
                                           }
                                         }}
-                                        className="text-red-500 hover:text-red-700 opacity-0 group-hover:opacity-100 transition-opacity"
+                                        className="text-red-500 hover:text-red-700 opacity-0 group-hover:opacity-100 transition-opacity text-xs"
                                         title="Delete this comment"
                                       >
                                         ✕

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { ChevronDown, ChevronRight, AlertCircle, CheckCircle, AlertTriangle, Search, RotateCcw, X, Check } from "lucide-react";
+import PaginationControls from "@/app/components/PaginationControls";
 import inventoryAPI from "@/lib/api/inventory.api";
 
 interface BatchDetail {
@@ -178,9 +179,11 @@ export default function StockTransactionsPage() {
   const [successMsg, setSuccessMsg] = useState("");
   const [search, setSearch] = useState("");
   const [filterAlert, setFilterAlert] = useState("all"); // all, expiring, lowstock
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(25);
   const [pagination, setPagination] = useState<PaginationInfo>({
     page: 1,
-    limit: 10,
+    limit: 25,
     total: 0,
     totalPages: 1,
   });
@@ -193,7 +196,7 @@ export default function StockTransactionsPage() {
     try {
       setLoading(true);
       setError("");
-      const response = await inventoryAPI.labStocks.getAllGrouped(page, pagination.limit, search);
+      const response = await inventoryAPI.labStocks.getAllGrouped(page, itemsPerPage, search);
       
       if (response.data.success) {
         setStocks(response.data.data);
@@ -208,8 +211,8 @@ export default function StockTransactionsPage() {
   };
 
   useEffect(() => {
-    fetchLabStocks(1);
-  }, [search]);
+    fetchLabStocks(currentPage);
+  }, [search, currentPage, itemsPerPage]);
 
   const toggleExpand = (itemId: number) => {
     const newExpanded = new Set(expandedItems);
@@ -528,49 +531,17 @@ export default function StockTransactionsPage() {
         </div>
 
         {/* Pagination Controls */}
-        {pagination.totalPages > 1 && (
-          <div className="border-t bg-gray-50 px-6 py-3 flex items-center justify-between">
-            <button
-              onClick={() => fetchLabStocks(pagination.page - 1)}
-              disabled={pagination.page === 1}
-              className={`px-4 py-2 rounded font-semibold transition ${
-                pagination.page === 1
-                  ? "bg-gray-200 text-gray-400 cursor-not-allowed"
-                  : "bg-orange-500 text-white hover:bg-orange-600"
-              }`}
-            >
-              ← Previous
-            </button>
-
-            <div className="flex gap-2">
-              {Array.from({ length: pagination.totalPages }, (_, i) => i + 1).map((page) => (
-                <button
-                  key={page}
-                  onClick={() => fetchLabStocks(page)}
-                  className={`w-8 h-8 rounded font-semibold transition ${
-                    pagination.page === page
-                      ? "bg-orange-500 text-white"
-                      : "bg-white border border-gray-300 hover:bg-gray-100"
-                  }`}
-                >
-                  {page}
-                </button>
-              ))}
-            </div>
-
-            <button
-              onClick={() => fetchLabStocks(pagination.page + 1)}
-              disabled={pagination.page === pagination.totalPages}
-              className={`px-4 py-2 rounded font-semibold transition ${
-                pagination.page === pagination.totalPages
-                  ? "bg-gray-200 text-gray-400 cursor-not-allowed"
-                  : "bg-orange-500 text-white hover:bg-orange-600"
-              }`}
-            >
-              Next →
-            </button>
-          </div>
-        )}
+        <PaginationControls
+          pagination={pagination}
+          currentPage={currentPage}
+          itemsPerPage={itemsPerPage}
+          onPageChange={setCurrentPage}
+          onItemsPerPageChange={(newItemsPerPage) => {
+            setItemsPerPage(newItemsPerPage);
+            setCurrentPage(1);
+          }}
+          isLoading={loading}
+        />
       </div>
 
       {/* Quantity Update Modal */}
