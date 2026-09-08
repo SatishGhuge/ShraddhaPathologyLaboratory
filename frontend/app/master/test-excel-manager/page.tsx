@@ -342,7 +342,7 @@ export default function TestExcelManager() {
           <h3 className="font-bold text-gray-900 mb-3">💡 Tips:</h3>
           <ul className="text-gray-700 space-y-2 text-sm">
             <li>• Export the current tests to use as a template for importing new tests</li>
-            <li>• Use "Yes" or "No" for boolean fields (isNABL, profileTest, isHeader, etc.)</li>
+            <li>• Use "Yes" or "No" for boolean fields (isNABL, profileTest, attachFile, etc.)</li>
             <li>• Make sure all referenced departments exist in the system</li>
             <li>• Parameters and Categories sheets are optional for import</li>
             <li>• Duplicate tests (same name + department) will be updated, not created</li>

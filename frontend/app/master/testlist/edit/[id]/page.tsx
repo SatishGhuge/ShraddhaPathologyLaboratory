@@ -45,17 +45,15 @@ const AddTest = () => {
     preparationTime: "",
     preparationType: "",
     isNABL: false,
-    lineHeight: "",
     profileTest: false,
-    reportHeader: "",
     sampleTypeId: "",
-    isHeader: true,
-    showTestName: true,
-    outsourceLab: "",
     testCode: "",
-    instructionPreparation: "",
-    instructionPatient: "",
-    interpretationLabel: "",
+    volume: "",
+    testMethod: "",
+    cutOff: "",
+    schedule: "",
+    temperature: "",
+    comments: "",
     interpretation: "",
   });
 
@@ -383,18 +381,15 @@ const AddTest = () => {
               preparationTime: testData.preparationTime || "",
               preparationType: testData.preparationType || "",
               isNABL: testData.isNABL || false,
-              lineHeight: testData.lineHeight?.toString() || "",
               profileTest: Boolean(testData.profileTest),
-              reportHeader: testData.reportHeader || "",
               sampleTypeId: testData.sampleTypeId?.toString() || "",
-              isHeader: testData.isHeader !== undefined ? testData.isHeader : true,
-              showTestName: testData.showTestName !== undefined ? testData.showTestName : true,
-              outsourceLab: testData.outsourceLab || "",
               testCode: testData.testCode || "",
-              group: testData.group || "",
-              instructionPreparation: testData.instructionPreparation || "",
-              instructionPatient: testData.instructionPatient || "",
-              interpretationLabel: testData.interpretationLabel || "",
+              volume: testData.volume || "",
+              testMethod: testData.testMethod || "",
+              cutOff: testData.cutOff || "",
+              schedule: testData.schedule || "",
+              temperature: testData.temperature || "",
+              comments: testData.comments || "",
               interpretation: testData.interpretation || "",
             };
             
@@ -998,21 +993,18 @@ const AddTest = () => {
         departmentId: formData.department ? parseInt(formData.department) : null,
         sampleTypeId: formData.sampleTypeId ? parseInt(formData.sampleTypeId) : null,
         machineIds: selectedMachines.map(m => m.id), // Send as array of machine IDs
-        reportHeader: formData.reportHeader || null,
         preparationTime: formData.preparationTime || null,
         preparationType: formData.preparationType || null,
-        instructionPreparation: formData.instructionPreparation || null,
-        instructionPatient: formData.instructionPatient || null,
-        interpretationLabel: formData.interpretationLabel || null,
+        volume: formData.volume || null,
+        testMethod: formData.testMethod || null,
+        temperature: formData.temperature || null,
+        comments: formData.comments || null,
         interpretation: formData.interpretation || null,
         outsourceLab: formData.outsourceLab || null,
         attachFile: Boolean(formData.attachFile),
         imageSize: formData.imageSize || "800|600",
         profileTest: Boolean(formData.profileTest),
-        isHeader: formData.isHeader,
-        showTestName: formData.showTestName,
         isNABL: formData.isNABL,
-        lineHeight: formData.lineHeight ? parseFloat(formData.lineHeight) : null,
         linkedTestIds: formData.profileTest === true ? selectedTestsToAdd.map(t => t.id) : []
       };
 
@@ -1284,39 +1276,32 @@ const AddTest = () => {
                     disabled={isViewMode} 
                   />
 
-                  <Input 
-                    label="Test Short Form" 
-                    name="shortName"
-                    value={formData.shortName}
-                    onChange={handleChange}
-                    disabled={isViewMode}
-                    required={false}
-                  />
-
-                  <Checkbox 
-                    label="Attach File" 
-                    name="attachFile" 
-                    checked={formData.attachFile}
-                    onChange={handleChange}
-                    disabled={isViewMode} 
-                  />
-
-                  {/* Image size field — only when Attach File = true */}
-                  {formData.attachFile === true && (
-                    <div className="flex flex-col gap-1">
-                      <label className="font-semibold text-gray-700 text-xs sm:text-sm">
-                        Image width/height :
-                      </label>
-                      <input
-                        className="px-2 py-1.5 border border-cyan-400 rounded text-xs sm:text-sm w-48 focus:outline-none focus:ring-2 focus:ring-orange-500 bg-white"
-                        placeholder="width|height (Optional)"
-                        name="imageSize"
-                        value={formData.imageSize || ''}
+                  {/* Test Short Form and Test Code - Same Row */}
+                  <div className="flex flex-col sm:flex-row gap-3">
+                    <div className="flex-1">
+                      <Input 
+                        label="Test Short Form" 
+                        name="shortName"
+                        value={formData.shortName}
                         onChange={handleChange}
                         disabled={isViewMode}
-                      required={false}/>
+                        placeholder="Machine Assay code"
+                        required={false}
+                      />
                     </div>
-                  )}
+                    <div className="flex-1">
+                      <Input 
+                        label="Test Code" 
+                        name="testCode"
+                        value={formData.testCode}
+                        onChange={handleChange}
+                        disabled={isViewMode}
+                        required={false}
+                      />
+                    </div>
+                  </div>
+
+
 
                   {/* Preparation Time + Type */}
                   <div className="flex flex-col sm:flex-row gap-3">
@@ -1339,8 +1324,58 @@ const AddTest = () => {
                     />
                   </div>
 
-                  {/* Is NABL + Line Height same row */}
-                  <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-6">
+                  {/* Temperature and Comments */}
+                  <div className="flex flex-col sm:flex-row gap-3">
+                    <div className="w-32 sm:w-40">
+                      <Input 
+                        label="Temperature" 
+                        name="temperature"
+                        value={formData.temperature}
+                        onChange={handleChange}
+                        disabled={isViewMode}
+                        placeholder="e.g., 37°C, Room Temperature"
+                        required={false}
+                      />
+                    </div>
+
+                    {/* Comments TextArea */}
+                    <div className="flex-1">
+                      <label className="font-semibold text-gray-700 text-xs sm:text-sm block mb-1">Comments</label>
+                      <textarea
+                        name="comments"
+                        value={formData.comments}
+                        onChange={handleChange}
+                        disabled={isViewMode}
+                        placeholder="Instruction"
+                        className="w-full px-2 py-1.5 border border-gray-300 rounded text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 resize disabled:bg-gray-100 disabled:cursor-not-allowed"
+                        rows={2}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Attach File, Image width/height, and Is NABL - Same row */}
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4">
+                    <Checkbox 
+                      label="Attach File" 
+                      name="attachFile" 
+                      checked={formData.attachFile}
+                      onChange={handleChange}
+                      disabled={isViewMode} 
+                    />
+                    {/* Image width/height - Show only when Attach File is checked */}
+                    {formData.attachFile && (
+                      <div className="sm:flex-none w-40">
+                        <Input 
+                          label="Image width/height" 
+                          name="imageSize"
+                          value={formData.imageSize}
+                          onChange={handleChange}
+                          disabled={isViewMode}
+                          placeholder="800|600"
+                          required={false}
+                        />
+                      </div>
+                    )}
                     <Checkbox 
                       label="Is NABL" 
                       name="isNABL"
@@ -1348,20 +1383,6 @@ const AddTest = () => {
                       onChange={handleChange}
                       disabled={isViewMode} 
                     />
-                    <div className="flex items-center gap-2">
-                      <label className="font-semibold text-gray-700 text-xs sm:text-sm">
-                        Line Height
-                      </label>
-                      <input 
-                        name="lineHeight"
-                        type="number"
-                        step="0.1"
-                        value={formData.lineHeight}
-                        onChange={handleChange}
-                        className="w-20 px-2 py-1.5 sm:py-1 border border-gray-300 rounded text-xs sm:text-sm bg-white" 
-                        disabled={isViewMode} 
-                      required={false}/>
-                    </div>
                   </div>
                 </div>
 
@@ -1376,17 +1397,17 @@ const AddTest = () => {
                     disabled={isViewMode} 
                   />
 
-                  {/* Test to add - Only show when Profile Test is enabled */}
+                  {/* Test to add - Only show when Profile Test is true */}
                   {formData.profileTest === true && (
                     <div>
                       <label className="font-semibold text-gray-700 text-xs sm:text-sm block mb-1">Test to add</label>
                       {/* Combined tag + select box */}
-                      <div className="flex flex-wrap items-center gap-1 px-2 py-1 border border-gray-300 rounded bg-white min-h-[32px] focus-within:ring-2 focus-within:ring-orange-500">
+                      <div className="flex flex-wrap items-center gap-1 px-2 py-1 border border-gray-300 rounded bg-white min-h-[32px] focus-within:ring-2 focus-within:ring-orange-600">
                         {/* Tags inside the box */}
                         {selectedTestsToAdd.map(t => (
-                          <span key={t.id} className="flex items-center gap-0.5 bg-orange-100 text-orange-900 text-xs px-1.5 py-0.5 rounded-full whitespace-nowrap">
-                            {t.name}
-                            {!isViewMode && (
+                          <span key={t.id} className="flex items-center gap-0.5 bg-orange-200 text-orange-900 text-xs px-1.5 py-0.5 rounded-full whitespace-nowrap">
+                            {t.name || `Test #${t.id}`}
+                            {(
                               <button
                                 type="button"
                                 onClick={() => setSelectedTestsToAdd(prev => prev.filter(x => x.id !== t.id))}
@@ -1396,7 +1417,7 @@ const AddTest = () => {
                           </span>
                         ))}
                         {/* Inline select — grows to fill remaining space */}
-                        {!isViewMode && (
+                        {(
                           <select
                             value=""
                             onChange={(e) => {
@@ -1405,16 +1426,19 @@ const AddTest = () => {
                               const id = parseInt(val);
                               if (!selectedTestsToAdd.find(t => t.id === id)) {
                                 const test = tests.find(t => t.id === id);
-                                if (test) setSelectedTestsToAdd(prev => [...prev, { id: test.id, name: test.name }]);
+                                if (test) {
+                                  const testName = test.name || test.shortName || `Test #${test.id}`;
+                                  setSelectedTestsToAdd(prev => [...prev, { id: test.id, name: testName }]);
+                                }
                               }
                             }}
                             className="flex-1 min-w-[120px] bg-transparent border-none outline-none text-xs text-gray-500 cursor-pointer"
                           >
                             <option value="">{selectedTestsToAdd.length === 0 ? '-- Select test to add --' : '+ Add more...'}</option>
-                            {tests
+                            {Array.isArray(tests) && tests
                               .filter(t => !selectedTestsToAdd.find(s => s.id === t.id))
                               .map(test => (
-                                <option key={test.id} value={test.id}>{test.name}</option>
+                                <option key={test.id} value={test.id}>{test.name || test.shortName || `Test #${test.id}`}</option>
                               ))}
                           </select>
                         )}
@@ -1422,14 +1446,6 @@ const AddTest = () => {
                     </div>
                   )}
 
-                  <Input 
-                    label="Report Header" 
-                    name="reportHeader"
-                    value={formData.reportHeader}
-                    onChange={handleChange}
-                    disabled={isViewMode}
-                    required={false}
-                  />
                   {/* Sample Type - Custom dropdown with colored test tube */}
                   <div className="relative sample-type-dropdown">
                     <label className="font-semibold text-gray-700 text-xs sm:text-sm">Sample Type</label>
@@ -1437,7 +1453,7 @@ const AddTest = () => {
                       type="button"
                       disabled={isViewMode}
                       onClick={() => setShowSampleTypeDropdown(v => !v)}
-                      className="w-full px-2 py-1.5 border border-gray-300 rounded text-xs sm:text-sm bg-white focus:outline-none focus:ring-2 focus:ring-orange-500 disabled:bg-gray-100 disabled:cursor-not-allowed flex items-center gap-2 text-left"
+                      className="w-full px-2 py-1.5 border border-gray-300 rounded text-xs sm:text-sm bg-white focus:outline-none focus:ring-2 focus:ring-orange-500 disabled:bg-gray-100 disabled:cursor-not-allowed text-left flex items-center gap-2"
                     >
                       {formData.sampleTypeId ? (
                         <>
@@ -1473,8 +1489,8 @@ const AddTest = () => {
                             </svg>
                             <div className="flex flex-col">
                               <span className="text-gray-700">{type.Sample_Type}</span>
-                              {type.Sample_Color && (
-                                <span className="text-gray-500 text-xs">{type.Sample_Color}</span>
+                              {type.colorName && (
+                                <span className="text-gray-500 text-xs">{type.colorName}</span>
                               )}
                             </div>
                           </div>
@@ -1482,6 +1498,54 @@ const AddTest = () => {
                       </div>
                     )}
                   </div>
+
+                  {/* Volume Field */}
+                  <Input 
+                    label="Volume" 
+                    name="volume"
+                    value={formData.volume}
+                    onChange={handleChange}
+                    disabled={isViewMode}
+                    placeholder="e.g., 5 mL"
+                    required={false}
+                  />
+
+                  {/* Test Method Field */}
+                  <Input 
+                    label="Test Method" 
+                    name="testMethod"
+                    value={formData.testMethod}
+                    onChange={handleChange}
+                    disabled={isViewMode}
+                    placeholder="e.g., HPLC, Immunoassay"
+                    required={false}
+                  />
+
+                  {/* Cut Off and Schedule - Same Row */}
+                  <div className="flex flex-col sm:flex-row gap-3">
+                    <div className="flex-1">
+                      <Input 
+                        label="Cut Off" 
+                        name="cutOff"
+                        value={formData.cutOff}
+                        onChange={handleChange}
+                        disabled={isViewMode}
+                        required={false}
+                      />
+                    </div>
+                    <div className="flex-1">
+                      <Input 
+                        label="Schedule" 
+                        name="schedule"
+                        value={formData.schedule}
+                        onChange={handleChange}
+                        disabled={isViewMode}
+                        placeholder="e.g., Daily, Weekly"
+                        required={false}
+                      />
+                    </div>
+                  </div>
+
                   {/* Machine Assignment - Multi-machine selection */}
                   <div>
                     <label className="font-semibold text-gray-700 text-xs sm:text-sm block mb-1">Machines</label>
@@ -1528,61 +1592,6 @@ const AddTest = () => {
                     </div>
                   </div>
 
-                  <Checkbox 
-                    label="Is Header" 
-                    name="isHeader"
-                    checked={formData.isHeader}
-                    onChange={handleChange}
-                    disabled={isViewMode} 
-                  />
-                  <Checkbox 
-                    label="Show Test Name" 
-                    name="showTestName"
-                    checked={formData.showTestName}
-                    onChange={handleChange}
-                    disabled={isViewMode} 
-                  />
-
-                  <Select 
-                    label="Outsource Lab" 
-                    name="outsourceLab"
-                    value={formData.outsourceLab}
-                    onChange={handleChange}
-                    options={["Lab A", "Lab B", "Lab C"]}
-                    disabled={isViewMode}
-                    required={false}
-                  />
-
-                  <div className="flex flex-col sm:flex-row gap-3">
-                    <Input 
-                      label="Test Code" 
-                      name="testCode"
-                      value={formData.testCode}
-                      onChange={handleChange}
-                      disabled={isViewMode}
-                      required={false}
-                    />
-                  </div>
-
-                  {/* Instructions – same row */}
-                  <div className="flex flex-col sm:flex-row gap-3">
-                    <Input 
-                      label="Instruction For Preparation" 
-                      name="instructionPreparation"
-                      value={formData.instructionPreparation}
-                      onChange={handleChange}
-                      disabled={isViewMode}
-                      required={false}
-                    />
-                    <Input 
-                      label="Instruction For Patient" 
-                      name="instructionPatient"
-                      value={formData.instructionPatient}
-                      onChange={handleChange}
-                      disabled={isViewMode}
-                      required={false}
-                    />
-                  </div>
                 </div>
 
               </form>
@@ -1595,14 +1604,6 @@ const AddTest = () => {
                   Interpretation Section
                 </h3>
                 
-                <Input 
-                  label="Interpretation Label" 
-                  name="interpretationLabel"
-                  value={formData.interpretationLabel}
-                  onChange={handleChange}
-                  disabled={isViewMode}
-                  required={false}
-                />
                 
                 {/* CKEditor for Interpretation */}
                 <div>
@@ -1618,6 +1619,7 @@ const AddTest = () => {
                             const interpretationContainer = document.querySelector('#interpretation-editor') as HTMLElement;
                             const expandBtn = document.querySelector('#interpretation-expand-btn') as HTMLElement;
                             const minimizeBtn = document.querySelector('#interpretation-minimize-btn') as HTMLElement;
+                            const backButtonContainer = document.querySelector('#interpretation-back-button') as HTMLElement;
                             
                             if (interpretationContainer) {
                               interpretationContainer.classList.add('expanded');
@@ -1628,10 +1630,13 @@ const AddTest = () => {
                               interpretationContainer.style.width = '100vw';
                               interpretationContainer.style.height = '100vh';
                               interpretationContainer.style.backgroundColor = 'white';
-                              interpretationContainer.style.padding = '20px';
+                              interpretationContainer.style.padding = '0';
+                              interpretationContainer.style.display = 'flex';
+                              interpretationContainer.style.flexDirection = 'column';
                               
                               if (expandBtn) expandBtn.style.display = 'none';
                               if (minimizeBtn) minimizeBtn.style.display = 'block';
+                              if (backButtonContainer) backButtonContainer.style.display = 'flex';
                             }
                           }}
                           id="interpretation-expand-btn"
@@ -1645,6 +1650,7 @@ const AddTest = () => {
                             const interpretationContainer = document.querySelector('#interpretation-editor') as HTMLElement;
                             const expandBtn = document.querySelector('#interpretation-expand-btn') as HTMLElement;
                             const minimizeBtn = document.querySelector('#interpretation-minimize-btn') as HTMLElement;
+                            const backButtonContainer = document.querySelector('#interpretation-back-button') as HTMLElement;
                             
                             if (interpretationContainer) {
                               interpretationContainer.classList.remove('expanded');
@@ -1656,9 +1662,12 @@ const AddTest = () => {
                               interpretationContainer.style.height = 'auto';
                               interpretationContainer.style.backgroundColor = 'transparent';
                               interpretationContainer.style.padding = '8px';
+                              interpretationContainer.style.display = 'block';
+                              interpretationContainer.style.flexDirection = 'row';
                               
                               if (expandBtn) expandBtn.style.display = 'block';
                               if (minimizeBtn) minimizeBtn.style.display = 'none';
+                              if (backButtonContainer) backButtonContainer.style.display = 'none';
                             }
                           }}
                           id="interpretation-minimize-btn"
@@ -1671,7 +1680,41 @@ const AddTest = () => {
                     )}
                   </div>
                   {!isViewMode ? (
-                    <div id="interpretation-editor" className="border border-gray-300 rounded bg-white p-2 min-h-[400px]">
+                    <div id="interpretation-editor" className="border border-gray-300 rounded bg-white p-2 h-[200px]">
+                      {/* Back Button - Only visible when expanded */}
+                      <div id="interpretation-back-button" className="flex items-center justify-between mb-4 pb-4 border-b border-gray-300" style={{ display: 'none' }}>
+                        <h2 className="text-lg font-semibold text-gray-800">Interpretation Editor</h2>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const interpretationContainer = document.querySelector('#interpretation-editor') as HTMLElement;
+                            const expandBtn = document.querySelector('#interpretation-expand-btn') as HTMLElement;
+                            const minimizeBtn = document.querySelector('#interpretation-minimize-btn') as HTMLElement;
+                            const backButtonContainer = document.querySelector('#interpretation-back-button') as HTMLElement;
+                            
+                            if (interpretationContainer) {
+                              interpretationContainer.classList.remove('expanded');
+                              interpretationContainer.style.position = 'relative';
+                              interpretationContainer.style.zIndex = 'auto';
+                              interpretationContainer.style.top = 'auto';
+                              interpretationContainer.style.left = 'auto';
+                              interpretationContainer.style.width = 'auto';
+                              interpretationContainer.style.height = 'auto';
+                              interpretationContainer.style.backgroundColor = 'transparent';
+                              interpretationContainer.style.padding = '8px';
+                              interpretationContainer.style.display = 'block';
+                              interpretationContainer.style.flexDirection = 'row';
+                              
+                              if (expandBtn) expandBtn.style.display = 'block';
+                              if (minimizeBtn) minimizeBtn.style.display = 'none';
+                              if (backButtonContainer) backButtonContainer.style.display = 'none';
+                            }
+                          }}
+                          className="px-4 py-2 bg-blue-500 text-white text-sm rounded hover:bg-blue-600 focus:outline-none"
+                        >
+                          ← Back to Form
+                        </button>
+                      </div>
                       {editorLoaded ? (
                         <CKEditor
                           editor={ClassicEditor as any}
@@ -1689,7 +1732,7 @@ const AddTest = () => {
                             setEditorLoaded(false);
                           }}
                           config={{
-                            height: 350,
+                            height: 160,
                             placeholder: 'Enter interpretation details here...',
                             toolbar: [
                               'heading', '|',
@@ -3146,7 +3189,7 @@ const AddTest = () => {
                 {formData.interpretation && (
                   <div className="mb-4">
                     <div className="text-sm font-semibold text-gray-700 mb-2">
-                      {formData.interpretationLabel || "Interpretation"}:
+                      Interpretation:
                     </div>
                     <div className="text-sm text-gray-600 bg-gray-50 p-3 rounded border">
                       {formData.interpretation}

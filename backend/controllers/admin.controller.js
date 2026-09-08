@@ -140,12 +140,6 @@ export const getServiceCountReport = async (req, res) => {
       where.referralDoctor = { contains: referralDoctor };
     }
 
-    if (inhouse === 'Inhouse') {
-      where.test = { outsourceLab: null };
-    } else if (inhouse === 'Outsource') {
-      where.test = { outsourceLab: { not: null } };
-    }
-
     const rows = await prisma.patientTest.findMany({
       where,
       select: {

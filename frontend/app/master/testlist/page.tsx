@@ -29,14 +29,14 @@ const TestList = () => {
 
   // Fetch tests from backend on component mount and when page changes
   useEffect(() => {
-    fetchTests(currentPage);
+    fetchTests(currentPage, search);
     fetchOutsourcedTests();
   }, [currentPage]);
 
   useEffect(() => {
     setCurrentPage(1);
-    fetchTests(1);
-  }, [itemsPerPage]);
+    fetchTests(1, search);
+  }, [itemsPerPage, search]); // Add search to dependency array
 
   // Fetch outsourced tests to get list of test IDs linked to outsourcing labs
   const fetchOutsourcedTests = async () => {
@@ -65,11 +65,11 @@ const TestList = () => {
     setCurrentPage(1);
   }, [search, showInactive]);
 
-  const fetchTests = async (page: number = 1): Promise<void> => {
+  const fetchTests = async (page: number = 1, searchTerm: string = ""): Promise<void> => {
     try {
       setLoading(true);
       setError(null);
-      const response = await getTests(page, itemsPerPage);
+      const response = await getTests(page, itemsPerPage, searchTerm);
       
       // Handle API response - getTests returns { data: [], pagination: {} }
       const testsArray = response.data || [];
@@ -200,7 +200,7 @@ const TestList = () => {
   const handleReset = () => {
     setSearch("");
     setCurrentPage(1);
-    fetchTests(1);
+    fetchTests(1, "");
   };
 
   // 🔹 Handle file selection for import
@@ -270,9 +270,10 @@ const TestList = () => {
     }
   };
 
-  // 🔹 Filter tests - exclude deleted, then by active/inactive and search
+  // 🔹 Filter tests - exclude deleted, then by active/inactive
+  // Note: Search filtering is now done on the backend, so we only filter by active/inactive here
   const filteredTests = (Array.isArray(tests) ? tests : []).filter(test => {
-    // Exclude deleted items from all views
+    // Exclude deleted items from all views (though backend should already do this)
     if (test.isDeleted) return false;
     
     // When "Show Inactive" is checked, show ONLY inactive tests
@@ -281,12 +282,7 @@ const TestList = () => {
     // When "Show Inactive" is unchecked, show ONLY active tests
     if (!showInactive && !test.isActive) return false;
     
-    // Filter by search
-    return (
-      test.name.toLowerCase().includes(search.toLowerCase()) ||
-      test.shortName?.toLowerCase().includes(search.toLowerCase()) ||
-      test.department?.name.toLowerCase().includes(search.toLowerCase())
-    );
+    return true;
   });
 
   return (

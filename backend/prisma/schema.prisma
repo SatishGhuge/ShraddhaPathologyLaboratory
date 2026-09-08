@@ -352,26 +352,24 @@ model Test {
   testParameterId         Int?
   testCategoryId          Int?
   sampleTypeId            Int?
-  group                   String?
-  reportHeader            String?
+  volume                  String?
+  testMethod              String?
+  cutOff                  String?
+  schedule                String?
   preparationTime         String?
   preparationType         String?
-  instructionPreparation  String?                  @db.Text
-  instructionPatient      String?                  @db.Text
-  interpretationLabel     String?
+  temperature             String?                  @db.Text
+  comments                String?                  @db.Text
   interpretation          String?                  @db.Text
-  outsourceLab            String?
   attachFile              Boolean                  @default(false)
   imageSize               String?                  @default("800|600")
   profileTest             Boolean                  @default(false)
   isNABL                  Boolean                  @default(false)
-  lineHeight              Float?                   @default(1.4)
   isActive                Boolean                  @default(true)
   isDeleted               Boolean                  @default(false)
   createdAt               DateTime                 @default(now())
   updatedAt               DateTime                 @updatedAt
   linkedTestIds           String?                  @db.Text
-  isOutsourced            Boolean                  @default(false)
   testparameters          testparameters[]
   doctorTestCharges       DoctorTestCharge[]
   organizationTestCharges OrganizationTestCharge[]
@@ -392,8 +390,6 @@ model Test {
   @@index([departmentId], map: "tests_departmentId_fkey")
   @@index([testCategoryId], map: "tests_testCategoryId_fkey")
   @@index([testParameterId], map: "tests_testParameterId_fkey")
-  @@index([isActive])
-  @@index([isOutsourced])
   @@index([name])
   @@index([sampleTypeId], map: "tests_sampleTypeId_fkey")
   @@map("tests")
@@ -658,6 +654,7 @@ model sample_type {
   id           Int    @id @default(autoincrement())
   Sample_Type  String @unique(map: "Sample_Type_Sample_Type_key")
   Sample_Color String
+  colorName    String? @default("Default")
   test         Test[]
 
   @@map("sample_types")

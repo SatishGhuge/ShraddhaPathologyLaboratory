@@ -82,20 +82,16 @@ export interface TestFormData {
   testMethod: string;
   preparationTime: string;
   preparationType: string;
+  volume: string;
+  cutOff: string;
+  schedule: string;
   isNABL: boolean;
-  lineHeight: string;
   profileTest: string;
-  reportHeader: string;
   sampleType: string;
   machineName: string;
-  isHeader: boolean;
-  showTestName: boolean;
-  outsourceLab: string;
   testCode: string;
-  group: string;
-  instructionPreparation: string;
-  instructionPatient: string;
-  interpretationLabel: string;
+  temperature: string;
+  comments: string;
   interpretation: string;
 }
 

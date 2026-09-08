@@ -698,20 +698,19 @@ export const getTestById = async (req, res) => {
       sampleTypeId: test.sampleTypeId,
       sample_type: test.sample_type,
       machineIds: test.testMachines?.map(tm => tm.machineId) || [],
-      group: test.group,
-      reportHeader: test.reportHeader,
       preparationTime: test.preparationTime,
       preparationType: test.preparationType,
-      instructionPreparation: test.instructionPreparation,
-      instructionPatient: test.instructionPatient,
-      interpretationLabel: test.interpretationLabel,
+      volume: test.volume,
+      testMethod: test.testMethod,
+      cutOff: test.cutOff,
+      schedule: test.schedule,
+      temperature: test.temperature,
+      comments: test.comments,
       interpretation: test.interpretation,
-      outsourceLab: test.outsourceLab,
       attachFile: test.attachFile ? true : false,  // ✅ Convert to boolean
       imageSize: test.imageSize,
       profileTest: test.profileTest ? true : false,  // ✅ Convert to boolean
       isNABL: test.isNABL,
-      lineHeight: test.lineHeight,
       isActive: test.isActive,
       isDeleted: test.isDeleted,
       linkedTestIds: (() => {
@@ -754,19 +753,18 @@ export const createTest = async (req, res) => {
       departmentId,
       sampleTypeId,
       machineIds, // Changed from machineId to machineIds (array)
-      group,
-      reportHeader,
       preparationTime,
       preparationType,
-      instructionPreparation,
-      instructionPatient,
-      interpretationLabel,
+      volume,
+      testMethod,
+      cutOff,
+      schedule,
+      temperature,
+      comments,
       interpretation,
-      outsourceLab,
       attachFile,
       profileTest,
       isNABL,
-      lineHeight,
       categories
     } = req.body;
 
@@ -810,19 +808,18 @@ export const createTest = async (req, res) => {
         testCode,
         departmentId: parseInt(departmentId),
         sampleTypeId: sampleTypeId ? parseInt(sampleTypeId) : null,
-        group,
-        reportHeader,
         preparationTime,
         preparationType,
-        instructionPreparation,
-        instructionPatient,
-        interpretationLabel,
+        volume,
+        testMethod,
+        cutOff,
+        schedule,
+        temperature,
+        comments,
         interpretation,
-        outsourceLab,
         attachFile: attachFileValue,
         profileTest: profileTestValue,
         isNABL: isNABL || false,
-        lineHeight: lineHeight ? parseFloat(lineHeight) : null,
         linkedTestIds: req.body.linkedTestIds ? JSON.stringify(req.body.linkedTestIds) : null
       }
     });
@@ -1055,20 +1052,19 @@ export const updateTest = async (req, res) => {
       departmentId,
       sampleTypeId,
       machineIds, // Changed from machineId to machineIds (array)
-      group,
-      reportHeader,
       preparationTime,
       preparationType,
-      instructionPreparation,
-      instructionPatient,
-      interpretationLabel,
+      volume,
+      testMethod,
+      cutOff,
+      schedule,
+      temperature,
+      comments,
       interpretation,
-      outsourceLab,
       attachFile,
       imageSize,
       profileTest,
       isNABL,
-      lineHeight,
       isActive,
       isDeleted,
       categories
@@ -1130,19 +1126,18 @@ export const updateTest = async (req, res) => {
       } else {
       }
     }
-    if (group !== undefined) updateData.group = group || null;
-    if (reportHeader !== undefined) updateData.reportHeader = reportHeader || null;
     if (preparationTime !== undefined) updateData.preparationTime = preparationTime || null;
     if (preparationType !== undefined) updateData.preparationType = preparationType || null;
-    if (instructionPreparation !== undefined) updateData.instructionPreparation = instructionPreparation || null;
-    if (instructionPatient !== undefined) updateData.instructionPatient = instructionPatient || null;
-    if (interpretationLabel !== undefined) updateData.interpretationLabel = interpretationLabel || null;
+    if (volume !== undefined) updateData.volume = volume || null;
+    if (testMethod !== undefined) updateData.testMethod = testMethod || null;
+    if (cutOff !== undefined) updateData.cutOff = cutOff || null;
+    if (schedule !== undefined) updateData.schedule = schedule || null;
+    if (temperature !== undefined) updateData.temperature = temperature || null;
+    if (comments !== undefined) updateData.comments = comments || null;
     if (interpretation !== undefined) updateData.interpretation = interpretation || null;
-    if (outsourceLab !== undefined) updateData.outsourceLab = outsourceLab || null;
     if (imageSize !== undefined) updateData.imageSize = imageSize || null;
     if (sampleTypeId !== undefined) updateData.sample_type = sampleTypeId ? { connect: { id: parseInt(sampleTypeId) } } : { disconnect: true };
     if (isNABL !== undefined) updateData.isNABL = isNABL;
-    if (lineHeight !== undefined) updateData.lineHeight = lineHeight ? parseFloat(lineHeight) : 1.4;
     if (isActive !== undefined) updateData.isActive = isActive;
     if (isDeleted !== undefined) updateData.isDeleted = isDeleted;
     if (req.body.linkedTestIds !== undefined) updateData.linkedTestIds = JSON.stringify(req.body.linkedTestIds || []);
@@ -1443,15 +1438,33 @@ export const updateTest = async (req, res) => {
 export const getTests = async (req, res) => {
   try {
     const { page, limit, skip } = getPaginationParams(req.query);
+    const { search } = req.query; // Get search parameter
 
+    // First, fetch all non-deleted tests with simple filtering
+    let whereClause = { isDeleted: false };
+    
+    // For search, we'll use simpler filters that Prisma can handle for count
+    if (search && search.trim()) {
+      const searchTerm = search.trim();
+      whereClause = {
+        isDeleted: false,
+        OR: [
+          { name: { contains: searchTerm } },
+          { shortName: { contains: searchTerm } },
+          { testCode: { contains: searchTerm } }
+        ]
+      };
+    }
+
+    // Count matching tests
     const total = await prisma.test.count({
-      where: { isDeleted: false }
+      where: whereClause
     });
 
     let tests;
     try {
       tests = await prisma.test.findMany({
-        where: { isDeleted: false },
+        where: whereClause,
         include: {
           department: {
             select: {
@@ -1509,6 +1522,17 @@ export const getTests = async (req, res) => {
         take: limit
       });
       
+      // Application-level filtering for department name and case-insensitive search
+      if (search && search.trim()) {
+        const searchLower = search.trim().toLowerCase();
+        tests = tests.filter(t => 
+          (t.name && t.name.toLowerCase().includes(searchLower)) ||
+          (t.shortName && t.shortName.toLowerCase().includes(searchLower)) ||
+          (t.testCode && t.testCode.toLowerCase().includes(searchLower)) ||
+          (t.department && t.department.name && t.department.name.toLowerCase().includes(searchLower))
+        );
+      }
+      
       // Convert boolean fields
       tests = tests.map(t => ({
         ...t,
@@ -1517,6 +1541,7 @@ export const getTests = async (req, res) => {
         categories: reconstructCategories(t.categories)
       }));
     } catch (err) {
+      console.error('Error fetching tests:', err);
       // If type conversion error, fetch with raw SQL and convert
       const rawTests = await prisma.$queryRaw`
         SELECT * FROM tests WHERE isDeleted = false ORDER BY name ASC LIMIT ${limit} OFFSET ${skip}
@@ -1531,6 +1556,7 @@ export const getTests = async (req, res) => {
 
     res.json(buildPaginatedResponse(tests, total, page, limit));
   } catch (error) {
+    console.error('Error in getTests:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to fetch tests'
