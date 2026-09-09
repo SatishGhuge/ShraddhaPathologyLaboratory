@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter, useParams, usePathname } from "next/navigation";
-import { ArrowLeft, Building2, Package, Hash, FlaskConical } from "lucide-react";
+import { ArrowLeft, Package, Hash, FlaskConical } from "lucide-react";
 
 import Header from "@/src/components/Header";
 import PageHeader from "@/src/components/BreadCrumb";
@@ -26,21 +26,50 @@ const AddPackage = () => {
   const [formData, setFormData] = useState({
     name: "",
     code: "",
-    departmentId: "",
+    description: "",
+    charges: "",
     labTests: "",
-    b2cCharge: "",
   });
   
   const [testList, setTestList] = useState<any[]>([]);
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [showDropdown, setShowDropdown] = useState(false);
   const [availableTests, setAvailableTests] = useState<any[]>([]);
-  const [departments, setDepartments] = useState<any[]>([]);
+  const [totalCharges, setTotalCharges] = useState<number>(0);
 
-  // Fetch departments and tests on component mount
+  // Fetch tests on component mount
   useEffect(() => {
-    fetchDepartmentsAndTests();
+    fetchTests();
   }, []);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      // Check if click is outside the lab tests input and dropdown
+      if (!target.closest('[data-lab-tests-container]')) {
+        setShowDropdown(false);
+      }
+    };
+
+    if (showDropdown) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => {
+        document.removeEventListener('mousedown', handleClickOutside);
+      };
+    }
+  }, [showDropdown]);
+
+  // Calculate total charges whenever testList changes
+  useEffect(() => {
+    const total = testList.reduce((sum, test) => sum + (test.charge || 0), 0);
+    setTotalCharges(total);
+    console.log('💰 Total Charges Calculated:', {
+      testCount: testList.length,
+      tests: testList.map(t => ({ name: t.name, charge: t.charge })),
+      totalCharges: total
+    });
+  }, [testList]);
 
   // Load package data for edit/view mode
   useEffect(() => {
@@ -49,30 +78,32 @@ const AddPackage = () => {
     }
   }, [id, isEditMode, isViewMode]);
 
-  const fetchDepartmentsAndTests = async () => {
+  const fetchTests = async () => {
     try {
       setLoading(true);
+      console.log('📡 Fetching ALL tests from:', `${API_BASE_URL}/master/tests/all`);
       
-      const [deptResponse, testsResponse] = await Promise.all([
-        fetch(`${API_BASE_URL}/master/departments`),
-        fetch(`${API_BASE_URL}/master/tests`)
-      ]);
+      const testsResponse = await fetch(`${API_BASE_URL}/master/tests/all`);
+      console.log('Response status:', testsResponse.status);
+      
+      const testsResult = await testsResponse.json();
+      console.log('✅ Tests response:', testsResult);
 
-      const [deptResult, testsResult] = await Promise.all([
-        deptResponse.json(),
-        testsResponse.json()
-      ]);
-
-      if (deptResult.success) {
-        setDepartments(deptResult.data);
-      }
-
-      if (testsResult.success) {
-        setAvailableTests(testsResult.data);
+      if (testsResult.success && testsResult.data) {
+        const testData = Array.isArray(testsResult.data) ? testsResult.data : [];
+        setAvailableTests(testData);
+        console.log('✅ All tests fetched successfully:', testData.length, 'tests');
+        
+        if (testData.length === 0) {
+          console.warn('⚠️ No tests found in response');
+        }
+      } else {
+        console.error('❌ Invalid response structure:', testsResult);
+        setError('Failed to load tests - invalid response');
       }
     } catch (error) {
-      console.error('Error fetching data:', error);
-      setError('Failed to load departments and tests');
+      console.error('❌ Error fetching tests:', error);
+      setError('Failed to load tests');
     } finally {
       setLoading(false);
     }
@@ -89,16 +120,35 @@ const AddPackage = () => {
         setFormData({
           name: pkg.name || "",
           code: pkg.code || "",
-          departmentId: pkg.departmentId?.toString() || "",
+          description: pkg.description || "",
+          charges: pkg.charges?.toString() || "",
           labTests: "",
-          b2cCharge: pkg.b2cCharge?.toString() || "",
         });
         
-        // Set the tests from packageTests
-        const tests = pkg.packageTests?.map(pt => ({
-          id: pt.test.id,
-          name: pt.test.name
-        })) || [];
+        // Set the tests from packageTests with charge info
+        const tests = pkg.packageTests?.map(pt => {
+          let charge = 0;
+          
+          // Try to get charge from test.charges array
+          if (pt.test.charges && Array.isArray(pt.test.charges) && pt.test.charges.length > 0) {
+            charge = pt.test.charges[0].b2cCharge || 0;
+          }
+          
+          return {
+            id: pt.test.id,
+            name: pt.test.name,
+            charge: charge
+          };
+        }) || [];
+        
+        console.log('📦 Package tests loaded:', {
+          packageId: pkg.id,
+          packageName: pkg.name,
+          testCount: tests.length,
+          tests: tests,
+          packageTotal: pkg.packageTotal
+        });
+        
         setTestList(tests);
       } else {
         setError('Failed to load package data');
@@ -136,8 +186,14 @@ const AddPackage = () => {
       return;
     }
     
-    // Add test to the list
-    setTestList([...testList, { id: test.id, name: test.name }]);
+    console.log('➕ Adding test:', { id: test.id, name: test.name, charge: test.charge });
+    
+    // Add test to the list with charge info
+    setTestList([...testList, { 
+      id: test.id, 
+      name: test.name,
+      charge: test.charge || 0
+    }]);
     
     // Clear search
     setFormData({ ...formData, labTests: "" });
@@ -146,6 +202,9 @@ const AddPackage = () => {
   };
 
   const handleRemoveTest = (testId: any) => {
+    const testToRemove = testList.find(t => t.id === testId);
+    console.log('➖ Removing test:', testToRemove);
+    
     const confirm = window.confirm("Are you sure you want to remove this test?");
     if (confirm) {
       setTestList(testList.filter(test => test.id !== testId));
@@ -176,13 +235,30 @@ const AddPackage = () => {
       setLoading(true);
       setError("");
       
+      // IMPORTANT: Recalculate packageTotal from current testList to ensure accuracy
+      const calculatedTotal = testList.reduce((sum, test) => sum + (test.charge || 0), 0);
+      
       const packageData = {
         name: formData.name,
         code: formData.code,
-        departmentId: formData.departmentId ? parseInt(formData.departmentId) : null,
-        testIds: testList.map(test => test.id),
-        b2cCharge: formData.b2cCharge ? parseFloat(formData.b2cCharge) : 0
+        description: formData.description,
+        charges: formData.charges ? parseFloat(formData.charges) : 0,
+        packageTotal: calculatedTotal, // Use recalculated value, not state
+        testIds: testList.map(test => test.id)
       };
+      
+      console.log('📦 Sending package data to API:', packageData);
+      console.log('💰 Total Charges Info:', {
+        testCount: testList.length,
+        testCharges: testList.map(t => ({ name: t.name, charge: t.charge })),
+        calculatedTotal: calculatedTotal,
+        packageTotal: packageData.packageTotal
+      });
+      
+      console.log('🔍 Frontend sending:');
+      console.log('   - charges (manual):', formData.charges);
+      console.log('   - packageTotal (test sum):', calculatedTotal);
+      console.log('   - testIds:', testIds);
       
       let response;
       if (isAddMode) {
@@ -204,6 +280,8 @@ const AddPackage = () => {
       }
       
       const result = await response.json();
+      
+      console.log('📨 API Response:', result);
       
       if (result.success) {
         setShowMessage(true);
@@ -289,29 +367,6 @@ const AddPackage = () => {
           {/* Form */}
           <form onSubmit={handleSubmit} className="p-3 sm:p-4 space-y-3 sm:space-y-4">
             <div className="max-w-2xl space-y-3 sm:space-y-4">
-              {/* Department */}
-              <div className="grid grid-cols-1 md:grid-cols-3 items-start md:items-center gap-2 sm:gap-3">
-                <label className="text-xs sm:text-sm font-medium flex items-center gap-1.5 text-gray-700">
-                  <Building2 size={14} className="text-cyan-600" />
-                  Department
-                </label>
-
-                <select
-                  name="departmentId"
-                  value={formData.departmentId}
-                  onChange={handleChange}
-                  disabled={isViewMode}
-                  className="md:col-span-2 border border-gray-300 rounded-md px-2 py-1.5 sm:py-1 text-xs sm:text-sm bg-white focus:ring-2 focus:ring-orange-500 outline-none disabled:bg-gray-100 disabled:cursor-not-allowed"
-                >
-                  <option value="">Select Department</option>
-                  {departments.map(dept => (
-                    <option key={dept.id} value={dept.id}>
-                      {dept.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
               {/* Package Name */}
               <div className="grid grid-cols-1 md:grid-cols-3 items-start md:items-center gap-2 sm:gap-4">
                 <label className="text-xs sm:text-sm font-medium flex items-center gap-1.5 text-gray-700">
@@ -346,8 +401,42 @@ const AddPackage = () => {
                 />
               </div>
 
+              {/* Description */}
+              <div className="grid grid-cols-1 md:grid-cols-3 items-start gap-2 sm:gap-4">
+                <label className="text-xs sm:text-sm font-medium text-gray-700 mt-1">
+                  Description
+                </label>
+
+                <textarea
+                  name="description"
+                  value={formData.description}
+                  onChange={handleChange}
+                  placeholder="Enter package description"
+                  disabled={isViewMode}
+                  rows={3}
+                  className="md:col-span-2 border border-gray-300 rounded-md px-2 py-1.5 text-xs sm:text-sm bg-white focus:ring-2 focus:ring-orange-500 outline-none disabled:bg-gray-100 disabled:cursor-not-allowed"
+                />
+              </div>
+
+              {/* Charges */}
+              <div className="grid grid-cols-1 md:grid-cols-3 items-start md:items-center gap-2 sm:gap-4">
+                <label className="text-xs sm:text-sm font-medium text-gray-700">
+                  Charges (₹)
+                </label>
+
+                <input
+                  type="text"
+                  name="charges"
+                  value={formData.charges}
+                  onChange={handleChange}
+                  placeholder="0"
+                  disabled={isViewMode}
+                  className="md:col-span-2 border border-gray-300 rounded-md px-2 py-1.5 sm:py-1 text-xs sm:text-sm bg-white focus:ring-2 focus:ring-orange-500 outline-none disabled:bg-gray-100 disabled:cursor-not-allowed"
+                />
+              </div>
+
               {/* Lab Tests */}
-              <div className="grid grid-cols-1 md:grid-cols-3 items-start gap-2 sm:gap-4 relative">
+              <div className="grid grid-cols-1 md:grid-cols-3 items-start gap-2 sm:gap-4 relative" data-lab-tests-container>
                 <label className="text-xs sm:text-sm font-medium flex items-center gap-1.5 mt-0 md:mt-2 text-gray-700">
                   <FlaskConical size={14} className="text-cyan-600" />
                   Lab Tests
@@ -361,6 +450,7 @@ const AddPackage = () => {
                     onChange={handleChange}
                     placeholder="Search Laboratory"
                     disabled={isViewMode}
+                    autoComplete="off"
                     className="w-full border border-gray-300 rounded-md px-2 py-1.5 sm:py-1 text-xs sm:text-sm bg-white focus:ring-2 focus:ring-orange-500 outline-none disabled:bg-gray-100 disabled:cursor-not-allowed"
                   />
                   
@@ -371,9 +461,10 @@ const AddPackage = () => {
                         <div
                           key={test.id}
                           onClick={() => handleAddTest(test)}
-                          className="px-3 py-2 text-xs sm:text-sm hover:bg-cyan-50 cursor-pointer border-b last:border-b-0"
+                          className="px-3 py-2 text-xs sm:text-sm hover:bg-cyan-50 cursor-pointer border-b last:border-b-0 flex justify-between items-center"
                         >
-                          {test.name}
+                          <span>{test.name}</span>
+                          <span className="text-gray-600 font-semibold">₹ {test.charge || 0}</span>
                         </div>
                       ))}
                     </div>
@@ -389,36 +480,27 @@ const AddPackage = () => {
                   )}
                 </div>
               </div>
-
-              {/* B2C Charge */}
-              <div className="grid grid-cols-1 md:grid-cols-3 items-start md:items-center gap-2 sm:gap-4">
-                <label className="text-xs sm:text-sm font-medium text-gray-700">
-                  B2C Charge
-                </label>
-
-                <input
-                  type="text"
-                  name="b2cCharge"
-                  value={formData.b2cCharge}
-                  onChange={handleChange}
-                  placeholder="0"
-                  disabled={isViewMode}
-                  className="md:col-span-2 border border-gray-300 rounded-md px-2 py-1.5 sm:py-1 text-xs sm:text-sm bg-white focus:ring-2 focus:ring-orange-500 outline-none disabled:bg-gray-100 disabled:cursor-not-allowed"
-                />
-              </div>
             </div>
 
             {/* Test List - Show in all modes */}
             {testList.length > 0 && (
               <div className="mt-4 border-t pt-3">
-                <h3 className="text-xs sm:text-sm font-semibold text-gray-700 mb-2">Tests in Package:</h3>
+                <div className="flex justify-between items-center mb-2">
+                  <h3 className="text-xs sm:text-sm font-semibold text-gray-700">Tests in Package:</h3>
+                  <div className="text-xs sm:text-sm font-semibold text-gray-700">
+                    Total: <span className="text-orange-600">₹ {totalCharges.toFixed(2)}</span>
+                  </div>
+                </div>
                 <div className="space-y-1.5">
                   {testList.map((test) => (
                     <div 
                       key={test.id} 
                       className="flex flex-col sm:flex-row items-start sm:items-center justify-between bg-gray-50 px-3 py-2 rounded border text-xs sm:text-sm gap-2"
                     >
-                      <span className="font-medium text-gray-700">{test.name}</span>
+                      <div className="flex-1">
+                        <div className="font-medium text-gray-700">{test.name}</div>
+                        <div className="text-gray-600">Charge: ₹ {test.charge || 0}</div>
+                      </div>
                       {!isViewMode && (
                         <button
                           type="button"
@@ -437,7 +519,7 @@ const AddPackage = () => {
 
           {/* Footer */}
           {!isViewMode && (
-            <div className="flex flex-col sm:flex-row justify-end gap-2 px-3 sm:px-4 py-3 border-t bg-gray-50">
+            <form onSubmit={handleSubmit} className="flex flex-col sm:flex-row justify-end gap-2 px-3 sm:px-4 py-3 border-t bg-gray-50">
               <button
                 onClick={() => router.back()}
                 type="button"
@@ -447,14 +529,13 @@ const AddPackage = () => {
               </button>
               
               <button 
-                onClick={handleSubmit}
-                type="button"
+                type="submit"
                 disabled={loading}
                 className="bg-orange-500 hover:bg-orange-600 text-white px-4 py-1.5 text-xs sm:text-sm rounded-md transition-colors w-full sm:w-auto disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {loading ? 'Saving...' : (isAddMode ? "Save" : "Update")}
               </button>
-            </div>
+            </form>
           )}
         </div>
       </div>

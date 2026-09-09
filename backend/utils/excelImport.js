@@ -93,6 +93,7 @@ export const importTestsFromExcel = async (buffer) => {
           // Find or create sample type (optional)
           let sampleTypeId = null;
           if (sampleTypeName) {
+            console.log(`🔍 Looking for sample type: "${sampleTypeName}"`);
             let sampleType = await prisma.sample_type.findFirst({
               where: { Sample_Type: sampleTypeName }
             });
@@ -103,12 +104,14 @@ export const importTestsFromExcel = async (buffer) => {
               sampleType = await prisma.sample_type.create({
                 data: {
                   Sample_Type: sampleTypeName,
-                  Sample_Color: '#FFFFFF' // Default white color
+                  Sample_Color: '#FFFFFF', // Default white color
+                  colorName: 'Default' // Default color name
                 }
               });
               warnings.push(`Row ${rowIndex}: Sample type "${sampleTypeName}" created automatically`);
             }
             sampleTypeId = sampleType.id;
+            console.log(`✅ Sample type ID set: ${sampleTypeId} for "${sampleTypeName}"`);
           }
 
           // Check if test exists
@@ -124,12 +127,13 @@ export const importTestsFromExcel = async (buffer) => {
           let testId;
           if (existingTest) {
             // Update existing test
+            console.log(`📝 Updating test: ${testName}, sampleTypeId: ${sampleTypeId}`);
             await prisma.test.update({
               where: { id: existingTest.id },
               data: {
                 shortName: shortName || existingTest.shortName,
                 testCode: testCode || existingTest.testCode,
-                sampleTypeId: sampleTypeId || existingTest.sampleTypeId,
+                sampleTypeId: sampleTypeId !== null ? sampleTypeId : existingTest.sampleTypeId,
                 group: group || existingTest.group,
                 reportHeader: reportHeader || existingTest.reportHeader,
                 preparationType: preparationType || existingTest.preparationType,
@@ -149,16 +153,17 @@ export const importTestsFromExcel = async (buffer) => {
             });
             testId = existingTest.id;
             updated.tests++;
-            console.log(`✏️ Updated test: ${testName}`);
+            console.log(`✏️ Updated test: ${testName}, sampleTypeId saved: ${sampleTypeId}`);
           } else {
             // Create new test
+            console.log(`📝 Creating test: ${testName}, sampleTypeId: ${sampleTypeId}`);
             const newTest = await prisma.test.create({
               data: {
                 name: testName,
                 shortName,
                 testCode,
                 departmentId: department.id,
-                sampleTypeId,
+                sampleTypeId: sampleTypeId || null,
                 group,
                 reportHeader,
                 preparationType,
@@ -177,7 +182,7 @@ export const importTestsFromExcel = async (buffer) => {
             });
             testId = newTest.id;
             created.tests++;
-            console.log(`✅ Created test: ${testName}`);
+            console.log(`✅ Created test: ${testName}, sampleTypeId saved: ${sampleTypeId}`);
           }
 
           // Handle machine associations (multiple machines separated by comma)

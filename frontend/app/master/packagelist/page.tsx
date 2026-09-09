@@ -8,9 +8,7 @@ import {
   RotateCcw,
   Pencil,
   IndianRupee,
-  Trash2,
   Package,
-  Eye,
   Edit
 } from "lucide-react";
 import { getAllPackages } from "@/src/api/master";
@@ -131,46 +129,8 @@ const PackagesTable = () => {
     }
   };
 
-  // Delete package
-  const handleDelete = async (id, name) => {
-    const confirm = window.confirm(`Are you sure you want to permanently delete "${name}"?\n\nThis will remove it from all lists but keep it in the database.`);
-    if (!confirm) return;
-
-    try {
-      setLoading(true);
-      
-      const currentPkg = packages.find((p) => p.id === id);
-      const updateData = {
-        ...currentPkg,
-        isDeleted: true
-      };
-      Object.keys(updateData).forEach(key => {
-        if (updateData[key] === undefined) delete updateData[key];
-      });
-      
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/master/packages/${id}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(updateData)
-      });
-      
-      const result = await response.json();
-      
-      if (result.success) {
-        alert('Package deleted permanently!');
-        fetchPackages(); // Refresh the list
-      } else {
-        alert(`Error: ${result.message}`);
-      }
-    } catch (error) {
-      console.error('Error deleting package:', error);
-      alert('Failed to delete package');
-    } finally {
-      setLoading(false);
-    }
-  };
+  // Delete package handler - REMOVED
+  // View and Delete buttons no longer available
 
   return (
     <div className="p-3 sm:p-4 md:p-6 bg-white min-h-screen">
@@ -243,9 +203,8 @@ const PackagesTable = () => {
               <th className="border border-gray-300 px-3 py-1 text-left font-semibold">Sr.No</th>
               <th className="border border-gray-300 px-3 py-1 text-left font-semibold">Name</th>
               <th className="border border-gray-300 px-3 py-1 text-left font-semibold">Code</th>
-              <th className="border border-gray-300 px-3 py-1 text-left font-semibold">Department</th>
-              <th className="border border-gray-300 px-3 py-1 text-left font-semibold">Center</th>
               <th className="border border-gray-300 px-3 py-1 text-left font-semibold">Tests</th>
+              <th className="border border-gray-300 px-3 py-1 text-left font-semibold">Package Total (₹)</th>
               <th className="border border-gray-300 px-3 py-1 text-left font-semibold">Active</th>
               <th className="border border-gray-300 px-3 py-1 text-center font-semibold">Actions</th>
             </tr>
@@ -254,7 +213,7 @@ const PackagesTable = () => {
           <tbody>
             {filteredData.length === 0 ? (
               <tr>
-                <td colSpan={8} className="text-center py-8 text-gray-500 border border-gray-300">
+                <td colSpan={7} className="text-center py-8 text-gray-500 border border-gray-300">
                   No packages found.
                 </td>
               </tr>
@@ -271,12 +230,15 @@ const PackagesTable = () => {
                   </td>
                   <td className="border border-gray-300 px-3 py-1 font-medium">{item.name}</td>
                   <td className="border border-gray-300 px-3 py-1">{item.code || '-'}</td>
-                  <td className="border border-gray-300 px-3 py-1">{item.department?.name || '-'}</td>
-                  <td className="border border-gray-300 px-3 py-1">{item.center || '-'}</td>
                   <td className="border border-gray-300 px-3 py-1">
                     <span className="bg-orange-100 text-gray-700 px-2 py-1 rounded text-xs">
                       {item.packageTests?.length || 0} tests
                     </span>
+                  </td>
+                  
+                  {/* Package Total Column */}
+                  <td className="border border-gray-300 px-3 py-1 font-semibold text-orange-600">
+                    ₹ {(item.packageTotal || 0).toFixed(2)}
                   </td>
                   
                   {/* Active column - just display text */}
@@ -287,27 +249,11 @@ const PackagesTable = () => {
                   <td className="border border-gray-300 px-3 py-1">
                     <div className="flex justify-center gap-1 flex-wrap">
                       <button 
-                        onClick={() => router.push(`/master/packagelist/view/${item.id}`)}
-                        disabled={loading}
-                        className="bg-orange-500 text-white px-2 py-1 rounded text-[10px] sm:text-xs hover:bg-orange-600 transition-colors flex items-center gap-1 disabled:opacity-50"
-                      >
-                        <Eye size={12} /> View
-                      </button>
-
-                      <button 
                         onClick={() => router.push(`/master/packagelist/edit/${item.id}`)}
                         disabled={loading}
                         className="bg-blue-600 text-white px-2 py-1 rounded text-[10px] sm:text-xs hover:bg-blue-700 transition-colors flex items-center gap-1 disabled:opacity-50"
                       >
                         <Edit size={12} /> Edit
-                      </button>
-
-                      <button 
-                        onClick={() => router.push(`/master/packagelist/charges/${item.id}`)}
-                        disabled={loading}
-                        className="bg-yellow-600 text-white px-2 py-1 rounded text-[10px] sm:text-xs hover:bg-yellow-700 transition-colors disabled:opacity-50"
-                      >
-                        Charges
                       </button>
 
                       {/* Active/Inactive Toggle Button (like TestList) */}
@@ -322,15 +268,6 @@ const PackagesTable = () => {
                         title={item.isActive ? "Click to inactivate package" : "Click to activate package"}
                       >
                         {item.isActive ? "Active" : "Inactive"}
-                      </button>
-
-                      <button 
-                        onClick={() => handleDelete(item.id, item.name)}
-                        disabled={loading}
-                        className="bg-red-500 text-white px-2 py-1 rounded text-[10px] sm:text-xs hover:bg-red-600 transition-colors flex items-center gap-1 disabled:opacity-50"
-                        title="Permanently delete package"
-                      >
-                        <Trash2 size={12} /> Delete
                       </button>
                     </div>
                   </td>

@@ -331,12 +331,10 @@ model Department {
   id           Int           @id @default(autoincrement())
   name         String        @unique
   code         String?
-  group        String?
   isActive     Boolean       @default(true)
   isDeleted    Boolean       @default(false)
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
-  packages     Package[]
   patientTests PatientTest[]
   tests        Test[]
 
@@ -396,20 +394,19 @@ model Test {
 }
 
 model Package {
-  id           Int           @id @default(autoincrement())
-  name         String
-  code         String?
-  departmentId Int?
-  b2cCharge    Float         @default(0)
-  isActive     Boolean       @default(true)
-  isDeleted    Boolean       @default(false)
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
-  packageTests PackageTest[]
-  department   Department?   @relation(fields: [departmentId], references: [id])
-  patientTests PatientTest[]
+  id             Int           @id @default(autoincrement())
+  name           String
+  code           String?
+  description    String?       @db.Text
+  charges        Float         @default(0)
+  packageTotal   Float         @default(0)
+  isActive       Boolean       @default(true)
+  isDeleted      Boolean       @default(false)
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  packageTests   PackageTest[]
+  patientTests   PatientTest[]
 
-  @@index([departmentId], map: "packages_departmentId_fkey")
   @@map("packages")
 }
 
@@ -651,8 +648,8 @@ model testparameters {
 }
 
 model sample_type {
-  id           Int    @id @default(autoincrement())
-  Sample_Type  String @unique(map: "Sample_Type_Sample_Type_key")
+  id           Int     @id @default(autoincrement())
+  Sample_Type  String  @unique(map: "Sample_Type_Sample_Type_key")
   Sample_Color String
   colorName    String? @default("Default")
   test         Test[]

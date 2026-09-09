@@ -3,7 +3,7 @@ import {
   getDepartments, getAllDepartments, getDepartmentById, createDepartment, updateDepartment, deleteDepartment,
   getDoctors, getDoctorById, createDoctor, updateDoctor, deleteDoctor, findDuplicateDoctors, getDoctorMergeHistory, mergeDoctors,
   getOrganizations, createOrganization, updateOrganization, deleteOrganization, getOrganizationById,
-  getTests, getTestById, createTest, updateTest, deleteTest,
+  getTests, getAllTests, getTestById, createTest, updateTest, deleteTest,
   getSeedDataSummary,
   getTestCharges, getAllTestCharges, getDoctorTestCharges, getOrganizationTestCharges, createTestCharge, updateTestCharge, deleteTestCharge, bulkCreateTestCharges, bulkCreateOrganizationTestCharges,
   getPackages, getAllPackages, getPackageById, createPackage, updatePackage, deletePackage,
@@ -75,6 +75,7 @@ router.delete('/organizations/:id', deleteOrganization);
 
 // Test routes — specific paths before parameterized
 router.get('/tests', getTests);
+router.get('/tests/all', getAllTests);      // ✅ Get ALL tests without pagination (for dropdowns)
 router.get('/tests/export', exportTests);  // ✅ Export before /:id
 router.post('/tests/import', excelUpload.single('file'), importTests);  // ✅ Import with Excel memory upload
 router.get('/tests/:id', getTestById);
