@@ -1443,15 +1443,28 @@ export const updateTest = async (req, res) => {
 export const getTests = async (req, res) => {
   try {
     const { page, limit, skip } = getPaginationParams(req.query);
+    const { search } = req.query;
+
+    // Build where clause with search support
+    const whereClause = {
+      isDeleted: false,
+      ...(search && {
+        OR: [
+          { name: { contains: search } },
+          { testCode: { contains: search } },
+          { shortName: { contains: search } }
+        ]
+      })
+    };
 
     const total = await prisma.test.count({
-      where: { isDeleted: false }
+      where: whereClause
     });
 
     let tests;
     try {
       tests = await prisma.test.findMany({
-        where: { isDeleted: false },
+        where: whereClause,
         include: {
           department: {
             select: {
