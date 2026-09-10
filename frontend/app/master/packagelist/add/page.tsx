@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter, useParams, usePathname } from "next/navigation";
-import { ArrowLeft, Package, Hash, FlaskConical } from "lucide-react";
+import { ArrowLeft, Package, Hash, FlaskConical, Check, X, Edit2 } from "lucide-react";
 
 import Header from "@/src/components/Header";
 import PageHeader from "@/src/components/BreadCrumb";
@@ -35,6 +35,9 @@ const AddPackage = () => {
   const [showDropdown, setShowDropdown] = useState(false);
   const [availableTests, setAvailableTests] = useState<any[]>([]);
   const [totalCharges, setTotalCharges] = useState<number>(0);
+  const [totalParameterCount, setTotalParameterCount] = useState<number>(0);
+  const [isEditingParamCount, setIsEditingParamCount] = useState(false);
+  const [editedParamCount, setEditedParamCount] = useState<string>("0");
 
   // Fetch tests on component mount
   useEffect(() => {
@@ -67,6 +70,18 @@ const AddPackage = () => {
       testCount: testList.length,
       tests: testList.map(t => ({ name: t.name, charge: t.charge })),
       totalCharges: total
+    });
+  }, [testList]);
+
+  // Calculate total parameter count whenever testList changes
+  useEffect(() => {
+    const paramCount = testList.reduce((sum, test) => sum + (test.parameterCount || 0), 0);
+    setTotalParameterCount(paramCount);
+    setEditedParamCount(paramCount.toString());
+    console.log('📊 Total Parameters Calculated:', {
+      testCount: testList.length,
+      tests: testList.map(t => ({ name: t.name, parameterCount: t.parameterCount })),
+      totalParameterCount: paramCount
     });
   }, [testList]);
 
@@ -124,21 +139,63 @@ const AddPackage = () => {
           labTests: "",
         });
         
-        // Set the tests from packageTests with charge info
-        const tests = pkg.packageTests?.map(pt => {
-          let charge = 0;
-          
-          // Try to get charge from test.charges array
-          if (pt.test.charges && Array.isArray(pt.test.charges) && pt.test.charges.length > 0) {
-            charge = pt.test.charges[0].b2cCharge || 0;
-          }
-          
-          return {
-            id: pt.test.id,
-            name: pt.test.name,
-            charge: charge
-          };
-        }) || [];
+        setTotalParameterCount(pkg.totalParameterCount || 0);
+        setEditedParamCount((pkg.totalParameterCount || 0).toString());
+        
+        // Fetch full test data with parameters for each test in the package
+        const tests = await Promise.all(
+          (pkg.packageTests || []).map(async (pt: any) => {
+            let charge = 0;
+            let parameterCount = 0;
+            
+            // Try to get charge from test.charges array
+            if (pt.test.charges && Array.isArray(pt.test.charges) && pt.test.charges.length > 0) {
+              charge = pt.test.charges[0].b2cCharge || 0;
+            }
+            
+            try {
+              // Fetch full test data to get accurate parameter count
+              console.log('📡 Fetching full test data for ID:', pt.test.id);
+              const testResponse = await fetch(`${API_BASE_URL}/master/tests/${pt.test.id}`);
+              const testResult = await testResponse.json();
+              
+              if (testResult.success && testResult.data) {
+                const fullTestData = testResult.data;
+                
+                // Calculate parameter count from all categories
+                if (fullTestData.categories && Array.isArray(fullTestData.categories)) {
+                  fullTestData.categories.forEach((category: any) => {
+                    if (category.parameters && Array.isArray(category.parameters)) {
+                      parameterCount += category.parameters.length;
+                    }
+                  });
+                }
+                
+                console.log('✅ Fetched test parameters:', {
+                  testId: pt.test.id,
+                  testName: pt.test.name,
+                  parameterCount: parameterCount,
+                  categories: fullTestData.categories?.length || 0
+                });
+              } else {
+                // Fallback to test.testparameters if available
+                parameterCount = pt.test.testparameters?.length || 0;
+              }
+            } catch (error) {
+              console.error('❌ Error fetching test parameters for ID', pt.test.id, ':', error);
+              // Fallback to test.testparameters if fetch fails
+              parameterCount = pt.test.testparameters?.length || 0;
+            }
+            
+            return {
+              id: pt.test.id,
+              name: pt.test.name,
+              charge: charge,
+              parameterCount: parameterCount
+            };
+          })
+        );
+        
         setTestList(tests);
       } else {
         setError('Failed to load package data');
@@ -168,7 +225,7 @@ const AddPackage = () => {
     }
   };
 
-  const handleAddTest = (test: any) => {
+  const handleAddTest = async (test: any) => {
     // Check if test already exists in the list
     const exists = testList.find(t => t.id === test.id);
     if (exists) {
@@ -176,19 +233,69 @@ const AddPackage = () => {
       return;
     }
     
-    console.log('➕ Adding test:', { id: test.id, name: test.name, charge: test.charge });
-    
-    // Add test to the list with charge info
-    setTestList([...testList, { 
-      id: test.id, 
-      name: test.name,
-      charge: test.charge || 0
-    }]);
-    
-    // Clear search
-    setFormData({ ...formData, labTests: "" });
-    setSearchResults([]);
-    setShowDropdown(false);
+    try {
+      setLoading(true);
+      console.log('📡 Fetching full test data for ID:', test.id);
+      
+      // Fetch full test data with parameters
+      const response = await fetch(`${API_BASE_URL}/master/tests/${test.id}`);
+      const result = await response.json();
+      
+      if (result.success && result.data) {
+        const fullTestData = result.data;
+        
+        // Calculate parameter count from all categories
+        let parameterCount = 0;
+        if (fullTestData.categories && Array.isArray(fullTestData.categories)) {
+          fullTestData.categories.forEach((category: any) => {
+            if (category.parameters && Array.isArray(category.parameters)) {
+              parameterCount += category.parameters.length;
+            }
+          });
+        }
+        
+        console.log('➕ Adding test with parameters:', { 
+          id: test.id, 
+          name: test.name, 
+          charge: test.charge, 
+          parameterCount: parameterCount,
+          categories: fullTestData.categories?.length || 0
+        });
+        
+        // Add test to the list with charge and parameter count from full data
+        setTestList([...testList, { 
+          id: test.id, 
+          name: test.name,
+          charge: test.charge || 0,
+          parameterCount: parameterCount
+        }]);
+        
+      } else {
+        console.error('❌ Failed to fetch full test data:', result.message);
+        // Fallback: use the data from the search result
+        setTestList([...testList, { 
+          id: test.id, 
+          name: test.name,
+          charge: test.charge || 0,
+          parameterCount: test.testparameters?.length || 0
+        }]);
+      }
+    } catch (error) {
+      console.error('❌ Error fetching test parameters:', error);
+      // Fallback: add test with available data
+      setTestList([...testList, { 
+        id: test.id, 
+        name: test.name,
+        charge: test.charge || 0,
+        parameterCount: test.testparameters?.length || 0
+      }]);
+    } finally {
+      setLoading(false);
+      // Clear search
+      setFormData({ ...formData, labTests: "" });
+      setSearchResults([]);
+      setShowDropdown(false);
+    }
   };
 
   const handleRemoveTest = (testId: any) => {
@@ -234,6 +341,7 @@ const AddPackage = () => {
         description: formData.description,
         charges: formData.charges ? parseFloat(formData.charges) : 0,
         packageTotal: calculatedTotal, // Use recalculated value, not state
+        totalParameterCount: totalParameterCount,
         testIds: testList.map(test => test.id)
       };
       
@@ -423,6 +531,69 @@ const AddPackage = () => {
                   disabled={isViewMode}
                   className="md:col-span-2 border border-gray-300 rounded-md px-2 py-1.5 sm:py-1 text-xs sm:text-sm bg-white focus:ring-2 focus:ring-orange-500 outline-none disabled:bg-gray-100 disabled:cursor-not-allowed"
                 />
+              </div>
+
+              {/* Total Parameter Count */}
+              <div className="grid grid-cols-1 md:grid-cols-3 items-start md:items-center gap-2 sm:gap-4">
+                <label className="text-xs sm:text-sm font-medium text-gray-700">
+                  Total Parameters
+                </label>
+
+                <div className="md:col-span-2 flex items-center gap-2">
+                  {!isEditingParamCount ? (
+                    <>
+                      <div className="flex-1 border border-gray-300 rounded-md px-2 py-1.5 sm:py-1 text-xs sm:text-sm bg-blue-50 text-gray-700 font-semibold">
+                        {totalParameterCount}
+                      </div>
+                      {!isViewMode && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsEditingParamCount(true);
+                            setEditedParamCount(totalParameterCount.toString());
+                          }}
+                          className="bg-cyan-600 hover:bg-cyan-700 text-white p-1.5 rounded transition"
+                          title="Edit parameter count"
+                        >
+                          <Edit2 size={14} />
+                        </button>
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      <input
+                        type="number"
+                        value={editedParamCount}
+                        onChange={(e) => setEditedParamCount(e.target.value)}
+                        min="0"
+                        className="flex-1 border border-cyan-400 rounded-md px-2 py-1.5 sm:py-1 text-xs sm:text-sm bg-white focus:ring-2 focus:ring-orange-500 outline-none"
+                        autoFocus
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setTotalParameterCount(parseInt(editedParamCount) || 0);
+                          setIsEditingParamCount(false);
+                        }}
+                        className="bg-green-500 hover:bg-green-600 text-white p-1.5 rounded transition"
+                        title="Save"
+                      >
+                        <Check size={14} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditedParamCount(totalParameterCount.toString());
+                          setIsEditingParamCount(false);
+                        }}
+                        className="bg-red-500 hover:bg-red-600 text-white p-1.5 rounded transition"
+                        title="Cancel"
+                      >
+                        <X size={14} />
+                      </button>
+                    </>
+                  )}
+                </div>
               </div>
 
               {/* Lab Tests */}

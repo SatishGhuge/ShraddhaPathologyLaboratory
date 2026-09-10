@@ -397,18 +397,19 @@ model Test {
 }
 
 model Package {
-  id             Int           @id @default(autoincrement())
-  name           String
-  code           String?
-  description    String?       @db.Text
-  charges        Float         @default(0)
-  packageTotal   Float         @default(0)
-  isActive       Boolean       @default(true)
-  isDeleted      Boolean       @default(false)
-  createdAt      DateTime      @default(now())
-  updatedAt      DateTime      @updatedAt
-  packageTests   PackageTest[]
-  patientTests   PatientTest[]
+  id                    Int           @id @default(autoincrement())
+  name                  String
+  code                  String?
+  description           String?       @db.Text
+  charges               Float         @default(0)
+  packageTotal          Float         @default(0)
+  totalParameterCount   Int           @default(0)
+  isActive              Boolean       @default(true)
+  isDeleted             Boolean       @default(false)
+  createdAt             DateTime      @default(now())
+  updatedAt             DateTime      @updatedAt
+  packageTests          PackageTest[]
+  patientTests          PatientTest[]
 
   @@map("packages")
 }
