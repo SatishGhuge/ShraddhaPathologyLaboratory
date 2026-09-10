@@ -2681,10 +2681,26 @@ export const getAllTestCharges = async (req, res) => {
     
     const tests = await prisma.test.findMany({
       where,
-      include: {
+      select: {
+        id: true,
+        name: true,
+        shortName: true,
+        testCode: true,
+        volume: true,
+        testMethod: true,
+        cutOff: true,
+        schedule: true,
+        preparationTime: true,
+        preparationType: true,
+        comments: true,
         department: {
           select: {
             name: true
+          }
+        },
+        sample_type: {
+          select: {
+            Sample_Type: true
           }
         },
         charges: {
@@ -2710,6 +2726,7 @@ export const getAllTestCharges = async (req, res) => {
       data: tests
     });
   } catch (error) {
+    console.error('Error fetching test charges:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to fetch test charges'
@@ -3651,6 +3668,33 @@ export const createPackage = async (req, res) => {
       });
     }
 
+    // Calculate total parameter count from tests
+    let totalParameterCount = 0;
+    if (testIds && testIds.length > 0) {
+      const tests = await prisma.test.findMany({
+        where: {
+          id: {
+            in: testIds.map(id => parseInt(id))
+          }
+        },
+        include: {
+          categories: {
+            include: {
+              testParameter: true
+            }
+          }
+        }
+      });
+
+      // Count total parameters from all categories of all tests
+      totalParameterCount = tests.reduce((sum, test) => {
+        const paramCount = test.categories ? test.categories.length : 0;
+        return sum + paramCount;
+      }, 0);
+
+      console.log(`📊 Calculated total parameters: ${totalParameterCount} from ${tests.length} tests`);
+    }
+
     // Create package
     const packageData = await prisma.package.create({
       data: {
@@ -3659,6 +3703,7 @@ export const createPackage = async (req, res) => {
         description: description || null,
         charges: charges ? parseFloat(charges) : 0,
         packageTotal: packageTotal ? parseFloat(packageTotal) : 0,
+        totalParameterCount: totalParameterCount,
         isActive: isActive !== undefined ? isActive : true
       }
     });
@@ -3755,6 +3800,37 @@ export const updatePackage = async (req, res) => {
       });
     }
 
+    // Calculate total parameter count from tests if testIds provided
+    let totalParameterCount = existingPackage.totalParameterCount;
+    if (testIds !== undefined) {
+      if (testIds.length > 0) {
+        const tests = await prisma.test.findMany({
+          where: {
+            id: {
+              in: testIds.map(id => parseInt(id))
+            }
+          },
+          include: {
+            categories: {
+              include: {
+                testParameter: true
+              }
+            }
+          }
+        });
+
+        // Count total parameters from all categories of all tests
+        totalParameterCount = tests.reduce((sum, test) => {
+          const paramCount = test.categories ? test.categories.length : 0;
+          return sum + paramCount;
+        }, 0);
+
+        console.log(`📊 Recalculated total parameters: ${totalParameterCount} from ${tests.length} tests`);
+      } else {
+        totalParameterCount = 0;
+      }
+    }
+
     // Update package basic information
     const packageData = await prisma.package.update({
       where: { id: parseInt(id) },
@@ -3764,6 +3840,7 @@ export const updatePackage = async (req, res) => {
         description: description || undefined,
         charges: charges !== undefined ? parseFloat(charges) : undefined,
         packageTotal: packageTotal !== undefined ? parseFloat(packageTotal) : undefined,
+        totalParameterCount: totalParameterCount,
         isActive: isActive !== undefined ? isActive : undefined
       }
     });
