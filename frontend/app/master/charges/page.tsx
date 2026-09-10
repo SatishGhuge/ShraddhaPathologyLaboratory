@@ -9,6 +9,7 @@ export default function AddLabCharges() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [tests, setTests] = useState<any[]>([]);
   const [filteredData, setFilteredData] = useState<any[]>([]);
+  const [originalData, setOriginalData] = useState<any[]>([]); // Track original data to detect changes
   const [loading, setLoading] = useState(false);
 
   const [searchQuery, setSearchQuery] = useState("");
@@ -30,6 +31,7 @@ export default function AddLabCharges() {
     schedule: true,
     cutOff: true,
     tat: true,
+    category: true,
     charges: true,
     comments: true
   });
@@ -79,6 +81,8 @@ export default function AddLabCharges() {
         }
         
         setTests(testsData);
+        // Store original data for change detection
+        setOriginalData(JSON.parse(JSON.stringify(testsData)));
       } else {
         setError('Failed to load charges from server');
       }
@@ -126,6 +130,7 @@ export default function AddLabCharges() {
         schedule: test.schedule || '',
         cutOff: test.cutOff || '',
         tat: tatValue, // TAT from preparationTime and preparationType
+        category: defaultCharge?.category || '', // New category field
         comments: test.comments || '',
         charges: defaultCharge?.b2cCharge || 0,
         chargeId: defaultCharge?.id || null
@@ -198,12 +203,12 @@ export default function AddLabCharges() {
     setVisibleColumns(newState as any);
   };
 
-  // Change Charges
+  // Change Charges or Category
   const handleChargeChange = (id: any, field: any, value: any) => {
-    if (value < 0) return;
+    if (field === 'charges' && value < 0) return;
 
     const updated = filteredData.map((item) =>
-      item.id === id ? { ...item, [field]: parseFloat(value) || 0 } : item
+      item.id === id ? { ...item, [field]: field === 'charges' ? parseFloat(value) || 0 : value } : item
     );
     setFilteredData(updated);
   };
@@ -239,19 +244,35 @@ export default function AddLabCharges() {
       setLoading(true);
       setError("");
       
-      // Prepare bulk update data for DEFAULT charges (no organizationId)
-      const bulkCharges = filteredData
-        .filter(item => item.charges && item.charges > 0)
-        .map(item => ({
-          testId: item.id,
-          b2cCharge: parseFloat(item.charges) || 0,
-          b2bCharge: parseFloat(item.charges) || 0  // ✅ Set B2B = B2C
-        }));
+      // Find only changed items by comparing with original data
+      const changedItems = filteredData.filter(item => {
+        const originalItem = originalData.find(o => o.id === item.id);
+        if (!originalItem) return false;
+        
+        // Get original charge from the charges array
+        const originalCharge = (originalItem.charges || []).find((c: any) => !c.organizationId);
+        const originalB2C = originalCharge?.b2cCharge || 0;
+        const originalCategory = originalCharge?.category || null;
+        
+        // Check if charges or category changed
+        return (
+          item.charges !== originalB2C || 
+          item.category !== originalCategory
+        );
+      });
 
-      if (bulkCharges.length === 0) {
-        alert("No charges to save. Please enter some charges first.");
+      if (changedItems.length === 0) {
+        alert("No changes to save.");
         return;
       }
+      
+      // Prepare bulk update data only for changed items
+      const bulkCharges = changedItems.map(item => ({
+        testId: item.id,
+        b2cCharge: parseFloat(item.charges) || 0,
+        b2bCharge: parseFloat(item.charges) || 0,  // ✅ Set B2B = B2C
+        category: item.category || null  // Include category field
+      }));
       
       const token = localStorage.getItem('token');
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/master/test-charges/bulk`, {
@@ -269,7 +290,7 @@ export default function AddLabCharges() {
       const result = await response.json();
       
       if (result.success) {
-        alert(`✅ ${result.data.updated + result.data.created} charges saved successfully!`);
+        alert(`✅ ${changedItems.length} charge(s) saved successfully!`);
         fetchTestsAndCharges(); // Reload data to get updated charge IDs
       } else {
         setError(result.message || 'Failed to save charges');
@@ -306,6 +327,7 @@ export default function AddLabCharges() {
         'Schedule': item.schedule,
         'Cut-Off': item.cutOff,
         'TAT': item.tat,
+        'Category': item.category,
         'Charges': item.charges,
         'Comments': item.comments
       }));
@@ -369,6 +391,7 @@ export default function AddLabCharges() {
         item.schedule,
         item.cutOff,
         item.tat,
+        item.category,
         item.charges,
         item.comments
       ]);
@@ -377,13 +400,13 @@ export default function AddLabCharges() {
       const pageWidth = doc.internal.pageSize.getWidth();
       const margin = 5;
       const availableWidth = pageWidth - (2 * margin);
-      const numColumns = 13;
+      const numColumns = 14;
       const columnWidth = availableWidth / numColumns;
 
       // Add table using autoTable with optimized settings for single page
       autoTable(doc, {
         startY: 5, // Minimal top margin
-        head: [['Sr.No', 'Code', 'Name', 'Short', 'Dept', 'Sample', 'Vol', 'Method', 'Sch', 'Cut-Off', 'TAT', 'Charges', 'Comments']],
+        head: [['Sr.No', 'Code', 'Name', 'Short', 'Dept', 'Sample', 'Vol', 'Method', 'Sch', 'Cut-Off', 'TAT', 'Category', 'Charges', 'Comments']],
         body: tableData,
         theme: 'grid',
         headStyles: {
@@ -421,8 +444,9 @@ export default function AddLabCharges() {
           8: { cellWidth: columnWidth },  // Sch
           9: { cellWidth: columnWidth },  // Cut-Off
           10: { cellWidth: columnWidth }, // TAT
-          11: { cellWidth: columnWidth, halign: 'center' }, // Charges
-          12: { cellWidth: columnWidth }  // Comments
+          11: { cellWidth: columnWidth }, // Category
+          12: { cellWidth: columnWidth, halign: 'center' }, // Charges
+          13: { cellWidth: columnWidth }  // Comments
         },
         margin: { top: 5, right: 5, bottom: 5, left: 5 },
         tableWidth: 'auto'
@@ -644,6 +668,7 @@ export default function AddLabCharges() {
                       {visibleColumns.schedule && <th className="border border-gray-300 px-2 py-1 text-left font-semibold">Schedule</th>}
                       {visibleColumns.cutOff && <th className="border border-gray-300 px-2 py-1 text-left font-semibold">Cut-Off</th>}
                       {visibleColumns.tat && <th className="border border-gray-300 px-2 py-1 text-left font-semibold">TAT</th>}
+                      {visibleColumns.category && <th className="border border-gray-300 px-2 py-1 text-left font-semibold">Category</th>}
                       {visibleColumns.charges && <th className="border border-gray-300 px-2 py-1 text-center font-semibold w-20">Charges</th>}
                       {visibleColumns.comments && <th className="border border-gray-300 px-2 py-1 text-left font-semibold">Comments</th>}
                     </tr>
@@ -671,6 +696,17 @@ export default function AddLabCharges() {
                         {visibleColumns.schedule && <td className="border border-gray-300 px-2 py-1">{item.schedule}</td>}
                         {visibleColumns.cutOff && <td className="border border-gray-300 px-2 py-1">{item.cutOff}</td>}
                         {visibleColumns.tat && <td className="border border-gray-300 px-2 py-1">{item.tat}</td>}
+                        {visibleColumns.category && (
+                          <td className="border border-gray-300 px-2 py-0.5">
+                            <input
+                              type="text"
+                              value={item.category}
+                              onChange={(e) => handleChargeChange(item.id, 'category', e.target.value)}
+                              className="w-full border border-gray-300 px-1.5 py-0.5 text-xs rounded bg-white focus:outline-none focus:ring-2 focus:ring-orange-500"
+                              placeholder="Enter category"
+                            />
+                          </td>
+                        )}
                         {visibleColumns.charges && (
                           <td className="border border-gray-300 px-2 py-0.5 w-20">
                             <input
