@@ -710,13 +710,23 @@ export default function PatientRegistration() {
         // Add tests to their departments
         tests.forEach(test => {
           if (deptMap[test.departmentId] && test.isActive && !test.isDeleted) {
+            // Charges should be an array from the include in backend
+            const chargesArray = test.charges || [];
+            const firstCharge = chargesArray.length > 0 ? chargesArray[0] : null;
+            
+            // ✅ Default to 0 if no charge found
+            const b2cCharge = firstCharge?.b2cCharge || 0;
+            const b2bCharge = firstCharge?.b2bCharge || 0;
+            
+            console.log(`📊 Test: ${test.name}, Charges array length: ${chargesArray.length}, B2C: ${b2cCharge}, B2B: ${b2bCharge}`);
+            
             deptMap[test.departmentId].tests.push({
               id: test.id,
               name: test.name,
               departmentId: test.departmentId, // Add departmentId
               sample: test.sample_type?.Sample_Type || "N/A",
-              b2cCharge: test.charges?.[0]?.b2cCharge || 0,
-              b2bCharge: test.charges?.[0]?.b2bCharge || 0,
+              b2cCharge: b2cCharge,
+              b2bCharge: b2bCharge,
               department: deptMap[test.departmentId].name,
               isOutsourced: test.isOutsourced || false,  // 🔧 Use Test.isOutsourced flag directly
               outsourcedTo: null // Not needed anymore
@@ -799,28 +809,6 @@ export default function PatientRegistration() {
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
-
-  // Handle doctor added from modal
-  const handleDoctorAdded = async (addedDoctor: any) => {
-    try {
-      // Refresh the doctors list for the dropdown
-      const doctors = await getDoctors();
-      setDoctorsList(doctors);
-      
-      // Auto-select the newly added doctor in the dropdown
-      setRefDoctor(`Dr. ${addedDoctor.name}`);
-      setIsManualRefDoctor(false);
-    } catch (error) {
-      console.error("Error refreshing doctors list:", error);
-    }
-  };
-
-  const handleRefDoctorCheckbox = (checked: boolean) => {
-    setIsManualRefDoctor(checked);
-    if (!checked) {
-      setManualRefDoctorName("");
-    }
-  };
 
   // Auto-fetch referral doctor details and populate patient email/phone when doctor is selected
   useEffect(() => {
@@ -1150,11 +1138,17 @@ export default function PatientRegistration() {
   // - Mixed case: sum package charges + individual test charges (from tests not in any package)
   
   const calculateTotal = () => {
-    const hasPackageTests = selectedTests.some(t => t.fromPackage !== null);
+    // ✅ Check if ANY test is from a package (fromPackage is truthy)
+    const hasPackageTests = selectedTests.some(t => t.fromPackage); // Just check if truthy, not !== null
     
     if (!hasPackageTests) {
       // No package tests - sum individual test charges
-      return selectedTests.reduce((s, t) => s + (businessType === "B2C" ? t.b2cCharge : t.b2bCharge), 0);
+      console.log('📊 No package tests - summing individual charges');
+      return selectedTests.reduce((s, t) => {
+        const charge = businessType === "B2C" ? t.b2cCharge : t.b2bCharge;
+        console.log(`  ${t.name}: ${charge}`);
+        return s + charge;
+      }, 0);
     }
     
     // Has package tests - sum UNIQUE package charges + any non-package test charges
@@ -1166,10 +1160,13 @@ export default function PatientRegistration() {
         // Track package charge (use first occurrence of each package)
         if (!packageCharges.has(t.fromPackage)) {
           packageCharges.set(t.fromPackage, t.packageCharge || 0);
+          console.log(`📦 Package: ${t.fromPackage} = ₹${t.packageCharge}`);
         }
       } else {
         // Sum individual test charges that are NOT from a package
-        nonPackageTestsTotal += (businessType === "B2C" ? t.b2cCharge : t.b2bCharge);
+        const charge = businessType === "B2C" ? t.b2cCharge : t.b2bCharge;
+        console.log(`📝 Non-package test: ${t.name} = ₹${charge}`);
+        nonPackageTestsTotal += charge;
       }
     });
     
@@ -1179,6 +1176,7 @@ export default function PatientRegistration() {
       total += charge;
     });
     total += nonPackageTestsTotal;
+    console.log(`💰 Total: packages=${Array.from(packageCharges.values()).reduce((s,c)=>s+c,0)} + non-package=${nonPackageTestsTotal} = ${total}`);
     return total;
   };
   
@@ -2529,6 +2527,25 @@ export default function PatientRegistration() {
     }
   };
 
+  /* --- Handle Referral Doctor Checkbox --- */
+  const handleRefDoctorCheckbox = (isChecked: boolean) => {
+    setIsManualRefDoctor(isChecked);
+    if (isChecked) {
+      setRefDoctor("");
+      setManualRefDoctorName("");
+    } else {
+      setManualRefDoctorName("");
+      setRefDoctor("");
+    }
+  };
+
+  /* --- Handle New Doctor Added from Modal --- */
+  const handleDoctorAdded = (newDoctor: any) => {
+    setDoctorsList([...doctorsList, newDoctor]);
+    setRefDoctor(`Dr. ${newDoctor.name}`);
+    setShowRefModal(false);
+  };
+
   /* ---------------- FILTER ---------------- */
 
   const allPackages = departments.flatMap(d => d.packages.map(p => ({...p, department: d.name})));
@@ -2884,24 +2901,42 @@ export default function PatientRegistration() {
                         <input
                           className={input}
                           placeholder="Search Referral Doctor"
-                          value={refDoctor}
-                          onChange={(e) => setRefDoctor(e.target.value)}
+                          value={refDoctor ? (doctorsList.find((d: any) => d.id.toString() === refDoctor)?.name ? `Dr. ${doctorsList.find((d: any) => d.id.toString() === refDoctor)?.name}` : refDoctor) : ""}
+                          onChange={(e) => {
+                            const input = e.target.value;
+                            // If it's a number, keep it as is; if it's text, filter by name
+                            if (/^\d+$/.test(input)) {
+                              setRefDoctor(input);
+                            } else {
+                              setRefDoctor(input);
+                            }
+                          }}
                           onFocus={() => setShowDoctorList(true)}
                         />
                         {showDoctorList && (
                           <div className="absolute top-full left-0 right-0 bg-white border border-gray-200 rounded-xl shadow-xl mt-1 z-10 overflow-hidden">
                             <div className="max-h-48 overflow-y-auto py-1">
                               {doctorsList
-                                .filter(doc => `Dr. ${doc.name}`.toLowerCase().includes(refDoctor.toLowerCase()) || doc.name.toLowerCase().includes(refDoctor.toLowerCase()))
+                                .filter(doc => {
+                                  // If refDoctor is numeric (ID selected), don't show dropdown
+                                  if (/^\d+$/.test(refDoctor)) return false;
+                                  // Otherwise filter by name
+                                  return `Dr. ${doc.name}`.toLowerCase().includes(refDoctor.toLowerCase()) || doc.name.toLowerCase().includes(refDoctor.toLowerCase());
+                                })
                                 .map((doc, i, arr) => (
                                   <div key={doc.id}
-                                    onClick={() => { setRefDoctor(`Dr. ${doc.name}`); setShowDoctorList(false); }}
-                                    className={`px-4 py-2.5 cursor-pointer hover:bg-gray-50 ${i < arr.length - 1 ? "border-b border-gray-100" : ""}`}>
+                                    onClick={() => { setRefDoctor(doc.id.toString()); setShowDoctorList(false); }}
+                                    className={`px-4 py-2.5 cursor-pointer hover:bg-gray-50 ${i < arr.length - 1 ? "border-b border-gray-100" : ""}`}
+                                    title={`Doctor ID: ${doc.id}`}>
                                     <div className="font-semibold text-xs text-gray-800">Dr. {doc.name}</div>
                                     <div className="text-xs text-gray-400">{doc.degree}{doc.degree && doc.type ? ' · ' : ''}{doc.type}</div>
                                   </div>
                                 ))}
-                              {doctorsList.filter(doc => `Dr. ${doc.name}`.toLowerCase().includes(refDoctor.toLowerCase()) || doc.name.toLowerCase().includes(refDoctor.toLowerCase())).length === 0 && (
+                              {doctorsList
+                                .filter(doc => {
+                                  if (/^\d+$/.test(refDoctor)) return false;
+                                  return `Dr. ${doc.name}`.toLowerCase().includes(refDoctor.toLowerCase()) || doc.name.toLowerCase().includes(refDoctor.toLowerCase());
+                                }).length === 0 && refDoctor && !(/^\d+$/.test(refDoctor)) && (
                                 <div className="px-4 py-3 text-xs text-gray-400 text-center">No doctors found</div>
                               )}
                             </div>
@@ -3282,22 +3317,7 @@ export default function PatientRegistration() {
               <div>
                 <label className="text-gray-600 block mb-1 text-xs font-semibold text-blue-600">Test Charges</label>
                 <input className={`${input} font-semibold bg-blue-50 border-blue-200`} 
-                  value={(() => {
-                    // If any test is from package, sum ALL package charges
-                    const hasPackageTests = selectedTests.some(t => t.fromPackage !== null);
-                    if (hasPackageTests) {
-                      // Sum all unique package charges
-                      const packageCharges = new Map();
-                      selectedTests.forEach(t => {
-                        if (t.fromPackage && !packageCharges.has(t.fromPackage)) {
-                          packageCharges.set(t.fromPackage, t.packageCharge || 0);
-                        }
-                      });
-                      const totalPackageCharges = Array.from(packageCharges.values()).reduce((sum, charge) => sum + charge, 0);
-                      return totalPackageCharges;  // ✅ Show sum of ALL package charges (₹1700)
-                    }
-                    return total;  // Otherwise show individual test charges
-                  })()}
+                  value={total}
                   readOnly 
                 />
               </div>

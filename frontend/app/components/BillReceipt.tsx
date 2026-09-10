@@ -130,7 +130,12 @@ const BillReceipt: React.FC<BillReceiptProps> = ({ booking, billing, businessTyp
             </div>
             <div className="flex gap-1">
               <span className="font-semibold">Referral :</span>
-              <span>{booking.patientData?.referralDoctor || 'N/A'}</span>
+              <span>
+                {booking.patientData?.otherReferralDoctor 
+                  ? booking.patientData.otherReferralDoctor
+                  : (booking.patientData?.referralDoctor?.name || booking.patientData?.referralDoctor || 'N/A')
+                }
+              </span>
             </div>
           </div>
           <div>

@@ -229,17 +229,31 @@ export const createPatient = async (req, res) => {
       });
     }
 
-    // Normalize referralDoctor: remove all "Dr." prefixes and add exactly one
-    if (referralDoctor && referralDoctor.trim()) {
-      referralDoctor = referralDoctor
-        .replace(/\bDr\.?\s*/gi, '') // Remove all "Dr" or "Dr." variations
-        .trim();
-      
-      // Add exactly one "Dr." prefix if it has content
-      if (referralDoctor) {
-        referralDoctor = `Dr. ${referralDoctor}`;
+    // Normalize and process referral doctor data
+    let referralDoctorId = null;
+    let otherReferralDoctor = null;
+    
+    if (referralDoctor) {
+      // Check if it's a numeric ID or a name string
+      const doctorIdNum = parseInt(referralDoctor);
+      if (!isNaN(doctorIdNum)) {
+        // It's a doctor ID - save to referralDoctorId
+        referralDoctorId = doctorIdNum;
+        console.log(`✅ Using doctor ID: ${referralDoctorId}`);
       } else {
-        referralDoctor = null;
+        // It's a doctor name - save to otherReferralDoctor
+        // Remove "Dr." prefix if present and clean up
+        otherReferralDoctor = referralDoctor
+          .replace(/\bDr\.?\s*/gi, '') // Remove all "Dr" or "Dr." variations
+          .trim();
+        
+        if (!otherReferralDoctor) {
+          otherReferralDoctor = null;
+        } else {
+          // Add exactly one "Dr." prefix
+          otherReferralDoctor = `Dr. ${otherReferralDoctor}`;
+        }
+        console.log(`✅ Using other referral doctor: ${otherReferralDoctor}`);
       }
     }
 
@@ -417,7 +431,8 @@ export const createPatient = async (req, res) => {
             sample: test.sample || 'Blood',
             charge: testCharge,
             reportMode: reportMode || 'Email',
-            referralDoctor,
+            referralDoctorId: referralDoctorId,
+            otherReferralDoctor: otherReferralDoctor,
             visitDate: visitDate ? new Date(visitDate) : new Date(),
             visitTime: visitTime || '10:00',
             sampleTaken: sampleTaken ? new Date(sampleTaken) : null,
@@ -627,7 +642,8 @@ export const createPatient = async (req, res) => {
             sample: test.sample || 'Blood',
             charge: testCharge,
             reportMode: reportMode || 'Email',
-            referralDoctor: referralDoctor || null,
+            referralDoctorId: referralDoctorId,
+            otherReferralDoctor: otherReferralDoctor,
             visitDate: visitDate ? new Date(visitDate) : new Date(),
             visitTime: visitTime || '10:00',
             sampleTaken: sampleTaken ? new Date(sampleTaken) : null,
@@ -1767,7 +1783,8 @@ export const addTestToVisit = async (req, res) => {
         charge: parseFloat(charge) || 0,
         status: 'Registered',
         reportMode: existingTest.reportMode,
-        referralDoctor: existingTest.referralDoctor,
+        referralDoctorId: existingTest.referralDoctorId,
+        otherReferralDoctor: existingTest.otherReferralDoctor,
         visitDate: existingTest.visitDate,
         visitTime: existingTest.visitTime,
         paymentMode: existingTest.paymentMode,
@@ -2071,6 +2088,14 @@ export const getTestsByVisitId = async (req, res) => {
             firstName: true,
             lastName: true
           }
+        },
+        referralDoctor: {
+          select: {
+            id: true,
+            name: true,
+            degree: true,
+            type: true
+          }
         }
       },
       orderBy: {
@@ -2235,7 +2260,14 @@ export const getTestsByVisitId = async (req, res) => {
       status: pt.status || 'Registered',
       barcode_status: pt.barcode_status || 'Unprinted',
       reportMode: pt.reportMode,
-      referralDoctor: pt.referralDoctor,
+      referralDoctorId: pt.referralDoctorId,
+      referralDoctor: pt.referralDoctor ? {
+        id: pt.referralDoctor.id,
+        name: pt.referralDoctor.name,
+        degree: pt.referralDoctor.degree,
+        type: pt.referralDoctor.type
+      } : null,
+      otherReferralDoctor: pt.otherReferralDoctor,
       visitDate: pt.visitDate,
       visitTime: pt.visitTime,
       

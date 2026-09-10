@@ -610,6 +610,7 @@ export default function BookingPage() {
             visitDate:       t.visitDate,
             location:        t.organization?.location || "",
             referralDoctor:  t.referralDoctor || "",
+            otherReferralDoctor: t.otherReferralDoctor || "",
             patient_history: t.patient_history || "",
             organizationId:  t.organizationId || "",
             totalAmount:     0,
@@ -711,6 +712,7 @@ export default function BookingPage() {
             patient_history: visit.patient_history || "",
             remark: visit.remarks,
             referralDoctor: visit.referralDoctor,
+            otherReferralDoctor: visit.otherReferralDoctor,
             referralDoctorChecked: !!visit.referralDoctor,
             visitDate: visitDate || "",
             organizationId: visit.organizationId || "",
@@ -975,7 +977,8 @@ export default function BookingPage() {
     const matchesMobile = booking.patientData?.mobile?.includes(mobileSearch) ?? true;
     const matchesOutstanding = showOutstanding ? booking.paymentStatus === "Due" : true;
     const matchesReferralDoctor = searchBarDoctorSearch 
-      ? booking.patientData?.referralDoctor?.toLowerCase().includes(searchBarDoctorSearch.toLowerCase()) 
+      ? (booking.patientData?.referralDoctor?.toLowerCase().includes(searchBarDoctorSearch.toLowerCase()) ||
+         booking.patientData?.otherReferralDoctor?.toLowerCase().includes(searchBarDoctorSearch.toLowerCase()))
       : true;
     const matchesOrganization = appliedOrganization
       ? booking.patientData?.organizationId === appliedOrganization

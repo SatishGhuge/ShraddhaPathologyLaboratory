@@ -257,7 +257,8 @@ model PatientTest {
   charge             Decimal             @db.Decimal(10, 2)
   status             String              @default("Registered")
   reportMode         String?
-  referralDoctor     String?
+  referralDoctorId   Int?
+  otherReferralDoctor String?
   visitDate          DateTime?
   visitTime          String?
   sampleBarcodeNo    String?
@@ -289,6 +290,7 @@ model PatientTest {
   organization       Organization?       @relation(fields: [organizationId], references: [id])
   package            Package?            @relation(fields: [packageId], references: [id], onDelete: Cascade)
   patient            Patient             @relation(fields: [patientId], references: [patientId], onDelete: Cascade)
+  referralDoctor     Doctor?             @relation(fields: [referralDoctorId], references: [id], onDelete: SetNull)
   test               Test                @relation(fields: [testId], references: [id])
   usedMachine        Machine?            @relation(fields: [usedMachineId], references: [id])
   reportQRToken      ReportQRToken?
@@ -299,6 +301,7 @@ model PatientTest {
   @@index([testId], map: "patient_tests_testId_fkey")
   @@index([organizationId], map: "patient_tests_organizationId_fkey")
   @@index([usedMachineId], map: "patient_tests_usedMachineId_fkey")
+  @@index([referralDoctorId], map: "patient_tests_referralDoctorId_fkey")
   @@index([status])
   @@index([barcode_status])
   @@index([visitDate])
@@ -503,6 +506,7 @@ model Doctor {
   mergedTo               DoctorMerge[]      @relation("SourceDoctor")
   mergedFrom             DoctorMerge[]      @relation("TargetDoctor")
   testCharges            DoctorTestCharge[]
+  patientTests           PatientTest[]
 
   @@map("doctors")
 }
