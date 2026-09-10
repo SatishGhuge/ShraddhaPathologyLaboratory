@@ -1463,13 +1463,11 @@ export const getTests = async (req, res) => {
 
     const total = await prisma.test.count({
       where: whereClause
-      where: whereClause
     });
 
     let tests;
     try {
       tests = await prisma.test.findMany({
-        where: whereClause,
         where: whereClause,
         include: {
           department: {
