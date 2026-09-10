@@ -2686,10 +2686,26 @@ export const getAllTestCharges = async (req, res) => {
     
     const tests = await prisma.test.findMany({
       where,
-      include: {
+      select: {
+        id: true,
+        name: true,
+        shortName: true,
+        testCode: true,
+        volume: true,
+        testMethod: true,
+        cutOff: true,
+        schedule: true,
+        preparationTime: true,
+        preparationType: true,
+        comments: true,
         department: {
           select: {
             name: true
+          }
+        },
+        sample_type: {
+          select: {
+            Sample_Type: true
           }
         },
         charges: {
@@ -2715,6 +2731,7 @@ export const getAllTestCharges = async (req, res) => {
       data: tests
     });
   } catch (error) {
+    console.error('Error fetching test charges:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to fetch test charges'
