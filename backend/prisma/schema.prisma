@@ -7,6 +7,16 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// ============================================================================
+// ENUMS
+// ============================================================================
+
+enum ReportMode {
+  BY_HAND
+  WHATSAPP
+  EMAIL
+}
+
 model Admin {
   id             Int             @id @default(autoincrement())
   username       String          @unique
@@ -256,7 +266,7 @@ model PatientTest {
   sample             String
   charge             Decimal             @db.Decimal(10, 2)
   status             String              @default("Registered")
-  reportMode         String?
+  reportMode         ReportMode?         @default(WHATSAPP)
   referralDoctorId   Int?
   otherReferralDoctor String?
   visitDate          DateTime?
