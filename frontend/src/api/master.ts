@@ -55,10 +55,13 @@ const extractDataArray = (response: any): any[] => {
 };
 
 // ==================== TESTS ====================
-export const getTests = async (page: number = 1, limit: number = 20): Promise<any> => { 
+export const getTests = async (page: number = 1, limit: number = 20, search: string = ""): Promise<any> => { 
   const params = new URLSearchParams();
   params.append('page', page.toString());
   params.append('limit', limit.toString());
+  if (search && search.trim()) {
+    params.append('search', search.trim());
+  }
   const r = await apiCall(`/master/tests?${params.toString()}`, { method: 'GET' }); 
   // Return full response with pagination data
   return {

@@ -7,6 +7,16 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// ============================================================================
+// ENUMS
+// ============================================================================
+
+enum ReportMode {
+  BY_HAND
+  WHATSAPP
+  EMAIL
+}
+
 model Admin {
   id             Int             @id @default(autoincrement())
   username       String          @unique
@@ -256,8 +266,9 @@ model PatientTest {
   sample             String
   charge             Decimal             @db.Decimal(10, 2)
   status             String              @default("Registered")
-  reportMode         String?
-  referralDoctor     String?
+  reportMode         ReportMode?         @default(WHATSAPP)
+  referralDoctorId   Int?
+  otherReferralDoctor String?
   visitDate          DateTime?
   visitTime          String?
   sampleBarcodeNo    String?
@@ -289,6 +300,7 @@ model PatientTest {
   organization       Organization?       @relation(fields: [organizationId], references: [id])
   package            Package?            @relation(fields: [packageId], references: [id], onDelete: Cascade)
   patient            Patient             @relation(fields: [patientId], references: [patientId], onDelete: Cascade)
+  referralDoctor     Doctor?             @relation(fields: [referralDoctorId], references: [id], onDelete: SetNull)
   test               Test                @relation(fields: [testId], references: [id])
   usedMachine        Machine?            @relation(fields: [usedMachineId], references: [id])
   reportQRToken      ReportQRToken?
@@ -299,6 +311,7 @@ model PatientTest {
   @@index([testId], map: "patient_tests_testId_fkey")
   @@index([organizationId], map: "patient_tests_organizationId_fkey")
   @@index([usedMachineId], map: "patient_tests_usedMachineId_fkey")
+  @@index([referralDoctorId], map: "patient_tests_referralDoctorId_fkey")
   @@index([status])
   @@index([barcode_status])
   @@index([visitDate])
@@ -331,12 +344,10 @@ model Department {
   id           Int           @id @default(autoincrement())
   name         String        @unique
   code         String?
-  group        String?
   isActive     Boolean       @default(true)
   isDeleted    Boolean       @default(false)
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
-  packages     Package[]
   patientTests PatientTest[]
   tests        Test[]
 
@@ -352,26 +363,24 @@ model Test {
   testParameterId         Int?
   testCategoryId          Int?
   sampleTypeId            Int?
-  group                   String?
-  reportHeader            String?
+  volume                  String?
+  testMethod              String?
+  cutOff                  String?
+  schedule                String?
   preparationTime         String?
   preparationType         String?
-  instructionPreparation  String?                  @db.Text
-  instructionPatient      String?                  @db.Text
-  interpretationLabel     String?
+  temperature             String?                  @db.Text
+  comments                String?                  @db.Text
   interpretation          String?                  @db.Text
-  outsourceLab            String?
   attachFile              Boolean                  @default(false)
   imageSize               String?                  @default("800|600")
   profileTest             Boolean                  @default(false)
   isNABL                  Boolean                  @default(false)
-  lineHeight              Float?                   @default(1.4)
   isActive                Boolean                  @default(true)
   isDeleted               Boolean                  @default(false)
   createdAt               DateTime                 @default(now())
   updatedAt               DateTime                 @updatedAt
   linkedTestIds           String?                  @db.Text
-  isOutsourced            Boolean                  @default(false)
   testparameters          testparameters[]
   doctorTestCharges       DoctorTestCharge[]
   organizationTestCharges OrganizationTestCharge[]
@@ -393,28 +402,25 @@ model Test {
   @@index([departmentId], map: "tests_departmentId_fkey")
   @@index([testCategoryId], map: "tests_testCategoryId_fkey")
   @@index([testParameterId], map: "tests_testParameterId_fkey")
-  @@index([isActive])
-  @@index([isOutsourced])
   @@index([name])
   @@index([sampleTypeId], map: "tests_sampleTypeId_fkey")
   @@map("tests")
 }
 
 model Package {
-  id           Int           @id @default(autoincrement())
-  name         String
-  code         String?
-  departmentId Int?
-  b2cCharge    Float         @default(0)
-  isActive     Boolean       @default(true)
-  isDeleted    Boolean       @default(false)
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
-  packageTests PackageTest[]
-  department   Department?   @relation(fields: [departmentId], references: [id])
-  patientTests PatientTest[]
+  id             Int           @id @default(autoincrement())
+  name           String
+  code           String?
+  description    String?       @db.Text
+  charges        Float         @default(0)
+  packageTotal   Float         @default(0)
+  isActive       Boolean       @default(true)
+  isDeleted      Boolean       @default(false)
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  packageTests   PackageTest[]
+  patientTests   PatientTest[]
 
-  @@index([departmentId], map: "packages_departmentId_fkey")
   @@map("packages")
 }
 
@@ -511,6 +517,7 @@ model Doctor {
   mergedTo               DoctorMerge[]      @relation("SourceDoctor")
   mergedFrom             DoctorMerge[]      @relation("TargetDoctor")
   testCharges            DoctorTestCharge[]
+  patientTests           PatientTest[]
 
   @@map("doctors")
 }
@@ -657,9 +664,10 @@ model testparameters {
 }
 
 model sample_type {
-  id           Int    @id @default(autoincrement())
-  Sample_Type  String @unique(map: "Sample_Type_Sample_Type_key")
+  id           Int     @id @default(autoincrement())
+  Sample_Type  String  @unique(map: "Sample_Type_Sample_Type_key")
   Sample_Color String
+  colorName    String? @default("Default")
   test         Test[]
 
   @@map("sample_types")

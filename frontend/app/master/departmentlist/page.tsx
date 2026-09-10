@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Eye, Edit, Trash2, Plus, Layers, RotateCcw } from "lucide-react";
+import { Edit, Trash2, Plus, Layers, RotateCcw } from "lucide-react";
 import PaginationControls from "@/app/components/PaginationControls";
 
 const DepartmentTable = () => {
@@ -16,23 +16,36 @@ const DepartmentTable = () => {
   const [itemsPerPage, setItemsPerPage] = useState(25);
   const router = useRouter();
 
-  // Fetch departments on component mount and when page changes
+  // Fetch departments on component mount and when page/search changes
   useEffect(() => {
-    fetchDepartments(currentPage);
+    fetchDepartments(1, search);
+    setCurrentPage(1);
+  }, [search]);
+
+  useEffect(() => {
+    fetchDepartments(currentPage, search);
   }, [currentPage]);
 
   useEffect(() => {
     setCurrentPage(1);
-    fetchDepartments(1);
+    fetchDepartments(1, search);
   }, [itemsPerPage]);
 
-  const fetchDepartments = async (page: number = 1) => {
+  const fetchDepartments = async (page: number = 1, searchQuery: string = "") => {
     try {
       setLoading(true);
       setError("");
       
+      // Build query params with search if provided
+      const params = new URLSearchParams();
+      params.append('page', page.toString());
+      params.append('limit', itemsPerPage.toString());
+      if (searchQuery.trim()) {
+        params.append('search', searchQuery.trim());
+      }
+      
       // Use /all endpoint to get both active and inactive departments
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/master/departments/all?page=${page}&limit=${itemsPerPage}`);
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/master/departments/all?${params.toString()}`);
       const result = await response.json();
       
       if (result.success) {
@@ -65,11 +78,7 @@ const DepartmentTable = () => {
     // When "Show Inactive" is unchecked, show ONLY active departments
     if (!showInactive && !dept.isActive) return false;
     
-    // Filter by search
-    return (
-      dept.name.toLowerCase().includes(search.toLowerCase()) ||
-      dept.code?.toLowerCase().includes(search.toLowerCase())
-    );
+    return true;
   });
 
   const handleDelete = async (id: string, name: string) => {
@@ -98,7 +107,7 @@ const DepartmentTable = () => {
         
         if (result.success) {
           alert('Department deleted permanently!');
-          fetchDepartments(); // Refresh the list
+          fetchDepartments(currentPage, search); // Refresh the list with current search
         } else {
           alert(`Error: ${result.message}`);
         }
@@ -147,7 +156,7 @@ const DepartmentTable = () => {
       
       if (result.success) {
         alert(currentDept.isActive ? "Department inactivated successfully!" : "Department activated successfully!");
-        fetchDepartments(); // Refresh the list
+        fetchDepartments(currentPage, search); // Refresh the list with current search
       } else {
         alert(`Error: ${result.message}`);
       }
@@ -163,7 +172,7 @@ const DepartmentTable = () => {
   const handleReset = () => {
     setSearch("");
     setCurrentPage(1);
-    fetchDepartments(1);
+    fetchDepartments(1, "");
   };
 
   return ( 
@@ -272,13 +281,6 @@ const DepartmentTable = () => {
                   <td className="border border-gray-300 px-3 py-1">
                     <div className="flex gap-1 justify-center flex-wrap">
                       <button 
-                        onClick={() => router.push(`/master/departmentlist/view/${dept.id}`)}
-                        disabled={loading}
-                        className="bg-orange-500 text-white px-2 py-1 rounded text-xs hover:bg-orange-600 transition-colors flex items-center gap-1 disabled:opacity-50"
-                      >
-                        <Eye size={14} /> View
-                      </button>
-                      <button 
                         onClick={() => router.push(`/master/departmentlist/edit/${dept.id}`)}
                         disabled={loading}
                         className="bg-blue-600 text-white px-2 py-1 rounded text-xs hover:bg-blue-700 transition-colors flex items-center gap-1 disabled:opacity-50"
@@ -316,12 +318,12 @@ const DepartmentTable = () => {
             itemsPerPage={itemsPerPage}
             onPageChange={(page) => {
               setCurrentPage(page);
-              fetchDepartments(page);
+              fetchDepartments(page, search);
             }}
             onItemsPerPageChange={(newLimit) => {
               setItemsPerPage(newLimit);
               setCurrentPage(1);
-              fetchDepartments(1);
+              fetchDepartments(1, search);
             }}
             isLoading={loading}
           />

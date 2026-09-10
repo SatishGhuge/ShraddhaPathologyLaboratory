@@ -206,7 +206,7 @@ export const getAvailableTestsAndPackages = async (req, res) => {
           departmentName: test.department.name,
           charge: test.charges[0]?.b2cCharge || 0,
           preparationTime: test.preparationTime,
-          instructions: test.instructionPatient
+          instructions: test.comments
         })),
         packages: packages.map(pkg => ({
           id: pkg.id,

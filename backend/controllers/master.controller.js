@@ -247,10 +247,21 @@ export const getDepartments = async (req, res) => {
 export const getAllDepartments = async (req, res) => {
   try {
     const { page, limit, skip } = getPaginationParams(req.query);
+    const { search } = req.query;
 
-    const total = await prisma.department.count();
+    // Build where clause with optional search filter
+    const where = {};
+    if (search) {
+      where.OR = [
+        { name: { contains: search, mode: 'insensitive' } },
+        { code: { contains: search, mode: 'insensitive' } }
+      ];
+    }
+
+    const total = await prisma.department.count({ where });
 
     const departments = await prisma.department.findMany({
+      where,
       select: {
         id: true,
         name: true,
@@ -313,7 +324,7 @@ export const getDepartmentById = async (req, res) => {
 // Create new department
 export const createDepartment = async (req, res) => {
   try {
-    const { name, code, group } = req.body;
+    const { name, code } = req.body;
 
     // Validate required fields
     if (!name || !code) {
@@ -339,7 +350,6 @@ export const createDepartment = async (req, res) => {
       data: {
         name,
         code,
-        group: group || null,
         isActive: true
       }
     });
@@ -369,7 +379,7 @@ export const createDepartment = async (req, res) => {
 export const updateDepartment = async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, code, group, isActive } = req.body;
+    const { name, code, isActive } = req.body;
 
     // Check if department exists
     const existingDepartment = await prisma.department.findUnique({
@@ -388,7 +398,6 @@ export const updateDepartment = async (req, res) => {
       data: {
         name: name || undefined,
         code: code || undefined,
-        group: group !== undefined ? group : undefined,
         isActive: isActive !== undefined ? isActive : undefined
       }
     });
@@ -481,7 +490,7 @@ export const getTestById = async (req, res) => {
           select: {
             id: true,
             name: true,
-            group: true
+            code: true
           }
         },
         sample_type: {
@@ -698,20 +707,19 @@ export const getTestById = async (req, res) => {
       sampleTypeId: test.sampleTypeId,
       sample_type: test.sample_type,
       machineIds: test.testMachines?.map(tm => tm.machineId) || [],
-      group: test.group,
-      reportHeader: test.reportHeader,
       preparationTime: test.preparationTime,
       preparationType: test.preparationType,
-      instructionPreparation: test.instructionPreparation,
-      instructionPatient: test.instructionPatient,
-      interpretationLabel: test.interpretationLabel,
+      volume: test.volume,
+      testMethod: test.testMethod,
+      cutOff: test.cutOff,
+      schedule: test.schedule,
+      temperature: test.temperature,
+      comments: test.comments,
       interpretation: test.interpretation,
-      outsourceLab: test.outsourceLab,
       attachFile: test.attachFile ? true : false,  // ✅ Convert to boolean
       imageSize: test.imageSize,
       profileTest: test.profileTest ? true : false,  // ✅ Convert to boolean
       isNABL: test.isNABL,
-      lineHeight: test.lineHeight,
       isActive: test.isActive,
       isDeleted: test.isDeleted,
       linkedTestIds: (() => {
@@ -754,19 +762,18 @@ export const createTest = async (req, res) => {
       departmentId,
       sampleTypeId,
       machineIds, // Changed from machineId to machineIds (array)
-      group,
-      reportHeader,
       preparationTime,
       preparationType,
-      instructionPreparation,
-      instructionPatient,
-      interpretationLabel,
+      volume,
+      testMethod,
+      cutOff,
+      schedule,
+      temperature,
+      comments,
       interpretation,
-      outsourceLab,
       attachFile,
       profileTest,
       isNABL,
-      lineHeight,
       categories
     } = req.body;
 
@@ -810,19 +817,18 @@ export const createTest = async (req, res) => {
         testCode,
         departmentId: parseInt(departmentId),
         sampleTypeId: sampleTypeId ? parseInt(sampleTypeId) : null,
-        group,
-        reportHeader,
         preparationTime,
         preparationType,
-        instructionPreparation,
-        instructionPatient,
-        interpretationLabel,
+        volume,
+        testMethod,
+        cutOff,
+        schedule,
+        temperature,
+        comments,
         interpretation,
-        outsourceLab,
         attachFile: attachFileValue,
         profileTest: profileTestValue,
         isNABL: isNABL || false,
-        lineHeight: lineHeight ? parseFloat(lineHeight) : null,
         linkedTestIds: req.body.linkedTestIds ? JSON.stringify(req.body.linkedTestIds) : null
       }
     });
@@ -1055,20 +1061,19 @@ export const updateTest = async (req, res) => {
       departmentId,
       sampleTypeId,
       machineIds, // Changed from machineId to machineIds (array)
-      group,
-      reportHeader,
       preparationTime,
       preparationType,
-      instructionPreparation,
-      instructionPatient,
-      interpretationLabel,
+      volume,
+      testMethod,
+      cutOff,
+      schedule,
+      temperature,
+      comments,
       interpretation,
-      outsourceLab,
       attachFile,
       imageSize,
       profileTest,
       isNABL,
-      lineHeight,
       isActive,
       isDeleted,
       categories
@@ -1130,19 +1135,18 @@ export const updateTest = async (req, res) => {
       } else {
       }
     }
-    if (group !== undefined) updateData.group = group || null;
-    if (reportHeader !== undefined) updateData.reportHeader = reportHeader || null;
     if (preparationTime !== undefined) updateData.preparationTime = preparationTime || null;
     if (preparationType !== undefined) updateData.preparationType = preparationType || null;
-    if (instructionPreparation !== undefined) updateData.instructionPreparation = instructionPreparation || null;
-    if (instructionPatient !== undefined) updateData.instructionPatient = instructionPatient || null;
-    if (interpretationLabel !== undefined) updateData.interpretationLabel = interpretationLabel || null;
+    if (volume !== undefined) updateData.volume = volume || null;
+    if (testMethod !== undefined) updateData.testMethod = testMethod || null;
+    if (cutOff !== undefined) updateData.cutOff = cutOff || null;
+    if (schedule !== undefined) updateData.schedule = schedule || null;
+    if (temperature !== undefined) updateData.temperature = temperature || null;
+    if (comments !== undefined) updateData.comments = comments || null;
     if (interpretation !== undefined) updateData.interpretation = interpretation || null;
-    if (outsourceLab !== undefined) updateData.outsourceLab = outsourceLab || null;
     if (imageSize !== undefined) updateData.imageSize = imageSize || null;
     if (sampleTypeId !== undefined) updateData.sample_type = sampleTypeId ? { connect: { id: parseInt(sampleTypeId) } } : { disconnect: true };
     if (isNABL !== undefined) updateData.isNABL = isNABL;
-    if (lineHeight !== undefined) updateData.lineHeight = lineHeight ? parseFloat(lineHeight) : 1.4;
     if (isActive !== undefined) updateData.isActive = isActive;
     if (isDeleted !== undefined) updateData.isDeleted = isDeleted;
     if (req.body.linkedTestIds !== undefined) updateData.linkedTestIds = JSON.stringify(req.body.linkedTestIds || []);
@@ -1459,11 +1463,13 @@ export const getTests = async (req, res) => {
 
     const total = await prisma.test.count({
       where: whereClause
+      where: whereClause
     });
 
     let tests;
     try {
       tests = await prisma.test.findMany({
+        where: whereClause,
         where: whereClause,
         include: {
           department: {
@@ -1522,6 +1528,17 @@ export const getTests = async (req, res) => {
         take: limit
       });
       
+      // Application-level filtering for department name and case-insensitive search
+      if (search && search.trim()) {
+        const searchLower = search.trim().toLowerCase();
+        tests = tests.filter(t => 
+          (t.name && t.name.toLowerCase().includes(searchLower)) ||
+          (t.shortName && t.shortName.toLowerCase().includes(searchLower)) ||
+          (t.testCode && t.testCode.toLowerCase().includes(searchLower)) ||
+          (t.department && t.department.name && t.department.name.toLowerCase().includes(searchLower))
+        );
+      }
+      
       // Convert boolean fields
       tests = tests.map(t => ({
         ...t,
@@ -1530,6 +1547,7 @@ export const getTests = async (req, res) => {
         categories: reconstructCategories(t.categories)
       }));
     } catch (err) {
+      console.error('Error fetching tests:', err);
       // If type conversion error, fetch with raw SQL and convert
       const rawTests = await prisma.$queryRaw`
         SELECT * FROM tests WHERE isDeleted = false ORDER BY name ASC LIMIT ${limit} OFFSET ${skip}
@@ -1544,6 +1562,82 @@ export const getTests = async (req, res) => {
 
     res.json(buildPaginatedResponse(tests, total, page, limit));
   } catch (error) {
+    console.error('Error in getTests:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch tests'
+    });
+  }
+};
+
+// Get ALL tests (without pagination) - for dropdowns and selects
+export const getAllTests = async (req, res) => {
+  try {
+    const { search } = req.query; // Get search parameter
+
+    // First, fetch all non-deleted tests with simple filtering
+    let whereClause = { isDeleted: false };
+    
+    // For search, we'll use simpler filters that Prisma can handle for count
+    if (search && search.trim()) {
+      const searchTerm = search.trim();
+      whereClause = {
+        isDeleted: false,
+        OR: [
+          { name: { contains: searchTerm } },
+          { shortName: { contains: searchTerm } },
+          { testCode: { contains: searchTerm } }
+        ]
+      };
+    }
+
+    const tests = await prisma.test.findMany({
+      where: whereClause,
+      select: {
+        id: true,
+        name: true,
+        shortName: true,
+        testCode: true,
+        departmentId: true,
+        isActive: true,
+        charges: {
+          where: { organizationId: null }, // Get default charges (not org-specific)
+          select: {
+            id: true,
+            b2cCharge: true,
+            b2bCharge: true
+          },
+          take: 1
+        }
+      },
+      orderBy: { name: 'asc' }
+      // NO skip/take = fetch ALL matching tests
+    });
+
+    // Application-level filtering for case-insensitive search if needed
+    let filteredTests = tests;
+    if (search && search.trim()) {
+      const searchLower = search.trim().toLowerCase();
+      filteredTests = tests.filter(t => 
+        (t.name && t.name.toLowerCase().includes(searchLower)) ||
+        (t.shortName && t.shortName.toLowerCase().includes(searchLower)) ||
+        (t.testCode && t.testCode.toLowerCase().includes(searchLower))
+      );
+    }
+
+    // Format tests with charge information
+    const testsWithCharges = filteredTests.map(t => ({
+      ...t,
+      charge: t.charges && t.charges.length > 0 ? t.charges[0].b2cCharge : 0
+    }));
+
+    res.json({
+      success: true,
+      data: testsWithCharges,
+      total: testsWithCharges.length
+    });
+  } catch (error) {
+    console.error('Error in getAllTests:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to fetch tests'
@@ -3349,13 +3443,6 @@ export const getPackages = async (req, res) => {
     const packages = await prisma.package.findMany({
       where: { isActive: true },
       include: {
-        department: {
-          select: {
-            id: true,
-            name: true,
-            group: true
-          }
-        },
         packageTests: {
           include: {
             test: {
@@ -3363,7 +3450,15 @@ export const getPackages = async (req, res) => {
                 id: true,
                 name: true,
                 testCode: true,
-                sampleTypeId: true
+                sampleTypeId: true,
+                charges: {
+                  where: { organizationId: null },
+                  select: {
+                    b2cCharge: true,
+                    b2bCharge: true
+                  },
+                  take: 1
+                }
               }
             }
           }
@@ -3374,7 +3469,7 @@ export const getPackages = async (req, res) => {
       take: limit
     });
 
-    // Format packages with test information
+    // Format packages with test information and charges
     const packagesWithTests = packages.map(pkg => {
       return {
         ...pkg,
@@ -3383,7 +3478,8 @@ export const getPackages = async (req, res) => {
           id: packageTest.test.id,
           name: packageTest.test.name,
           testCode: packageTest.test.testCode,
-          sampleTypeId: packageTest.test.sampleTypeId
+          sampleTypeId: packageTest.test.sampleTypeId,
+          charges: packageTest.test.charges
         }))
       };
     });
@@ -3406,13 +3502,6 @@ export const getAllPackages = async (req, res) => {
 
     const packages = await prisma.package.findMany({
       include: {
-        department: {
-          select: {
-            id: true,
-            name: true,
-            group: true
-          }
-        },
         packageTests: {
           include: {
             test: {
@@ -3420,7 +3509,15 @@ export const getAllPackages = async (req, res) => {
                 id: true,
                 name: true,
                 testCode: true,
-                sampleTypeId: true
+                sampleTypeId: true,
+                charges: {
+                  where: { organizationId: null },
+                  select: {
+                    b2cCharge: true,
+                    b2bCharge: true
+                  },
+                  take: 1
+                }
               }
             }
           }
@@ -3431,7 +3528,7 @@ export const getAllPackages = async (req, res) => {
       take: limit
     });
 
-    // Format packages with test information
+    // Format packages with test information and charges
     const packagesWithTests = packages.map(pkg => {
       return {
         ...pkg,
@@ -3440,7 +3537,8 @@ export const getAllPackages = async (req, res) => {
           id: packageTest.test.id,
           name: packageTest.test.name,
           testCode: packageTest.test.testCode,
-          sampleTypeId: packageTest.test.sampleTypeId
+          sampleTypeId: packageTest.test.sampleTypeId,
+          charges: packageTest.test.charges
         }))
       };
     });
@@ -3462,12 +3560,6 @@ export const getPackageById = async (req, res) => {
     const packageData = await prisma.package.findUnique({
       where: { id: parseInt(id) },
       include: {
-        department: {
-          select: {
-            id: true,
-            name: true
-          }
-        },
         packageTests: {
           include: {
             test: {
@@ -3475,7 +3567,15 @@ export const getPackageById = async (req, res) => {
                 id: true,
                 name: true,
                 testCode: true,
-                sampleTypeId: true
+                sampleTypeId: true,
+                charges: {
+                  where: { organizationId: null },
+                  select: {
+                    b2cCharge: true,
+                    b2bCharge: true
+                  },
+                  take: 1
+                }
               }
             }
           }
@@ -3489,6 +3589,14 @@ export const getPackageById = async (req, res) => {
         message: 'Package not found'
       });
     }
+
+    console.log('📦 getPackageById - Returning package:', {
+      id: packageData.id,
+      name: packageData.name,
+      charges: packageData.charges,
+      packageTotal: packageData.packageTotal,
+      testCount: packageData.packageTests.length
+    });
 
     // Format package with test information
     const formattedPackage = {
@@ -3507,6 +3615,7 @@ export const getPackageById = async (req, res) => {
       data: formattedPackage
     });
   } catch (error) {
+    console.error('❌ Error in getPackageById:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to fetch package'
@@ -3520,13 +3629,21 @@ export const createPackage = async (req, res) => {
     const {
       name,
       code,
-      departmentId,
-      center,
-      b2cCharge,
-      b2bCharge,
+      description,
+      charges,
       isActive,
-      testIds
+      testIds,
+      packageTotal
     } = req.body;
+
+    console.log('📦 Creating package with data:', {
+      name,
+      code,
+      description,
+      charges,
+      packageTotal,
+      testIds
+    });
 
     // Validate required fields
     if (!name) {
@@ -3536,30 +3653,19 @@ export const createPackage = async (req, res) => {
       });
     }
 
-    // Check if department exists (if provided)
-    if (departmentId) {
-      const department = await prisma.department.findUnique({
-        where: { id: parseInt(departmentId) }
-      });
-
-      if (!department) {
-        return res.status(404).json({
-          success: false,
-          message: 'Department not found'
-        });
-      }
-    }
-
     // Create package
     const packageData = await prisma.package.create({
       data: {
         name,
-        code,
-        departmentId: departmentId ? parseInt(departmentId) : null,
-        b2cCharge: b2cCharge ? parseFloat(b2cCharge) : 0,
+        code: code || null,
+        description: description || null,
+        charges: charges ? parseFloat(charges) : 0,
+        packageTotal: packageTotal ? parseFloat(packageTotal) : 0,
         isActive: isActive !== undefined ? isActive : true
       }
     });
+
+    console.log('✅ Package created:', packageData);
 
     // Add tests to package if testIds provided
     if (testIds && testIds.length > 0) {
@@ -3578,12 +3684,6 @@ export const createPackage = async (req, res) => {
     const completePackage = await prisma.package.findUnique({
       where: { id: packageData.id },
       include: {
-        department: {
-          select: {
-            id: true,
-            name: true
-          }
-        },
         packageTests: {
           include: {
             test: {
@@ -3605,6 +3705,7 @@ export const createPackage = async (req, res) => {
       data: completePackage
     });
   } catch (error) {
+    console.error('❌ Error creating package:', error);
     
     if (error.code === 'P2002') {
       return res.status(400).json({
@@ -3628,13 +3729,21 @@ export const updatePackage = async (req, res) => {
     const {
       name,
       code,
-      departmentId,
-      center,
-      b2cCharge,
-      b2bCharge,
+      description,
+      charges,
       isActive,
-      testIds
+      testIds,
+      packageTotal
     } = req.body;
+
+    console.log('📦 Updating package ID:', id, 'with data:', {
+      name,
+      code,
+      description,
+      charges,
+      packageTotal,
+      testIds
+    });
 
     // Check if package exists
     const existingPackage = await prisma.package.findUnique({
@@ -3654,11 +3763,14 @@ export const updatePackage = async (req, res) => {
       data: {
         name: name || undefined,
         code: code || undefined,
-        departmentId: departmentId ? parseInt(departmentId) : undefined,
-        b2cCharge: b2cCharge !== undefined ? parseFloat(b2cCharge) : undefined,
+        description: description || undefined,
+        charges: charges !== undefined ? parseFloat(charges) : undefined,
+        packageTotal: packageTotal !== undefined ? parseFloat(packageTotal) : undefined,
         isActive: isActive !== undefined ? isActive : undefined
       }
     });
+
+    console.log('✅ Package updated:', packageData);
 
     // If testIds are provided, update package tests
     if (testIds !== undefined) {
@@ -3685,12 +3797,6 @@ export const updatePackage = async (req, res) => {
     const completePackage = await prisma.package.findUnique({
       where: { id: parseInt(id) },
       include: {
-        department: {
-          select: {
-            id: true,
-            name: true
-          }
-        },
         packageTests: {
           include: {
             test: {
@@ -3712,6 +3818,7 @@ export const updatePackage = async (req, res) => {
       data: completePackage
     });
   } catch (error) {
+    console.error('❌ Error updating package:', error);
     
     if (error.code === 'P2002') {
       return res.status(400).json({

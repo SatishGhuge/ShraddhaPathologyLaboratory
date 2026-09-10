@@ -25,25 +25,23 @@ const AddDepartment = () => {
   
   // Determine mode based on route
   const isEditMode = pathname.includes('/edit/');
-  const isViewMode = pathname.includes('/view/');
-  const isAddMode = !isEditMode && !isViewMode;
+  const isAddMode = !isEditMode;
   
   const [formData, setFormData] = useState({
     name: "",
     code: "",
-    group: "",
     isInactive: false,
   });
   const [showMessage, setShowMessage] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  // Load department data for edit/view mode
+  // Load department data for edit mode
   useEffect(() => {
-    if ((isEditMode || isViewMode) && id) {
+    if (isEditMode && id) {
       fetchDepartmentData();
     }
-  }, [id, isEditMode, isViewMode]);
+  }, [id, isEditMode]);
 
   const fetchDepartmentData = async () => {
     try {
@@ -56,7 +54,6 @@ const AddDepartment = () => {
         setFormData({
           name: dept.name || "",
           code: dept.code || "",
-          group: dept.group || "",
           isInactive: !dept.isActive,
         });
       } else {
@@ -107,7 +104,6 @@ const AddDepartment = () => {
       const departmentData = {
         name: formData.name,
         code: formData.code,
-        group: formData.group || null,
         isActive: !formData.isInactive
       };
       
@@ -163,7 +159,6 @@ const AddDepartment = () => {
   const imageBg = "";
   
   const getTitle = () => {
-    if (isViewMode) return "View Department";
     if (isEditMode) return "Edit Department";
     return "Add New Department";
   };
@@ -232,7 +227,7 @@ const AddDepartment = () => {
           )}
 
           {/* Loading State */}
-          {loading && (isEditMode || isViewMode) && (
+          {loading && isEditMode && (
             <div className="mx-3 sm:mx-4 mb-4 p-4 text-center">
               <div className="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-orange-600"></div>
               <p className="mt-2 text-gray-600 text-sm">Loading department data...</p>
@@ -240,93 +235,49 @@ const AddDepartment = () => {
           )}
           
           <form onSubmit={handleSubmit} className="p-3 sm:p-4 space-y-3 sm:space-y-4">
-            {/* Row 1: ID (view only) and Code */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-              {/* ID Field - Only shown in View Mode */}
-              {isViewMode && (
-                <div>
-                  <label className="block text-xs sm:text-sm font-medium mb-1 text-orange-800">ID</label>
-                  <div className="relative">
-                    <Hash
-                      className="absolute left-2 top-2.5 text-gray-400"
-                      size={16}
-                    />
-                    <input
-                      type="text"
-                      value={id || ''}
-                      disabled
-                      className="w-full pl-8 border border-orange-600 rounded px-2 py-1.5 sm:py-1 bg-gray-100 cursor-not-allowed font-semibold text-sm"
-                    />
-                  </div>
-                </div>
-              )}
-
-              {/* Code */}
-              <div className={isViewMode ? "" : "sm:col-span-2"}>
-                <label className="block text-xs sm:text-sm font-medium mb-1 text-orange-800">Code</label>
-                <div className="relative">
-                  <Hash
-                    className="absolute left-2 top-2.5 text-gray-400"
-                    size={16}
-                  />
-                  <input
-                    type="text"
-                    name="code"
-                    value={formData.code}
-                    onChange={handleChange}
-                    disabled={isViewMode}
-                    autoComplete="off"
-                    className={`w-full pl-8 border ${inputBorder} rounded px-2 py-1.5 sm:py-1 ${inputBg} focus:outline-none focus:ring-2 ${focusRing} disabled:bg-gray-100 disabled:cursor-not-allowed text-sm`}
-                  />
-                </div>
+            {/* Row 1: Code */}
+            <div>
+              <label className="block text-xs sm:text-sm font-medium mb-1 text-orange-800">Code</label>
+              <div className="relative">
+                <Hash
+                  className="absolute left-2 top-2.5 text-gray-400"
+                  size={16}
+                />
+                <input
+                  type="text"
+                  name="code"
+                  value={formData.code}
+                  onChange={handleChange}
+                  disabled={false}
+                  autoComplete="off"
+                  className={`w-full pl-8 border ${inputBorder} rounded px-2 py-1.5 sm:py-1 ${inputBg} focus:outline-none focus:ring-2 ${focusRing} disabled:bg-gray-100 disabled:cursor-not-allowed text-sm`}
+                />
               </div>
             </div>
 
-            {/* Row 2: Name and Group Name */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-              {/* Name */}
-              <div>
-                <label className="block text-xs sm:text-sm font-medium mb-1 text-orange-800">Name</label>
-                <div className="relative">
-                  <Layers
-                    className="absolute left-2 top-2.5 text-gray-400"
-                    size={16}
-                  />
-                  <input
-                    type="text"
-                    name="name"
-                    value={formData.name}
-                    onChange={handleChange}
-                    disabled={isViewMode}
-                    autoComplete="off"
-                    style={{ textTransform: 'uppercase' }}
-                    className={`w-full pl-8 border ${inputBorder} rounded px-2 py-1.5 sm:py-1 ${inputBg} focus:outline-none focus:ring-2 ${focusRing} disabled:bg-gray-100 disabled:cursor-not-allowed text-sm`}
-                  />
-                </div>
-              </div>
-
-              {/* Group Name */}
-              <div>
-                <label className="block text-xs sm:text-sm font-medium mb-1 text-orange-800">Group Name</label>
-                <div className="relative">
-                  <Layers
-                    className="absolute left-2 top-2.5 text-gray-400"
-                    size={16}
-                  />
-                  <input
-                    type="text"
-                    name="group"
-                    value={formData.group}
-                    onChange={handleChange}
-                    disabled={isViewMode}
-                    className={`w-full pl-8 border ${inputBorder} rounded px-2 py-1.5 sm:py-1 ${inputBg} focus:outline-none focus:ring-2 ${focusRing} disabled:bg-gray-100 disabled:cursor-not-allowed text-sm`}
-                  />
-                </div>
+            {/* Row 2: Name */}
+            <div>
+              <label className="block text-xs sm:text-sm font-medium mb-1 text-orange-800">Name</label>
+              <div className="relative">
+                <Layers
+                  className="absolute left-2 top-2.5 text-gray-400"
+                  size={16}
+                />
+                <input
+                  type="text"
+                  name="name"
+                  value={formData.name}
+                  onChange={handleChange}
+                  disabled={false}
+                  autoComplete="off"
+                  style={{ textTransform: 'uppercase' }}
+                  className={`w-full pl-8 border ${inputBorder} rounded px-2 py-1.5 sm:py-1 ${inputBg} focus:outline-none focus:ring-2 ${focusRing} disabled:bg-gray-100 disabled:cursor-not-allowed text-sm`}
+                />
               </div>
             </div>
 
-            {/* Row 3: Make Inactive - Only for Edit/View Mode */}
-            {(isEditMode || isViewMode) && (
+            {/* Row 3: Make Inactive - Only for Edit Mode */}
+            {isEditMode && (
               <div className="flex items-center gap-2">
                 {/* Make Inactive Checkbox */}
                 <input
@@ -334,7 +285,7 @@ const AddDepartment = () => {
                   name="isInactive"
                   checked={formData.isInactive}
                   onChange={handleChange}
-                  disabled={isViewMode}
+                  disabled={false}
                   className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
                 />
                 <label className="text-xs sm:text-sm font-medium">Make Inactive?</label>
@@ -342,28 +293,25 @@ const AddDepartment = () => {
             )}
 
             {/* Action Buttons */}
-            {!isViewMode && (
-              <div className="flex flex-col sm:flex-row justify-end gap-2">
-                {isEditMode && (
-                  <button
-                    type="button"
-                    onClick={() => router.back()}
-                    className="flex items-center justify-center gap-2 bg-gray-500 text-white px-4 py-2 sm:py-1.5 rounded hover:bg-gray-600 transition-colors text-sm"
-                  >
-                    Cancel
-                  </button>
-                )}
+            <div className="flex flex-col sm:flex-row justify-end gap-2">
+              {isEditMode && (
                 <button
-                  type="submit"
-                  disabled={loading}
-                  className="flex items-center justify-center gap-2 bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 sm:py-1.5 rounded transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                  type="button"
+                  onClick={() => router.back()}
+                  className="flex items-center justify-center gap-2 bg-gray-500 text-white px-4 py-2 sm:py-1.5 rounded hover:bg-gray-600 transition-colors text-sm"
                 >
-                  <Save size={16} />
-                  {loading ? 'Saving...' : (isAddMode ? "Save" : "Update")}
+                  Cancel
                 </button>
-              </div>
-            )}
-          </form>
+              )}
+              <button
+                type="submit"
+                disabled={loading}
+                className="flex items-center justify-center gap-2 bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 sm:py-1.5 rounded transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <Save size={16} />
+                {loading ? 'Saving...' : (isAddMode ? "Save" : "Update")}
+              </button>
+            </div>          </form>
         </div>
       </div>
     </>

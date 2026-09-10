@@ -710,13 +710,23 @@ export default function PatientRegistration() {
         // Add tests to their departments
         tests.forEach(test => {
           if (deptMap[test.departmentId] && test.isActive && !test.isDeleted) {
+            // Charges should be an array from the include in backend
+            const chargesArray = test.charges || [];
+            const firstCharge = chargesArray.length > 0 ? chargesArray[0] : null;
+            
+            // ✅ Default to 0 if no charge found
+            const b2cCharge = firstCharge?.b2cCharge || 0;
+            const b2bCharge = firstCharge?.b2bCharge || 0;
+            
+            console.log(`📊 Test: ${test.name}, Charges array length: ${chargesArray.length}, B2C: ${b2cCharge}, B2B: ${b2bCharge}`);
+            
             deptMap[test.departmentId].tests.push({
               id: test.id,
               name: test.name,
               departmentId: test.departmentId, // Add departmentId
               sample: test.sample_type?.Sample_Type || "N/A",
-              b2cCharge: test.charges?.[0]?.b2cCharge || 0,
-              b2bCharge: test.charges?.[0]?.b2bCharge || 0,
+              b2cCharge: b2cCharge,
+              b2bCharge: b2bCharge,
               department: deptMap[test.departmentId].name,
               isOutsourced: test.isOutsourced || false,  // 🔧 Use Test.isOutsourced flag directly
               outsourcedTo: null // Not needed anymore
@@ -731,20 +741,37 @@ export default function PatientRegistration() {
         // Add packages to their departments
         if (packages && packages.length > 0) {
           packages.forEach(pkg => {
-            if (deptMap[pkg.departmentId] && pkg.isActive) {
-              const packageTests = pkg.packageTests?.map(pt => pt.test.name) || [];
+            // No longer filtering by departmentId since packages are not tied to departments anymore
+            if (pkg.isActive && !pkg.isDeleted) {
+              // Get all test names and create test objects with charges
+              const packageTestsData = pkg.packageTests?.map(pt => ({
+                id: pt.test.id,
+                name: pt.test.name,
+                sample: pt.test.sample_type?.Sample_Type || "N/A",
+                // Get charge from test_charges table
+                b2cCharge: pt.test.charges?.[0]?.b2cCharge || 0,
+                b2bCharge: pt.test.charges?.[0]?.b2bCharge || 0
+              })) || [];
               
-              deptMap[pkg.departmentId].packages.push({
-                id: pkg.id,
-                name: pkg.name,
-                departmentId: pkg.departmentId,
-                tests: packageTests,
-                packageTests: packageTests,
-                b2cCharge: pkg.b2cCharge || 0,
-                b2bCharge: pkg.b2bCharge || 0,
-                packageTestCharges: pkg.packageTests || [],
-                department: deptMap[pkg.departmentId].name
-              });
+              const packageTestNames = packageTestsData.map(t => t.name);
+              
+              console.log(`📦 Package: ${pkg.name}, Tests: ${packageTestNames.join(', ')}, Total: ₹${pkg.packageTotal}`);
+              
+              // Add to all departments (not filtered by dept anymore)
+              // But we need to ensure packages appear somewhere - add to a general/all section
+              // For now, add to first department as fallback
+              const firstDeptId = Object.keys(deptMap)[0];
+              if (firstDeptId && deptMap[firstDeptId]) {
+                deptMap[firstDeptId].packages.push({
+                  id: pkg.id,
+                  name: pkg.name,
+                  packageTests: packageTestsData,  // Full test objects with charges
+                  testNames: packageTestNames,     // Just names for display
+                  charges: pkg.charges || 0,       // Manual package charges
+                  packageTotal: pkg.packageTotal || 0, // Sum of test charges
+                  packageTestCharges: packageTestsData
+                });
+              }
             }
           });
         }
@@ -782,28 +809,6 @@ export default function PatientRegistration() {
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
-
-  // Handle doctor added from modal
-  const handleDoctorAdded = async (addedDoctor: any) => {
-    try {
-      // Refresh the doctors list for the dropdown
-      const doctors = await getDoctors();
-      setDoctorsList(doctors);
-      
-      // Auto-select the newly added doctor in the dropdown
-      setRefDoctor(`Dr. ${addedDoctor.name}`);
-      setIsManualRefDoctor(false);
-    } catch (error) {
-      console.error("Error refreshing doctors list:", error);
-    }
-  };
-
-  const handleRefDoctorCheckbox = (checked: boolean) => {
-    setIsManualRefDoctor(checked);
-    if (!checked) {
-      setManualRefDoctorName("");
-    }
-  };
 
   // Auto-fetch referral doctor details and populate patient email/phone when doctor is selected
   useEffect(() => {
@@ -1127,7 +1132,55 @@ export default function PatientRegistration() {
   /* ============ END LOCALSTORAGE PERSISTENCE ============ */
   /* ---------------- BILL ---------------- */
 
-  const total = selectedTests.reduce((s, t) => s + (businessType === "B2C" ? t.b2cCharge : t.b2bCharge), 0);
+  // ✅ NEW LOGIC: Calculate total charges based on package selection
+  // - If tests are from packages: sum ALL package charges (not individual test charges)
+  // - If tests are NOT from packages: sum individual test charges
+  // - Mixed case: sum package charges + individual test charges (from tests not in any package)
+  
+  const calculateTotal = () => {
+    // ✅ Check if ANY test is from a package (fromPackage is truthy)
+    const hasPackageTests = selectedTests.some(t => t.fromPackage); // Just check if truthy, not !== null
+    
+    if (!hasPackageTests) {
+      // No package tests - sum individual test charges
+      console.log('📊 No package tests - summing individual charges');
+      return selectedTests.reduce((s, t) => {
+        const charge = businessType === "B2C" ? t.b2cCharge : t.b2bCharge;
+        console.log(`  ${t.name}: ${charge}`);
+        return s + charge;
+      }, 0);
+    }
+    
+    // Has package tests - sum UNIQUE package charges + any non-package test charges
+    const packageCharges = new Map(); // Map of packageName -> charge
+    let nonPackageTestsTotal = 0;
+    
+    selectedTests.forEach(t => {
+      if (t.fromPackage) {
+        // Track package charge (use first occurrence of each package)
+        if (!packageCharges.has(t.fromPackage)) {
+          packageCharges.set(t.fromPackage, t.packageCharge || 0);
+          console.log(`📦 Package: ${t.fromPackage} = ₹${t.packageCharge}`);
+        }
+      } else {
+        // Sum individual test charges that are NOT from a package
+        const charge = businessType === "B2C" ? t.b2cCharge : t.b2bCharge;
+        console.log(`📝 Non-package test: ${t.name} = ₹${charge}`);
+        nonPackageTestsTotal += charge;
+      }
+    });
+    
+    // Sum all package charges + any non-package test charges
+    let total = 0;
+    packageCharges.forEach(charge => {
+      total += charge;
+    });
+    total += nonPackageTestsTotal;
+    console.log(`💰 Total: packages=${Array.from(packageCharges.values()).reduce((s,c)=>s+c,0)} + non-package=${nonPackageTestsTotal} = ${total}`);
+    return total;
+  };
+  
+  const total = calculateTotal();
 
   const handleDiscountPercentChange = (value: any) => {
     if (value === '') { setDiscountPercent(0); setDiscount(0); return; }
@@ -1882,8 +1935,8 @@ export default function PatientRegistration() {
       // Show loading state immediately
       setLoading(true);
       
-      // Calculate billing amounts
-      const totalAmt = total;
+      // Calculate billing amounts (only test charges - package charge is for display only)
+      const totalAmt = total;  // ✅ Only test charges saved, not package charge
       const discAmt = discount;
       const discPct = discountPercent;
       const paidAmt = paid;
@@ -1899,11 +1952,21 @@ export default function PatientRegistration() {
         sample: item.sample || "N/A",
         charge: businessType === "B2C" ? item.b2cCharge : item.b2bCharge,
         packageName: item.fromPackage || null,
+        packageCharge: item.packageCharge || 0,  // ✅ Save package charge
         // ===== EMERGENCY FIELD - Applied to ALL tests if visit is emergency =====
         isEmergency: isEmergency
       }));
       
       // Prepare patient data for backend with all fields
+      const hasPackageTests = selectedTests.some(t => t.fromPackage !== null);
+      const packageCharges = new Map();
+      selectedTests.forEach(t => {
+        if (t.fromPackage && !packageCharges.has(t.fromPackage)) {
+          packageCharges.set(t.fromPackage, t.packageCharge || 0);
+        }
+      });
+      const totalPackageCharges = Array.from(packageCharges.values()).reduce((sum, charge) => sum + charge, 0);
+      
       const patientData = {
         // Existing patient ID (if found)
         existingPatientId: existingPatientId || null,
@@ -1950,7 +2013,11 @@ export default function PatientRegistration() {
           balanceAmount: balAmt || 0,
           totalPaid: paidAmt || 0,
           totalRefund: 0,
-          status: paidAmt >= totalAmt ? "PAID" : (paidAmt > 0 ? "PARTIAL" : "PENDING")
+          status: paidAmt >= totalAmt ? "PAID" : (paidAmt > 0 ? "PARTIAL" : "PENDING"),
+          // ✅ NEW: Flag to indicate if using package charges (multiple packages supported)
+          usePackageCharges: hasPackageTests,
+          totalPackageCharges: totalPackageCharges,
+          packageChargesByName: Array.from(packageCharges.entries()).reduce((obj, [name, charge]) => ({ ...obj, [name]: charge }), {})
         },
         // Tests (expanded from packages)
         tests: expandedTests
@@ -2169,29 +2236,29 @@ export default function PatientRegistration() {
   };
 
   /* --- Helper: distribute package charge evenly with remainder on first tests --- */
+  /* --- Helper: Store package charge to display, not individual test charges --- */
   const distributePackageCharge = (pkg: any, tests: any) => {
-    const count = tests.length;
-    if (count === 0) return tests;
-    const baseB2C = Math.floor((pkg.b2cCharge || 0) / count);
-    const baseB2B = Math.floor((pkg.b2bCharge || 0) / count);
-    const remB2C = (pkg.b2cCharge || 0) - baseB2C * count;
-    const remB2B = (pkg.b2bCharge || 0) - baseB2B * count;
-    return tests.map((t, i) => ({
+    // Store package charge on all tests
+    // This will be used to show ONLY package charge in bill, not individual charges
+    return tests.map(t => ({
       ...t,
-      b2cCharge: baseB2C + (i < remB2C ? 1 : 0),
-      b2bCharge: baseB2B + (i < remB2B ? 1 : 0),
+      fromPackage: pkg.name,
+      packageCharge: pkg.charges || 0,  // ✅ Store package charge for display
+      // Don't use individual test charges when from package
+      usePackageChargeOnly: true
     }));
   };
 
   const addPackage = (pkg: any) => {
-    const deptTests = departments.flatMap(d => d.tests.map(t => ({ ...t, department: d.name })));
-    const pkgTests = (pkg.tests || [])
-      .map(testName => deptTests.find(t => t.name === testName))
-      .filter(Boolean);
+    // Use packageTests array which has full test objects with charges
+    const pkgTests = pkg.packageTests || [];
+    
     if (pkgTests.length === 0) return;
+    
     const newItems = pkgTests
-      .filter(t => !selectedTests.find(st => st.name === t.name))
+      .filter(t => !selectedTests.find(st => st.id === t.id))
       .map(t => ({ ...t, fromPackage: pkg.name }));
+    
     if (newItems.length > 0) {
       setSelectedTests([...selectedTests, ...distributePackageCharge(pkg, newItems)]);
     }
@@ -2460,6 +2527,25 @@ export default function PatientRegistration() {
     }
   };
 
+  /* --- Handle Referral Doctor Checkbox --- */
+  const handleRefDoctorCheckbox = (isChecked: boolean) => {
+    setIsManualRefDoctor(isChecked);
+    if (isChecked) {
+      setRefDoctor("");
+      setManualRefDoctorName("");
+    } else {
+      setManualRefDoctorName("");
+      setRefDoctor("");
+    }
+  };
+
+  /* --- Handle New Doctor Added from Modal --- */
+  const handleDoctorAdded = (newDoctor: any) => {
+    setDoctorsList([...doctorsList, newDoctor]);
+    setRefDoctor(`Dr. ${newDoctor.name}`);
+    setShowRefModal(false);
+  };
+
   /* ---------------- FILTER ---------------- */
 
   const allPackages = departments.flatMap(d => d.packages.map(p => ({...p, department: d.name})));
@@ -2502,7 +2588,7 @@ export default function PatientRegistration() {
               <InlineSelect
                 value={title}
                 onChange={handleTitleChange}
-                options={["MR","MRS","MISS","Master","Baby Boy","Baby Girl"]}
+                options={["Dr","MR","MRS","MISS","Master","Baby Boy of","Baby Girl of"]}
                 placeholder="Mr"
               />
               <input 
@@ -2815,24 +2901,42 @@ export default function PatientRegistration() {
                         <input
                           className={input}
                           placeholder="Search Referral Doctor"
-                          value={refDoctor}
-                          onChange={(e) => setRefDoctor(e.target.value)}
+                          value={refDoctor ? (doctorsList.find((d: any) => d.id.toString() === refDoctor)?.name ? `Dr. ${doctorsList.find((d: any) => d.id.toString() === refDoctor)?.name}` : refDoctor) : ""}
+                          onChange={(e) => {
+                            const input = e.target.value;
+                            // If it's a number, keep it as is; if it's text, filter by name
+                            if (/^\d+$/.test(input)) {
+                              setRefDoctor(input);
+                            } else {
+                              setRefDoctor(input);
+                            }
+                          }}
                           onFocus={() => setShowDoctorList(true)}
                         />
                         {showDoctorList && (
                           <div className="absolute top-full left-0 right-0 bg-white border border-gray-200 rounded-xl shadow-xl mt-1 z-10 overflow-hidden">
                             <div className="max-h-48 overflow-y-auto py-1">
                               {doctorsList
-                                .filter(doc => `Dr. ${doc.name}`.toLowerCase().includes(refDoctor.toLowerCase()) || doc.name.toLowerCase().includes(refDoctor.toLowerCase()))
+                                .filter(doc => {
+                                  // If refDoctor is numeric (ID selected), don't show dropdown
+                                  if (/^\d+$/.test(refDoctor)) return false;
+                                  // Otherwise filter by name
+                                  return `Dr. ${doc.name}`.toLowerCase().includes(refDoctor.toLowerCase()) || doc.name.toLowerCase().includes(refDoctor.toLowerCase());
+                                })
                                 .map((doc, i, arr) => (
                                   <div key={doc.id}
-                                    onClick={() => { setRefDoctor(`Dr. ${doc.name}`); setShowDoctorList(false); }}
-                                    className={`px-4 py-2.5 cursor-pointer hover:bg-gray-50 ${i < arr.length - 1 ? "border-b border-gray-100" : ""}`}>
+                                    onClick={() => { setRefDoctor(doc.id.toString()); setShowDoctorList(false); }}
+                                    className={`px-4 py-2.5 cursor-pointer hover:bg-gray-50 ${i < arr.length - 1 ? "border-b border-gray-100" : ""}`}
+                                    title={`Doctor ID: ${doc.id}`}>
                                     <div className="font-semibold text-xs text-gray-800">Dr. {doc.name}</div>
                                     <div className="text-xs text-gray-400">{doc.degree}{doc.degree && doc.type ? ' · ' : ''}{doc.type}</div>
                                   </div>
                                 ))}
-                              {doctorsList.filter(doc => `Dr. ${doc.name}`.toLowerCase().includes(refDoctor.toLowerCase()) || doc.name.toLowerCase().includes(refDoctor.toLowerCase())).length === 0 && (
+                              {doctorsList
+                                .filter(doc => {
+                                  if (/^\d+$/.test(refDoctor)) return false;
+                                  return `Dr. ${doc.name}`.toLowerCase().includes(refDoctor.toLowerCase()) || doc.name.toLowerCase().includes(refDoctor.toLowerCase());
+                                }).length === 0 && refDoctor && !(/^\d+$/.test(refDoctor)) && (
                                 <div className="px-4 py-3 text-xs text-gray-400 text-center">No doctors found</div>
                               )}
                             </div>
@@ -2926,9 +3030,9 @@ export default function PatientRegistration() {
         {/* LEFT */}
         <div className="md:col-span-2 col-span-12 bg-white rounded-xl shadow flex flex-col">
           <div className="flex text-xs font-semibold rounded-tl-xl rounded-tr-xl overflow-hidden">
-            <button onClick={() => { setActiveTab("tests"); setShowAllTests(true); setSelectedDept(null); setSelectedPackage(null); }}
+            <button onClick={() => { setActiveTab("tests"); setShowAllTests(true); setSelectedDept(null); }}
               className={`flex-1 p-2 ${activeTab === "tests" ? "bg-cyan-900 text-white" : "bg-gray-200"}`}>Department</button>
-            <button onClick={() => { setActiveTab("packages"); setSelectedPackage(null); setShowAllTests(false); }}
+            <button onClick={() => { setActiveTab("packages"); setShowAllTests(false); }}
               className={`flex-1 p-2 ${activeTab === "packages" ? "bg-cyan-900 text-white" : "bg-gray-200"}`}>Packages</button>
           </div>
           <div className="flex-1 overflow-auto text-xs" style={{ maxHeight: 'calc(75vh - 40px)' }}>
@@ -2939,7 +3043,7 @@ export default function PatientRegistration() {
             ) : (
               departments.map((d) => (
                 <div key={d.name}
-                  onClick={() => { setSelectedDept(d); setShowAllTests(false); setSelectedPackage(null); }}
+                  onClick={() => { setSelectedDept(d); setShowAllTests(false); }}
                   className={`p-2 border-b cursor-pointer hover:bg-gray-50 ${selectedDept?.name === d.name && !showAllTests ? 'bg-orange-100 font-semibold' : ''}`}
                 >{d.name}</div>
               ))
@@ -2952,11 +3056,15 @@ export default function PatientRegistration() {
                 {displayPackages.map((pkg, idx) => (
                   <div key={idx}
                     className={`p-2 border-b hover:bg-gray-50 cursor-pointer ${selectedPackage?.name === pkg.name ? 'bg-orange-100 font-semibold' : ''}`}
-                    onClick={() => setSelectedPackage(pkg)}
+                    onClick={() => {
+                      setSelectedPackage(pkg);
+                      // ✅ Auto-add all tests from this package to the bill
+                      addPackage(pkg);
+                    }}
                   >
                     <div className="font-semibold">{pkg.name}</div>
-                    <div className="text-gray-500 text-xs">B2C: ₹{pkg.b2cCharge} | B2B: ₹{pkg.b2bCharge}</div>
-                    <div className="text-gray-400 text-xs">{pkg.department}</div>
+                    <div className="text-gray-500 text-xs">Charges: ₹{pkg.charges || 0} | Package Total: ₹{pkg.packageTotal || 0}</div>
+                    <div className="text-gray-400 text-xs">{pkg.testNames?.length || 0} tests</div>
                   </div>
                 ))}
                 {displayPackages.length === 0 && <div className="p-4 text-center text-gray-400">No packages found</div>}
@@ -2991,16 +3099,14 @@ export default function PatientRegistration() {
                     type="checkbox" 
                     className="w-3 h-3 cursor-pointer accent-white"
                     checked={(() => {
-                      const deptTests = departments.flatMap(d => d.tests.map(t => ({...t, department: d.name})));
-                      const pkgTests = selectedPackage.tests.map(n => deptTests.find(t => t.name === n)).filter(Boolean);
-                      return pkgTests.length > 0 && pkgTests.every(t => selectedTests.find(st => st.name === t.name));
+                      const pkgTests = selectedPackage.packageTests || [];
+                      return pkgTests.length > 0 && pkgTests.every(t => selectedTests.find(st => st.id === t.id));
                     })()}
                     onChange={(e) => {
-                      const deptTests = departments.flatMap(d => d.tests.map(t => ({...t, department: d.name})));
-                      const pkgTests = selectedPackage.tests.map(n => deptTests.find(t => t.name === n)).filter(Boolean);
+                      const pkgTests = selectedPackage.packageTests || [];
                       if (e.target.checked) {
                         const toAdd = pkgTests
-                          .filter(t => !selectedTests.find(st => st.name === t.name))
+                          .filter(t => !selectedTests.find(st => st.id === t.id))
                           .map(t => ({ ...t, fromPackage: selectedPackage.name }));
                         const allPkgTests = [...selectedTests.filter(st => st.fromPackage === selectedPackage.name), ...toAdd];
                         const redistributed = distributePackageCharge(selectedPackage, allPkgTests);
@@ -3009,8 +3115,8 @@ export default function PatientRegistration() {
                           ...redistributed
                         ]);
                       } else {
-                        const names = pkgTests.map(t => t.name);
-                        setSelectedTests(selectedTests.filter(st => !names.includes(st.name)));
+                        const ids = pkgTests.map(t => t.id);
+                        setSelectedTests(selectedTests.filter(st => !ids.includes(st.id)));
                       }
                     }}
                     onClick={(e) => e.stopPropagation()}
@@ -3025,54 +3131,89 @@ export default function PatientRegistration() {
           <div className="flex-1 overflow-auto text-xs" style={{ maxHeight: 'calc(75vh - 50px)' }}>
             {selectedPackage ? (
               <>
+                {/* Show ALL tests from ALL selected packages (not just current one) */}
                 {(() => {
-                  const deptTests = departments.flatMap(d => d.tests.map(t => ({...t, department: d.name})));
-                  const pkgTests = selectedPackage.tests.map(testName => deptTests.find(t => t.name === testName)).filter(Boolean);
-                  return pkgTests.map((t, i) => (
-                    <div key={t.name} className="grid grid-cols-12 border-b p-2 hover:bg-gray-50 items-center">
-                      <div className="col-span-5 flex gap-2 items-center">
-                        <input 
-                          type="checkbox" 
-                          className="w-3 h-3 cursor-pointer accent-orange-500"
-                          checked={selectedTests.find(st => st.name === t.name) !== undefined}
-                          onChange={(e) => {
-                            e.stopPropagation();
-                            if (e.target.checked) {
-                              if (!selectedTests.find(st => st.name === t.name)) {
-                                // Recalculate all package tests including the re-added one
-                                const allPkgTests = [...selectedTests.filter(st => st.fromPackage === selectedPackage.name), { ...t, fromPackage: selectedPackage.name }];
-                                const redistributed = distributePackageCharge(selectedPackage, allPkgTests);
-                                setSelectedTests([
-                                  ...selectedTests.filter(st => st.fromPackage !== selectedPackage.name),
-                                  ...redistributed
-                                ]);
-                              }
-                            } else {
-                              removeTest(t.name);
-                            }
-                          }}
-                        />
-                        {t.name}
-                      </div>
-                    <div className="col-span-3 text-center flex items-center justify-center gap-1">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" style={{ transform: 'rotate(45deg)', flexShrink: 0 }}>
-                          <path d="M9 3h6v11a3 3 0 0 1-6 0V3z" fill={getSampleColor(t.sample, specimenTypes)} stroke="#555" strokeWidth="1.2"/>
-                          <rect x="8" y="2" width="8" height="2" rx="1" fill="#888" stroke="#555" strokeWidth="0.8"/>
-                          <line x1="9" y1="10" x2="15" y2="10" stroke="white" strokeWidth="1" opacity="0.5"/>
-                        </svg>
-                        {t.sample}
-                      </div>
-                      {/* Always show B2C Charges column */}
-                      <div className="col-span-3 text-right">-</div>
-                      <div className="col-span-1"></div>
-                    </div>
-                  ));
+                  // Get all unique packages from selected tests
+                  const selectedPackageNames = new Set();
+                  
+                  selectedTests.forEach(t => {
+                    if (t.fromPackage) {
+                      selectedPackageNames.add(t.fromPackage);
+                    }
+                  });
+                  
+                  // Find package objects for all selected packages
+                  const allPkgs = departments
+                    .flatMap(d => d.packages || [])
+                    .filter(p => selectedPackageNames.has(p.name));
+                  
+                  return (
+                    <>
+                      {allPkgs.map(pkg => (
+                        <div key={pkg.name}>
+                          {/* Package Header */}
+                          <div className="bg-orange-50 border-b-2 border-orange-300 p-2 font-semibold text-orange-900 text-xs sticky top-0 z-10">
+                            📦 {pkg.name}
+                            <span className="float-right text-orange-700">₹{pkg.charges || 0}</span>
+                          </div>
+                          
+                          {/* Package Tests */}
+                          {(pkg.packageTests || []).map((t, i) => (
+                            <div key={t.id} className="grid grid-cols-12 border-b p-2 hover:bg-gray-50 items-center">
+                              <div className="col-span-5 flex gap-2 items-center">
+                                <input 
+                                  type="checkbox" 
+                                  className="w-3 h-3 cursor-pointer accent-orange-500"
+                                  checked={selectedTests.find(st => st.id === t.id) !== undefined}
+                                  onChange={(e) => {
+                                    e.stopPropagation();
+                                    if (e.target.checked) {
+                                      if (!selectedTests.find(st => st.name === t.name)) {
+                                        // Recalculate all package tests including the re-added one
+                                        const allPkgTests = [...selectedTests.filter(st => st.fromPackage === pkg.name), { ...t, fromPackage: pkg.name }];
+                                        const redistributed = distributePackageCharge(pkg, allPkgTests);
+                                        setSelectedTests([
+                                          ...selectedTests.filter(st => st.fromPackage !== pkg.name),
+                                          ...redistributed
+                                        ]);
+                                      }
+                                    } else {
+                                      removeTest(t.name);
+                                    }
+                                  }}
+                                />
+                                {t.name}
+                              </div>
+                            <div className="col-span-3 text-center flex items-center justify-center gap-1">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" style={{ transform: 'rotate(45deg)', flexShrink: 0 }}>
+                                  <path d="M9 3h6v11a3 3 0 0 1-6 0V3z" fill={getSampleColor(t.sample, specimenTypes)} stroke="#555" strokeWidth="1.2"/>
+                                  <rect x="8" y="2" width="8" height="2" rx="1" fill="#888" stroke="#555" strokeWidth="0.8"/>
+                                  <line x1="9" y1="10" x2="15" y2="10" stroke="white" strokeWidth="1" opacity="0.5"/>
+                                </svg>
+                                {t.sample}
+                              </div>
+                              {/* Always show charges column */}
+                              <div className="col-span-3 text-right">-</div>
+                              <div className="col-span-1"></div>
+                            </div>
+                          ))}
+                        </div>
+                      ))}
+                      
+                      {/* TOTAL OF ALL SELECTED PACKAGES */}
+                      {selectedPackageNames.size > 0 && (
+                        <div className="grid grid-cols-12 border-t-4 border-cyan-900 p-2 bg-cyan-50 font-bold items-center sticky bottom-0">
+                          <div className="col-span-9 text-right">Total All Packages</div>
+                          <div className="col-span-3 text-right">₹{Array.from(selectedPackageNames).reduce((sum, pkgName) => {
+                            const pkg = departments.flatMap(d => d.packages || []).find(p => p.name === pkgName);
+                            return sum + (pkg?.charges || 0);
+                          }, 0)}</div>
+                          <div className="col-span-1"></div>
+                        </div>
+                      )}
+                    </>
+                  );
                 })()}
-                <div className="grid grid-cols-12 border-t-2 border-cyan-900 p-2 bg-gray-50 font-bold items-center">
-                  <div className="col-span-9 text-right">Total Package Cost</div>
-                  <div className="col-span-3 text-right">₹{businessType === "B2C" ? selectedPackage.b2cCharge : selectedPackage.b2bCharge}</div>
-                  <div className="col-span-1"></div>
-                </div>
               </>
             ) : (
               (showAllTests ? departments : (selectedDept ? [selectedDept] : [])).map((dept) => {
@@ -3175,7 +3316,10 @@ export default function PatientRegistration() {
             <div className="grid grid-cols-6 gap-2 p-2 border-b bg-white">
               <div>
                 <label className="text-gray-600 block mb-1 text-xs font-semibold text-blue-600">Test Charges</label>
-                <input className={`${input} font-semibold bg-blue-50 border-blue-200`} value={total} readOnly />
+                <input className={`${input} font-semibold bg-blue-50 border-blue-200`} 
+                  value={total}
+                  readOnly 
+                />
               </div>
               <div>
                 <label className="text-gray-600 block mb-1 text-xs">Discount(%)</label>
@@ -3193,7 +3337,27 @@ export default function PatientRegistration() {
               </div>
               <div>
                 <label className="text-gray-600 block mb-1 text-xs font-semibold text-purple-600">Test Amount</label>
-                <input className={`${input} font-semibold bg-purple-50 border-purple-200`} value={(total - discount).toFixed(0)} readOnly />
+                <input className={`${input} font-semibold bg-purple-50 border-purple-200`} 
+                  value={(() => {
+                    // Calculate charge amount - use package charges if available
+                    const hasPackageTests = selectedTests.some(t => t.fromPackage !== null);
+                    let chargeAmount = total;
+                    
+                    if (hasPackageTests) {
+                      // Sum all unique package charges
+                      const packageCharges = new Map();
+                      selectedTests.forEach(t => {
+                        if (t.fromPackage && !packageCharges.has(t.fromPackage)) {
+                          packageCharges.set(t.fromPackage, t.packageCharge || 0);
+                        }
+                      });
+                      chargeAmount = Array.from(packageCharges.values()).reduce((sum, charge) => sum + charge, 0);
+                    }
+                    
+                    return (chargeAmount - discount).toFixed(0);
+                  })()}
+                  readOnly 
+                />
               </div>
               <div>
                 <label className="text-gray-600 block mb-1 text-xs">Payment(Adv)</label>
@@ -3204,7 +3368,27 @@ export default function PatientRegistration() {
               </div>
               <div>
                 <label className="text-gray-600 block mb-1 text-xs font-semibold text-red-600">Balance</label>
-                <input className={`${input} font-semibold bg-red-50 border-red-200`} value={((total - discount) - paid).toFixed(0)} readOnly />
+                <input className={`${input} font-semibold bg-red-50 border-red-200`} 
+                  value={(() => {
+                    // Calculate charge amount - use package charges if available
+                    const hasPackageTests = selectedTests.some(t => t.fromPackage !== null);
+                    let chargeAmount = total;
+                    
+                    if (hasPackageTests) {
+                      // Sum all unique package charges
+                      const packageCharges = new Map();
+                      selectedTests.forEach(t => {
+                        if (t.fromPackage && !packageCharges.has(t.fromPackage)) {
+                          packageCharges.set(t.fromPackage, t.packageCharge || 0);
+                        }
+                      });
+                      chargeAmount = Array.from(packageCharges.values()).reduce((sum, charge) => sum + charge, 0);
+                    }
+                    
+                    return ((chargeAmount - discount) - paid).toFixed(0);
+                  })()}
+                  readOnly 
+                />
               </div>
             </div>
 
@@ -3326,7 +3510,10 @@ export default function PatientRegistration() {
                     sample: t.sample,
                     charge: businessType === "B2C" ? t.b2cCharge : t.b2bCharge,
                     b2cCharge: t.b2cCharge,
-                    b2bCharge: t.b2bCharge
+                    b2bCharge: t.b2bCharge,
+                    packageName: t.fromPackage || null,
+                    packageCharge: t.packageCharge || 0,
+                    fromPackage: t.fromPackage ? true : false
                   })),
                   patientData: {
                     title,

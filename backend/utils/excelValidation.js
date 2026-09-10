@@ -49,7 +49,7 @@ export const validateTestRow = async (row, rowIndex) => {
   }
 
   // Validate boolean fields
-  const booleanFields = ['isNABL', 'profileTest', 'isHeader', 'showTestName', 'attachFile', 'isActive'];
+  const booleanFields = ['isNABL', 'profileTest', 'attachFile', 'isActive'];
   booleanFields.forEach(field => {
     if (row[field] && !['yes', 'no', 'true', 'false'].includes(row[field].toLowerCase())) {
       errors.push(`Row ${rowIndex}: ${field} must be "Yes" or "No"`);
