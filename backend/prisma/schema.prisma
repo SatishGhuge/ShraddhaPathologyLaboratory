@@ -444,6 +444,7 @@ model TestCharge {
   organizationId  String?
   b2cCharge       Float
   b2bCharge       Float
+  category        String?
   discountPercent Float?        @default(0)
   specialPrice    Float?
   effectiveFrom   DateTime      @default(now())

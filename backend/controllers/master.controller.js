@@ -3396,6 +3396,7 @@ export const bulkCreateTestCharges = async (req, res) => {
               data: {
                 b2cCharge: parseFloat(b2cCharge) || 0,
                 b2bCharge: parseFloat(b2bCharge) || 0,
+                category: charge.category || null,
                 discountPercent: discountPercent ? parseFloat(discountPercent) : 0,
                 specialPrice: specialPrice ? parseFloat(specialPrice) : null
               }
@@ -3409,6 +3410,7 @@ export const bulkCreateTestCharges = async (req, res) => {
                 organizationId: chargeOrgId,
                 b2cCharge: parseFloat(b2cCharge) || 0,
                 b2bCharge: parseFloat(b2bCharge) || 0,
+                category: charge.category || null,
                 discountPercent: discountPercent ? parseFloat(discountPercent) : 0,
                 specialPrice: specialPrice ? parseFloat(specialPrice) : null,
                 isActive: true
