@@ -3453,7 +3453,15 @@ export const getPackages = async (req, res) => {
                 id: true,
                 name: true,
                 testCode: true,
-                sampleTypeId: true
+                sampleTypeId: true,
+                charges: {
+                  where: { organizationId: null },
+                  select: {
+                    b2cCharge: true,
+                    b2bCharge: true
+                  },
+                  take: 1
+                }
               }
             }
           }
@@ -3464,7 +3472,7 @@ export const getPackages = async (req, res) => {
       take: limit
     });
 
-    // Format packages with test information
+    // Format packages with test information and charges
     const packagesWithTests = packages.map(pkg => {
       return {
         ...pkg,
@@ -3473,7 +3481,8 @@ export const getPackages = async (req, res) => {
           id: packageTest.test.id,
           name: packageTest.test.name,
           testCode: packageTest.test.testCode,
-          sampleTypeId: packageTest.test.sampleTypeId
+          sampleTypeId: packageTest.test.sampleTypeId,
+          charges: packageTest.test.charges
         }))
       };
     });
@@ -3503,7 +3512,15 @@ export const getAllPackages = async (req, res) => {
                 id: true,
                 name: true,
                 testCode: true,
-                sampleTypeId: true
+                sampleTypeId: true,
+                charges: {
+                  where: { organizationId: null },
+                  select: {
+                    b2cCharge: true,
+                    b2bCharge: true
+                  },
+                  take: 1
+                }
               }
             }
           }
@@ -3514,7 +3531,7 @@ export const getAllPackages = async (req, res) => {
       take: limit
     });
 
-    // Format packages with test information
+    // Format packages with test information and charges
     const packagesWithTests = packages.map(pkg => {
       return {
         ...pkg,
@@ -3523,7 +3540,8 @@ export const getAllPackages = async (req, res) => {
           id: packageTest.test.id,
           name: packageTest.test.name,
           testCode: packageTest.test.testCode,
-          sampleTypeId: packageTest.test.sampleTypeId
+          sampleTypeId: packageTest.test.sampleTypeId,
+          charges: packageTest.test.charges
         }))
       };
     });

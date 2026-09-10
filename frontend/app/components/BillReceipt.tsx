@@ -150,21 +150,75 @@ const BillReceipt: React.FC<BillReceiptProps> = ({ booking, billing, businessTyp
           <thead>
             <tr style={{ borderTop: '1px solid #000', borderBottom: '1px solid #000' }}>
               <th className="text-left py-2 px-1" style={{ width: '5%', pageBreakInside: 'avoid' }}>Sr.</th>
-              <th className="text-left py-2 px-1" style={{ width: '55%', pageBreakInside: 'avoid' }}>Test Name</th>
-              <th className="text-left py-2 px-1" style={{ width: '20%', pageBreakInside: 'avoid' }}>Test Price</th>
+              <th className="text-left py-2 px-1" style={{ width: '55%', pageBreakInside: 'avoid' }}>Test / Package Name</th>
+              <th className="text-left py-2 px-1" style={{ width: '20%', pageBreakInside: 'avoid' }}>Charge</th>
             </tr>
           </thead>
           <tbody>
-            {booking.tests.map((t: any, i: number) => {
-              const charge = businessType === "B2C" ? (t.b2cCharge || t.charge || 0) : (t.b2bCharge || t.charge || 0);
-              return (
-                <tr key={i} style={{ borderBottom: '1px solid #ccc', pageBreakInside: 'avoid' }}>
-                  <td className="text-left py-1.5 px-1">{i + 1}</td>
-                  <td className="text-left py-1.5 px-1">{t.name}</td>
-                  <td className="text-left py-1.5 px-1">{Math.round(charge).toFixed(2)}</td>
-                </tr>
-              );
-            })}
+            {(() => {
+              // Safety check - if no tests, show empty message
+              if (!booking.tests || booking.tests.length === 0) {
+                return (
+                  <tr>
+                    <td colSpan={3} className="text-center py-4 text-gray-500">No tests found</td>
+                  </tr>
+                );
+              }
+
+              // Group tests by package
+              const groupedByPackage = new Map<string, any[]>();
+              booking.tests.forEach((test: any) => {
+                const packageKey = test.packageName || test.fromPackage || '__individual__';
+                if (!groupedByPackage.has(packageKey)) {
+                  groupedByPackage.set(packageKey, []);
+                }
+                groupedByPackage.get(packageKey)!.push(test);
+              });
+
+              const rows: JSX.Element[] = [];
+              let rowIndex = 1;
+
+              // Sort: packages first, then individual tests
+              const sortedKeys = Array.from(groupedByPackage.keys()).sort((a, b) => {
+                if (a === '__individual__') return 1; // individual tests go last
+                if (b === '__individual__') return -1;
+                return 0;
+              });
+
+              sortedKeys.forEach(packageKey => {
+                const testsInGroup = groupedByPackage.get(packageKey) || [];
+                
+                if (packageKey !== '__individual__') {
+                  // Package row - show package charge instead of individual tests
+                  const firstTest = testsInGroup[0];
+                  const packageCharge = firstTest?.packageCharge || 0;
+                  
+                  rows.push(
+                    <tr key={`pkg-${packageKey}`} style={{ borderBottom: '1px solid #ccc', pageBreakInside: 'avoid', backgroundColor: '#f0f0f0' }}>
+                      <td className="text-left py-1.5 px-1 font-semibold">{rowIndex++}</td>
+                      <td className="text-left py-1.5 px-1 font-semibold">📦 {packageKey}</td>
+                      <td className="text-left py-1.5 px-1 font-semibold">{Math.round(packageCharge).toFixed(2)}</td>
+                    </tr>
+                  );
+                } else {
+                  // Individual tests (if there are any)
+                  if (testsInGroup.length > 0) {
+                    testsInGroup.forEach((t: any) => {
+                      const charge = businessType === "B2C" ? (t.b2cCharge || t.charge || 0) : (t.b2bCharge || t.charge || 0);
+                      rows.push(
+                        <tr key={`test-${t.name}`} style={{ borderBottom: '1px solid #ccc', pageBreakInside: 'avoid' }}>
+                          <td className="text-left py-1.5 px-1">{rowIndex++}</td>
+                          <td className="text-left py-1.5 px-1">{t.name}</td>
+                          <td className="text-left py-1.5 px-1">{Math.round(charge).toFixed(2)}</td>
+                        </tr>
+                      );
+                    });
+                  }
+                }
+              });
+
+              return rows;
+            })()}
           </tbody>
         </table>
 

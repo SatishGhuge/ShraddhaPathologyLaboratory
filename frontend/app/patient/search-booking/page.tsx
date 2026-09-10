@@ -540,7 +540,6 @@ export default function BookingPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(25);
   const ITEMS_PER_PAGE = itemsPerPage;  // Use dynamic items per page
-  const [showReceiptModal, setShowReceiptModal] = useState(false);
   const [successPopup,     setSuccessPopup]     = useState("");
 
   useEffect(() => {
@@ -649,6 +648,10 @@ export default function BookingPage() {
           paymentMode: t.paymentMode || "Cash",
           businessType: t.businessType || "B2C",
           isEmergency: t.isEmergency || false,  // NEW: Include emergency flag
+          // ✅ NEW: Include package information for bill display
+          packageName: t.package?.name || t.packageName || null,
+          packageCharge: t.package?.charges || t.packageCharge || 0,
+          packageId: t.packageId || null,
         });
       });
 
@@ -1355,22 +1358,9 @@ export default function BookingPage() {
   };
 
   const handlePrintBooking = (b: any) => {
-    const invoiceId = b.visitId || b.bookingId;
-    const html=`<html><head><title>${invoiceId}</title>
-    <style>body{font-family:Arial;padding:20px}h1{color:#0891b2}
-    table{width:100%;border-collapse:collapse;margin:20px 0}
-    th,td{border:1px solid #ddd;padding:8px;text-align:left}
-    th{background:#0891b2;color:white}</style></head>
-    <body><h1>SHRADDHA PATHOLOGY LABORATORY - ${invoiceId}</h1>
-    <p><b>Patient:</b> ${b.name} | <b>ID:</b> ${b.patientId}</p>
-    <p><b>Date:</b> ${b.date} | <b>Mobile:</b> ${b.patientData.mobile}</p>
-    <table><tr><th>Sr</th><th>Test</th><th>Charge</th></tr>
-    ${b.tests.map((t,i)=>`<tr><td>${i+1}</td><td>${t.name}</td><td>₹${t.b2cCharge||t.charge}</td></tr>`).join('')}
-    </table><h3>Total: ₹${total}</h3></body></html>`;
-    const w=window.open("","_blank");
-    if (w) {
-      w.document.write(html); w.document.close(); w.print();
-    }
+    // ✅ CHANGED: Open BillModal instead of printing directly
+    setSelectedBooking(b);
+    setShowBillModal(true);
   };
 
   const handleDeleteTest = async (testToDelete: any) => {
@@ -1530,7 +1520,7 @@ export default function BookingPage() {
   };
 
   const handleBill    = () => setShowBillModal(true);
-  const handleReceipt = () => setShowReceiptModal(true);
+  const handleReceipt = () => setShowBillModal(true);  // ✅ CHANGED: Use BillModal instead of ReceiptModal
   const handleRefund  = () => setShowRefundModal(true);
 
   // Print functions for bill modal
@@ -2235,7 +2225,7 @@ export default function BookingPage() {
                   <div>{selectedBooking.name} <span className="text-yellow-300">UID: {selectedBooking.visitId || selectedBooking.bookingId}</span></div>
                   <div className="flex gap-1">
                     <button onClick={() => setShowBillModal(true)}    className="bg-orange-100 text-black px-3 py-1 rounded text-xs font-semibold">Bill</button>
-                    <button onClick={() => alert('Receipt functionality to be implemented')} className="bg-orange-100 text-black px-3 py-1 rounded text-xs font-semibold">Receipts</button>
+                    <button onClick={() => handleReceipt()} className="bg-orange-100 text-black px-3 py-1 rounded text-xs font-semibold">Receipts</button>
                     <button onClick={() => setShowRefundModal(true)}  className="bg-orange-100 text-black px-3 py-1 rounded text-xs font-semibold">Refund</button>
                     <button onClick={()=>setSelectedBooking(null)} className="bg-red-500 p-1 rounded"><X size={16}/></button>
                   </div>
@@ -2952,79 +2942,6 @@ export default function BookingPage() {
         </div>
       )}
 
-      {/* ===== RECEIPT MODAL ===== */}
-      {showReceiptModal && selectedBooking && (() => {
-        const paymentDate = selectedBooking.patientData?.visitDate
-          ? new Date(selectedBooking.patientData.visitDate).toLocaleString("en-GB", { day:"2-digit", month:"2-digit", year:"numeric", hour:"2-digit", minute:"2-digit", second:"2-digit", hour12:false }).replace(",","")
-          : selectedBooking.date + " 00:00:00";
-        const paidAmt = parseFloat(billing.payment) || total;
-
-        const printReceipt = () => {
-          const html = `<html><head><title>Receipt</title>
-          <style>body{font-family:Arial;padding:20px}h2{text-align:center}table{width:100%;border-collapse:collapse;margin-top:16px}th,td{border:1px solid #ccc;padding:8px;text-align:left}th{background:#5b5ea6;color:white}</style></head>
-          <body><h2>SHRADDHA PATHOLOGY LABORATORY</h2><h3 style="text-align:center">Receipt - ${selectedBooking.name}</h3>
-          <table><tr><th>Payment Date</th><th>Amount</th><th>Received By</th></tr>
-          <tr><td>${paymentDate}</td><td>${paidAmt}</td><td>SHRADDHA PATHOLOGY LABORATORY</td></tr></table>
-          </body></html>`;
-          const w = window.open("","_blank");
-          if (w) {
-            w.document.write(html); w.document.close(); w.print();
-          }
-        };
-
-        return (
-          <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-[70]">
-            <div className="bg-white rounded-lg shadow-2xl w-[95%] max-w-2xl">
-              {/* Header */}
-              <div className="bg-gray-100 px-4 py-3 flex justify-between items-center border-b rounded-t-lg">
-                <h2 className="text-base font-bold text-gray-800">Receipts - {selectedBooking.name}</h2>
-                <button
-                  onClick={() => setShowReceiptModal(false)}
-                  className="text-gray-500 hover:text-gray-800 border rounded px-2 py-0.5 text-sm"
-                >✕</button>
-              </div>
-
-              {/* Table */}
-              <div className="p-4">
-                <table className="w-full text-sm border-collapse">
-                  <thead>
-                    <tr className="bg-indigo-600 text-white">
-                      <th className="px-3 py-2 text-left font-semibold">Payment Date</th>
-                      <th className="px-3 py-2 text-left font-semibold">Amount</th>
-                      <th className="px-3 py-2 text-left font-semibold">Received By</th>
-                      <th className="px-3 py-2 text-left font-semibold">Action</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr className="border-b hover:bg-gray-50">
-                      <td className="px-3 py-2">{paymentDate}</td>
-                      <td className="px-3 py-2 font-semibold">{paidAmt}</td>
-                      <td className="px-3 py-2">SHRADDHA PATHOLOGY LABORATORY</td>
-                      <td className="px-3 py-2">
-                        <div className="flex gap-1 flex-wrap">
-                          <button
-                            onClick={printReceipt}
-                            className="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1 rounded text-xs font-semibold"
-                          >Print Receipt</button>
-                          <button className="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1 rounded text-xs font-semibold">Whatsapp</button>
-                          <button className="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1 rounded text-xs font-semibold">Edit</button>
-                          <button
-                            onClick={() => {
-                              if (window.confirm("Delete this receipt?")) setShowReceiptModal(false);
-                            }}
-                            className="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded text-xs font-semibold"
-                          >Delete</button>
-                        </div>
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-        );
-      })()}
-
       {/* ===== BILL MODAL ===== */}
       {showBillModal && selectedBooking && (() => {
         // Calculate proper amounts for bill display
@@ -3129,148 +3046,14 @@ export default function BookingPage() {
                 >✕</button>
               </div>
 
-              {/* Bill content */}
-              <div className="overflow-y-auto flex-1 p-6" id="bill-print-area">
-                {/* Header */}
-                <div className="text-center mb-4">
-                  <h1 className="text-2xl font-bold tracking-wide">SHRADDHA PATHOLOGY LABORATORY</h1>
-                  <p className="text-xs text-gray-600">Plot No-38, Sector-1, D-Mart Road, New Panvel - 410 206</p>
-                  <p className="text-xs text-gray-600">+91 8779295302, 022-2745 1122</p>
-                  <p className="text-xs text-gray-600">info@shraddha.com | www.shraddha.com</p>
-                  <h2 className="text-sm font-bold underline mt-3 tracking-widest">
-                    {isFullyPaid ? 'INVOICE-CUM-RECEIPT' : 'INVOICE'}
-                  </h2>
-                  {!isFullyPaid && billBalanceAmount > 0 && (
-                    <div className="mt-2 inline-block bg-red-100 text-red-800 px-3 py-1 rounded-full text-xs font-bold">
-                      BALANCE DUE: Rs.{Math.round(billBalanceAmount).toLocaleString()}
-                    </div>
-                  )}
-                </div>
-
-                {/* Patient info grid */}
-                <div className="grid grid-cols-[2fr_1fr_2fr] gap-x-4 text-xs mb-4 border-t border-b py-3">
-                  <div className="space-y-1">
-                    <div className="flex gap-2"><span className="w-20 font-semibold">Name</span><span>: {selectedBooking.name}</span></div>
-                    <div className="flex gap-2"><span className="w-20 font-semibold">Age/Sex</span><span>: {selectedBooking.patientData?.age} Yrs/{selectedBooking.patientData?.gender}</span></div>
-                    <div className="flex gap-2"><span className="w-20 font-semibold">Ref Dr.</span><span>: {selectedBooking.patientData?.referralDoctor || "—"}</span></div>
-                    <div className="flex gap-2"><span className="w-20 font-semibold">Center</span><span>: SHRADDHA PATHOLOGY LABORATORY</span></div>
-                  </div>
-                  <div></div>
-                  <div className="space-y-1">
-                    <div className="flex gap-2"><span className="w-24 font-semibold">Patient ID</span><span>: {selectedBooking.patientId}</span></div>
-                    <div className="flex gap-2"><span className="w-24 font-semibold">Date</span><span>: {selectedBooking.date}</span></div>
-                    <div className="flex gap-2"><span className="w-24 font-semibold">Mobile No</span><span>: {selectedBooking.patientData?.mobile}</span></div>
-                    <div className="flex gap-2"><span className="w-24 font-semibold">Invoice No</span><span>: {selectedBooking.visitId || selectedBooking.bookingId}</span></div>
-                  </div>
-                </div>
-
-                {/* Tests table */}
-                <table className="w-full text-xs mb-4 border-collapse">
-                  <thead>
-                    <tr className="border-b-2 border-gray-800">
-                      <th className="text-left py-1 w-10">Sr.No</th>
-                      <th className="text-left py-1">Investigation(s)</th>
-                      <th className="text-left py-1 w-28">Date</th>
-                      <th className="text-right py-1 w-20">Charges</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {selectedBooking.tests.map((t, i) => {
-                      const charge = businessType==="B2C" ? (t.b2cCharge||t.charge||0) : (t.b2bCharge||t.charge||0);
-                      return (
-                        <tr key={i} className="border-b border-gray-200">
-                          <td className="py-1 align-top">{i+1}</td>
-                          <td className="py-1 align-top font-medium">{t.name}</td>
-                          <td className="py-1 align-top">{selectedBooking.date}</td>
-                          <td className="py-1 align-top text-right">Rs.{Math.round(charge).toLocaleString()}</td>
-                        </tr>
-                      );
-                    })}
-                    {/* Total row */}
-                    <tr className="border-b-2 border-gray-800">
-                      <td colSpan={3} className="py-1 font-bold text-right">TOTAL:</td>
-                      <td className="py-1 font-bold text-right">Rs.{Math.round(billTotal).toLocaleString()}</td>
-                    </tr>
-                  </tbody>
-                </table>
-
-                {/* Amount in words + summary */}
-                <div className="flex justify-between items-start text-xs mt-2">
-                  <div className="max-w-xs">
-                    <p className="font-bold">
-                      {isFullyPaid ? 'Total Paid' : 'Net Amount'}: {numberToWords(isFullyPaid ? billPaidAmount : billNetAmount)} Rupees Only
-                    </p>
-                  </div>
-                  <div className="text-right space-y-0.5 min-w-[200px]">
-                    <div className="flex justify-between gap-8">
-                      <span className="font-semibold">Total Bill:</span>
-                      <span className="font-semibold">Rs.{Math.round(billTotal).toLocaleString()}</span>
-                    </div>
-                    
-                    {billDiscountAmount > 0 && (
-                      <div className="flex justify-between gap-8">
-                        <span>Discount {currentDiscountPercent > 0 ? `(${currentDiscountPercent}%)` : ''}:</span>
-                        <span className="font-semibold text-green-600">
-                          - Rs.{Math.round(billDiscountAmount).toLocaleString()}
-                        </span>
-                      </div>
-                    )}
-                    
-                    <div className="flex justify-between gap-8 border-t border-gray-300 pt-0.5">
-                      <span className="font-bold">Net Amount:</span>
-                      <span className="font-bold">Rs.{Math.round(billNetAmount).toLocaleString()}</span>
-                    </div>
-                    
-                    <div className="flex justify-between gap-8">
-                      <span>Amount Paid:</span>
-                      <span className="font-semibold text-orange-600">Rs.{Math.round(billPaidAmount).toLocaleString()}</span>
-                    </div>
-                    
-                    <div className="flex justify-between gap-8">
-                      <span>Balance Amount:</span>
-                      <span className={`font-semibold ${billBalanceAmount > 0 ? 'text-red-600' : 'text-green-600'}`}>
-                        Rs.{Math.round(billBalanceAmount).toLocaleString()}
-                      </span>
-                    </div>
-                    
-                    <div className="border-t border-gray-400 my-1"/>
-                    
-                    <div className="flex justify-between gap-8">
-                      <span className="font-semibold">Payment Status:</span>
-                      <span className={`font-bold ${isFullyPaid ? 'text-green-600' : 'text-red-600'}`}>
-                        {isFullyPaid ? 'FULLY PAID' : 'PENDING'}
-                      </span>
-                    </div>
-                    
-                    {billPaidAmount > 0 && (
-                      <div className="flex justify-between gap-8">
-                        <span>Payment Mode:</span>
-                        <span className="font-semibold">{billing.paymentMode || "CASH"}</span>
-                      </div>
-                    )}
-                    
-                    {billDiscountAmount > 0 && billing.remarks && (
-                      <div className="flex justify-between gap-8">
-                        <span>Discount Remark:</span>
-                        <span className="font-semibold text-gray-600">{billing.remarks}</span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* Footer */}
-                <div className="mt-6 pt-3 border-t text-xs text-gray-600">
-                  <div className="flex justify-between items-end">
-                    <div>
-                      <p className="mb-2">Thank you for choosing SHRADDHA PATHOLOGY LABORATORY</p>
-                      <p>For any queries, please contact us at +91 8779295302</p>
-                    </div>
-                    <div className="text-right">
-                      <p className="mb-2">Authorised Signatory</p>
-                      <p>SHRADDHA PATHOLOGY LABORATORY</p>
-                    </div>
-                  </div>
-                </div>
+              {/* Bill content - Using BillReceipt component */}
+              <div className="overflow-y-auto flex-1 bg-gray-50">
+                <BillReceipt
+                  booking={selectedBooking}
+                  billing={billing}
+                  businessType={businessType}
+                  numberToWords={numberToWords}
+                />
               </div>
             </div>
           </div>

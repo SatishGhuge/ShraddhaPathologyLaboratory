@@ -197,6 +197,10 @@ export const createPatient = async (req, res) => {
     let discountAmount = billing.discountAmount || 0;
     let advanceAmount = billing.paidAmount || 0; // Frontend sends paidAmount, not advanceAmount
     let discountRemark = billing.discountRemark || null;
+    // ✅ NEW: Check if using package charges (multiple packages supported)
+    const usePackageCharges = billing.usePackageCharges || false;
+    const totalPackageCharges = billing.totalPackageCharges || 0;
+    const packageChargesByName = billing.packageChargesByName || {};
     // 🔧 FIX: Declare visitId at top level so it's accessible in response
     let visitId = null;
 
@@ -290,8 +294,17 @@ export const createPatient = async (req, res) => {
       visitId = await generateVisitId(visitDate);
       
       // ✅ NEW BILLING LOGIC: Single discount for all tests
-      // Step 1: Calculate total test charges
-      const totalTestCharges = tests.reduce((sum, t) => sum + (parseFloat(t.charge) || 0), 0);
+      // Step 1: Calculate total charges - use package charges if available, otherwise sum individual test charges
+      let totalTestCharges = 0;
+      if (usePackageCharges && totalPackageCharges > 0) {
+        // Use sum of all package charges (e.g., ₹900 + ₹1000 = ₹1900)
+        totalTestCharges = totalPackageCharges;
+        console.log(`✅ Using package charges: ₹${totalTestCharges} for bill (packages: ${JSON.stringify(packageChargesByName)})`);
+      } else {
+        // Sum individual test charges
+        totalTestCharges = tests.reduce((sum, t) => sum + (parseFloat(t.charge) || 0), 0);
+        console.log(`✅ Using sum of individual test charges: ₹${totalTestCharges}`);
+      }
       
       // Step 2: Calculate discount amount
       let finalDiscountAmount = 0;
@@ -453,8 +466,17 @@ export const createPatient = async (req, res) => {
       visitId = await generateVisitId(visitDate);
 
       // ✅ NEW BILLING LOGIC: Single discount for all tests
-      // Step 1: Calculate total test charges
-      const totalTestCharges = tests.reduce((sum, t) => sum + (parseFloat(t.charge) || 0), 0);
+      // Step 1: Calculate total charges - use package charges if available, otherwise sum individual test charges
+      let totalTestCharges = 0;
+      if (usePackageCharges && totalPackageCharges > 0) {
+        // Use sum of all package charges (e.g., ₹900 + ₹1000 = ₹1900)
+        totalTestCharges = totalPackageCharges;
+        console.log(`✅ Using package charges: ₹${totalTestCharges} for bill (packages: ${JSON.stringify(packageChargesByName)})`);
+      } else {
+        // Sum individual test charges
+        totalTestCharges = tests.reduce((sum, t) => sum + (parseFloat(t.charge) || 0), 0);
+        console.log(`✅ Using sum of individual test charges: ₹${totalTestCharges}`);
+      }
       
       // Step 2: Calculate discount amount
       let finalDiscountAmount = 0;
@@ -580,12 +602,26 @@ export const createPatient = async (req, res) => {
         }
         
         // Step 6: Create PatientTest records (source of truth)
+        // First, resolve packageIds from packageNames
+        const packageMap = new Map();
+        const uniquePackageNames = [...new Set(tests.filter(t => t.packageName).map(t => t.packageName))];
+        
+        if (uniquePackageNames.length > 0) {
+          const packages = await tx.package.findMany({
+            where: { name: { in: uniquePackageNames } }
+          });
+          packages.forEach(pkg => packageMap.set(pkg.name, pkg.id));
+        }
+        
         const patientTestsData = tests.map(test => {
           const testCharge = parseFloat(test.charge);
+          const packageId = test.packageName ? packageMap.get(test.packageName) : null;
+          
           return {
             patientId,
             visitId,
             testId: parseInt(test.testId || test.id),
+            packageId: packageId || null,  // ✅ Save packageId if test is from a package
             departmentId: test.departmentId || 1,
             organizationId: req.body.organizationId || null,
             sample: test.sample || 'Blood',
@@ -788,6 +824,17 @@ export const registerPatientWithEmail = async (req, res) => {
 
     // Create patient tests if provided
     if (tests && tests.length > 0) {
+      // Resolve packageIds from packageNames
+      const packageMap = new Map();
+      const uniquePackageNames = [...new Set(tests.filter(t => t.packageName).map(t => t.packageName))];
+      
+      if (uniquePackageNames.length > 0) {
+        const packages = await prisma.package.findMany({
+          where: { name: { in: uniquePackageNames } }
+        });
+        packages.forEach(pkg => packageMap.set(pkg.name, pkg.id));
+      }
+      
       const perTestAmount = totalAmount / tests.length;
       const perTestDiscount = discountAmount / tests.length;
       const perTestPaid = paidAmount / tests.length;
@@ -799,6 +846,7 @@ export const registerPatientWithEmail = async (req, res) => {
           patientId,
           visitId,
           testId: test.id,
+          packageId: test.packageName ? packageMap.get(test.packageName) : null,  // ✅ Save packageId
           departmentId: test.departmentId,
           organizationId: organizationId || null,
           sample: test.sample || 'Blood',
@@ -2013,7 +2061,8 @@ export const getTestsByVisitId = async (req, res) => {
         package: {
           select: {
             id: true,
-            name: true
+            name: true,
+            charges: true
           }
         },
         patient: {
@@ -2153,6 +2202,7 @@ export const getTestsByVisitId = async (req, res) => {
       organizationName: pt.organization?.name,
       packageId: pt.packageId,
       packageName: pt.package?.name,
+      packageCharge: pt.package?.charges || 0,  // ✅ Include package charge from package relationship
       
       // Charge details
       charge: pt.charge || 0,

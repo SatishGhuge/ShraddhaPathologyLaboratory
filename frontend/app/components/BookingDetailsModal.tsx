@@ -66,6 +66,7 @@ const BookingDetailsModal: React.FC<BookingDetailsModalProps> = ({
   const [selectedPackage, setSelectedPackage] = useState<any>(null);
   const [packageSearch, setPackageSearch] = useState("");
   const [showPkgDropdown, setShowPkgDropdown] = useState(false);
+  const [activeTab, setActiveTab] = useState("test");  // ✅ Tab state: "test" or "package"
   const [editingCharge, setEditingCharge] = useState<any>(null);
   const [discount, setDiscount] = useState(0); // ✅ Reset on modal open
   const [discountPercent, setDiscountPercent] = useState(0); // ✅ Reset on modal open
@@ -157,6 +158,7 @@ const BookingDetailsModal: React.FC<BookingDetailsModalProps> = ({
         const result = await response.json();
         
         console.log('🔍 API Response:', result);
+        console.log('🔍 First test data:', result?.data?.tests?.[0] ? JSON.stringify(result.data.tests[0], null, 2) : 'NO TESTS');
         
         if (result.success && result.data) {
           console.log('✅ Fetched tests from PatientTest table:', result.data);
@@ -240,7 +242,7 @@ const BookingDetailsModal: React.FC<BookingDetailsModalProps> = ({
     if (!isOpen) {
       console.log('🧹 Clearing BookingDetailsModal form states on close');
       setSearchTest("");
-      setTestView("all");
+      setActiveTab("test");  // Reset to test tab
       setSelectedPackage(null);
       setPackageSearch("");
       setShowPkgDropdown(false);
@@ -263,15 +265,20 @@ const BookingDetailsModal: React.FC<BookingDetailsModalProps> = ({
   if (!isOpen || !booking) return null;
 
   // Filter tests based on search (no useMemo to avoid hook mismatch errors)
+  // ✅ Only filter tests based on activeTab - don't mix with packages
   let displayTests: any[] = [];
-  if (testView === "packages" && selectedPackage) {
+  if (activeTab === "package" && selectedPackage) {
+    // When viewing a selected package, show its tests filtered by search
     displayTests = selectedPackage.tests?.filter((t: any) =>
       t.name.toLowerCase().includes(searchTest.toLowerCase())
     ) || [];
-  } else {
+  } else if (activeTab === "test") {
+    // When on Test tab, ONLY show individual tests
     displayTests = allTests.filter((t: any) =>
       t.name.toLowerCase().includes(searchTest.toLowerCase())
     );
+  } else {
+    displayTests = [];
   }
 
   // ============================================================================
@@ -361,15 +368,16 @@ const BookingDetailsModal: React.FC<BookingDetailsModalProps> = ({
     return sum + charge;
   }, 0);
   
-  // ✅ HANDLE DELETED EXISTING TESTS
-  // Use the tracked state of deleted tests charges
-  finalGrandTotal = Math.max(0, finalGrandTotal - deletedTestsChargeTotal);
-  finalBalance = Math.max(0, finalBalance - deletedTestsChargeTotal);
+  // ✅ IMPORTANT: Don't subtract deletedTestsChargeTotal from finalGrandTotal
+  // deletedTestsChargeTotal is ONLY for tracking NEW tests added in this session and then deleted
+  // Existing tests deletion is handled by backend and returns updated billing
+  // So just use finalGrandTotal as-is, then add newTestsChargeTotal on top
   
   console.log('📊 Test Deletion Debug:', {
     deletedTestsChargeTotal,
-    adjustedFinalGrandTotal: finalGrandTotal,
-    adjustedFinalBalance: finalBalance,
+    newTestsChargeTotal,
+    finalGrandTotal,
+    note: 'deletedTestsChargeTotal is tracked but not applied - it is for info only'
   });
   
   // ✅ NEW LOGIC: Discount applies to BALANCE AMOUNT (not just new tests)
@@ -928,114 +936,145 @@ const BookingDetailsModal: React.FC<BookingDetailsModalProps> = ({
           <div className="w-1/3 flex flex-col bg-white rounded shadow overflow-hidden">
             {/* Search Section */}
             <div className="p-2 flex gap-2 border-b items-center flex-shrink-0">
-              {testView === "packages" ? (
-                <div className="relative flex-1">
-                  <input
-                    autoFocus
-                    placeholder="Search package..."
-                    value={packageSearch}
-                    onChange={e => {
-                      setPackageSearch(e.target.value);
-                      setSelectedPackage(null);
-                    }}
-                    onFocus={() => setShowPkgDropdown(true)}
-                    onBlur={() => setTimeout(() => setShowPkgDropdown(false), 150)}
-                    className={`${style.input} w-full`}
-                  />
-                  {showPkgDropdown && (
-                    <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-gray-200 rounded shadow-lg z-50 max-h-56 overflow-y-auto">
-                      {packagesList
-                        .filter(p => p.name.toLowerCase().includes(packageSearch.toLowerCase()))
-                        .map(pkg => (
-                          <div
-                            key={pkg.id}
-                            onMouseDown={e => e.preventDefault()}
-                            onClick={() => {
-                              setSelectedPackage(pkg);
-                              setPackageSearch(pkg.name);
-                              setShowPkgDropdown(false);
-                              setSearchTest("");
-                            }}
-                            className={`px-3 py-2 cursor-pointer border-b last:border-b-0 text-sm transition-colors ${
-                              selectedPackage?.id === pkg.id ? "bg-orange-100 font-semibold" : "hover:bg-orange-50"
-                            }`}
-                          >
-                            <div className="font-medium text-gray-800">{pkg.name}</div>
-                            <div className="text-xs text-gray-500">
-                              {pkg.tests.length} test{pkg.tests.length !== 1 ? "s" : ""} · B2C ₹{pkg.b2cCharge} · B2B ₹{pkg.b2bCharge}
-                            </div>
-                          </div>
-                        ))}
-                      {packagesList.filter(p => p.name.toLowerCase().includes(packageSearch.toLowerCase())).length === 0 && (
-                        <div className="p-3 text-center text-gray-400 text-sm">No packages found</div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              ) : (
+              <div className="relative flex-1">
                 <input
-                  placeholder="Search for test"
+                  placeholder="Search test or package..."
                   value={searchTest}
                   onChange={e => setSearchTest(e.target.value)}
-                  className={`${style.input} flex-1`}
+                  className={`${style.input} w-full`}
                 />
-              )}
-              <button
-                onClick={() => {
-                  setTestView("all");
-                  setSearchTest("");
-                  setSelectedPackage(null);
-                  setPackageSearch("");
-                  setShowPkgDropdown(false);
-                }}
-                className={`${testView === "all" ? "bg-orange-600" : "bg-cyan-900"} text-white px-2 py-1 rounded shrink-0 hover:bg-orange-600`}
-                title="All Tests"
-              >
-                <RefreshCcw size={14} />
-              </button>
-              <button
-                onClick={() => {
-                  setTestView("packages");
-                  setSearchTest("");
-                  setPackageSearch("");
-                  setSelectedPackage(null);
-                  setTimeout(() => setShowPkgDropdown(true), 50);
-                }}
-                className={`${testView === "packages" ? "bg-orange-600" : "bg-cyan-900"} text-white px-2 py-1 rounded shrink-0 hover:bg-orange-600`}
-                title="Packages"
-              >
-                <Plus size={14} />
-              </button>
+              </div>
             </div>
 
-            {/* Tests List */}
+            {/* Tests List - ALWAYS shows tests, package dropdown via search */}
             <div className="flex-1 overflow-y-auto max-h-96">
-              <div className="bg-cyan-900 text-white text-xs font-semibold px-2 py-1 sticky top-0 grid grid-cols-3 gap-2">
-                <div className="col-span-2">Test Name</div>
+              {/* Header with clickable tabs */}
+              <div className="bg-cyan-900 text-white text-xs font-semibold px-2 py-1 sticky top-0 flex items-center justify-between gap-4">
+                <div className="flex items-center gap-3 flex-1">
+                  <button
+                    onClick={() => setActiveTab("test")}
+                    className={`px-3 py-1 rounded transition-colors ${
+                      activeTab === "test"
+                        ? "bg-white text-cyan-900 font-bold"
+                        : "hover:bg-cyan-800 text-white"
+                    }`}
+                  >
+                    Test
+                  </button>
+                  <span className="text-gray-300">/</span>
+                  <button
+                    onClick={() => setActiveTab("package")}
+                    className={`px-3 py-1 rounded transition-colors ${
+                      activeTab === "package"
+                        ? "bg-white text-cyan-900 font-bold"
+                        : "hover:bg-cyan-800 text-white"
+                    }`}
+                  >
+                    Package Name
+                  </button>
+                </div>
                 <div className="text-right">Charges</div>
               </div>
 
-              {testView === "packages" && !selectedPackage ? (
-                <div className="flex items-center justify-center h-full text-gray-400 text-xs p-4">
-                  Select a package
-                </div>
-              ) : displayTests.length > 0 ? (
-                displayTests.map((t, i) => (
-                  <div
-                    key={i}
-                    onClick={() => handleAddTest(t, selectedPackage)}
-                    className="border-b px-2 py-2 text-xs cursor-pointer hover:bg-gray-50 transition-colors grid grid-cols-3 gap-2 items-center"
-                  >
-                    <div className="col-span-2 font-medium text-gray-800 flex items-center gap-2">
-                      <Plus size={13} className="text-orange-500" />
-                      <span className="truncate">{t.name}</span>
+              {/* TEST TAB - Show only individual tests by default */}
+              {activeTab === "test" && (
+                <div>
+                  {displayTests.filter(t => t.name.toLowerCase().includes(searchTest.toLowerCase())).length > 0 ? (
+                    displayTests
+                      .filter(t => t.name.toLowerCase().includes(searchTest.toLowerCase()))
+                      .map((t, i) => (
+                        <div
+                          key={`test-${i}`}
+                          onClick={() => handleAddTest(t, null)}
+                          className="border-b px-2 py-2 text-xs cursor-pointer hover:bg-gray-50 transition-colors grid grid-cols-3 gap-2 items-center"
+                        >
+                          <div className="col-span-2 font-medium text-gray-800 flex items-center gap-2">
+                            <Plus size={13} className="text-blue-500" />
+                            <span className="truncate">{t.name}</span>
+                          </div>
+                          <div className="text-right text-gray-700">₹{t.b2cCharge || t.charge || 0}</div>
+                        </div>
+                      ))
+                  ) : (
+                    <div className="flex items-center justify-center h-full text-gray-400 text-xs p-4">
+                      No tests found
                     </div>
-                    <div className="text-right text-gray-700">₹{t.b2cCharge || t.charge || 0}</div>
+                  )}
+                </div>
+              )}
+
+              {/* PACKAGE TAB - Show packages when clicked */}
+              {activeTab === "package" && (
+                <div>
+                  {packagesList
+                    .filter(p => p.name.toLowerCase().includes(searchTest.toLowerCase())).length > 0 ? (
+                    packagesList
+                      .filter(p => p.name.toLowerCase().includes(searchTest.toLowerCase()))
+                      .map((pkg) => (
+                        <div
+                          key={`pkg-${pkg.id}`}
+                          onClick={() => {
+                            setSelectedPackage(pkg);
+                            // Show package dropdown indicator
+                            setShowPkgDropdown(true);
+                          }}
+                          className="border-b px-2 py-2 text-xs cursor-pointer hover:bg-orange-50 transition-colors grid grid-cols-3 gap-2 items-center"
+                        >
+                          <div className="col-span-2 font-medium text-orange-800 flex items-center gap-2">
+                            <Plus size={13} className="text-orange-600" />
+                            <span className="truncate">📦 {pkg.name}</span>
+                          </div>
+                          <div className="text-right text-orange-700 font-semibold">₹{pkg.charges || pkg.b2cCharge || 0}</div>
+                        </div>
+                      ))
+                  ) : (
+                    <div className="flex items-center justify-center h-full text-gray-400 text-xs p-4">
+                      No packages found
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* PACKAGE DETAILS - Show tests from selected package */}
+              {activeTab === "package" && selectedPackage && (
+                <div className="bg-orange-50 border-t-2 border-orange-200 p-2">
+                  <div className="text-xs font-bold text-orange-900 mb-2">
+                    📦 {selectedPackage.name} - Tests ({selectedPackage.tests?.length || 0})
                   </div>
-                ))
-              ) : (
-                <div className="flex items-center justify-center h-full text-gray-400 text-xs p-4">
-                  No tests found
+                  <div className="space-y-1">
+                    {selectedPackage.tests && selectedPackage.tests.length > 0 ? (
+                      selectedPackage.tests.map((test: any, idx: number) => (
+                        <div
+                          key={`pkg-test-${idx}`}
+                          onClick={() => {
+                            handleAddTest(test, selectedPackage);
+                            // After adding, show confirmation
+                            setSelectedPackage(null);
+                            setShowPkgDropdown(false);
+                          }}
+                          className="px-2 py-1 text-xs cursor-pointer hover:bg-white rounded transition-colors text-gray-800"
+                        >
+                          <Plus size={11} className="inline text-orange-600 mr-1" />
+                          {test.name}
+                        </div>
+                      ))
+                    ) : (
+                      <div className="text-xs text-gray-500">No tests in this package</div>
+                    )}
+                  </div>
+                  <button
+                    onClick={() => {
+                      // Add all tests from package
+                      selectedPackage.tests?.forEach((test: any) => {
+                        handleAddTest(test, selectedPackage);
+                      });
+                      setSelectedPackage(null);
+                      setShowPkgDropdown(false);
+                    }}
+                    className="mt-2 w-full bg-orange-500 hover:bg-orange-600 text-white text-xs py-1 rounded font-semibold"
+                  >
+                    Add All {selectedPackage.tests?.length || 0} Tests
+                  </button>
                 </div>
               )}
             </div>
@@ -1050,7 +1089,20 @@ const BookingDetailsModal: React.FC<BookingDetailsModalProps> = ({
                   <thead className="bg-cyan-900 text-white sticky top-0">
                     <tr>
                       <th className="p-1 text-left">#</th>
-                      <th className="p-1 text-left">Test   <span className="text-yellow-300 text-sm">{tests.length}</span></th>
+                      <th className="p-1 text-left">
+                        {(() => {
+                          const nonPackageTests = tests.filter(t => !t.fromPackage).length;
+                          const uniquePackages = new Set(tests.filter(t => t.fromPackage).map(t => t.fromPackage)).size;
+                          const totalCount = nonPackageTests + (uniquePackages > 0 ? 1 : 0);
+                          
+                          let title = `Test ${tests.length}`;
+                          if (tests.filter(t => t.fromPackage).length > 0) {
+                            title = `Tests ${nonPackageTests}P${uniquePackages}`;
+                          }
+                          return title;
+                        })()}
+                      </th>
+                      <th className="p-1 text-left">Package</th>
                       <th className="p-1 text-center">Date</th>
                       <th className="p-1 text-center">Amt</th>
                       <th className="p-1 text-center">📝</th>
@@ -1061,70 +1113,160 @@ const BookingDetailsModal: React.FC<BookingDetailsModalProps> = ({
                   <tbody>
                     {tests.length === 0 ? (
                       <tr>
-                        <td colSpan={7} className="p-2 text-center text-gray-400 text-xs">
+                        <td colSpan={8} className="p-2 text-center text-gray-400 text-xs">
                           No tests added
                         </td>
                       </tr>
-                    ) : (
-                      tests.map((t, i) => {
-                        const charge = businessType === "B2C" ? (t.b2cCharge || t.charge || 0) : (t.b2bCharge || t.charge || 0);
-                        const isEditing = editingCharge?.testName === t.name;
-                        const isNewTest = !t.isExisting; // Mark new tests
-                        return (
-                          <tr key={i} className={`border-b text-xs hover:bg-gray-50 ${isNewTest ? "bg-blue-50" : ""}`}>
-                            <td className="p-1 text-center font-medium">{i + 1}</td>
-                            <td className="p-1">
-                              <div className="flex items-center gap-1">
-                                {isNewTest && (
-                                  <span className="text-blue-600 font-bold text-xs">N</span>
+                    ) : (() => {
+                      // Group tests by package - use packageName from backend or fromPackage for newly added tests
+                      console.log('🔍 Tests to group:', tests);
+                      console.log('🔍 First test packageName:', tests[0]?.packageName, 'fromPackage:', tests[0]?.fromPackage);
+                      
+                      const groupedByPackage = new Map<string | null, any[]>();
+                      tests.forEach(test => {
+                        const packageKey = test.packageName || test.fromPackage || '__individual__';
+                        console.log(`📦 Test "${test.name}" -> packageKey: "${packageKey}"`);
+                        if (!groupedByPackage.has(packageKey)) {
+                          groupedByPackage.set(packageKey, []);
+                        }
+                        groupedByPackage.get(packageKey)!.push(test);
+                      });
+
+                      // Get packages info (need to find package data)
+                      const packageMap = new Map<string, any>();
+                      packagesList.forEach(pkg => {
+                        packageMap.set(pkg.name, pkg);
+                      });
+                      
+                      // Also build packageMap from tests that have packageName
+                      tests.forEach(test => {
+                        if (test.packageName && !packageMap.has(test.packageName)) {
+                          packageMap.set(test.packageName, {
+                            name: test.packageName,
+                            charges: test.packageCharge || 0,
+                            id: test.packageId
+                          });
+                        }
+                      });
+
+                      const rows: JSX.Element[] = [];
+                      let rowIndex = 1;
+
+                      // Sort: packages first, then individual tests
+                      const sortedKeys = Array.from(groupedByPackage.keys()).sort((a, b) => {
+                        if (a === '__individual__') return 1; // individual tests go last
+                        if (b === '__individual__') return -1;
+                        return 0;
+                      });
+
+                      sortedKeys.forEach(packageKey => {
+                        const testsInGroup = groupedByPackage.get(packageKey) || [];
+                        
+                        if (packageKey !== '__individual__') {
+                          // Package header row
+                          const pkgData = packageMap.get(packageKey);
+                          // Get package charge from first test in group (all tests in same package have same charge)
+                          const firstTestInGroup = testsInGroup[0];
+                          const packageCharge = firstTestInGroup?.packageCharge || pkgData?.charges || 0;
+                          
+                          rows.push(
+                            <tr key={`pkg-header-${packageKey}`} className="bg-blue-100 border-b-2 border-blue-300">
+                              <td colSpan={1} className="p-1 text-center font-bold text-blue-800 text-xs"></td>
+                              <td colSpan={3} className="p-1 font-bold text-blue-800 text-xs">
+                                📦 {packageKey}
+                              </td>
+                              <td className="p-1 text-center font-bold text-blue-800 text-xs">₹{packageCharge}</td>
+                              <td colSpan={3} className="p-1"></td>
+                            </tr>
+                          );
+                        } else {
+                          // Individual tests header (only if there are individual tests)
+                          if (testsInGroup.length > 0) {
+                            rows.push(
+                              <tr key="individual-header" className="bg-gray-100 border-b-2 border-gray-300">
+                                <td colSpan={1} className="p-1 text-center font-bold text-gray-700 text-xs"></td>
+                                <td colSpan={3} className="p-1 font-bold text-gray-700 text-xs">
+                                  Individual Tests
+                                </td>
+                                <td colSpan={4} className="p-1"></td>
+                              </tr>
+                            );
+                          }
+                        }
+
+                        // Test rows
+                        testsInGroup.forEach((t) => {
+                          const charge = businessType === "B2C" ? (t.b2cCharge || t.charge || 0) : (t.b2bCharge || t.charge || 0);
+                          const isEditing = editingCharge?.testName === t.name;
+                          const isNewTest = !t.isExisting;
+
+                          rows.push(
+                            <tr key={`test-${t.name}`} className={`border-b text-xs hover:bg-gray-50 ${isNewTest ? "bg-blue-50" : ""}`}>
+                              <td className="p-1 text-center font-medium">{rowIndex++}</td>
+                              <td className="p-1">
+                                <div className="flex items-center gap-1">
+                                  {isNewTest && (
+                                    <span className="text-blue-600 font-bold text-xs">N</span>
+                                  )}
+                                  <span>{t.name}</span>
+                                </div>
+                              </td>
+                              <td className="p-1 text-left">
+                                {t.packageName || t.fromPackage ? (
+                                  <span className="bg-orange-100 text-orange-800 px-2 py-0.5 rounded text-xs font-semibold whitespace-nowrap">
+                                    📦 {t.packageName || t.fromPackage}
+                                  </span>
+                                ) : (
+                                  <span className="text-gray-400 text-xs">-</span>
                                 )}
-                                <span>{t.name}</span>
-                              </div>
-                            </td>
-                            <td className="p-1 text-center">{booking.date}</td>
-                            <td className="p-1 text-center">
-                              {isEditing ? (
-                                <input
-                                  type="number"
-                                  autoFocus
-                                  value={editingCharge.value}
-                                  onChange={e => setEditingCharge({ ...editingCharge, value: e.target.value })}
-                                  onBlur={() => handleSaveCharge(t.name)}
-                                  onKeyDown={e => {
-                                    if (e.key === "Enter") handleSaveCharge(t.name);
-                                    if (e.key === "Escape") setEditingCharge(null);
-                                  }}
-                                  className="w-12 border border-gray-300 rounded px-0.5 py-0 text-center text-xs"
-                                />
-                              ) : (
-                                <span className="font-semibold">₹{charge}</span>
-                              )}
-                            </td>
-                            <td className="p-1 text-center">
-                              <button
-                                onClick={() => setEditingCharge({ testName: t.name, value: charge })}
-                                className="text-orange-600 hover:text-orange-800"
-                                title="Edit"
-                              >
-                                <Pencil size={11} />
-                              </button>
-                            </td>
-                            <td className="p-1 text-center">
-                              <input type="checkbox" className="w-3 h-3 accent-blue-500" />
-                            </td>
-                            <td className="p-1 text-center">
-                              <button
-                                onClick={() => handleDeleteTest(t.name)}
-                                className="text-red-600 hover:text-red-800"
-                                title="Delete"
-                              >
-                                <X size={12} />
-                              </button>
-                            </td>
-                          </tr>
-                        );
-                      })
-                    )}
+                              </td>
+                              <td className="p-1 text-center">{booking.date}</td>
+                              <td className="p-1 text-center">
+                                {isEditing ? (
+                                  <input
+                                    type="number"
+                                    autoFocus
+                                    value={editingCharge.value}
+                                    onChange={e => setEditingCharge({ ...editingCharge, value: e.target.value })}
+                                    onBlur={() => handleSaveCharge(t.name)}
+                                    onKeyDown={e => {
+                                      if (e.key === "Enter") handleSaveCharge(t.name);
+                                      if (e.key === "Escape") setEditingCharge(null);
+                                    }}
+                                    className="w-12 border border-gray-300 rounded px-0.5 py-0 text-center text-xs"
+                                  />
+                                ) : (
+                                  <span className="font-semibold">₹{charge}</span>
+                                )}
+                              </td>
+                              <td className="p-1 text-center">
+                                <button
+                                  onClick={() => setEditingCharge({ testName: t.name, value: charge })}
+                                  className="text-orange-600 hover:text-orange-800"
+                                  title="Edit"
+                                >
+                                  <Pencil size={11} />
+                                </button>
+                              </td>
+                              <td className="p-1 text-center">
+                                <input type="checkbox" className="w-3 h-3 accent-blue-500" />
+                              </td>
+                              <td className="p-1 text-center">
+                                <button
+                                  onClick={() => handleDeleteTest(t.name)}
+                                  className="text-red-600 hover:text-red-800"
+                                  title="Delete"
+                                >
+                                  <X size={12} />
+                                </button>
+                              </td>
+                            </tr>
+                          );
+                        });
+                      });
+
+                      return rows;
+                    })()}
                   </tbody>
                 </table>
               </div>
@@ -1303,7 +1445,10 @@ const BookingDetailsModal: React.FC<BookingDetailsModalProps> = ({
                       sample: t.sample,
                       charge: businessType === "B2C" ? (t.b2cCharge || t.charge) : (t.b2bCharge || t.charge),
                       b2cCharge: t.b2cCharge || t.charge,
-                      b2bCharge: t.b2bCharge || t.charge
+                      b2bCharge: t.b2bCharge || t.charge,
+                      packageName: t.packageName || null,
+                      packageCharge: t.packageCharge || 0,
+                      fromPackage: t.packageName ? true : false
                     })),
                     patientData: {
                       title: booking.patientData?.title || '',
@@ -1372,7 +1517,12 @@ const BookingDetailsModal: React.FC<BookingDetailsModalProps> = ({
               {/* Footer with Print Button */}
               <div className="bg-gray-100 px-4 py-3 flex justify-end gap-2 shrink-0 border-t">
                 <button
-                  onClick={() => window.print()}
+                  onClick={() => {
+                    // Print and close both bill modal and booking details modal
+                    window.print();
+                    setShowBillModal(false);
+                    onClose();
+                  }}
                   className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded font-semibold text-sm"
                 >
                   🖨️ Print Bill
