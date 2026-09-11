@@ -295,9 +295,6 @@ export const getDepartmentById = async (req, res) => {
       include: {
         tests: {
           where: { isActive: true }
-        },
-        packages: {
-          where: { isActive: true }
         }
       }
     });
@@ -309,9 +306,24 @@ export const getDepartmentById = async (req, res) => {
       });
     }
 
+    // Fetch packages separately as they are not directly related to Department
+    const packages = await prisma.package.findMany({
+      where: { isActive: true },
+      include: {
+        packageTests: {
+          include: {
+            test: true
+          }
+        }
+      }
+    });
+
     res.json({
       success: true,
-      data: department
+      data: {
+        ...department,
+        packages: packages
+      }
     });
   } catch (error) {
     res.status(500).json({

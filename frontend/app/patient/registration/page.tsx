@@ -3030,9 +3030,9 @@ export default function PatientRegistration() {
         {/* LEFT */}
         <div className="md:col-span-2 col-span-12 bg-white rounded-xl shadow flex flex-col">
           <div className="flex text-xs font-semibold rounded-tl-xl rounded-tr-xl overflow-hidden">
-            <button onClick={() => { setActiveTab("tests"); setShowAllTests(true); setSelectedDept(null); }}
+            <button onClick={() => { setActiveTab("tests"); setShowAllTests(true); setSelectedDept(null); setSelectedPackage(null); }}
               className={`flex-1 p-2 ${activeTab === "tests" ? "bg-cyan-900 text-white" : "bg-gray-200"}`}>Department</button>
-            <button onClick={() => { setActiveTab("packages"); setShowAllTests(false); }}
+            <button onClick={() => { setActiveTab("packages"); setShowAllTests(false); setSelectedDept(null); }}
               className={`flex-1 p-2 ${activeTab === "packages" ? "bg-cyan-900 text-white" : "bg-gray-200"}`}>Packages</button>
           </div>
           <div className="flex-1 overflow-auto text-xs" style={{ maxHeight: 'calc(75vh - 40px)' }}>
@@ -3053,20 +3053,31 @@ export default function PatientRegistration() {
                 <div className="p-2 border-b sticky top-0 bg-white">
                   <input className={input} placeholder="Search Package" value={packageSearch} onChange={(e) => setPackageSearch(e.target.value)} />
                 </div>
-                {displayPackages.map((pkg, idx) => (
-                  <div key={idx}
-                    className={`p-2 border-b hover:bg-gray-50 cursor-pointer ${selectedPackage?.name === pkg.name ? 'bg-orange-100 font-semibold' : ''}`}
-                    onClick={() => {
-                      setSelectedPackage(pkg);
-                      // ✅ Auto-add all tests from this package to the bill
-                      addPackage(pkg);
-                    }}
-                  >
-                    <div className="font-semibold">{pkg.name}</div>
-                    <div className="text-gray-500 text-xs">Charges: ₹{pkg.charges || 0} | Package Total: ₹{pkg.packageTotal || 0}</div>
-                    <div className="text-gray-400 text-xs">{pkg.testNames?.length || 0} tests</div>
-                  </div>
-                ))}
+                {displayPackages.map((pkg, idx) => {
+                  // Check if any test from this package is selected
+                  const isPackageSelected = (pkg.packageTests || []).some(t => selectedTests.find(st => st.id === t.id));
+                  
+                  return (
+                    <div key={idx}
+                      className={`p-1 border-b hover:bg-gray-50 cursor-pointer ${selectedPackage?.name === pkg.name ? 'bg-orange-100 font-semibold' : ''}`}
+                      onClick={() => {
+                        // ✅ Toggle: If clicking same package again, deselect it
+                        // Otherwise, select the new package
+                        if (selectedPackage?.name === pkg.name) {
+                          setSelectedPackage(null);
+                        } else {
+                          setSelectedPackage(pkg);
+                        }
+                      }}
+                    >
+                      <div className="font-semibold text-xs flex items-center gap-1">
+                        {pkg.name}
+                        {isPackageSelected && <span className="text-green-600 font-bold">✓</span>}
+                      </div>
+                      <div className="text-gray-500 text-xs leading-tight">₹{pkg.charges || 0} | ₹{pkg.packageTotal || 0} | {pkg.testNames?.length || 0} tests</div>
+                    </div>
+                  );
+                })}
                 {displayPackages.length === 0 && <div className="p-4 text-center text-gray-400">No packages found</div>}
               </>
             )}
@@ -3129,7 +3140,120 @@ export default function PatientRegistration() {
               <div className="col-span-1"></div>
             </div>
           <div className="flex-1 overflow-auto text-xs" style={{ maxHeight: 'calc(75vh - 50px)' }}>
-            {selectedPackage ? (
+            {activeTab === "packages" ? (
+              // Show all packages when in Packages tab
+              <>
+                {displayPackages.map((pkg) => {
+                  // Check if any test from this package is selected
+                  const isPackageSelected = (pkg.packageTests || []).some(t => selectedTests.find(st => st.id === t.id));
+                  
+                  return (
+                  <div key={pkg.name}>
+                    {/* Package Header */}
+                    <div className="bg-orange-50 border-b-2 border-orange-300 p-1 font-semibold text-orange-900 text-xs sticky top-0 z-10">
+                      <div className="flex items-center justify-between gap-1">
+                        <div className="flex items-center gap-1 cursor-pointer flex-1 min-w-0"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            // Just toggle package selection for display, don't add tests
+                            if (selectedPackage?.name === pkg.name) {
+                              setSelectedPackage(null);
+                            } else {
+                              setSelectedPackage(pkg);
+                            }
+                          }}
+                        >
+                          <span className="truncate">📦 {pkg.name}</span>
+                          {isPackageSelected && <span className="text-green-600 font-bold flex-shrink-0">✓</span>}
+                          <span className="text-orange-700 flex-shrink-0">₹{pkg.charges || 0}</span>
+                        </div>
+                        
+                        {/* Check All checkbox - Only show when package is expanded */}
+                        {selectedPackage?.name === pkg.name && (
+                          <input 
+                            type="checkbox" 
+                            className="w-3 h-3 cursor-pointer accent-orange-500"
+                            checked={(() => {
+                              const pkgTests = pkg.packageTests || [];
+                              return pkgTests.length > 0 && pkgTests.every(t => selectedTests.find(st => st.id === t.id));
+                            })()}
+                            onChange={(e) => {
+                              e.stopPropagation();
+                              const pkgTests = pkg.packageTests || [];
+                              if (e.target.checked) {
+                                // Add all tests from this package
+                                const toAdd = pkgTests
+                                  .filter(t => !selectedTests.find(st => st.id === t.id))
+                                  .map(t => ({
+                                    ...t,
+                                    fromPackage: pkg.name,
+                                    // Store individual test charge instead of package charge
+                                    packageCharge: pkg.charges || 0,
+                                    testCharge: t.b2cCharge || 0
+                                  }));
+                                setSelectedTests([
+                                  ...selectedTests.filter(st => st.fromPackage !== pkg.name),
+                                  ...toAdd
+                                ]);
+                              } else {
+                                // Remove all tests from this package
+                                const ids = pkgTests.map(t => t.id);
+                                setSelectedTests(selectedTests.filter(st => !ids.includes(st.id)));
+                              }
+                            }}
+                            title="Select/Deselect all tests in this package"
+                          />
+                        )}
+                      </div>
+                    </div>
+                    
+                    {/* Package Tests - Show only if selected */}
+                    {selectedPackage?.name === pkg.name && (pkg.packageTests || []).map((t, i) => (
+                      <div key={t.id} className="grid grid-cols-12 border-b p-1 hover:bg-gray-50 items-center text-xs">
+                        <div className="col-span-5 flex gap-1 items-center">
+                          <input 
+                            type="checkbox" 
+                            className="w-3 h-3 cursor-pointer accent-orange-500"
+                            checked={selectedTests.find(st => st.id === t.id) !== undefined}
+                            onChange={(e) => {
+                              e.stopPropagation();
+                              if (e.target.checked) {
+                                if (!selectedTests.find(st => st.name === t.name)) {
+                                  setSelectedTests([
+                                    ...selectedTests,
+                                    {
+                                      ...t,
+                                      fromPackage: pkg.name,
+                                      packageCharge: pkg.charges || 0,
+                                      testCharge: t.b2cCharge || 0
+                                    }
+                                  ]);
+                                }
+                              } else {
+                                setSelectedTests(selectedTests.filter(st => st.id !== t.id));
+                              }
+                            }}
+                          />
+                          <span className="truncate">{t.name}</span>
+                        </div>
+                        <div className="col-span-3 text-center flex items-center justify-center gap-1">
+                          <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" style={{ transform: 'rotate(45deg)', flexShrink: 0 }}>
+                            <path d="M9 3h6v11a3 3 0 0 1-6 0V3z" fill={getSampleColor(t.sample, specimenTypes)} stroke="#555" strokeWidth="1.2"/>
+                            <rect x="8" y="2" width="8" height="2" rx="1" fill="#888" stroke="#555" strokeWidth="0.8"/>
+                            <line x1="9" y1="10" x2="15" y2="10" stroke="white" strokeWidth="1" opacity="0.5"/>
+                          </svg>
+                          <span className="truncate text-xs">{t.sample}</span>
+                        </div>
+                        <div className="col-span-3 text-right">-</div>
+                        <div className="col-span-1"></div>
+                      </div>
+                    ))}
+                  </div>
+                  );
+                })}
+                {displayPackages.length === 0 && <div className="p-4 text-center text-gray-400">No packages found</div>}
+              </>
+            ) : selectedPackage ? (
               <>
                 {/* Show ALL tests from ALL selected packages (not just current one) */}
                 {(() => {
@@ -3152,15 +3276,17 @@ export default function PatientRegistration() {
                       {allPkgs.map(pkg => (
                         <div key={pkg.name}>
                           {/* Package Header */}
-                          <div className="bg-orange-50 border-b-2 border-orange-300 p-2 font-semibold text-orange-900 text-xs sticky top-0 z-10">
-                            📦 {pkg.name}
-                            <span className="float-right text-orange-700">₹{pkg.charges || 0}</span>
+                          <div className="bg-orange-50 border-b-2 border-orange-300 p-1 font-semibold text-orange-900 text-xs sticky top-0 z-10">
+                            <div className="flex items-center justify-between gap-1">
+                              <span className="truncate">📦 {pkg.name}</span>
+                              <span className="text-orange-700 flex-shrink-0">₹{pkg.charges || 0}</span>
+                            </div>
                           </div>
                           
                           {/* Package Tests */}
                           {(pkg.packageTests || []).map((t, i) => (
-                            <div key={t.id} className="grid grid-cols-12 border-b p-2 hover:bg-gray-50 items-center">
-                              <div className="col-span-5 flex gap-2 items-center">
+                            <div key={t.id} className="grid grid-cols-12 border-b p-1 hover:bg-gray-50 items-center text-xs">
+                              <div className="col-span-5 flex gap-1 items-center">
                                 <input 
                                   type="checkbox" 
                                   className="w-3 h-3 cursor-pointer accent-orange-500"
@@ -3182,15 +3308,15 @@ export default function PatientRegistration() {
                                     }
                                   }}
                                 />
-                                {t.name}
+                                <span className="truncate">{t.name}</span>
                               </div>
                             <div className="col-span-3 text-center flex items-center justify-center gap-1">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" style={{ transform: 'rotate(45deg)', flexShrink: 0 }}>
+                                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" style={{ transform: 'rotate(45deg)', flexShrink: 0 }}>
                                   <path d="M9 3h6v11a3 3 0 0 1-6 0V3z" fill={getSampleColor(t.sample, specimenTypes)} stroke="#555" strokeWidth="1.2"/>
                                   <rect x="8" y="2" width="8" height="2" rx="1" fill="#888" stroke="#555" strokeWidth="0.8"/>
                                   <line x1="9" y1="10" x2="15" y2="10" stroke="white" strokeWidth="1" opacity="0.5"/>
                                 </svg>
-                                {t.sample}
+                                <span className="truncate text-xs">{t.sample}</span>
                               </div>
                               {/* Always show charges column */}
                               <div className="col-span-3 text-right">-</div>
@@ -3221,8 +3347,8 @@ export default function PatientRegistration() {
                   ? dept.tests.filter(t => frequentTests.find(f => f.name === t.name) && t.name.toLowerCase().includes(search.toLowerCase()))
                   : dept.tests.filter(t => t.name.toLowerCase().includes(search.toLowerCase()));
                 return filteredTests.map((t) => (
-                  <div key={t.name} className="grid grid-cols-12 border-b p-2 hover:bg-gray-50 items-center">
-                    <div className="col-span-5 flex gap-2 items-center">
+                  <div key={t.name} className="grid grid-cols-12 border-b p-1 hover:bg-gray-50 items-center text-xs">
+                    <div className="col-span-5 flex gap-1 items-center">
                       <input 
                         type="checkbox" 
                         className="w-3 h-3 cursor-pointer accent-orange-500"
@@ -3236,20 +3362,20 @@ export default function PatientRegistration() {
                           }
                         }}
                       />
-                      <span>{t.name}</span>
+                      <span className="truncate">{t.name}</span>
                       {t.isOutsourced && (
-                        <span title="Outsourced test" className="text-orange-500 font-bold text-lg leading-none">
+                        <span title="Outsourced test" className="text-orange-500 font-bold leading-none">
                           ▲
                         </span>
                       )}
                     </div>
                     <div className="col-span-3 text-center flex items-center justify-center gap-1">
-                      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" style={{ transform: 'rotate(45deg)', flexShrink: 0 }}>
+                      <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" style={{ transform: 'rotate(45deg)', flexShrink: 0 }}>
                         <path d="M9 3h6v11a3 3 0 0 1-6 0V3z" fill={getSampleColor(t.sample, specimenTypes)} stroke="#555" strokeWidth="1.2"/>
                         <rect x="8" y="2" width="8" height="2" rx="1" fill="#888" stroke="#555" strokeWidth="0.8"/>
                         <line x1="9" y1="10" x2="15" y2="10" stroke="white" strokeWidth="1" opacity="0.5"/>
                       </svg>
-                      {t.sample}
+                      <span className="truncate text-xs">{t.sample}</span>
                     </div>
                     {/* Always show B2C Charges column */}
                     <div className="col-span-3 text-right">₹{t.b2cCharge}</div>
@@ -3266,49 +3392,147 @@ export default function PatientRegistration() {
 
           {/* Header - Using grid for consistency with left table - Minimized */}
           <div className="grid grid-cols-12 border-b bg-cyan-900 text-white p-1 sticky top-0 font-semibold items-center rounded-t text-xs">
-            <div className="col-span-5">Test</div>
-            <div className="col-span-3 text-center">Specimen</div>
-            <div className="col-span-3 text-right">Charges</div>
+            <div className="col-span-5">Test / Package</div>
+            <div className="col-span-2 text-center">Specimen</div>
+            <div className="col-span-4 text-right">Charges</div>
             <div className="col-span-1"></div>
           </div>
 
           {/* Body - Scrollable */}
           <div className="flex-1 overflow-auto text-xs" style={{ maxHeight: 'calc(75vh - 220px)' }}>
-            {selectedTests.map((t) => (
-              <div key={t.name} className="grid grid-cols-12 border-b p-2 hover:bg-gray-50 items-center">
-                <div className="col-span-5">
-                  <div className="flex items-center gap-2">
-                    <span className="truncate">{t.name}</span>
-                    {t.isOutsourced && (
-                      <span title="Outsourced test" className="text-orange-500 font-bold text-lg leading-none flex-shrink-0">
-                        ▲
-                      </span>
-                    )}
-                  </div>
-                </div>
-                <div className="col-span-3 text-center flex items-center justify-center gap-1">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" style={{ transform: 'rotate(45deg)', flexShrink: 0 }}>
-                    <path d="M9 3h6v11a3 3 0 0 1-6 0V3z" fill={getSampleColor(t.sample, specimenTypes)} stroke="#555" strokeWidth="1.2"/>
-                    <rect x="8" y="2" width="8" height="2" rx="1" fill="#888" stroke="#555" strokeWidth="0.8"/>
-                    <line x1="9" y1="10" x2="15" y2="10" stroke="white" strokeWidth="1" opacity="0.5"/>
-                  </svg>
-                  <span className="truncate">{t.sample}</span>
-                </div>
-                <div className="col-span-3 text-right">
-                  <input 
-                    type="number" 
-                    min="0"
-                    value={t.b2cCharge}
-                    onChange={(e) => editTestCharge(t.name, parseFloat(e.target.value) || 0)}
-                    className="w-full text-right bg-blue-50 border border-blue-200 px-2 py-1 rounded text-xs font-semibold"
-                    title="Edit charge for this test (won't affect master database)"
-                  />
-                </div>
-                <div className="col-span-1 text-center">
-                  <button onClick={() => removeTest(t.name)} className="text-red-500 hover:text-red-700 p-1"><X size={14} /></button>
-                </div>
-              </div>
-            ))}
+            {(() => {
+              // Group tests by package
+              const packageGroups = new Map();
+              const departmentTests = [];
+              
+              selectedTests.forEach(t => {
+                if (t.fromPackage) {
+                  if (!packageGroups.has(t.fromPackage)) {
+                    packageGroups.set(t.fromPackage, []);
+                  }
+                  packageGroups.get(t.fromPackage).push(t);
+                } else {
+                  departmentTests.push(t);
+                }
+              });
+              
+              return (
+                <>
+                  {/* Package Groups */}
+                  {Array.from(packageGroups.entries()).map(([pkgName, tests]) => (
+                    <div key={pkgName}>
+                      {/* Package Header */}
+                      <div className="bg-orange-50 border-b-2 border-orange-300 p-1 font-semibold text-orange-900 text-xs sticky top-0 z-10">
+                        <div className="grid grid-cols-12 items-center gap-1">
+                          <div className="col-span-5">📦 {pkgName}</div>
+                          <div className="col-span-2"></div>
+                          <div className="col-span-4 text-right">₹{(() => {
+                            // Find the package to get its actual charge
+                            const pkg = departments.flatMap(d => d.packages || []).find(p => p.name === pkgName);
+                            return pkg?.charges || 0;
+                          })()}</div>
+                          <div className="col-span-1 text-center">
+                            <button 
+                              onClick={() => {
+                                // Remove all tests from this package
+                                setSelectedTests(selectedTests.filter(st => st.fromPackage !== pkgName));
+                              }} 
+                              className="text-red-500 hover:text-red-700 p-1"
+                              title="Remove entire package"
+                            >
+                              <X size={14} />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      {/* Package Tests - Always shown */}
+                      {tests.map((t) => (
+                        <div key={t.name} className="grid grid-cols-12 border-b p-1 hover:bg-gray-50 items-center">
+                          <div className="col-span-5">
+                            <div className="flex items-center gap-1 ml-4">
+                              <span className="truncate">{t.name}</span>
+                              {t.isOutsourced && (
+                                <span title="Outsourced test" className="text-orange-500 font-bold leading-none flex-shrink-0">
+                                  ▲
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          <div className="col-span-2 text-center flex items-center justify-center gap-1">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" style={{ transform: 'rotate(45deg)', flexShrink: 0 }}>
+                              <path d="M9 3h6v11a3 3 0 0 1-6 0V3z" fill={getSampleColor(t.sample, specimenTypes)} stroke="#555" strokeWidth="1.2"/>
+                              <rect x="8" y="2" width="8" height="2" rx="1" fill="#888" stroke="#555" strokeWidth="0.8"/>
+                              <line x1="9" y1="10" x2="15" y2="10" stroke="white" strokeWidth="1" opacity="0.5"/>
+                            </svg>
+                            <span className="truncate text-xs">{t.sample}</span>
+                          </div>
+                          <div className="col-span-4 text-right">
+                            <input 
+                              type="number" 
+                              min="0"
+                              value={t.b2cCharge}
+                              onChange={(e) => {
+                                const newCharge = parseFloat(e.target.value) || 0;
+                                setSelectedTests(selectedTests.map(st => 
+                                  st.id === t.id ? {...st, b2cCharge: newCharge} : st
+                                ));
+                              }}
+                              className="w-full text-right bg-blue-50 border border-blue-200 px-2 py-1 rounded text-xs font-semibold"
+                              title="Edit charge for this test (won't affect master database)"
+                            />
+                          </div>
+                          <div className="col-span-1 text-center">
+                            <button onClick={() => setSelectedTests(selectedTests.filter(st => st.id !== t.id))} className="text-red-500 hover:text-red-700 p-1"><X size={14} /></button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ))}
+                  
+                  {/* Department Tests (not from any package) */}
+                  {departmentTests.length > 0 && (
+                    <div>
+                      {departmentTests.map((t) => (
+                        <div key={t.name} className="grid grid-cols-12 border-b p-1 hover:bg-gray-50 items-center">
+                          <div className="col-span-5">
+                            <div className="flex items-center gap-1">
+                              <span className="truncate">{t.name}</span>
+                              {t.isOutsourced && (
+                                <span title="Outsourced test" className="text-orange-500 font-bold leading-none flex-shrink-0">
+                                  ▲
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          <div className="col-span-2 text-center flex items-center justify-center gap-1">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" style={{ transform: 'rotate(45deg)', flexShrink: 0 }}>
+                              <path d="M9 3h6v11a3 3 0 0 1-6 0V3z" fill={getSampleColor(t.sample, specimenTypes)} stroke="#555" strokeWidth="1.2"/>
+                              <rect x="8" y="2" width="8" height="2" rx="1" fill="#888" stroke="#555" strokeWidth="0.8"/>
+                              <line x1="9" y1="10" x2="15" y2="10" stroke="white" strokeWidth="1" opacity="0.5"/>
+                            </svg>
+                            <span className="truncate text-xs">{t.sample}</span>
+                          </div>
+                          <div className="col-span-4 text-right">
+                            <input 
+                              type="number" 
+                              min="0"
+                              value={t.b2cCharge}
+                              onChange={(e) => editTestCharge(t.name, parseFloat(e.target.value) || 0)}
+                              className="w-full text-right bg-blue-50 border border-blue-200 px-2 py-1 rounded text-xs font-semibold"
+                              title="Edit charge for this test (won't affect master database)"
+                            />
+                          </div>
+                          <div className="col-span-1 text-center">
+                            <button onClick={() => removeTest(t.name)} className="text-red-500 hover:text-red-700 p-1"><X size={14} /></button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </>
+              );
+            })()}
           </div>
 
           {/* BILLING SECTION */}
@@ -3317,7 +3541,31 @@ export default function PatientRegistration() {
               <div>
                 <label className="text-gray-600 block mb-1 text-xs font-semibold text-blue-600">Test Charges</label>
                 <input className={`${input} font-semibold bg-blue-50 border-blue-200`} 
-                  value={total}
+                  value={(() => {
+                    // Calculate total charges - use package charges if available
+                    const packageCharges = new Map();
+                    let nonPackageTotal = 0;
+                    
+                    selectedTests.forEach(t => {
+                      if (t.fromPackage) {
+                        // Use package charge instead of individual test charge
+                        if (!packageCharges.has(t.fromPackage)) {
+                          packageCharges.set(t.fromPackage, t.packageCharge || 0);
+                        }
+                      } else {
+                        // For non-package tests, sum individual charges
+                        nonPackageTotal += (t.b2cCharge || 0);
+                      }
+                    });
+                    
+                    let totalCharge = 0;
+                    packageCharges.forEach(charge => {
+                      totalCharge += charge;
+                    });
+                    totalCharge += nonPackageTotal;
+                    
+                    return totalCharge;
+                  })()}
                   readOnly 
                 />
               </div>
@@ -3339,20 +3587,25 @@ export default function PatientRegistration() {
                 <label className="text-gray-600 block mb-1 text-xs font-semibold text-purple-600">Test Amount</label>
                 <input className={`${input} font-semibold bg-purple-50 border-purple-200`} 
                   value={(() => {
-                    // Calculate charge amount - use package charges if available
-                    const hasPackageTests = selectedTests.some(t => t.fromPackage !== null);
-                    let chargeAmount = total;
+                    // Calculate total charges - use package charges if available
+                    const packageCharges = new Map();
+                    let nonPackageTotal = 0;
                     
-                    if (hasPackageTests) {
-                      // Sum all unique package charges
-                      const packageCharges = new Map();
-                      selectedTests.forEach(t => {
-                        if (t.fromPackage && !packageCharges.has(t.fromPackage)) {
+                    selectedTests.forEach(t => {
+                      if (t.fromPackage) {
+                        if (!packageCharges.has(t.fromPackage)) {
                           packageCharges.set(t.fromPackage, t.packageCharge || 0);
                         }
-                      });
-                      chargeAmount = Array.from(packageCharges.values()).reduce((sum, charge) => sum + charge, 0);
-                    }
+                      } else {
+                        nonPackageTotal += (t.b2cCharge || 0);
+                      }
+                    });
+                    
+                    let chargeAmount = 0;
+                    packageCharges.forEach(charge => {
+                      chargeAmount += charge;
+                    });
+                    chargeAmount += nonPackageTotal;
                     
                     return (chargeAmount - discount).toFixed(0);
                   })()}
@@ -3370,20 +3623,25 @@ export default function PatientRegistration() {
                 <label className="text-gray-600 block mb-1 text-xs font-semibold text-red-600">Balance</label>
                 <input className={`${input} font-semibold bg-red-50 border-red-200`} 
                   value={(() => {
-                    // Calculate charge amount - use package charges if available
-                    const hasPackageTests = selectedTests.some(t => t.fromPackage !== null);
-                    let chargeAmount = total;
+                    // Calculate total charges - use package charges if available
+                    const packageCharges = new Map();
+                    let nonPackageTotal = 0;
                     
-                    if (hasPackageTests) {
-                      // Sum all unique package charges
-                      const packageCharges = new Map();
-                      selectedTests.forEach(t => {
-                        if (t.fromPackage && !packageCharges.has(t.fromPackage)) {
+                    selectedTests.forEach(t => {
+                      if (t.fromPackage) {
+                        if (!packageCharges.has(t.fromPackage)) {
                           packageCharges.set(t.fromPackage, t.packageCharge || 0);
                         }
-                      });
-                      chargeAmount = Array.from(packageCharges.values()).reduce((sum, charge) => sum + charge, 0);
-                    }
+                      } else {
+                        nonPackageTotal += (t.b2cCharge || 0);
+                      }
+                    });
+                    
+                    let chargeAmount = 0;
+                    packageCharges.forEach(charge => {
+                      chargeAmount += charge;
+                    });
+                    chargeAmount += nonPackageTotal;
                     
                     return ((chargeAmount - discount) - paid).toFixed(0);
                   })()}
