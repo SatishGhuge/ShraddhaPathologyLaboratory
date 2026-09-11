@@ -1459,25 +1459,20 @@ export const updateTest = async (req, res) => {
 export const getTests = async (req, res) => {
   try {
     const { page, limit, skip } = getPaginationParams(req.query);
-    const { search } = req.query; // Get search parameter
+    const { search } = req.query;
 
-    // First, fetch all non-deleted tests with simple filtering
-    let whereClause = { isDeleted: false };
-    
-    // For search, we'll use simpler filters that Prisma can handle for count
-    if (search && search.trim()) {
-      const searchTerm = search.trim();
-      whereClause = {
-        isDeleted: false,
+    // Build where clause with search support
+    const whereClause = {
+      isDeleted: false,
+      ...(search && {
         OR: [
-          { name: { contains: searchTerm } },
-          { shortName: { contains: searchTerm } },
-          { testCode: { contains: searchTerm } }
+          { name: { contains: search } },
+          { testCode: { contains: search } },
+          { shortName: { contains: search } }
         ]
-      };
-    }
+      })
+    };
 
-    // Count matching tests
     const total = await prisma.test.count({
       where: whereClause
     });

@@ -17,6 +17,7 @@ const iconMap = {
   "Configuration": Settings,
   "Signature": FileSignature,
   "Machines": Database,
+  "Worklist Configuration": Settings,
   "Tests": Database,
   "Result": ClipboardCheck,
   "Dashboard": BarChart3,
@@ -87,6 +88,7 @@ const urlPathMap: { [key: string]: string } = {
   // Configuration Module
   "config/signature": "Configuration / Signature",
   "config/machines": "Configuration / Machines",
+  "config/worklist": "Configuration / Worklist Configuration",
   
   // Inventory Module
   "inventory/item": "Inventory / Item",

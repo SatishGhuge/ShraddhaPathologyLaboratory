@@ -97,8 +97,8 @@ export const getPatientTests = async (req, res) => {
       andConditions.push({ status });
     }
 
-    // Filter by date range
-    if (fromDate || toDate) {
+    // Filter by date range - BUT if searchQuery is provided, ignore date filter and search all dates
+    if ((fromDate || toDate) && !searchQuery) {
       const dateFilter = {};
       if (fromDate) { const f = new Date(fromDate); f.setHours(0,0,0,0); dateFilter.gte = f; }
       if (toDate)   { const t = new Date(toDate);   t.setHours(23,59,59,999); dateFilter.lte = t; }

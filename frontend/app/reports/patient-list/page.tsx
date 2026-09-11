@@ -616,7 +616,7 @@ export default function PatientList() {
               }}
               isLoading={loading}
             />
-          )}
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            )}
           {data.length>0&&(
             <div className="px-3 py-1.5 border-t border-gray-200 text-xs text-gray-500 flex justify-between">
               <span>{data.length} record(s)</span>

@@ -406,9 +406,10 @@ export default function Result() {
         } catch (e) {}
       }
     }
-    // Default columns - all visible
+    // Default columns - all visible EXCEPT date (hidden by default)
     return {
       visitId: true,
+      date: false,
       orgId: true,
       patientName: true,
       age: true,
@@ -429,6 +430,7 @@ export default function Result() {
   // Column definitions for the required columns section
   const RESULT_COLUMNS = [
     { key: 'visitId', label: 'Visit ID' },
+    { key: 'date', label: 'Date' },
     { key: 'orgId', label: 'Org ID' },
     { key: 'patientName', label: 'Patient Name' },
     { key: 'age', label: 'Age' },
@@ -509,6 +511,9 @@ export default function Result() {
                     if (isRepeatPatientInResult(patient, sortedAndFilteredResults)) {
                       cellValue += ' R';
                     }
+                    break;
+                  case 'date':
+                    cellValue = test.approved_date || '-';
                     break;
                   case 'orgId':
                     cellValue = patient.organizationCode || patient.organizationId || '';
@@ -881,7 +886,7 @@ export default function Result() {
 
       }
     }
-    // Default filters if none saved
+    // Default filters if none saved - default to today's date
     return {
       fromDate: new Date().toISOString().split('T')[0],
       toDate: new Date().toISOString().split('T')[0],
@@ -1030,6 +1035,20 @@ export default function Result() {
     return false;
   };
 
+  // Helper to get age in specific time unit (matching backend logic)
+  const getAgeInUnit = (years, months, days, timeUnit) => {
+    switch (timeUnit) {
+      case 'Day(s)':
+        return days;
+      case 'Month(s)':
+        return months;
+      case 'Year(s)':
+        return years;
+      default:
+        return years;
+    }
+  };
+
   // Helper function to calculate biological reference range based on patient demographics
   const getAgeAppropriateRange = (parameterData: any, patient: any) => {
     if (!parameterData) return '-';
@@ -1103,20 +1122,6 @@ export default function Result() {
     return '';
     
     let exactAgeInYears = patientAgeYears;
-    
-    // Helper to get age in specific time unit (matching backend logic)
-    const getAgeInUnit = (years, months, days, timeUnit) => {
-      switch (timeUnit) {
-        case 'Day(s)':
-          return days;
-        case 'Month(s)':
-          return months;
-        case 'Year(s)':
-          return years;
-        default:
-          return years;
-      }
-    };
     
     if (parameterData.ageRanges) {
       try {
@@ -2442,20 +2447,6 @@ export default function Result() {
     }
   };
 
-  // Helper function to get age in specific time unit
-  const getAgeInUnit = (years, months, days, timeUnit) => {
-    switch (timeUnit) {
-      case 'Day(s)':
-        return days;
-      case 'Month(s)':
-        return months;
-      case 'Year(s)':
-        return years;
-      default:
-        return years;
-    }
-  };
-
   // Load data on component mount and when filters change
   useEffect(() => {
     fetchResults();
@@ -3001,7 +2992,7 @@ export default function Result() {
       toDate: new Date().toISOString().split('T')[0],
       searchQuery: '',
       department: '',
-      organization: '',
+      organization: [],
       testName: ''
     };
     setFilters(defaultFilters);
@@ -3647,6 +3638,9 @@ export default function Result() {
                       {selectedColumns.visitId && (
                         <th className="px-1 sm:px-2 py-0.5 sm:py-1 text-left font-semibold text-[10px] whitespace-nowrap border border-gray-300">Visit ID</th>
                       )}
+                      {selectedColumns.date && (
+                        <th className="px-1 sm:px-2 py-0.5 sm:py-1 text-left font-semibold text-[10px] whitespace-nowrap border border-gray-300">Date</th>
+                      )}
                       {selectedColumns.orgId && (
                         <th className="px-1 sm:px-2 py-0.5 sm:py-1 text-left font-semibold text-[10px] whitespace-nowrap border border-gray-300">Org ID</th>
                       )}
@@ -3759,6 +3753,15 @@ export default function Result() {
                                       <span className="text-blue-600 font-bold text-sm" title="Repeat Patient - Has previous test reports">R</span>
                                     )}
                                   </span>
+                                ) : ''}
+                              </td>
+                            )}
+
+                            {/* Column 2.5: Date (show only on first test row) */}
+                            {selectedColumns.date && (
+                              <td className="px-1 sm:px-2 py-0.25 text-[11px] border border-gray-300">
+                                {testIndex === 0 ? (
+                                  <span className="font-medium">{test.approved_date || '-'}</span>
                                 ) : ''}
                               </td>
                             )}

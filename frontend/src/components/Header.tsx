@@ -80,6 +80,7 @@ const allModules: NavModule[] = [
     items: [
       { label: "Signature", path: "/config/signature" },
       { label: "Machines", path: "/config/machines" },
+      { label: "Worklist Configuration", path: "/config/worklist" },
       { label: "Report Settings", path: "/config/report-settings" },
     ],
   },
@@ -241,6 +242,11 @@ const Header = () => {
                 if (item.label === "Machines") {
                   const result = (accessible.configuration as any)?.machines === true;
                   console.log(`  ✓ Machines: ${result}`);
+                  return result;
+                }
+                if (item.label === "Worklist Configuration") {
+                  const result = (accessible.configuration as any)?.worklist === true;
+                  console.log(`  ✓ Worklist Configuration: ${result}`);
                   return result;
                 }
                 if (item.label === "Report Settings") {

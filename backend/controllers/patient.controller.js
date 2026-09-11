@@ -8,6 +8,16 @@ import crypto from 'crypto';
 import bcryptjs from 'bcryptjs';
 import { emailService } from '../services/notification.service.js';
 
+// ✅ Helper: Normalize reportMode to match Prisma enum (BY_HAND, WHATSAPP, EMAIL)
+const normalizeReportMode = (mode) => {
+  if (!mode) return 'EMAIL';
+  const normalized = mode.toUpperCase().replace(/\s+/g, '');
+  if (normalized === 'BYHAND') return 'BY_HAND';
+  if (normalized === 'WHATSAPP' || normalized === 'WHATSAPP') return 'WHATSAPP';
+  if (normalized === 'EMAIL') return 'EMAIL';
+  return 'EMAIL'; // Default to EMAIL if invalid
+};
+
 // ✅ Helper: Calculate and save age fields from DOB
 async function calculateAndSaveAgeFields(patientId, dob) {
   if (!dob) return;
@@ -430,7 +440,7 @@ export const createPatient = async (req, res) => {
             organizationId: req.body.organizationId || null,
             sample: test.sample || 'Blood',
             charge: testCharge,
-            reportMode: reportMode || 'Email',
+            reportMode: normalizeReportMode(reportMode),
             referralDoctorId: referralDoctorId,
             otherReferralDoctor: otherReferralDoctor,
             visitDate: visitDate ? new Date(visitDate) : new Date(),
@@ -641,7 +651,7 @@ export const createPatient = async (req, res) => {
             organizationId: req.body.organizationId || null,
             sample: test.sample || 'Blood',
             charge: testCharge,
-            reportMode: reportMode || 'Email',
+            reportMode: normalizeReportMode(reportMode),
             referralDoctorId: referralDoctorId,
             otherReferralDoctor: otherReferralDoctor,
             visitDate: visitDate ? new Date(visitDate) : new Date(),
@@ -867,7 +877,7 @@ export const registerPatientWithEmail = async (req, res) => {
           organizationId: organizationId || null,
           sample: test.sample || 'Blood',
           charge: perTestAmount,
-          reportMode: 'Email',
+          reportMode: 'EMAIL',
           referralDoctor: referralDoctor,
           visitDate: visitDate ? new Date(visitDate) : new Date(),
           visitTime: '10:00',

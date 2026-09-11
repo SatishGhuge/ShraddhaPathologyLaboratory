@@ -7,6 +7,16 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// ============================================================================
+// ENUMS
+// ============================================================================
+
+enum ReportMode {
+  BY_HAND
+  WHATSAPP
+  EMAIL
+}
+
 model Admin {
   id             Int             @id @default(autoincrement())
   username       String          @unique
@@ -256,7 +266,7 @@ model PatientTest {
   sample             String
   charge             Decimal             @db.Decimal(10, 2)
   status             String              @default("Registered")
-  reportMode         String?
+  reportMode         ReportMode?         @default(WHATSAPP)
   referralDoctorId   Int?
   otherReferralDoctor String?
   visitDate          DateTime?
@@ -382,6 +392,7 @@ model Test {
   testMachines            TestMachine[]
   ownedParameters         TestParameter[]          @relation("ParameterOwner")
   templates               TestTemplate[]
+  worklists               Worklist[]
   department              Department               @relation(fields: [departmentId], references: [id], onDelete: Cascade)
   sample_type             sample_type?             @relation(fields: [sampleTypeId], references: [id])
   testCategory            TestCategory?            @relation("PrimaryTestCategory", fields: [testCategoryId], references: [id])
@@ -533,56 +544,57 @@ model DoctorMerge {
 }
 
 model TestParameter {
-  id                 Int              @id @default(autoincrement())
+  id                 Int                 @id @default(autoincrement())
   testId             Int?
   unitId             Int?
   parameterName      String
   machineCode        String?
   multiplyBy         String?
-  decimal            Int?             @default(2)
+  decimal            Int?                @default(2)
   parameterSortOrder Int?
-  isDescriptive      Boolean          @default(false)
-  descriptiveText    String?          @db.Text
+  isDescriptive      Boolean             @default(false)
+  descriptiveText    String?             @db.Text
   lowPanic           Float?
   highPanic          Float?
-  isNABL             Boolean          @default(false)
-  parameterCode      String?          @unique
+  isNABL             Boolean             @default(false)
+  parameterCode      String?             @unique
   testMethod         String?
-  hasFormula         Boolean          @default(false)
-  formula            String?          @db.Text
-  type               String           @default("Numeric")
-  isMandatory        Boolean          @default(false)
-  rangeType          String           @default("BySex")
-  displayRangeText   String?          @db.Text
-  rangeText          String?          @db.Text
-  textContent        String?          @db.Text
-  isMultipleOptions  Boolean          @default(false)
+  hasFormula         Boolean             @default(false)
+  formula            String?             @db.Text
+  type               String              @default("Numeric")
+  isMandatory        Boolean             @default(false)
+  rangeType          String              @default("BySex")
+  displayRangeText   String?             @db.Text
+  rangeText          String?             @db.Text
+  textContent        String?             @db.Text
+  isMultipleOptions  Boolean             @default(false)
   maleLowValue       String?
   maleHighValue      String?
   maleDefaultValue   String?
-  maleActive         Boolean          @default(true)
+  maleActive         Boolean             @default(true)
   femaleLowValue     String?
   femaleHighValue    String?
   femaleDefaultValue String?
-  femaleActive       Boolean          @default(false)
+  femaleActive       Boolean             @default(false)
   childLowValue      String?
   childHighValue     String?
   childDefaultValue  String?
-  childActive        Boolean          @default(false)
-  ageRanges          String?          @db.Text
-  rangeValues        String?          @db.Text
-  isActive           Boolean          @default(true)
-  createdAt          DateTime         @default(now())
-  updatedAt          DateTime         @updatedAt
-  defaultDisplayText String?          @db.Text
-  femaleDisplayText  String?          @db.Text
-  maleDisplayText    String?          @db.Text
+  childActive        Boolean             @default(false)
+  ageRanges          String?             @db.Text
+  rangeValues        String?             @db.Text
+  isActive           Boolean             @default(true)
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  defaultDisplayText String?             @db.Text
+  femaleDisplayText  String?             @db.Text
+  maleDisplayText    String?             @db.Text
   testparameters     testparameters[]
   testCategories     TestCategory[]
-  testOwner          Test?            @relation("ParameterOwner", fields: [testId], references: [id], onDelete: Cascade)
-  unit               Unit?            @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  testOwner          Test?               @relation("ParameterOwner", fields: [testId], references: [id], onDelete: Cascade)
+  unit               Unit?               @relation(fields: [unitId], references: [id], onDelete: Cascade)
   testResults        TestResult[]
-  primaryTests       Test[]           @relation("PrimaryTestParameter")
+  primaryTests       Test[]              @relation("PrimaryTestParameter")
+  worklistParameters WorklistParameter[]
 
   @@index([testId], map: "test_parameters_testId_fkey")
   @@index([unitId], map: "test_parameters_unitId_fkey")
@@ -1197,6 +1209,42 @@ model ReferralDoctorSettlement {
   @@index([status])
   @@index([createdAt])
   @@map("referral_doctor_settlements")
+}
+
+model Worklist {
+  id          Int                 @id @default(autoincrement())
+  testId      Int
+  name        String
+  description String?             @db.Text
+  isActive    Boolean             @default(true)
+  isDeleted   Boolean             @default(false)
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+  test        Test                @relation(fields: [testId], references: [id], onDelete: Cascade)
+  parameters  WorklistParameter[]
+
+  @@unique([name, isActive]) // Unique constraint only for active worklists
+  @@index([testId])
+  @@index([isActive])
+  @@map("worklists")
+}
+
+model WorklistParameter {
+  id              Int           @id @default(autoincrement())
+  worklistId      Int
+  testParameterId Int
+  columnName      String
+  isIncluded      Boolean       @default(true)
+  sortOrder       Int?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  worklist        Worklist      @relation(fields: [worklistId], references: [id], onDelete: Cascade)
+  testParameter   TestParameter @relation(fields: [testParameterId], references: [id], onDelete: Cascade)
+
+  @@unique([worklistId, testParameterId])
+  @@index([worklistId])
+  @@index([testParameterId])
+  @@map("worklist_parameters")
 }
 
 enum BillStatus {
