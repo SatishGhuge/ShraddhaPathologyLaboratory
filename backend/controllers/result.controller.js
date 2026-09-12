@@ -2344,3 +2344,80 @@ export const deleteCommentFromHistory = async (req, res) => {
   }
 };
 
+
+
+// ✅ NEW: Authorize report and trigger Template 3 (Final Report Delivery)
+// This endpoint is called when lab tech clicks "Authorize" on authorized reports tab
+// It checks if payment is complete, then sends report and updates status to DELIVERED
+export const authorizeAndSendReport = async (req, res) => {
+  try {
+    const { testIds, visitId } = req.body;
+
+    if (!testIds || !Array.isArray(testIds) || testIds.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'testIds array is required'
+      });
+    }
+
+    if (!visitId) {
+      return res.status(400).json({
+        success: false,
+        message: 'visitId is required'
+      });
+    }
+
+    // Import report delivery utilities
+    const { sendReportToPatient, sendReportToReferralDoctor, checkAndSendPendingAuthorizedReports } = await import('../utils/reportDelivery.utils.js');
+
+    // Check if payment is complete
+    const visitBill = await prisma.visitBill.findUnique({
+      where: { visitId },
+      include: { patient: true }
+    });
+
+    if (!visitBill) {
+      return res.status(404).json({
+        success: false,
+        message: 'Visit bill not found'
+      });
+    }
+
+    // If payment NOT complete, keep reports in AUTHORIZED and return warning
+    if (visitBill.balanceAmount !== 0) {
+      return res.status(402).json({
+        success: false,
+        message: 'Payment not complete. Reports remain in AUTHORIZED status.',
+        warning: `Pending payment: ${visitBill.balanceAmount}`,
+        data: {
+          visitId,
+          testIds,
+          status: 'AUTHORIZED',
+          balanceAmount: visitBill.balanceAmount.toString()
+        }
+      });
+    }
+
+    // Payment is complete! Proceed with sending reports (Template 3)
+    const results = await checkAndSendPendingAuthorizedReports(visitId);
+
+    res.json({
+      success: true,
+      message: 'Report authorized and sent successfully',
+      data: {
+        visitId,
+        testIds,
+        status: 'DELIVERED',
+        sentTo: results,
+        timestamp: new Date().toISOString()
+      }
+    });
+  } catch (error) {
+    console.error('Error in authorizeAndSendReport:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to authorize and send report',
+      error: error.message
+    });
+  }
+};

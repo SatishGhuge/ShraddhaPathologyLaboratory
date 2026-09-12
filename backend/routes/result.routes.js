@@ -16,7 +16,8 @@ import {
   getAllTestResults,
   updatePatientComments,
   getCommentHistory,
-  deleteCommentFromHistory
+  deleteCommentFromHistory,
+  authorizeAndSendReport
 } from '../controllers/result.controller.js';
 import {
   getOutsourcingReport
@@ -350,6 +351,9 @@ router.put('/bulk/status', bulkUpdateTestStatus);
 
 // Send report via email or whatsapp
 router.post('/send-report', sendReport);
+
+// ✅ NEW: Authorize report and send via AISensy (Template 3)
+router.post('/authorize-and-send', authorizeAndSendReport);
 
 // Get patient test by ID
 router.get('/:id', getPatientTestById);

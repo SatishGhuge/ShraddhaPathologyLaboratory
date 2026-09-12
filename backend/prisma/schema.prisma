@@ -1282,3 +1282,28 @@ enum DiscountType {
   FLAT
   WRITEOFF
 }
+
+// ============================================================================
+// NOTIFICATION LOGS (AISensy WhatsApp Integration Audit Trail)
+// ============================================================================
+
+model NotificationLog {
+  id                Int      @id @default(autoincrement())
+  visitId           String?
+  patientId         String?
+  eventType         String   // PATIENT_REGISTRATION, VISIT_BILL, REPORT_DELIVERY
+  status            String   // SUCCESS, FAILED
+  responseMessageId String?  // AISensy message ID for successful sends
+  errorMessage      String?  @db.Text // Error details if failed
+  recipientType     String   @default("patient") // patient or doctor
+  recipientId       Int?     // Doctor ID if recipientType is doctor
+  createdAt         DateTime @default(now())
+
+  @@index([visitId])
+  @@index([patientId])
+  @@index([eventType])
+  @@index([status])
+  @@index([createdAt])
+  @@index([recipientType])
+  @@map("notification_logs")
+}

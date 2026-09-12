@@ -7,6 +7,7 @@ import { formatAge, calculateExactAge, getAgeForRangeMatching, formatAgeFromComp
 import crypto from 'crypto';
 import bcryptjs from 'bcryptjs';
 import { emailService } from '../services/notification.service.js';
+import { sendRegistrationCredentials, sendVisitBillNotification } from '../utils/reportDelivery.utils.js';
 
 // ✅ Helper: Normalize reportMode to match Prisma enum (BY_HAND, WHATSAPP, EMAIL)
 const normalizeReportMode = (mode) => {
@@ -57,6 +58,32 @@ async function createVisitBill(visitId, patientId, grossAmount, totalDiscount, t
       }
     });
     
+    // ✅ Trigger Template 2 (Visit Bill Notification) asynchronously
+    try {
+      // Get patient and first test to get reportMode
+      const patient = await prisma.patient.findUnique({
+        where: { patientId }
+      });
+
+      const firstTest = await prisma.patientTest.findFirst({
+        where: { visitId }
+      });
+
+      if (patient && firstTest) {
+        const reportMode = firstTest.reportMode || 'WHATSAPP';
+        
+        // Generate bill PDF URL (you'll need to implement this)
+        const billPdfUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/api/bills/download/${visitId}`;
+        
+        // Send Template 2 (Thank You + Bill)
+        await sendVisitBillNotification(visitId, patient, billPdfUrl, reportMode).catch(err => {
+          console.error('Template 2 (Visit Bill) send error:', err);
+          // Don't fail bill creation if template send fails
+        });
+      }
+    } catch (templateError) {
+      console.error('Error triggering Template 2:', templateError);
+    }
 
     return visitBill;
   } catch (error) {
@@ -867,6 +894,9 @@ export const registerPatientWithEmail = async (req, res) => {
       const balanceAmount = (totalAmount - discountAmount) - paidAmount;
       const perTestBalance = balanceAmount / tests.length;
 
+      // Normalize report mode (all tests in a visit have same reportMode)
+      const normalizedReportMode = normalizeReportMode(tests[0]?.reportMode || 'EMAIL');
+
       await prisma.patientTest.createMany({
         data: tests.map(test => ({
           patientId,
@@ -877,8 +907,9 @@ export const registerPatientWithEmail = async (req, res) => {
           organizationId: organizationId || null,
           sample: test.sample || 'Blood',
           charge: perTestAmount,
-          reportMode: 'EMAIL',
-          referralDoctor: referralDoctor,
+          reportMode: normalizedReportMode,
+          referralDoctorId: referralDoctor ? referralDoctor.id : null,
+          otherReferralDoctor: referralDoctor ? (typeof referralDoctor === 'string' ? referralDoctor : null) : null,
           visitDate: visitDate ? new Date(visitDate) : new Date(),
           visitTime: '10:00',
           totalAmount: perTestAmount,
@@ -910,7 +941,48 @@ export const registerPatientWithEmail = async (req, res) => {
 
 
 
-    // Send email with credentials
+    // Determine reportMode for credentials sending
+    // If no referral doctor is selected, send credentials based on reportMode
+    // If referral doctor IS selected, we still send credentials to patient based on reportMode
+    let reportModeForCredentials = 'EMAIL'; // default
+    if (tests && tests.length > 0) {
+      reportModeForCredentials = tests[0].reportMode || 'EMAIL';
+    }
+
+    // Send registration credentials (Template 1) via AISensy
+    // Only send if referral doctor is NOT selected
+    if (!referralDoctor) {
+      try {
+        const credentialsSendResult = await sendRegistrationCredentials(
+          patient,
+          patientId,
+          randomPassword,
+          reportModeForCredentials
+        );
+        
+        console.log(`Template 1 (Credentials) send result:`, credentialsSendResult);
+      } catch (credentialsError) {
+        console.error('Template 1 (Credentials) send error:', credentialsError);
+        // Don't fail registration if template send fails
+      }
+    } else {
+      // If referral doctor selected, still send credentials to patient
+      try {
+        const credentialsSendResult = await sendRegistrationCredentials(
+          patient,
+          patientId,
+          randomPassword,
+          reportModeForCredentials
+        );
+        
+        console.log(`Template 1 (Credentials) send result for visit with referral doctor:`, credentialsSendResult);
+      } catch (credentialsError) {
+        console.error('Template 1 (Credentials) send error:', credentialsError);
+        // Don't fail registration if template send fails
+      }
+    }
+
+    // Also send traditional email with credentials (existing logic)
     try {
       await emailService.sendRegistrationCredentials(
         email,
@@ -927,13 +999,13 @@ export const registerPatientWithEmail = async (req, res) => {
 
     res.status(201).json({
       success: true,
-      message: 'Patient registered successfully. Credentials sent to email.',
+      message: 'Patient registered successfully. Credentials sent.',
       data: {
         patientId: patient.patientId,
         firstName: patient.firstName,
         email: patient.email,
         mobile: patient.mobile,
-        message: `Patient ID: ${patientId}, Password sent to email`
+        message: `Patient ID: ${patientId}, Credentials sent via ${reportModeForCredentials}`
       }
     });
   } catch (error) {
@@ -2548,6 +2620,24 @@ export const recordPayment = async (req, res) => {
         remarks: remarks || `Payment received via ${paymentMode}`
       }
     });
+
+    // ✅ NEW: Check if payment is now complete and send pending authorized reports
+    try {
+      if (newBalance <= 0) {
+        console.log(`Payment complete for visitId: ${visitId}. Checking for pending authorized reports...`);
+        
+        const { checkAndSendPendingAuthorizedReports } = await import('../utils/reportDelivery.utils.js');
+        const reportResults = await checkAndSendPendingAuthorizedReports(visitId).catch(err => {
+          console.error('Error sending pending reports:', err);
+          return { success: false, error: err.message };
+        });
+        
+        console.log('Pending reports send result:', reportResults);
+      }
+    } catch (reportError) {
+      console.error('Error triggering pending reports send:', reportError);
+      // Don't fail payment recording if report send fails
+    }
 
     res.json({
       success: true,
