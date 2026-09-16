@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { Download, Upload, AlertCircle, CheckCircle, XCircle, Loader, ChevronLeft } from 'lucide-react';
 import API_BASE_URL from '@/src/api/config';
@@ -25,6 +25,7 @@ export default function TestExcelManager() {
   const [preValidationErrors, setPreValidationErrors] = useState<string[]>([]);
   const [preValidationWarnings, setPreValidationWarnings] = useState<string[]>([]);
   const [showSuccess, setShowSuccess] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const router = useRouter();
 
@@ -125,7 +126,9 @@ export default function TestExcelManager() {
 
       // Reset file after successful import
       setFile(null);
-      if (e.target) (e.target as HTMLInputElement).value = '';
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
     } catch (error) {
       console.error('❌ Import error:', error);
       setPreValidationErrors([(error as Error).message]);
@@ -133,8 +136,6 @@ export default function TestExcelManager() {
       setIsImporting(false);
     }
   };
-
-  const e = {} as any;
 
   return (
     <div className="min-h-screen bg-gray-50 p-6">
@@ -216,6 +217,7 @@ export default function TestExcelManager() {
               </label>
               <div className="flex items-center gap-3">
                 <input
+                  ref={fileInputRef}
                   type="file"
                   accept=".xlsx"
                   onChange={handleFileSelect}
