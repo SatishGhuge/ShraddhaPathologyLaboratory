@@ -530,10 +530,8 @@ export default function BookingPage() {
   const [showRefundModal,  setShowRefundModal]  = useState(false);
   const [refundAmount,     setRefundAmount]     = useState("");
   const [refundRemark,     setRefundRemark]     = useState("");
-  const [showBillModal,    setShowBillModal]    = useState(false);
-  const [showPrintDropdown, setShowPrintDropdown] = useState(false);
-  const [showDownloadDropdown, setShowDownloadDropdown] = useState(false);
   const [showBookingDetailsModal, setShowBookingDetailsModal] = useState(false);
+  const [showPrintPreview, setShowPrintPreview] = useState(false);  // ✅ BillReceipt modal
   const [selectedBookingForModal, setSelectedBookingForModal] = useState<any>(null);
   
   /* ===== PAGINATION STATES ===== */
@@ -844,21 +842,10 @@ export default function BookingPage() {
       if (searchBarOrganizationDropdownRef.current && !searchBarOrganizationDropdownRef.current.contains(e.target)) {
         setShowSearchBarOrganizationDropdown(false);
       }
-      // Close print/download dropdowns when clicking outside
-      if (showPrintDropdown || showDownloadDropdown) {
-        const printBtn = document.querySelector('.print-dropdown-container');
-        const downloadBtn = document.querySelector('.download-dropdown-container');
-        if (printBtn && !printBtn.contains(e.target)) {
-          setShowPrintDropdown(false);
-        }
-        if (downloadBtn && !downloadBtn.contains(e.target)) {
-          setShowDownloadDropdown(false);
-        }
-      }
     };
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [showPrintDropdown, showDownloadDropdown]);
+  }, []);
 
   // When a booking is selected, pre-fill billing fields from stored amounts
   useEffect(() => {
@@ -1360,10 +1347,14 @@ export default function BookingPage() {
     }
   };
 
+  const handleRefund  = () => setShowRefundModal(true);
+
+  // Open BillReceipt modal for printing
   const handlePrintBooking = (b: any) => {
-    // ✅ CHANGED: Open BillModal instead of printing directly
+    console.log('🖨️ [Print Button] Clicked for booking:', b.visitId);
     setSelectedBooking(b);
-    setShowBillModal(true);
+    setShowPrintPreview(true);
+    console.log('🖨️ [Print Button] showPrintPreview set to true');
   };
 
   const handleDeleteTest = async (testToDelete: any) => {
@@ -1520,47 +1511,6 @@ export default function BookingPage() {
       setSelectedBooking(updatedBooking);
     }
     setEditingCharge(null);
-  };
-
-  const handleBill    = () => setShowBillModal(true);
-  const handleReceipt = () => setShowBillModal(true);  // ✅ CHANGED: Use BillModal instead of ReceiptModal
-  const handleRefund  = () => setShowRefundModal(true);
-
-  // Print functions for bill modal
-  const handlePrintWithHeader = async () => {
-    setShowPrintDropdown(false);
-    if (!selectedBooking) return;
-    const result = await printBill(selectedBooking, billing, businessType, true);
-    if (!result.success) {
-      alert('Failed to print: ' + result.error);
-    }
-  };
-
-  const handlePrintWithoutHeader = async () => {
-    setShowPrintDropdown(false);
-    if (!selectedBooking) return;
-    const result = await printBill(selectedBooking, billing, businessType, false);
-    if (!result.success) {
-      alert('Failed to print: ' + result.error);
-    }
-  };
-
-  const handleDownloadWithHeader = async () => {
-    setShowDownloadDropdown(false);
-    if (!selectedBooking) return;
-    const result = await generateBillPDF(selectedBooking, billing, businessType, true);
-    if (!result.success) {
-      alert('Failed to generate PDF: ' + result.error);
-    }
-  };
-
-  const handleDownloadWithoutHeader = async () => {
-    setShowDownloadDropdown(false);
-    if (!selectedBooking) return;
-    const result = await generateBillPDF(selectedBooking, billing, businessType, false);
-    if (!result.success) {
-      alert('Failed to generate PDF: ' + result.error);
-    }
   };
 
   const handleSavePayment = async () => {
@@ -1737,186 +1687,6 @@ export default function BookingPage() {
     setBarcodeLabels(labels);
     setSelectedBarcodeIndices(new Set(labels.map((_, idx) => idx)));
     setShowBarcodeModal(true);
-  };
-
-  // Print bill with header for booking
-  const handlePrintBillWithHeader = async () => {
-    setShowPrintDropdown(false);
-    if (!selectedBooking) return;
-
-    const billBooking = {
-      bookingId: selectedBooking.bookingId,
-      visitId: selectedBooking.visitId || selectedBooking.bookingId,
-      patientId: selectedBooking.patientId,
-      name: selectedBooking.name,
-      date: selectedBooking.date,
-      tests: selectedBooking.tests.map((t: any) => ({
-        name: t.name,
-        sample: t.sample,
-        charge: businessType === "B2C" ? (t.b2cCharge || t.charge || 0) : (t.b2bCharge || t.charge || 0),
-        b2cCharge: t.b2cCharge || t.charge || 0,
-        b2bCharge: t.b2bCharge || t.charge || 0
-      })),
-      paidAmount: selectedBooking.paidAmount || 0,
-      balanceAmount: selectedBooking.balanceAmount || 0,
-      patientData: {
-        title: selectedBooking.patientData?.title || 'MR',
-        firstName: selectedBooking.patientData?.firstName || '',
-        lastName: selectedBooking.patientData?.lastName || '',
-        age: selectedBooking.patientData?.age || '',
-        gender: selectedBooking.patientData?.gender || 'Male',
-        mobile: selectedBooking.patientData?.mobile || '',
-        referralDoctor: selectedBooking.patientData?.referralDoctor || '',
-        remark: selectedBooking.patientData?.remark || ''
-      }
-    };
-
-    const billingInfo = {
-      discount: String(selectedBooking.discountAmount || 0),
-      discountPercent: String(selectedBooking.discountPercent || 0),
-      remarks: selectedBooking.discountRemark || '',
-      paymentMode: billing.paymentMode || 'Cash'
-    };
-
-    const result = await printBill(billBooking, billingInfo, businessType, true);
-    if (!result.success) {
-      alert('Failed to print: ' + result.error);
-    }
-  };
-
-  // Print bill without header for booking
-  const handlePrintBillWithoutHeader = async () => {
-    setShowPrintDropdown(false);
-    if (!selectedBooking) return;
-
-    const billBooking = {
-      bookingId: selectedBooking.bookingId,
-      visitId: selectedBooking.visitId || selectedBooking.bookingId,
-      patientId: selectedBooking.patientId,
-      name: selectedBooking.name,
-      date: selectedBooking.date,
-      tests: selectedBooking.tests.map((t: any) => ({
-        name: t.name,
-        sample: t.sample,
-        charge: businessType === "B2C" ? (t.b2cCharge || t.charge || 0) : (t.b2bCharge || t.charge || 0),
-        b2cCharge: t.b2cCharge || t.charge || 0,
-        b2bCharge: t.b2bCharge || t.charge || 0
-      })),
-      paidAmount: selectedBooking.paidAmount || 0,
-      balanceAmount: selectedBooking.balanceAmount || 0,
-      patientData: {
-        title: selectedBooking.patientData?.title || 'MR',
-        firstName: selectedBooking.patientData?.firstName || '',
-        lastName: selectedBooking.patientData?.lastName || '',
-        age: selectedBooking.patientData?.age || '',
-        gender: selectedBooking.patientData?.gender || 'Male',
-        mobile: selectedBooking.patientData?.mobile || '',
-        referralDoctor: selectedBooking.patientData?.referralDoctor || '',
-        remark: selectedBooking.patientData?.remark || ''
-      }
-    };
-
-    const billingInfo = {
-      discount: String(selectedBooking.discountAmount || 0),
-      discountPercent: String(selectedBooking.discountPercent || 0),
-      remarks: selectedBooking.discountRemark || '',
-      paymentMode: billing.paymentMode || 'Cash'
-    };
-
-    const result = await printBill(billBooking, billingInfo, businessType, false);
-    if (!result.success) {
-      alert('Failed to print: ' + result.error);
-    }
-  };
-
-  // Download bill with header for booking
-  const handleDownloadBillWithHeader = async () => {
-    setShowDownloadDropdown(false);
-    if (!selectedBooking) return;
-
-    const billBooking = {
-      bookingId: selectedBooking.bookingId,
-      visitId: selectedBooking.visitId || selectedBooking.bookingId,
-      patientId: selectedBooking.patientId,
-      name: selectedBooking.name,
-      date: selectedBooking.date,
-      tests: selectedBooking.tests.map((t: any) => ({
-        name: t.name,
-        sample: t.sample,
-        charge: businessType === "B2C" ? (t.b2cCharge || t.charge || 0) : (t.b2bCharge || t.charge || 0),
-        b2cCharge: t.b2cCharge || t.charge || 0,
-        b2bCharge: t.b2bCharge || t.charge || 0
-      })),
-      paidAmount: selectedBooking.paidAmount || 0,
-      balanceAmount: selectedBooking.balanceAmount || 0,
-      patientData: {
-        title: selectedBooking.patientData?.title || 'MR',
-        firstName: selectedBooking.patientData?.firstName || '',
-        lastName: selectedBooking.patientData?.lastName || '',
-        age: selectedBooking.patientData?.age || '',
-        gender: selectedBooking.patientData?.gender || 'Male',
-        mobile: selectedBooking.patientData?.mobile || '',
-        referralDoctor: selectedBooking.patientData?.referralDoctor || '',
-        remark: selectedBooking.patientData?.remark || ''
-      }
-    };
-
-    const billingInfo = {
-      discount: String(selectedBooking.discountAmount || 0),
-      discountPercent: String(selectedBooking.discountPercent || 0),
-      remarks: selectedBooking.discountRemark || '',
-      paymentMode: billing.paymentMode || 'Cash'
-    };
-
-    const result = await generateBillPDF(billBooking, billingInfo, businessType, true);
-    if (!result.success) {
-      alert('Failed to download PDF: ' + result.error);
-    }
-  };
-
-  // Download bill without header for booking
-  const handleDownloadBillWithoutHeader = async () => {
-    setShowDownloadDropdown(false);
-    if (!selectedBooking) return;
-
-    const billBooking = {
-      bookingId: selectedBooking.bookingId,
-      visitId: selectedBooking.visitId || selectedBooking.bookingId,
-      patientId: selectedBooking.patientId,
-      name: selectedBooking.name,
-      date: selectedBooking.date,
-      tests: selectedBooking.tests.map((t: any) => ({
-        name: t.name,
-        sample: t.sample,
-        charge: businessType === "B2C" ? (t.b2cCharge || t.charge || 0) : (t.b2bCharge || t.charge || 0),
-        b2cCharge: t.b2cCharge || t.charge || 0,
-        b2bCharge: t.b2bCharge || t.charge || 0
-      })),
-      paidAmount: selectedBooking.paidAmount || 0,
-      balanceAmount: selectedBooking.balanceAmount || 0,
-      patientData: {
-        title: selectedBooking.patientData?.title || 'MR',
-        firstName: selectedBooking.patientData?.firstName || '',
-        lastName: selectedBooking.patientData?.lastName || '',
-        age: selectedBooking.patientData?.age || '',
-        gender: selectedBooking.patientData?.gender || 'Male',
-        mobile: selectedBooking.patientData?.mobile || '',
-        referralDoctor: selectedBooking.patientData?.referralDoctor || '',
-        remark: selectedBooking.patientData?.remark || ''
-      }
-    };
-
-    const billingInfo = {
-      discount: String(selectedBooking.discountAmount || 0),
-      discountPercent: String(selectedBooking.discountPercent || 0),
-      remarks: selectedBooking.discountRemark || '',
-      paymentMode: billing.paymentMode || 'Cash'
-    };
-
-    const result = await generateBillPDF(billBooking, billingInfo, businessType, false);
-    if (!result.success) {
-      alert('Failed to download PDF: ' + result.error);
-    }
   };
 
   return (
@@ -2227,8 +1997,6 @@ export default function BookingPage() {
                 <div className="bg-slate-900 text-white p-2 flex justify-between items-center">
                   <div>{selectedBooking.name} <span className="text-yellow-300">UID: {selectedBooking.visitId || selectedBooking.bookingId}</span></div>
                   <div className="flex gap-1">
-                    <button onClick={() => setShowBillModal(true)}    className="bg-orange-100 text-black px-3 py-1 rounded text-xs font-semibold">Bill</button>
-                    <button onClick={() => handleReceipt()} className="bg-orange-100 text-black px-3 py-1 rounded text-xs font-semibold">Receipts</button>
                     <button onClick={() => setShowRefundModal(true)}  className="bg-orange-100 text-black px-3 py-1 rounded text-xs font-semibold">Refund</button>
                     <button onClick={()=>setSelectedBooking(null)} className="bg-red-500 p-1 rounded"><X size={16}/></button>
                   </div>
@@ -2485,8 +2253,8 @@ export default function BookingPage() {
                                     <td className="p-1 text-center text-xs">{selectedBooking.date}</td>
                                     <td className="p-1 text-center text-xs">
                                       <div className="flex items-center justify-center gap-0.5 text-xs">
-                                        {isEditing ? (
-                                          <input type="number" autoFocus value={editingCharge.value}
+                                        {isEditing && editingCharge ? (
+                                          <input type="number" autoFocus value={editingCharge.value || charge}
                                             onChange={e=>setEditingCharge({...editingCharge,value:e.target.value})}
                                             onBlur={()=>handleSaveCharge(t.name)}
                                             onKeyDown={e=>{if(e.key==="Enter")handleSaveCharge(t.name);if(e.key==="Escape")setEditingCharge(null);}}
@@ -2945,174 +2713,33 @@ export default function BookingPage() {
         </div>
       )}
 
-      {/* ===== BILL MODAL ===== */}
-      {showBillModal && selectedBooking && (() => {
-        // Calculate proper amounts for bill display
-        const billTotal = selectedBooking.tests.reduce(
-          (s,t) => s+(businessType==="B2C"?(t.b2cCharge||t.charge||0):(t.b2bCharge||t.charge||0)), 0
-        );
-        
-        // Get discount from current billing state (includes stored + any manual changes)
-        const currentDiscountPercent = parseFloat(billing.discountPercent) || 0;
-        const currentDiscountAmount = parseFloat(billing.discount) || 0;
-        
-        // Calculate discount amount - prioritize percentage over fixed amount
-        const billDiscountAmount = currentDiscountPercent > 0 
-          ? Math.round(billTotal * currentDiscountPercent / 100)
-          : Math.round(currentDiscountAmount);
-        
-        const billNetAmount = Math.max(0, billTotal - billDiscountAmount);
-        const billPaidAmount = selectedBooking.paidAmount || 0;
-        // Calculate balance as: billNetAmount - billPaidAmount (not from database)
-        const billBalanceAmount = Math.max(0, billNetAmount - billPaidAmount);
-        const isFullyPaid = billBalanceAmount <= 0;
-        
-        return (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[70]">
-            <div className="bg-white rounded-lg shadow-2xl w-[95%] max-w-3xl max-h-[95vh] flex flex-col">
-
-              {/* Action buttons */}
-              <div className="flex items-center gap-2 p-3 border-b bg-gray-50 rounded-t-lg">
-                {/* Print Dropdown */}
-                <div className="relative print-dropdown-container">
-                  <button
-                    onClick={() => {
-                      setShowPrintDropdown(!showPrintDropdown);
-                      setShowDownloadDropdown(false);
-                    }}
-                    className="text-Red px-5 py-2.5 rounded text-sm font-semibold flex items-center gap-2"
-                  >
-                    <Printer size={16} />
-                    Print
-                    <ChevronDown size={14} />
-                  </button>
-                  
-                  {showPrintDropdown && (
-                    <div className="absolute bottom-full left-0 mb-1 bg-white border border-gray-200 rounded-lg shadow-lg z-10 min-w-[180px]">
-                      <button
-                        onClick={handlePrintWithHeader}
-                        className="w-full text-left px-4 py-2 text-sm hover:bg-gray-50 rounded-t-lg border-b border-gray-100"
-                      >
-                        With Header
-                      </button>
-                      <button
-                        onClick={handlePrintWithoutHeader}
-                        className="w-full text-left px-4 py-2 text-sm hover:bg-gray-50 rounded-b-lg"
-                      >
-                        Without Header
-                      </button>
-                    </div>
-                  )}
-                </div>
-
-                {/* Download Dropdown */}
-                <div className="relative download-dropdown-container">
-                  <button
-                    onClick={() => {
-                      setShowDownloadDropdown(!showDownloadDropdown);
-                      setShowPrintDropdown(false);
-                    }}
-                    className="bg-slate-900 hover:bg-orange-600 text-white px-5 py-2.5 rounded text-sm font-semibold flex items-center gap-2"
-                  >
-                    <Download size={16} />
-                    Download PDF
-                    <ChevronDown size={14} />
-                  </button>
-                  
-                  {showDownloadDropdown && (
-                    <div className="absolute bottom-full left-0 mb-1 bg-white border border-gray-200 rounded-lg shadow-lg z-10 min-w-[180px]">
-                      <button
-                        onClick={handleDownloadWithHeader}
-                        className="w-full text-left px-4 py-2 text-sm hover:bg-gray-50 rounded-t-lg border-b border-gray-100"
-                      >
-                        With Header
-                      </button>
-                      <button
-                        onClick={handleDownloadWithoutHeader}
-                        className="w-full text-left px-4 py-2 text-sm hover:bg-gray-50 rounded-b-lg"
-                      >
-                        Without Header
-                      </button>
-                    </div>
-                  )}
-                </div>
-
-                <button className="bg-green-600 hover:bg-green-700 text-white px-5 py-2.5 rounded text-sm font-semibold">Whatsapp To Patient</button>
-                <button className="bg-teal-600 hover:bg-teal-700 text-white px-5 py-2.5 rounded text-sm font-semibold">Direct WA to Patient</button>
-                <button 
-                  onClick={() => {
-                    setShowBillModal(false);
-                    setShowPrintDropdown(false);
-                    setShowDownloadDropdown(false);
-                  }} 
-                  className="ml-auto text-gray-500 hover:text-gray-800 text-xl font-bold px-2"
-                >✕</button>
-              </div>
-
-              {/* Bill content - Using BillReceipt component */}
-              <div className="overflow-y-auto flex-1 bg-gray-50">
-                <BillReceipt
-                  booking={selectedBooking}
-                  billing={billing}
-                  businessType={businessType}
-                  numberToWords={numberToWords}
-                />
-              </div>
-            </div>
-          </div>
-        );
-      })()}
-
-      {/* ===== BILL MODAL ===== */}
-      {showBillModal && selectedBooking && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[100]">
-          <div className="bg-white rounded-lg shadow-2xl w-[95%] max-w-4xl max-h-[95vh] overflow-y-auto flex flex-col">
-            {/* Modal Header */}
-            <div className="sticky top-0 bg-gradient-to-r from-slate-900 to-slate-800 text-white p-4 flex justify-between items-center border-b border-slate-700">
-              <h2 className="text-xl font-bold">INVOICE - {selectedBooking.name}</h2>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => handlePrintBillWithHeader()}
-                  className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded text-sm font-semibold flex items-center gap-2 transition-colors"
-                  title="Print with letterhead"
-                >
-                  <Printer size={16} /> Print Header
-                </button>
-                <button
-                  onClick={() => handlePrintBillWithoutHeader()}
-                  className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded text-sm font-semibold flex items-center gap-2 transition-colors"
-                  title="Print without letterhead"
-                >
-                  <Printer size={16} /> Print
-                </button>
-                <button
-                  onClick={() => handleDownloadBillWithHeader()}
-                  className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded text-sm font-semibold flex items-center gap-2 transition-colors"
-                  title="Download PDF with letterhead"
-                >
-                  <Download size={16} /> PDF Header
-                </button>
-                <button
-                  onClick={() => handleDownloadBillWithoutHeader()}
-                  className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded text-sm font-semibold flex items-center gap-2 transition-colors"
-                  title="Download PDF without letterhead"
-                >
-                  <Download size={16} /> PDF
-                </button>
-                <button
-                  onClick={() => setShowBillModal(false)}
-                  className="bg-red-500 hover:bg-red-600 text-white px-3 py-2 rounded text-sm font-semibold transition-colors"
-                >
-                  <X size={20} />
-                </button>
-              </div>
+      {/* ===== BILL RECEIPT MODAL ===== */}
+      {showPrintPreview && selectedBooking && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999]">
+          <div className="bg-white rounded-lg shadow-2xl w-[98%] h-[95vh] max-w-[210mm] flex flex-col overflow-hidden">
+            {/* Minimal Header with Close Button */}
+            <div className="flex items-center justify-end p-2 border-b bg-white">
+              <button
+                onClick={() => setShowPrintPreview(false)}
+                className="text-gray-500 hover:text-gray-800 text-2xl font-bold px-2"
+              >✕</button>
             </div>
 
-            {/* Modal Body - Bill Receipt */}
-            <div className="flex-1 overflow-y-auto p-6 bg-gray-50">
+            {/* BillReceipt Content (Full Paper Width) */}
+            <div className="flex-1 overflow-auto bg-white" style={{ pageSize: 'A4', fontSize: '12px' }}>
               <BillReceipt
                 booking={selectedBooking}
-                billing={billing}
+                billing={{
+                  grossAmount: selectedBooking.tests.reduce(
+                    (sum: number, t: any) => sum + (businessType === "B2C" ? (t.b2cCharge || t.charge || 0) : (t.b2bCharge || t.charge || 0)),
+                    0
+                  ),
+                  totalDiscount: parseFloat(billing.discount) || 0,
+                  totalPaid: parseFloat(billing.advance) || parseFloat(billing.payment) || 0,
+                  balanceAmount: selectedBooking.balanceAmount || 0,
+                  discountPercent: parseFloat(billing.discountPercent) || 0,
+                  paymentMode: billing.paymentMode || 'Cash'
+                }}
                 businessType={businessType}
                 numberToWords={numberToWords}
               />

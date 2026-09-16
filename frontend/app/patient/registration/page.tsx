@@ -435,6 +435,7 @@ export default function PatientRegistration() {
   const [frequentTests, setFrequentTests] = useState<any[]>([]);
   const [filterFrequent, setFilterFrequent] = useState(false);
   const [selectedPackage, setSelectedPackage] = useState<any>(null);
+  const [showPackageTests, setShowPackageTests] = useState(true); // Toggle between package tests and department tests
   const [showAllTests, setShowAllTests] = useState(true);
   const [businessType, setBusinessType] = useState("B2C");
 
@@ -3030,9 +3031,9 @@ export default function PatientRegistration() {
         {/* LEFT */}
         <div className="md:col-span-2 col-span-12 bg-white rounded-xl shadow flex flex-col">
           <div className="flex text-xs font-semibold rounded-tl-xl rounded-tr-xl overflow-hidden">
-            <button onClick={() => { setActiveTab("tests"); setShowAllTests(true); setSelectedDept(null); setSelectedPackage(null); }}
+            <button onClick={() => { setActiveTab("tests"); setShowAllTests(true); setSelectedDept(null); setSelectedPackage(null); setShowPackageTests(true); }}
               className={`flex-1 p-2 ${activeTab === "tests" ? "bg-cyan-900 text-white" : "bg-gray-200"}`}>Department</button>
-            <button onClick={() => { setActiveTab("packages"); setShowAllTests(false); setSelectedDept(null); }}
+            <button onClick={() => { setActiveTab("packages"); setShowAllTests(false); setSelectedDept(null); setShowPackageTests(true); }}
               className={`flex-1 p-2 ${activeTab === "packages" ? "bg-cyan-900 text-white" : "bg-gray-200"}`}>Packages</button>
           </div>
           <div className="flex-1 overflow-auto text-xs" style={{ maxHeight: 'calc(75vh - 40px)' }}>
@@ -3061,12 +3062,15 @@ export default function PatientRegistration() {
                     <div key={idx}
                       className={`p-1 border-b hover:bg-gray-50 cursor-pointer ${selectedPackage?.name === pkg.name ? 'bg-orange-100 font-semibold' : ''}`}
                       onClick={() => {
-                        // ✅ Toggle: If clicking same package again, deselect it
+                        // ✅ Toggle: If clicking same package, toggle view between package tests and department tests
                         // Otherwise, select the new package
                         if (selectedPackage?.name === pkg.name) {
-                          setSelectedPackage(null);
+                          // Same package clicked again: toggle between package tests and department tests view
+                          setShowPackageTests(!showPackageTests);
                         } else {
+                          // Different package clicked: select it and show package tests
                           setSelectedPackage(pkg);
+                          setShowPackageTests(true);
                         }
                       }}
                     >
@@ -3155,11 +3159,12 @@ export default function PatientRegistration() {
                         <div className="flex items-center gap-1 cursor-pointer flex-1 min-w-0"
                           onClick={(e) => {
                             e.stopPropagation();
-                            // Just toggle package selection for display, don't add tests
+                            // Toggle: If clicking same package, toggle view. Otherwise, select it and show tests
                             if (selectedPackage?.name === pkg.name) {
-                              setSelectedPackage(null);
+                              setShowPackageTests(!showPackageTests);
                             } else {
                               setSelectedPackage(pkg);
+                              setShowPackageTests(true);
                             }
                           }}
                         >
@@ -3169,7 +3174,7 @@ export default function PatientRegistration() {
                         </div>
                         
                         {/* Check All checkbox - Only show when package is expanded */}
-                        {selectedPackage?.name === pkg.name && (
+                        {selectedPackage?.name === pkg.name && showPackageTests && (
                           <input 
                             type="checkbox" 
                             className="w-3 h-3 cursor-pointer accent-orange-500"
@@ -3207,8 +3212,8 @@ export default function PatientRegistration() {
                       </div>
                     </div>
                     
-                    {/* Package Tests - Show only if selected */}
-                    {selectedPackage?.name === pkg.name && (pkg.packageTests || []).map((t, i) => (
+                    {/* Package Tests - Show only if selected AND showPackageTests is true */}
+                    {selectedPackage?.name === pkg.name && showPackageTests && (pkg.packageTests || []).map((t, i) => (
                       <div key={t.id} className="grid grid-cols-12 border-b p-1 hover:bg-gray-50 items-center text-xs">
                         <div className="col-span-5 flex gap-1 items-center">
                           <input 
@@ -3253,7 +3258,7 @@ export default function PatientRegistration() {
                 })}
                 {displayPackages.length === 0 && <div className="p-4 text-center text-gray-400">No packages found</div>}
               </>
-            ) : selectedPackage ? (
+            ) : selectedPackage && showPackageTests ? (
               <>
                 {/* Show ALL tests from ALL selected packages (not just current one) */}
                 {(() => {
@@ -3356,9 +3361,9 @@ export default function PatientRegistration() {
                         onChange={(e) => {
                           e.stopPropagation();
                           if (e.target.checked) {
-                            addTest({...t, department: dept.name});
+                            setSelectedTests([...selectedTests, {...t, department: dept.name}]);
                           } else {
-                            removeTest(t.name);
+                            setSelectedTests(selectedTests.filter(st => st.name !== t.name));
                           }
                         }}
                       />
@@ -3468,19 +3473,7 @@ export default function PatientRegistration() {
                             <span className="truncate text-xs">{t.sample}</span>
                           </div>
                           <div className="col-span-4 text-right">
-                            <input 
-                              type="number" 
-                              min="0"
-                              value={t.b2cCharge}
-                              onChange={(e) => {
-                                const newCharge = parseFloat(e.target.value) || 0;
-                                setSelectedTests(selectedTests.map(st => 
-                                  st.id === t.id ? {...st, b2cCharge: newCharge} : st
-                                ));
-                              }}
-                              className="w-full text-right bg-blue-50 border border-blue-200 px-2 py-1 rounded text-xs font-semibold"
-                              title="Edit charge for this test (won't affect master database)"
-                            />
+                            <span className="text-gray-500">-</span>
                           </div>
                           <div className="col-span-1 text-center">
                             <button onClick={() => setSelectedTests(selectedTests.filter(st => st.id !== t.id))} className="text-red-500 hover:text-red-700 p-1"><X size={14} /></button>
