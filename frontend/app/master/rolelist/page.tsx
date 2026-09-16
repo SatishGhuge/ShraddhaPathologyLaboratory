@@ -6,9 +6,11 @@ import { useRouter } from "next/navigation";
 import { RotateCcw, X, ChevronLeft, ChevronRight } from "lucide-react";
 import { getRoles, deleteRole } from "@/src/api/master";
 import PaginationControls from "@/app/components/PaginationControls";
+import { useNotification } from "@/src/hooks/useNotification";
 
 const RoleList = () => {
   const router = useRouter();
+  const { success, error: showError, warning, info } = useNotification();
   const [search, setSearch] = useState("");
   const [roles, setRoles] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -73,7 +75,7 @@ const RoleList = () => {
       setCurrentPage(1);
       fetchRoles(1);
     } catch (err) {
-      alert(err.message || "Failed to delete role");
+      showError(err.message || "Failed to delete role");
     }
   };
 
@@ -108,20 +110,20 @@ const RoleList = () => {
 
       const result = await response.json();
       if (result.success) {
-        alert(role.isActive ? "Role inactivated successfully!" : "Role activated successfully!");
+        success(role.isActive ? "Role inactivated successfully!" : "Role activated successfully!");
         fetchRoles(1);
       } else {
-        alert(result.message || "Failed to update role");
+        showError(result.message || "Failed to update role");
       }
     } catch (err) {
       console.error('Error updating role:', err);
-      alert("Failed to update role");
+      showError("Failed to update role");
     }
   };
 
   const handleSaveRole = async () => {
     if (!roleName.trim()) {
-      alert("Please enter role name");
+      warning("Please enter role name");
       return;
     }
 
@@ -145,17 +147,17 @@ const RoleList = () => {
       const result = await response.json();
 
       if (result.success) {
-        alert(editingRoleId ? "Role updated successfully!" : "Role added successfully!");
+        success(editingRoleId ? "Role updated successfully!" : "Role added successfully!");
         setShowModal(false);
         setRoleName("");
         setEditingRoleId(null);
         fetchRoles(1);
       } else {
-        alert(result.message || "Failed to save role");
+        showError(result.message || "Failed to save role");
       }
     } catch (err) {
       console.error('Error saving role:', err);
-      alert("Failed to save role");
+      showError("Failed to save role");
     } finally {
       setSaveLoading(false);
     }

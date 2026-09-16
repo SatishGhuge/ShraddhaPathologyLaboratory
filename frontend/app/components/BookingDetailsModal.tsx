@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { X, Plus, RefreshCcw, Pencil, Eye, Trash2, AlertCircle } from "lucide-react";
 import { generateBillPDF, printBill } from "@/src/utils/billPdfGenerator.js";
+import { useNotification } from "@/src/hooks/useNotification";
 import BillReceipt from "@/app/components/BillReceipt";
 
 /*
@@ -61,6 +62,7 @@ const BookingDetailsModal: React.FC<BookingDetailsModalProps> = ({
   onBookingUpdate,
   onTestCancelled  // ✅ NEW: Add callback prop
 }) => {
+  const { success, error: showError, warning, info } = useNotification();
   const [testView, setTestView] = useState("all");
   const [searchTest, setSearchTest] = useState("");
   const [selectedPackage, setSelectedPackage] = useState<any>(null);
@@ -558,7 +560,7 @@ const BookingDetailsModal: React.FC<BookingDetailsModalProps> = ({
         }
         
         // Step 4: Show success message
-        setSuccessMessage(`✅ Test "${testToDelete.name}" cancelled successfully! Balance updated.`);
+        setSuccessMessage(`✅ Test "${testToDelete.name || 'Unknown'}" cancelled successfully! Balance updated.`);
         setTimeout(() => setSuccessMessage(""), 3000);
         
       } else {
@@ -589,7 +591,7 @@ const BookingDetailsModal: React.FC<BookingDetailsModalProps> = ({
       
     } catch (error) {
       console.error('❌ Error during test deletion:', error);
-      alert(`Failed to cancel test: ${(error as Error).message}`);
+      showError(`Failed to cancel test: ${(error as Error).message}`);
     } finally {
       setIsDeleting(false);
     }
@@ -693,9 +695,9 @@ const BookingDetailsModal: React.FC<BookingDetailsModalProps> = ({
 
         // Show message if fully paid
         if (finalBalance <= 0) {
-          alert(`✅ Payment received - Amount Fully Paid!`);
+          success(`Payment received - Amount Fully Paid!`);
         } else {
-          alert(`✅ Payment received successfully!\nRemaining Balance: ₹${Math.round(finalBalance)}`);
+          success(`Payment received successfully!\nRemaining Balance: ₹${Math.round(finalBalance)}`);
         }
 
         setPaymentAmount(0);
@@ -706,7 +708,7 @@ const BookingDetailsModal: React.FC<BookingDetailsModalProps> = ({
 
       } catch (error) {
         console.error('❌ Error saving payment:', error);
-        alert('Failed to save payment: ' + (error instanceof Error ? error.message : String(error)));
+        showError('Failed to save payment: ' + (error instanceof Error ? error.message : String(error)));
       }
     }
 
@@ -826,7 +828,7 @@ const BookingDetailsModal: React.FC<BookingDetailsModalProps> = ({
         messages.push(`✅ Payment received - Amount Fully Paid!`);
         
         const successMessage = messages.join('\n');
-        alert(successMessage);
+        success(successMessage);
       }
       
       // ✅ Reset payment field to 0
@@ -836,7 +838,7 @@ const BookingDetailsModal: React.FC<BookingDetailsModalProps> = ({
 
     } catch (error) {
       console.error('❌ Error saving tests:', error);
-      alert('Failed to save tests: ' + (error instanceof Error ? error.message : String(error)));
+      showError('Failed to save tests: ' + (error instanceof Error ? error.message : String(error)));
     }
   };
 
@@ -862,7 +864,7 @@ const BookingDetailsModal: React.FC<BookingDetailsModalProps> = ({
               <div className="flex-1">
                 <h3 className="font-bold text-base text-gray-900 mb-1">Cancel Test?</h3>
                 <p className="text-sm text-gray-600">
-                  Are you sure you want to cancel <strong>{showConfirmDelete.name}</strong>?
+                  Are you sure you want to cancel <strong>{showConfirmDelete.name || 'Unknown Test'}</strong>?
                 </p>
                 <p className="text-xs text-gray-500 mt-2">
                   Charge: ₹{businessType === "B2C" ? (showConfirmDelete.b2cCharge || showConfirmDelete.charge || 0) : (showConfirmDelete.b2bCharge || showConfirmDelete.charge || 0)}
@@ -913,8 +915,8 @@ const BookingDetailsModal: React.FC<BookingDetailsModalProps> = ({
         {/* HEADER */}
         <div className="bg-cyan-900 text-white p-3 flex justify-between items-center flex-shrink-0">
           <div className="flex-1">
-            <h2 className="font-bold text-base">{booking.name}</h2>
-            <p className="text-xs text-yellow-300">UID: {booking.patientId} | Visit: {booking.visitId || booking.bookingId}</p>
+            <h2 className="font-bold text-base">{booking.name || 'Unknown Patient'}</h2>
+            <p className="text-xs text-yellow-300">UID: {booking.patientId || 'N/A'} | Visit: {booking.visitId || booking.bookingId || 'N/A'}</p>
           </div>
           <div className="flex gap-2">
             <button 
@@ -990,7 +992,7 @@ const BookingDetailsModal: React.FC<BookingDetailsModalProps> = ({
                         >
                           <div className="col-span-2 font-medium text-gray-800 flex items-center gap-2">
                             <Plus size={13} className="text-blue-500" />
-                            <span className="truncate">{t.name}</span>
+                            <span className="truncate">{t.name || 'Unknown Test'}</span>
                           </div>
                           <div className="text-right text-gray-700">₹{t.b2cCharge || t.charge || 0}</div>
                         </div>
@@ -1012,7 +1014,7 @@ const BookingDetailsModal: React.FC<BookingDetailsModalProps> = ({
                       .filter(p => p.name.toLowerCase().includes(searchTest.toLowerCase()))
                       .map((pkg) => (
                         <div
-                          key={`pkg-${pkg.id}`}
+                          key={`pkg-${pkg.id || pkg.name || 'unknown'}`}
                           onClick={() => {
                             setSelectedPackage(pkg);
                             // Show package dropdown indicator
@@ -1022,7 +1024,7 @@ const BookingDetailsModal: React.FC<BookingDetailsModalProps> = ({
                         >
                           <div className="col-span-2 font-medium text-orange-800 flex items-center gap-2">
                             <Plus size={13} className="text-orange-600" />
-                            <span className="truncate">📦 {pkg.name}</span>
+                            <span className="truncate">📦 {pkg.name || 'Unknown Package'}</span>
                           </div>
                           <div className="text-right text-orange-700 font-semibold">₹{pkg.charges || pkg.b2cCharge || 0}</div>
                         </div>
@@ -1039,7 +1041,7 @@ const BookingDetailsModal: React.FC<BookingDetailsModalProps> = ({
               {activeTab === "package" && selectedPackage && (
                 <div className="bg-orange-50 border-t-2 border-orange-200 p-2">
                   <div className="text-xs font-bold text-orange-900 mb-2">
-                    📦 {selectedPackage.name} - Tests ({selectedPackage.tests?.length || 0})
+                    📦 {selectedPackage.name || 'Unknown Package'} - Tests ({selectedPackage.tests?.length || 0})
                   </div>
                   <div className="space-y-1">
                     {selectedPackage.tests && selectedPackage.tests.length > 0 ? (
@@ -1055,7 +1057,7 @@ const BookingDetailsModal: React.FC<BookingDetailsModalProps> = ({
                           className="px-2 py-1 text-xs cursor-pointer hover:bg-white rounded transition-colors text-gray-800"
                         >
                           <Plus size={11} className="inline text-orange-600 mr-1" />
-                          {test.name}
+                          {test.name || 'Unknown Test'}
                         </div>
                       ))
                     ) : (
@@ -1125,7 +1127,7 @@ const BookingDetailsModal: React.FC<BookingDetailsModalProps> = ({
                       const groupedByPackage = new Map<string | null, any[]>();
                       tests.forEach(test => {
                         const packageKey = test.packageName || test.fromPackage || '__individual__';
-                        console.log(`📦 Test "${test.name}" -> packageKey: "${packageKey}"`);
+                        console.log(`📦 Test "${test.name || 'Unknown'}" -> packageKey: "${packageKey}"`);
                         if (!groupedByPackage.has(packageKey)) {
                           groupedByPackage.set(packageKey, []);
                         }
@@ -1149,7 +1151,7 @@ const BookingDetailsModal: React.FC<BookingDetailsModalProps> = ({
                         }
                       });
 
-                      const rows: JSX.Element[] = [];
+                      const rows: React.ReactElement[] = [];
                       let rowIndex = 1;
 
                       // Sort: packages first, then individual tests
@@ -1164,16 +1166,16 @@ const BookingDetailsModal: React.FC<BookingDetailsModalProps> = ({
                         
                         if (packageKey !== '__individual__') {
                           // Package header row
-                          const pkgData = packageMap.get(packageKey);
+                          const pkgData = packageKey ? packageMap.get(packageKey) : null;
                           // Get package charge from first test in group (all tests in same package have same charge)
                           const firstTestInGroup = testsInGroup[0];
                           const packageCharge = firstTestInGroup?.packageCharge || pkgData?.charges || 0;
                           
                           rows.push(
-                            <tr key={`pkg-header-${packageKey}`} className="bg-blue-100 border-b-2 border-blue-300">
+                            <tr key={`pkg-header-${packageKey || 'unknown'}`} className="bg-blue-100 border-b-2 border-blue-300">
                               <td colSpan={1} className="p-1 text-center font-bold text-blue-800 text-xs"></td>
                               <td colSpan={3} className="p-1 font-bold text-blue-800 text-xs">
-                                📦 {packageKey}
+                                📦 {packageKey || 'Unknown Package'}
                               </td>
                               <td className="p-1 text-center font-bold text-blue-800 text-xs">₹{packageCharge}</td>
                               <td colSpan={3} className="p-1"></td>
@@ -1201,26 +1203,26 @@ const BookingDetailsModal: React.FC<BookingDetailsModalProps> = ({
                           const isNewTest = !t.isExisting;
 
                           rows.push(
-                            <tr key={`test-${t.name}`} className={`border-b text-xs hover:bg-gray-50 ${isNewTest ? "bg-blue-50" : ""}`}>
+                            <tr key={`test-${t.name || 'unknown'}`} className={`border-b text-xs hover:bg-gray-50 ${isNewTest ? "bg-blue-50" : ""}`}>
                               <td className="p-1 text-center font-medium">{rowIndex++}</td>
                               <td className="p-1">
                                 <div className="flex items-center gap-1">
                                   {isNewTest && (
                                     <span className="text-blue-600 font-bold text-xs">N</span>
                                   )}
-                                  <span>{t.name}</span>
+                                  <span>{t.name || 'Unknown Test'}</span>
                                 </div>
                               </td>
                               <td className="p-1 text-left">
                                 {t.packageName || t.fromPackage ? (
                                   <span className="bg-orange-100 text-orange-800 px-2 py-0.5 rounded text-xs font-semibold whitespace-nowrap">
-                                    📦 {t.packageName || t.fromPackage}
+                                    📦 {t.packageName || t.fromPackage || 'Unknown Package'}
                                   </span>
                                 ) : (
                                   <span className="text-gray-400 text-xs">-</span>
                                 )}
                               </td>
-                              <td className="p-1 text-center">{booking.date}</td>
+                              <td className="p-1 text-center">{booking.date || 'N/A'}</td>
                               <td className="p-1 text-center">
                                 {isEditing ? (
                                   <input
@@ -1400,7 +1402,7 @@ const BookingDetailsModal: React.FC<BookingDetailsModalProps> = ({
                     onClick={() => {
                       // Check if already fully paid
                       if (finalBalance <= 0 && !newTestsAdded && paymentAmount === 0) {
-                        alert('✅ Payment already completed!\nNo further payment required.');
+                        success('Payment already completed!\nNo further payment required.');
                         return;
                       }
                       handleSave();

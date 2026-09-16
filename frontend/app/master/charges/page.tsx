@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { DollarSign, RotateCcw, FileSpreadsheet, FileText, Upload } from "lucide-react";
 import PaginationControls from "@/app/components/PaginationControls";
+import { useNotification } from "@/src/hooks/useNotification";
 
 export default function AddLabCharges() {
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -26,6 +27,7 @@ export default function AddLabCharges() {
   // Pagination states
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(25);
+  const { success, error: showError, warning, info } = useNotification();
 
   // Fetch tests and charges on component mount
   useEffect(() => {
@@ -126,7 +128,7 @@ export default function AddLabCharges() {
   // Bulk apply charges
   const handleBulkApply = () => {
     if (!bulkCharge) {
-      alert("Please enter a bulk charge value!");
+      warning("Please enter a bulk charge value!");
       return;
     }
 
@@ -138,7 +140,7 @@ export default function AddLabCharges() {
     setFilteredData(updated);
     setShowBulkModal(false);
     setBulkCharge("");
-    alert("Bulk charges applied! Click 'Save' to save to database.");
+    info("Bulk charges applied! Click 'Save' to save to database.");
   };
 
   // Save charges to database
@@ -157,7 +159,7 @@ export default function AddLabCharges() {
         }));
 
       if (bulkCharges.length === 0) {
-        alert("No charges to save. Please enter some charges first.");
+        warning("No charges to save. Please enter some charges first.");
         return;
       }
       
@@ -177,7 +179,7 @@ export default function AddLabCharges() {
       const result = await response.json();
       
       if (result.success) {
-        alert(`✅ ${result.data.updated + result.data.created} charges saved successfully!`);
+        success(`${result.data.updated + result.data.created} charges saved successfully!`);
         fetchTestsAndCharges(); // Reload data to get updated charge IDs
       } else {
         setError(result.message || 'Failed to save charges');
@@ -197,7 +199,7 @@ export default function AddLabCharges() {
       const XLSX = await import('xlsx').catch(() => null);
       
       if (!XLSX) {
-        alert('Excel export feature requires the "xlsx" package to be installed.\n\nPlease run: npm install xlsx');
+        warning('Excel export feature requires the "xlsx" package to be installed.\n\nPlease run: npm install xlsx');
         return;
       }
       
@@ -234,7 +236,7 @@ export default function AddLabCharges() {
       XLSX.writeFile(wb, filename);
     } catch (error) {
       console.error('Error exporting to Excel:', error);
-      alert('Error exporting to Excel. Please try again.');
+      showError('Error exporting to Excel. Please try again.');
     }
   };
 
@@ -246,7 +248,7 @@ export default function AddLabCharges() {
       const autoTableModule = await import('jspdf-autotable').catch(() => null);
       
       if (!jsPDFModule || !autoTableModule) {
-        alert('PDF export feature requires "jspdf" and "jspdf-autotable" packages to be installed.\n\nPlease run: npm install jspdf jspdf-autotable');
+        warning('PDF export feature requires "jspdf" and "jspdf-autotable" packages to be installed.\n\nPlease run: npm install jspdf jspdf-autotable');
         return;
       }
       
@@ -304,7 +306,7 @@ export default function AddLabCharges() {
       doc.save(filename);
     } catch (error) {
       console.error('Error exporting to PDF:', error);
-      alert('Error exporting to PDF. Please try again.');
+      showError('Error exporting to PDF. Please try again.');
     }
   };
 
@@ -319,7 +321,7 @@ export default function AddLabCharges() {
   // Parse Excel file and show data
   const handleImportExcel = async () => {
     if (!selectedFile) {
-      alert('Please select a file first');
+      warning('Please select a file first');
       return;
     }
 
@@ -328,7 +330,7 @@ export default function AddLabCharges() {
       const XLSX = await import('xlsx').catch(() => null);
       
       if (!XLSX) {
-        alert('Excel import feature requires the "xlsx" package to be installed.\n\nPlease run: npm install xlsx');
+        warning('Excel import feature requires the "xlsx" package to be installed.\n\nPlease run: npm install xlsx');
         return;
       }
 
@@ -351,7 +353,7 @@ export default function AddLabCharges() {
           })).filter(row => row.testName || row.testCode);
 
           if (validData.length === 0) {
-            alert('No valid data found in Excel file. Please check the format.');
+            warning('No valid data found in Excel file. Please check the format.');
             return;
           }
 
@@ -359,7 +361,7 @@ export default function AddLabCharges() {
           setLoading(false);
         } catch (err) {
           console.error('Error parsing Excel:', err);
-          alert('Error parsing Excel file. Please check the format.');
+          showError('Error parsing Excel file. Please check the format.');
           setLoading(false);
         }
       };
@@ -367,7 +369,7 @@ export default function AddLabCharges() {
       reader.readAsBinaryString(selectedFile);
     } catch (error) {
       console.error('Error importing Excel:', error);
-      alert('Error importing Excel file.');
+      showError('Error importing Excel file.');
       setLoading(false);
     }
   };
@@ -375,7 +377,7 @@ export default function AddLabCharges() {
   // Fill charges from imported data
   const handleFillCharges = () => {
     if (importedData.length === 0) {
-      alert('No imported data to fill');
+      warning('No imported data to fill');
       return;
     }
 

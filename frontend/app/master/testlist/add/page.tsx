@@ -10,6 +10,7 @@ import { CKEditor } from "@ckeditor/ckeditor5-react";
 import ClassicEditor from "@ckeditor/ckeditor5-build-classic";
 import { getTestById, createTest, updateTest, getDepartments, getAllUnits, getTests, getSampleTypes } from "@/src/api/master";
 import { getMachinesDropdown } from "@/src/api/machines";
+import { useNotification } from "@/src/hooks/useNotification";
 
 const baseInputClass =
   "px-2 py-1 border border-gray-300 rounded text-sm bg-white focus:outline-none focus:ring-2 focus:ring-orange-500";
@@ -18,6 +19,7 @@ const AddTest = () => {
   const router = useRouter();
   const { id } = useParams()
   const pathname = usePathname();
+  const { success, error: showError, warning, info } = useNotification();
   
   // Determine mode based on route - more robust detection
   const isEditMode = pathname.toLowerCase().includes('/edit/') || pathname.toLowerCase().includes('/edit');
@@ -1004,7 +1006,7 @@ const AddTest = () => {
     
     // If any fields are empty, show general message first
     if (emptyFields.length > 0) {
-      alert("Please enter all fields!\n\nMissing fields:\n- " + emptyFields.join("\n- "));
+      warning("Please enter all fields!\n\nMissing fields:\n- " + emptyFields.join("\n- "));
       return;
     }
     

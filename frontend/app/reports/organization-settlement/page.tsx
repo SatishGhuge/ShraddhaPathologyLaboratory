@@ -5,6 +5,7 @@ import { DollarSign, RotateCcw, Printer, Calendar, ChevronDown, ChevronLeft, Che
 import Header from "@/src/components/Header";
 import PaginationControls from "@/app/components/PaginationControls";
 import { getOrganizations } from "@/src/api/patient";
+import { useNotification } from '@/src/hooks/useNotification';
 
 // Hide number input spinners (up/down arrows)
 const numberInputStyle = `
@@ -579,6 +580,7 @@ function BulkSettlementModal({ show, recordCount, records, onClose, onSave }: an
 }
 
 export default function OrganizationSettlementReport() {
+  const { success, error: showError, warning, info } = useNotification();
   // Date range state
   const [dateFrom, setDateFrom] = useState(fmtISO(today0()));
   const [dateTo, setDateTo]     = useState(fmtISO(today0()));
@@ -735,7 +737,7 @@ export default function OrganizationSettlementReport() {
 
   const handleBulkSettlement = () => {
     if (data.length === 0) {
-      alert('No records to settle');
+      warning('No records to settle');
       return;
     }
     setShowBulkSettlement(true);
@@ -762,14 +764,14 @@ export default function OrganizationSettlementReport() {
       
       if (result.success) {
         setShowBulkSettlement(false);
-        alert(`Settlement saved for ${result.data.visitCount} visits`);
+        success(`Settlement saved for ${result.data.visitCount} visits`);
         fetchData();
       } else {
-        alert(result.message || 'Failed to save bulk settlement');
+        showError(result.message || 'Failed to save bulk settlement');
       }
     } catch (error) {
       console.error('Error saving bulk settlement:', error);
-      alert('Failed to save bulk settlement');
+      showError('Failed to save bulk settlement');
     }
   };
 
@@ -790,11 +792,11 @@ export default function OrganizationSettlementReport() {
         setShowSettlement(false);
         fetchData();
       } else {
-        alert(result.message || 'Failed to save settlement');
+        showError(result.message || 'Failed to save settlement');
       }
     } catch (error) {
       console.error('Error saving settlement:', error);
-      alert('Failed to save settlement');
+      showError('Failed to save settlement');
     }
   };
 

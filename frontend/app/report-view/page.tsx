@@ -5,6 +5,7 @@ import { useState, useEffect, useRef } from "react";
 import { ArrowLeft, Share2, Loader, Printer, FileDown } from "lucide-react";
 import API_BASE_URL from "@/src/api/config";
 import dynamic from "next/dynamic";
+import { useNotification } from "@/src/hooks/useNotification";
 
 // Dynamically import ProfessionalReport to avoid SSR issues
 const ProfessionalReport = dynamic(
@@ -42,6 +43,7 @@ export default function ReportViewPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [debugInfo, setDebugInfo] = useState<string>('');
+  const { showError } = useNotification();
   const reportRef = useRef<HTMLDivElement>(null);
 
   // Handle PDF download - Optimized for mobile
@@ -72,11 +74,11 @@ export default function ReportViewPage() {
         })
         .catch((err: any) => {
           console.error('Error downloading PDF:', err);
-          alert('Failed to download PDF. Please try again.');
+          showError('Failed to download PDF. Please try again.');
         });
     } catch (err) {
       console.error('Error in PDF download:', err);
-      alert('PDF download failed. Make sure you have a stable internet connection.');
+      showError('PDF download failed. Make sure you have a stable internet connection.');
     }
   };
 

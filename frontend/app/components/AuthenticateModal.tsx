@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, Fragment, useRef } from 'react';
 import { X, AlertCircle } from 'lucide-react';
 import API_BASE_URL from '@/src/api/config';
 import { deleteCommentFromHistory } from '@/src/api/result';
+import { useNotification } from '@/src/hooks/useNotification';
 
 // Helper function to extract ALL available options from a parameter (from ALL database fields)
 const getAllOptionsFromParameter = (param: Parameter): string[] => {
@@ -218,6 +219,7 @@ const AuthenticateModal = ({
   parameters,
   groupedParameters,
 }: AuthenticateModalProps) => {
+  const { success, error: showError, warning, info } = useNotification();
   const [results, setResults] = useState<any>({});
   const [error, setError] = useState<string | null>(null);
   const [authenticating, setAuthenticating] = useState(false);
@@ -559,12 +561,12 @@ const AuthenticateModal = ({
         throw new Error(statusData.message || 'Failed to authenticate test');
       }
 
-      alert('✅ Test has been successfully authenticated and transitioned to Authenticated phase!');
+      success('Test has been successfully authenticated and transitioned to Authenticated phase!');
       onClose();
     } catch (err: any) {
       console.error('Error authenticating readings:', err);
       setError(err.message || 'Error authenticating readings');
-      alert('Error: ' + (err.message || 'Failed to authenticate readings'));
+      showError('Error: ' + (err.message || 'Failed to authenticate readings'));
     } finally {
       setAuthenticating(false);
     }
@@ -893,7 +895,7 @@ const AuthenticateModal = ({
                               setCommentHistory(prev => prev.filter(c => c !== hist));
                             } catch (error) {
                               console.error('Error deleting comment:', error);
-                              alert('Failed to delete comment');
+                              showError('Failed to delete comment');
                             }
                           }}
                           className="text-red-500 hover:text-red-700 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0"

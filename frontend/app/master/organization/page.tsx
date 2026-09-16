@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { getOrganizations, deleteOrganization } from "@/src/api/master";
+import { useNotification } from "@/src/hooks/useNotification";
 
 import { RotateCcw, Building2 } from "lucide-react";
 import PaginationControls from "@/app/components/PaginationControls";
@@ -16,6 +17,7 @@ const OrganizationList = () => {
   const [organizations, setOrganizations] = useState<any[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(25);
+  const { showError: errorNotification } = useNotification();
 
   useEffect(() => {
     fetchOrganizations();
@@ -74,7 +76,7 @@ const OrganizationList = () => {
           setOrganizations(updated);
           setFilteredOrganizations(updated);
         })
-        .catch(() => alert("Failed to delete organization"));
+        .catch(() => errorNotification("Failed to delete organization"));
     }
   };
 

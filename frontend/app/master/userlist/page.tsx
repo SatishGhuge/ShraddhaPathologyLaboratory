@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 
 import { Users, RotateCcw, ChevronLeft, ChevronRight } from "lucide-react";
 import { getUsers, deleteUser } from "@/src/api/master";
+import { useNotification } from "@/src/hooks/useNotification";
 import PaginationControls from "@/app/components/PaginationControls";
 
 const UserList = () => {
@@ -16,6 +17,7 @@ const UserList = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(25);
   const [pagination, setPagination] = useState<any>(null);
+  const { showError: errorNotification } = useNotification();
 
   const fetchUsers = async (page: number = 1) => {
     setLoading(true);
@@ -46,7 +48,7 @@ const UserList = () => {
       setCurrentPage(1);
       fetchUsers(1);
     } catch (err) {
-      alert((err as any).message || "Failed to delete user");
+      errorNotification((err as any).message || "Failed to delete user");
     }
   };
 

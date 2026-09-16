@@ -9,6 +9,7 @@ import BarcodeModal, { generateBarcodeLabels } from "@/app/components/BarcodeMod
 import ProfessionalReport from "@/app/components/ProfessionalReport";
 import API_BASE_URL from "@/src/api/config";
 import { generateCompactBarcodePrintHtml } from "@/app/utils/barcodePrintUtils";
+import { useNotification } from "@/src/hooks/useNotification";
 
 import { FaWhatsapp } from "react-icons/fa";
 import html2pdf from "html2pdf.js";
@@ -240,6 +241,7 @@ function PerTestDateRow({ test, onSave, onStatusChange, rowBg }: { test: any; on
 export default function Result() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { success, error: showError, warning, info } = useNotification();
   
   // ✅ Helper function to detect if a patient is a repeat (based on PATIENT UID - count their visits)
   // Show "R" only if this is NOT the patient's first (earliest) visit
@@ -831,14 +833,14 @@ export default function Result() {
         };
       }
       
-      alert('PDF generated! Print dialog opened.');
-    } catch (error) {
-      console.error('Error generating PDF:', error);
+      success('PDF generated! Print dialog opened.');
+    } catch (err) {
+      console.error('Error generating PDF:', err);
       console.error('Error details:', {
-        message: error instanceof Error ? error.message : String(error),
-        stack: error instanceof Error ? error.stack : 'No stack trace'
+        message: err instanceof Error ? err.message : String(err),
+        stack: err instanceof Error ? err.stack : 'No stack trace'
       });
-      alert(`Error generating PDF: ${error instanceof Error ? error.message : String(error)}`);
+      showError(`Error generating PDF: ${err instanceof Error ? err.message : String(err)}`);
     }
   };
 
@@ -1324,7 +1326,7 @@ export default function Result() {
   // Open barcode preview modal for selected barcode tests
   const handleBarcodePrint = () => {
     if (barcodeSelectedTests.size === 0) {
-      alert('Please select tests using the barcode checkboxes first');
+      warning('Please select tests using the barcode checkboxes first');
       return;
     }
 
@@ -1381,7 +1383,7 @@ export default function Result() {
   // Handle navigate to result entry
   const handleResultEntry = () => {
     if (selectedTests.size === 0) {
-      alert('Please select a test to enter results');
+      warning('Please select a test to enter results');
       return;
     }
     
@@ -1443,7 +1445,7 @@ export default function Result() {
     setShowDownloadDropdown(false);
     
     if (selectedTests.size === 0) {
-      alert('Please select a test to view report');
+      warning('Please select a test to view report');
       return;
     }
     
@@ -1512,7 +1514,7 @@ export default function Result() {
       setShowReportModal(true);
     } catch (err) {
       console.error('Error loading report data:', err);
-      alert('Error loading report: ' + err.message);
+      showError('Error loading report: ' + (err as any).message);
     } finally {
       setLoading(false);
     }
@@ -1540,14 +1542,14 @@ export default function Result() {
   // Download report as PDF using professional format
   const handleDownloadPdf = async (withHeader: boolean) => {
     setShowDownloadDropdown(false);
-    if (selectedTests.size === 0) { alert('Please select a test'); return; }
+    if (selectedTests.size === 0) { warning('Please select a test'); return; }
     try {
       setLoading(true);
       const testIds = Array.from(selectedTests);
       const responses = await Promise.all(testIds.map(id => getPatientTestById(id)));
       
       if (!responses || responses.length === 0) {
-        alert('No test data found');
+        showError('No test data found');
         return;
       }
 
@@ -1555,7 +1557,7 @@ export default function Result() {
       const patientTestData = first.patientTest;
       const patient = patientTestData.patient;
       const visitId = patientTestData.visitId;
-      const visitDate = patientTestData.visitDate 
+      const visitDate = patientTestData.visitDate
         ? new Date(patientTestData.visitDate).toLocaleDateString('en-GB') 
         : '-';
       const patientName = `${patient.title || ''} ${patient.firstName || ''} ${patient.lastName || ''}`.trim();
@@ -1765,13 +1767,13 @@ export default function Result() {
       pdfDoc.save(fileName);
     } catch (err) {
       console.error('PDF download error:', err);
-      alert('Failed to generate PDF: ' + err.message);
+      showError('Failed to generate PDF: ' + (err as any).message);
     } finally {
       setLoading(false);
     }
   };
   const handleSendEmail = async () => {
-    if (selectedTests.size === 0) { alert('Please select at least one test'); return; }
+    if (selectedTests.size === 0) { warning('Please select at least one test'); return; }
     try {
       setLoading(true);
       const testIds = Array.from(selectedTests);
@@ -1779,7 +1781,7 @@ export default function Result() {
       const first = responses[0];
       const patient: any = first.patientTest.patient;
 
-      if (!patient.email) { alert('No email address saved for this patient.'); return; }
+      if (!patient.email) { showError('No email address saved for this patient.'); return; }
 
       // Build results payload matching what the backend email function expects
       const allResults: any[] = [];
@@ -1804,9 +1806,9 @@ export default function Result() {
       await Promise.all(testIds.map(id => updateTestStatus(id, { status: 'DELIVERED' })));
       markSentIcons(testIds, 'email');
       fetchResults();
-      alert(`Report sent to ${patient.email}`);
+      success(`Report sent to ${patient.email}`);
     } catch (err) {
-      alert('Failed to send email: ' + err.message);
+      showError('Failed to send email: ' + (err as any).message);
     } finally {
       setLoading(false);
     }
@@ -1879,13 +1881,13 @@ export default function Result() {
 
   // Handle WhatsApp — opens wa.me deep link with document-style report
   const handleSendWhatsApp = async () => {
-    if (selectedTests.size === 0) { alert('Please select at least one test'); return; }
+    if (selectedTests.size === 0) { warning('Please select at least one test'); return; }
     try {
       setLoading(true);
       const testIds = Array.from(selectedTests);
       const responses = await Promise.all(testIds.map(id => getPatientTestById(id)));
       const patient = responses[0].patientTest.patient;
-      if (!patient.mobile) { alert('No mobile number saved for this patient.'); return; }
+      if (!patient.mobile) { showError('No mobile number saved for this patient.'); return; }
       const phone = patient.mobile.startsWith('+')
         ? patient.mobile.replace(/\D/g, '')
         : `91${patient.mobile.replace(/\D/g, '')}`;
@@ -1896,7 +1898,7 @@ export default function Result() {
       markSentIcons(testIds, 'whatsapp');
       fetchResults();
     } catch (err) {
-      alert('Failed to prepare WhatsApp message: ' + err.message);
+      showError('Failed to prepare WhatsApp message: ' + (err as any).message);
     } finally {
       setLoading(false);
     }
@@ -1904,25 +1906,25 @@ export default function Result() {
 
   // Direct WA to Doctor — same report but sent to referral doctor's mobile
   const handleDirectWADoctor = async () => {
-    if (selectedTests.size === 0) { alert('Please select at least one test'); return; }
+    if (selectedTests.size === 0) { warning('Please select at least one test'); return; }
     try {
       setLoading(true);
       const testIds = Array.from(selectedTests);
       const responses = await Promise.all(testIds.map(id => getPatientTestById(id)));
       const doctorName = responses[0].patientTest.referralDoctor;
-      if (!doctorName || doctorName === 'SELF') { alert('No referral doctor for this test.'); return; }
+      if (!doctorName || doctorName === 'SELF') { showError('No referral doctor for this test.'); return; }
       const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || '/api';
       const res = await fetch(`${API_BASE_URL}/master/doctors`);
       const data = await res.json();
       const doctor = data.data?.find(d => d.name === doctorName);
-      if (!doctor?.mobile) { alert(`No mobile number found for Dr. ${doctorName}`); return; }
+      if (!doctor?.mobile) { showError(`No mobile number found for Dr. ${doctorName}`); return; }
       const phone = doctor.mobile.startsWith('+')
         ? doctor.mobile.replace(/\D/g, '')
         : `91${doctor.mobile.replace(/\D/g, '')}`;
       const msg = buildWhatsAppMessage(responses);
       window.open(`https://wa.me/${phone}?text=${encodeURIComponent(msg)}`, '_blank');
     } catch (err) {
-      alert('Failed: ' + err.message);
+      showError('Failed: ' + (err as any).message);
     } finally {
       setLoading(false);
     }
@@ -1930,7 +1932,7 @@ export default function Result() {
 
   // Print — loads report data and opens browser print dialog directly (skip modal)
   const handlePrintPreview = async () => {
-    if (selectedTests.size === 0) { alert('Please select a test to print'); return; }
+    if (selectedTests.size === 0) { warning('Please select a test to print'); return; }
     
     // If multiple tests selected from same patient/visit, show print options modal
     if (selectedTests.size > 1) {
@@ -1955,7 +1957,7 @@ export default function Result() {
 
   // Proceed with printing based on selected option - DIRECT PRINT PREVIEW (no modal)
   const proceedWithPrint = async (option: 'pagebreak' | 'nobreak') => {
-    if (selectedTests.size === 0) { alert('Please select a test to print'); return; }
+    if (selectedTests.size === 0) { warning('Please select a test to print'); return; }
 
     if (option === 'nobreak') {
       // Show test selection modal first
@@ -2156,7 +2158,7 @@ export default function Result() {
       setShowPrintOptionsModal(false);
     } catch (err) {
       console.error('Error loading report:', err);
-      alert('Error loading report: ' + err.message);
+      showError('Error loading report: ' + (err as any).message);
       setLoading(false);
     }
   };
@@ -2288,7 +2290,7 @@ export default function Result() {
       setPendingCommentsResponses([]);
     } catch (err) {
       console.error('Error printing:', err);
-      alert('Error: ' + err.message);
+      showError('Error: ' + (err as any).message);
       setLoading(false);
     }
   };
@@ -2418,8 +2420,8 @@ export default function Result() {
 
   const handleUploadSubmit = async () => {
     const selectedIds = Object.keys(uploadSelectedTests).filter(id => uploadSelectedTests[id]);
-    if (!uploadFile) { alert('Please choose a file'); return; }
-    if (selectedIds.length === 0) { alert('Please select at least one test'); return; }
+    if (!uploadFile) { warning('Please choose a file'); return; }
+    if (selectedIds.length === 0) { warning('Please select at least one test'); return; }
     setUploading(true);
     try {
       const objectUrl = URL.createObjectURL(uploadFile);
@@ -2438,10 +2440,10 @@ export default function Result() {
       }
 
       setUploadedFiles(prev => ({ ...prev, ...newUploads }));
-      alert('File uploaded and saved successfully!');
+      success('File uploaded and saved successfully!');
       setShowUploadModal(false);
     } catch (err: any) {
-      alert('Upload failed: ' + err.message);
+      showError('Upload failed: ' + err.message);
     } finally {
       setUploading(false);
     }
@@ -2500,7 +2502,7 @@ export default function Result() {
           const testData = await getPatientTestById(test.test_id);
           
           if (!testData || !testData.patientTest) {
-            alert('Error loading test data');
+            showError('Error loading test data');
             return;
           }
 
@@ -2541,7 +2543,7 @@ export default function Result() {
           setShowReportModal(true);
         } catch (err) {
           console.error('Error loading outsourced report:', err);
-          alert('Error loading report');
+          showError('Error loading report');
         }
         return;
       }
@@ -2550,13 +2552,13 @@ export default function Result() {
       if (testStatus === 'Received' || testStatus === 'Rectified') {
         router.push(`/result/patientresult/${test.test_id}`);
       } else {
-        alert(`⚠️ Not Authorized\n\nCurrent Stage: ${testStatus}\n\nReadings can only be entered in "Received" stage or edited in "Rectified" stage.\n\nTo edit results in other stages, click on "Parameter" in the Result column.`);
+        warning(`Not Authorized. Current Stage: ${testStatus}. Readings can only be entered in "Received" stage or edited in "Rectified" stage. To edit results in other stages, click on "Parameter" in the Result column.`);
         return;
       }
 
     } catch (err: any) {
       console.error('Error opening result entry page:', err);
-      alert('Error: ' + (err.message || 'Failed to open result entry page'));
+      showError('Error: ' + (err.message || 'Failed to open result entry page'));
     }
   };
 
@@ -2566,7 +2568,7 @@ export default function Result() {
       const testData = await getPatientTestById(test.test_id);
       
       if (!testData || !testData.patientTest) {
-        alert('Error loading test data');
+        showError('Error loading test data');
         return;
       }
 
@@ -2604,7 +2606,7 @@ export default function Result() {
       } else if (status === 'Authorized' || status === 'Delivered') {
         // Status is Authorized or Delivered → Show view-only or completed message
         console.log('✅ Test already authorized/delivered - show read-only');
-        alert('This test is already authorized. You can print or download the report.');
+        info('This test is already authorized. You can print or download the report.');
       } else if (status === 'Registered') {
         // Status is Registered → Allow entering results
         console.log('📝 Opening result entry');
@@ -2627,7 +2629,7 @@ export default function Result() {
 
     } catch (err: any) {
       console.error('Error opening modal:', err);
-      alert('Error: ' + (err.message || 'Failed to open modal'));
+      showError('Error: ' + (err.message || 'Failed to open modal'));
     }
   };
 
@@ -2792,7 +2794,7 @@ export default function Result() {
       }
     } catch (err: any) {
       console.error('❌ Error saving result:', err);
-      alert('Failed to save result: ' + (err.message || 'Unknown error'));
+      showError('Failed to save result: ' + (err.message || 'Unknown error'));
       // Don't clear editing state on error, allow user to retry
     }
   };
@@ -3025,9 +3027,9 @@ export default function Result() {
         result: result
       });
       setShowPreviousResultModal(true);
-    } catch (error) {
-      console.error('Error fetching previous result:', error);
-      alert('Failed to fetch previous test result: ' + error.message);
+    } catch (err) {
+      console.error('Error fetching previous result:', err);
+      showError('Failed to fetch previous test result: ' + (err as any).message);
     } finally {
       setPreviousResultLoading(false);
     }
@@ -3044,9 +3046,9 @@ export default function Result() {
         results: results
       });
       setShowAllResultsModal(true);
-    } catch (error) {
-      console.error('Error fetching all results:', error);
-      alert('Failed to fetch test result history: ' + error.message);
+    } catch (err) {
+      console.error('Error fetching all results:', err);
+      showError('Failed to fetch test result history: ' + (err as any).message);
     } finally {
       setAllResultsLoading(false);
     }
@@ -3227,7 +3229,7 @@ export default function Result() {
       });
       
       if (updates.length === 0) {
-        alert('Please select tests to update');
+        warning('Please select tests to update');
         return;
       }
       
@@ -3244,7 +3246,7 @@ export default function Result() {
       setShowSettingsModal(false);
       fetchResults(); // Refresh data
       
-      alert('Status updated successfully!');
+      success('Status updated successfully!');
       
     } catch (err: any) {
       console.error('Error updating test statuses:', err);
@@ -4288,18 +4290,18 @@ export default function Result() {
                   onClick={async () => {
                     const testsToValidate = Array.from(selectedTests);
                     if (testsToValidate.length === 0) {
-                      alert('Please select tests to validate');
+                      warning('Please select tests to validate');
                       return;
                     }
                     try {
                       for (const testId of testsToValidate) {
                         await updateTestStatus(testId.toString(), { status: 'Validated' });
                       }
-                      alert(`${testsToValidate.length} test(s) moved to Validated stage`);
+                      success(`${testsToValidate.length} test(s) moved to Validated stage`);
                       fetchResults();
                       setSelectedTests(new Set());
                     } catch (err) {
-                      alert('Error validating tests: ' + err.message);
+                      showError('Error validating tests: ' + (err as any).message);
                     }
                   }}
                   disabled={loading || selectedTests.size === 0}
@@ -4313,18 +4315,18 @@ export default function Result() {
                   onClick={async () => {
                     const testsToAuthorize = Array.from(selectedTests);
                     if (testsToAuthorize.length === 0) {
-                      alert('Please select tests to authorize');
+                      warning('Please select tests to authorize');
                       return;
                     }
                     try {
                       for (const testId of testsToAuthorize) {
                         await updateTestStatus(testId.toString(), { status: 'Authorized' });
                       }
-                      alert(`${testsToAuthorize.length} test(s) moved to Authorized stage`);
+                      success(`${testsToAuthorize.length} test(s) moved to Authorized stage`);
                       fetchResults();
                       setSelectedTests(new Set());
                     } catch (err) {
-                      alert('Error authorizing tests: ' + err.message);
+                      showError('Error authorizing tests: ' + (err as any).message);
                     }
                   }}
                   disabled={loading || selectedTests.size === 0}
@@ -4922,7 +4924,7 @@ export default function Result() {
           
           if (successCount > 0) {
             setTimeout(() => {
-              alert(`✅ ${successCount} test(s) marked as Received and ${selectedBarcodeIndices.size} barcode(s) printed!`);
+              success(`${successCount} test(s) marked as Received and ${selectedBarcodeIndices.size} barcode(s) printed!`);
               // Refresh results to get updated barcode_status from database
               fetchResults();
             }, 800);
@@ -5044,7 +5046,7 @@ export default function Result() {
                 onClick={async () => {
                   const selectedTests = testSelectionData.filter(t => t.selected);
                   if (selectedTests.length === 0) {
-                    alert('Please select at least one test');
+                    warning('Please select at least one test');
                     return;
                   }
                   
@@ -5070,7 +5072,7 @@ export default function Result() {
                     setTestSelectionOrder([]);
                   } catch (err) {
                     console.error('Error loading report:', err);
-                    alert('Error: ' + err.message);
+                    showError('Error: ' + err.message);
                   } finally {
                     setLoading(false);
                   }

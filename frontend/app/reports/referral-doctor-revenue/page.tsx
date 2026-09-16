@@ -5,6 +5,7 @@ import { DollarSign, Download, Search, RotateCcw, ChevronDown, Printer, Calendar
 import Header from "@/src/components/Header";
 import PaginationControls from "@/app/components/PaginationControls";
 import * as XLSX from 'xlsx';
+import { useNotification } from '@/src/hooks/useNotification';
 
 /* ── date helpers ── */
 const toYMD = (iso: any) => {
@@ -76,6 +77,7 @@ const COLS = [
 ];
 
 export default function ReferralDoctorRevenueReport() {
+  const { success, error: showError, warning, info } = useNotification();
   const [doctors, setDoctors] = useState<any[]>([]);
   const [allTransactions, setAllTransactions] = useState<any[]>([]);
   const [filteredData, setFilteredData] = useState<any[]>([]);
@@ -377,7 +379,7 @@ export default function ReferralDoctorRevenueReport() {
   // Handle proper print with formatted layout
   const handlePrint = () => {
     if (filteredData.length === 0) {
-      alert('Please generate report with filters first');
+      warning('Please generate report with filters first');
       return;
     }
     

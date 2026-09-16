@@ -5,6 +5,7 @@
 import { useState, useEffect } from "react";
 import { X, Plus, Trash2, Edit2, Check, AlertCircle } from "lucide-react";
 import inventoryAPI from "@/lib/api/inventory.api";
+import { useNotification } from "@/src/hooks/useNotification";
 
 interface Organization {
   id: string;
@@ -224,7 +225,7 @@ export default function OrganizationTransferModal({
 
     const qty = Number(editedQty);
     if (!editedQty || qty <= 0) {
-      alert("Please enter a valid quantity");
+      warning("Please enter a valid quantity");
       return;
     }
 
@@ -236,7 +237,7 @@ export default function OrganizationTransferModal({
         .reduce((sum, item) => sum + item.transferQuantity, 0);
 
     if (qty > remainingStock) {
-      alert(`Transfer quantity cannot exceed remaining stock (${remainingStock})`);
+      warning(`Transfer quantity cannot exceed remaining stock (${remainingStock})`);
       return;
     }
 

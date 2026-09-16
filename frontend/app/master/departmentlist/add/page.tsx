@@ -5,6 +5,7 @@ import { useRouter, useParams, usePathname } from "next/navigation";
 
 import Header from "@/src/components/Header";
 import PageHeader from "@/src/components/BreadCrumb";
+import { useNotification } from "@/src/hooks/useNotification";
 import {
   Building2,
   ArrowLeft,
@@ -34,6 +35,7 @@ const AddDepartment = () => {
   const [showMessage, setShowMessage] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const { warning } = useNotification();
 
   // Load department data for edit mode
   useEffect(() => {
@@ -94,7 +96,7 @@ const AddDepartment = () => {
     
     // If any fields are empty, show general message first
     if (emptyFields.length > 0) {
-      alert("Please enter all fields!\n\nMissing fields:\n- " + emptyFields.join("\n- "));
+      warning("Please enter all fields!\n\nMissing fields:\n- " + emptyFields.join("\n- "));
       return;
     }
     

@@ -5,6 +5,7 @@ import { Package, RotateCcw, Edit2, Trash2, Plus } from "lucide-react";
 import PaginationControls from "@/app/components/PaginationControls";
 import ItemMasterModal from "@/src/components/ItemMasterModal";
 import inventoryAPI from "@/lib/api/inventory.api";
+import { useNotification } from "@/src/hooks/useNotification";
 
 interface Item {
   id: number;
@@ -19,9 +20,10 @@ interface Item {
 }
 
 export default function ItemPage() {
+  const { success, error: showError, warning, info } = useNotification();
+  
   const [items, setItems] = useState<Item[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
   const [pagination, setPagination] = useState<any>(null);
 
   const [search, setSearch] = useState("");
@@ -29,7 +31,6 @@ export default function ItemPage() {
   const [itemsPerPage, setItemsPerPage] = useState(25);
   const [showModal, setShowModal] = useState(false);
   const [editingItem, setEditingItem] = useState<Item | null>(null);
-  const [successMsg, setSuccessMsg] = useState("");
   const [showInactive, setShowInactive] = useState(false);
 
   // Fetch items from API
@@ -40,12 +41,11 @@ export default function ItemPage() {
   const fetchItems = async () => {
     try {
       setLoading(true);
-      setError("");
       const response = await inventoryAPI.items.getAll(currentPage, itemsPerPage);
       setItems(response.data.data || []);
       setPagination(response.data.pagination || null);
     } catch (err: any) {
-      setError(err.response?.data?.message || "Failed to fetch items");
+      showError(err.response?.data?.message || "Failed to fetch items");
       console.error("Fetch error:", err);
     } finally {
       setLoading(false);
@@ -57,11 +57,9 @@ export default function ItemPage() {
       try {
         await inventoryAPI.items.delete(id);
         setItems(items.filter((item) => item.id !== id));
-        setSuccessMsg("Item deleted successfully!");
-        setTimeout(() => setSuccessMsg(""), 2000);
+        success("Item deleted successfully!");
       } catch (err: any) {
-        setError(err.response?.data?.message || "Failed to delete item");
-        setTimeout(() => setError(""), 3000);
+        showError(err.response?.data?.message || "Failed to delete item");
       }
     }
   };
@@ -84,32 +82,23 @@ export default function ItemPage() {
           : i
       )
     );
-    setSuccessMsg(
+    success(
       currentItem.isActive
         ? "Item inactivated successfully!"
         : "Item activated successfully!"
     );
-    setTimeout(() => setSuccessMsg(""), 2000);
   };
 
   const handleItemSaved = (itemData: any) => {
     setShowModal(false);
     setEditingItem(null);
     fetchItems();
-    setSuccessMsg(editingItem ? "Item updated successfully!" : "Item created successfully!");
-    setTimeout(() => setSuccessMsg(""), 2000);
+    success(editingItem ? "Item updated successfully!" : "Item created successfully!");
   };
 
   return (
     <>
       <div className="min-h-screen bg-white p-6">
-        {/* Error Message */}
-        {error && (
-          <div className="mb-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
-            {error}
-          </div>
-        )}
-
         {/* Top Bar */}
         <div className="flex flex-wrap items-center justify-between gap-3 mb-4 bg-white p-3 rounded shadow-md">
           <div className="flex gap-2 flex-1 flex-wrap items-center">
@@ -302,13 +291,6 @@ export default function ItemPage() {
         onItemSaved={handleItemSaved}
         editingItem={editingItem}
       />
-
-      {/* Success Message */}
-      {successMsg && (
-        <div className="fixed bottom-4 right-4 bg-green-500 text-white px-4 py-2 rounded shadow-lg text-sm">
-          {successMsg}
-        </div>
-      )}
     </>
   );
 }

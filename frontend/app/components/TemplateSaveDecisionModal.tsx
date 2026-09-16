@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { AlertCircle, Save, Plus } from 'lucide-react';
+import { useNotification } from '@/src/hooks/useNotification';
 
 interface TemplateSaveDecisionModalProps {
   isOpen: boolean;
@@ -24,12 +25,13 @@ export default function TemplateSaveDecisionModal({
 }: TemplateSaveDecisionModalProps) {
   const [newTemplateName, setNewTemplateName] = useState('');
   const [showNewTemplateInput, setShowNewTemplateInput] = useState(false);
+  const { warning } = useNotification();
 
   if (!isOpen) return null;
 
   const handleSaveAsNewTemplate = () => {
     if (!newTemplateName.trim()) {
-      alert('Please enter a template name');
+      warning('Please enter a template name');
       return;
     }
     onSaveAsNewTemplate(newTemplateName.trim());

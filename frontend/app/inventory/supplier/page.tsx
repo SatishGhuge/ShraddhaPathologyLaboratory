@@ -5,6 +5,7 @@ import { Users, RotateCcw, Edit2, Trash2, Plus } from "lucide-react";
 import PaginationControls from "@/app/components/PaginationControls";
 import SupplierMasterModal from "@/src/components/SupplierMasterModal";
 import inventoryAPI from "@/lib/api/inventory.api";
+import { useNotification } from "@/src/hooks/useNotification";
 
 interface Supplier {
   id: number;
@@ -22,9 +23,10 @@ interface Supplier {
 }
 
 export default function SupplierPage() {
+  const { success, error: showError, warning, info } = useNotification();
+  
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
   const [pagination, setPagination] = useState<any>(null);
 
   const [search, setSearch] = useState("");
@@ -33,7 +35,6 @@ export default function SupplierPage() {
   const [itemsPerPage, setItemsPerPage] = useState(25);
   const [showModal, setShowModal] = useState(false);
   const [editingSupplier, setEditingSupplier] = useState<Supplier | null>(null);
-  const [successMsg, setSuccessMsg] = useState("");
   const [showInactive, setShowInactive] = useState(false);
 
   // Fetch suppliers from API
@@ -44,12 +45,11 @@ export default function SupplierPage() {
   const fetchSuppliers = async () => {
     try {
       setLoading(true);
-      setError("");
       const response = await inventoryAPI.suppliers.getAll(currentPage, itemsPerPage);
       setSuppliers(response.data.data || []);
       setPagination(response.data.pagination || null);
     } catch (err: any) {
-      setError(err.response?.data?.message || "Failed to fetch suppliers");
+      showError(err.response?.data?.message || "Failed to fetch suppliers");
       console.error("Fetch error:", err);
     } finally {
       setLoading(false);
@@ -61,11 +61,9 @@ export default function SupplierPage() {
       try {
         await inventoryAPI.suppliers.delete(id);
         setSuppliers(suppliers.filter((supplier) => supplier.id !== id));
-        setSuccessMsg("Supplier deleted successfully!");
-        setTimeout(() => setSuccessMsg(""), 2000);
+        success("Supplier deleted successfully!");
       } catch (err: any) {
-        setError(err.response?.data?.message || "Failed to delete supplier");
-        setTimeout(() => setError(""), 3000);
+        showError(err.response?.data?.message || "Failed to delete supplier");
       }
     }
   };
@@ -88,31 +86,23 @@ export default function SupplierPage() {
           : s
       )
     );
-    setSuccessMsg(
+    success(
       currentSupplier.isActive
         ? "Supplier inactivated successfully!"
         : "Supplier activated successfully!"
     );
-    setTimeout(() => setSuccessMsg(""), 2000);
   };
 
   const handleSupplierSaved = (supplierData: any) => {
     setShowModal(false);
     setEditingSupplier(null);
     fetchSuppliers();
-    setSuccessMsg(editingSupplier ? "Supplier updated successfully!" : "Supplier created successfully!");
-    setTimeout(() => setSuccessMsg(""), 2000);
+    success(editingSupplier ? "Supplier updated successfully!" : "Supplier created successfully!");
   };
 
   return (
     <>
       <div className="min-h-screen bg-white p-6">
-        {/* Error Message */}
-        {error && (
-          <div className="mb-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
-            {error}
-          </div>
-        )}
 
         {/* Top Bar */}
         <div className="flex flex-wrap items-center justify-between gap-3 mb-4 bg-white p-3 rounded shadow-md">
@@ -316,13 +306,6 @@ export default function SupplierPage() {
         onSupplierSaved={handleSupplierSaved}
         editingSupplier={editingSupplier}
       />
-
-      {/* Success Message */}
-      {successMsg && (
-        <div className="fixed bottom-4 right-4 bg-green-500 text-white px-4 py-2 rounded shadow-lg text-sm">
-          {successMsg}
-        </div>
-      )}
     </>
   );
 }

@@ -5,6 +5,7 @@ import { DollarSign, RotateCcw, Printer, Calendar, ChevronDown, ChevronLeft, Che
 import Header from "@/src/components/Header";
 import PaginationControls from "@/app/components/PaginationControls";
 import API_BASE_URL from "@/src/api/config";
+import { useNotification } from '@/src/hooks/useNotification';
 
 // Hide number input spinners (up/down arrows)
 const numberInputStyle = `
@@ -309,7 +310,7 @@ function SettlementModal({ show, record, onClose, onSave }: any) {
 }
 
 // Bulk Settlement Modal Component
-function BulkSettlementModal({ show, recordCount, records, onClose, onSave }: any) {
+function BulkSettlementModal({ show, recordCount, records, onClose, onSave, showError }: any) {
   const [applyDoctorDiscount, setApplyDoctorDiscount] = useState(true);
   const [applyTds, setApplyTds] = useState(true);
   const [tdsPercent, setTdsPercent] = useState("10");
@@ -436,7 +437,7 @@ function BulkSettlementModal({ show, recordCount, records, onClose, onSave }: an
 
   const handleSave = () => {
     if (validationError) {
-      alert(validationError);
+      showError(validationError);
       return;
     }
     onSave({
@@ -627,6 +628,7 @@ function BulkSettlementModal({ show, recordCount, records, onClose, onSave }: an
 }
 
 export default function ReferralDoctorSettlementReport() {
+  const { success, error: showError, warning, info } = useNotification();
   const [dateFrom, setDateFrom] = useState(fmtISO(today0()));
   const [dateTo, setDateTo]     = useState(fmtISO(today0()));
   const [dpOpen, setDpOpen]     = useState(false);
@@ -783,7 +785,7 @@ export default function ReferralDoctorSettlementReport() {
 
   const handleBulkSettlement = () => {
     if (data.length === 0) {
-      alert('No records to settle');
+      warning('No records to settle');
       return;
     }
     setShowBulkSettlement(true);
@@ -808,14 +810,14 @@ export default function ReferralDoctorSettlementReport() {
       
       if (result.success) {
         setShowBulkSettlement(false);
-        alert(`Settlement saved for ${result.data.visitCount} visits`);
+        success(`Settlement saved for ${result.data.visitCount} visits`);
         fetchData();
       } else {
-        alert(result.message || 'Failed to save bulk settlement');
+        showError(result.message || 'Failed to save bulk settlement');
       }
     } catch (error) {
       console.error('Error saving bulk settlement:', error);
-      alert('Failed to save bulk settlement');
+      showError('Failed to save bulk settlement');
     }
   };
 
@@ -835,11 +837,11 @@ export default function ReferralDoctorSettlementReport() {
         setShowSettlement(false);
         fetchData();
       } else {
-        alert(result.message || 'Failed to save settlement');
+        showError(result.message || 'Failed to save settlement');
       }
     } catch (error) {
       console.error('Error saving settlement:', error);
-      alert('Failed to save settlement');
+      showError('Failed to save settlement');
     }
   };
 
@@ -1096,6 +1098,7 @@ export default function ReferralDoctorSettlementReport() {
         records={data}
         onClose={() => setShowBulkSettlement(false)}
         onSave={handleBulkSettlementSave}
+        showError={showError}
       />
     </>
   );

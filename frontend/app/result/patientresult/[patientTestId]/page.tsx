@@ -9,6 +9,7 @@ import BarcodeModal, { generateBarcodeLabels, getSampleTypeId, getSampleTypeName
 import { getPatientTestById, updateTestStatus, updatePatientComments, deleteCommentFromHistory } from "@/src/api/result.js";
 import API_BASE_URL from "@/src/api/config";
 import { useTestTemplates } from '@/src/hooks/useTestTemplates';
+import { useNotification } from '@/src/hooks/useNotification';
 import InlineTemplateSelector from '@/app/components/InlineTemplateSelector';
 import { parseHtmlText, stripHtmlTags, HtmlPart } from '@/src/utils/htmlParser';
 const LetterHead = "/LetterHead.jpeg";
@@ -363,6 +364,7 @@ const PatientResult = () => {
 
   // Initialize template hook
   const { templateCache, fetchTemplatesForTests, getTemplates } = useTestTemplates();
+  const { success, error: showError, warning } = useNotification();
 
   const [loading, setLoading] = useState(true);
   const [multipleTestIds, setMultipleTestIds] = useState<string[]>([]); // For multiple tests
@@ -824,7 +826,7 @@ const PatientResult = () => {
           });
         }
         
-        alert('Barcodes printed and status updated!');
+        success('Barcodes printed and status updated!');
         setShowBarcodeModal(false);
         // Refresh data
         if (patientData) {
@@ -833,7 +835,7 @@ const PatientResult = () => {
       }
     } catch (error) {
       console.error('Error updating barcode status:', error);
-      alert('Barcodes printed but failed to update status');
+      showError('Barcodes printed but failed to update status');
       setShowBarcodeModal(false);
     }
   };
@@ -1624,12 +1626,12 @@ const PatientResult = () => {
         })
       );
 
-      alert('All results saved successfully!');
+      success('All results saved successfully!');
       
       router.push('/result');
     } catch (error) {
       console.error('Error saving results:', error);
-      alert('Error saving results');
+      showError('Error saving results');
     } finally {
       setSaving(false);
     }
@@ -1720,14 +1722,14 @@ const PatientResult = () => {
           formData.append('file', attachedFile);
           await fetch(`${API_BASE_URL}/results/${patientData.id}/attachment`, { method: 'POST', body: formData });
         }
-        alert('Results saved successfully!');
+        success('Results saved successfully!');
         fetchPatientTestData();
       } else {
-        alert('Error saving results: ' + data.message);
+        showError('Error saving results: ' + data.message);
       }
     } catch (error) {
       console.error('Error saving results:', error);
-      alert('Error saving results');
+      showError('Error saving results');
     } finally {
       setSaving(false);
     }
@@ -1793,11 +1795,11 @@ const PatientResult = () => {
         setReportWithHeader(withHeader);
         setShowReportModal(true);
       } else {
-        alert('Error saving results: ' + data.message);
+        showError('Error saving results: ' + data.message);
       }
     } catch (error) {
       console.error('Error saving results:', error);
-      alert('Error saving results');
+      showError('Error saving results');
     } finally {
       setSaving(false);
     }
@@ -1807,11 +1809,11 @@ const PatientResult = () => {
   const handleDeliver = async () => {
     try {
       await updateTestStatus(patientData.id, { status: 'DELIVERED' });
-      alert('Report delivered successfully!');
+      success('Report delivered successfully!');
       router.back();
     } catch (error) {
       console.error('Error delivering:', error);
-      alert('Error delivering report');
+      showError('Error delivering report');
     }
   };
 
@@ -2222,7 +2224,7 @@ const PatientResult = () => {
                                                 setCommentHistory(prev => prev.filter(c => c !== hist));
                                               } catch (error) {
                                                 console.error('Error deleting comment:', error);
-                                                alert('Failed to delete comment');
+                                                showError('Failed to delete comment');
                                               }
                                             }}
                                             className="text-red-500 hover:text-red-700 opacity-0 group-hover:opacity-100 transition-opacity text-xs"
@@ -2537,7 +2539,7 @@ const PatientResult = () => {
                                             setCommentHistory(prev => prev.filter(c => c !== hist));
                                           } catch (error) {
                                             console.error('Error deleting comment:', error);
-                                            alert('Failed to delete comment');
+                                            showError('Failed to delete comment');
                                           }
                                         }}
                                         className="text-red-500 hover:text-red-700 opacity-0 group-hover:opacity-100 transition-opacity text-xs"

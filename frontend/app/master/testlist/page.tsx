@@ -6,8 +6,10 @@ import { RotateCwIcon, Upload, FileSpreadsheet } from "lucide-react";
 import { getTests, updateTest } from "@/src/api/master";
 import API_BASE_URL from "@/src/api/config";
 import PaginationControls from "@/app/components/PaginationControls";
+import { useNotification } from "@/src/hooks/useNotification";
 
 const TestList = () => {
+  const { success, error: showError, warning, info } = useNotification();
   const router = useRouter();
 
   const [search, setSearch] = useState<string>("");
@@ -125,7 +127,7 @@ const TestList = () => {
       const result = await response.json();
 
       if (result.success) {
-        alert(`Test copied successfully!`);
+        success(`Test copied successfully!`);
         setCurrentPage(1); // Reset to page 1
         fetchTests(1); // Fetch first page
       } else {
@@ -133,7 +135,7 @@ const TestList = () => {
       }
     } catch (err) {
       console.error('Error copying test:', err);
-      alert(`Failed to copy test: ${err instanceof Error ? err.message : 'Unknown error'}`);
+      showError(`Failed to copy test: ${err instanceof Error ? err.message : 'Unknown error'}`);
     }
   };
 
@@ -155,12 +157,12 @@ const TestList = () => {
       });
       
       await updateTest(String(id), updateData);
-      alert("Test deleted permanently!");
+      success("Test deleted permanently!");
       setCurrentPage(1); // Reset to page 1
       fetchTests(1); // Fetch first page
     } catch (err) {
       console.error('Error deleting test:', err);
-      alert(`Failed to delete test: ${err instanceof Error ? err.message : 'Unknown error'}`);
+      showError(`Failed to delete test: ${err instanceof Error ? err.message : 'Unknown error'}`);
     }
   };
 
@@ -187,12 +189,12 @@ const TestList = () => {
       });
       
       await updateTest(String(id), updateData);
-      alert(currentTest.isActive ? "Test inactivated successfully!" : "Test activated successfully!");
+      success(currentTest.isActive ? "Test inactivated successfully!" : "Test activated successfully!");
       setCurrentPage(1); // Reset to page 1
       fetchTests(1); // Fetch first page
     } catch (err) {
       console.error('Error toggling test status:', err);
-      alert(`Failed to update test: ${err instanceof Error ? err.message : 'Unknown error'}`);
+      showError(`Failed to update test: ${err instanceof Error ? err.message : 'Unknown error'}`);
     }
   };
 
@@ -208,7 +210,7 @@ const TestList = () => {
     const selectedFile = e.target.files?.[0];
     if (selectedFile) {
       if (!selectedFile.name.endsWith('.xlsx')) {
-        alert('⚠️ Please select an Excel file (.xlsx)');
+        warning('⚠️ Please select an Excel file (.xlsx)');
         return;
       }
       setImportFile(selectedFile);
@@ -220,7 +222,7 @@ const TestList = () => {
   // 🔹 Handle quick import from test list
   const handleQuickImport = async () => {
     if (!importFile) {
-      alert('⚠️ Please select a file first');
+      warning('⚠️ Please select a file first');
       return;
     }
 
@@ -250,7 +252,7 @@ const TestList = () => {
       console.log('✅ Import successful:', data);
       setImportResult(data.data);
       setImportErrors([]);
-      alert('✅ ' + data.data.summary);
+      success('✅ ' + data.data.summary);
 
       // Refresh test list
       setCurrentPage(1);

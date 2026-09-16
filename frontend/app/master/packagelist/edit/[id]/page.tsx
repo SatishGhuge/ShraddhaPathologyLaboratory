@@ -7,12 +7,14 @@ import { ArrowLeft, Package, Hash, FlaskConical } from "lucide-react";
 import Header from "@/src/components/Header";
 import PageHeader from "@/src/components/BreadCrumb";
 import API_BASE_URL from "@/src/api/config.js";
+import { useNotification } from "@/src/hooks/useNotification";
 
 const AddPackage = () => {
   const router = useRouter();
   const params = useParams();
   const pathname = usePathname();
   const id = Array.isArray(params.id) ? params.id[0] : params.id;
+  const { success, error: showError, warning, info } = useNotification();
   
   // Determine mode based on route
   const isEditMode = pathname.includes('/edit/');
@@ -182,7 +184,7 @@ const AddPackage = () => {
     // Check if test already exists in the list
     const exists = testList.find(t => t.id === test.id);
     if (exists) {
-      alert("This test is already added to the package!");
+      warning("This test is already added to the package!");
       return;
     }
     
@@ -227,7 +229,7 @@ const AddPackage = () => {
     
     // If any fields are empty, show general message first
     if (emptyFields.length > 0) {
-      alert("Please enter all fields!\n\nMissing fields:\n- " + emptyFields.join("\n- "));
+      warning("Please enter all fields!\n\nMissing fields:\n- " + emptyFields.join("\n- "));
       return;
     }
     

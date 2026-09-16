@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter, useParams, usePathname } from "next/navigation";
 import { Save, ArrowLeft, Eye, FlaskConical, Hash, Phone, MapPin, Edit } from "lucide-react";
 import Header from "@/src/components/Header";
+import { useNotification } from "@/src/hooks/useNotification";
 
 // Mock data
 const mockOutsourcingData = [
@@ -42,6 +43,7 @@ const AddOutsourcing = () => {
   const router = useRouter();
   const { id } = useParams();
   const pathname = usePathname();
+  const { success, error: showError, warning, info } = useNotification();
   
   const isViewMode = pathname.includes("/view/");
   const isEditMode = pathname.includes("/edit/");
@@ -108,33 +110,33 @@ const AddOutsourcing = () => {
     if (isViewMode) return;
     
     if (!formData.labName.trim()) {
-      alert("Lab Name is required!");
+      warning("Lab Name is required!");
       return;
     }
     
     if (!formData.code.trim()) {
-      alert("Code is required!");
+      warning("Code is required!");
       return;
     }
     
     if (formData.mobile && formData.mobile.length !== 10) {
-      alert("Mobile number must be exactly 10 digits!");
+      warning("Mobile number must be exactly 10 digits!");
       return;
     }
     
     if (formData.mobile && !/^\d{10}$/.test(formData.mobile)) {
-      alert("Mobile number must contain only digits!");
+      warning("Mobile number must contain only digits!");
       return;
     }
 
     if (formData.selectedTests.length === 0) {
-      alert("Please select at least one test!");
+      warning("Please select at least one test!");
       return;
     }
 
     for (const testId of formData.selectedTests) {
       if (!formData.testCharges[testId] || formData.testCharges[testId] <= 0) {
-        alert(`Please set a valid charge for ${mockTests.find(t => t.id === testId)?.name}`);
+        warning(`Please set a valid charge for ${mockTests.find(t => t.id === testId)?.name}`);
         return;
       }
     }

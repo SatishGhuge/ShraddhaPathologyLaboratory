@@ -5,8 +5,10 @@ import { Ruler, RotateCcw, ChevronLeft, ChevronRight } from "lucide-react";
 import UnitModal from "@/src/components/UnitModal";
 import { getUnits, deleteUnit } from "@/src/api/master";
 import PaginationControls from "@/app/components/PaginationControls";
+import { useNotification } from "@/src/hooks/useNotification";
 
 export default function ResultUnits() {
+  const { success, error: showError, warning, info } = useNotification();
   const [data, setData] = useState<any[]>([]);
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(false);
@@ -45,10 +47,10 @@ export default function ResultUnits() {
       try {
         await deleteUnit(id);
         setData(data.filter((item) => item.id !== id));
-        alert("Unit deleted successfully!");
+        success("Unit deleted successfully!");
       } catch (error) {
         console.error('Error deleting unit:', error);
-        alert("Failed to delete unit");
+        showError("Failed to delete unit");
       }
     }
   };

@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Edit, Trash2, Plus, Layers, RotateCcw } from "lucide-react";
 import PaginationControls from "@/app/components/PaginationControls";
+import { useNotification } from "@/src/hooks/useNotification";
 
 const DepartmentTable = () => {
   const [search, setSearch] = useState("");
@@ -15,6 +16,7 @@ const DepartmentTable = () => {
   const [pagination, setPagination] = useState<any>(null);
   const [itemsPerPage, setItemsPerPage] = useState(25);
   const router = useRouter();
+  const { success, showError: errorNotification, warning } = useNotification();
 
   // Fetch departments on component mount and when page/search changes
   useEffect(() => {
@@ -106,14 +108,14 @@ const DepartmentTable = () => {
         const result = await response.json();
         
         if (result.success) {
-          alert('Department deleted permanently!');
+          success('Department deleted permanently!');
           fetchDepartments(currentPage, search); // Refresh the list with current search
         } else {
-          alert(`Error: ${result.message}`);
+          errorNotification(`Error: ${result.message}`);
         }
       } catch (error) {
         console.error('Error deleting department:', error);
-        alert('Failed to delete department');
+        errorNotification('Failed to delete department');
       } finally {
         setLoading(false);
       }
@@ -155,14 +157,14 @@ const DepartmentTable = () => {
       const result = await response.json();
       
       if (result.success) {
-        alert(currentDept.isActive ? "Department inactivated successfully!" : "Department activated successfully!");
+        success(currentDept.isActive ? "Department inactivated successfully!" : "Department activated successfully!");
         fetchDepartments(currentPage, search); // Refresh the list with current search
       } else {
-        alert(`Error: ${result.message}`);
+        errorNotification(`Error: ${result.message}`);
       }
     } catch (error) {
       console.error('Error updating department:', error);
-      alert('Failed to update department');
+      errorNotification('Failed to update department');
     } finally {
       setLoading(false);
     }

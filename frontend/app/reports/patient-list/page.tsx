@@ -8,6 +8,7 @@ import Header from "@/src/components/Header";
 import PaginationControls from "@/app/components/PaginationControls";
 import { getAllPatients, getCollectionCenters, getOrganizations } from "@/src/api/patient";
 import API_BASE_URL from "@/src/api/config";
+import { useNotification } from '@/src/hooks/useNotification';
 
 /* ── helpers ── */
 const toYMD = (iso: any) => {
@@ -79,6 +80,7 @@ const COLS = [
 ];
 
 export default function PatientList() {
+  const { success, error: showError, warning, info } = useNotification();
   const searchParams = useSearchParams();
   
   // Check for date parameter from URL (from dashboard navigation)
@@ -376,7 +378,7 @@ export default function PatientList() {
 
   const handleExportExcel = () => {
     if (data.length === 0) {
-      alert("No data to export. Please search first.");
+      warning("No data to export. Please search first.");
       return;
     }
 

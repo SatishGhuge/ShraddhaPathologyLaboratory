@@ -4,6 +4,8 @@ import { createContext, useContext, useEffect, useState, ReactNode } from "react
 import { useRouter, usePathname } from "next/navigation";
 import Header from "@/src/components/Header";
 import PageHeader from "@/src/components/BreadCrumb";
+import { NotificationProvider } from "@/src/context/NotificationContext";
+import NotificationDisplay from "@/src/components/NotificationDisplay";
 
 const publicRoutes = ["/", "/login", "/seed-data", "/report-view", "/report"];
 
@@ -71,13 +73,17 @@ export function LayoutWrapper({ children }: { children: ReactNode }) {
   const containerPadding = isRegistrationPage ? 'p-2 sm:p-3' : 'p-3 sm:p-4 md:p-6';
 
   return (
-    <SidebarContext.Provider value={{ sidebarOpen, setSidebarOpen }}>
-      <Header />
-      <div className={`transition-all duration-300 ${!isPublicRoute ? `mt-14 ${sidebarOpen ? 'ml-48' : 'ml-0'} ${containerPadding}` : ""}`}>
-        {/* Auto-render breadcrumb for non-public routes, but NOT on dashboard */}
-        {!isPublicRoute && !pathname.includes('/labdashboard') && !pathname.includes('/dashboard') && <PageHeader />}
-        {children}
-      </div>
-    </SidebarContext.Provider>
+    <NotificationProvider>
+      <SidebarContext.Provider value={{ sidebarOpen, setSidebarOpen }}>
+        <Header />
+        <div className={`transition-all duration-300 ${!isPublicRoute ? `mt-14 ${sidebarOpen ? 'ml-48' : 'ml-0'} ${containerPadding}` : ""}`}>
+          {/* Auto-render breadcrumb for non-public routes, but NOT on dashboard */}
+          {!isPublicRoute && !pathname.includes('/labdashboard') && !pathname.includes('/dashboard') && <PageHeader />}
+          {children}
+        </div>
+        {/* Global notification display */}
+        <NotificationDisplay />
+      </SidebarContext.Provider>
+    </NotificationProvider>
   );
 }

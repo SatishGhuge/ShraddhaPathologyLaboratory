@@ -13,9 +13,11 @@ import {
 } from "lucide-react";
 import { getAllPackages } from "@/src/api/master";
 import PaginationControls from "@/app/components/PaginationControls";
+import { useNotification } from "@/src/hooks/useNotification";
 
 const PackagesTable = () => {
   const router = useRouter();
+  const { success, error: showError, warning, info } = useNotification();
   const [search, setSearch] = useState("");
   const [packages, setPackages] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
@@ -116,14 +118,14 @@ const PackagesTable = () => {
       const result = await response.json();
       
       if (result.success) {
-        alert(currentPkg.isActive ? "Package inactivated successfully!" : "Package activated successfully!");
+        success(currentPkg.isActive ? "Package inactivated successfully!" : "Package activated successfully!");
         fetchPackages(); // Refresh the list
       } else {
-        alert(`Error: ${result.message}`);
+        showError(`Error: ${result.message}`);
       }
     } catch (error) {
       console.error('Error updating package:', error);
-      alert('Failed to update package');
+      showError('Failed to update package');
     } finally {
       setLoading(false);
     }

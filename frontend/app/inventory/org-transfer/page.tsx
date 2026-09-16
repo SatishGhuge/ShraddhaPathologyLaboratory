@@ -7,6 +7,7 @@ import OrganizationTransferModal from "@/src/components/OrganizationTransferModa
 import TransferDetailsModal from "@/src/components/TransferDetailsModal";
 import * as XLSX from "xlsx";
 import inventoryAPI from "@/lib/api/inventory.api";
+import { useNotification } from "@/src/hooks/useNotification";
 
 interface TransferItem {
   itemName: string;
@@ -28,12 +29,13 @@ interface OrganizationTransfer {
 }
 
 export default function OrganizationTransferPage() {
+  const { success, error: showError, warning, info } = useNotification();
+  
   const [transfers, setTransfers] = useState<OrganizationTransfer[]>([]);
   const [organizations, setOrganizations] = useState<any[]>([]);
   const [items, setItems] = useState<any[]>([]);
   const [stockItems, setStockItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
   const [pagination, setPagination] = useState<any>(null);
 
   const [search, setSearch] = useState("");
@@ -42,7 +44,6 @@ export default function OrganizationTransferPage() {
   const [showModal, setShowModal] = useState(false);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [selectedTransfer, setSelectedTransfer] = useState<OrganizationTransfer | null>(null);
-  const [successMsg, setSuccessMsg] = useState("");
 
   useEffect(() => {
     fetchTransfers();
@@ -91,7 +92,7 @@ export default function OrganizationTransferPage() {
       }
     } catch (err: any) {
       console.error("Failed to fetch transfers data:", err);
-      setError("Failed to fetch transfer data");
+      showError("Failed to fetch transfer data");
     } finally {
       setLoading(false);
     }
@@ -99,8 +100,7 @@ export default function OrganizationTransferPage() {
 
   const handleTransferComplete = (transferData: any) => {
     fetchTransfers();
-    setSuccessMsg("Transfer recorded successfully!");
-    setTimeout(() => setSuccessMsg(""), 3000);
+    success("Transfer recorded successfully!");
   };
 
   const handleViewDetails = (transfer: OrganizationTransfer) => {
@@ -111,8 +111,7 @@ export default function OrganizationTransferPage() {
   const handleDelete = (id: number) => {
     if (window.confirm("Are you sure you want to delete this transfer record?")) {
       setTransfers(transfers.filter((transfer) => transfer.id !== id));
-      setSuccessMsg("Transfer record deleted!");
-      setTimeout(() => setSuccessMsg(""), 2000);
+      success("Transfer record deleted!");
     }
   };
 
@@ -145,19 +144,12 @@ export default function OrganizationTransferPage() {
     worksheet["!cols"] = colWidths.map((width) => ({ wch: width }));
 
     XLSX.writeFile(workbook, `Organization_Transfers_${new Date().toISOString().split("T")[0]}.xlsx`);
-    setSuccessMsg("Excel file exported successfully!");
-    setTimeout(() => setSuccessMsg(""), 2000);
+    success("Excel file exported successfully!");
   };
 
   return (
     <>
       <div className="min-h-screen bg-white p-6">
-        {/* Error Message */}
-        {error && (
-          <div className="mb-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
-            {error}
-          </div>
-        )}
 
         {/* Top Bar */}
         <div className="flex flex-wrap items-center justify-between gap-3 mb-4 bg-white p-3 rounded shadow-md">
@@ -344,12 +336,6 @@ export default function OrganizationTransferPage() {
         transfer={selectedTransfer}
       />
 
-      {/* Success Message */}
-      {successMsg && (
-        <div className="fixed bottom-4 right-4 bg-green-500 text-white px-4 py-2 rounded shadow-lg text-sm">
-          {successMsg}
-        </div>
-      )}
     </>
   );
 }

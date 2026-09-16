@@ -4,11 +4,13 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { RotateCcw, Loader } from "lucide-react";
 import PaginationControls from "@/app/components/PaginationControls";
+import { useNotification } from "@/src/hooks/useNotification";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
 
 const OutsourcingList = () => {
   const router = useRouter();
+  const { success, error: showError, warning, info } = useNotification();
 
   const [searchName, setSearchName] = useState("");
   const [filteredLabs, setFilteredLabs] = useState<any[]>([]);
@@ -82,13 +84,13 @@ const OutsourcingList = () => {
           const updatedLabs = labs.filter((l) => l.id !== lab.id);
           setLabs(updatedLabs);
           setFilteredLabs(updatedLabs);
-          alert(`Lab "${lab.labName}" deleted successfully!`);
+          success(`Lab "${lab.labName}" deleted successfully!`);
         } else {
-          alert(result.message || 'Failed to delete lab');
+          showError(result.message || 'Failed to delete lab');
         }
       } catch (err) {
         console.error('Error deleting lab:', err);
-        alert('Failed to delete lab');
+        showError('Failed to delete lab');
       }
     }
   };
@@ -105,7 +107,7 @@ const OutsourcingList = () => {
     if (!confirm) return;
 
     // For now, show success (backend would handle this)
-    alert("Lab status updated successfully!");
+    success("Lab status updated successfully!");
   };
 
   // Calculate pagination

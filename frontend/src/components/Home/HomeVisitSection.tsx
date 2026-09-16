@@ -7,6 +7,7 @@ import {
   X, User, Mail, MapPin, Calendar, Hash, Building2,
 } from "lucide-react";
 import { createBooking } from "@/services/homepageApi";
+import { useNotification } from "@/src/hooks/useNotification";
 
 const features = [
   "Trained phlebotomists at your doorstep",
@@ -227,6 +228,7 @@ function RegisterModal({ onClose }: { onClose: () => void }) {
 
 /* ─── Main Section ─────────────────────────────────────── */
 export default function HomeVisitSection() {
+  const { warning, error: showError } = useNotification();
   const [form, setForm] = useState({
     fullName: "", mobile: "", city: "",
     agreeTerms: true, whatsapp: true,
@@ -248,7 +250,7 @@ export default function HomeVisitSection() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.agreeTerms) {
-      alert("Please agree to Terms & Conditions to proceed.");
+      warning("Please agree to Terms & Conditions to proceed.");
       return;
     }
     setLoading(true);
@@ -263,7 +265,7 @@ export default function HomeVisitSection() {
       });
       setSuccess(true);
     } catch {
-      alert("Booking failed. Please try again.");
+      showError("Booking failed. Please try again.");
     } finally {
       setLoading(false);
     }

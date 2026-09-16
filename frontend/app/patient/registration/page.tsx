@@ -53,6 +53,7 @@ import { getDoctors, createDoctor, getSpecimenTypes, getOrganizations, getTestCh
 import { searchLocations } from "@/src/data/maharashtraLocations";
 import { generateBillPDF, printBill } from "@/src/utils/billPdfGenerator.js";
 import BillReceipt from "@/app/components/BillReceipt";
+import { useNotification } from "@/src/hooks/useNotification";
 
 /* ------------------ INLINE DATE PICKER ------------------ */
 const DP_MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
@@ -379,6 +380,7 @@ export default function PatientRegistration() {
   const mobileInputRef = useRef<HTMLInputElement>(null);
   const doctorDropdownRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
+  const { success, error, warning, info } = useNotification();
   
   // Read rebooking data from localStorage
   const [rebookingData, setRebookingData] = useState<RebookingData | null>(null);
@@ -1337,10 +1339,8 @@ export default function PatientRegistration() {
                 fillPatientData(patient);
               } else {
                 setExistingPatientId(null);
-                alert(
-                  `New patient will be created with a new Patient ID.\n\n` +
-                  `Note: This email is already registered to:\n` +
-                  `${patient.firstName} ${patient.lastName} (${patient.patientId})`
+                warning(
+                  `New patient will be created with a new Patient ID. Note: This email is already registered to: ${patient.firstName} ${patient.lastName} (${patient.patientId})`
                 );
               }
             } else {
@@ -1358,11 +1358,8 @@ export default function PatientRegistration() {
               
               if (createNew) {
                 setExistingPatientId(null);
-                alert(
-                  `✅ New patient will be created\n\n` +
-                  `A new Patient ID will be generated for:\n` +
-                  `${firstName} ${lastName}\n` +
-                  `Email: ${value}`
+                success(
+                  `New patient will be created. A new Patient ID will be generated for: ${firstName} ${lastName}, Email: ${value}`
                 );
               } else {
                 fillPatientData(patient);
@@ -1409,24 +1406,13 @@ export default function PatientRegistration() {
     
     // Show patient's previous tests if any
     if (patient.tests && patient.tests.length > 0) {
-      alert(
-        `Existing Patient Found!\n\n` +
-        `Patient ID: ${patient.patientId}\n` +
-        `Name: ${patient.firstName} ${patient.lastName}\n\n` +
-        `Previous Tests (${patient.tests.length}):\n` +
-        patient.tests.slice(0, 3).map(t => `• ${t.testName} (${t.department})`).join('\n') +
-        (patient.tests.length > 3 ? `\n... and ${patient.tests.length - 3} more` : '') +
-        `\n\nPatient Identity fields have been filled.\n` +
-        `Please enter new Registration and Billing details for this visit.`
+      success(
+        `Existing Patient Found! Patient ID: ${patient.patientId}, Name: ${patient.firstName} ${patient.lastName}. Previous Tests: ${patient.tests.length}. Please enter new Registration and Billing details.`
       );
     } else {
-      alert(
-        `Existing Patient Found!\n\n` +
-        `Patient ID: ${patient.patientId}\n` +
-        `Name: ${patient.firstName} ${patient.lastName}\n\n` +
-        `This patient has no previous tests.\n\n` +
-        `Patient Identity fields have been filled.\n` +
-        `Please enter Registration and Billing details for this visit.`
+      info(
+        `Existing Patient Found! Patient ID: ${patient.patientId}, Name: ${patient.firstName} ${patient.lastName}. This patient has no previous tests. Please enter Registration and Billing details.`,
+        0
       );
     }
   };
@@ -1811,7 +1797,7 @@ export default function PatientRegistration() {
     };
     const result = await generateBillPDF(billData, billing, businessType, true);
     if (!result.success) {
-      alert('Failed to generate PDF: ' + result.error);
+      error('Failed to generate PDF: ' + result.error);
     }
   };
 
@@ -1826,7 +1812,7 @@ export default function PatientRegistration() {
     };
     const result = await generateBillPDF(billData, billing, businessType, false);
     if (!result.success) {
-      alert('Failed to generate PDF: ' + result.error);
+      error('Failed to generate PDF: ' + result.error);
     }
   };
 
@@ -1842,17 +1828,22 @@ export default function PatientRegistration() {
     // Mobile, Email, Address, and Location are now optional ✅
     
     if (missingFields.length > 0) {
-      return alert(`Please fill the following mandatory fields:\n\n• ${missingFields.join('\n• ')}`);
+      error(`Please fill the following mandatory fields: ${missingFields.join(', ')}`);
+      return;
     }
     
     // Validate mobile only if provided (optional field)
-    if (mobile && mobile.length !== 10) return alert("Mobile must be 10 digits");
+    if (mobile && mobile.length !== 10) {
+      error("Mobile must be 10 digits");
+      return;
+    }
     // Validate email only if provided (optional field)
     // Email validation regex: basic check for valid email format
     if (email) {
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
       if (!emailRegex.test(email)) {
-        return alert("Please enter a valid email address (e.g., user@example.com, user@hospital.org)");
+        error("Please enter a valid email address (e.g., user@example.com, user@hospital.org)");
+        return;
       }
     }
     
@@ -1914,19 +1905,19 @@ export default function PatientRegistration() {
       
       const patientId = response?.data?.patientId || response?.patientId || 'N/A';
       
-      alert(`Patient Information Saved ✅\nPatient ID: ${patientId}\n\nYou can now add tests and click "Register" to complete registration.`);
+      success(`Patient Information Saved! Patient ID: ${patientId}. You can now add tests and click "Register" to complete registration.`);
       
       // ✅ KEEP selected tests displayed (don't clear them)
       // setSelectedTests([]); // ❌ REMOVED - tests now persist after save
       
-    } catch (error) {
-      console.error("Error saving patient info:", error);
+    } catch (err) {
+      console.error("Error saving patient info:", err);
       console.error("Full error details:", {
-        message: error?.message,
-        status: error?.response?.status,
-        data: error?.response?.data
+        message: err?.message,
+        status: err?.response?.status,
+        data: err?.response?.data
       });
-      alert(`Failed to save patient info: ${error.message || 'Network error - check console'}`);
+      error(`Failed to save patient info: ${err.message || 'Network error - check console'}`);
     }
   };
 
@@ -2076,13 +2067,13 @@ export default function PatientRegistration() {
       } else {
         // New patient - completely new registration
         message = selectedTests.length > 0 
-          ? `✅ NEW Patient Registered Successfully\nNew Patient ID: ${patientId}\nVisit ID: ${visitId}\n\nYou can now add more tests or print barcode.`
-          : `✅ Patient Information Saved\nNew Patient ID: ${patientId}\n\nSelect tests to create a visit.`;
+          ? `NEW Patient Registered Successfully! New Patient ID: ${patientId}, Visit ID: ${visitId}. You can now add more tests or print barcode.`
+          : `Patient Information Saved! New Patient ID: ${patientId}. Select tests to create a visit.`;
       }
       
-      alert(message);
+      success(message);
       
-      console.log('🔍 AFTER ALERT - About to show barcode');
+      console.log('🔍 AFTER NOTIFICATION - About to show barcode');
       console.log({
         testsForBarcode_length: testsForBarcode.length,
         visitId
@@ -2115,9 +2106,9 @@ export default function PatientRegistration() {
       // Close registration modal if it was open
       setShowRegistrationModal(false);
       
-    } catch (error) {
-      console.error("Error saving registration:", error);
-      alert(`Failed to register patient: ${error.message || 'Network error - check backend server'}`);
+    } catch (err) {
+      console.error("Error saving registration:", err);
+      error(`Failed to register patient: ${err.message || 'Network error - check backend server'}`);
     } finally {
       setLoading(false);
     }
@@ -2139,7 +2130,7 @@ export default function PatientRegistration() {
   // Print barcode for already registered patient
   const handlePrintBarcode = () => {
     if (!lastRegisteredVisitId) {
-      alert('Please save the patient registration first');
+      error('Please save the patient registration first');
       return;
     }
 
@@ -2265,10 +2256,16 @@ export default function PatientRegistration() {
   };
 
   const saveNewPackage = () => {
-    if (!newPackage.name || newPackage.tests.length === 0) return alert("Please enter package name and select tests");
-    if (!selectedDept) return alert("Please select a department first");
+    if (!newPackage.name || newPackage.tests.length === 0) {
+      error("Please enter package name and select tests");
+      return;
+    }
+    if (!selectedDept) {
+      error("Please select a department first");
+      return;
+    }
     selectedDept.packages.push(newPackage);
-    alert("Package added successfully!");
+    success("Package added successfully!");
     setNewPackage({ name: "", tests: [], b2cCharge: 0, b2bCharge: 0 });
     setShowPackageModal(false);
   };
@@ -2321,12 +2318,12 @@ export default function PatientRegistration() {
     
     // Check if patient has been registered (visitId exists)
     if (!lastRegisteredVisitId) {
-      alert('Please save the patient registration first before printing the bill');
+      error('Please save the patient registration first before printing the bill');
       return;
     }
     
     if (selectedTests.length === 0) {
-      alert('Please add tests before printing bill');
+      error('Please add tests before printing bill');
       return;
     }
     
@@ -2365,7 +2362,7 @@ export default function PatientRegistration() {
 
     const result = await printBill(billBooking, billingInfo, businessType, true);
     if (!result.success) {
-      alert('Failed to print: ' + result.error);
+      error('Failed to print: ' + result.error);
     }
   };
 
@@ -2374,11 +2371,11 @@ export default function PatientRegistration() {
     
     // Check if patient has been registered (visitId exists)
     if (!lastRegisteredVisitId) {
-      alert('Please save the patient registration first before printing the bill');
+      error('Please save the patient registration first before printing the bill');
       return;
     }
     if (selectedTests.length === 0) {
-      alert('Please add tests before printing bill');
+      error('Please add tests before printing bill');
       return;
     }
     
@@ -2417,7 +2414,7 @@ export default function PatientRegistration() {
 
     const result = await printBill(billBooking, billingInfo, businessType, false);
     if (!result.success) {
-      alert('Failed to print: ' + result.error);
+      error('Failed to print: ' + result.error);
     }
   };
 
@@ -2426,12 +2423,12 @@ export default function PatientRegistration() {
     
     // Check if patient has been registered (visitId exists)
     if (!lastRegisteredVisitId) {
-      alert('Please save the patient registration first before downloading the bill');
+      error('Please save the patient registration first before downloading the bill');
       return;
     }
     
     if (selectedTests.length === 0) {
-      alert('Please add tests before downloading bill');
+      error('Please add tests before downloading bill');
       return;
     }
     
@@ -2470,7 +2467,7 @@ export default function PatientRegistration() {
 
     const result = await generateBillPDF(billBooking, billingInfo, businessType, true);
     if (!result.success) {
-      alert('Failed to generate PDF: ' + result.error);
+      error('Failed to generate PDF: ' + result.error);
     }
   };
 
@@ -2479,12 +2476,12 @@ export default function PatientRegistration() {
     
     // Check if patient has been registered (visitId exists)
     if (!lastRegisteredVisitId) {
-      alert('Please save the patient registration first before downloading the bill');
+      error('Please save the patient registration first before downloading the bill');
       return;
     }
     
     if (selectedTests.length === 0) {
-      alert('Please add tests before downloading bill');
+      error('Please add tests before downloading bill');
       return;
     }
     
@@ -2523,7 +2520,7 @@ export default function PatientRegistration() {
 
     const result = await generateBillPDF(billBooking, billingInfo, businessType, false);
     if (!result.success) {
-      alert('Failed to generate PDF: ' + result.error);
+      error('Failed to generate PDF: ' + result.error);
     }
   };
 
@@ -3652,7 +3649,7 @@ export default function PatientRegistration() {
                   setExistingPatientId(null);
                   setShowPatientSelectionModal(false);
                   setFoundPatients([]);
-                  alert('New patient will be created with a new Patient ID.');
+                  warning('New patient will be created with a new Patient ID.');
                 }}
                 className="w-full bg-green-600 hover:bg-green-700 text-white px-4 py-2.5 rounded-lg font-semibold flex items-center justify-center gap-2 text-sm">
                 <UserPlus size={18} />
@@ -4158,7 +4155,7 @@ export default function PatientRegistration() {
             
             if (successCount > 0) {
               setTimeout(() => {
-                alert(`✅ ${successCount} test(s) marked as Received and ${selectedBarcodeIndices.size} barcode(s) printed!`);
+                success(`${successCount} test(s) marked as Received and ${selectedBarcodeIndices.size} barcode(s) printed!`);
               }, 800);
             }
           }, 500);

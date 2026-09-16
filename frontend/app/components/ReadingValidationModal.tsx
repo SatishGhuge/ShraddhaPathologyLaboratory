@@ -3,6 +3,7 @@ import { X, AlertCircle } from 'lucide-react';
 import API_BASE_URL from '@/src/api/config';
 import { deleteCommentFromHistory } from '@/src/api/result';
 import { parseHtmlText, HtmlPart } from '@/src/utils/htmlParser';
+import { useNotification } from '@/src/hooks/useNotification';
 
 // Helper function to extract ALL available options from a parameter (from ALL database fields)
 const getAllOptionsFromParameter = (param: Parameter): string[] => {
@@ -219,6 +220,7 @@ const ReadingValidationModal = ({
   parameters,
   groupedParameters,
 }: ReadingValidationModalProps) => {
+  const { success, error: showError, warning } = useNotification();
   const [results, setResults] = useState<any>({});
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -652,12 +654,12 @@ const ReadingValidationModal = ({
         throw new Error(statusData.message || 'Failed to update test status');
       }
 
-      alert('✅ Test readings verified and transitioned to Validation phase successfully!');
+      success('Test readings verified and transitioned to Validation phase successfully!');
       onClose();
     } catch (err: any) {
       console.error('Error validating readings:', err);
       setError(err.message || 'Error validating readings');
-      alert('Error: ' + (err.message || 'Failed to validate readings'));
+      showError('Error: ' + (err.message || 'Failed to validate readings'));
     } finally {
       setValidating(false);
     }
@@ -1035,9 +1037,9 @@ const ReadingValidationModal = ({
                             try {
                               await deleteCommentFromHistory(hist);
                               setCommentHistory(prev => prev.filter(c => c !== hist));
-                            } catch (error) {
-                              console.error('Error deleting comment:', error);
-                              alert('Failed to delete comment');
+                            } catch (err) {
+                              console.error('Error deleting comment:', err);
+                              showError('Failed to delete comment');
                             }
                           }}
                           className="text-red-500 hover:text-red-700 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0"

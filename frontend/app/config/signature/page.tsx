@@ -90,7 +90,7 @@ const SignatureList = () => {
     const file = e.target.files[0];
     if (!file) return;
     if (!['image/jpeg', 'image/jpg', 'image/png'].includes(file.type)) {
-      alert('Only jpg, jpeg, png allowed'); e.target.value = ''; return;
+      warning('Only jpg, jpeg, png allowed'); e.target.value = ''; return;
     }
     const reader = new FileReader();
     reader.onloadend = () => {
@@ -119,7 +119,7 @@ const SignatureList = () => {
   };
 
   const handleSave = async () => {
-    if (!formData.doctorName) { alert('Doctor Name is required'); return; }
+    if (!formData.doctorName) { warning('Doctor Name is required'); return; }
     const payload = {
       doctorName: formData.doctorName,
       signatureText: formData.signatureText,
@@ -140,7 +140,7 @@ const SignatureList = () => {
       setIsEditMode(false);
       setEditingId(null);
     } else {
-      alert('Save failed: ' + data.message);
+      showError('Save failed: ' + data.message);
     }
   };
 

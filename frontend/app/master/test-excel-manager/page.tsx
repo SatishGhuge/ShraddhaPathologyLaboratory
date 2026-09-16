@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Download, Upload, AlertCircle, CheckCircle, XCircle, Loader, ChevronLeft } from 'lucide-react';
 import API_BASE_URL from '@/src/api/config';
+import { useNotification } from '@/src/hooks/useNotification';
 
 interface ImportResult {
   created: { tests: number; parameters: number; categories: number };
@@ -16,6 +17,7 @@ interface ImportResult {
 }
 
 export default function TestExcelManager() {
+  const { success, error: showError, warning, info } = useNotification();
   const [isExporting, setIsExporting] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
   const [file, setFile] = useState<File | null>(null);
@@ -57,10 +59,10 @@ export default function TestExcelManager() {
       window.URL.revokeObjectURL(url);
 
       console.log('✅ Export successful');
-      alert('✅ Tests exported successfully!');
+      success('✅ Tests exported successfully!');
     } catch (error) {
       console.error('❌ Export error:', error);
-      alert('❌ Failed to export tests: ' + (error as Error).message);
+      showError('❌ Failed to export tests: ' + (error as Error).message);
     } finally {
       setIsExporting(false);
     }
@@ -72,7 +74,7 @@ export default function TestExcelManager() {
     if (selectedFile) {
       // Validate file type
       if (!selectedFile.name.endsWith('.xlsx')) {
-        alert('⚠️ Please select an Excel file (.xlsx)');
+        warning('⚠️ Please select an Excel file (.xlsx)');
         return;
       }
       setFile(selectedFile);
@@ -85,7 +87,7 @@ export default function TestExcelManager() {
   // Handle import
   const handleImport = async () => {
     if (!file) {
-      alert('⚠️ Please select a file first');
+      warning('⚠️ Please select a file first');
       return;
     }
 

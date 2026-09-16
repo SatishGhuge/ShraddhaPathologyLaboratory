@@ -6,6 +6,7 @@ import axios from 'axios';
 import DOMPurify from 'dompurify';
 import { AlertCircle, CheckCircle, Download, Printer, RefreshCw } from 'lucide-react';
 import ProfessionalReport from '@/app/components/ProfessionalReport';
+import { useNotification } from '@/src/hooks/useNotification';
 
 interface ReportData {
   report: {
@@ -74,6 +75,7 @@ export default function ReportQRViewPage() {
   const [error, setError] = useState<string | null>(null);
   const [showTokenInfo, setShowTokenInfo] = useState(false);
   const [isPrinting, setIsPrinting] = useState(false);
+  const { showError } = useNotification();
 
   // Validate token and fetch report data
   useEffect(() => {
@@ -122,7 +124,7 @@ export default function ReportQRViewPage() {
       // This will be implemented with html2pdf
       const element = document.getElementById('report-content');
       if (!element) {
-        alert('Report content not found');
+        showError('Report content not found');
         return;
       }
 
@@ -138,7 +140,7 @@ export default function ReportQRViewPage() {
       html2pdf().set(opt).from(element).save();
     } catch (err) {
       console.error('Error downloading PDF:', err);
-      alert('Failed to download PDF');
+      showError('Failed to download PDF');
     }
   }, [reportData]);
 

@@ -7,8 +7,10 @@ import { getDoctors, deleteDoctor } from "@/src/api/master";
 import DoctorMergeModal from "@/src/components/DoctorMergeModal";
 import API_BASE_URL from "@/src/api/config";
 import PaginationControls from "@/app/components/PaginationControls";
+import { useNotification } from "@/src/hooks/useNotification";
 
 export default function ReferralListing() {
+  const { success, error: showError, warning, info } = useNotification();
   const [search, setSearch] = useState("");
   const [data, setData] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -62,7 +64,7 @@ export default function ReferralListing() {
       await deleteDoctor(id);
       setData((prev) => prev.filter((item) => item.id !== id));
     } catch (err) {
-      alert("Failed to delete: " + (err.message || "Unknown error"));
+      showError("Failed to delete: " + (err.message || "Unknown error"));
     }
   };
 
@@ -115,10 +117,10 @@ export default function ReferralListing() {
       window.URL.revokeObjectURL(url);
 
       console.log('✅ Export successful');
-      alert('✅ Referral doctors exported successfully!');
+      success('✅ Referral doctors exported successfully!');
     } catch (error) {
       console.error('❌ Export error:', error);
-      alert('❌ Failed to export doctors: ' + (error as Error).message);
+      showError('❌ Failed to export doctors: ' + (error as Error).message);
     } finally {
       setIsExporting(false);
     }
@@ -129,7 +131,7 @@ export default function ReferralListing() {
     const selectedFile = e.target.files?.[0];
     if (selectedFile) {
       if (!selectedFile.name.endsWith('.xlsx')) {
-        alert('⚠️ Please select an Excel file (.xlsx)');
+        warning('⚠️ Please select an Excel file (.xlsx)');
         return;
       }
       setImportFile(selectedFile);
@@ -142,7 +144,7 @@ export default function ReferralListing() {
   // 🔹 HANDLE IMPORT
   const handleImport = async () => {
     if (!importFile) {
-      alert('⚠️ Please select a file first');
+      warning('⚠️ Please select a file first');
       return;
     }
 

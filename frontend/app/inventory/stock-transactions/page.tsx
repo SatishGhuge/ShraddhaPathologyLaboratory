@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { ChevronDown, ChevronRight, AlertCircle, CheckCircle, AlertTriangle, Search, RotateCcw, X, Check } from "lucide-react";
 import PaginationControls from "@/app/components/PaginationControls";
 import inventoryAPI from "@/lib/api/inventory.api";
+import { useNotification } from "@/src/hooks/useNotification";
 
 interface BatchDetail {
   id: number;
@@ -41,32 +42,31 @@ interface QuantityUpdateModalProps {
 }
 
 function QuantityUpdateModal({ item, isOpen, onClose, onUpdate }: QuantityUpdateModalProps) {
+  const { warning } = useNotification();
+  
   const [quantity, setQuantity] = useState<string>("");
   const [remark, setRemark] = useState<string>("");
-  const [error, setError] = useState<string>("");
 
   const handleUpdate = () => {
-    setError("");
-
     if (!quantity.trim()) {
-      setError("Quantity is required");
+      warning("Quantity is required");
       return;
     }
 
     const qty = parseInt(quantity);
 
     if (isNaN(qty)) {
-      setError("Quantity must be a number");
+      warning("Quantity must be a number");
       return;
     }
 
     if (qty <= 0) {
-      setError("Quantity must be greater than 0");
+      warning("Quantity must be greater than 0");
       return;
     }
 
     if (qty > item.quantityAvailable) {
-      setError(`Cannot exceed available stock (${item.quantityAvailable})`);
+      warning(`Cannot exceed available stock (${item.quantityAvailable})`);
       return;
     }
 
@@ -144,13 +144,6 @@ function QuantityUpdateModal({ item, isOpen, onClose, onUpdate }: QuantityUpdate
           />
         </div>
 
-        {/* Error Message */}
-        {error && (
-          <div className="p-2 bg-red-50 border border-red-200 rounded text-xs text-red-700">
-            {error}
-          </div>
-        )}
-
         {/* Action Buttons */}
         <div className="flex gap-2 pt-2">
           <button
@@ -173,10 +166,10 @@ function QuantityUpdateModal({ item, isOpen, onClose, onUpdate }: QuantityUpdate
 }
 
 export default function StockTransactionsPage() {
+  const { success, error: showError, warning, info } = useNotification();
+  
   const [stocks, setStocks] = useState<GroupedLabStock[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-  const [successMsg, setSuccessMsg] = useState("");
   const [search, setSearch] = useState("");
   const [filterAlert, setFilterAlert] = useState("all"); // all, expiring, lowstock
   const [currentPage, setCurrentPage] = useState(1);
@@ -204,7 +197,7 @@ export default function StockTransactionsPage() {
       }
     } catch (err: any) {
       console.error("Error fetching lab stocks:", err);
-      setError(err.response?.data?.message || "Failed to fetch lab stocks");
+      showError(err.response?.data?.message || "Failed to fetch lab stocks");
     } finally {
       setLoading(false);
     }
@@ -247,8 +240,7 @@ export default function StockTransactionsPage() {
         reason: remark || "Manual stock removal"
       });
 
-      setSuccessMsg(`Removed ${quantity} ${selectedBatch.unit} from ${selectedBatch.batchNo}`);
-      setTimeout(() => setSuccessMsg(""), 3000);
+      success(`Removed ${quantity} ${selectedBatch.unit} from ${selectedBatch.batchNo}`);
       
       setShowUpdateModal(false);
       setSelectedBatch(null);
@@ -257,8 +249,7 @@ export default function StockTransactionsPage() {
       fetchLabStocks(pagination.page);
     } catch (err: any) {
       console.error("Failed to update stock:", err);
-      setError(err.response?.data?.message || "Failed to update stock");
-      setTimeout(() => setError(""), 3000);
+      showError(err.response?.data?.message || "Failed to update stock");
     }
   };
 
@@ -365,14 +356,6 @@ export default function StockTransactionsPage() {
           ))}
         </div>
       </div>
-
-      {/* Error Message */}
-      {error && (
-        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-6 flex items-center gap-2">
-          <AlertCircle size={18} />
-          {error}
-        </div>
-      )}
 
       {/* Table */}
       <div className="bg-white rounded-lg shadow overflow-hidden">

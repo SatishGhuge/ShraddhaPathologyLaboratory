@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { Upload, ArrowLeft, FileText, CheckCircle, AlertCircle, Loader, Plus, Trash2, X, ArrowRight } from "lucide-react";
 import Header from "@/src/components/Header";
+import { useNotification } from "@/src/hooks/useNotification";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
 
@@ -25,6 +26,7 @@ const OutsourcingImport = () => {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
   const [showStep3Modal, setShowStep3Modal] = useState(false);
+  const { warning } = useNotification();
 
   // Fetch patient test and labs
   useEffect(() => {
@@ -252,7 +254,7 @@ const OutsourcingImport = () => {
                   if (file.type === 'application/pdf') {
                     handleFileChange({ target: { files } } as any);
                   } else {
-                    alert('Please upload a PDF file');
+                    warning('Please upload a PDF file');
                   }
                 }
               }}

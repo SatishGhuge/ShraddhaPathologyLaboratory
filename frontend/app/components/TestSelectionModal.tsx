@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { GripVertical, ChevronUp, ChevronDown } from 'lucide-react';
+import { useNotification } from '@/src/hooks/useNotification';
 
 export interface SelectedTestItem {
   test_id: string;
@@ -28,6 +29,7 @@ const TestSelectionModal: React.FC<TestSelectionModalProps> = ({
 }) => {
   const [testItems, setTestItems] = useState<SelectedTestItem[]>([]);
   const [draggedItem, setDraggedItem] = useState<number | null>(null);
+  const { warning } = useNotification();
 
   // Initialize test items with default values
   useEffect(() => {
@@ -126,7 +128,7 @@ const TestSelectionModal: React.FC<TestSelectionModalProps> = ({
   const handleConfirm = () => {
     const selected = testItems.filter((item) => item.isSelected);
     if (selected.length === 0) {
-      alert('Please select at least one test');
+      warning('Please select at least one test');
       return;
     }
     onConfirm(selected);

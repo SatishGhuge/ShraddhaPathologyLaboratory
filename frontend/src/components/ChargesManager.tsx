@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { DollarSign, RotateCcw, FileSpreadsheet, FileText, Upload } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { useNotification } from "@/src/hooks/useNotification";
 
 interface ChargesManagerProps {
   entityId: string;
@@ -19,6 +20,7 @@ export default function ChargesManager({
 }: ChargesManagerProps) {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const { success, error: showError, warning, info } = useNotification();
 
   const [tests, setTests] = useState<any[]>([]);
   const [charges, setCharges] = useState<any[]>([]);
@@ -328,7 +330,7 @@ export default function ChargesManager({
 
   const handleBulkApply = () => {
     if (!bulkCharge) {
-      alert("Please enter charge value!");
+      warning("Please enter charge value!");
       return;
     }
     const bulkChargeValue = parseFloat(bulkCharge);
@@ -344,7 +346,7 @@ export default function ChargesManager({
     setFilteredData(updated);
     setShowBulkModal(false);
     setBulkCharge("");
-    alert("Bulk charges applied! Click 'Save' to save to database.");
+    info("Bulk charges applied! Click 'Save' to save to database.");
   };
 
   const handleSave = async () => {
@@ -384,7 +386,7 @@ export default function ChargesManager({
       console.log("Filtered bulkCharges:", bulkCharges);
 
       if (bulkCharges.length === 0) {
-        alert("⚠️ No customized charges to save.\n\nAll tests use default charges.");
+        warning("No customized charges to save. All tests use default charges.");
         setLoading(false);
         return;
       }
@@ -418,19 +420,19 @@ export default function ChargesManager({
 
       if (result.success) {
         const total = (result.data.created || 0) + (result.data.updated || 0);
-        alert(`✅ Successfully saved ${bulkCharges.length} customized charges!\n✓ Created: ${result.data.created || 0}\n✓ Updated: ${result.data.updated || 0}`);
+        success(`✅ Successfully saved ${bulkCharges.length} customized charges!\n✓ Created: ${result.data.created || 0}\n✓ Updated: ${result.data.updated || 0}`);
         
         // Refresh data and show all tests (don't auto-filter to customized)
         await fetchData();
         setFilterType("all");  // Show all tests after save
       } else {
         setError(result.message || "Failed to save charges");
-        alert("❌ Error: " + (result.message || "Failed to save charges"));
+        showError("❌ Error: " + (result.message || "Failed to save charges"));
       }
     } catch (error) {
       console.error("Error saving charges:", error);
       setError("Failed to save charges: " + error.message);
-      alert("❌ Error: " + error.message);
+      showError("Error: " + error.message);
     } finally {
       setLoading(false);
     }
@@ -440,7 +442,7 @@ export default function ChargesManager({
     try {
       const XLSX = await import("xlsx").catch(() => null);
       if (!XLSX) {
-        alert("Please install: npm install xlsx");
+        warning("Please install: npm install xlsx");
         return;
       }
 
@@ -469,7 +471,7 @@ export default function ChargesManager({
       XLSX.writeFile(wb, filename);
     } catch (error) {
       console.error("Error exporting:", error);
-      alert("Error exporting to Excel");
+      showError("Error exporting to Excel");
     }
   };
 
@@ -479,7 +481,7 @@ export default function ChargesManager({
       const autoTableModule = await import("jspdf-autotable").catch(() => null);
 
       if (!jsPDFModule || !autoTableModule) {
-        alert("Please install: npm install jspdf jspdf-autotable");
+        warning("Please install: npm install jspdf jspdf-autotable");
         return;
       }
 
@@ -525,7 +527,7 @@ export default function ChargesManager({
       doc.save(filename);
     } catch (error) {
       console.error("Error exporting PDF:", error);
-      alert("Error exporting to PDF");
+      showError("Error exporting to PDF");
     }
   };
 
@@ -538,7 +540,7 @@ export default function ChargesManager({
 
   const handleImportExcel = async () => {
     if (!selectedFile) {
-      alert("Please select a file first");
+      warning("Please select a file first");
       return;
     }
 
@@ -547,7 +549,7 @@ export default function ChargesManager({
       const XLSX = await import("xlsx").catch(() => null);
 
       if (!XLSX) {
-        alert("Please install: npm install xlsx");
+        warning("Please install: npm install xlsx");
         return;
       }
 
@@ -570,7 +572,7 @@ export default function ChargesManager({
             .filter((row) => row.testName || row.testCode);
 
           if (validData.length === 0) {
-            alert("No valid data found in Excel");
+            warning("No valid data found in Excel");
             setLoading(false);
             return;
           }
@@ -579,7 +581,7 @@ export default function ChargesManager({
           setLoading(false);
         } catch (err) {
           console.error("Error parsing Excel:", err);
-          alert("Error parsing Excel file");
+          showError("Error parsing Excel file");
           setLoading(false);
         }
       };
@@ -587,14 +589,14 @@ export default function ChargesManager({
       reader.readAsBinaryString(selectedFile);
     } catch (error) {
       console.error("Error importing Excel:", error);
-      alert("Error importing Excel file");
+      showError("Error importing Excel file");
       setLoading(false);
     }
   };
 
   const handleFillCharges = () => {
     if (importedData.length === 0) {
-      alert("No imported data to fill");
+      warning("No imported data to fill");
       return;
     }
 
@@ -623,7 +625,7 @@ export default function ChargesManager({
     // Show summary
     const customizedCount = updated.filter(u => u.isCustomized).length;
     const defaultCount = updated.length - customizedCount;
-    alert(`✅ Charges imported!\n• Customized: ${customizedCount}\n• Using Default: ${defaultCount}\n\nNow click Save to store customized charges.`);
+    success(`Charges imported! Customized: ${customizedCount}, Using Default: ${defaultCount}. Now click Save to store customized charges.`);
     
     setShowImportModal(false);
     setImportedData([]);

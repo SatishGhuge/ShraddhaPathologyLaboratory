@@ -5,6 +5,7 @@ import { Package, RotateCcw, Edit2, Trash2, Plus } from "lucide-react";
 import PaginationControls from "@/app/components/PaginationControls";
 import StockEntryModal from "@/src/components/StockEntryModal";
 import inventoryAPI from "@/lib/api/inventory.api";
+import { useNotification } from "@/src/hooks/useNotification";
 
 interface Supplier {
   id: number;
@@ -88,11 +89,12 @@ const SAMPLE_ITEMS: Item[] = [
 ];
 
 export default function StockEntryPage() {
+  const { success, error: showError, warning, info } = useNotification();
+  
   const [stockEntries, setStockEntries] = useState<StockEntry[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [items, setItems] = useState<Item[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
   const [pagination, setPagination] = useState<any>(null);
 
   const [search, setSearch] = useState("");
@@ -100,7 +102,6 @@ export default function StockEntryPage() {
   const [itemsPerPage, setItemsPerPage] = useState(25);
   const [showModal, setShowModal] = useState(false);
   const [editingEntry, setEditingEntry] = useState<StockEntry | null>(null);
-  const [successMsg, setSuccessMsg] = useState("");
   const [showInactive, setShowInactive] = useState(false);
 
   useEffect(() => {
@@ -144,7 +145,7 @@ export default function StockEntryPage() {
       setItems(itemsRes.data.data || []);
     } catch (err: any) {
       console.error("Failed to fetch data:", err);
-      setError("Failed to fetch stock entries data");
+      showError("Failed to fetch stock entries data");
     } finally {
       setLoading(false);
     }
@@ -161,11 +162,9 @@ export default function StockEntryPage() {
       try {
         await inventoryAPI.stockEntries.delete(id);
         setStockEntries(stockEntries.filter((entry) => entry.id !== id));
-        setSuccessMsg("Stock entry deleted successfully!");
-        setTimeout(() => setSuccessMsg(""), 2000);
+        success("Stock entry deleted successfully!");
       } catch (err: any) {
-        setError(err.response?.data?.message || "Failed to delete stock entry");
-        setTimeout(() => setError(""), 3000);
+        showError(err.response?.data?.message || "Failed to delete stock entry");
       }
     }
   };
@@ -188,31 +187,23 @@ export default function StockEntryPage() {
           : e
       )
     );
-    setSuccessMsg(
+    success(
       currentEntry.status === "Active"
         ? "Stock entry inactivated successfully!"
         : "Stock entry activated successfully!"
     );
-    setTimeout(() => setSuccessMsg(""), 2000);
   };
 
   const handleStockEntrySaved = (entryData: any) => {
     fetchData(); // Refresh list from server
     setShowModal(false);
     setEditingEntry(null);
-    setSuccessMsg("Stock entry saved successfully!");
-    setTimeout(() => setSuccessMsg(""), 2000);
+    success("Stock entry saved successfully!");
   };
 
   return (
     <>
       <div className="min-h-screen bg-white p-6">
-        {/* Error Message */}
-        {error && (
-          <div className="mb-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
-            {error}
-          </div>
-        )}
 
         {/* Top Bar */}
         <div className="flex flex-wrap items-center justify-between gap-3 mb-4 bg-white p-3 rounded shadow-md">
@@ -427,13 +418,6 @@ export default function StockEntryPage() {
         items={items}
         editingEntry={editingEntry}
       />
-
-      {/* Success Message */}
-      {successMsg && (
-        <div className="fixed bottom-4 right-4 bg-green-500 text-white px-4 py-2 rounded shadow-lg text-sm">
-          {successMsg}
-        </div>
-      )}
     </>
   );
 }

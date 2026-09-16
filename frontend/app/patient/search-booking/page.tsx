@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { getAllPatients, updatePayment, updatePatient, updatePatientTestDetails, getVisitBill, cancelTest } from "@/src/api/patient";
 import { getDoctors, getTests, getPackages, getSpecimenTypes, getOrganizations } from "@/src/api/master";
+import { useNotification } from "@/src/hooks/useNotification";
 import PaginationControls from "@/app/components/PaginationControls";
 import html2pdf from "html2pdf.js";
 import { jsPDF } from "jspdf";
@@ -541,6 +542,7 @@ export default function BookingPage() {
   const [itemsPerPage, setItemsPerPage] = useState(25);
   const ITEMS_PER_PAGE = itemsPerPage;  // Use dynamic items per page
   const [successPopup,     setSuccessPopup]     = useState("");
+  const { warning, success, showError } = useNotification();
 
   useEffect(() => {
     const today = new Date(); today.setHours(0,0,0,0);
@@ -1136,7 +1138,7 @@ export default function BookingPage() {
     if (validateReferral()) {
       // Here you would typically save to a database or state
       console.log("Saving referral:", referralData);
-      alert(`Referral ${referralData.type} "${referralData.name}" added successfully!`);
+      success(`Referral ${referralData.type} "${referralData.name}" added successfully!`);
       
       // Reset and close
       setReferralData({
@@ -1167,7 +1169,7 @@ export default function BookingPage() {
   };
 
   const handleClickTest = async (t: any, pkg: any) => {
-    if (!selectedBooking) return alert("Please select a booking first");
+    if (!selectedBooking) return warning("Please select a booking first");
     if (selectedBooking.tests.find(x => x.name === t.name && !x.isExisting)) return;
     
     let testEntry = { ...t };
@@ -1221,7 +1223,7 @@ export default function BookingPage() {
   };
 
   const handleClickPackage = (pkg: any) => {
-    if (!selectedBooking) return alert("Please select a booking first");
+    if (!selectedBooking) return warning("Please select a booking first");
     if (selectedBooking.tests.find(x=>x.name===pkg.name)) return;
     const packageEntry = { name:pkg.name, sample:"N/A",
       b2cCharge:pkg.b2cCharge, b2bCharge:pkg.b2bCharge,
@@ -1257,7 +1259,7 @@ export default function BookingPage() {
         isEmergency: formData.isEmergency || false,  // ✅ Send emergency flag to backend
         visitId: editingPatient.visitId,  // ✅ NEW: Send visitId to apply emergency to all tests in this visit
       });
-      if (!res.success) { alert('Failed to update patient: ' + res.message); return; }
+      if (!res.success) { showError('Failed to update patient: ' + res.message); return; }
 
       // Update patient_history for the visit if present
       if (editingPatient.visitId && formData.patient_history !== undefined) {
@@ -1275,7 +1277,7 @@ export default function BookingPage() {
         }
       }
     } catch (e) {
-      alert('Failed to update patient: ' + (e instanceof Error ? e.message : 'Unknown error')); return;
+      showError('Failed to update patient: ' + (e instanceof Error ? e.message : 'Unknown error')); return;
     }
 
     const updated = bookings.map(b=>
@@ -1423,7 +1425,7 @@ export default function BookingPage() {
       if (!response?.success) {
         const errorMsg = response?.message || 'Unknown error';
         console.error('❌ Backend returned error:', errorMsg);
-        alert(`Failed to cancel test: ${errorMsg}`);
+        showError(`Failed to cancel test: ${errorMsg}`);
         return;
       }
       
@@ -1433,7 +1435,7 @@ export default function BookingPage() {
       // Extract updated bill from response
       if (!response.data?.updatedBill) {
         console.error('❌ No updatedBill in response');
-        alert('Test cancelled but billing update failed');
+        showError('Test cancelled but billing update failed');
         return;
       }
       
@@ -1498,7 +1500,7 @@ export default function BookingPage() {
       
     } catch (error) {
       console.error('❌ EXCEPTION during test cancellation:', error);
-      alert(`Error: ${(error as Error).message}`);
+      showError(`Error: ${(error as Error).message}`);
     }
   };
 
@@ -1532,7 +1534,7 @@ export default function BookingPage() {
     if (!selectedBooking) return;
     const result = await printBill(selectedBooking, billing, businessType, true);
     if (!result.success) {
-      alert('Failed to print: ' + result.error);
+      showError('Failed to print: ' + result.error);
     }
   };
 
@@ -1541,7 +1543,7 @@ export default function BookingPage() {
     if (!selectedBooking) return;
     const result = await printBill(selectedBooking, billing, businessType, false);
     if (!result.success) {
-      alert('Failed to print: ' + result.error);
+      showError('Failed to print: ' + result.error);
     }
   };
 
@@ -1550,7 +1552,7 @@ export default function BookingPage() {
     if (!selectedBooking) return;
     const result = await generateBillPDF(selectedBooking, billing, businessType, true);
     if (!result.success) {
-      alert('Failed to generate PDF: ' + result.error);
+      showError('Failed to generate PDF: ' + result.error);
     }
   };
 
@@ -1559,14 +1561,14 @@ export default function BookingPage() {
     if (!selectedBooking) return;
     const result = await generateBillPDF(selectedBooking, billing, businessType, false);
     if (!result.success) {
-      alert('Failed to generate PDF: ' + result.error);
+      showError('Failed to generate PDF: ' + result.error);
     }
   };
 
   const handleSavePayment = async () => {
     if (!selectedBooking) return;
     const payment = parseFloat(billing.payment) || 0;
-    if (payment <= 0) return alert("Please enter a payment amount");
+    if (payment <= 0) return warning("Please enter a payment amount");
 
     // Calculate net amount after discount
     const discountAmt = (parseFloat(billing.discountPercent) > 0)
@@ -1579,7 +1581,7 @@ export default function BookingPage() {
     const remainingBalance = netAmt - currentPaid;
     
     if (payment > remainingBalance) {
-      return alert(`Payment amount (₹${payment}) cannot exceed remaining balance (₹${remainingBalance})`);
+      return warning(`Payment amount (₹${payment}) cannot exceed remaining balance (₹${remainingBalance})`);
     }
 
     try {
@@ -1666,7 +1668,7 @@ export default function BookingPage() {
       setSuccessPopup(message);
       setTimeout(() => setSuccessPopup(""), 3000);
     } catch (err) {
-      alert("Failed to save payment: " + err.message);
+      showError("Failed to save payment: " + err.message);
     }
   };
 
@@ -1697,7 +1699,7 @@ export default function BookingPage() {
   // Show barcode modal for booking
   const handlePrintBarcode = (booking: any) => {
     if (!booking.tests || booking.tests.length === 0) {
-      alert('No tests in this booking');
+      warning('No tests in this booking');
       return;
     }
 
@@ -1780,7 +1782,7 @@ export default function BookingPage() {
 
     const result = await printBill(billBooking, billingInfo, businessType, true);
     if (!result.success) {
-      alert('Failed to print: ' + result.error);
+      showError('Failed to print: ' + result.error);
     }
   };
 
@@ -1825,7 +1827,7 @@ export default function BookingPage() {
 
     const result = await printBill(billBooking, billingInfo, businessType, false);
     if (!result.success) {
-      alert('Failed to print: ' + result.error);
+      showError('Failed to print: ' + result.error);
     }
   };
 
@@ -1870,7 +1872,7 @@ export default function BookingPage() {
 
     const result = await generateBillPDF(billBooking, billingInfo, businessType, true);
     if (!result.success) {
-      alert('Failed to download PDF: ' + result.error);
+      showError('Failed to download PDF: ' + result.error);
     }
   };
 
@@ -1915,7 +1917,7 @@ export default function BookingPage() {
 
     const result = await generateBillPDF(billBooking, billingInfo, businessType, false);
     if (!result.success) {
-      alert('Failed to download PDF: ' + result.error);
+      showError('Failed to download PDF: ' + result.error);
     }
   };
 
@@ -3170,11 +3172,11 @@ export default function BookingPage() {
                 onClick={() => {
                   const amt = parseFloat(refundAmount);
                   if (!refundAmount || isNaN(amt) || amt <= 0) {
-                    alert("Please enter a valid refund amount.");
+                    warning("Please enter a valid refund amount.");
                     return;
                   }
                   if (amt > total) {
-                    alert(`Refund amount cannot exceed total ₹${total}.`);
+                    warning(`Refund amount cannot exceed total ₹${total}.`);
                     return;
                   }
                   setBookings(bookings.map(b =>
@@ -3185,7 +3187,7 @@ export default function BookingPage() {
                   setShowRefundModal(false);
                   setRefundAmount("");
                   setRefundRemark("");
-                  alert(`Refund of ₹${amt} processed for ${selectedBooking.name}.`);
+                  success(`Refund of ₹${amt} processed for ${selectedBooking.name}.`);
                 }}
                 className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2 rounded font-semibold text-sm"
               >
@@ -3337,7 +3339,7 @@ export default function BookingPage() {
           
           if (successCount > 0) {
             setTimeout(() => {
-              alert(`✅ ${successCount} test(s) marked as Received and ${selectedBarcodeIndices.size} barcode(s) printed!`);
+              success(`${successCount} test(s) marked as Received and ${selectedBarcodeIndices.size} barcode(s) printed!`);
               // Reload to refresh barcode status
               window.location.reload();
             }, 800);
@@ -3453,7 +3455,7 @@ export default function BookingPage() {
           
         } catch (error) {
           console.error('❌ Error refreshing booking after test cancellation:', error);
-          alert('Error refreshing booking data. Please close and reopen the modal.');
+          showError('Error refreshing booking data. Please close and reopen the modal.');
         }
       }}
     />

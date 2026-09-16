@@ -6,8 +6,10 @@ import { CKEditor } from '@ckeditor/ckeditor5-react';
 import ClassicEditor from '@ckeditor/ckeditor5-build-classic';
 import { getTemplates, getTests, createTemplate, updateTemplate, deleteTemplate, getUnits, createCategoryWithParameter, getTestById } from "@/src/api/master";
 import PaginationControls from '@/app/components/PaginationControls';
+import { useNotification } from '@/src/hooks/useNotification';
 
 const TestTemplets = () => {
+  const { success, error: showError, warning, info } = useNotification();
 
   const [search, setSearch] = useState('');
   const [templates, setTemplates] = useState<any[]>([]);
@@ -248,14 +250,14 @@ const TestTemplets = () => {
       };
       
       await updateTemplate(id, updateData);
-      alert('Template deleted permanently!');
+      success('Template deleted permanently!');
       
       // Refresh current page or go back if last item on page
       const newPage = Math.max(1, currentPage);
       fetchTemplates(newPage);
     } catch (err: any) {
       console.error('Error deleting template:', err);
-      alert(`Failed to delete template: ${err.message}`);
+      showError(`Failed to delete template: ${err.message}`);
     } finally {
       setLoading(false);
     }
@@ -283,14 +285,14 @@ const TestTemplets = () => {
       };
 
       await updateTemplate(id, updateData);
-      alert(currentTemplate.isActive ? "Template inactivated successfully!" : "Template activated successfully!");
+      success(currentTemplate.isActive ? "Template inactivated successfully!" : "Template activated successfully!");
       
       // Refresh current page
       const newPage = Math.max(1, currentPage);
       fetchTemplates(newPage);
     } catch (err: any) {
       console.error('Error updating template:', err);
-      alert('Failed to update template');
+      showError('Failed to update template');
     } finally {
       setLoading(false);
     }
@@ -298,7 +300,7 @@ const TestTemplets = () => {
 
   const handleSave = async () => {
     if (!formData.testId || !formData.templateName) {
-      alert('Please select a test and enter a template name!');
+      warning('Please select a test and enter a template name!');
       return;
     }
 
@@ -313,17 +315,17 @@ const TestTemplets = () => {
 
       if (editMode) {
         await updateTemplate(currentTemplateId, templateData);
-        alert('Template updated successfully!');
+        success('Template updated successfully!');
       } else {
         await createTemplate(templateData);
-        alert('Template created successfully!');
+        success('Template created successfully!');
       }
 
       setShowForm(false);
       fetchTemplates();
     } catch (err: any) {
       console.error('Error saving template:', err);
-      alert(`Failed to save template: ${err.message}`);
+      showError(`Failed to save template: ${err.message}`);
     } finally {
       setLoading(false);
     }
