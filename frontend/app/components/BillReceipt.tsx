@@ -194,7 +194,7 @@ const BillReceipt: React.FC<BillReceiptProps> = ({ booking, billing, businessTyp
                 const testsInGroup = groupedByPackage.get(packageKey) || [];
                 
                 if (packageKey !== '__individual__') {
-                  // Package row - show package charge instead of individual tests
+                  // Package row - show package charge
                   const firstTest = testsInGroup[0];
                   const packageCharge = firstTest?.packageCharge || 0;
                   
@@ -202,11 +202,22 @@ const BillReceipt: React.FC<BillReceiptProps> = ({ booking, billing, businessTyp
                     <tr key={`pkg-${packageKey}`} style={{ borderBottom: '1px solid #ccc', pageBreakInside: 'avoid', backgroundColor: '#f0f0f0' }}>
                       <td className="text-left py-1.5 px-1 font-semibold">{rowIndex++}</td>
                       <td className="text-left py-1.5 px-1 font-semibold">📦 {packageKey}</td>
-                      <td className="text-left py-1.5 px-1 font-semibold">{Math.round(packageCharge).toFixed(2)}</td>
+                      <td className="text-left py-1.5 px-1 font-semibold">₹{Math.round(packageCharge).toFixed(2)}</td>
                     </tr>
                   );
+                  
+                  // Show tests under package (indented, compact)
+                  testsInGroup.forEach((t: any, idx: number) => {
+                    rows.push(
+                      <tr key={`test-${packageKey}-${idx}`} style={{ borderBottom: '1px solid #ddd', pageBreakInside: 'avoid', backgroundColor: '#fafafa' }}>
+                        <td className="text-left px-1 text-gray-500" style={{ paddingTop: '2px', paddingBottom: '2px' }}></td>
+                        <td className="text-left px-3 text-xs" style={{ paddingTop: '2px', paddingBottom: '2px' }}>└─ {t.name}</td>
+                        <td className="text-left px-1 text-gray-600 text-xs" style={{ paddingTop: '2px', paddingBottom: '2px' }}>—</td>
+                      </tr>
+                    );
+                  });
                 } else {
-                  // Individual tests (if there are any)
+                  // Individual tests (not in any package)
                   if (testsInGroup.length > 0) {
                     testsInGroup.forEach((t: any) => {
                       const charge = businessType === "B2C" ? (t.b2cCharge || t.charge || 0) : (t.b2bCharge || t.charge || 0);
@@ -214,7 +225,7 @@ const BillReceipt: React.FC<BillReceiptProps> = ({ booking, billing, businessTyp
                         <tr key={`test-${t.name}`} style={{ borderBottom: '1px solid #ccc', pageBreakInside: 'avoid' }}>
                           <td className="text-left py-1.5 px-1">{rowIndex++}</td>
                           <td className="text-left py-1.5 px-1">{t.name}</td>
-                          <td className="text-left py-1.5 px-1">{Math.round(charge).toFixed(2)}</td>
+                          <td className="text-left py-1.5 px-1">₹{Math.round(charge).toFixed(2)}</td>
                         </tr>
                       );
                     });

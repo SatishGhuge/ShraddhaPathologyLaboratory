@@ -318,17 +318,27 @@ export const createPatient = async (req, res) => {
       visitId = await generateVisitId(visitDate);
       
       // ✅ NEW BILLING LOGIC: Single discount for all tests
-      // Step 1: Calculate total charges - use package charges if available, otherwise sum individual test charges
+      // Step 1: Calculate total charges - sum BOTH package charges AND individual test charges
       let totalTestCharges = 0;
+      
+      // Sum package charges (each unique package counted once)
+      let packageChargesTotal = 0;
       if (usePackageCharges && totalPackageCharges > 0) {
-        // Use sum of all package charges (e.g., ₹900 + ₹1000 = ₹1900)
-        totalTestCharges = totalPackageCharges;
-        console.log(`✅ Using package charges: ₹${totalTestCharges} for bill (packages: ${JSON.stringify(packageChargesByName)})`);
-      } else {
-        // Sum individual test charges
-        totalTestCharges = tests.reduce((sum, t) => sum + (parseFloat(t.charge) || 0), 0);
-        console.log(`✅ Using sum of individual test charges: ₹${totalTestCharges}`);
+        packageChargesTotal = totalPackageCharges;
+        console.log(`📦 Package charges: ₹${packageChargesTotal} (packages: ${JSON.stringify(packageChargesByName)})`);
       }
+      
+      // Sum individual test charges (for tests NOT from any package)
+      let individualTestChargesTotal = 0;
+      const nonPackageTests = tests.filter(t => !t.packageName);  // Tests without a package
+      if (nonPackageTests.length > 0) {
+        individualTestChargesTotal = nonPackageTests.reduce((sum, t) => sum + (parseFloat(t.charge) || 0), 0);
+        console.log(`📝 Individual test charges (non-package): ₹${individualTestChargesTotal} for ${nonPackageTests.length} tests`);
+      }
+      
+      // TOTAL = Package charges + Individual test charges
+      totalTestCharges = packageChargesTotal + individualTestChargesTotal;
+      console.log(`💰 Total charges: ₹${packageChargesTotal} (packages) + ₹${individualTestChargesTotal} (individual tests) = ₹${totalTestCharges}`);
       
       // Step 2: Calculate discount amount
       let finalDiscountAmount = 0;
@@ -491,17 +501,27 @@ export const createPatient = async (req, res) => {
       visitId = await generateVisitId(visitDate);
 
       // ✅ NEW BILLING LOGIC: Single discount for all tests
-      // Step 1: Calculate total charges - use package charges if available, otherwise sum individual test charges
+      // Step 1: Calculate total charges - sum BOTH package charges AND individual test charges
       let totalTestCharges = 0;
+      
+      // Sum package charges (each unique package counted once)
+      let packageChargesTotal = 0;
       if (usePackageCharges && totalPackageCharges > 0) {
-        // Use sum of all package charges (e.g., ₹900 + ₹1000 = ₹1900)
-        totalTestCharges = totalPackageCharges;
-        console.log(`✅ Using package charges: ₹${totalTestCharges} for bill (packages: ${JSON.stringify(packageChargesByName)})`);
-      } else {
-        // Sum individual test charges
-        totalTestCharges = tests.reduce((sum, t) => sum + (parseFloat(t.charge) || 0), 0);
-        console.log(`✅ Using sum of individual test charges: ₹${totalTestCharges}`);
+        packageChargesTotal = totalPackageCharges;
+        console.log(`📦 Package charges: ₹${packageChargesTotal} (packages: ${JSON.stringify(packageChargesByName)})`);
       }
+      
+      // Sum individual test charges (for tests NOT from any package)
+      let individualTestChargesTotal = 0;
+      const nonPackageTests = tests.filter(t => !t.packageName);  // Tests without a package
+      if (nonPackageTests.length > 0) {
+        individualTestChargesTotal = nonPackageTests.reduce((sum, t) => sum + (parseFloat(t.charge) || 0), 0);
+        console.log(`📝 Individual test charges (non-package): ₹${individualTestChargesTotal} for ${nonPackageTests.length} tests`);
+      }
+      
+      // TOTAL = Package charges + Individual test charges
+      totalTestCharges = packageChargesTotal + individualTestChargesTotal;
+      console.log(`💰 Total charges: ₹${packageChargesTotal} (packages) + ₹${individualTestChargesTotal} (individual tests) = ₹${totalTestCharges}`);
       
       // Step 2: Calculate discount amount
       let finalDiscountAmount = 0;
@@ -861,37 +881,41 @@ export const registerPatientWithEmail = async (req, res) => {
         packages.forEach(pkg => packageMap.set(pkg.name, pkg.id));
       }
       
-      const perTestAmount = totalAmount / tests.length;
-      const perTestDiscount = discountAmount / tests.length;
-      const perTestPaid = paidAmount / tests.length;
       const balanceAmount = (totalAmount - discountAmount) - paidAmount;
-      const perTestBalance = balanceAmount / tests.length;
 
       await prisma.patientTest.createMany({
-        data: tests.map(test => ({
-          patientId,
-          visitId,
-          testId: test.id,
-          packageId: test.packageName ? packageMap.get(test.packageName) : null,  // ✅ Save packageId
-          departmentId: test.departmentId,
-          organizationId: organizationId || null,
-          sample: test.sample || 'Blood',
-          charge: perTestAmount,
-          reportMode: 'EMAIL',
-          referralDoctor: referralDoctor,
-          visitDate: visitDate ? new Date(visitDate) : new Date(),
-          visitTime: '10:00',
-          totalAmount: perTestAmount,
-          discountPercent,
-          discountAmount: perTestDiscount,
-          paidAmount: perTestPaid,
-          balanceAmount: perTestBalance,
-          paymentMode,
-          businessType,
-          status: 'Registered',
-          isOutsourced: test.isOutsourced || false,
-          outsourcedTo: test.outsourcedTo || null
-        }))
+        data: tests.map(test => {
+          // Use individual test charge if available, otherwise divide equally
+          const testCharge = test.b2cCharge || (totalAmount / tests.length);
+          const testDiscount = (test.b2cCharge / totalAmount) * discountAmount;
+          const testPaid = (test.b2cCharge / totalAmount) * paidAmount;
+          const testBalance = (testCharge - testDiscount) - testPaid;
+          
+          return {
+            patientId,
+            visitId,
+            testId: test.id,
+            packageId: test.fromPackage ? packageMap.get(test.fromPackage) : null,
+            departmentId: test.departmentId,
+            organizationId: organizationId || null,
+            sample: test.sample || 'Blood',
+            charge: testCharge,
+            reportMode: 'EMAIL',
+            referralDoctor: referralDoctor,
+            visitDate: visitDate ? new Date(visitDate) : new Date(),
+            visitTime: '10:00',
+            totalAmount: testCharge,
+            discountPercent,
+            discountAmount: testDiscount,
+            paidAmount: testPaid,
+            balanceAmount: testBalance,
+            paymentMode,
+            businessType,
+            status: 'Registered',
+            isOutsourced: test.isOutsourced || false,
+            outsourcedTo: test.outsourcedTo || null
+          };
+        })
       });
 
       // Create payment transaction if payment was made
