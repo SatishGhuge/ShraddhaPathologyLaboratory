@@ -45,20 +45,20 @@ export const importTestsFromExcel = async (buffer) => {
           const departmentName = row[4]?.toString().trim();
           const sampleTypeName = row[5]?.toString().trim() || null;
           const machineNamesRaw = row[6]?.toString().trim() || null; // Multiple machines separated by ;
-          const group = row[7]?.toString().trim() || null;
-          const reportHeader = row[8]?.toString().trim() || null;
-          const preparationType = row[9]?.toString().trim() || null;
-          const isNABL = row[10]?.toString().toLowerCase() === 'yes';
-          const profileTest = row[11]?.toString().toLowerCase() === 'yes';
-          const lineHeight = parseFloat(row[12]) || 1.4;
-          const attachFile = row[13]?.toString().toLowerCase() === 'yes';
-          const imageSize = row[14]?.toString().trim() || '800|600';
-          const outsourceLab = row[15]?.toString().trim() || null;
-          const isActive = row[16]?.toString().toLowerCase() === 'yes';
-          const instructionPreparation = row[17]?.toString().trim() || null;
-          const instructionPatient = row[18]?.toString().trim() || null;
-          const interpretationLabel = row[19]?.toString().trim() || null;
-          const interpretation = row[20]?.toString().trim() || null;
+          const volume = row[7]?.toString().trim() || null;
+          const testMethod = row[8]?.toString().trim() || null;
+          const cutOff = row[9]?.toString().trim() || null;
+          const schedule = row[10]?.toString().trim() || null;
+          const preparationTime = row[11]?.toString().trim() || null;
+          const preparationType = row[12]?.toString().trim() || null;
+          const temperature = row[13]?.toString().trim() || null;
+          const comments = row[14]?.toString().trim() || null;
+          const interpretation = row[15]?.toString().trim() || null;
+          const attachFile = row[16]?.toString().toLowerCase() === 'yes';
+          const imageSize = row[17]?.toString().trim() || '800|600';
+          const profileTest = row[18]?.toString().toLowerCase() === 'yes';
+          const isNABL = row[19]?.toString().toLowerCase() === 'yes';
+          const isActive = row[20]?.toString().toLowerCase() === 'yes';
 
           // Validate required fields
           if (!testName) {
@@ -134,20 +134,20 @@ export const importTestsFromExcel = async (buffer) => {
                 shortName: shortName || existingTest.shortName,
                 testCode: testCode || existingTest.testCode,
                 sampleTypeId: sampleTypeId !== null ? sampleTypeId : existingTest.sampleTypeId,
-                group: group || existingTest.group,
-                reportHeader: reportHeader || existingTest.reportHeader,
+                volume: volume !== null ? volume : existingTest.volume,
+                testMethod: testMethod || existingTest.testMethod,
+                cutOff: cutOff !== null ? cutOff : existingTest.cutOff,
+                schedule: schedule !== null ? schedule : existingTest.schedule,
+                preparationTime: preparationTime !== null ? preparationTime : existingTest.preparationTime,
                 preparationType: preparationType || existingTest.preparationType,
-                isNABL,
-                profileTest,
-                lineHeight,
+                temperature: temperature !== null ? temperature : existingTest.temperature,
+                comments: comments !== null ? comments : existingTest.comments,
+                interpretation: interpretation || existingTest.interpretation,
                 attachFile,
                 imageSize,
-                outsourceLab,
+                profileTest,
+                isNABL,
                 isActive,
-                instructionPreparation,
-                instructionPatient,
-                interpretationLabel,
-                interpretation,
                 updatedAt: new Date()
               }
             });
@@ -164,20 +164,20 @@ export const importTestsFromExcel = async (buffer) => {
                 testCode,
                 departmentId: department.id,
                 sampleTypeId: sampleTypeId || null,
-                group,
-                reportHeader,
+                volume,
+                testMethod,
+                cutOff,
+                schedule,
+                preparationTime,
                 preparationType,
-                isNABL,
-                profileTest,
-                lineHeight,
+                temperature,
+                comments,
+                interpretation,
                 attachFile,
                 imageSize,
-                outsourceLab,
-                isActive,
-                instructionPreparation,
-                instructionPatient,
-                interpretationLabel,
-                interpretation
+                profileTest,
+                isNABL,
+                isActive
               }
             });
             testId = newTest.id;
@@ -257,12 +257,24 @@ export const importTestsFromExcel = async (buffer) => {
           const lowPanic = parseFloat(row[12]) || null;
           const highPanic = parseFloat(row[13]) || null;
           const rangeType = row[14]?.toString().trim() || 'BySex';
-          const maleLowValue = parseFloat(row[15]) || null;
-          const maleHighValue = parseFloat(row[16]) || null;
-          const femaleLowValue = parseFloat(row[17]) || null;
-          const femaleHighValue = parseFloat(row[18]) || null;
-          const childLowValue = parseFloat(row[19]) || null;
-          const childHighValue = parseFloat(row[20]) || null;
+          // ✅ FIX: Use correct column indices 
+          // Columns: 15=MaleLow, 16=MaleHigh, 17=FemaleLow, 18=FemaleHigh, 19=ChildLow, 20=ChildHigh
+          // Array indices (1-based): row[14]=Range Type, row[15]=MaleLow, etc.
+          // ✅ FIX: Store as String (not parseFloat) to match database schema
+          // ✅ FIX: Use != null check to preserve "0" values
+          const maleLowValue = row[15] != null && row[15] !== '' ? row[15]?.toString().trim() : null;
+          const maleHighValue = row[16] != null && row[16] !== '' ? row[16]?.toString().trim() : null;
+          const femaleLowValue = row[17] != null && row[17] !== '' ? row[17]?.toString().trim() : null;
+          const femaleHighValue = row[18] != null && row[18] !== '' ? row[18]?.toString().trim() : null;
+          const childLowValue = row[19] != null && row[19] !== '' ? row[19]?.toString().trim() : null;
+          const childHighValue = row[20] != null && row[20] !== '' ? row[20]?.toString().trim() : null;
+          
+          // DEBUG: Log numeric range extraction
+          console.log(`🔍 DEBUG excelImport Row ${rowIndex} - Parameter "${parameterName}" ranges:`, {
+            extracted: { maleLowValue, maleHighValue, femaleLowValue, femaleHighValue, childLowValue, childHighValue },
+            rawValues: { col15: row[15], col16: row[16], col17: row[17], col18: row[18], col19: row[19], col20: row[20] }
+          });
+          
           const ageRangesRaw = row[21]?.toString().trim() || null;
           const rangeValuesRaw = row[22]?.toString().trim() || null;
           const textContent = row[23]?.toString().trim() || null;
@@ -274,7 +286,7 @@ export const importTestsFromExcel = async (buffer) => {
           const rangeText = row[29]?.toString().trim() || null;
           const isNABL = row[30]?.toString().toLowerCase() === 'yes';
           const isActive = row[31]?.toString().toLowerCase() === 'yes';
-          const parameterSortOrder = parseInt(row[32]) || null;
+          const parameterSortOrder = row[32] ? parseInt(row[32]) : null;
 
           // Parse JSON fields safely
           let ageRanges = null;
@@ -392,7 +404,7 @@ export const importTestsFromExcel = async (buffer) => {
                 displayRangeText,
                 rangeText,
                 isNABL,
-                isActive,
+                isActive: true,  // ✅ ALWAYS active when importing
                 parameterSortOrder
               }
             });
