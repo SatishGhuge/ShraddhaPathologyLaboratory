@@ -999,6 +999,13 @@ export const getAllPatients = async (req, res) => {
                 }
               }
             },
+            package: {
+              select: {
+                id: true,
+                name: true,
+                charges: true
+              }
+            },
             department: true,
             organization: true
           }

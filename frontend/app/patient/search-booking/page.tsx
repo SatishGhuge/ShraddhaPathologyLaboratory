@@ -653,6 +653,7 @@ export default function BookingPage() {
           packageName: t.package?.name || t.packageName || null,
           packageCharge: t.package?.charges || t.packageCharge || 0,
           packageId: t.packageId || null,
+          fromPackage: t.package?.name || t.packageName || null,  // ✅ CRITICAL: Mark if test is from a package
         });
       });
 
@@ -1354,9 +1355,26 @@ export default function BookingPage() {
   // Open BillReceipt modal for printing
   const handlePrintBooking = (b: any) => {
     console.log('🖨️ [Print Button] Clicked for booking:', b.visitId);
-    setSelectedBooking(b);
+    console.log('🖨️ [Print Button] Booking tests:', b.tests);
+    
+    // ✅ FIX: Ensure tests have proper package data for BillReceipt
+    const enrichedBooking = {
+      ...b,
+      tests: (b.tests || []).map((t: any) => ({
+        ...t,
+        // Ensure packageName and fromPackage are set correctly for BillReceipt grouping
+        packageName: t.packageName || t.fromPackage || null,
+        fromPackage: t.packageName || t.fromPackage || null,
+        // Ensure charges are set
+        charge: t.charge || t.b2cCharge || t.b2bCharge || 0,
+        b2cCharge: t.b2cCharge || t.charge || 0,
+        b2bCharge: t.b2bCharge || t.charge || 0
+      }))
+    };
+    
+    setSelectedBooking(enrichedBooking);
     setShowPrintPreview(true);
-    console.log('🖨️ [Print Button] showPrintPreview set to true');
+    console.log('🖨️ [Print Button] Enriched booking tests:', enrichedBooking.tests);
   };
 
   const handleDeleteTest = async (testToDelete: any) => {
@@ -1957,7 +1975,6 @@ export default function BookingPage() {
                             setShowBookingDetailsModal(true);
                           }} className="text-slate-900 hover:bg-orange-400 p-0.5 rounded" title="View Details"><Eye size={14}/></button>
                           <button onClick={()=>{setEditingPatient(b);setFormData(b.patientData);}} className="text-blue-900 hover:bg-orange-400 p-0.5 rounded" title="Edit"><Pencil size={14}/></button>
-                          <button onClick={()=>handlePrintBooking(b)} className="text-red-900 hover:bg-orange-400 p-0.5 rounded" title="Print"><Printer size={12}/></button>
                           <button onClick={()=>handlePrintBarcode(b)} className="bg-white text-slate-900 hover:bg-orange-400 p-0.5 rounded" title="Barcode"><Barcode size={14}/></button>
                           <button onClick={()=>handleRebooking(b)} className="text-green-600 hover:bg-orange-400 p-0.5 rounded" title="Rebook"><RefreshCw size={14}/></button>
                         </div>
@@ -2715,20 +2732,55 @@ export default function BookingPage() {
         </div>
       )}
 
-      {/* ===== BILL RECEIPT MODAL ===== */}
+      {/* ===== BILL RECEIPT MODAL - Using BillReceipt Component ===== */}
       {showPrintPreview && selectedBooking && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999]">
-          <div className="bg-white rounded-lg shadow-2xl w-[98%] h-[95vh] max-w-[210mm] flex flex-col overflow-hidden">
-            {/* Minimal Header with Close Button */}
-            <div className="flex items-center justify-end p-2 border-b bg-white">
-              <button
-                onClick={() => setShowPrintPreview(false)}
-                className="text-gray-500 hover:text-gray-800 text-2xl font-bold px-2"
-              >✕</button>
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999] p-2 sm:p-4">
+          <div className="bg-white rounded-lg shadow-2xl w-full max-w-[210mm] max-h-[95vh] flex flex-col overflow-hidden">
+            {/* Minimal Header with Close and Print */}
+            <div className="flex items-center justify-between px-4 sm:px-6 py-3 border-b border-gray-300 bg-gradient-to-r from-gray-800 to-gray-700 rounded-t-lg print:hidden">
+              <h2 className="text-xs sm:text-sm font-bold text-white truncate">
+                BILL - {selectedBooking.name}
+              </h2>
+              <div className="flex gap-2 ml-4">
+                <button
+                  onClick={() => {
+                    const billDiv = document.getElementById('bill-receipt-wrapper');
+                    if (billDiv) {
+                      const printWindow = window.open('', '_blank');
+                      if (!printWindow) return;
+                      printWindow.document.write(`
+                        <!DOCTYPE html>
+                        <html>
+                        <head>
+                          <style>
+                            * { margin: 0; padding: 0; box-sizing: border-box; }
+                            body { font-family: Arial, sans-serif; background: white; padding: 20px; }
+                            @media print { body { padding: 0; } }
+                          </style>
+                        </head>
+                        <body>${billDiv.innerHTML}</body>
+                        </html>
+                      `);
+                      printWindow.document.close();
+                      setTimeout(() => printWindow.print(), 500);
+                    }
+                  }}
+                  className="whitespace-nowrap text-white bg-blue-600 hover:bg-blue-700 active:bg-blue-800 px-3 py-1.5 rounded text-xs font-semibold transition shadow-md"
+                >
+                  🖨️ Print
+                </button>
+                <button
+                  onClick={() => setShowPrintPreview(false)}
+                  className="text-gray-300 hover:text-white active:text-gray-100 text-2xl font-light leading-none p-1 transition"
+                  title="Close"
+                >
+                  ✕
+                </button>
+              </div>
             </div>
 
-            {/* BillReceipt Content (Full Paper Width) */}
-            <div className="flex-1 overflow-auto bg-white" style={{ pageSize: 'A4', fontSize: '12px' }}>
+            {/* Bill Receipt Component - Scrollable */}
+            <div id="bill-receipt-wrapper" className="flex-1 overflow-y-auto bg-white">
               <BillReceipt
                 booking={selectedBooking}
                 billing={{
@@ -2736,11 +2788,11 @@ export default function BookingPage() {
                     (sum: number, t: any) => sum + (businessType === "B2C" ? (t.b2cCharge || t.charge || 0) : (t.b2bCharge || t.charge || 0)),
                     0
                   ),
-                  totalDiscount: parseFloat(billing.discount) || 0,
-                  totalPaid: parseFloat(billing.advance) || parseFloat(billing.payment) || 0,
+                  totalDiscount: selectedBooking.discountAmount || parseFloat(billing.discount) || 0,
+                  totalPaid: selectedBooking.paidAmount || parseFloat(billing.advance) || parseFloat(billing.payment) || 0,
                   balanceAmount: selectedBooking.balanceAmount || 0,
-                  discountPercent: parseFloat(billing.discountPercent) || 0,
-                  paymentMode: billing.paymentMode || 'Cash'
+                  discountPercent: selectedBooking.discountPercent || parseFloat(billing.discountPercent) || 0,
+                  paymentMode: selectedBooking.paymentMode || billing.paymentMode || 'Cash'
                 }}
                 businessType={businessType}
                 numberToWords={numberToWords}

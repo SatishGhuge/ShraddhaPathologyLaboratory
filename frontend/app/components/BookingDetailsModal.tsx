@@ -1450,7 +1450,7 @@ const BookingDetailsModal: React.FC<BookingDetailsModalProps> = ({
                       b2bCharge: t.b2bCharge || t.charge,
                       packageName: t.packageName || null,
                       packageCharge: t.packageCharge || 0,
-                      fromPackage: t.packageName ? true : false
+                      fromPackage: t.packageName || null  // ✅ FIX: Should be package NAME, not boolean
                     })),
                     patientData: {
                       title: booking.patientData?.title || '',

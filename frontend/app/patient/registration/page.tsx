@@ -3695,23 +3695,22 @@ export default function PatientRegistration() {
 
       </div>
 
-      {/* BILL MODAL - Using BillReceipt Component */}
+      {/* BILL RECEIPT MODAL - Using BillReceipt Component */}
       {showBillModal && billData && (
-        <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] flex flex-col">
-            {/* Header */}
-            <div className="flex items-center justify-between px-5 py-3 border-b bg-gray-800 rounded-t-lg print:hidden">
-              <h2 className="text-sm font-semibold text-white">Bill - {`${title} ${firstName} ${lastName || ''}`.trim()}</h2>
-              <div className="flex gap-2">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999] p-2 sm:p-4">
+          <div className="bg-white rounded-lg shadow-2xl w-full max-w-[210mm] max-h-[95vh] flex flex-col overflow-hidden">
+            {/* Minimal Header with Close and Print */}
+            <div className="flex items-center justify-between px-4 sm:px-6 py-3 border-b border-gray-300 bg-gradient-to-r from-gray-800 to-gray-700 rounded-t-lg print:hidden">
+              <h2 className="text-xs sm:text-sm font-bold text-white truncate">
+                BILL - {`${title} ${firstName} ${lastName || ''}`.trim()}
+              </h2>
+              <div className="flex gap-2 ml-4">
                 <button
                   onClick={() => {
-                    const printWindow = window.open('', '_blank');
-                    if (!printWindow) {
-                      console.error('Could not open print window');
-                      return;
-                    }
-                    const billDiv = document.getElementById('bill-modal-content');
+                    const billDiv = document.getElementById('bill-receipt-wrapper');
                     if (billDiv) {
+                      const printWindow = window.open('', '_blank');
+                      if (!printWindow) return;
                       printWindow.document.write(`
                         <!DOCTYPE html>
                         <html>
@@ -3726,31 +3725,28 @@ export default function PatientRegistration() {
                         </html>
                       `);
                       printWindow.document.close();
-                      setTimeout(() => {
-                        printWindow.print();
-                      }, 500);
+                      setTimeout(() => printWindow.print(), 500);
                     }
                   }}
-                  className="text-white bg-blue-600 hover:bg-blue-700 px-3 py-1 rounded text-xs font-semibold transition"
+                  className="whitespace-nowrap text-white bg-blue-600 hover:bg-blue-700 active:bg-blue-800 px-3 py-1.5 rounded text-xs font-semibold transition shadow-md"
                 >
-                  Print
+                  🖨️ Print
                 </button>
                 <button
                   onClick={() => setShowBillModal(false)}
-                  className="text-gray-300 hover:text-white text-xl font-bold leading-none px-2"
+                  className="text-gray-300 hover:text-white active:text-gray-100 text-2xl font-light leading-none p-1 transition"
+                  title="Close"
                 >
-                  ×
+                  ✕
                 </button>
               </div>
             </div>
 
-            {/* Bill Content */}
-            <div id="bill-modal-content">
+            {/* Bill Receipt Component - Scrollable */}
+            <div id="bill-receipt-wrapper" className="flex-1 overflow-y-auto bg-white">
               <BillReceipt
                 booking={{
-                  bookingId: `REG-${Date.now()}`,
                   visitId: lastRegisteredVisitId || `VIS-${Date.now()}`,
-                  patientId: existingPatientId || `NEW-${Date.now()}`,
                   name: `${title} ${firstName} ${lastName || ''}`.trim(),
                   date: new Date(date).toLocaleDateString("en-GB"),
                   tests: selectedTests.map(t => ({
@@ -3771,7 +3767,6 @@ export default function PatientRegistration() {
                     gender,
                     mobile,
                     referralDoctor: isManualRefDoctor ? manualRefDoctorName : refDoctor || '',
-                    remark: remarks
                   }
                 }}
                 billing={{
