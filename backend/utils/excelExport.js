@@ -13,14 +13,13 @@ export const exportTestsToExcel = async () => {
       include: {
         department: { select: { id: true, name: true } },
         sample_type: { select: { id: true, Sample_Type: true } },
-        ownedParameters: {
-          include: {
-            unit: { select: { id: true, symbol: true } }
-          }
-        },
         categories: {
           include: {
-            testParameter: { select: { id: true, parameterName: true } }
+            testParameter: {
+              include: {
+                unit: { select: { id: true, symbol: true } }
+              }
+            }
           }
         },
         testMachines: {
@@ -45,20 +44,20 @@ export const exportTestsToExcel = async () => {
       { header: 'Department', key: 'department', width: 20 },
       { header: 'Sample Type', key: 'sampleType', width: 15 },
       { header: 'Machine Names', key: 'machineNames', width: 25 },
-      { header: 'Group', key: 'group', width: 15 },
-      { header: 'Report Header', key: 'reportHeader', width: 20 },
+      { header: 'Volume', key: 'volume', width: 12 },
+      { header: 'Test Method', key: 'testMethod', width: 15 },
+      { header: 'Cut Off', key: 'cutOff', width: 12 },
+      { header: 'Schedule', key: 'schedule', width: 15 },
+      { header: 'Preparation Time', key: 'preparationTime', width: 15 },
       { header: 'Preparation Type', key: 'preparationType', width: 15 },
-      { header: 'Is NABL', key: 'isNABL', width: 10 },
-      { header: 'Profile Test', key: 'profileTest', width: 10 },
-      { header: 'Line Height', key: 'lineHeight', width: 10 },
+      { header: 'Temperature', key: 'temperature', width: 15 },
+      { header: 'Comments', key: 'comments', width: 30 },
+      { header: 'Interpretation', key: 'interpretation', width: 30 },
       { header: 'Attach File', key: 'attachFile', width: 10 },
       { header: 'Image Size', key: 'imageSize', width: 15 },
-      { header: 'Outsource Lab', key: 'outsourceLab', width: 15 },
-      { header: 'Is Active', key: 'isActive', width: 10 },
-      { header: 'Instructions Preparation', key: 'instructionPreparation', width: 30 },
-      { header: 'Instructions Patient', key: 'instructionPatient', width: 30 },
-      { header: 'Interpretation Label', key: 'interpretationLabel', width: 20 },
-      { header: 'Interpretation', key: 'interpretation', width: 30 }
+      { header: 'Profile Test', key: 'profileTest', width: 10 },
+      { header: 'Is NABL', key: 'isNABL', width: 10 },
+      { header: 'Is Active', key: 'isActive', width: 10 }
     ];
 
     // Add test rows
@@ -73,20 +72,20 @@ export const exportTestsToExcel = async () => {
         department: test.department?.name || '',
         sampleType: test.sample_type?.Sample_Type || '',
         machineNames: machineNames,
-        group: test.group || '',
-        reportHeader: test.reportHeader || '',
+        volume: test.volume || '',
+        testMethod: test.testMethod || '',
+        cutOff: test.cutOff || '',
+        schedule: test.schedule || '',
+        preparationTime: test.preparationTime || '',
         preparationType: test.preparationType || '',
-        isNABL: test.isNABL ? 'Yes' : 'No',
-        profileTest: test.profileTest ? 'Yes' : 'No',
-        lineHeight: test.lineHeight || 1.4,
+        temperature: test.temperature || '',
+        comments: test.comments || '',
+        interpretation: test.interpretation || '',
         attachFile: test.attachFile ? 'Yes' : 'No',
         imageSize: test.imageSize || '800|600',
-        outsourceLab: test.outsourceLab || '',
-        isActive: test.isActive ? 'Yes' : 'No',
-        instructionPreparation: test.instructionPreparation || '',
-        instructionPatient: test.instructionPatient || '',
-        interpretationLabel: test.interpretationLabel || '',
-        interpretation: test.interpretation || ''
+        profileTest: test.profileTest ? 'Yes' : 'No',
+        isNABL: test.isNABL ? 'Yes' : 'No',
+        isActive: test.isActive ? 'Yes' : 'No'
       });
     });
 
@@ -135,7 +134,10 @@ export const exportTestsToExcel = async () => {
 
     // Add parameter rows
     tests.forEach(test => {
-      test.ownedParameters?.forEach(param => {
+      test.categories?.forEach(cat => {
+        const param = cat.testParameter;
+        if (!param) return;  // Skip if no parameter
+        
         parametersSheet.addRow({
           testName: test.name,
           parameterName: param.parameterName,

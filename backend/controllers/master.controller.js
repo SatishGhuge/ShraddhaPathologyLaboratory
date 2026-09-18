@@ -1,6 +1,7 @@
 import prisma from '../config/database.js';
 import { sendUserCredentialsEmail, sendFranchiseCredentialsEmail, sendCenterCredentialsEmail, sendStaffCredentialsEmail, sendOrganizationCredentialsEmail, sendAccountUpdateEmail } from '../utils/email.js';
 import { getPaginationParams, buildPaginatedResponse } from '../utils/pagination.js';
+import { importTestsFromExcel } from '../utils/excelImport.js';
 
 // Helper function to generate random password
 function generateRandomPassword(length = 10) {
@@ -6095,75 +6096,32 @@ export const exportTests = async (req, res) => {
 
 export const importTests = async (req, res) => {
   try {
-
     if (!req.file) {
       return res.status(400).json({
         success: false,
-        message: 'No file uploaded',
-        data: { errors: ['No file provided'] }
+        message: 'No file uploaded'
       });
     }
 
-    // Validate file type
-    if (!req.file.mimetype.includes('spreadsheet') && !req.file.originalname.endsWith('.xlsx')) {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid file format. Please upload an Excel file (.xlsx)',
-        data: { errors: ['File must be Excel format (.xlsx)'] }
-      });
-    }
+    console.log('📥 Importing tests from:', req.file.originalname);
 
-    // Import utilities
-    const { importTestsFromExcel } = await import('../utils/excelImport.js');
-    const { validateExcelFile } = await import('../utils/excelValidation.js');
-    const ExcelJS = await import('exceljs');
-
-    // Load workbook
-    const workbook = new ExcelJS.default.Workbook();
-    await workbook.xlsx.load(req.file.buffer);
-
-    const testsSheet = workbook.getWorksheet('Tests');
-    const parametersSheet = workbook.getWorksheet('Parameters');
-    const categoriesSheet = workbook.getWorksheet('Categories');
-
-    // Pre-validate file structure
-    const preValidation = await validateExcelFile(testsSheet, parametersSheet, categoriesSheet);
-
-    if (!preValidation.isValid) {
-      return res.status(400).json({
-        success: false,
-        message: 'Excel file validation failed',
-        data: {
-          errors: preValidation.errors,
-          warnings: preValidation.warnings,
-          stats: preValidation.stats
-        }
-      });
-    }
-
-    // Process the file
+    // Call the import function
     const result = await importTestsFromExcel(req.file.buffer);
 
+    console.log('✅ Import result:', result);
+
     res.json({
-      success: result.success,
-      message: result.message,
-      data: {
-        created: result.created,
-        updated: result.updated,
-        errors: result.errors,
-        warnings: result.warnings,
-        totalErrors: result.errors.length,
-        totalWarnings: result.warnings.length,
-        summary: `Created ${result.created.tests} tests, ${result.created.parameters} parameters, ${result.created.categories} categories. Updated ${result.updated.tests} tests, ${result.updated.parameters} parameters, ${result.updated.categories} categories.`
-      }
+      success: true,
+      message: 'Tests imported successfully',
+      data: result
     });
 
   } catch (error) {
+    console.error('❌ Import error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to import tests',
-      error: error.message,
-      data: { errors: [error.message] }
+      error: error.message
     });
   }
 };
@@ -6571,4 +6529,3 @@ export const deleteTestParameter = async (req, res) => {
     });
   }
 };
-
